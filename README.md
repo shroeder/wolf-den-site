@@ -1,4 +1,4 @@
-# Wolf Den Cards Site
+# The Wolf Den Site
 
 Conversion-focused Next.js MVP for a local trading card store in Montgomery, MN.
 

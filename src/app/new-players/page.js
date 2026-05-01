@@ -1,4 +1,4 @@
-export const metadata = { title: "New Players & Parents | Wolf Den Cards" };
+export const metadata = { title: "New Players & Parents | The Wolf Den" };
 
 export default function NewPlayersPage() {
     return (

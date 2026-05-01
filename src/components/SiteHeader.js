@@ -24,12 +24,12 @@ export default function SiteHeader() {
                     <Image
                         className="brand-mark"
                         src="/logo/logo.png"
-                        alt="Wolf Den Cards logo"
+                        alt="The Wolf Den logo"
                         width={1536}
                         height={1024}
                         priority
                     />
-                    <span>Wolf Den Cards</span>
+                    <span>The Wolf Den</span>
                 </Link>
                 <a className="pill nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
                     Join Discord

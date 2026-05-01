@@ -1,4 +1,4 @@
-export const metadata = { title: "FAQ | Wolf Den Cards" };
+export const metadata = { title: "FAQ | The Wolf Den" };
 
 const faqs = [
     ["Are you open yet?", "Soft opening is planned for May 2026."],

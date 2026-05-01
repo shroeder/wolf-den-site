@@ -1,4 +1,4 @@
-export const metadata = { title: "Community | Wolf Den Cards" };
+export const metadata = { title: "Community | The Wolf Den" };
 
 export default function CommunityPage() {
     return (

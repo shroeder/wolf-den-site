@@ -11,12 +11,12 @@ export default function HomePage() {
                 <Image
                     className="hero-logo"
                     src="/logo/wolf-den-full-logo.png"
-                    alt="Wolf Den Cards"
+                    alt="The Wolf Den"
                     width={420}
                     height={280}
                     priority
                 />
-                <h1 className="sr-only">Wolf Den Cards</h1>
+                <h1 className="sr-only">The Wolf Den</h1>
                 <p className="lead">
                     Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN.
                 </p>

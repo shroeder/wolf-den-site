@@ -1,7 +1,7 @@
 {
   "name": "wolf-den-site",
   "version": "1.0.0",
-  "description": "Wolf Den Cards local game store website",
+  "description": "The Wolf Den local game store website",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

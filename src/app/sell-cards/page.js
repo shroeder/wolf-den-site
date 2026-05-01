@@ -1,4 +1,4 @@
-export const metadata = { title: "Sell Your Cards | Wolf Den Cards" };
+export const metadata = { title: "Sell Your Cards | The Wolf Den" };
 
 export default function SellCardsPage() {
     return (

@@ -9,7 +9,7 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
     const event = getEventBySlug(params.slug);
     return {
-        title: event ? `${event.title} | Wolf Den Cards` : "Event | Wolf Den Cards",
+        title: event ? `${event.title} | The Wolf Den` : "Event | The Wolf Den",
     };
 }
 

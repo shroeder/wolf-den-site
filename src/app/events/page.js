@@ -1,6 +1,6 @@
 import { events } from "@/lib/events";
 
-export const metadata = { title: "Events | Wolf Den Cards" };
+export const metadata = { title: "Events | The Wolf Den" };
 
 export default function EventsPage() {
     return (

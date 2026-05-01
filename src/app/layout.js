@@ -14,7 +14,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-    title: "Wolf Den Cards",
+    title: "The Wolf Den",
     description:
         "Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN.",
 };

@@ -5,7 +5,7 @@ export default function SiteFooter() {
         <footer className="site-footer">
             <div className="shell footer-grid">
                 <div>
-                    <h3>Wolf Den Cards</h3>
+                    <h3>The Wolf Den</h3>
                     <p>Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN.</p>
                 </div>
                 <div>
