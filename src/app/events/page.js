@@ -1,6 +1,9 @@
 import { events } from "@/lib/events";
 
-export const metadata = { title: "Events | The Wolf Den" };
+export const metadata = {
+    title: "Events",
+    description: "View upcoming tournaments, weekly leagues, and beginner play nights at The Wolf Den in Montgomery, MN.",
+};
 
 export default function EventsPage() {
     return (

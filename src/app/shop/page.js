@@ -1,4 +1,7 @@
-export const metadata = { title: "Shop | The Wolf Den" };
+export const metadata = {
+    title: "Shop",
+    description: "Browse Pokemon, Magic, and collectible trading card singles, sealed product, and accessories at The Wolf Den in Montgomery, MN.",
+};
 
 export default function ShopPage() {
     return (

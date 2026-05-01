@@ -1,4 +1,7 @@
-export const metadata = { title: "Contact | The Wolf Den" };
+export const metadata = {
+    title: "Contact",
+    description: "Get in touch with The Wolf Den in Montgomery, MN. Find our address, hours, phone number, and contact form.",
+};
 
 export default function ContactPage() {
     return (

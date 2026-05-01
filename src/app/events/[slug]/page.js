@@ -9,7 +9,10 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
     const event = getEventBySlug(params.slug);
     return {
-        title: event ? `${event.title} | The Wolf Den` : "Event | The Wolf Den",
+        title: event ? event.title : "Event",
+        description: event
+            ? `${event.title} at The Wolf Den in Montgomery, MN. Join us for trading card events, tournaments, and local play.`
+            : "Event details at The Wolf Den in Montgomery, MN.",
     };
 }
 

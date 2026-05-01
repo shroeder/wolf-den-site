@@ -1,4 +1,7 @@
-export const metadata = { title: "FAQ | The Wolf Den" };
+export const metadata = {
+    title: "FAQ",
+    description: "Answers to common questions about The Wolf Den — hours, buying cards, upcoming events, and more.",
+};
 
 const faqs = [
     ["Are you open yet?", "Soft opening is planned for May 2026."],
