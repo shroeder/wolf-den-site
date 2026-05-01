@@ -68,6 +68,8 @@ const localBusinessSchema = {
         latitude: 44.4383,
         longitude: -93.5836,
     },
+    image: "https://wolfdengamingmn.com/logo/wolf-den-full-logo.png",
+    priceRange: "$$",
     openingHoursSpecification: [
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "16:00", closes: "19:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "16:00", closes: "19:00" },
