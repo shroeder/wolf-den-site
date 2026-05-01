@@ -20,6 +20,11 @@ export const metadata = {
         default: "The Wolf Den",
         template: "%s | The Wolf Den",
     },
+    icons: {
+        icon: "/logo/logo.png",
+        shortcut: "/logo/logo.png",
+        apple: "/logo/logo.png",
+    },
     description:
         "Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN. Your local Pokemon and Magic: The Gathering shop.",
     keywords: ["trading cards", "Pokemon", "Magic The Gathering", "card shop", "Montgomery MN", "singles", "sealed product", "local game store", "LGS"],
