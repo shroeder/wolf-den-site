@@ -6,8 +6,9 @@ export function generateStaticParams() {
     return events.map((event) => ({ slug: event.slug }));
 }
 
-export function generateMetadata({ params }) {
-    const event = getEventBySlug(params.slug);
+export async function generateMetadata({ params }) {
+    const { slug } = await params;
+    const event = getEventBySlug(slug);
     return {
         title: event ? event.title : "Event",
         description: event
@@ -19,8 +20,9 @@ export function generateMetadata({ params }) {
     };
 }
 
-export default function EventDetailPage({ params }) {
-    const event = getEventBySlug(params.slug);
+export default async function EventDetailPage({ params }) {
+    const { slug } = await params;
+    const event = getEventBySlug(slug);
 
     if (!event) {
         notFound();
