@@ -50,6 +50,9 @@ export default function MagicTheGatheringPage() {
                     <h2>Weekly Play</h2>
                     <ul>
                         <li>Friday Night Magic events</li>
+                        <li>
+                            <Link href="/events/fnm-draft-night">Draft Night every Friday (typical MTG night)</Link>
+                        </li>
                         <li>Casual Commander nights</li>
                         <li>Beginner-friendly support and pairings</li>
                     </ul>
