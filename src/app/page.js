@@ -3,6 +3,12 @@ import Link from "next/link";
 
 const categories = ["Pokemon", "Magic", "Singles", "Accessories", "Events"];
 
+export const metadata = {
+    alternates: {
+        canonical: "/",
+    },
+};
+
 export default function HomePage() {
     return (
         <div className="stack reveal">

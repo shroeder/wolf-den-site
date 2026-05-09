@@ -1,6 +1,9 @@
 export const metadata = {
     title: "Community",
     description: "Join The Wolf Den community in Montgomery, MN — Discord server, local events, and a welcoming trading card game scene.",
+    alternates: {
+        canonical: "/community",
+    },
 };
 
 export default function CommunityPage() {

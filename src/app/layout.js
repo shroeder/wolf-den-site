@@ -50,9 +50,6 @@ export const metadata = {
         "local game store",
         "LGS",
     ],
-    alternates: {
-        canonical: "/",
-    },
     openGraph: {
         type: "website",
         siteName: "The Wolf Den",

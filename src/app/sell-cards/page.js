@@ -1,6 +1,9 @@
 export const metadata = {
     title: "Sell Your Cards",
     description: "Sell your Pokemon, Magic, and collectible cards at The Wolf Den in Montgomery, MN. We offer cash or store credit for singles and collections.",
+    alternates: {
+        canonical: "/sell-cards",
+    },
 };
 
 export default function SellCardsPage() {

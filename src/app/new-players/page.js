@@ -1,6 +1,9 @@
 export const metadata = {
     title: "New Players & Parents",
     description: "New to trading card games? The Wolf Den in Montgomery, MN welcomes beginners with friendly events, starter resources, and a welcoming community.",
+    alternates: {
+        canonical: "/new-players",
+    },
 };
 
 export default function NewPlayersPage() {
