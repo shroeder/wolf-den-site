@@ -1,6 +1,10 @@
 export const metadata = {
     title: "FAQ",
-    description: "Answers to common questions about The Wolf Den — hours, buying cards, upcoming events, and more.",
+    description:
+        "Answers about Pokemon and Magic at The Wolf Den in Montgomery, MN, including card buying, events, inventory, and local pickup.",
+    alternates: {
+        canonical: "/faq",
+    },
 };
 
 const faqs = [
@@ -15,9 +19,26 @@ const faqs = [
     ["Do you offer local pickup?", "Yes, local pickup is available during business hours."],
 ];
 
+const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map(([question, answer]) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: {
+            "@type": "Answer",
+            text: answer,
+        },
+    })),
+};
+
 export default function FaqPage() {
     return (
         <div className="stack reveal">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+            />
             <section className="card">
                 <h1>FAQ</h1>
                 <p>Quick answers for the most common store and event questions.</p>

@@ -11,8 +11,11 @@ export function generateMetadata({ params }) {
     return {
         title: event ? event.title : "Event",
         description: event
-            ? `${event.title} at The Wolf Den in Montgomery, MN. Join us for trading card events, tournaments, and local play.`
+            ? `${event.title} at The Wolf Den in Montgomery, MN. Join us for Pokemon and Magic events, tournaments, and local play.`
             : "Event details at The Wolf Den in Montgomery, MN.",
+        alternates: {
+            canonical: event ? `/events/${event.slug}` : "/events",
+        },
     };
 }
 
@@ -23,8 +26,55 @@ export default function EventDetailPage({ params }) {
         notFound();
     }
 
+    const hasValidStartDate = !Number.isNaN(Date.parse(event.date));
+    const eventSchema = {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        name: event.title,
+        description: event.description,
+        eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+        eventStatus: "https://schema.org/EventScheduled",
+        url: `https://wolfdengamingmn.com/events/${event.slug}`,
+        location: {
+            "@type": "Place",
+            name: "The Wolf Den",
+            address: {
+                "@type": "PostalAddress",
+                streetAddress: "300 1st St S",
+                addressLocality: "Montgomery",
+                addressRegion: "MN",
+                postalCode: "56069",
+                addressCountry: "US",
+            },
+        },
+        organizer: {
+            "@type": "Organization",
+            name: "The Wolf Den",
+            url: "https://wolfdengamingmn.com",
+        },
+        offers: {
+            "@type": "Offer",
+            price: event.entryFee === "Free" ? "0" : undefined,
+            priceCurrency: "USD",
+            availability: "https://schema.org/InStock",
+            url: "https://discord.gg/Pad8U2KVsD",
+        },
+    };
+
+    if (hasValidStartDate) {
+        eventSchema.startDate = new Date(event.date).toISOString();
+    }
+
+    if (event.entryFee !== "Free") {
+        delete eventSchema.offers.price;
+    }
+
     return (
         <div className="stack reveal">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(eventSchema) }}
+            />
             <section className="card">
                 <h1>{event.title}</h1>
                 <p>

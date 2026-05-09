@@ -2,7 +2,11 @@ import { events } from "@/lib/events";
 
 export const metadata = {
     title: "Events",
-    description: "View upcoming tournaments, weekly leagues, and beginner play nights at The Wolf Den in Montgomery, MN.",
+    description:
+        "Pokemon League, Friday Night Magic, tournaments, and beginner play nights at The Wolf Den in Montgomery, MN.",
+    alternates: {
+        canonical: "/events",
+    },
 };
 
 export default function EventsPage() {
@@ -11,7 +15,7 @@ export default function EventsPage() {
             <section className="card">
                 <h1>Upcoming Events</h1>
                 <p>
-                    Join Discord for event updates, waitlist announcements, and last-minute seat changes.
+                    Join Discord for Pokemon League, Friday Night Magic, waitlist announcements, and last-minute seat changes.
                 </p>
             </section>
 

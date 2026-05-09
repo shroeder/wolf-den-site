@@ -1,6 +1,10 @@
 export const metadata = {
     title: "Shop",
-    description: "Browse Pokemon, Magic, and collectible trading card singles, sealed product, and accessories at The Wolf Den in Montgomery, MN.",
+    description:
+        "Browse Pokemon, Magic, and collectible trading card singles, sealed product, and accessories at The Wolf Den in Montgomery, MN, near New Prague, Lonsdale, and Le Sueur.",
+    alternates: {
+        canonical: "/shop",
+    },
 };
 
 export default function ShopPage() {
@@ -9,7 +13,7 @@ export default function ShopPage() {
             <section className="card">
                 <h1>Shop Inventory</h1>
                 <p>
-                    Shopify can power products while this site handles your marketing and event conversion paths.
+                    Shopify can power products while this site handles your marketing and event conversion paths for players in Montgomery and nearby towns.
                 </p>
             </section>
 

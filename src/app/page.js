@@ -64,6 +64,20 @@ export default function HomePage() {
 
             <section className="grid three-col">
                 <article className="card lift">
+                    <h2>Pokemon Cards</h2>
+                    <p>Browse Pokemon singles, sealed product, and beginner-friendly local league play.</p>
+                    <Link className="text-link" href="/pokemon-cards">
+                        Explore Pokemon
+                    </Link>
+                </article>
+                <article className="card lift">
+                    <h2>Magic: The Gathering</h2>
+                    <p>Find MTG singles, sealed products, and Friday Night Magic updates.</p>
+                    <Link className="text-link" href="/magic-the-gathering">
+                        Explore Magic
+                    </Link>
+                </article>
+                <article className="card lift">
                     <h2>Shop Inventory</h2>
                     <p>Sealed product, accessories, and featured singles online at launch.</p>
                     <Link className="text-link" href="/shop">

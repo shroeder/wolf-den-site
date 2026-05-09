@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 const navItems = [
+    { href: "/pokemon-cards", label: "Pokemon Cards" },
+    { href: "/magic-the-gathering", label: "Magic: The Gathering" },
     { href: "/shop", label: "Shop" },
     { href: "/events", label: "Events" },
     { href: "/sell-cards", label: "Sell Your Cards" },

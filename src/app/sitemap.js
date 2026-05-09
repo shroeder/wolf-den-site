@@ -5,6 +5,8 @@ const BASE_URL = "https://wolfdengamingmn.com";
 export default function sitemap() {
     const staticRoutes = [
         { url: BASE_URL, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
+        { url: `${BASE_URL}/pokemon-cards`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
+        { url: `${BASE_URL}/magic-the-gathering`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
         { url: `${BASE_URL}/events`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.9 },
         { url: `${BASE_URL}/shop`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
         { url: `${BASE_URL}/sell-cards`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
