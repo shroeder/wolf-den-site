@@ -1,7 +1,10 @@
+import Image from "next/image";
+import Link from "next/link";
+
 export const metadata = {
-    title: "Shop",
+    title: "Pokemon, MTG & Accessories",
     description:
-        "Browse Pokemon, Magic, and collectible trading card singles, sealed product, and accessories at The Wolf Den in Montgomery, MN, near New Prague, Lonsdale, and Le Sueur.",
+        "Shop Pokemon cards, Magic: The Gathering, sealed product, singles, and accessories at The Wolf Den in Montgomery, MN, serving players across southern Minnesota.",
     alternates: {
         canonical: "/shop",
     },
@@ -10,39 +13,84 @@ export const metadata = {
 export default function ShopPage() {
     return (
         <div className="stack reveal">
-            <section className="card">
+            <section className="card hero-accent">
                 <h1>Shop Inventory</h1>
                 <p>
-                    Shopify can power products while this site handles your marketing and event conversion paths for players in Montgomery and nearby towns.
+                    The Wolf Den is building a local source for Pokemon cards, Magic: The Gathering, sealed product, singles, and accessories in Montgomery, Minnesota.
+                </p>
+                <p>
+                    Our inventory rotates based on releases, distributor availability, local trade-ins, and in-store demand. As the store grows, online inventory will continue expanding for players across southern Minnesota.
                 </p>
             </section>
 
             <section className="grid two-col">
                 <article className="card lift">
                     <h2>Sealed Product</h2>
-                    <p>Launch online with sealed Pokemon and Magic product.</p>
+                    <p>Current Pokemon and Magic releases, ETBs, booster boxes, bundles, commander decks, and other sealed product will be a major focus.</p>
                 </article>
                 <article className="card lift">
                     <h2>Singles</h2>
-                    <p>Feature high-demand singles/slabs online. Keep bulk singles marked in-store.</p>
+                    <p>We are growing a local singles selection for collectors and players who want a nearby option instead of a long drive to larger markets.</p>
                 </article>
                 <article className="card lift">
                     <h2>Accessories</h2>
-                    <p>Sleeves, deck boxes, binders, and playmats with local pickup options.</p>
+                    <p>Sleeves, deck boxes, binders, playmats, and other supplies are part of the core in-store lineup for new and returning players.</p>
                 </article>
                 <article className="card lift">
-                    <h2>Preorders / Allocations</h2>
-                    <p>Collect interest early and manage limits clearly by account.</p>
+                    <h2>Trade-Ins and Buylist Opportunities</h2>
+                    <p>Local trade-ins help expand inventory and keep the shop connected to the community. Cash and store credit offers are available on qualifying cards and collections.</p>
+                </article>
+            </section>
+
+            <section className="grid two-col">
+                <article className="card lift">
+                    <h2>Singles and Case Inventory</h2>
+                    <Image
+                        src="/images/pokemon-singles-case-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon and TCG singles displayed in-store at The Wolf Den in Montgomery, Minnesota"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
+                </article>
+                <article className="card lift">
+                    <h2>Product Shelves</h2>
+                    <Image
+                        src="/images/pokemon-etbs-and-sealed-product-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon and trading card product shelves inside The Wolf Den"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
                 </article>
             </section>
 
             <section className="card">
-                <h2>Launch Workflow</h2>
+                <h2>What to Expect as Inventory Grows</h2>
                 <ul>
-                    <li>Start with sealed and accessories online.</li>
-                    <li>Add curated singles rather than full real-time singles inventory.</li>
-                    <li>Keep a visible buylist/contact flow to source local inventory.</li>
+                    <li>Rotating sealed Pokemon and Magic product</li>
+                    <li>Curated singles and in-store case inventory</li>
+                    <li>Accessories and supplies for local play</li>
+                    <li>Preorder and release-day updates through Discord</li>
+                    <li>More online inventory as the storefront grows</li>
                 </ul>
+            </section>
+
+            <section className="card">
+                <h2>Serving Southern Minnesota Shoppers</h2>
+                <p>
+                    The Wolf Den serves Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and nearby southern Minnesota communities looking for a real local game store with real shelf inventory.
+                </p>
+                <div className="cta-row">
+                    <Link className="button primary" href="/sell-cards">
+                        Sell or Trade Cards
+                    </Link>
+                    <a className="button" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
+                        Join Discord for Inventory Updates
+                    </a>
+                </div>
             </section>
         </div>
     );

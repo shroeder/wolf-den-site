@@ -6,11 +6,14 @@ export default function SiteFooter() {
             <div className="shell footer-grid">
                 <div>
                     <h3>The Wolf Den</h3>
-                    <p>Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN.</p>
+                    <p>Locally owned trading card game store in Montgomery, MN serving southern Minnesota players and collectors.</p>
                 </div>
                 <div>
                     <h3>Top Actions</h3>
                     <ul>
+                        <li>
+                            <Link href="/about">About The Wolf Den</Link>
+                        </li>
                         <li>
                             <Link href="/pokemon-cards">Pokemon Cards</Link>
                         </li>
@@ -38,6 +41,7 @@ export default function SiteFooter() {
                     <p>300 1st St S, Montgomery, MN 56069</p>
                     <p>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm</p>
                     <p>Soft opening: May 2026</p>
+                    <p>Serving Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, and Belle Plaine.</p>
                 </div>
             </div>
         </footer>

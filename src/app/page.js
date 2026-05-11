@@ -4,6 +4,18 @@ import Link from "next/link";
 const categories = ["Pokemon", "Magic", "Singles", "Accessories", "Events"];
 
 export const metadata = {
+    title: "Game Store in Montgomery, MN | Pokemon & MTG",
+    description:
+        "The Wolf Den is a locally owned trading card game store in Montgomery, Minnesota specializing in Pokemon cards, Magic: The Gathering, sealed product, accessories, and community events.",
+    keywords: [
+        "game store Montgomery MN",
+        "trading card game store Minnesota",
+        "Pokemon cards Montgomery MN",
+        "Magic The Gathering Montgomery MN",
+        "southern Minnesota game store",
+        "Pokemon cards near me",
+        "MTG near me",
+    ],
     alternates: {
         canonical: "/",
     },
@@ -12,38 +24,80 @@ export const metadata = {
 export default function HomePage() {
     return (
         <div className="stack reveal">
-            <section className="hero card">
-                <p className="eyebrow">Montgomery, Minnesota</p>
-                <Image
-                    className="hero-logo"
-                    src="/logo/wolf-den-full-logo.png"
-                    alt="The Wolf Den"
-                    width={420}
-                    height={280}
-                    priority
-                />
-                <h1 className="sr-only">The Wolf Den</h1>
-                <p className="lead">
-                    Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN.
-                </p>
-                <p>
-                    <strong>Status:</strong> Soft opening in May 2026.
-                </p>
-                <div className="cta-row">
-                    <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
-                        Join Discord
-                    </a>
-                    <Link className="button" href="/events">
-                        View Events
-                    </Link>
-                    <Link className="button" href="/shop">
-                        Get Opening Updates
-                    </Link>
+            <section className="hero card hero-split">
+                <div className="hero-copy">
+                    <p className="eyebrow">Montgomery, Minnesota</p>
+                    <Image
+                        className="hero-logo"
+                        src="/logo/wolf-den-full-logo.png"
+                        alt="The Wolf Den"
+                        width={420}
+                        height={280}
+                        sizes="(max-width: 900px) 80vw, 420px"
+                        priority
+                    />
+                    <h1 className="sr-only">The Wolf Den</h1>
+                    <p className="lead">
+                        Trading card game store in Montgomery, Minnesota for Pokemon cards, Magic: The Gathering, sealed product, singles, accessories, and local community play.
+                    </p>
+                    <p className="statement-copy">
+                        The Wolf Den is a locally owned trading card game store in Montgomery, Minnesota specializing in Pokemon cards, Magic: The Gathering, sealed product, accessories, and community events.
+                    </p>
+                    <p>
+                        Serving players and collectors across Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and surrounding southern Minnesota communities.
+                    </p>
+                    <p>
+                        <strong>Status:</strong> Soft opening in May 2026.
+                    </p>
+                    <div className="cta-row">
+                        <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
+                            Join Discord
+                        </a>
+                        <Link className="button" href="/events">
+                            View Events
+                        </Link>
+                        <Link className="button" href="/shop">
+                            Get Opening Updates
+                        </Link>
+                        <Link className="button" href="/about">
+                            About The Wolf Den
+                        </Link>
+                    </div>
+                    <div className="hero-badges">
+                        <span className="hero-badge">Locally owned</span>
+                        <span className="hero-badge">Pokemon + MTG</span>
+                        <span className="hero-badge">Weekly community events</span>
+                        <span className="hero-badge">Southern Minnesota</span>
+                    </div>
+                </div>
+                <div className="hero-panel">
+                    <Image
+                        src="/images/trading-card-store-interior-the-wolf-den-montgomery-mn.jpg"
+                        alt="Interior of The Wolf Den in Montgomery, Minnesota with product displays and community play tables"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 45vw"
+                        className="hero-photo"
+                    />
+                    <div className="hero-stats">
+                        <div className="hero-stat">
+                            <span className="hero-stat-label">Store Type</span>
+                            <strong>Local TCG storefront</strong>
+                        </div>
+                        <div className="hero-stat">
+                            <span className="hero-stat-label">Focus</span>
+                            <strong>Pokemon, Magic, singles, accessories</strong>
+                        </div>
+                        <div className="hero-stat">
+                            <span className="hero-stat-label">Community</span>
+                            <strong>Friday MTG and Saturday Pokemon</strong>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <section className="grid two-col">
-                <article className="card">
+                <article className="card feature-card">
                     <h2>Hours & Location</h2>
                     <p>300 1st St S, Montgomery, MN 56069</p>
                     <ul>
@@ -55,8 +109,8 @@ export default function HomePage() {
                         Open Map
                     </a>
                 </article>
-                <article className="card">
-                    <h2>Featured Categories</h2>
+                <article className="card feature-card">
+                    <h2>What We Offer</h2>
                     <div className="chips">
                         {categories.map((category) => (
                             <span key={category} className="chip">
@@ -64,8 +118,83 @@ export default function HomePage() {
                             </span>
                         ))}
                     </div>
-                    <p className="muted">Storefront and interior photos can be dropped here once available.</p>
+                    <figure className="photo-block">
+                        <Image
+                            src="/images/trading-card-store-interior-the-wolf-den-montgomery-mn.jpg"
+                            alt="Interior view of The Wolf Den in Montgomery, Minnesota showing card display cases and community play tables"
+                            width={1200}
+                            height={900}
+                            sizes="(max-width: 900px) 100vw, 48vw"
+                            className="content-photo"
+                        />
+                        <figcaption className="muted">Real in-store inventory and play space in Montgomery, MN.</figcaption>
+                    </figure>
                 </article>
+            </section>
+
+            <section className="grid two-col">
+                <article className="card">
+                    <h2>Southern Minnesota Card Shop</h2>
+                    <p>
+                        The Wolf Den is a locally owned hobby and trading card store built to give southern Minnesota players a nearby option for Pokemon cards, Magic: The Gathering, supplies, and community events.
+                    </p>
+                    <p>
+                        Many local players have been used to driving into the metro for releases, singles, and in-store play. Our goal is to build a reliable local alternative closer to home.
+                    </p>
+                </article>
+                <article className="card">
+                    <h2>What You Can Expect</h2>
+                    <ul>
+                        <li>Rotating sealed Pokemon and Magic product</li>
+                        <li>Singles and card accessories</li>
+                        <li>Beginner-friendly local play space</li>
+                        <li>Trade nights and community events</li>
+                        <li>Real storefront inventory and local pickup</li>
+                    </ul>
+                </article>
+            </section>
+
+            <section className="grid three-col">
+                <article className="card lift info-card">
+                    <h2>Play Space</h2>
+                    <Image
+                        src="/images/tcg-play-tables-the-wolf-den-montgomery-mn.jpg"
+                        alt="In-store card game tables set up for local events and casual play nights at The Wolf Den"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 31vw"
+                        className="content-photo"
+                    />
+                </article>
+                <article className="card lift info-card">
+                    <h2>Singles Cases</h2>
+                    <Image
+                        src="/images/pokemon-singles-case-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon singles display case at The Wolf Den with organized card inventory"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 31vw"
+                        className="content-photo"
+                    />
+                </article>
+                <article className="card lift">
+                    <h2>Store Interior</h2>
+                    <Image
+                        src="/images/local-game-store-interior-the-wolf-den-montgomery-mn.jpg"
+                        alt="Wide interior shot of The Wolf Den storefront with product shelves and customer counter"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 31vw"
+                        className="content-photo"
+                    />
+                </article>
+            </section>
+
+            <section className="card">
+                <h2>Serving Nearby Communities</h2>
+                <p>
+                    If you are searching for a game store near me, Pokemon cards near me, or a local Magic shop in southern Minnesota, The Wolf Den serves Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and nearby communities.
+                </p>
             </section>
 
             <section className="grid three-col">
@@ -102,6 +231,13 @@ export default function HomePage() {
                     <p>Cash or store credit for Pokemon, Magic, and select collectibles.</p>
                     <Link className="text-link" href="/sell-cards">
                         Sell Your Cards
+                    </Link>
+                </article>
+                <article className="card lift">
+                    <h2>About The Wolf Den</h2>
+                    <p>Learn how the store is building a local hobby community for southern Minnesota players and collectors.</p>
+                    <Link className="text-link" href="/about">
+                        Read Our Story
                     </Link>
                 </article>
             </section>

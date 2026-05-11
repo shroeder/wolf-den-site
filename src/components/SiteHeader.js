@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 const navItems = [
+    { href: "/about", label: "About" },
     { href: "/pokemon-cards", label: "Pokemon Cards" },
     { href: "/magic-the-gathering", label: "Magic: The Gathering" },
     { href: "/shop", label: "Shop" },
@@ -29,6 +30,7 @@ export default function SiteHeader() {
                         alt="The Wolf Den logo"
                         width={1536}
                         height={1024}
+                        sizes="34px"
                         priority
                     />
                     <span>The Wolf Den</span>

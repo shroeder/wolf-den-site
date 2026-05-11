@@ -80,31 +80,31 @@ export default async function EventDetailPage({ params }) {
             <section className="card">
                 <h1>{event.title}</h1>
                 <p>
-                    {event.date} at {event.time}
+                    {event.day} at {event.time}
                 </p>
                 <p>{event.description}</p>
             </section>
 
             <section className="grid two-col">
                 <article className="card">
-                    <h2>Registration</h2>
+                    <h2>Event Details</h2>
                     <p>
-                        <strong>RSVP:</strong> {event.rsvp}
+                        <strong>Day:</strong> {event.day}
+                    </p>
+                    <p>
+                        <strong>Time:</strong> {event.time}
+                    </p>
+                    <p>
+                        <strong>Location:</strong> The Wolf Den, Montgomery, Minnesota
                     </p>
                     <p>
                         <strong>Entry Fee:</strong> {event.entryFee}
                     </p>
-                    <p>
-                        <strong>Capacity:</strong> {event.capacity}
-                    </p>
-                    <p>
-                        <strong>Seats Remaining:</strong> {event.seatsRemaining}
-                    </p>
                 </article>
                 <article className="card">
-                    <h2>Format & Rules</h2>
+                    <h2>What to Expect</h2>
                     <p>
-                        <strong>Format:</strong> {event.format}
+                        <strong>Activities:</strong> {event.format}
                     </p>
                     <p>{event.rules}</p>
                     <p>
@@ -114,12 +114,12 @@ export default async function EventDetailPage({ params }) {
             </section>
 
             <section className="card">
-                <h2>Prize Support & Policy</h2>
+                <h2>Future Plans</h2>
                 <p>
-                    <strong>Prize Support:</strong> {event.prizeSupport}
+                    {event.futurePlans}
                 </p>
                 <p>
-                    <strong>Cancellation/Refund:</strong> {event.refundPolicy}
+                    <strong>Updates:</strong> {event.rsvp}
                 </p>
                 <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
                     Join Discord for Event Updates

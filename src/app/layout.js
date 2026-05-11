@@ -26,7 +26,7 @@ export const metadata = {
         apple: "/logo/logo.png",
     },
     description:
-        "Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN. Your local Pokemon and Magic: The Gathering shop near New Prague, Lonsdale, and Le Sueur.",
+        "Trading card game store in Montgomery, MN offering Pokemon cards, Magic: The Gathering, singles, sealed product, accessories, and local play for southern Minnesota.",
     keywords: [
         "trading cards",
         "Pokemon",
@@ -44,7 +44,11 @@ export const metadata = {
         "Montgomery MN",
         "New Prague MN",
         "Lonsdale MN",
+        "Faribault MN",
+        "Northfield MN",
+        "Jordan MN",
         "Le Sueur MN",
+        "Belle Plaine MN",
         "singles",
         "sealed product",
         "local game store",
@@ -55,7 +59,7 @@ export const metadata = {
         siteName: "The Wolf Den",
         title: "The Wolf Den",
         description:
-            "Pokemon and Magic cards in Montgomery, MN, serving players near New Prague, Lonsdale, and Le Sueur.",
+            "Pokemon and Magic cards in Montgomery, MN, serving players across southern Minnesota including New Prague, Lonsdale, Faribault, Northfield, and Le Sueur.",
         url: "https://wolfdengamingmn.com",
         images: [{ url: "/logo/wolf-den-full-logo.png", width: 420, height: 280, alt: "The Wolf Den logo" }],
     },
@@ -63,17 +67,17 @@ export const metadata = {
         card: "summary_large_image",
         title: "The Wolf Den",
         description:
-            "Pokemon and Magic cards in Montgomery, MN, serving nearby players across Le Sueur County.",
+            "Pokemon and Magic cards in Montgomery, MN, serving nearby players across southern Minnesota.",
         images: ["/logo/wolf-den-full-logo.png"],
     },
 };
 
 const localBusinessSchema = {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": ["LocalBusiness", "Store"],
     name: "The Wolf Den",
     description:
-        "Trading cards, singles, sealed product, accessories, and local play in Montgomery, MN.",
+        "Locally owned trading card game store in Montgomery, Minnesota offering Pokemon cards, Magic: The Gathering, singles, sealed product, accessories, and community play.",
     url: "https://wolfdengamingmn.com",
     telephone: "+15073016434",
     email: "luke@wolfdengamingmn.com",
@@ -90,21 +94,32 @@ const localBusinessSchema = {
         latitude: 44.4383,
         longitude: -93.5836,
     },
-    image: "https://wolfdengamingmn.com/logo/wolf-den-full-logo.png",
+    image: [
+        "https://wolfdengamingmn.com/logo/wolf-den-full-logo.png",
+        "https://wolfdengamingmn.com/images/trading-card-store-interior-the-wolf-den-montgomery-mn.jpg",
+        "https://wolfdengamingmn.com/images/local-game-store-interior-the-wolf-den-montgomery-mn.jpg",
+    ],
     priceRange: "$$",
     areaServed: [
         { "@type": "City", name: "Montgomery" },
         { "@type": "City", name: "New Prague" },
         { "@type": "City", name: "Lonsdale" },
+        { "@type": "City", name: "Faribault" },
+        { "@type": "City", name: "Northfield" },
+        { "@type": "City", name: "Jordan" },
         { "@type": "City", name: "Le Sueur" },
+        { "@type": "City", name: "Belle Plaine" },
     ],
-    knowsAbout: ["Pokemon cards", "Magic: The Gathering", "trading card singles", "local tournaments"],
+    knowsAbout: ["Pokemon cards", "Magic: The Gathering", "trading card singles", "sealed product", "Commander", "local play"],
     openingHoursSpecification: [
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "16:00", closes: "19:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "16:00", closes: "19:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "12:00", closes: "18:00" },
     ],
-    sameAs: ["https://discord.gg/Pad8U2KVsD"],
+    sameAs: [
+        "https://discord.gg/Pad8U2KVsD",
+        "https://www.facebook.com/WolfDenGamesMN",
+    ],
 };
 
 export default function RootLayout({ children }) {

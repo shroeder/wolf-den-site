@@ -1,81 +1,43 @@
 export const events = [
     {
-        slug: "pokemon-league-night",
-        title: "Pokémon League Night",
-        date: "Coming Soon",
-        time: "6:00 PM",
-        format: "Casual + Swiss",
+        slug: "friday-night-magic",
+        title: "Friday Night Magic at The Wolf Den",
+        day: "Fridays",
+        date: "Weekly",
+        time: "4:00 PM - 8:00 PM",
+        format: "Casual Commander, open play, trading, pack battles, and learn-to-play support",
         entryFee: "Free",
-        rsvp: "Discord RSVP",
-        capacity: "24 players",
-        seatsRemaining: "TBD",
+        rsvp: "Discord for updates",
+        capacity: "Community seating",
+        seatsRemaining: "Open",
         beginnerFriendly: true,
         description:
-            "A welcoming weekly Pokémon night with casual pods and a beginner table. Dates and times will be announced on Discord.",
+            "Every Friday evening, The Wolf Den hosts a casual Magic: The Gathering community night in Montgomery, Minnesota.",
         rules:
-            "Standard Play! Pokemon League structure with casual pods first, then Swiss rounds when attendance supports it.",
-        prizeSupport:
-            "Promo packs and participation support while supplies last.",
+            "This is currently a relaxed, community-focused environment intended to help local players connect. Bring Commander decks, trade cards, meet local MTG players, and help grow the southern Minnesota Magic community.",
+        futurePlans:
+            "As the community grows, future Friday events may expand into draft nights, organized Commander events, prize-supported events, special release events, and additional MTG formats.",
         refundPolicy:
             "No paid entry required for this event.",
     },
     {
-        slug: "fnm-modern",
-        title: "Friday Night Magic: Modern",
-        date: "Coming Soon",
-        time: "6:30 PM",
-        format: "Modern",
+        slug: "pokemon-community-saturday",
+        title: "Pokemon Community Saturdays at The Wolf Den",
+        day: "Saturdays",
+        date: "Weekly",
+        time: "12:00 PM - 6:00 PM",
+        format: "Casual Pokemon gameplay, trading cards, pack battles, collection discussions, and learn-to-play opportunities",
         entryFee: "Free",
-        rsvp: "Discord RSVP recommended",
-        capacity: "20 players",
-        seatsRemaining: "TBD",
-        beginnerFriendly: false,
-        description:
-            "Weekly competitive Modern event for experienced players. Watch Discord for scheduling updates.",
-        rules:
-            "Swiss rounds based on attendance with current MTG Comprehensive Rules and ban list.",
-        prizeSupport:
-            "Store credit payout based on attendance and final standings.",
-        refundPolicy:
-            "If a paid version of the event is posted later, refunds are available up to event start time.",
-    },
-    {
-        slug: "fnm-draft-night",
-        title: "Friday Night Magic: Draft Night",
-        date: "Coming Soon",
-        time: "6:30 PM",
-        format: "Booster Draft",
-        entryFee: "$20",
-        rsvp: "Discord RSVP required",
-        capacity: "16 players",
-        seatsRemaining: "TBD",
-        beginnerFriendly: true,
-        description:
-            "Our typical Magic event night is Draft Night: build from fresh packs, play three Swiss rounds, and learn in a friendly but competitive environment.",
-        rules:
-            "Each player drafts three Play Boosters, builds a 40-card deck, and plays Swiss rounds. Basic lands are provided.",
-        prizeSupport:
-            "Participation booster plus additional prizes based on standings and attendance.",
-        refundPolicy:
-            "Refunds available until 24 hours before event start. After that, store credit only.",
-    },
-    {
-        slug: "sunday-family-open-play",
-        title: "Sunday Family Open Play",
-        date: "Coming Soon",
-        time: "1:00 PM",
-        format: "Open tables",
-        entryFee: "Free",
-        rsvp: "Walk-ins welcome",
-        capacity: "Open seating",
+        rsvp: "Discord for updates",
+        capacity: "Community seating",
         seatsRemaining: "Open",
         beginnerFriendly: true,
         description:
-            "Bring the family, learn games, and trade in a relaxed environment. Details coming soon.",
+            "Every Saturday, The Wolf Den hosts a Pokemon-focused community event in Montgomery, Minnesota for collectors, players, families, and fans of all ages.",
         rules:
-            "Casual community play with staff support for basic rules and event etiquette.",
-        prizeSupport:
-            "Occasional door prizes and promo items during special family sessions.",
+            "The focus right now is growing a fun and welcoming local Pokemon community. Whether you are brand new to Pokemon, returning after years away, a collector, or an experienced player, you are welcome at The Wolf Den.",
+        futurePlans:
+            "As the local community grows, future Pokemon events may include organized tournaments, league-style play, special set release events, trade nights, and community challenges.",
         refundPolicy:
             "No paid entry required for this event.",
     },

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export const metadata = {
-    title: "Magic: The Gathering Cards",
+    title: "Magic: The Gathering in Montgomery, MN",
     description:
-        "Shop Magic: The Gathering cards in Montgomery, MN at The Wolf Den. Browse MTG singles, sealed product, and Friday Night Magic events near New Prague, Lonsdale, and Le Sueur.",
+        "Magic: The Gathering in Montgomery, MN at The Wolf Den. Find Commander, sealed product, accessories, singles, and Friday community play for southern Minnesota players near New Prague, Northfield, Faribault, and Lonsdale.",
     keywords: [
         "Magic The Gathering cards",
         "MTG singles",
@@ -22,66 +23,124 @@ export const metadata = {
 export default function MagicTheGatheringPage() {
     return (
         <div className="stack reveal">
-            <section className="card hero-accent">
-                <h1>Magic: The Gathering Cards in Montgomery, MN</h1>
-                <p>
-                    The Wolf Den supports new and competitive MTG players with singles, sealed product, and weekly events for players across Montgomery and nearby communities.
-                </p>
-                <div className="cta-row">
-                    <Link className="button primary" href="/shop">
-                        Shop MTG Inventory
-                    </Link>
-                    <Link className="button" href="/events">
-                        View MTG Events
-                    </Link>
+            <section className="card hero-accent showcase-grid">
+                <div>
+                    <h1>Magic: The Gathering in Southern Minnesota</h1>
+                    <p>
+                        The Wolf Den is building a local home for Magic: The Gathering players in Montgomery, Minnesota.
+                    </p>
+                    <p>
+                        Whether you enjoy Commander, casual play, collecting sealed product, or cracking packs with friends, our goal is to provide a welcoming local game store experience for southern Minnesota players.
+                    </p>
+                    <p className="statement-copy">
+                        We are focused on giving local Magic players a nearby store for Commander, current releases, accessories, singles, and Friday community play without always needing to drive into the cities.
+                    </p>
+                    <div className="cta-row">
+                        <Link className="button primary" href="/shop">
+                            Shop MTG Inventory
+                        </Link>
+                        <Link className="button" href="/events">
+                            View MTG Events
+                        </Link>
+                    </div>
+                    <div className="hero-badges">
+                        <span className="hero-badge">Commander friendly</span>
+                        <span className="hero-badge">Friday community nights</span>
+                        <span className="hero-badge">Sealed + singles</span>
+                    </div>
+                </div>
+                <div className="showcase-media">
+                    <Image
+                        src="/images/magic-the-gathering-products-the-wolf-den-montgomery-mn.jpg"
+                        alt="Magic: The Gathering product selection at The Wolf Den in Montgomery, Minnesota"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 45vw"
+                        className="hero-photo"
+                    />
                 </div>
             </section>
 
             <section className="grid two-col">
                 <article className="card">
-                    <h2>What We Stock</h2>
+                    <h2>Magic Products We Carry</h2>
                     <ul>
-                        <li>Magic play boosters and collector products</li>
-                        <li>Modern, Commander, and Standard staples</li>
-                        <li>Deck boxes, sleeves, and playmats</li>
+                        <li>Play Booster Boxes</li>
+                        <li>Collector products</li>
+                        <li>Commander decks</li>
+                        <li>Bundles and prerelease kits</li>
+                        <li>Sleeves and accessories</li>
+                        <li>Singles and sealed product</li>
                     </ul>
+                    <p>We focus heavily on current releases while continuing to expand inventory over time.</p>
                 </article>
                 <article className="card">
-                    <h2>Weekly Play</h2>
+                    <h2>Commander and Casual Play</h2>
                     <ul>
-                        <li>Friday Night Magic events</li>
+                        <li>Meet new players</li>
+                        <li>Play casual Commander</li>
+                        <li>Trade cards</li>
+                        <li>Learn the game</li>
                         <li>
-                            <Link href="/events/fnm-draft-night">Draft Night every Friday (typical MTG night)</Link>
+                            <Link href="/events/friday-night-magic">Join Friday Night Magic</Link>
                         </li>
-                        <li>Casual Commander nights</li>
-                        <li>Beginner-friendly support and pairings</li>
+                        <li>Participate in future organized events</li>
                     </ul>
+                    <p>Commander is one of the biggest focuses at The Wolf Den, and new players are always welcome.</p>
+                </article>
+            </section>
+
+            <section className="grid two-col">
+                <article className="card lift">
+                    <h2>MTG Product Selection</h2>
+                    <Image
+                        src="/images/magic-the-gathering-products-the-wolf-den-montgomery-mn.jpg"
+                        alt="Magic: The Gathering sealed product inventory for southern Minnesota players at The Wolf Den"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
+                </article>
+                <article className="card lift">
+                    <h2>MTG Singles Case</h2>
+                    <Image
+                        src="/images/magic-singles-case-the-wolf-den-montgomery-mn.jpg"
+                        alt="Magic singles display case for Commander and MTG players at The Wolf Den in Montgomery, Minnesota"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
                 </article>
             </section>
 
             <section className="card">
-                <h2>Sell or Trade MTG Cards</h2>
+                <h2>Serving Local MTG Players</h2>
                 <p>
-                    Bring in Magic singles and decks for same-day offers in cash or higher-value store credit.
+                    The Wolf Den serves players from Montgomery, New Prague, Northfield, Faribault, Jordan, Lonsdale, Le Sueur, and surrounding southern Minnesota communities.
                 </p>
-                <Link className="text-link" href="/sell-cards">
-                    Start a Magic Buylist Request
-                </Link>
-            </section>
-
-            <section className="card">
-                <h2>Serving Nearby Communities</h2>
                 <p>
-                    If you are searching for a Magic card shop near me, The Wolf Den serves Montgomery, New Prague, Lonsdale, Le Sueur, and surrounding Minnesota communities.
+                    We know many players currently drive long distances for local game store access, and we are working to create a strong local alternative.
                 </p>
             </section>
 
             <section className="card">
-                <h2>Visit or Contact The Wolf Den</h2>
-                <p>300 1st St S, Montgomery, MN 56069</p>
+                <h2>Friday Night Magic at The Wolf Den</h2>
+                <p>
+                    Friday evenings are dedicated to Magic: The Gathering community play. Events may include Commander nights, casual pods, draft events, learn-to-play sessions, and future organized tournaments.
+                </p>
+                <p>As the community grows, event offerings will continue to expand.</p>
+            </section>
+
+            <section className="card">
+                <h2>Join the Community</h2>
+                <p>
+                    Follow The Wolf Den online and join our Discord for inventory updates, event announcements, new release information, community discussions, and local trade coordination.
+                </p>
                 <div className="cta-row">
-                    <a className="button primary" href="tel:+15073016434">
-                        Call Now: (507) 301-6434
+                    <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
+                        Join Discord
                     </a>
                     <a
                         className="button"

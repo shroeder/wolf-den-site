@@ -1,6 +1,10 @@
+import Image from "next/image";
+import Link from "next/link";
+
 export const metadata = {
-    title: "Sell Your Cards",
-    description: "Sell your Pokemon, Magic, and collectible cards at The Wolf Den in Montgomery, MN. We offer cash or store credit for singles and collections.",
+    title: "Sell Pokemon & Magic Cards",
+    description:
+        "Sell Pokemon cards, Magic: The Gathering cards, and select collectibles at The Wolf Den in Montgomery, MN. Get cash offers or store credit for singles, decks, and collections.",
     alternates: {
         canonical: "/sell-cards",
     },
@@ -11,19 +15,30 @@ export default function SellCardsPage() {
         <div className="stack reveal">
             <section className="card hero-accent">
                 <h1>Sell or Trade Cards</h1>
-                <p>We buy Pokemon, Magic, and select collectibles.</p>
-                <a className="button primary" href="/contact">
-                    Start a Buylist Request
-                </a>
+                <p>
+                    The Wolf Den buys Pokemon cards, Magic: The Gathering cards, and select collectibles in Montgomery, Minnesota.
+                </p>
+                <p>
+                    If you have singles, decks, sealed product, or a larger collection, we offer local evaluation with payout options in cash or higher-value store credit.
+                </p>
+                <div className="cta-row">
+                    <Link className="button primary" href="/contact">
+                        Start a Buylist Request
+                    </Link>
+                    <a className="button" href="tel:+15073016434">
+                        Call Store
+                    </a>
+                </div>
             </section>
 
             <section className="grid two-col">
                 <article className="card">
                     <h2>What We Are Buying</h2>
                     <ul>
-                        <li>Pokemon singles and sealed</li>
-                        <li>Magic staples and decks</li>
+                        <li>Pokemon singles and select sealed product</li>
+                        <li>Magic staples, Commander cards, and decks</li>
                         <li>Select graded cards and premium collectibles</li>
+                        <li>Small collections and larger trade-in opportunities</li>
                     </ul>
                 </article>
                 <article className="card">
@@ -36,14 +51,52 @@ export default function SellCardsPage() {
                 </article>
             </section>
 
+            <section className="grid two-col">
+                <article className="card lift">
+                    <h2>In-Store Singles Inventory</h2>
+                    <Image
+                        src="/images/magic-singles-case-the-wolf-den-montgomery-mn.jpg"
+                        alt="Magic and trading card singles display case used for local buylist and trade-ins at The Wolf Den"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
+                </article>
+                <article className="card">
+                    <h2>Why Sell Locally?</h2>
+                    <p>
+                        Selling locally is often simpler than shipping cards out, waiting on marketplace payouts, or splitting cards across multiple buyers. The Wolf Den gives southern Minnesota players a nearby option for turning collections into cash, store credit, or new product.
+                    </p>
+                    <p>
+                        We are especially interested in inventory that helps grow the local community and strengthen the store&apos;s singles selection over time.
+                    </p>
+                </article>
+            </section>
+
             <section className="card">
                 <h2>How It Works</h2>
                 <ol>
-                    <li>Bring cards in during business hours.</li>
-                    <li>We review condition and market data.</li>
-                    <li>Receive a same-day offer in cash or store credit.</li>
+                    <li>Bring cards in during business hours or contact the store first for larger collections.</li>
+                    <li>We review condition, demand, and current market data.</li>
+                    <li>Receive an offer in cash or higher-value store credit.</li>
                 </ol>
-                <p className="muted">Optional upgrade: add upload form for photos/card lists to pre-qualify collections.</p>
+                <p className="muted">For larger collections, a short message or photo list ahead of time helps speed up the process.</p>
+            </section>
+
+            <section className="card">
+                <h2>Serving Southern Minnesota Sellers</h2>
+                <p>
+                    The Wolf Den is a local option for sellers in Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and nearby southern Minnesota communities who want to sell Pokemon cards, Magic cards, or collections without a long drive.
+                </p>
+                <div className="cta-row">
+                    <Link className="button primary" href="/contact">
+                        Contact The Store
+                    </Link>
+                    <a className="button" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
+                        Join Discord
+                    </a>
+                </div>
             </section>
         </div>
     );

@@ -1,18 +1,21 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export const metadata = {
-    title: "Pokemon Cards",
+    title: "Pokemon Cards in Montgomery, MN",
     description:
-        "Shop Pokemon cards in Montgomery, MN at The Wolf Den. Find Pokemon singles, sealed product, league nights, and a local game store option near New Prague, Lonsdale, and Le Sueur.",
+        "Pokemon cards in Montgomery, MN at The Wolf Den. Find ETBs, booster boxes, singles, accessories, and a local southern Minnesota store serving New Prague, Lonsdale, Faribault, Northfield, and nearby communities.",
     keywords: [
         "Pokemon cards",
         "pokemon singles",
         "pokemon sealed product",
-        "pokemon league",
+        "pokemon southern Minnesota",
         "Montgomery MN card shop",
         "pokemon cards near me",
         "pokemon store near me",
         "new prague pokemon cards",
+        "faribault pokemon cards",
+        "northfield pokemon cards",
     ],
     alternates: {
         canonical: "/pokemon-cards",
@@ -22,60 +25,129 @@ export const metadata = {
 export default function PokemonCardsPage() {
     return (
         <div className="stack reveal">
-            <section className="card hero-accent">
-                <h1>Pokemon Cards in Montgomery, MN</h1>
-                <p>
-                    The Wolf Den carries Pokemon singles, sealed product, and beginner-friendly events for local players and families near Montgomery, New Prague, Lonsdale, and Le Sueur.
-                </p>
-                <div className="cta-row">
-                    <Link className="button primary" href="/shop">
-                        Shop Pokemon Inventory
-                    </Link>
-                    <Link className="button" href="/events">
-                        View Pokemon Events
-                    </Link>
+            <section className="card hero-accent showcase-grid">
+                <div>
+                    <h1>Pokemon Trading Cards in Southern Minnesota</h1>
+                    <p>
+                        Welcome to The Wolf Den, your local destination for Pokemon cards, sealed product, accessories, and community in Montgomery, Minnesota.
+                    </p>
+                    <p className="statement-copy">
+                        The Wolf Den gives southern Minnesota players and collectors a nearby option for Pokemon cards, ETBs, booster boxes, singles, accessories, and future organized play.
+                    </p>
+                    <div className="cta-row">
+                        <Link className="button primary" href="/shop">
+                            Shop Pokemon Inventory
+                        </Link>
+                        <Link className="button" href="/events">
+                            View Pokemon Events
+                        </Link>
+                    </div>
+                    <div className="hero-badges">
+                        <span className="hero-badge">ETBs + booster boxes</span>
+                        <span className="hero-badge">Singles + accessories</span>
+                        <span className="hero-badge">Saturday community play</span>
+                    </div>
+                </div>
+                <div className="showcase-media">
+                    <Image
+                        src="/images/pokemon-etbs-and-sealed-product-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon sealed products and accessories on store shelves at The Wolf Den in Montgomery, Minnesota"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 45vw"
+                        className="hero-photo"
+                    />
                 </div>
             </section>
 
             <section className="grid two-col">
                 <article className="card">
-                    <h2>What We Stock</h2>
+                    <h2>What We Carry</h2>
                     <ul>
-                        <li>Pokemon booster boxes, ETBs, and bundles</li>
-                        <li>High-demand Pokemon singles</li>
-                        <li>Sleeves, deck boxes, and binders</li>
+                        <li>Elite Trainer Boxes (ETBs)</li>
+                        <li>Booster Boxes and Booster Bundles</li>
+                        <li>Sleeved Boosters and Premium Collections</li>
+                        <li>Pokemon Center products</li>
+                        <li>Singles, sleeves, binders, deck boxes, and accessories</li>
                     </ul>
+                    <p>
+                        Whether you are a collector, competitive player, investor, parent, or casual fan, we aim to provide a reliable local source for Pokemon products without needing to drive into the cities.
+                    </p>
                 </article>
                 <article className="card">
-                    <h2>Play and Learn</h2>
+                    <h2>Pokemon Community and Events</h2>
                     <ul>
-                        <li>Pokemon League and beginner tables</li>
-                        <li>Family-friendly in-store play</li>
-                        <li>Discord updates for seat availability</li>
+                        <li>Casual Pokemon meetups</li>
+                        <li>Trade nights</li>
+                        <li>Learn-to-play opportunities</li>
+                        <li>Pack battles</li>
+                        <li>Community tournaments</li>
+                        <li>Future sanctioned play opportunities</li>
                     </ul>
+                    <p>
+                        The Wolf Den is building a welcoming local Pokemon community for players of all ages. Join Discord and follow our social pages for inventory updates and event announcements.
+                    </p>
+                </article>
+            </section>
+
+            <section className="grid two-col">
+                <article className="card lift">
+                    <h2>Pokemon Product Shelves</h2>
+                    <Image
+                        src="/images/pokemon-etbs-and-sealed-product-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon ETBs, booster boxes, and sealed product on retail shelves at The Wolf Den in Montgomery, Minnesota"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
+                </article>
+                <article className="card lift">
+                    <h2>Pokemon Singles</h2>
+                    <Image
+                        src="/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon singles display case inventory at The Wolf Den local game store in Montgomery, Minnesota"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
                 </article>
             </section>
 
             <section className="card">
-                <h2>Sell or Trade Pokemon Cards</h2>
+                <h2>What You Will Find at The Wolf Den</h2>
                 <p>
-                    We buy Pokemon singles and select sealed product with same-day offers in cash or store credit.
+                    Inventory rotates frequently based on availability and market conditions. Common product categories include current Pokemon TCG expansions, specialty collections, ETBs, booster boxes, accessories, supplies, trade-in opportunities, and community events.
                 </p>
-                <Link className="text-link" href="/sell-cards">
-                    Start a Pokemon Buylist Request
-                </Link>
+                <p>We are continuously expanding inventory as the store grows.</p>
             </section>
 
             <section className="card">
-                <h2>Serving Nearby Communities</h2>
+                <h2>Serving Southern Minnesota Pokemon Players</h2>
+                <p>The Wolf Den proudly serves players and collectors from:</p>
+                <ul>
+                    <li>Montgomery</li>
+                    <li>New Prague</li>
+                    <li>Lonsdale</li>
+                    <li>Faribault</li>
+                    <li>Northfield</li>
+                    <li>Jordan</li>
+                    <li>Le Sueur</li>
+                    <li>Belle Plaine</li>
+                    <li>Surrounding southern Minnesota communities</li>
+                </ul>
                 <p>
-                    If you are searching for a Pokemon card shop near me, The Wolf Den is a short drive for players in Montgomery, New Prague, Lonsdale, Le Sueur, and surrounding areas.
+                    Our goal is to help grow the local trading card community while giving people a nearby option for Pokemon cards, supplies, and future organized play.
                 </p>
             </section>
 
             <section className="card">
-                <h2>Visit or Contact The Wolf Den</h2>
+                <h2>Visit The Wolf Den</h2>
                 <p>300 1st St S, Montgomery, MN 56069</p>
+                <p>
+                    The Wolf Den is a locally owned trading card game store focused on building a fun, welcoming environment for collectors and players throughout southern Minnesota.
+                </p>
                 <div className="cta-row">
                     <a className="button primary" href="tel:+15073016434">
                         Call Now: (507) 301-6434
