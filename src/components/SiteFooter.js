@@ -40,7 +40,7 @@ export default function SiteFooter() {
                     <h3>Visit</h3>
                     <p>300 1st St S, Montgomery, MN 56069</p>
                     <p>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm</p>
-                    <p>Soft opening: May 2026</p>
+                    <p><strong>Soft opening: May 21, 2026</strong></p>
                     <p>Serving Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, and Belle Plaine.</p>
                 </div>
             </div>

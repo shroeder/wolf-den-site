@@ -47,7 +47,7 @@ export default function HomePage() {
                         Serving players and collectors across Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and surrounding southern Minnesota communities.
                     </p>
                     <p>
-                        <strong>Status:</strong> Soft opening in May 2026.
+                        <strong>Status:</strong> Soft opening on <strong>May 21, 2026</strong>.
                     </p>
                     <div className="cta-row">
                         <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
