@@ -16,7 +16,7 @@ const faqs = [
     ["Do you sell Pokemon cards?", "Yes. The Wolf Den carries Pokemon sealed product, singles, accessories, and beginner-friendly items."],
     ["Do you sell Magic: The Gathering?", "Yes. The store carries Magic sealed product, singles, accessories, and supports local community play."],
     ["Do you buy or trade cards?", "Yes. We buy and evaluate Pokemon, Magic, and select collectibles. Trade-ins may be accepted depending on condition and store needs."],
-    ["Do you host events?", "Yes. Friday evenings are focused on Magic community play, and Saturday afternoons are focused on Pokemon community events."],
+    ["Do you host events?", "Yes. Friday 4 PM to 7 PM is focused on Magic community play, and Saturday 12 PM to 6 PM is focused on Pokemon community events."],
     ["Are your events beginner friendly?", "Yes. The store is actively trying to build a welcoming environment for new players, returning players, families, and casual fans."],
     ["Can kids play at The Wolf Den?", "Yes. Pokemon-focused community time and family-friendly in-store expectations make the store welcoming for younger players and parents."],
     ["Do I need to be competitive to show up?", "No. Right now the focus is on community growth, casual play, learning, and helping people connect locally."],

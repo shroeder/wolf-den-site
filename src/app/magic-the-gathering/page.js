@@ -128,7 +128,7 @@ export default function MagicTheGatheringPage() {
             <section className="card">
                 <h2>Friday Night Magic at The Wolf Den</h2>
                 <p>
-                    Friday evenings are dedicated to Magic: The Gathering community play. Events may include Commander nights, casual pods, draft events, learn-to-play sessions, and future organized tournaments.
+                    Friday community play runs during store hours from 4:00 PM to 7:00 PM. Events may include Commander nights, casual pods, draft events, learn-to-play sessions, and future organized tournaments.
                 </p>
                 <p>As the community grows, event offerings will continue to expand.</p>
             </section>

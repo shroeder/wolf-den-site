@@ -4,7 +4,7 @@ export const events = [
         title: "Friday Night Magic at The Wolf Den",
         day: "Fridays",
         date: "Weekly",
-        time: "4:00 PM - 8:00 PM",
+        time: "4:00 PM - 7:00 PM",
         format: "Casual Commander, open play, trading, pack battles, and learn-to-play support",
         entryFee: "Free",
         rsvp: "Discord for updates",
@@ -12,7 +12,7 @@ export const events = [
         seatsRemaining: "Open",
         beginnerFriendly: true,
         description:
-            "Every Friday evening, The Wolf Den hosts a casual Magic: The Gathering community night in Montgomery, Minnesota.",
+            "Every Friday from 4:00 PM to 7:00 PM, The Wolf Den hosts a casual Magic: The Gathering community night in Montgomery, Minnesota.",
         rules:
             "This is currently a relaxed, community-focused environment intended to help local players connect. Bring Commander decks, trade cards, meet local MTG players, and help grow the southern Minnesota Magic community.",
         futurePlans:
