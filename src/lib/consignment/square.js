@@ -139,7 +139,19 @@ export async function listConsignorCatalog(categoryId) {
         const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
 
         for (const item of payload.objects || []) {
-            if (item.type !== "ITEM" || item.item_data?.category_id !== categoryId) {
+            if (item.type !== "ITEM") {
+                continue;
+            }
+
+            // Square returns category as item_data.category_id (legacy) or
+            // item_data.categories[].id (current API). Check both.
+            const legacyCategoryId = item.item_data?.category_id;
+            const categoriesArray = item.item_data?.categories || [];
+            const matchesCategory =
+                legacyCategoryId === categoryId ||
+                categoriesArray.some((c) => c.id === categoryId);
+
+            if (!matchesCategory) {
                 continue;
             }
 
@@ -154,6 +166,11 @@ export async function listConsignorCatalog(categoryId) {
 
         cursor = payload.cursor || null;
     } while (cursor);
+
+    squareLogger.info("square.catalog.list.completed", {
+        categoryId,
+        variationCount: variations.length,
+    });
 
     return variations;
 }
