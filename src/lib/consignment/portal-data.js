@@ -6,6 +6,7 @@ import { getInventoryCounts, listConsignorCatalog, searchSalesForVariations } fr
 import { createServerLogger } from "@/lib/server-logger";
 
 const portalDataLogger = createServerLogger({ source: "api", subsystem: "consignment-portal-data" });
+const ALL_TIME_SALES_START_AT = "2000-01-01T00:00:00.000Z";
 
 const sortByName = (left, right) => left.name.localeCompare(right.name);
 
@@ -83,7 +84,7 @@ async function buildDashboard(consignor, options = {}) {
 
     const sales = await searchSalesForVariations(variationLookup, options);
     const salesForSummary = await searchSalesForVariations(variationLookup, {
-        startAt: consignor.created_at ? new Date(consignor.created_at).toISOString() : undefined,
+        startAt: ALL_TIME_SALES_START_AT,
         endAt: new Date().toISOString(),
     });
     const payouts = await listPayoutsForConsignor(consignor.id);

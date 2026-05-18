@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
 const reportLogger = createServerLogger({ source: "api", subsystem: "consignment-nightly-reports" });
+const ALL_TIME_SALES_START_AT = "2000-01-01T00:00:00.000Z";
 
 function getDefaultWindow() {
     const end = new Date();
@@ -20,7 +21,7 @@ function getDefaultWindow() {
 
 async function listEnabledConsignors() {
     return db.query(
-                `SELECT id, slug, display_name, email, square_category_id, payout_rate, created_at
+        `SELECT id, slug, display_name, email, square_category_id, payout_rate, created_at
          FROM consignors
          WHERE active = TRUE
            AND nightly_reports_enabled = TRUE
@@ -39,7 +40,7 @@ async function buildConsignorReport(consignor, window) {
     });
 
     const lifetimeSales = await searchSalesForVariations(variationLookup, {
-        startAt: new Date(consignor.created_at).toISOString(),
+        startAt: ALL_TIME_SALES_START_AT,
         endAt: new Date().toISOString(),
     });
 
