@@ -576,6 +576,12 @@ textarea:focus-visible {
     height: 1.15rem;
 }
 
+.consignment-receipt-link {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.82rem;
+    text-decoration: none;
+}
+
 .footer-grid {
     display: grid;
     grid-template-columns: 2fr 1.2fr 1.2fr;

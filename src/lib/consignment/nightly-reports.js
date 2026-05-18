@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sendNightlyConsignmentReportEmail } from "@/lib/consignment/email";
+import { getTotalPaidForConsignor } from "@/lib/consignment/payouts";
 import { listConsignorCatalog, searchSalesForVariations } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
@@ -45,6 +46,8 @@ async function buildConsignorReport(consignor, window) {
     const todayNetRevenue = dailySales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
     const totalNetRevenue = lifetimeSales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
     const payoutRate = Number(consignor.payout_rate || 0);
+    const estimatedPayoutGross = totalNetRevenue * payoutRate;
+    const totalPaid = await getTotalPaidForConsignor(consignor.id);
 
     return {
         windowStart: window.startAt,
@@ -53,7 +56,9 @@ async function buildConsignorReport(consignor, window) {
         todayNetRevenue,
         totalNetRevenue,
         payoutRate,
-        currentOwed: totalNetRevenue * payoutRate,
+        estimatedPayoutGross,
+        totalPaid,
+        currentOwed: Math.max(0, estimatedPayoutGross - totalPaid),
     };
 }
 

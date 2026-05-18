@@ -106,7 +106,7 @@ export async function sendNightlyConsignmentReportEmail(consignor, report) {
             </p>
             <hr style="margin:24px 0;" />
             <h2>Current Owed</h2>
-            <p><strong>${currency.format(Number(report.currentOwed || 0))}</strong> (net sales ${currency.format(Number(report.totalNetRevenue || 0))} × payout rate ${(Number(report.payoutRate || 0) * 100).toFixed(1)}%)</p>
+            <p><strong>${currency.format(Number(report.currentOwed || 0))}</strong> (estimated payout ${currency.format(Number(report.estimatedPayoutGross || 0))} − paid ${currency.format(Number(report.totalPaid || 0))})</p>
             <p style="color:#5a5a5a;">This amount is an estimate from Square sales data and your configured payout rate.</p>
             <hr style="margin:24px 0;" />
             <p><small>You are receiving this because nightly reports are enabled for your portal profile.</small></p>

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getConsignorById } from "@/lib/consignment/config";
+import { getTotalPaidForConsignor, listPayoutsForConsignor } from "@/lib/consignment/payouts";
 import { getInventoryCounts, listConsignorCatalog, searchSalesForVariations } from "@/lib/consignment/square";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -36,19 +37,25 @@ async function loadConsignor(consignorId) {
     return consignor;
 }
 
-function buildSummary(consignor, inventory, sales, options = {}) {
-    const totalGrossRevenue = sales.reduce((sum, entry) => sum + Number(entry.grossRevenue || 0), 0);
-    const totalRefunds = sales.reduce((sum, entry) => sum + Number(entry.refundedRevenue || 0), 0);
-    const totalRevenue = sales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
+async function buildSummary(consignor, inventory, salesForSummary, options = {}) {
+    const totalGrossRevenue = salesForSummary.reduce((sum, entry) => sum + Number(entry.grossRevenue || 0), 0);
+    const totalRefunds = salesForSummary.reduce((sum, entry) => sum + Number(entry.refundedRevenue || 0), 0);
+    const totalRevenue = salesForSummary.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
     const totalUnitsInStock = inventory.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
     const payoutRate = Number(consignor.payout_rate || 0);
+    const estimatedPayoutGross = totalRevenue * payoutRate;
+    const totalPaid = await getTotalPaidForConsignor(consignor.id);
+    const estimatedPayout = Math.max(0, estimatedPayoutGross - totalPaid);
 
     return {
         totalGrossRevenue,
         totalRefunds,
         totalRevenue,
         payoutRate,
-        estimatedPayout: totalRevenue * payoutRate,
+        estimatedPayoutGross,
+        totalPaid,
+        estimatedPayout,
+        outstandingBalance: estimatedPayout,
         catalogItems: inventory.length,
         unitsInStock: totalUnitsInStock,
         lookbackDays: Number(options.lookbackDays) || 90,
@@ -75,7 +82,12 @@ async function buildDashboard(consignor, options = {}) {
         .sort(sortByName);
 
     const sales = await searchSalesForVariations(variationLookup, options);
-    const summary = buildSummary(consignor, inventory, sales, options);
+    const salesForSummary = await searchSalesForVariations(variationLookup, {
+        startAt: consignor.created_at ? new Date(consignor.created_at).toISOString() : undefined,
+        endAt: new Date().toISOString(),
+    });
+    const payouts = await listPayoutsForConsignor(consignor.id);
+    const summary = await buildSummary(consignor, inventory, salesForSummary, options);
 
     portalDataLogger.info("consignment.portal_data.build_dashboard.succeeded", {
         consignorId: consignor.id,
@@ -83,7 +95,7 @@ async function buildDashboard(consignor, options = {}) {
         salesItems: sales.length,
     });
 
-    return { inventory, sales, summary };
+    return { inventory, sales, payouts, summary };
 }
 
 export async function getConsignorInventory(consignorId) {

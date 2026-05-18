@@ -40,6 +40,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
     const [password, setPassword] = useState("");
     const [inventory, setInventory] = useState([]);
     const [sales, setSales] = useState([]);
+    const [payouts, setPayouts] = useState([]);
     const [summary, setSummary] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(initialAuthenticated);
     const [isLoading, setIsLoading] = useState(initialAuthenticated);
@@ -51,7 +52,8 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
     const totalRevenue = Number(summary?.totalRevenue ?? sales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0));
     const totalRefunds = Number(summary?.totalRefunds ?? sales.reduce((sum, entry) => sum + Number(entry.refundedRevenue || 0), 0));
     const resolvedRate = Number(summary?.payoutRate ?? consignmentRate);
-    const estimatedPayout = Number(summary?.estimatedPayout ?? totalRevenue * resolvedRate);
+    const totalPaid = Number(summary?.totalPaid ?? payouts.reduce((sum, entry) => sum + Number(entry.amount || 0), 0));
+    const estimatedPayout = Number(summary?.estimatedPayout ?? Math.max(0, totalRevenue * resolvedRate - totalPaid));
     const totalUnitsInStock = Number(summary?.unitsInStock ?? inventory.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0));
 
     useEffect(() => {
@@ -74,6 +76,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
 
                 setInventory(Array.isArray(dashboard?.inventory) ? dashboard.inventory : []);
                 setSales(Array.isArray(dashboard?.sales) ? dashboard.sales : []);
+                setPayouts(Array.isArray(dashboard?.payouts) ? dashboard.payouts : []);
                 setSummary(dashboard?.summary || null);
                 setNightlyReportsEnabled(Boolean(dashboard?.consignor?.nightlyReportsEnabled ?? true));
                 setIsAuthenticated(true);
@@ -86,6 +89,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                     setIsAuthenticated(false);
                     setInventory([]);
                     setSales([]);
+                    setPayouts([]);
                     setSummary(null);
                     setNightlyReportsEnabled(true);
                 } else {
@@ -136,6 +140,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
 
             setInventory(Array.isArray(dashboard?.inventory) ? dashboard.inventory : []);
             setSales(Array.isArray(dashboard?.sales) ? dashboard.sales : []);
+            setPayouts(Array.isArray(dashboard?.payouts) ? dashboard.payouts : []);
             setSummary(dashboard?.summary || null);
             setNightlyReportsEnabled(Boolean(dashboard?.consignor?.nightlyReportsEnabled ?? true));
             setIsAuthenticated(true);
@@ -183,7 +188,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                 <p className="eyebrow">Consignment Portal</p>
                 <h1>{displayName}</h1>
                 <p className="lead consignment-lead">
-                    View live inventory, sold items, revenue totals, and estimated payout without exposing Square data or dashboard access.
+                    View live inventory, sold items, revenue totals, and estimated payout.
                 </p>
             </section>
 
@@ -223,8 +228,19 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                             <strong>{Math.round(resolvedRate * 100)}%</strong>
                         </article>
                         <article className="card consignment-stat">
-                            <span className="consignment-stat-label">Estimated Payout</span>
+                            <span className="consignment-stat-label">Current Owed</span>
                             <strong>{formatCurrency(estimatedPayout)}</strong>
+                        </article>
+                    </section>
+
+                    <section className="grid two-col">
+                        <article className="card consignment-stat">
+                            <span className="consignment-stat-label">Estimated Payout (Gross)</span>
+                            <strong>{formatCurrency(summary?.estimatedPayoutGross ?? totalRevenue * resolvedRate)}</strong>
+                        </article>
+                        <article className="card consignment-stat">
+                            <span className="consignment-stat-label">Paid Out To Date</span>
+                            <strong>{formatCurrency(totalPaid)}</strong>
                         </article>
                     </section>
 
@@ -265,6 +281,45 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                 disabled={isSavingPreferences}
                             />
                         </label>
+                    </section>
+
+                    <section className="card consignment-table-card">
+                        <div className="consignment-section-heading">
+                            <div>
+                                <h2>Payout History</h2>
+                                <p className="secondary">Manual payouts and branded receipts are stored here for recall.</p>
+                            </div>
+                        </div>
+                        <div className="consignment-table-wrap consignment-table-scroll">
+                            <table className="consignment-table">
+                                <thead>
+                                    <tr>
+                                        <th>Paid At</th>
+                                        <th>Amount</th>
+                                        <th>Method</th>
+                                        <th>Receipt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {payouts.length ? payouts.map((entry) => (
+                                        <tr key={entry.id}>
+                                            <td>{formatDate(entry.paidAt)}</td>
+                                            <td>{formatCurrency(entry.amount)}</td>
+                                            <td>{entry.paymentMethod || "manual"}</td>
+                                            <td>
+                                                <a className="button ghost consignment-receipt-link" href={`/api/consignment/payouts/${entry.id}/receipt`} target="_blank" rel="noreferrer">
+                                                    View Receipt
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan="4" className="consignment-empty">No payouts recorded yet.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <section className="card consignment-table-card">
