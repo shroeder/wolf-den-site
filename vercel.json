@@ -1,4 +1,5 @@
 {
+    "buildCommand": "bash scripts/build.sh",
     "trailingSlash": false,
     "headers": [
         {

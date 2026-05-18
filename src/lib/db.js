@@ -84,6 +84,13 @@ export const db = {
     },
 };
 
+/**
+ * Deprecated: Schema is now managed by migrations (migrations/ directory).
+ * This function is kept for backward compatibility with existing setup scripts.
+ * 
+ * New schema changes should be added as SQL migrations files, not here.
+ * Run: npm run db:migrate
+ */
 export async function ensureSchema() {
     await db.query(`
         CREATE TABLE IF NOT EXISTS consignors (

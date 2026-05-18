@@ -63,14 +63,57 @@ Set these manually in Vercel for portal/admin features:
 - `RESEND_API_KEY`
 - `NEXT_PUBLIC_BASE_URL` (optional override)
 
+### Database Migrations
+
+The project uses versioned SQL migrations stored in `migrations/`. Each migration is tracked in the `pgmigrations` table and run exactly once.
+
+#### Running Migrations Locally
+
+```bash
+# Run all pending migrations
+npm run db:migrate
+
+# View migration status (applied vs pending)
+npm run db:migrate:status
+```
+
+#### Creating New Migrations
+
+1. Create a new file in `migrations/` with format: `NNN-description.sql` (e.g., `002-add-consignor-notes.sql`)
+2. Write idempotent SQL (use `IF NOT EXISTS`, `IF NOT ADDED`, etc.)
+3. Test locally: `npm run db:migrate`
+4. Commit and push; Vercel will run it automatically before deploying
+
+#### Production Deployments
+
+Vercel automatically:
+1. Runs `npm run db:migrate` against production `DATABASE_URL`
+2. If migrations succeed, continues to `next build`
+3. If migrations fail, the build aborts and no new code is deployed
+
+This ensures the database schema is always in sync with the deployed code.
+
 ### Initial Database Setup
 
-1. Create the consignors table and setup tokens table:
-   ```bash
-   node scripts/setup-consignors.js
-   ```
+#### Option A: Fresh Database (Recommended)
 
-2. Find Square Catalog Category IDs:
+Just deploy; migrations will create all tables:
+
+```bash
+git push origin main
+# Vercel build will run migrations automatically
+```
+
+#### Option B: Manual Local Setup
+
+If you need to set up locally before a push:
+
+```bash
+# Ensure DATABASE_URL points to your local/dev Neon database
+npm run db:migrate
+```
+
+### Initial Database Setup (Deprecated - kept for reference)
    - Log into your Square Dashboard
    - Navigate to **Catalog** → **Categories**
    - Note the category ID for each consignor
