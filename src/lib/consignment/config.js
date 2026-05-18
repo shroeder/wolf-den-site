@@ -52,6 +52,7 @@ export async function getPublicConsignorBySlug(slug) {
         displayName: consignor.display_name,
         consignmentRate: Number(consignor.payout_rate),
         mustChangePassword: consignor.must_change_password,
+        nightlyReportsEnabled: Boolean(consignor.nightly_reports_enabled),
     };
 }
 
@@ -93,4 +94,13 @@ export async function setConsignorPasswordFromSetup(consignorId, newPassword) {
     );
 
     return result[0]?.slug || null;
+}
+
+export async function setConsignorNightlyReportsEnabled(consignorId, enabled) {
+    const rows = await db.query(
+        "UPDATE consignors SET nightly_reports_enabled = $1, updated_at = NOW() WHERE id = $2 RETURNING id, nightly_reports_enabled",
+        [Boolean(enabled), consignorId]
+    );
+
+    return rows[0] || null;
 }

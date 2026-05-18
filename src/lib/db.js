@@ -100,6 +100,7 @@ export async function ensureSchema() {
             email TEXT UNIQUE NOT NULL,
             square_category_id TEXT NOT NULL,
             payout_rate NUMERIC(5, 4) NOT NULL DEFAULT 0.5000,
+            nightly_reports_enabled BOOLEAN NOT NULL DEFAULT TRUE,
             password_hash TEXT,
             must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
             active BOOLEAN NOT NULL DEFAULT TRUE,

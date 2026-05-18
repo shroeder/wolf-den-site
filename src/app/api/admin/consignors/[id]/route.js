@@ -29,6 +29,10 @@ function normalizePatchPayload(body) {
         updates.active = body.active;
     }
 
+    if (body?.nightlyReportsEnabled !== undefined) {
+        updates.nightlyReportsEnabled = body.nightlyReportsEnabled;
+    }
+
     return updates;
 }
 
@@ -59,6 +63,10 @@ function validatePatchPayload(updates) {
 
     if (updates.active !== undefined && typeof updates.active !== "boolean") {
         return "invalid_active";
+    }
+
+    if (updates.nightlyReportsEnabled !== undefined && typeof updates.nightlyReportsEnabled !== "boolean") {
+        return "invalid_nightly_reports_enabled";
     }
 
     return null;

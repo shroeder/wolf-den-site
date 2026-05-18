@@ -40,6 +40,7 @@ function mapAdminConsignor(row) {
         email: row.email,
         squareCategoryId: row.square_category_id,
         payoutRate: Number(row.payout_rate || 0),
+        nightlyReportsEnabled: Boolean(row.nightly_reports_enabled),
         active: Boolean(row.active),
         onboardingStatus: deriveOnboardingStatus(row),
         createdAt: toIso(row.created_at),
@@ -110,6 +111,7 @@ export async function getAdminConsignorDetail(id, options = {}) {
             email: row.email,
             squareCategoryId: row.square_category_id,
             payoutRate: Number(row.payout_rate || 0),
+            nightlyReportsEnabled: Boolean(row.nightly_reports_enabled),
             active: Boolean(row.active),
         },
         onboarding: {
@@ -238,6 +240,11 @@ export async function updateAdminConsignor(id, updates) {
     if (updates.active !== undefined) {
         assignments.push(`active = $${assignments.length + 1}`);
         values.push(Boolean(updates.active));
+    }
+
+    if (updates.nightlyReportsEnabled !== undefined) {
+        assignments.push(`nightly_reports_enabled = $${assignments.length + 1}`);
+        values.push(Boolean(updates.nightlyReportsEnabled));
     }
 
     if (!assignments.length) {

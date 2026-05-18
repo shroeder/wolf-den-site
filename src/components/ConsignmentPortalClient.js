@@ -44,6 +44,8 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
     const [isAuthenticated, setIsAuthenticated] = useState(initialAuthenticated);
     const [isLoading, setIsLoading] = useState(initialAuthenticated);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+    const [nightlyReportsEnabled, setNightlyReportsEnabled] = useState(true);
     const [error, setError] = useState("");
 
     const totalRevenue = Number(summary?.totalRevenue ?? sales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0));
@@ -73,6 +75,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                 setInventory(Array.isArray(dashboard?.inventory) ? dashboard.inventory : []);
                 setSales(Array.isArray(dashboard?.sales) ? dashboard.sales : []);
                 setSummary(dashboard?.summary || null);
+                setNightlyReportsEnabled(Boolean(dashboard?.consignor?.nightlyReportsEnabled ?? true));
                 setIsAuthenticated(true);
             } catch (fetchError) {
                 if (!active) {
@@ -84,6 +87,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                     setInventory([]);
                     setSales([]);
                     setSummary(null);
+                    setNightlyReportsEnabled(true);
                 } else {
                     setError("Unable to load portal data right now.");
                 }
@@ -133,12 +137,43 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
             setInventory(Array.isArray(dashboard?.inventory) ? dashboard.inventory : []);
             setSales(Array.isArray(dashboard?.sales) ? dashboard.sales : []);
             setSummary(dashboard?.summary || null);
+            setNightlyReportsEnabled(Boolean(dashboard?.consignor?.nightlyReportsEnabled ?? true));
             setIsAuthenticated(true);
         } catch {
             setError("Unable to sign in right now.");
         } finally {
             setIsSubmitting(false);
             setIsLoading(false);
+        }
+    };
+
+    const handleNightlyReportsToggle = async (event) => {
+        const nextValue = event.target.checked;
+
+        setIsSavingPreferences(true);
+        setError("");
+
+        try {
+            const response = await fetch("/api/consignment/preferences", {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                credentials: "same-origin",
+                body: JSON.stringify({ nightlyReportsEnabled: nextValue }),
+            });
+
+            if (!response.ok) {
+                throw new Error("preferences_failed");
+            }
+
+            const payload = await response.json();
+
+            setNightlyReportsEnabled(Boolean(payload?.nightlyReportsEnabled));
+        } catch {
+            setError("Unable to update email report preference right now.");
+        } finally {
+            setIsSavingPreferences(false);
         }
     };
 
@@ -215,6 +250,21 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                             <span className="consignment-stat-label">Units In Stock</span>
                             <strong>{totalUnitsInStock}</strong>
                         </article>
+                    </section>
+
+                    <section className="card consignment-preferences">
+                        <h2>Email Reports</h2>
+                        <p className="secondary">Receive a nightly email with items sold that day and your currently owed amount.</p>
+                        <label className="consignment-toggle-row" htmlFor="nightly-reports-enabled">
+                            <span>Nightly consignment email report</span>
+                            <input
+                                id="nightly-reports-enabled"
+                                type="checkbox"
+                                checked={nightlyReportsEnabled}
+                                onChange={handleNightlyReportsToggle}
+                                disabled={isSavingPreferences}
+                            />
+                        </label>
                     </section>
 
                     <section className="card consignment-table-card">

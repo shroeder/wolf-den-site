@@ -28,6 +28,7 @@ export async function GET(request) {
                         displayName: consignor.display_name,
                         email: consignor.email,
                         payoutRate: Number(consignor.payout_rate || 0),
+                        nightlyReportsEnabled: Boolean(consignor.nightly_reports_enabled),
                         active: Boolean(consignor.active),
                         mustChangePassword: Boolean(consignor.must_change_password),
                     },

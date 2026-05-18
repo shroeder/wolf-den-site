@@ -117,6 +117,7 @@ export async function getConsignorDashboard(consignorId, options = {}) {
             slug: consignor.slug,
             displayName: consignor.display_name,
             payoutRate: Number(consignor.payout_rate || 0),
+            nightlyReportsEnabled: Boolean(consignor.nightly_reports_enabled),
             active: Boolean(consignor.active),
         },
         ...dashboard,

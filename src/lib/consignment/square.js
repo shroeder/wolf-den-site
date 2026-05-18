@@ -301,8 +301,13 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
     });
 
     const lookbackDays = normalizeLookbackDays(options.lookbackDays);
-    const startDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
-    const endDate = new Date().toISOString();
+    const parsedStart = options.startAt ? new Date(options.startAt) : null;
+    const parsedEnd = options.endAt ? new Date(options.endAt) : null;
+    const hasCustomWindow = parsedStart instanceof Date && !Number.isNaN(parsedStart.getTime()) && parsedEnd instanceof Date && !Number.isNaN(parsedEnd.getTime());
+    const startDate = hasCustomWindow
+        ? parsedStart.toISOString()
+        : new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
+    const endDate = hasCustomWindow ? parsedEnd.toISOString() : new Date().toISOString();
     const aggregates = new Map();
     let cursor = null;
     let totalOrdersFound = 0;
