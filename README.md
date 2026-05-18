@@ -46,11 +46,22 @@ The consignment portal lives at `/consign/[slug]` and is intentionally read-only
    SQUARE_ACCESS_TOKEN=
    SQUARE_LOCATION_ID=
    CONSIGNMENT_SESSION_SECRET=
+   ADMIN_API_KEY=
+   RESEND_API_KEY=
+   NEXT_PUBLIC_BASE_URL=https://wolfdengamingmn.com
    ```
 
 #### Production
 
-All secrets are automatically managed by the Vercel ↔ Neon integration. No manual configuration needed.
+`DATABASE_URL` is managed by the Vercel ↔ Neon integration.
+
+Set these manually in Vercel for portal/admin features:
+- `SQUARE_ACCESS_TOKEN`
+- `SQUARE_LOCATION_ID`
+- `CONSIGNMENT_SESSION_SECRET`
+- `ADMIN_API_KEY`
+- `RESEND_API_KEY`
+- `NEXT_PUBLIC_BASE_URL` (optional override)
 
 ### Initial Database Setup
 
@@ -100,6 +111,21 @@ Setup tokens expire after 14 days.
 - `GET /api/consignment/inventory` — Authenticated inventory list
 - `GET /api/consignment/sales` — Authenticated sales history
 - `POST /api/consignment/change-password` — Password change (future)
+
+### Internal Admin API (Temporary)
+
+These endpoints are for the private sideloaded internal phone app during development.
+
+- `POST /api/admin/consignors/create` — Creates consignor and sends setup email
+
+Admin auth requirements:
+- Header: `x-admin-key: <ADMIN_API_KEY>`
+- Runtime: Node.js server runtime only
+
+Error response format:
+```json
+{ "error": "slug_already_exists" }
+```
 
 ## MVP Notes
 
