@@ -16,7 +16,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-    metadataBase: new URL("https://wolfdengamingmn.com"),
+    metadataBase: new URL("https://www.wolfdengamingmn.com"),
     title: {
         default: "The Wolf Den",
         template: "%s | The Wolf Den",

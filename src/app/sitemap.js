@@ -1,6 +1,6 @@
 import { events } from "@/lib/events";
 
-const BASE_URL = "https://wolfdengamingmn.com";
+const BASE_URL = "https://www.wolfdengamingmn.com";
 
 export default function sitemap() {
     const staticRoutes = [
