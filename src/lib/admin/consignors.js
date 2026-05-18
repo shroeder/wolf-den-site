@@ -5,6 +5,9 @@ import { createAdminSetupToken } from "@/lib/admin/setup-token";
 import { getConsignorDashboard, getConsignorSummary } from "@/lib/consignment/portal-data";
 import { invalidateUnusedSetupTokens } from "@/lib/consignment/tokens";
 import { db } from "@/lib/db";
+import { createServerLogger } from "@/lib/server-logger";
+
+const adminConsignorLogger = createServerLogger({ source: "api", subsystem: "admin-consignors" });
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -64,6 +67,10 @@ async function fetchAdminConsignorRowById(id) {
 }
 
 export async function listAdminConsignors() {
+    adminConsignorLogger.info("admin.consignors.service.list.started", {
+        step: "database_query_started",
+    });
+
     const rows = await db.query(
         `SELECT c.*, latest.created_at AS last_invite_sent_at, latest.expires_at AS setup_token_expires_at, latest.used_at AS setup_token_used_at
          FROM consignors c
@@ -76,6 +83,11 @@ export async function listAdminConsignors() {
          ) latest ON TRUE
          ORDER BY c.created_at DESC`
     );
+
+    adminConsignorLogger.info("admin.consignors.service.list.succeeded", {
+        step: "database_query_succeeded",
+        count: rows.length,
+    });
 
     return rows.map(mapAdminConsignor);
 }
@@ -114,6 +126,10 @@ export async function getAdminConsignorDetail(id, options = {}) {
 }
 
 export async function createAdminConsignor(payload) {
+    adminConsignorLogger.info("admin.consignors.service.create.started", {
+        slug: payload.slug,
+    });
+
     const existingSlug = await db.queryOne("SELECT id FROM consignors WHERE slug = $1", [payload.slug]);
 
     if (existingSlug) {
@@ -145,12 +161,21 @@ export async function createAdminConsignor(payload) {
 
     const fullRow = await fetchAdminConsignorRowById(consignor.id);
 
+    adminConsignorLogger.info("admin.consignors.service.create.succeeded", {
+        consignorId: consignor.id,
+        slug: consignor.slug,
+    });
+
     return {
         consignor: mapAdminConsignor(fullRow || consignor),
     };
 }
 
 export async function inviteAdminConsignor(id) {
+    adminConsignorLogger.info("admin.consignors.service.invite.started", {
+        consignorId: id,
+    });
+
     const consignor = await db.queryOne(
         "SELECT id, slug, display_name, email, active FROM consignors WHERE id = $1",
         [id]
@@ -172,12 +197,21 @@ export async function inviteAdminConsignor(id) {
 
     const fullRow = await fetchAdminConsignorRowById(consignor.id);
 
+    adminConsignorLogger.info("admin.consignors.service.invite.succeeded", {
+        consignorId: consignor.id,
+    });
+
     return {
         consignor: mapAdminConsignor(fullRow || consignor),
     };
 }
 
 export async function updateAdminConsignor(id, updates) {
+    adminConsignorLogger.info("admin.consignors.service.update.started", {
+        consignorId: id,
+        fieldCount: Object.keys(updates || {}).length,
+    });
+
     const assignments = [];
     const values = [];
 
@@ -238,12 +272,20 @@ export async function updateAdminConsignor(id, updates) {
 
     const fullRow = await fetchAdminConsignorRowById(id);
 
+    adminConsignorLogger.info("admin.consignors.service.update.succeeded", {
+        consignorId: id,
+    });
+
     return {
         consignor: mapAdminConsignor(fullRow),
     };
 }
 
 export async function revokeAdminConsignor(id) {
+    adminConsignorLogger.info("admin.consignors.service.revoke.started", {
+        consignorId: id,
+    });
+
     const rows = await db.query(
         `UPDATE consignors
          SET active = FALSE, updated_at = NOW()
@@ -260,12 +302,20 @@ export async function revokeAdminConsignor(id) {
 
     const fullRow = await fetchAdminConsignorRowById(id);
 
+    adminConsignorLogger.info("admin.consignors.service.revoke.succeeded", {
+        consignorId: id,
+    });
+
     return {
         consignor: mapAdminConsignor(fullRow),
     };
 }
 
 export async function restoreAdminConsignor(id) {
+    adminConsignorLogger.info("admin.consignors.service.restore.started", {
+        consignorId: id,
+    });
+
     const rows = await db.query(
         `UPDATE consignors
          SET active = TRUE, updated_at = NOW()
@@ -279,6 +329,10 @@ export async function restoreAdminConsignor(id) {
     }
 
     const fullRow = await fetchAdminConsignorRowById(id);
+
+    adminConsignorLogger.info("admin.consignors.service.restore.succeeded", {
+        consignorId: id,
+    });
 
     return {
         consignor: mapAdminConsignor(fullRow),
@@ -295,4 +349,4 @@ export async function getAdminConsignorDashboard(id, options = {}) {
     const dashboard = await getConsignorDashboard(id, options);
 
     return { dashboard };
- }
+}

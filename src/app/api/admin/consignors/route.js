@@ -2,30 +2,39 @@ import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
 import { listAdminConsignors } from "@/lib/admin/consignors";
+import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 
 export async function GET(request) {
-    const authError = verifyAdminApiKey(request);
+    return withRequestLogging(request, "GET /api/admin/consignors", async ({ logger, internalError }) => {
+        const authError = verifyAdminApiKey(request, logger);
 
-    if (authError) {
-        return authError;
-    }
+        if (authError) {
+            return authError;
+        }
 
-    try {
-        const consignors = await listAdminConsignors();
+        try {
+            const consignors = await listAdminConsignors();
 
-        return NextResponse.json(
-            {
-                consignors,
-            },
-            {
-                headers: {
-                    "Cache-Control": "no-store",
+            logger.info("admin.consignors.list.success", {
+                count: consignors.length,
+            });
+
+            return NextResponse.json(
+                {
+                    consignors,
                 },
-            }
-        );
-    } catch {
-        return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
-    }
+                {
+                    headers: {
+                        "Cache-Control": "no-store",
+                    },
+                }
+            );
+        } catch (error) {
+            return internalError(error, {
+                event: "admin.consignors.list.failure",
+            });
+        }
+    });
 }

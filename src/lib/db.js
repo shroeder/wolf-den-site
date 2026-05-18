@@ -2,18 +2,34 @@ import "server-only";
 
 import { Pool } from "@neondatabase/serverless";
 
+import { createServerLogger } from "@/lib/server-logger";
+
 let pool = null;
+const dbLogger = createServerLogger({ source: "db", subsystem: "neon" });
 
 function getPool() {
     if (pool) {
         return pool;
     }
 
+    dbLogger.info("db.env.validation.started", {
+        step: "env_validation_started",
+    });
+
     const url = process.env.DATABASE_URL;
 
     if (!url) {
+        dbLogger.error("db.env.validation.failed", {
+            step: "env_validation_failed",
+            reason: "missing_database_url",
+        });
+
         throw new Error("Missing DATABASE_URL environment variable.");
     }
+
+    dbLogger.info("db.env.validation.passed", {
+        step: "env_validation_passed",
+    });
 
     pool = new Pool({ connectionString: url });
 
@@ -22,18 +38,43 @@ function getPool() {
 
 export const db = {
     query: async (query, params = []) => {
+        const normalizedQuery = typeof query === "string" ? query.replace(/\s+/g, " ").trim() : "<non_string_query>";
+
+        dbLogger.info("db.query.started", {
+            step: "database_query_started",
+            queryPreview: normalizedQuery.slice(0, 140),
+            paramCount: Array.isArray(params) ? params.length : 0,
+        });
+
         try {
             const client = await getPool().connect();
 
             try {
                 const result = await client.query(query, params);
 
+                dbLogger.info("db.query.succeeded", {
+                    step: "database_query_succeeded",
+                    rowCount: result.rowCount,
+                    queryPreview: normalizedQuery.slice(0, 140),
+                });
+
                 return result.rows;
             } finally {
                 client.release();
             }
         } catch (error) {
-            throw new Error(`Database query failed: ${error.message}`);
+            dbLogger.error("db.query.failed", error, {
+                step: "database_query_failed",
+                queryPreview: normalizedQuery.slice(0, 140),
+                dbCode: error?.code,
+            });
+
+            const wrappedError = new Error(`Database query failed: ${error.message}`);
+
+            wrappedError.code = "db_query_failed";
+            wrappedError.dbCode = error?.code;
+
+            throw wrappedError;
         }
     },
     queryOne: async (query, params = []) => {

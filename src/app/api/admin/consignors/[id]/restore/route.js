@@ -2,27 +2,40 @@ import { NextResponse } from "next/server";
 
 import { restoreAdminConsignor } from "@/lib/admin/consignors";
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 
 export async function POST(request, { params }) {
-    const authError = verifyAdminApiKey(request);
+    return withRequestLogging(request, "POST /api/admin/consignors/[id]/restore", async ({ logger, internalError }) => {
+        const authError = verifyAdminApiKey(request, logger);
 
-    if (authError) {
-        return authError;
-    }
-
-    const { id } = await params;
-
-    try {
-        const result = await restoreAdminConsignor(id);
-
-        if (result.error) {
-            return NextResponse.json({ error: result.error }, { status: result.status || 400 });
+        if (authError) {
+            return authError;
         }
 
-        return NextResponse.json({ success: true, consignor: result.consignor });
-    } catch {
-        return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
-    }
+        const { id } = await params;
+
+        try {
+            const result = await restoreAdminConsignor(id);
+
+            if (result.error) {
+                logger.warn("admin.consignors.restore.failed", {
+                    consignorId: id,
+                    reason: result.error,
+                });
+
+                return NextResponse.json({ error: result.error }, { status: result.status || 400 });
+            }
+
+            logger.info("admin.consignors.restore.success", { consignorId: id });
+
+            return NextResponse.json({ success: true, consignor: result.consignor });
+        } catch (error) {
+            return internalError(error, {
+                event: "admin.consignors.restore.failure",
+                consignorId: id,
+            });
+        }
+    });
 }

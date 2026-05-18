@@ -4,6 +4,10 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { createServerLogger } from "@/lib/server-logger";
+
+const authLogger = createServerLogger({ source: "api", subsystem: "admin-auth" });
+
 function isValidAdminKey(providedKey, configuredKey) {
     if (!providedKey || !configuredKey) {
         return false;
@@ -19,13 +23,35 @@ function isValidAdminKey(providedKey, configuredKey) {
     return timingSafeEqual(provided, configured);
 }
 
-export function verifyAdminApiKey(request) {
+export function verifyAdminApiKey(request, logger = authLogger) {
+    logger.info("admin.auth.check.started", {
+        step: "auth_check_started",
+        authType: "admin_api_key",
+    });
+
     const providedKey = request.headers.get("x-admin-key") || "";
     const configuredKey = process.env.ADMIN_API_KEY || "";
+    const hasHeader = Boolean(providedKey);
+    const hasConfig = Boolean(configuredKey);
 
     if (!isValidAdminKey(providedKey, configuredKey)) {
+        logger.warn("admin.auth.failure", {
+            step: "auth_check_failed",
+            authType: "admin_api_key",
+            reason: hasConfig ? "invalid_key" : "missing_configuration",
+            hasHeader,
+            hasConfig,
+        });
+
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+
+    logger.info("admin.auth.success", {
+        step: "auth_check_passed",
+        authType: "admin_api_key",
+        hasHeader,
+        hasConfig,
+    });
 
     return null;
 }

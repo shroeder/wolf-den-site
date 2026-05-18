@@ -4,10 +4,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { getActiveConsignorBySlug } from "@/lib/consignment/config";
+import { createServerLogger } from "@/lib/server-logger";
 
 export const CONSIGNMENT_SESSION_COOKIE = "wolfden-consignment-session";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
+const sessionLogger = createServerLogger({ source: "api", subsystem: "consignment-session" });
 
 const encodePayload = (value) => Buffer.from(value, "utf8").toString("base64url");
 const decodePayload = (value) => Buffer.from(value, "base64url").toString("utf8");
@@ -27,10 +29,23 @@ const safeEqual = (left, right) => {
     return timingSafeEqual(leftBuffer, rightBuffer);
 };
 
-export function assertSessionSecret() {
+export function assertSessionSecret(logger = sessionLogger) {
+    logger.info("consignment.session.env.validation.started", {
+        step: "env_validation_started",
+    });
+
     if (!getSessionSecret()) {
+        logger.error("consignment.session.env.validation.failed", {
+            step: "env_validation_failed",
+            reason: "missing_consignment_session_secret",
+        });
+
         throw new Error("Missing consignment session secret.");
     }
+
+    logger.info("consignment.session.env.validation.passed", {
+        step: "env_validation_passed",
+    });
 }
 
 export function createSessionToken(slug) {
@@ -96,9 +111,42 @@ export async function getAuthenticatedConsignorFromToken(token) {
     return getActiveConsignorBySlug(payload.slug);
 }
 
-export async function getAuthenticatedConsignorFromCookies() {
+export async function getAuthenticatedConsignorFromCookies(logger = sessionLogger) {
+    logger.info("consignment.session.auth.check.started", {
+        step: "auth_check_started",
+        authType: "consignor_session_cookie",
+    });
+
     const cookieStore = await cookies();
     const token = cookieStore.get(CONSIGNMENT_SESSION_COOKIE)?.value;
 
-    return getAuthenticatedConsignorFromToken(token);
+    if (!token) {
+        logger.warn("consignment.session.auth.check.failed", {
+            step: "auth_check_failed",
+            authType: "consignor_session_cookie",
+            reason: "missing_session_cookie",
+        });
+
+        return null;
+    }
+
+    const consignor = await getAuthenticatedConsignorFromToken(token);
+
+    if (!consignor) {
+        logger.warn("consignment.session.auth.check.failed", {
+            step: "auth_check_failed",
+            authType: "consignor_session_cookie",
+            reason: "invalid_or_expired_session",
+        });
+
+        return null;
+    }
+
+    logger.info("consignment.session.auth.check.passed", {
+        step: "auth_check_passed",
+        authType: "consignor_session_cookie",
+        consignorId: consignor.id,
+    });
+
+    return consignor;
 }
