@@ -307,7 +307,11 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
                     lastSoldAt: null,
                 };
                 const quantitySold = Number(lineItem.quantity || 0);
-                const grossRevenue = normalizeMoney(lineItem.gross_sales_money?.amount ?? lineItem.total_money?.amount);
+                // Use base_price_money × quantity (listed item price) so consignor
+                // revenue reflects what the item was priced at, not the post-tax
+                // amount Square reports in gross_sales_money when tax is inclusive.
+                const unitPrice = normalizeMoney(lineItem.base_price_money?.amount ?? lineItem.gross_sales_money?.amount ?? lineItem.total_money?.amount);
+                const grossRevenue = unitPrice * quantitySold;
                 const soldAt = order.closed_at || order.updated_at || null;
 
                 current.quantitySold += quantitySold;
