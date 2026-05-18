@@ -29,9 +29,13 @@ export function verifyAdminApiKey(request, logger = authLogger) {
         authType: "admin_api_key",
     });
 
-    const providedKey = request.headers.get("x-admin-key") || "";
+    const headerKey = request.headers.get("x-admin-key") || "";
+    const authHeader = request.headers.get("authorization") || "";
+    const bearerKey = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+    const providedKey = headerKey || bearerKey;
     const configuredKey = process.env.ADMIN_API_KEY || "";
-    const hasHeader = Boolean(providedKey);
+    const hasHeader = Boolean(headerKey || bearerKey);
+    const authSource = headerKey ? "x-admin-key" : bearerKey ? "authorization_bearer" : "none";
     const hasConfig = Boolean(configuredKey);
 
     if (!isValidAdminKey(providedKey, configuredKey)) {
@@ -40,6 +44,7 @@ export function verifyAdminApiKey(request, logger = authLogger) {
             authType: "admin_api_key",
             reason: hasConfig ? "invalid_key" : "missing_configuration",
             hasHeader,
+            authSource,
             hasConfig,
         });
 
@@ -50,6 +55,7 @@ export function verifyAdminApiKey(request, logger = authLogger) {
         step: "auth_check_passed",
         authType: "admin_api_key",
         hasHeader,
+        authSource,
         hasConfig,
     });
 
