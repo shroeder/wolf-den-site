@@ -46,6 +46,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
     const [error, setError] = useState("");
 
     const totalRevenue = Number(summary?.totalRevenue ?? sales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0));
+    const totalRefunds = Number(summary?.totalRefunds ?? sales.reduce((sum, entry) => sum + Number(entry.refundedRevenue || 0), 0));
     const resolvedRate = Number(summary?.payoutRate ?? consignmentRate);
     const estimatedPayout = Number(summary?.estimatedPayout ?? totalRevenue * resolvedRate);
     const totalUnitsInStock = Number(summary?.unitsInStock ?? inventory.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0));
@@ -178,7 +179,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
 
                     <section className="grid three-col">
                         <article className="card consignment-stat">
-                            <span className="consignment-stat-label">Total Revenue</span>
+                            <span className="consignment-stat-label">Net Revenue</span>
                             <strong>{formatCurrency(totalRevenue)}</strong>
                         </article>
                         <article className="card consignment-stat">
@@ -190,6 +191,19 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                             <strong>{formatCurrency(estimatedPayout)}</strong>
                         </article>
                     </section>
+
+                    {totalRefunds > 0 ? (
+                        <section className="grid two-col">
+                            <article className="card consignment-stat">
+                                <span className="consignment-stat-label">Gross Revenue</span>
+                                <strong>{formatCurrency((summary?.totalGrossRevenue ?? totalRevenue + totalRefunds))}</strong>
+                            </article>
+                            <article className="card consignment-stat">
+                                <span className="consignment-stat-label">Refunds / Returns</span>
+                                <strong>−{formatCurrency(totalRefunds)}</strong>
+                            </article>
+                        </section>
+                    ) : null}
 
                     <section className="grid two-col">
                         <article className="card consignment-stat">
@@ -249,7 +263,8 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                     <tr>
                                         <th>Name</th>
                                         <th>Qty Sold</th>
-                                        <th>Revenue</th>
+                                        {sales.some((item) => item.quantityReturned > 0) ? <th>Qty Returned</th> : null}
+                                        <th>Net Revenue</th>
                                         <th>Last Sold</th>
                                     </tr>
                                 </thead>
@@ -258,6 +273,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                         <tr key={`${item.name}-${item.lastSoldAt || "never"}`}>
                                             <td>{item.name}</td>
                                             <td>{item.quantitySold}</td>
+                                            {sales.some((s) => s.quantityReturned > 0) ? <td>{item.quantityReturned || 0}</td> : null}
                                             <td>{formatCurrency(item.revenue)}</td>
                                             <td>{formatDate(item.lastSoldAt)}</td>
                                         </tr>
