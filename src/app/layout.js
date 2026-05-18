@@ -1,9 +1,6 @@
 import "./globals.css";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
-import SiteHeader from "@/components/SiteHeader";
-import SiteFooter from "@/components/SiteFooter";
-import OpeningBanner from "@/components/OpeningBanner";
 
 const manrope = Manrope({
     subsets: ["latin"],
@@ -141,10 +138,7 @@ export default function RootLayout({ children }) {
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
                 />
-                <OpeningBanner />
-                <SiteHeader />
-                <main className="shell content">{children}</main>
-                <SiteFooter />
+                {children}
             </body>
         </html>
     );

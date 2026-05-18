@@ -437,6 +437,108 @@ textarea:focus-visible {
     background: var(--surface);
 }
 
+.consignment-portal {
+    padding: 1.5rem 0 3rem;
+}
+
+.consignment-hero {
+    background:
+        radial-gradient(circle at top right, rgba(212, 175, 55, 0.12), transparent 32%),
+        linear-gradient(145deg, rgba(31, 31, 31, 0.98), rgba(14, 14, 14, 0.98));
+    border-color: rgba(212, 175, 55, 0.18);
+}
+
+.consignment-lead {
+    max-width: 52ch;
+    margin-bottom: 0;
+}
+
+.consignment-auth,
+.consignment-stat,
+.consignment-table-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)), var(--surface);
+}
+
+.consignment-auth-form {
+    display: grid;
+    gap: 0.8rem;
+    max-width: 420px;
+}
+
+.consignment-auth-form button[disabled] {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.consignment-error {
+    margin: 0;
+    color: #ffb4b4;
+}
+
+.consignment-stat {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.consignment-stat strong {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+}
+
+.consignment-stat-label {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+}
+
+.consignment-section-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: end;
+    margin-bottom: 1rem;
+}
+
+.consignment-section-heading h2 {
+    margin-bottom: 0.25rem;
+}
+
+.consignment-section-heading p {
+    margin: 0;
+}
+
+.consignment-table-wrap {
+    overflow-x: auto;
+}
+
+.consignment-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 540px;
+}
+
+.consignment-table th,
+.consignment-table td {
+    text-align: left;
+    padding: 0.8rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.consignment-table th {
+    color: var(--ink-secondary);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.consignment-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.consignment-empty {
+    color: var(--muted);
+}
+
 .footer-grid {
     display: grid;
     grid-template-columns: 2fr 1.2fr 1.2fr;
@@ -567,6 +669,11 @@ textarea {
 
     .brand {
         width: 100%;
+    }
+
+    .consignment-section-heading {
+        align-items: start;
+        flex-direction: column;
     }
 
     @media (max-width: 700px) {
