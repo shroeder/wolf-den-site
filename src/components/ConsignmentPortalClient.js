@@ -220,60 +220,11 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                     <section className="card consignment-table-card">
                         <div className="consignment-section-heading">
                             <div>
-                                <h2>Inventory</h2>
-                                <p className="secondary">Current Square catalog items assigned to this consignor category.</p>
-                            </div>
-                            {isLoading ? <span className="secondary">Refreshing...</span> : null}
-                        </div>
-                        <div className="consignment-table-wrap">
-                            <table className="consignment-table">
-                                <thead>
-                                    <tr>
-                                        <th>Image</th>
-                                        <th>Name</th>
-                                        <th>Price</th>
-                                        <th>Qty In Stock</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {inventory.length ? inventory.map((item) => (
-                                        <tr key={`${getRowKey(item)}-${item.price}`}>
-                                            <td>
-                                                {item.imageUrl ? (
-                                                    <img
-                                                        className="consignment-item-thumb"
-                                                        src={item.imageUrl}
-                                                        alt={item.name}
-                                                        loading="lazy"
-                                                        width="44"
-                                                        height="44"
-                                                    />
-                                                ) : (
-                                                    <div className="consignment-item-thumb consignment-item-thumb-placeholder" aria-hidden="true" />
-                                                )}
-                                            </td>
-                                            <td>{item.name}</td>
-                                            <td>{formatCurrency(item.price)}</td>
-                                            <td>{item.quantity}</td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan="4" className="consignment-empty">No inventory found for this consignor.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <section className="card consignment-table-card">
-                        <div className="consignment-section-heading">
-                            <div>
                                 <h2>Sales</h2>
                                 <p className="secondary">Completed orders from the configured lookback window, filtered server-side to this consignor’s items only.</p>
                             </div>
                         </div>
-                        <div className="consignment-table-wrap">
+                        <div className="consignment-table-wrap consignment-table-scroll">
                             <table className="consignment-table">
                                 <thead>
                                     <tr>
@@ -313,6 +264,55 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                             <td colSpan={sales.some((item) => item.quantityReturned > 0) ? 6 : 5} className="consignment-empty">
                                                 No completed sales found in the current lookback window.
                                             </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section className="card consignment-table-card">
+                        <div className="consignment-section-heading">
+                            <div>
+                                <h2>Inventory</h2>
+                                <p className="secondary">Current Square catalog items assigned to this consignor category.</p>
+                            </div>
+                            {isLoading ? <span className="secondary">Refreshing...</span> : null}
+                        </div>
+                        <div className="consignment-table-wrap consignment-table-scroll">
+                            <table className="consignment-table">
+                                <thead>
+                                    <tr>
+                                        <th>Image</th>
+                                        <th>Name</th>
+                                        <th>Price</th>
+                                        <th>Qty In Stock</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {inventory.length ? inventory.map((item) => (
+                                        <tr key={`${getRowKey(item)}-${item.price}`}>
+                                            <td>
+                                                {item.imageUrl ? (
+                                                    <img
+                                                        className="consignment-item-thumb"
+                                                        src={item.imageUrl}
+                                                        alt={item.name}
+                                                        loading="lazy"
+                                                        width="44"
+                                                        height="44"
+                                                    />
+                                                ) : (
+                                                    <div className="consignment-item-thumb consignment-item-thumb-placeholder" aria-hidden="true" />
+                                                )}
+                                            </td>
+                                            <td>{item.name}</td>
+                                            <td>{formatCurrency(item.price)}</td>
+                                            <td>{item.quantity}</td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan="4" className="consignment-empty">No inventory found for this consignor.</td>
                                         </tr>
                                     )}
                                 </tbody>

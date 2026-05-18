@@ -511,6 +511,11 @@ textarea:focus-visible {
     overflow-x: auto;
 }
 
+.consignment-table-scroll {
+    max-height: 30rem;
+    overflow: auto;
+}
+
 .consignment-table {
     width: 100%;
     border-collapse: collapse;
