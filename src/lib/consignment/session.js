@@ -1,8 +1,9 @@
 import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
 
-import { getConsignorBySlug } from "@/lib/consignment/config";
+import { getActiveConsignorBySlug } from "@/lib/consignment/config";
 
 export const CONSIGNMENT_SESSION_COOKIE = "wolfden-consignment-session";
 
@@ -92,5 +93,12 @@ export async function getAuthenticatedConsignorFromToken(token) {
         return null;
     }
 
-    return getConsignorBySlug(payload.slug);
+    return getActiveConsignorBySlug(payload.slug);
+}
+
+export async function getAuthenticatedConsignorFromCookies() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(CONSIGNMENT_SESSION_COOKIE)?.value;
+
+    return getAuthenticatedConsignorFromToken(token);
 }

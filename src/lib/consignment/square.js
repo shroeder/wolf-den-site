@@ -3,6 +3,16 @@ import "server-only";
 const SQUARE_API_BASE = "https://connect.squareup.com";
 const DEFAULT_SALES_LOOKBACK_DAYS = 90;
 
+const normalizeLookbackDays = (value) => {
+    const nextValue = Number(value);
+
+    if (!Number.isFinite(nextValue) || nextValue <= 0) {
+        return DEFAULT_SALES_LOOKBACK_DAYS;
+    }
+
+    return Math.floor(nextValue);
+};
+
 const toDisplayName = (itemName, variationName) => {
     if (!variationName || variationName === "Regular") {
         return itemName;
@@ -131,14 +141,15 @@ export async function getInventoryCounts(variationIds) {
     return totals;
 }
 
-export async function searchSalesForVariations(variationLookup) {
+export async function searchSalesForVariations(variationLookup, options = {}) {
     const locationId = process.env.SQUARE_LOCATION_ID;
 
     if (!locationId) {
         throw new Error("Missing Square location ID.");
     }
 
-    const startDate = new Date(Date.now() - DEFAULT_SALES_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const lookbackDays = normalizeLookbackDays(options.lookbackDays);
+    const startDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
     const endDate = new Date().toISOString();
     const aggregates = new Map();
     let cursor = null;

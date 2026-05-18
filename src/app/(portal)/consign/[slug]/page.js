@@ -41,7 +41,7 @@ export default async function ConsignmentPortalPage({ params }) {
 
     const cookieStore = await cookies();
     const token = cookieStore.get(CONSIGNMENT_SESSION_COOKIE)?.value;
-    const authenticatedConsignor = getAuthenticatedConsignorFromToken(token);
+    const authenticatedConsignor = await getAuthenticatedConsignorFromToken(token);
     const initialAuthenticated = authenticatedConsignor?.slug === consignor.slug;
 
     return (

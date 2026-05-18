@@ -39,14 +39,16 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
     const [password, setPassword] = useState("");
     const [inventory, setInventory] = useState([]);
     const [sales, setSales] = useState([]);
+    const [summary, setSummary] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(initialAuthenticated);
     const [isLoading, setIsLoading] = useState(initialAuthenticated);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
 
-    const totalRevenue = sales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
-    const estimatedPayout = totalRevenue * consignmentRate;
-    const totalUnitsInStock = inventory.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0);
+    const totalRevenue = Number(summary?.totalRevenue ?? sales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0));
+    const resolvedRate = Number(summary?.payoutRate ?? consignmentRate);
+    const estimatedPayout = Number(summary?.estimatedPayout ?? totalRevenue * resolvedRate);
+    const totalUnitsInStock = Number(summary?.unitsInStock ?? inventory.reduce((sum, entry) => sum + Number(entry.quantity || 0), 0));
 
     useEffect(() => {
         if (!initialAuthenticated) {
@@ -60,17 +62,15 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
             setError("");
 
             try {
-                const [nextInventory, nextSales] = await Promise.all([
-                    loadJson("/api/consignment/inventory"),
-                    loadJson("/api/consignment/sales"),
-                ]);
+                const dashboard = await loadJson("/api/consignment/dashboard");
 
                 if (!active) {
                     return;
                 }
 
-                setInventory(nextInventory);
-                setSales(nextSales);
+                setInventory(Array.isArray(dashboard?.inventory) ? dashboard.inventory : []);
+                setSales(Array.isArray(dashboard?.sales) ? dashboard.sales : []);
+                setSummary(dashboard?.summary || null);
                 setIsAuthenticated(true);
             } catch (fetchError) {
                 if (!active) {
@@ -81,6 +81,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                     setIsAuthenticated(false);
                     setInventory([]);
                     setSales([]);
+                    setSummary(null);
                 } else {
                     setError("Unable to load portal data right now.");
                 }
@@ -125,13 +126,11 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
             setPassword("");
             setIsLoading(true);
 
-            const [nextInventory, nextSales] = await Promise.all([
-                loadJson("/api/consignment/inventory"),
-                loadJson("/api/consignment/sales"),
-            ]);
+            const dashboard = await loadJson("/api/consignment/dashboard");
 
-            setInventory(nextInventory);
-            setSales(nextSales);
+            setInventory(Array.isArray(dashboard?.inventory) ? dashboard.inventory : []);
+            setSales(Array.isArray(dashboard?.sales) ? dashboard.sales : []);
+            setSummary(dashboard?.summary || null);
             setIsAuthenticated(true);
         } catch {
             setError("Unable to sign in right now.");
@@ -184,7 +183,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                         </article>
                         <article className="card consignment-stat">
                             <span className="consignment-stat-label">Consignment Rate</span>
-                            <strong>{Math.round(consignmentRate * 100)}%</strong>
+                            <strong>{Math.round(resolvedRate * 100)}%</strong>
                         </article>
                         <article className="card consignment-stat">
                             <span className="consignment-stat-label">Estimated Payout</span>

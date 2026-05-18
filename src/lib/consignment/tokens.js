@@ -69,3 +69,14 @@ export async function consumeSetupToken(tokenId) {
         [tokenId]
     );
 }
+
+export async function invalidateUnusedSetupTokens(consignorId) {
+    await db.query(
+        `UPDATE consignor_setup_tokens
+         SET used_at = NOW()
+         WHERE consignor_id = $1
+           AND used_at IS NULL
+           AND expires_at > NOW()`,
+        [consignorId]
+    );
+}

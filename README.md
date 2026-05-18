@@ -108,15 +108,24 @@ Setup tokens expire after 14 days.
 
 - `GET /consign/[slug]` — Portal page (requires auth)
 - `POST /api/consignment/auth` — Password login
-- `GET /api/consignment/inventory` — Authenticated inventory list
-- `GET /api/consignment/sales` — Authenticated sales history
+- `GET /api/consignment/me` — Current authenticated consignor profile/status
+- `GET /api/consignment/dashboard` — Authenticated inventory, sales, and summary
+- `GET /api/consignment/inventory` — Authenticated inventory list (legacy)
+- `GET /api/consignment/sales` — Authenticated sales history (legacy)
 - `POST /api/consignment/change-password` — Password change (future)
 
 ### Internal Admin API (Temporary)
 
 These endpoints are for the private sideloaded internal phone app during development.
 
-- `POST /api/admin/consignors/create` — Creates consignor and sends setup email
+- `GET /api/admin/consignors` — List consignors with onboarding status
+- `GET /api/admin/consignors/:id` — Consignor profile/config + onboarding + summary totals
+- `POST /api/admin/consignors/create` — Create consignor and send setup email
+- `POST /api/admin/consignors/:id/invite` — Re-send onboarding invite and invalidate old unused tokens
+- `PATCH /api/admin/consignors/:id` — Update profile/config fields
+- `POST /api/admin/consignors/:id/revoke` — Set active false and invalidate unused setup tokens
+- `POST /api/admin/consignors/:id/restore` — Set active true
+- `GET /api/admin/consignors/:id/dashboard` — Same normalized dashboard payload used by consignor portal
 
 Admin auth requirements:
 - Header: `x-admin-key: <ADMIN_API_KEY>`

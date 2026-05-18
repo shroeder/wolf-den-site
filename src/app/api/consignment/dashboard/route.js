@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getConsignorSales } from "@/lib/consignment/portal-data";
+import { getConsignorDashboard } from "@/lib/consignment/portal-data";
 import { getAuthenticatedConsignorFromCookies } from "@/lib/consignment/session";
 
 export const runtime = "nodejs";
@@ -10,17 +10,17 @@ export async function GET() {
         const consignor = await getAuthenticatedConsignorFromCookies();
 
         if (!consignor) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ error: "unauthorized" }, { status: 401 });
         }
 
-        const sales = await getConsignorSales(consignor.id);
+        const dashboard = await getConsignorDashboard(consignor.id);
 
-        return NextResponse.json(sales, {
+        return NextResponse.json(dashboard, {
             headers: {
                 "Cache-Control": "no-store",
             },
         });
     } catch {
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: "internal_server_error" }, { status: 500 });
     }
 }
