@@ -19,7 +19,7 @@ function getDefaultWindow() {
 
 async function listEnabledConsignors() {
     return db.query(
-        `SELECT id, display_name, email, square_category_id, payout_rate, created_at
+                `SELECT id, slug, display_name, email, square_category_id, payout_rate, created_at
          FROM consignors
          WHERE active = TRUE
            AND nightly_reports_enabled = TRUE

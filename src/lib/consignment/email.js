@@ -84,6 +84,8 @@ function formatSalesRows(salesEntries) {
 export async function sendNightlyConsignmentReportEmail(consignor, report) {
     const resend = getResendClient();
     const subjectDate = dateOnly.format(new Date(report.windowStart));
+    const portalUrl = new URL(`/consign/${consignor.slug}`, process.env.NEXT_PUBLIC_BASE_URL || "https://wolfdengamingmn.com");
+
     const result = await resend.emails.send({
         from: "The Wolf Den <portal@wolfdengamingmn.com>",
         to: consignor.email,
@@ -94,6 +96,14 @@ export async function sendNightlyConsignmentReportEmail(consignor, report) {
             <h2 style="margin-top:24px;">Sold Today</h2>
             ${formatSalesRows(report.dailySales)}
             <p style="margin-top:16px;"><strong>Today net sales:</strong> ${currency.format(Number(report.todayNetRevenue || 0))}</p>
+            <p style="margin-top:16px;">
+                <a
+                    href="${portalUrl.toString()}"
+                    style="display:inline-block;padding:12px 20px;background:#D4AF37;color:#0E0E0E;text-decoration:none;border-radius:6px;font-weight:700;"
+                >
+                    Open Consignment Portal
+                </a>
+            </p>
             <hr style="margin:24px 0;" />
             <h2>Current Owed</h2>
             <p><strong>${currency.format(Number(report.currentOwed || 0))}</strong> (net sales ${currency.format(Number(report.totalNetRevenue || 0))} × payout rate ${(Number(report.payoutRate || 0) * 100).toFixed(1)}%)</p>
