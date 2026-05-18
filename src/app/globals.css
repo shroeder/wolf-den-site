@@ -539,6 +539,21 @@ textarea:focus-visible {
     color: var(--muted);
 }
 
+.consignment-item-thumb {
+    display: block;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.consignment-item-thumb-placeholder {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.12));
+}
+
 .footer-grid {
     display: grid;
     grid-template-columns: 2fr 1.2fr 1.2fr;

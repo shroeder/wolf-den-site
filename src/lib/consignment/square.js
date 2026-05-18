@@ -36,6 +36,45 @@ const chunk = (values, size) => {
     return chunks;
 };
 
+const getCatalogImageId = (item, variation) => {
+    const variationImageId = variation.item_variation_data?.image_ids?.[0];
+
+    if (variationImageId) {
+        return variationImageId;
+    }
+
+    return item.item_data?.image_ids?.[0] || null;
+};
+
+async function getImageUrlLookup(imageIds) {
+    const urls = new Map();
+
+    for (const batch of chunk(imageIds, 1000)) {
+        if (!batch.length) {
+            continue;
+        }
+
+        const payload = await squareFetch("/v2/catalog/batch-retrieve", {
+            method: "POST",
+            body: JSON.stringify({
+                object_ids: batch,
+            }),
+        });
+
+        for (const object of payload.objects || []) {
+            if (object.type !== "IMAGE") {
+                continue;
+            }
+
+            if (object.id && object.image_data?.url) {
+                urls.set(object.id, object.image_data.url);
+            }
+        }
+    }
+
+    return urls;
+}
+
 function getSquareHeaders() {
     squareLogger.info("square.env.validation.started", {
         step: "env_validation_started",
@@ -127,6 +166,7 @@ async function squareFetch(path, init = {}) {
 
 export async function listConsignorCatalog(categoryId) {
     const variations = [];
+    const imageIds = new Set();
     let cursor = null;
 
     do {
@@ -156,10 +196,17 @@ export async function listConsignorCatalog(categoryId) {
             }
 
             for (const variation of item.item_data?.variations || []) {
+                const imageId = getCatalogImageId(item, variation);
+
+                if (imageId) {
+                    imageIds.add(imageId);
+                }
+
                 variations.push({
                     id: variation.id,
                     name: toDisplayName(item.item_data?.name || "Unnamed Item", variation.item_variation_data?.name),
                     price: normalizeMoney(variation.item_variation_data?.price_money?.amount),
+                    imageId,
                 });
             }
         }
@@ -167,12 +214,19 @@ export async function listConsignorCatalog(categoryId) {
         cursor = payload.cursor || null;
     } while (cursor);
 
+    const imageUrlLookup = await getImageUrlLookup(Array.from(imageIds));
+
     squareLogger.info("square.catalog.list.completed", {
         categoryId,
         variationCount: variations.length,
     });
 
-    return variations;
+    return variations.map((variation) => ({
+        id: variation.id,
+        name: variation.name,
+        price: variation.price,
+        imageUrl: variation.imageId ? imageUrlLookup.get(variation.imageId) || null : null,
+    }));
 }
 
 export async function getInventoryCounts(variationIds) {
@@ -299,6 +353,7 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
 
                 const current = aggregates.get(variationId) || {
                     name: variation.name,
+                    imageUrl: variation.imageUrl || null,
                     quantitySold: 0,
                     quantityReturned: 0,
                     grossRevenue: 0,
@@ -339,6 +394,7 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
 
                     const current = aggregates.get(variationId) || {
                         name: variationLookup.get(variationId).name,
+                        imageUrl: variationLookup.get(variationId).imageUrl || null,
                         quantitySold: 0,
                         quantityReturned: 0,
                         grossRevenue: 0,

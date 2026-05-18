@@ -69,6 +69,7 @@ async function buildDashboard(consignor, options = {}) {
         .map((item) => ({
             name: item.name,
             price: item.price,
+            imageUrl: item.imageUrl || null,
             quantity: counts.get(item.id) || 0,
         }))
         .sort(sortByName);

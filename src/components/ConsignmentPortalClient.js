@@ -15,6 +15,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 
 const formatCurrency = (value) => currencyFormatter.format(Number(value || 0));
 const formatDate = (value) => (value ? dateFormatter.format(new Date(value)) : "-");
+const getRowKey = (item) => `${item.name}-${item.imageUrl || "no-image"}`;
 
 const loadJson = async (url) => {
     const response = await fetch(url, {
@@ -228,6 +229,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                             <table className="consignment-table">
                                 <thead>
                                     <tr>
+                                        <th>Image</th>
                                         <th>Name</th>
                                         <th>Price</th>
                                         <th>Qty In Stock</th>
@@ -235,14 +237,28 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                 </thead>
                                 <tbody>
                                     {inventory.length ? inventory.map((item) => (
-                                        <tr key={`${item.name}-${item.price}`}>
+                                        <tr key={`${getRowKey(item)}-${item.price}`}>
+                                            <td>
+                                                {item.imageUrl ? (
+                                                    <img
+                                                        className="consignment-item-thumb"
+                                                        src={item.imageUrl}
+                                                        alt={item.name}
+                                                        loading="lazy"
+                                                        width="44"
+                                                        height="44"
+                                                    />
+                                                ) : (
+                                                    <div className="consignment-item-thumb consignment-item-thumb-placeholder" aria-hidden="true" />
+                                                )}
+                                            </td>
                                             <td>{item.name}</td>
                                             <td>{formatCurrency(item.price)}</td>
                                             <td>{item.quantity}</td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan="3" className="consignment-empty">No inventory found for this consignor.</td>
+                                            <td colSpan="4" className="consignment-empty">No inventory found for this consignor.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -261,6 +277,7 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                             <table className="consignment-table">
                                 <thead>
                                     <tr>
+                                        <th>Image</th>
                                         <th>Name</th>
                                         <th>Qty Sold</th>
                                         {sales.some((item) => item.quantityReturned > 0) ? <th>Qty Returned</th> : null}
@@ -270,7 +287,21 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                 </thead>
                                 <tbody>
                                     {sales.length ? sales.map((item) => (
-                                        <tr key={`${item.name}-${item.lastSoldAt || "never"}`}>
+                                        <tr key={`${getRowKey(item)}-${item.lastSoldAt || "never"}`}>
+                                            <td>
+                                                {item.imageUrl ? (
+                                                    <img
+                                                        className="consignment-item-thumb"
+                                                        src={item.imageUrl}
+                                                        alt={item.name}
+                                                        loading="lazy"
+                                                        width="44"
+                                                        height="44"
+                                                    />
+                                                ) : (
+                                                    <div className="consignment-item-thumb consignment-item-thumb-placeholder" aria-hidden="true" />
+                                                )}
+                                            </td>
                                             <td>{item.name}</td>
                                             <td>{item.quantitySold}</td>
                                             {sales.some((s) => s.quantityReturned > 0) ? <td>{item.quantityReturned || 0}</td> : null}
@@ -279,7 +310,9 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan="4" className="consignment-empty">No completed sales found in the current lookback window.</td>
+                                            <td colSpan={sales.some((item) => item.quantityReturned > 0) ? 6 : 5} className="consignment-empty">
+                                                No completed sales found in the current lookback window.
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>
