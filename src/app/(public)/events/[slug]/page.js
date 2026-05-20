@@ -114,6 +114,31 @@ export default async function EventDetailPage({ params }) {
                 </article>
             </section>
 
+            {event.details && (
+                <section className="card">
+                    <h2>What to Expect</h2>
+                    {event.details.whatToExpect && (
+                        <div>
+                            <ul>
+                                {event.details.whatToExpect.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {event.details.whoShould && (
+                        <p>
+                            <strong>Who Should Come:</strong> {event.details.whoShould}
+                        </p>
+                    )}
+                    {event.details.note && (
+                        <p className="muted">
+                            <em>{event.details.note}</em>
+                        </p>
+                    )}
+                </section>
+            )}
+
             <section className="card">
                 <h2>Future Plans</h2>
                 <p>

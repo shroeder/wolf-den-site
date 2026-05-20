@@ -41,6 +41,38 @@ export const events = [
         refundPolicy:
             "No paid entry required for this event.",
     },
+    {
+        slug: "pokemon-beginner-community-day",
+        title: "Pokemon Beginner Community Day at The Wolf Den",
+        day: "Saturdays",
+        date: "Weekly",
+        time: "2:00 PM",
+        format: "Casual open-play games, trading, learning, and community hangout",
+        entryFee: "Free",
+        rsvp: "Discord for updates",
+        capacity: "Community seating",
+        seatsRemaining: "Open",
+        beginnerFriendly: true,
+        description:
+            "Come hang out and learn Pokemon with us! Saturday at 2:00 PM, The Wolf Den hosts a relaxed, beginner-focused community event for kids, parents, and new players.",
+        rules:
+            "This is intentionally casual and community-driven—not a tournament or competition. Bring your own deck if you have one, but don't worry if you don't (we'll have extra decks available to learn with). Our goal is to help new players get comfortable with the game, meet other local players, and build a welcoming Pokemon community. Experienced players and staff are happy to help teach and answer questions as time allows.",
+        details: {
+            whatToExpect: [
+                "A relaxed, no-pressure environment focused on learning and fun",
+                "Casual games and trading with other players",
+                "Help from experienced players if you're new to the game",
+                "Opportunity to meet other Pokemon fans and new players in the community",
+                "Extra decks available to learn with (no deck required)",
+            ],
+            whoShould: "Kids, parents, brand new players, and returning players of all experience levels. Everyone is welcome!",
+            note: "We're gauging community interest and building this event based on what players want. The format may evolve as our local community grows. Parents are encouraged to stay, participate, and hang out with us.",
+        },
+        futurePlans:
+            "As interest grows, we may expand to different formats, organized play, special events, or additional time slots based on community feedback.",
+        refundPolicy:
+            "No paid entry required for this event.",
+    },
 ];
 
 export function getEventBySlug(slug) {
