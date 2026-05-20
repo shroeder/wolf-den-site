@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Resend } from "resend";
+import { SITE_URL } from "@/lib/site";
 
 const currency = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -25,7 +26,7 @@ function getResendClient() {
 
 export async function sendSetupEmail(consignor, setupToken) {
     const resend = getResendClient();
-    const setupUrl = new URL("/consign/setup", process.env.NEXT_PUBLIC_BASE_URL || "https://wolfdengamingmn.com");
+    const setupUrl = new URL("/consign/setup", process.env.NEXT_PUBLIC_BASE_URL || SITE_URL);
 
     setupUrl.searchParams.set("token", setupToken);
 
@@ -84,7 +85,7 @@ function formatSalesRows(salesEntries) {
 export async function sendNightlyConsignmentReportEmail(consignor, report) {
     const resend = getResendClient();
     const subjectDate = dateOnly.format(new Date(report.windowStart));
-    const portalUrl = new URL(`/consign/${consignor.slug}`, process.env.NEXT_PUBLIC_BASE_URL || "https://wolfdengamingmn.com");
+    const portalUrl = new URL(`/consign/${consignor.slug}`, process.env.NEXT_PUBLIC_BASE_URL || SITE_URL);
 
     const result = await resend.emails.send({
         from: "The Wolf Den <portal@wolfdengamingmn.com>",

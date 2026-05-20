@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
+import { SITE_URL } from "@/lib/site";
 
 const manrope = Manrope({
     subsets: ["latin"],
@@ -13,7 +14,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-    metadataBase: new URL("https://www.wolfdengamingmn.com"),
+    metadataBase: new URL(SITE_URL),
     title: {
         default: "The Wolf Den",
         template: "%s | The Wolf Den",
@@ -58,7 +59,7 @@ export const metadata = {
         title: "The Wolf Den",
         description:
             "Pokemon and Magic cards in Montgomery, MN, serving players across southern Minnesota including New Prague, Lonsdale, Faribault, Northfield, and Le Sueur.",
-        url: "https://wolfdengamingmn.com",
+        url: SITE_URL,
         images: [{ url: "/logo/wolf-den-full-logo.png", width: 420, height: 280, alt: "The Wolf Den logo" }],
     },
     twitter: {
@@ -76,7 +77,7 @@ const localBusinessSchema = {
     name: "The Wolf Den",
     description:
         "Locally owned trading card game store in Montgomery, Minnesota offering Pokemon cards, Magic: The Gathering, singles, sealed product, accessories, and community play.",
-    url: "https://wolfdengamingmn.com",
+    url: SITE_URL,
     telephone: "+15073016434",
     email: "luke@wolfdengamingmn.com",
     address: {
@@ -93,9 +94,9 @@ const localBusinessSchema = {
         longitude: -93.5836,
     },
     image: [
-        "https://wolfdengamingmn.com/logo/wolf-den-full-logo.png",
-        "https://wolfdengamingmn.com/images/trading-card-store-interior-the-wolf-den-montgomery-mn.jpg",
-        "https://wolfdengamingmn.com/images/local-game-store-interior-the-wolf-den-montgomery-mn.jpg",
+        `${SITE_URL}/logo/wolf-den-full-logo.png`,
+        `${SITE_URL}/images/trading-card-store-interior-the-wolf-den-montgomery-mn.jpg`,
+        `${SITE_URL}/images/local-game-store-interior-the-wolf-den-montgomery-mn.jpg`,
     ],
     priceRange: "$$",
     areaServed: [

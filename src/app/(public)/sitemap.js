@@ -1,6 +1,7 @@
 import { events } from "@/lib/events";
+import { SITE_URL } from "@/lib/site";
 
-const BASE_URL = "https://www.wolfdengamingmn.com";
+const BASE_URL = SITE_URL;
 
 export default function sitemap() {
     const staticRoutes = [

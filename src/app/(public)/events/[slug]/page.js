@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { events, getEventBySlug } from "@/lib/events";
+import { SITE_URL } from "@/lib/site";
 
 export function generateStaticParams() {
     return events.map((event) => ({ slug: event.slug }));
@@ -36,7 +37,7 @@ export default async function EventDetailPage({ params }) {
         description: event.description,
         eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
         eventStatus: "https://schema.org/EventScheduled",
-        url: `https://wolfdengamingmn.com/events/${event.slug}`,
+        url: `${SITE_URL}/events/${event.slug}`,
         location: {
             "@type": "Place",
             name: "The Wolf Den",
@@ -52,7 +53,7 @@ export default async function EventDetailPage({ params }) {
         organizer: {
             "@type": "Organization",
             name: "The Wolf Den",
-            url: "https://wolfdengamingmn.com",
+            url: SITE_URL,
         },
         offers: {
             "@type": "Offer",
@@ -132,3 +133,4 @@ export default async function EventDetailPage({ params }) {
         </div>
     );
 }
+
