@@ -835,3 +835,91 @@ textarea {
     font-weight: 700;
     color: var(--ink-secondary);
 }
+
+.footer-secret-wrap {
+    margin: 0.1rem 0 0;
+}
+
+.footer-secret-link {
+    color: rgba(212, 175, 55, 0.2);
+    text-decoration: none;
+    font-size: 0.95rem;
+    letter-spacing: 0.12em;
+}
+
+.footer-secret-link:hover,
+.footer-secret-link:focus-visible {
+    color: rgba(212, 175, 55, 0.55);
+}
+
+.giveaway-wrap {
+    background:
+        radial-gradient(circle at 10% 10%, rgba(212, 175, 55, 0.12), transparent 35%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0)),
+        var(--surface);
+    border-color: rgba(212, 175, 55, 0.22);
+}
+
+.giveaway-wheel-zone {
+    position: relative;
+    width: min(390px, 90vw);
+    margin: 1rem auto 0.8rem;
+}
+
+.giveaway-pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 28px solid var(--accent);
+    z-index: 2;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+}
+
+.giveaway-wheel {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 10px solid #111;
+    box-shadow:
+        inset 0 0 0 3px rgba(255, 255, 255, 0.08),
+        0 18px 28px rgba(0, 0, 0, 0.55);
+    transition: transform 4.3s cubic-bezier(0.2, 0.8, 0.1, 1);
+}
+
+.giveaway-wheel::after {
+    content: "";
+    position: absolute;
+    inset: 47%;
+    background: var(--bg);
+    border: 3px solid rgba(212, 175, 55, 0.45);
+    border-radius: 50%;
+}
+
+.giveaway-actions {
+    display: flex;
+    justify-content: center;
+    margin: 0.3rem 0 0.8rem;
+}
+
+.giveaway-result {
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(212, 175, 55, 0.28);
+    background: rgba(212, 175, 55, 0.08);
+}
+
+.giveaway-result h3 {
+    margin-top: 0;
+}
+
+.giveaway-prizes {
+    margin-top: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
