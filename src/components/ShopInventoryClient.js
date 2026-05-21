@@ -13,6 +13,13 @@ export default function ShopInventoryClient({ categories }) {
     const [searchTerm, setSearchTerm] = useState("");
 
     const active = categories.find((c) => c.id === activeId) ?? categories[0];
+
+    const closeModalOnOverlayInteraction = (event) => {
+        if (event.target === event.currentTarget) {
+            setModalItem(null);
+        }
+    };
+
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const isSearching = normalizedSearch.length > 0;
 
@@ -146,7 +153,11 @@ export default function ShopInventoryClient({ categories }) {
             )}
 
             {modalItem && (
-                <div className="shop-image-modal" onClick={() => setModalItem(null)}>
+                <div
+                    className="shop-image-modal"
+                    onClick={closeModalOnOverlayInteraction}
+                    onPointerDown={closeModalOnOverlayInteraction}
+                >
                     <div className="shop-image-modal-card" onClick={(event) => event.stopPropagation()}>
                         <button className="shop-image-modal-close" onClick={() => setModalItem(null)} aria-label="Close image">
                             Close
