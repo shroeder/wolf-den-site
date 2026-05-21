@@ -17,19 +17,8 @@ export default async function ShopPage() {
 
     return (
         <div className="stack reveal">
-            <section className="card hero-accent">
-                <h1>Shop Inventory</h1>
-                <p>
-                    The Wolf Den carries Pokemon cards, Magic: The Gathering, sealed product, singles, and accessories in Montgomery, Minnesota.
-                </p>
-                <p>
-                    Inventory rotates based on releases, distributor availability, local trade-ins, and in-store demand. The list below reflects what is currently in stock.
-                </p>
-            </section>
-
             {categories && categories.length > 0 ? (
                 <section className="card">
-                    <h2>Current In-Stock Inventory</h2>
                     <ShopInventoryClient categories={categories} />
                 </section>
             ) : (

@@ -10,8 +10,19 @@ const formatPrice = (price) => {
 export default function ShopInventoryClient({ categories }) {
     const [activeId, setActiveId] = useState(categories[0]?.id ?? null);
     const [modalItem, setModalItem] = useState(null);
+    const [searchTerm, setSearchTerm] = useState("");
 
     const active = categories.find((c) => c.id === activeId) ?? categories[0];
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const isSearching = normalizedSearch.length > 0;
+
+    const visibleItems = isSearching
+        ? categories.flatMap((category) =>
+              category.items
+                  .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+                  .map((item) => ({ ...item, categoryName: category.name }))
+          )
+        : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
     useEffect(() => {
         const onEscape = (event) => {
             if (event.key === "Escape") {
@@ -39,6 +50,25 @@ export default function ShopInventoryClient({ categories }) {
 
     return (
         <div className="shop-inventory">
+            <div className="shop-search-row">
+                <label htmlFor="shop-product-search" className="sr-only">
+                    Search products across categories
+                </label>
+                <input
+                    id="shop-product-search"
+                    type="search"
+                    className="shop-search-input"
+                    placeholder="Search products across all categories"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                />
+                {isSearching && (
+                    <p className="secondary shop-search-meta">
+                        {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
+                    </p>
+                )}
+            </div>
+
             <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
                 {categories.map((category) => (
                     <button
@@ -67,9 +97,9 @@ export default function ShopInventoryClient({ categories }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {active.items.map((item) => (
+                                    {visibleItems.map((item) => (
                                         <tr
-                                            key={item.id}
+                                            key={`${item.id}-${item.categoryName}`}
                                             className={item.imageUrl ? "shop-row-has-image" : undefined}
                                             onClick={() => {
                                                 if (item.imageUrl) {
@@ -87,7 +117,10 @@ export default function ShopInventoryClient({ categories }) {
                                                             loading="lazy"
                                                         />
                                                     )}
-                                                    <span>{item.name}</span>
+                                                    <span>
+                                                        {item.name}
+                                                        {isSearching && <small className="shop-item-category">{item.categoryName}</small>}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td className="shop-col-price">
@@ -98,6 +131,13 @@ export default function ShopInventoryClient({ categories }) {
                                             </td>
                                         </tr>
                                     ))}
+                                    {visibleItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={3} className="consignment-empty">
+                                                No products matched "{searchTerm}".
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
