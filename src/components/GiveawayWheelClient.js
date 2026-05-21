@@ -85,7 +85,26 @@ export default function GiveawayWheelClient() {
                     }}
                     aria-label="Prize wheel"
                     role="img"
-                />
+                >
+                    {PRIZES.map((prize, index) => {
+                        const angle = index * segmentAngle + segmentAngle / 2;
+
+                        return (
+                            <div
+                                key={prize.code}
+                                className="giveaway-segment-label"
+                                style={{ transform: `rotate(${angle}deg)` }}
+                            >
+                                <span
+                                    className="giveaway-segment-text"
+                                    style={{ transform: `rotate(${-angle}deg)` }}
+                                >
+                                    {prize.label}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             <div className="giveaway-actions">
