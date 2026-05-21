@@ -50,7 +50,7 @@ export default function PokemonCardsPage() {
                 </div>
                 <div className="showcase-media">
                     <Image
-                        src="/images/pokemon-etbs-and-sealed-product-the-wolf-den-montgomery-mn.jpg"
+                        src="/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg"
                         alt="Pokemon sealed products and accessories on store shelves at The Wolf Den in Montgomery, Minnesota"
                         width={1200}
                         height={900}
@@ -94,7 +94,7 @@ export default function PokemonCardsPage() {
                 <article className="card lift">
                     <h2>Pokemon Product Shelves</h2>
                     <Image
-                        src="/images/pokemon-etbs-and-sealed-product-the-wolf-den-montgomery-mn.jpg"
+                        src="/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg"
                         alt="Pokemon ETBs, booster boxes, and sealed product on retail shelves at The Wolf Den in Montgomery, Minnesota"
                         width={1200}
                         height={900}
