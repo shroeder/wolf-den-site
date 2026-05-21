@@ -155,11 +155,15 @@ export default function ShopInventoryClient({ categories }) {
             {modalItem && (
                 <div
                     className="shop-image-modal"
-                    onClick={closeModalOnOverlayInteraction}
-                    onPointerDown={closeModalOnOverlayInteraction}
+                    onMouseDown={closeModalOnOverlayInteraction}
+                    onTouchStart={closeModalOnOverlayInteraction}
                 >
-                    <div className="shop-image-modal-card" onClick={(event) => event.stopPropagation()}>
-                        <button className="shop-image-modal-close" onClick={() => setModalItem(null)} aria-label="Close image">
+                    <div
+                        className="shop-image-modal-card"
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onTouchStart={(event) => event.stopPropagation()}
+                    >
+                        <button type="button" className="shop-image-modal-close" onClick={() => setModalItem(null)} aria-label="Close image">
                             Close
                         </button>
                         <h3>{modalItem.name}</h3>

@@ -906,17 +906,18 @@ textarea {
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
 }
 
 .shop-image-modal-card {
     position: relative;
     width: min(860px, 96vw);
-    max-height: calc(100vh - 2rem);
-    overflow: auto;
+    max-height: 70vh;
+    overflow: hidden;
+    display: grid;
+    gap: 0.55rem;
     padding: 1rem;
+    padding-top: 2.35rem;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.13);
     background: var(--surface);
@@ -924,9 +925,10 @@ textarea {
 }
 
 .shop-image-modal-close {
-    position: sticky;
-    top: 0;
-    margin-left: auto;
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    z-index: 2;
     display: inline-flex;
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -940,11 +942,11 @@ textarea {
 
 .shop-image-modal-photo {
     width: 100%;
+    max-height: calc(70vh - 8.8rem);
     height: auto;
     border-radius: 12px;
     border: 1px solid var(--line);
     object-fit: contain;
-    margin-top: 0.5rem;
 }
 
 .footer-secret-wrap {
