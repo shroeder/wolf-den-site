@@ -88,7 +88,9 @@ export default function GiveawayWheelClient() {
                     role="img"
                 >
                     {PRIZES.map((prize, index) => {
-                        const angle = index * segmentAngle + segmentAngle / 2;
+                        // conic-gradient starts at 12 o'clock, but CSS rotate(0deg)
+                        // points to 3 o'clock, so subtract 90deg to align labels.
+                        const angle = index * segmentAngle + segmentAngle / 2 - 90;
 
                         return (
                             <div
