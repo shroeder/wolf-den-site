@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const GIVEAWAY_STORAGE_KEY = "wolfden_giveaway_spin_v1";
+const GIVEAWAY_END_AT = "2026-05-21T19:00:00-05:00";
 
 const PRIZES = [
     { label: "$5 Off", detail: "Get $5 off your next purchase.", code: "WOLF5" },
@@ -43,14 +46,40 @@ export default function GiveawayWheelClient() {
     const [rotation, setRotation] = useState(0);
     const [spinning, setSpinning] = useState(false);
     const [resultIndex, setResultIndex] = useState(null);
+    const [hasSpun, setHasSpun] = useState(false);
 
     const segmentAngle = 360 / PRIZES.length;
     const wheelBackground = useMemo(() => buildWheelGradient(PRIZES.length), []);
+    const hasExpired = Date.now() >= new Date(GIVEAWAY_END_AT).getTime();
 
     const result = resultIndex === null ? null : PRIZES[resultIndex];
 
+    useEffect(() => {
+        if (hasExpired) {
+            return;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(GIVEAWAY_STORAGE_KEY);
+
+            if (!raw) {
+                return;
+            }
+
+            const parsed = JSON.parse(raw);
+            const index = Number(parsed?.resultIndex);
+
+            if (Number.isInteger(index) && index >= 0 && index < PRIZES.length) {
+                setResultIndex(index);
+                setHasSpun(true);
+            }
+        } catch {
+            // Ignore bad local storage values and continue.
+        }
+    }, [hasExpired]);
+
     const spin = () => {
-        if (spinning) {
+        if (spinning || hasExpired || hasSpun) {
             return;
         }
 
@@ -67,7 +96,20 @@ export default function GiveawayWheelClient() {
 
         window.setTimeout(() => {
             setResultIndex(nextIndex);
+            setHasSpun(true);
             setSpinning(false);
+
+            try {
+                window.localStorage.setItem(
+                    GIVEAWAY_STORAGE_KEY,
+                    JSON.stringify({
+                        resultIndex: nextIndex,
+                        spunAt: new Date().toISOString(),
+                    })
+                );
+            } catch {
+                // If storage fails, the wheel still works for this session.
+            }
         }, 4300);
     };
 
@@ -75,6 +117,8 @@ export default function GiveawayWheelClient() {
         <section className="giveaway-wrap card">
             <h2>Spin The Wolf Wheel</h2>
             <p className="secondary">Tap spin to win a random discount or bonus dollar amount for in-store use.</p>
+            {hasExpired && <p className="consignment-empty">This giveaway ended on May 21 at 7:00 PM.</p>}
+            {!hasExpired && hasSpun && <p className="consignment-empty">This device has already used its one spin.</p>}
 
             <div className="giveaway-wheel-zone">
                 <div className="giveaway-pointer" aria-hidden="true" />
@@ -111,7 +155,7 @@ export default function GiveawayWheelClient() {
             </div>
 
             <div className="giveaway-actions">
-                <button className="button primary" onClick={spin} disabled={spinning}>
+                <button className="button primary" onClick={spin} disabled={spinning || hasExpired || hasSpun}>
                     {spinning ? "Spinning..." : "Spin The Wheel"}
                 </button>
             </div>

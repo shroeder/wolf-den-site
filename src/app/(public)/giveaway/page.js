@@ -29,7 +29,8 @@ export default function GiveawayPage() {
                 <h2>Rules</h2>
                 <ul>
                     <li>Rewards are for in-store use only.</li>
-                    <li>One reward redemption per transaction unless staff approves otherwise.</li>
+                    <li>One spin per client/device.</li>
+                    <li>Giveaway is valid through May 21, 2026 at 7:00 PM.</li>
                     <li>The Wolf Den may adjust prize amounts during special events.</li>
                 </ul>
                 <div className="cta-row">
