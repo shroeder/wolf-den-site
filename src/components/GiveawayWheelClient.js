@@ -54,11 +54,12 @@ export default function GiveawayWheelClient() {
             return;
         }
 
-        const nextIndex = Math.floor(Math.random() * PRIZES.length);
-        const centerOffset = nextIndex * segmentAngle + segmentAngle / 2;
-        const target = 360 - centerOffset;
         const extraTurns = 6 * 360;
-        const nextRotation = rotation + extraTurns + target + (360 - (rotation % 360));
+        const randomDrift = Math.random() * 360;
+        const nextRotation = rotation + extraTurns + randomDrift;
+        const normalizedFinalRotation = ((nextRotation % 360) + 360) % 360;
+        const pointerAngle = (360 - normalizedFinalRotation) % 360;
+        const nextIndex = Math.floor(pointerAngle / segmentAngle) % PRIZES.length;
 
         setSpinning(true);
         setResultIndex(null);
