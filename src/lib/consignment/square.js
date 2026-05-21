@@ -443,3 +443,109 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
 
     return Array.from(aggregates.values()).sort((left, right) => right.revenue - left.revenue || left.name.localeCompare(right.name));
 }
+
+export async function listShopInventory() {
+    // 1. Fetch all categories
+    const categories = new Map();
+    {
+        let cursor = null;
+
+        do {
+            const params = new URLSearchParams({ types: "CATEGORY" });
+
+            if (cursor) {
+                params.set("cursor", cursor);
+            }
+
+            const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+
+            for (const obj of payload.objects || []) {
+                if (obj.type === "CATEGORY" && obj.id && obj.category_data?.name) {
+                    categories.set(obj.id, obj.category_data.name);
+                }
+            }
+
+            cursor = payload.cursor || null;
+        } while (cursor);
+    }
+
+    // 2. Fetch all items and group variations by category
+    const itemsByCategory = new Map();
+    const allVariationIds = [];
+
+    {
+        let cursor = null;
+
+        do {
+            const params = new URLSearchParams({ types: "ITEM" });
+
+            if (cursor) {
+                params.set("cursor", cursor);
+            }
+
+            const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+
+            for (const item of payload.objects || []) {
+                if (item.type !== "ITEM") {
+                    continue;
+                }
+
+                // Collect all category IDs from both legacy and current API fields
+                const legacyCategoryId = item.item_data?.category_id;
+                const categoriesArray = item.item_data?.categories || [];
+                const categoryIds = new Set([
+                    ...(legacyCategoryId ? [legacyCategoryId] : []),
+                    ...categoriesArray.map((c) => c.id),
+                ]);
+
+                for (const categoryId of categoryIds) {
+                    if (!categories.has(categoryId)) {
+                        continue;
+                    }
+
+                    if (!itemsByCategory.has(categoryId)) {
+                        itemsByCategory.set(categoryId, []);
+                    }
+
+                    for (const variation of item.item_data?.variations || []) {
+                        allVariationIds.push(variation.id);
+                        itemsByCategory.get(categoryId).push({
+                            id: variation.id,
+                            name: toDisplayName(item.item_data?.name || "Unnamed Item", variation.item_variation_data?.name),
+                            price: normalizeMoney(variation.item_variation_data?.price_money?.amount),
+                        });
+                    }
+                }
+            }
+
+            cursor = payload.cursor || null;
+        } while (cursor);
+    }
+
+    // 3. Get inventory counts for all variations
+    const counts = await getInventoryCounts(allVariationIds);
+
+    // 4. Build result — only categories/items that have in-stock quantity
+    const result = [];
+
+    for (const [categoryId, categoryName] of categories) {
+        const variations = itemsByCategory.get(categoryId) || [];
+        const inStock = variations
+            .map((v) => ({ ...v, quantity: counts.get(v.id) || 0 }))
+            .filter((v) => v.quantity > 0)
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (inStock.length > 0) {
+            result.push({ id: categoryId, name: categoryName, items: inStock });
+        }
+    }
+
+    result.sort((a, b) => a.name.localeCompare(b.name));
+
+    squareLogger.info("square.shop_inventory.list.completed", {
+        categoryCount: result.length,
+        totalItems: result.reduce((sum, c) => sum + c.items.length, 0),
+    });
+
+    return result;
+}
