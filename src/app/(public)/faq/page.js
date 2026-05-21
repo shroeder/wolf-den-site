@@ -12,7 +12,7 @@ export const metadata = {
 const faqs = [
     ["Where is The Wolf Den located?", "The Wolf Den is located at 300 1st St S, Montgomery, MN 56069."],
     ["What are your current store hours?", "Current hours are Thursday 4 PM to 7 PM, Friday 4 PM to 7 PM, and Saturday 12 PM to 6 PM."],
-    ["Are you open yet?", "Yes. The store is in soft opening and continuing to grow inventory, events, and community offerings."],
+    ["Are you open yet?", "Yes. We are open, and the Grand Opening is May 21, 2026. We are continuing to grow inventory, events, and community offerings."],
     ["Do you sell Pokemon cards?", "Yes. The Wolf Den carries Pokemon sealed product, singles, accessories, and beginner-friendly items."],
     ["Do you sell Magic: The Gathering?", "Yes. The store carries Magic sealed product, singles, accessories, and supports local community play."],
     ["Do you buy or trade cards?", "Yes. We buy and evaluate Pokemon, Magic, and select collectibles. Trade-ins may be accepted depending on condition and store needs."],
