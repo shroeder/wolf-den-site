@@ -41,7 +41,7 @@
         },
         {
             "path": "/api/jobs/shop-inventory-refresh",
-            "schedule": "0 8 * * *"
+            "schedule": "9 0 * * *"
         }
     ]
 }
