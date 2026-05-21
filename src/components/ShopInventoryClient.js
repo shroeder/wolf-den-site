@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const formatPrice = (price) => {
     if (!price) return null;
@@ -9,8 +9,20 @@ const formatPrice = (price) => {
 
 export default function ShopInventoryClient({ categories }) {
     const [activeId, setActiveId] = useState(categories[0]?.id ?? null);
+    const [modalItem, setModalItem] = useState(null);
 
     const active = categories.find((c) => c.id === activeId) ?? categories[0];
+    useEffect(() => {
+        const onEscape = (event) => {
+            if (event.key === "Escape") {
+                setModalItem(null);
+            }
+        };
+
+        window.addEventListener("keydown", onEscape);
+
+        return () => window.removeEventListener("keydown", onEscape);
+    }, []);
 
     return (
         <div className="shop-inventory">
@@ -42,7 +54,15 @@ export default function ShopInventoryClient({ categories }) {
                             </thead>
                             <tbody>
                                 {active.items.map((item) => (
-                                    <tr key={item.id}>
+                                        <tr
+                                            key={item.id}
+                                            className={item.imageUrl ? "shop-row-has-image" : undefined}
+                                            onClick={() => {
+                                                if (item.imageUrl) {
+                                                    setModalItem(item);
+                                                }
+                                            }}
+                                        >
                                         <td>{item.name}</td>
                                         <td className="shop-col-price">
                                             {formatPrice(item.price) ?? <span className="muted">—</span>}
@@ -54,6 +74,21 @@ export default function ShopInventoryClient({ categories }) {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {modalItem && (
+                <div className="shop-image-modal" onClick={() => setModalItem(null)}>
+                    <div className="shop-image-modal-card" onClick={(event) => event.stopPropagation()}>
+                        <button className="shop-image-modal-close" onClick={() => setModalItem(null)} aria-label="Close image">
+                            Close
+                        </button>
+                        <h3>{modalItem.name}</h3>
+                        <img src={modalItem.imageUrl} alt={modalItem.name} className="shop-image-modal-photo" />
+                        <p className="secondary">
+                            {formatPrice(modalItem.price) ?? "Price unavailable"} | In stock: {modalItem.quantity}
+                        </p>
                     </div>
                 </div>
             )}

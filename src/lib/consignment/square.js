@@ -472,6 +472,7 @@ export async function listShopInventory() {
     // 2. Fetch all items and group variations by category
     const itemsByCategory = new Map();
     const allVariationIds = [];
+    const imageIds = new Set();
 
     {
         let cursor = null;
@@ -508,11 +509,18 @@ export async function listShopInventory() {
                     }
 
                     for (const variation of item.item_data?.variations || []) {
+                        const imageId = getCatalogImageId(item, variation);
+
+                        if (imageId) {
+                            imageIds.add(imageId);
+                        }
+
                         allVariationIds.push(variation.id);
                         itemsByCategory.get(categoryId).push({
                             id: variation.id,
                             name: toDisplayName(item.item_data?.name || "Unnamed Item", variation.item_variation_data?.name),
                             price: normalizeMoney(variation.item_variation_data?.price_money?.amount),
+                            imageId,
                         });
                     }
                 }
@@ -524,6 +532,7 @@ export async function listShopInventory() {
 
     // 3. Get inventory counts for all variations
     const counts = await getInventoryCounts(allVariationIds);
+    const imageUrlLookup = await getImageUrlLookup(Array.from(imageIds));
 
     // 4. Build result — only categories/items that have in-stock quantity
     const result = [];
@@ -531,7 +540,11 @@ export async function listShopInventory() {
     for (const [categoryId, categoryName] of categories) {
         const variations = itemsByCategory.get(categoryId) || [];
         const inStock = variations
-            .map((v) => ({ ...v, quantity: counts.get(v.id) || 0 }))
+            .map((v) => ({
+                ...v,
+                quantity: counts.get(v.id) || 0,
+                imageUrl: v.imageId ? imageUrlLookup.get(v.imageId) || null : null,
+            }))
             .filter((v) => v.quantity > 0)
             .sort((a, b) => a.name.localeCompare(b.name));
 
