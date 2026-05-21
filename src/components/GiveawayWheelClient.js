@@ -5,10 +5,10 @@ import { useMemo, useState } from "react";
 const PRIZES = [
     { label: "$5 Off", detail: "Get $5 off your next purchase.", code: "WOLF5" },
     { label: "10% Off", detail: "Save 10% on one item.", code: "HOWL10" },
-    { label: "$10 Off", detail: "Get $10 off when you spend $50+.", code: "DEN10" },
+    { label: "$10 Off", detail: "Get $10 off your next purchase.", code: "DEN10" },
     { label: "$3 Bonus", detail: "$3 in bonus store credit.", code: "BONUS3" },
     { label: "15% Off", detail: "Save 15% on one sealed product.", code: "PACK15" },
-    { label: "$20 Off", detail: "Get $20 off when you spend $100+.", code: "WILD20" },
+    { label: "$20 Off", detail: "Get $20 off your next purchase.", code: "WILD20" },
     { label: "$7 Bonus", detail: "$7 in bonus store credit.", code: "BONUS7" },
     { label: "5% Off", detail: "Save 5% storewide.", code: "DEN5" },
 ];
