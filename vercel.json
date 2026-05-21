@@ -38,10 +38,6 @@
         {
             "path": "/api/jobs/consignment-nightly-reports",
             "schedule": "30 7 * * *"
-        },
-        {
-            "path": "/api/jobs/shop-inventory-refresh",
-            "schedule": "20 0 * * *"
         }
     ]
 }

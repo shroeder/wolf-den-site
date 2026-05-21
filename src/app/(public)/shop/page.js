@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getShopInventory } from "@/lib/shop/inventory";
+import { listShopInventory } from "@/lib/consignment/square";
 
 export const metadata = {
     title: "Pokemon, MTG & Accessories",
@@ -16,13 +16,8 @@ function formatPrice(price) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
 }
 
-function formatRefreshedAt(date) {
-    if (!date) return null;
-    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(date));
-}
-
 export default async function ShopPage() {
-    const snapshot = await getShopInventory().catch(() => null);
+    const categories = await listShopInventory().catch(() => null);
 
     return (
         <div className="stack reveal">
@@ -32,17 +27,14 @@ export default async function ShopPage() {
                     The Wolf Den carries Pokemon cards, Magic: The Gathering, sealed product, singles, and accessories in Montgomery, Minnesota.
                 </p>
                 <p>
-                    Inventory rotates based on releases, distributor availability, local trade-ins, and in-store demand. The list below reflects what is currently in stock and updates daily.
+                    Inventory rotates based on releases, distributor availability, local trade-ins, and in-store demand. The list below reflects what is currently in stock.
                 </p>
             </section>
 
-            {snapshot && snapshot.categories.length > 0 ? (
+            {categories && categories.length > 0 ? (
                 <section className="card">
                     <h2>Current In-Stock Inventory</h2>
-                    {snapshot.refreshedAt && (
-                        <p className="text-muted">Updated {formatRefreshedAt(snapshot.refreshedAt)}</p>
-                    )}
-                    {snapshot.categories.map((category) => (
+                    {categories.map((category) => (
                         <div key={category.id} className="stack">
                             <h3>{category.name}</h3>
                             <table className="inventory-table">
