@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import ShopInventoryClient from "@/components/ShopInventoryClient";
 import { listShopInventory } from "@/lib/consignment/square";
 
 export const metadata = {
@@ -10,11 +11,6 @@ export const metadata = {
         canonical: "/shop",
     },
 };
-
-function formatPrice(price) {
-    if (!price) return null;
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
-}
 
 export default async function ShopPage() {
     const categories = await listShopInventory().catch(() => null);
@@ -34,29 +30,7 @@ export default async function ShopPage() {
             {categories && categories.length > 0 ? (
                 <section className="card">
                     <h2>Current In-Stock Inventory</h2>
-                    {categories.map((category) => (
-                        <div key={category.id} className="stack">
-                            <h3>{category.name}</h3>
-                            <table className="inventory-table">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Price</th>
-                                        <th>In Stock</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {category.items.map((item) => (
-                                        <tr key={item.id}>
-                                            <td>{item.name}</td>
-                                            <td>{formatPrice(item.price) ?? "—"}</td>
-                                            <td>{item.quantity}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ))}
+                    <ShopInventoryClient categories={categories} />
                 </section>
             ) : (
                 <section className="grid two-col">
