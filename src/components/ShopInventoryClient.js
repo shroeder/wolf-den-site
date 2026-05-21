@@ -24,6 +24,19 @@ export default function ShopInventoryClient({ categories }) {
         return () => window.removeEventListener("keydown", onEscape);
     }, []);
 
+    useEffect(() => {
+        if (!modalItem) {
+            return undefined;
+        }
+
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = previous;
+        };
+    }, [modalItem]);
+
     return (
         <div className="shop-inventory">
             <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
@@ -44,16 +57,17 @@ export default function ShopInventoryClient({ categories }) {
             {active && (
                 <div role="tabpanel" className="shop-panel">
                     <div className="consignment-table-wrap">
-                        <table className="consignment-table shop-table">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th className="shop-col-price">Price</th>
-                                    <th className="shop-col-qty">In Stock</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {active.items.map((item) => (
+                        <div className="shop-table-scroll">
+                            <table className="consignment-table shop-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th className="shop-col-price">Price</th>
+                                        <th className="shop-col-qty">In Stock</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {active.items.map((item) => (
                                         <tr
                                             key={item.id}
                                             className={item.imageUrl ? "shop-row-has-image" : undefined}
@@ -63,17 +77,30 @@ export default function ShopInventoryClient({ categories }) {
                                                 }
                                             }}
                                         >
-                                        <td>{item.name}</td>
-                                        <td className="shop-col-price">
-                                            {formatPrice(item.price) ?? <span className="muted">—</span>}
-                                        </td>
-                                        <td className="shop-col-qty">
-                                            <span className="shop-qty-badge">{item.quantity}</span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            <td>
+                                                <div className="shop-item-cell">
+                                                    {item.imageUrl && (
+                                                        <img
+                                                            src={item.imageUrl}
+                                                            alt={item.name}
+                                                            className="shop-item-thumb"
+                                                            loading="lazy"
+                                                        />
+                                                    )}
+                                                    <span>{item.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="shop-col-price">
+                                                {formatPrice(item.price) ?? <span className="muted">—</span>}
+                                            </td>
+                                            <td className="shop-col-qty">
+                                                <span className="shop-qty-badge">{item.quantity}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
