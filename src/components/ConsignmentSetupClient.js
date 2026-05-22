@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function SetupPortalClient() {
     const router = useRouter();
@@ -13,6 +13,55 @@ export default function SetupPortalClient() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+    const [tokenStatus, setTokenStatus] = useState(token ? "checking" : "missing");
+    const [tokenStatusError, setTokenStatusError] = useState("");
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (!token) {
+            return () => {
+                isCancelled = true;
+            };
+        }
+
+        async function checkTokenStatus() {
+            try {
+                const response = await fetch(`/api/consignment/setup?token=${encodeURIComponent(token)}`, {
+                    method: "GET",
+                    cache: "no-store",
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (isCancelled) {
+                    return;
+                }
+
+                if (response.ok && data?.status === "already_setup" && data?.slug) {
+                    router.replace(`/consign/${data.slug}`);
+                    return;
+                }
+
+                if (response.ok) {
+                    setTokenStatus("ready");
+                    return;
+                }
+
+                setTokenStatusError(data?.error || "Setup link is no longer valid.");
+                setTokenStatus("invalid");
+            } catch {
+                if (!isCancelled) {
+                    setTokenStatus("ready");
+                }
+            }
+        }
+
+        checkTokenStatus();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [token, router]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -49,6 +98,11 @@ export default function SetupPortalClient() {
                 return;
             }
 
+            if (data?.alreadySetup && data?.slug) {
+                router.push(`/consign/${data.slug}`);
+                return;
+            }
+
             setSuccess(true);
             setPassword("");
             setConfirmPassword("");
@@ -69,6 +123,28 @@ export default function SetupPortalClient() {
                 <section className="card consignment-auth">
                     <h2>Invalid Setup Link</h2>
                     <p className="secondary">The setup link is missing or invalid. Please check your email for the correct link.</p>
+                </section>
+            </div>
+        );
+    }
+
+    if (tokenStatus === "checking") {
+        return (
+            <div className="consignment-portal stack compact">
+                <section className="card consignment-auth">
+                    <h2>Checking Setup Link</h2>
+                    <p className="secondary">One moment while we verify your setup link...</p>
+                </section>
+            </div>
+        );
+    }
+
+    if (tokenStatus === "invalid") {
+        return (
+            <div className="consignment-portal stack compact">
+                <section className="card consignment-auth">
+                    <h2>Invalid Setup Link</h2>
+                    <p className="secondary">{tokenStatusError}</p>
                 </section>
             </div>
         );

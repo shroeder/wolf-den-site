@@ -61,6 +61,28 @@ export async function validateSetupToken(rawToken) {
     };
 }
 
+export async function getSetupTokenConsignorState(rawToken) {
+    if (!rawToken) {
+        return null;
+    }
+
+    const tokenHash = hashToken(rawToken);
+
+    return db.queryOne(
+        `SELECT
+            st.id,
+            st.consignor_id,
+            st.used_at,
+            st.expires_at,
+            c.slug,
+            c.password_hash
+         FROM consignor_setup_tokens st
+         JOIN consignors c ON c.id = st.consignor_id
+         WHERE st.token_hash = $1`,
+        [tokenHash]
+    );
+}
+
 export async function consumeSetupToken(tokenId) {
     await db.query(
         `UPDATE consignor_setup_tokens
