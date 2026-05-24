@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const formatPrice = (price) => {
     if (!price) return null;
@@ -9,14 +9,15 @@ const formatPrice = (price) => {
 
 export default function ShopInventoryClient({ categories }) {
     const [activeId, setActiveId] = useState(categories[0]?.id ?? null);
-    const [modalItem, setModalItem] = useState(null);
+    const [modalIndex, setModalIndex] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const swipeStartRef = useRef(null);
 
     const active = categories.find((c) => c.id === activeId) ?? categories[0];
 
     const closeModalOnOverlayInteraction = (event) => {
         if (event.target === event.currentTarget) {
-            setModalItem(null);
+            setModalIndex(null);
         }
     };
 
@@ -30,17 +31,104 @@ export default function ShopInventoryClient({ categories }) {
                   .map((item) => ({ ...item, categoryName: category.name }))
           )
         : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
+
+    const modalItems = useMemo(() => visibleItems.filter((item) => item.imageUrl), [visibleItems]);
+    const modalItem = modalIndex === null ? null : modalItems[modalIndex] ?? null;
+
+    const closeModal = useCallback(() => setModalIndex(null), []);
+
+    const openModalForItem = (item) => {
+        if (!item.imageUrl) {
+            return;
+        }
+
+        const index = modalItems.findIndex((candidate) => candidate.id === item.id && candidate.categoryName === item.categoryName);
+        if (index >= 0) {
+            setModalIndex(index);
+        }
+    };
+
+    const goToPreviousModalItem = useCallback(() => {
+        if (modalItems.length < 2) {
+            return;
+        }
+
+        setModalIndex((previousIndex) => {
+            if (previousIndex === null) {
+                return previousIndex;
+            }
+
+            return (previousIndex - 1 + modalItems.length) % modalItems.length;
+        });
+    }, [modalItems.length]);
+
+    const goToNextModalItem = useCallback(() => {
+        if (modalItems.length < 2) {
+            return;
+        }
+
+        setModalIndex((previousIndex) => {
+            if (previousIndex === null) {
+                return previousIndex;
+            }
+
+            return (previousIndex + 1) % modalItems.length;
+        });
+    }, [modalItems.length]);
+
+    const onModalTouchStart = (event) => {
+        const touch = event.touches[0];
+        swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    };
+
+    const onModalTouchEnd = (event) => {
+        if (!swipeStartRef.current || modalItems.length < 2) {
+            swipeStartRef.current = null;
+            return;
+        }
+
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - swipeStartRef.current.x;
+        const deltaY = touch.clientY - swipeStartRef.current.y;
+        swipeStartRef.current = null;
+
+        if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
+            return;
+        }
+
+        if (deltaX > 0) {
+            goToPreviousModalItem();
+            return;
+        }
+
+        goToNextModalItem();
+    };
+
     useEffect(() => {
-        const onEscape = (event) => {
+        if (modalIndex === null) {
+            return undefined;
+        }
+
+        const onModalKeys = (event) => {
             if (event.key === "Escape") {
-                setModalItem(null);
+                closeModal();
+                return;
+            }
+
+            if (event.key === "ArrowLeft") {
+                goToPreviousModalItem();
+                return;
+            }
+
+            if (event.key === "ArrowRight") {
+                goToNextModalItem();
             }
         };
 
-        window.addEventListener("keydown", onEscape);
+        window.addEventListener("keydown", onModalKeys);
 
-        return () => window.removeEventListener("keydown", onEscape);
-    }, []);
+        return () => window.removeEventListener("keydown", onModalKeys);
+    }, [closeModal, goToNextModalItem, goToPreviousModalItem, modalIndex]);
 
     useEffect(() => {
         if (!modalItem) {
@@ -99,13 +187,11 @@ export default function ShopInventoryClient({ categories }) {
                                 key={`${item.id}-${item.categoryName}`}
                                 className={`shop-tile${item.imageUrl ? " shop-tile-has-image" : ""}`}
                                 onClick={() => {
-                                    if (item.imageUrl) {
-                                        setModalItem(item);
-                                    }
+                                    openModalForItem(item);
                                 }}
                                 role={item.imageUrl ? "button" : undefined}
                                 tabIndex={item.imageUrl ? 0 : undefined}
-                                aria-label={item.imageUrl ? `View larger image for ${item.name}` : undefined}
+                                aria-label={item.imageUrl ? `Open product gallery for ${item.name}` : undefined}
                                 onKeyDown={(event) => {
                                     if (!item.imageUrl) {
                                         return;
@@ -113,7 +199,7 @@ export default function ShopInventoryClient({ categories }) {
 
                                     if (event.key === "Enter" || event.key === " ") {
                                         event.preventDefault();
-                                        setModalItem(item);
+                                        openModalForItem(item);
                                     }
                                 }}
                             >
@@ -156,20 +242,67 @@ export default function ShopInventoryClient({ categories }) {
                     className="shop-image-modal"
                     onMouseDown={closeModalOnOverlayInteraction}
                     onTouchStart={closeModalOnOverlayInteraction}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Product image viewer"
                 >
                     <div
                         className="shop-image-modal-card"
                         onMouseDown={(event) => event.stopPropagation()}
                         onTouchStart={(event) => event.stopPropagation()}
                     >
-                        <button type="button" className="shop-image-modal-close" onClick={() => setModalItem(null)} aria-label="Close image">
-                            Close
-                        </button>
-                        <h3>{modalItem.name}</h3>
-                        <img src={modalItem.imageUrl} alt={modalItem.name} className="shop-image-modal-photo" />
-                        <p className="secondary">
-                            {formatPrice(modalItem.price) ?? "Price unavailable"} | In stock: {modalItem.quantity}
-                        </p>
+                        <div className="shop-image-modal-topbar">
+                            <p className="shop-image-modal-category">{modalItem.categoryName}</p>
+                            <p className="shop-image-modal-counter">{modalIndex + 1} / {modalItems.length}</p>
+                            <button type="button" className="shop-image-modal-close" onClick={closeModal} aria-label="Close image viewer">
+                                Close
+                            </button>
+                        </div>
+
+                        <div
+                            className="shop-image-modal-stage"
+                            onTouchStart={onModalTouchStart}
+                            onTouchEnd={onModalTouchEnd}
+                        >
+                            {modalItems.length > 1 && (
+                                <button
+                                    type="button"
+                                    className="shop-image-modal-nav shop-image-modal-nav-prev"
+                                    onClick={goToPreviousModalItem}
+                                    aria-label="View previous product"
+                                >
+                                    Prev
+                                </button>
+                            )}
+
+                            <img
+                                src={modalItem.imageUrl}
+                                alt={modalItem.name}
+                                className="shop-image-modal-photo"
+                                decoding="async"
+                            />
+
+                            {modalItems.length > 1 && (
+                                <button
+                                    type="button"
+                                    className="shop-image-modal-nav shop-image-modal-nav-next"
+                                    onClick={goToNextModalItem}
+                                    aria-label="View next product"
+                                >
+                                    Next
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="shop-image-modal-details">
+                            <h3>{modalItem.name}</h3>
+                            <p className="secondary">
+                                {formatPrice(modalItem.price) ?? "Price unavailable"} | In stock: {modalItem.quantity}
+                            </p>
+                            {modalItems.length > 1 && (
+                                <p className="shop-image-modal-help secondary">Swipe on mobile, or use arrow keys and Prev/Next on desktop.</p>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
