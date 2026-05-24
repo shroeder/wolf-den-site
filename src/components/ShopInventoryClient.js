@@ -93,61 +93,60 @@ export default function ShopInventoryClient({ categories }) {
 
             {active && (
                 <div role="tabpanel" className="shop-panel">
-                    <div className="consignment-table-wrap">
-                        <div className="shop-table-scroll">
-                            <table className="consignment-table shop-table">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th className="shop-col-price">Price</th>
-                                        <th className="shop-col-qty">In Stock</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {visibleItems.map((item) => (
-                                        <tr
-                                            key={`${item.id}-${item.categoryName}`}
-                                            className={item.imageUrl ? "shop-row-has-image" : undefined}
-                                            onClick={() => {
-                                                if (item.imageUrl) {
-                                                    setModalItem(item);
-                                                }
-                                            }}
-                                        >
-                                            <td>
-                                                <div className="shop-item-cell">
-                                                    {item.imageUrl && (
-                                                        <img
-                                                            src={item.imageUrl}
-                                                            alt={item.name}
-                                                            className="shop-item-thumb"
-                                                            loading="lazy"
-                                                        />
-                                                    )}
-                                                    <span>
-                                                        {item.name}
-                                                        {isSearching && <small className="shop-item-category">{item.categoryName}</small>}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="shop-col-price">
-                                                {formatPrice(item.price) ?? <span className="muted">—</span>}
-                                            </td>
-                                            <td className="shop-col-qty">
-                                                <span className="shop-qty-badge">{item.quantity}</span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {visibleItems.length === 0 && (
-                                        <tr>
-                                            <td colSpan={3} className="consignment-empty">
-                                                No products matched "{searchTerm}".
-                                            </td>
-                                        </tr>
+                    <div className="shop-grid" aria-live="polite">
+                        {visibleItems.map((item) => (
+                            <article
+                                key={`${item.id}-${item.categoryName}`}
+                                className={`shop-tile${item.imageUrl ? " shop-tile-has-image" : ""}`}
+                                onClick={() => {
+                                    if (item.imageUrl) {
+                                        setModalItem(item);
+                                    }
+                                }}
+                                role={item.imageUrl ? "button" : undefined}
+                                tabIndex={item.imageUrl ? 0 : undefined}
+                                aria-label={item.imageUrl ? `View larger image for ${item.name}` : undefined}
+                                onKeyDown={(event) => {
+                                    if (!item.imageUrl) {
+                                        return;
+                                    }
+
+                                    if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
+                                        setModalItem(item);
+                                    }
+                                }}
+                            >
+                                <div className="shop-tile-image-wrap">
+                                    {item.imageUrl ? (
+                                        <img
+                                            src={item.imageUrl}
+                                            alt={item.name}
+                                            className="shop-tile-image"
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
+                                    ) : (
+                                        <div className="shop-tile-image-placeholder" aria-hidden="true">
+                                            No image
+                                        </div>
                                     )}
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+
+                                <div className="shop-tile-body">
+                                    <h3 className="shop-tile-name">{item.name}</h3>
+                                    {isSearching && <p className="shop-item-category">{item.categoryName}</p>}
+                                    <div className="shop-tile-meta-row">
+                                        <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
+                                        <span className="shop-qty-badge">{item.quantity} in stock</span>
+                                    </div>
+                                </div>
+                            </article>
+                        ))}
+
+                        {visibleItems.length === 0 && (
+                            <p className="consignment-empty shop-empty">No products matched &quot;{searchTerm}&quot;.</p>
+                        )}
                     </div>
                 </div>
             )}
