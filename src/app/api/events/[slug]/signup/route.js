@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import { sendEventSignupConfirmationEmail } from "@/lib/events/email";
 import { getEventBySlug } from "@/lib/events";
 import { getEffectiveSignupLimit, getSeatsTaken, getSignupStatus } from "@/lib/event-signups";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -144,6 +145,23 @@ export async function POST(request, { params }) {
             const seatsRemaining = Math.max(signupLimit - seatsTaken, 0);
 
             if (signup.status === "created") {
+                try {
+                    await sendEventSignupConfirmationEmail({
+                        to: email,
+                        name,
+                        event,
+                        slotNumber: signup.slotNumber,
+                        seatsRemaining,
+                        capacity: signupLimit,
+                    });
+                } catch (emailError) {
+                    logger.warn("events.signup.confirmation_email.failed", {
+                        slug,
+                        email: emailNormalized,
+                        reason: emailError instanceof Error ? emailError.message : "unknown_error",
+                    });
+                }
+
                 return NextResponse.json(
                     {
                         success: true,
