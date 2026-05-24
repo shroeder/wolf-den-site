@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { getEventBySlug } from "@/lib/events";
+import { getEffectiveSignupLimit, getSeatsTaken, getSignupStatus } from "@/lib/event-signups";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -14,17 +15,6 @@ function normalizeEmail(value) {
 
 function sanitizeName(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
-}
-
-async function getSeatsTaken(slug) {
-    const row = await db.queryOne(
-        `SELECT COUNT(*)::int AS seats_taken
-         FROM event_signups
-         WHERE event_slug = $1`,
-        [slug]
-    );
-
-    return row?.seats_taken ?? 0;
 }
 
 async function reserveSeat({ slug, name, email, signupLimit }) {
@@ -90,25 +80,16 @@ export async function GET(request, { params }) {
                 return NextResponse.json({ error: "Event not found" }, { status: 404 });
             }
 
-            if (!event.signupLimit) {
+            const status = await getSignupStatus(slug);
+
+            if (!status.enabled) {
                 return NextResponse.json({
-                    enabled: false,
-                    slug,
+                    ...status,
                     message: "Event signup is not enabled for this event.",
                 });
             }
 
-            const seatsTaken = await getSeatsTaken(slug);
-            const seatsRemaining = Math.max(event.signupLimit - seatsTaken, 0);
-
-            return NextResponse.json({
-                enabled: true,
-                slug,
-                capacity: event.signupLimit,
-                seatsTaken,
-                seatsRemaining,
-                isFull: seatsRemaining === 0,
-            });
+            return NextResponse.json(status);
         } catch (error) {
             logger.error("events.signup.status.failed", error);
             return internalError(error, {
@@ -128,7 +109,9 @@ export async function POST(request, { params }) {
                 return NextResponse.json({ error: "Event not found" }, { status: 404 });
             }
 
-            if (!event.signupLimit) {
+            const signupLimit = await getEffectiveSignupLimit(slug);
+
+            if (!signupLimit) {
                 return badRequest("Event signup is not enabled for this event.");
             }
 
@@ -154,11 +137,11 @@ export async function POST(request, { params }) {
                 slug,
                 name,
                 email,
-                signupLimit: event.signupLimit,
+                signupLimit,
             });
 
             const seatsTaken = await getSeatsTaken(slug);
-            const seatsRemaining = Math.max(event.signupLimit - seatsTaken, 0);
+            const seatsRemaining = Math.max(signupLimit - seatsTaken, 0);
 
             if (signup.status === "created") {
                 return NextResponse.json(
@@ -166,7 +149,7 @@ export async function POST(request, { params }) {
                         success: true,
                         status: "created",
                         message: `You are confirmed for ${event.title}.`,
-                        capacity: event.signupLimit,
+                        capacity: signupLimit,
                         seatsTaken,
                         seatsRemaining,
                     },
@@ -180,7 +163,7 @@ export async function POST(request, { params }) {
                         success: true,
                         status: "duplicate",
                         message: "This email is already signed up for this event.",
-                        capacity: event.signupLimit,
+                        capacity: signupLimit,
                         seatsTaken,
                         seatsRemaining,
                     },
@@ -194,7 +177,7 @@ export async function POST(request, { params }) {
                         success: false,
                         status: "full",
                         message: "This event is currently full.",
-                        capacity: event.signupLimit,
+                        capacity: signupLimit,
                         seatsTaken,
                         seatsRemaining,
                     },
@@ -211,7 +194,7 @@ export async function POST(request, { params }) {
                     success: false,
                     status: "retry_exhausted",
                     message: "Could not complete signup right now. Please try again.",
-                    capacity: event.signupLimit,
+                    capacity: signupLimit,
                     seatsTaken,
                     seatsRemaining,
                 },
