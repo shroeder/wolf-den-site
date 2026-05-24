@@ -7,13 +7,72 @@ const formatPrice = (price) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
 };
 
+const normalizeCategoryName = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+const CATEGORY_PRIORITY_RULES = [
+    {
+        score: 10,
+        match: (name) => name.includes("pokemon") && (name.includes("single") || name.includes("singles")),
+    },
+    {
+        score: 20,
+        match: (name) => name.includes("pokemon") && name.includes("sealed"),
+    },
+    {
+        score: 30,
+        match: (name) =>
+            name.includes("pokemon") &&
+            (name.includes("booster pack") || name.includes("booster packs") || name.includes("packs")),
+    },
+    {
+        score: 40,
+        match: (name) => (name.includes("magic") || name.includes("mtg")) && name.includes("sealed"),
+    },
+    {
+        score: 50,
+        match: (name) =>
+            (name.includes("magic") || name.includes("mtg")) &&
+            (name.includes("booster pack") || name.includes("booster packs") || name.includes("packs")),
+    },
+    {
+        score: 900,
+        match: (name) => name.includes("accessories") || name.includes("accessory"),
+    },
+];
+
+const getCategoryPriority = (categoryName) => {
+    const normalized = normalizeCategoryName(categoryName);
+    const rule = CATEGORY_PRIORITY_RULES.find((entry) => entry.match(normalized));
+
+    if (rule) {
+        return rule.score;
+    }
+
+    return 500;
+};
+
+const sortShopCategories = (categories) =>
+    [...categories].sort((left, right) => {
+        const priorityDiff = getCategoryPriority(left.name) - getCategoryPriority(right.name);
+
+        if (priorityDiff !== 0) {
+            return priorityDiff;
+        }
+
+        return left.name.localeCompare(right.name);
+    });
+
 export default function ShopInventoryClient({ categories }) {
-    const [activeId, setActiveId] = useState(categories[0]?.id ?? null);
+    const orderedCategories = useMemo(() => sortShopCategories(categories), [categories]);
+    const [activeId, setActiveId] = useState(orderedCategories[0]?.id ?? null);
     const [modalIndex, setModalIndex] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const swipeStartRef = useRef(null);
 
-    const active = categories.find((c) => c.id === activeId) ?? categories[0];
+    const selectedCategoryId = orderedCategories.some((category) => category.id === activeId)
+        ? activeId
+        : orderedCategories[0]?.id ?? null;
+    const active = orderedCategories.find((c) => c.id === selectedCategoryId) ?? orderedCategories[0];
 
     const closeModalOnOverlayInteraction = (event) => {
         if (event.target === event.currentTarget) {
@@ -25,7 +84,7 @@ export default function ShopInventoryClient({ categories }) {
     const isSearching = normalizedSearch.length > 0;
 
     const visibleItems = isSearching
-        ? categories.flatMap((category) =>
+        ? orderedCategories.flatMap((category) =>
               category.items
                   .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
                   .map((item) => ({ ...item, categoryName: category.name }))
@@ -165,12 +224,12 @@ export default function ShopInventoryClient({ categories }) {
             </div>
 
             <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
-                {categories.map((category) => (
+                {orderedCategories.map((category) => (
                     <button
                         key={category.id}
                         role="tab"
-                        aria-selected={category.id === activeId}
-                        className={`shop-tab${category.id === activeId ? " shop-tab-active" : ""}`}
+                        aria-selected={category.id === selectedCategoryId}
+                        className={`shop-tab${category.id === selectedCategoryId ? " shop-tab-active" : ""}`}
                         onClick={() => setActiveId(category.id)}
                     >
                         {category.name}
