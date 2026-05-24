@@ -4,7 +4,7 @@ import Image from "next/image";
 export const metadata = {
     title: "Weekly Pokemon & Magic Events",
     description:
-        "Events at The Wolf Den in Montgomery, MN, including Friday Magic community nights and Saturday Pokemon community days for players across southern Minnesota.",
+        "Events at The Wolf Den in Montgomery, MN, including Friday Commander community nights and Saturday Pokemon community days for players across southern Minnesota.",
     alternates: {
         canonical: "/events",
     },
@@ -26,7 +26,7 @@ export default function EventsPage() {
             <section className="card">
                 <h2>Weekly Event Schedule</h2>
                 <p>
-                    Friday Magic community play runs during store hours from 4:00 PM to 7:00 PM, and Saturday Pokemon community play runs
+                    Friday Commander community play runs during store hours from 4:00 PM to 7:00 PM, and Saturday Pokemon community play runs
                     during store hours from 12:00 PM to 6:00 PM.
                 </p>
             </section>

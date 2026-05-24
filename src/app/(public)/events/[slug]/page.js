@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { events, getEventBySlug } from "@/lib/events";
 import { SITE_URL } from "@/lib/site";
+import EventSignupClient from "@/components/EventSignupClient";
 
 export function generateStaticParams() {
     return events.map((event) => ({ slug: event.slug }));
@@ -101,6 +102,11 @@ export default async function EventDetailPage({ params }) {
                     <p>
                         <strong>Entry Fee:</strong> {event.entryFee}
                     </p>
+                    {event.capacity && (
+                        <p>
+                            <strong>Capacity:</strong> {event.capacity}
+                        </p>
+                    )}
                 </article>
                 <article className="card">
                     <h2>What to Expect</h2>
@@ -113,6 +119,12 @@ export default async function EventDetailPage({ params }) {
                     </p>
                 </article>
             </section>
+
+            <EventSignupClient
+                eventSlug={event.slug}
+                eventTitle={event.title}
+                signupLimit={event.signupLimit}
+            />
 
             {event.details && (
                 <section className="card">

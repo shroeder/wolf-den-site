@@ -47,7 +47,7 @@ export default function HomePage() {
                         Serving players and collectors across Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and surrounding southern Minnesota communities.
                     </p>
                     <p>
-                        <strong>Status:</strong> Soft opening on <strong>May 21, 2026</strong>.
+                        <strong>Status:</strong> Open and actively growing inventory, events, and community play.
                     </p>
                     <div className="cta-row">
                         <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
@@ -57,7 +57,7 @@ export default function HomePage() {
                             View Events
                         </Link>
                         <Link className="button" href="/shop">
-                            Get Opening Updates
+                            Browse Shop
                         </Link>
                         <Link className="button" href="/about">
                             About The Wolf Den
@@ -90,7 +90,7 @@ export default function HomePage() {
                         </div>
                         <div className="hero-stat">
                             <span className="hero-stat-label">Community</span>
-                            <strong>Friday MTG and Saturday Pokemon</strong>
+                            <strong>Friday Commander and Saturday Pokemon</strong>
                         </div>
                     </div>
                 </div>
@@ -207,7 +207,7 @@ export default function HomePage() {
                 </article>
                 <article className="card lift">
                     <h2>Magic: The Gathering</h2>
-                    <p>Find MTG singles, sealed products, and Friday Night Magic updates.</p>
+                    <p>Find MTG singles, sealed products, and Friday Commander Night updates.</p>
                     <Link className="text-link" href="/magic-the-gathering">
                         Explore Magic
                     </Link>

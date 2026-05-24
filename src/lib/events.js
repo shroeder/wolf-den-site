@@ -1,22 +1,23 @@
 export const events = [
     {
         slug: "friday-night-magic",
-        title: "Friday Night Magic at The Wolf Den",
+        title: "Friday Commander Night at The Wolf Den",
         day: "Fridays",
         date: "Weekly",
         time: "4:00 PM - 7:00 PM",
-        format: "Casual Commander, open play, trading, pack battles, and learn-to-play support",
+        format: "Casual Commander pods, open play, trading, deck tuning, and learn-to-play support",
         entryFee: "Free",
-        rsvp: "Discord for updates",
-        capacity: "Community seating",
-        seatsRemaining: "Open",
+        rsvp: "RSVP online to reserve a seat",
+        capacity: "16 seats",
+        seatsRemaining: "Live RSVP count",
+        signupLimit: 16,
         beginnerFriendly: true,
         description:
-            "Every Friday from 4:00 PM to 7:00 PM, The Wolf Den hosts a casual Magic: The Gathering community night in Montgomery, Minnesota.",
+            "Every Friday from 4:00 PM to 7:00 PM, The Wolf Den hosts a casual Commander-focused Magic: The Gathering community night in Montgomery, Minnesota.",
         rules:
-            "This is currently a relaxed, community-focused environment intended to help local players connect. Bring Commander decks, trade cards, meet local MTG players, and help grow the southern Minnesota Magic community.",
+            "This is currently a relaxed, community-focused environment intended to help local players connect. Bring Commander decks, trade cards, meet local MTG players, and help grow the southern Minnesota Commander community.",
         futurePlans:
-            "As the community grows, future Friday events may expand into draft nights, organized Commander events, prize-supported events, special release events, and additional MTG formats.",
+            "As the community grows, future Friday events may expand into organized Commander leagues, prize-supported nights, special release events, and occasional additional MTG formats.",
         refundPolicy:
             "No paid entry required for this event.",
     },

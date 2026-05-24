@@ -4,11 +4,12 @@ import Image from "next/image";
 export const metadata = {
     title: "Magic: The Gathering in Montgomery, MN",
     description:
-        "Magic: The Gathering in Montgomery, MN at The Wolf Den. Find Commander, sealed product, accessories, singles, and Friday community play for southern Minnesota players near New Prague, Northfield, Faribault, and Lonsdale.",
+        "Magic: The Gathering in Montgomery, MN at The Wolf Den. Find Commander, sealed product, accessories, singles, and Friday Commander Night play for southern Minnesota players near New Prague, Northfield, Faribault, and Lonsdale.",
     keywords: [
         "Magic The Gathering cards",
         "MTG singles",
-        "Friday Night Magic",
+        "Friday Commander Night",
+        "Commander night",
         "Magic sealed product",
         "Montgomery MN game store",
         "magic the gathering near me",
@@ -82,7 +83,7 @@ export default function MagicTheGatheringPage() {
                         <li>Trade cards</li>
                         <li>Learn the game</li>
                         <li>
-                            <Link href="/events/friday-night-magic">Join Friday Night Magic</Link>
+                            <Link href="/events/friday-night-magic">Join Friday Commander Night</Link>
                         </li>
                         <li>Participate in future organized events</li>
                     </ul>
@@ -126,9 +127,9 @@ export default function MagicTheGatheringPage() {
             </section>
 
             <section className="card">
-                <h2>Friday Night Magic at The Wolf Den</h2>
+                <h2>Friday Commander Night at The Wolf Den</h2>
                 <p>
-                    Friday community play runs during store hours from 4:00 PM to 7:00 PM. Events may include Commander nights, casual pods, draft events, learn-to-play sessions, and future organized tournaments.
+                    Friday Commander Night runs during store hours from 4:00 PM to 7:00 PM. The focus is casual Commander pods, trading, learn-to-play support, and future organized Commander events as the community grows.
                 </p>
                 <p>As the community grows, event offerings will continue to expand.</p>
             </section>
