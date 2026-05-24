@@ -138,7 +138,41 @@ Response:
 }
 ```
 
-### 6) List signups for one event
+### 6) Get one event dashboard payload
+
+`GET /api/admin/events/{eventSlug}`
+
+Response:
+
+```json
+{
+  "event": {
+    "slug": "friday-night-magic",
+    "title": "Friday Commander Night at The Wolf Den",
+    "day": "Fridays",
+    "time": "4:00 PM - 7:00 PM"
+  },
+  "signupStatus": {
+    "enabled": true,
+    "slug": "friday-night-magic",
+    "capacity": 16,
+    "seatsTaken": 6,
+    "seatsRemaining": 10,
+    "isFull": false
+  },
+  "signups": [
+    {
+      "id": "uuid",
+      "slotNumber": 1,
+      "name": "Jane Player",
+      "email": "jane@example.com",
+      "createdAt": "2026-05-23T12:34:56.000Z"
+    }
+  ]
+}
+```
+
+### 7) List signups for one event
 
 `GET /api/admin/events/{eventSlug}/signups`
 
@@ -172,7 +206,7 @@ Response:
 }
 ```
 
-### 7) Remove a player from an event
+### 8) Remove a player from an event
 
 `DELETE /api/admin/events/{eventSlug}/signups/{signupId}`
 
@@ -204,7 +238,7 @@ Common errors:
 - `404 event_not_found`
 - `404 signup_not_found`
 
-### 8) Increase or set event capacity
+### 9) Increase or set event capacity
 
 `PATCH /api/admin/events/{eventSlug}`
 
@@ -243,6 +277,12 @@ Validation and constraints:
 - Capacity cannot be set below current signups.
 - If lower than current signups, response is `409 signup_limit_below_current_signups`.
 
+### Event management scope currently supported
+
+- Supported now: list events, read event signup dashboard, list roster, remove signup, set signup limit.
+- Not currently exposed by API: create new events, delete events, or edit event title/day/time.
+- Event definitions are currently server-owned and loaded from the events library.
+
 ## Phone Agent Event Admin Playbook
 
 Use these steps in your phone app agent when handling event admin requests.
@@ -252,7 +292,8 @@ Use these steps in your phone app agent when handling event admin requests.
    - Show each event: capacity, seats taken, seats remaining, full/not full.
 
 2. View and manage one event roster:
-   - Call `GET /api/admin/events/{eventSlug}/signups`
+  - Call `GET /api/admin/events/{eventSlug}`
+  - You can also call `GET /api/admin/events/{eventSlug}/signups` if you want roster-specific refreshes.
    - Render signups list with `id`, `slotNumber`, `name`, `email`.
 
 3. Remove a player:
@@ -296,15 +337,18 @@ Endpoints to use:
 1. GET /api/admin/events
    - Returns RSVP-enabled events with slug, title, day, time, capacity, seatsTaken, seatsRemaining, isFull.
 
-2. GET /api/admin/events/{eventSlug}/signups
-   - Returns event metadata, signupStatus, and signups array.
+2. GET /api/admin/events/{eventSlug}
+  - Returns event metadata, signupStatus, and signups array.
    - Each signup includes id, slotNumber, name, email, createdAt.
 
-3. DELETE /api/admin/events/{eventSlug}/signups/{signupId}
+3. GET /api/admin/events/{eventSlug}/signups
+  - Optional roster-only refresh endpoint with the same shape as event detail.
+
+4. DELETE /api/admin/events/{eventSlug}/signups/{signupId}
    - Removes one player from the roster.
    - Response includes updated signupStatus.
 
-4. PATCH /api/admin/events/{eventSlug}
+5. PATCH /api/admin/events/{eventSlug}
    - Body: { "signupLimit": number }
    - Updates capacity.
    - Cannot set below current signup count.
@@ -326,7 +370,7 @@ Screen 1: Events List
 - Pull to refresh should re-fetch the list.
 
 Screen 2: Event Detail
-- Fetch GET /api/admin/events/{eventSlug}/signups on load.
+- Fetch GET /api/admin/events/{eventSlug} on load.
 - Show event title, day, time.
 - Show summary stats:
   - capacity
@@ -371,7 +415,7 @@ Implementation notes:
 Deliverables:
 - Event list screen
 - Event detail/roster screen
-- API client methods for the four endpoints above
+- API client methods for the five endpoints above
 - Loading, error, empty, and success states
 - Brief summary of files created/changed
 ```
