@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const formatPrice = (price) => {
     if (!price) return null;
@@ -62,10 +62,12 @@ const sortShopCategories = (categories) =>
         return left.name.localeCompare(right.name);
     });
 
+const getDetailKey = (item) => `${item.id}-${item.categoryName}`;
+
 export default function ShopInventoryClient({ categories }) {
     const orderedCategories = useMemo(() => sortShopCategories(categories), [categories]);
     const [activeId, setActiveId] = useState(orderedCategories[0]?.id ?? null);
-    const [modalIndex, setModalIndex] = useState(null);
+    const [detailItemKey, setDetailItemKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const swipeStartRef = useRef(null);
 
@@ -73,12 +75,6 @@ export default function ShopInventoryClient({ categories }) {
         ? activeId
         : orderedCategories[0]?.id ?? null;
     const active = orderedCategories.find((c) => c.id === selectedCategoryId) ?? orderedCategories[0];
-
-    const closeModalOnOverlayInteraction = (event) => {
-        if (event.target === event.currentTarget) {
-            setModalIndex(null);
-        }
-    };
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const isSearching = normalizedSearch.length > 0;
@@ -91,57 +87,44 @@ export default function ShopInventoryClient({ categories }) {
           )
         : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
 
-    const modalItems = useMemo(() => visibleItems.filter((item) => item.imageUrl), [visibleItems]);
-    const modalItem = modalIndex === null ? null : modalItems[modalIndex] ?? null;
+    const detailIndex = detailItemKey === null
+        ? -1
+        : visibleItems.findIndex((item) => getDetailKey(item) === detailItemKey);
+    const detailItem = detailIndex >= 0 ? visibleItems[detailIndex] : null;
 
-    const closeModal = useCallback(() => setModalIndex(null), []);
-
-    const openModalForItem = (item) => {
-        if (!item.imageUrl) {
-            return;
-        }
-
-        const index = modalItems.findIndex((candidate) => candidate.id === item.id && candidate.categoryName === item.categoryName);
-        if (index >= 0) {
-            setModalIndex(index);
-        }
+    const closeDetail = () => {
+        setDetailItemKey(null);
     };
 
-    const goToPreviousModalItem = useCallback(() => {
-        if (modalItems.length < 2) {
+    const openDetailForItem = (item) => {
+        setDetailItemKey(getDetailKey(item));
+    };
+
+    const goToPreviousDetailItem = () => {
+        if (visibleItems.length < 2 || detailIndex < 0) {
             return;
         }
 
-        setModalIndex((previousIndex) => {
-            if (previousIndex === null) {
-                return previousIndex;
-            }
+        const nextIndex = (detailIndex - 1 + visibleItems.length) % visibleItems.length;
+        setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
+    };
 
-            return (previousIndex - 1 + modalItems.length) % modalItems.length;
-        });
-    }, [modalItems.length]);
-
-    const goToNextModalItem = useCallback(() => {
-        if (modalItems.length < 2) {
+    const goToNextDetailItem = () => {
+        if (visibleItems.length < 2 || detailIndex < 0) {
             return;
         }
 
-        setModalIndex((previousIndex) => {
-            if (previousIndex === null) {
-                return previousIndex;
-            }
+        const nextIndex = (detailIndex + 1) % visibleItems.length;
+        setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
+    };
 
-            return (previousIndex + 1) % modalItems.length;
-        });
-    }, [modalItems.length]);
-
-    const onModalTouchStart = (event) => {
+    const onDetailTouchStart = (event) => {
         const touch = event.touches[0];
         swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
     };
 
-    const onModalTouchEnd = (event) => {
-        if (!swipeStartRef.current || modalItems.length < 2) {
+    const onDetailTouchEnd = (event) => {
+        if (!swipeStartRef.current || visibleItems.length < 2) {
             swipeStartRef.current = null;
             return;
         }
@@ -156,51 +139,48 @@ export default function ShopInventoryClient({ categories }) {
         }
 
         if (deltaX > 0) {
-            goToPreviousModalItem();
+            goToPreviousDetailItem();
             return;
         }
 
-        goToNextModalItem();
+        goToNextDetailItem();
     };
 
     useEffect(() => {
-        if (modalIndex === null) {
+        if (!detailItem) {
             return undefined;
         }
 
-        const onModalKeys = (event) => {
+        const onDetailKeys = (event) => {
             if (event.key === "Escape") {
-                closeModal();
+                setDetailItemKey(null);
                 return;
             }
 
             if (event.key === "ArrowLeft") {
-                goToPreviousModalItem();
+                if (visibleItems.length < 2 || detailIndex < 0) {
+                    return;
+                }
+
+                const nextIndex = (detailIndex - 1 + visibleItems.length) % visibleItems.length;
+                setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
                 return;
             }
 
             if (event.key === "ArrowRight") {
-                goToNextModalItem();
+                if (visibleItems.length < 2 || detailIndex < 0) {
+                    return;
+                }
+
+                const nextIndex = (detailIndex + 1) % visibleItems.length;
+                setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
             }
         };
 
-        window.addEventListener("keydown", onModalKeys);
+        window.addEventListener("keydown", onDetailKeys);
 
-        return () => window.removeEventListener("keydown", onModalKeys);
-    }, [closeModal, goToNextModalItem, goToPreviousModalItem, modalIndex]);
-
-    useEffect(() => {
-        if (!modalItem) {
-            return undefined;
-        }
-
-        const previous = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-
-        return () => {
-            document.body.style.overflow = previous;
-        };
-    }, [modalItem]);
+        return () => window.removeEventListener("keydown", onDetailKeys);
+    }, [detailIndex, detailItem, visibleItems]);
 
     return (
         <div className="shop-inventory">
@@ -223,6 +203,25 @@ export default function ShopInventoryClient({ categories }) {
                 )}
             </div>
 
+            <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
+                <label htmlFor="shop-category-select" className="shop-category-mobile-label">
+                    Category
+                </label>
+                <select
+                    id="shop-category-select"
+                    className="shop-category-mobile-select"
+                    value={selectedCategoryId ?? ""}
+                    onChange={(event) => setActiveId(event.target.value)}
+                    disabled={isSearching}
+                >
+                    {orderedCategories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                            {category.name} ({category.items.length})
+                        </option>
+                    ))}
+                </select>
+            </div>
+
             <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
                 {orderedCategories.map((category) => (
                     <button
@@ -240,129 +239,123 @@ export default function ShopInventoryClient({ categories }) {
 
             {active && (
                 <div role="tabpanel" className="shop-panel">
-                    <div className="shop-grid" aria-live="polite">
-                        {visibleItems.map((item) => (
-                            <article
-                                key={`${item.id}-${item.categoryName}`}
-                                className={`shop-tile${item.imageUrl ? " shop-tile-has-image" : ""}`}
-                                onClick={() => {
-                                    openModalForItem(item);
-                                }}
-                                role={item.imageUrl ? "button" : undefined}
-                                tabIndex={item.imageUrl ? 0 : undefined}
-                                aria-label={item.imageUrl ? `Open product gallery for ${item.name}` : undefined}
-                                onKeyDown={(event) => {
-                                    if (!item.imageUrl) {
-                                        return;
-                                    }
+                    {detailItem ? (
+                        <section className="shop-detail" aria-live="polite" aria-label="Product detail view">
+                            <div className="shop-detail-head">
+                                <button type="button" className="shop-detail-back" onClick={closeDetail}>
+                                    Back to results
+                                </button>
+                                <p className="shop-detail-breadcrumb">
+                                    Shop / {detailItem.categoryName} / {detailItem.name}
+                                </p>
+                                {visibleItems.length > 1 && (
+                                    <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
+                                )}
+                            </div>
 
-                                    if (event.key === "Enter" || event.key === " ") {
-                                        event.preventDefault();
-                                        openModalForItem(item);
-                                    }
-                                }}
+                            <div
+                                className="shop-detail-stage"
+                                onTouchStart={onDetailTouchStart}
+                                onTouchEnd={onDetailTouchEnd}
                             >
-                                <div className="shop-tile-image-wrap">
-                                    {item.imageUrl ? (
-                                        <img
-                                            src={item.imageUrl}
-                                            alt={item.name}
-                                            className="shop-tile-image"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                    ) : (
-                                        <div className="shop-tile-image-placeholder" aria-hidden="true">
-                                            No image
-                                        </div>
-                                    )}
-                                </div>
+                                {visibleItems.length > 1 && (
+                                    <button
+                                        type="button"
+                                        className="shop-detail-nav shop-detail-nav-prev"
+                                        onClick={goToPreviousDetailItem}
+                                        aria-label="View previous product"
+                                    >
+                                        Prev
+                                    </button>
+                                )}
 
-                                <div className="shop-tile-body">
-                                    <h3 className="shop-tile-name">{item.name}</h3>
-                                    {isSearching && <p className="shop-item-category">{item.categoryName}</p>}
-                                    <div className="shop-tile-meta-row">
-                                        <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
-                                        <span className="shop-qty-badge">{item.quantity} in stock</span>
+                                {detailItem.imageUrl ? (
+                                    <img
+                                        src={detailItem.imageUrl}
+                                        alt={detailItem.name}
+                                        className="shop-detail-photo"
+                                        decoding="async"
+                                    />
+                                ) : (
+                                    <div className="shop-detail-photo-placeholder" aria-hidden="true">
+                                        No image available
                                     </div>
-                                </div>
-                            </article>
-                        ))}
+                                )}
 
-                        {visibleItems.length === 0 && (
-                            <p className="consignment-empty shop-empty">No products matched &quot;{searchTerm}&quot;.</p>
-                        )}
-                    </div>
-                </div>
-            )}
+                                {visibleItems.length > 1 && (
+                                    <button
+                                        type="button"
+                                        className="shop-detail-nav shop-detail-nav-next"
+                                        onClick={goToNextDetailItem}
+                                        aria-label="View next product"
+                                    >
+                                        Next
+                                    </button>
+                                )}
+                            </div>
 
-            {modalItem && (
-                <div
-                    className="shop-image-modal"
-                    onMouseDown={closeModalOnOverlayInteraction}
-                    onTouchStart={closeModalOnOverlayInteraction}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Product image viewer"
-                >
-                    <div
-                        className="shop-image-modal-card"
-                        onMouseDown={(event) => event.stopPropagation()}
-                        onTouchStart={(event) => event.stopPropagation()}
-                    >
-                        <div className="shop-image-modal-topbar">
-                            <p className="shop-image-modal-category">{modalItem.categoryName}</p>
-                            <p className="shop-image-modal-counter">{modalIndex + 1} / {modalItems.length}</p>
-                            <button type="button" className="shop-image-modal-close" onClick={closeModal} aria-label="Close image viewer">
-                                Close
-                            </button>
-                        </div>
-
-                        <div
-                            className="shop-image-modal-stage"
-                            onTouchStart={onModalTouchStart}
-                            onTouchEnd={onModalTouchEnd}
-                        >
-                            {modalItems.length > 1 && (
-                                <button
-                                    type="button"
-                                    className="shop-image-modal-nav shop-image-modal-nav-prev"
-                                    onClick={goToPreviousModalItem}
-                                    aria-label="View previous product"
+                            <div className="shop-detail-meta">
+                                <h3>{detailItem.name}</h3>
+                                <p className="secondary">{detailItem.categoryName}</p>
+                                <p className="shop-detail-summary">
+                                    {formatPrice(detailItem.price) ?? "Price unavailable"} | In stock: {detailItem.quantity}
+                                </p>
+                                {visibleItems.length > 1 && (
+                                    <p className="shop-detail-help secondary">Swipe on mobile, or use arrow keys and Prev/Next.</p>
+                                )}
+                            </div>
+                        </section>
+                    ) : (
+                        <div className="shop-grid" aria-live="polite">
+                            {visibleItems.map((item) => (
+                                <article
+                                    key={`${item.id}-${item.categoryName}`}
+                                    className="shop-tile shop-tile-action"
+                                    onClick={() => {
+                                        openDetailForItem(item);
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Open product details for ${item.name}`}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            openDetailForItem(item);
+                                        }
+                                    }}
                                 >
-                                    Prev
-                                </button>
-                            )}
+                                    <div className="shop-tile-image-wrap">
+                                        {item.imageUrl ? (
+                                            <img
+                                                src={item.imageUrl}
+                                                alt={item.name}
+                                                className="shop-tile-image"
+                                                loading="lazy"
+                                                decoding="async"
+                                            />
+                                        ) : (
+                                            <div className="shop-tile-image-placeholder" aria-hidden="true">
+                                                No image
+                                            </div>
+                                        )}
+                                    </div>
 
-                            <img
-                                src={modalItem.imageUrl}
-                                alt={modalItem.name}
-                                className="shop-image-modal-photo"
-                                decoding="async"
-                            />
+                                    <div className="shop-tile-body">
+                                        <h3 className="shop-tile-name">{item.name}</h3>
+                                        {isSearching && <p className="shop-item-category">{item.categoryName}</p>}
+                                        <div className="shop-tile-meta-row">
+                                            <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
+                                            <span className="shop-qty-badge">{item.quantity} in stock</span>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
 
-                            {modalItems.length > 1 && (
-                                <button
-                                    type="button"
-                                    className="shop-image-modal-nav shop-image-modal-nav-next"
-                                    onClick={goToNextModalItem}
-                                    aria-label="View next product"
-                                >
-                                    Next
-                                </button>
+                            {visibleItems.length === 0 && (
+                                <p className="consignment-empty shop-empty">No products matched &quot;{searchTerm}&quot;.</p>
                             )}
                         </div>
-
-                        <div className="shop-image-modal-details">
-                            <h3>{modalItem.name}</h3>
-                            <p className="secondary">
-                                {formatPrice(modalItem.price) ?? "Price unavailable"} | In stock: {modalItem.quantity}
-                            </p>
-                            {modalItems.length > 1 && (
-                                <p className="shop-image-modal-help secondary">Swipe on mobile, or use arrow keys and Prev/Next on desktop.</p>
-                            )}
-                        </div>
-                    </div>
+                    )}
                 </div>
             )}
         </div>
