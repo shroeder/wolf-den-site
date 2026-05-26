@@ -56,6 +56,13 @@ export default function sitemap() {
             ],
         },
         {
+            url: `${BASE_URL}/mystery-bags`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.85,
+            images: [`${BASE_URL}/images/mystery_bag.jpg`],
+        },
+        {
             url: `${BASE_URL}/sell-cards`,
             lastModified: new Date(),
             changeFrequency: "monthly",

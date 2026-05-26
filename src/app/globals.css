@@ -1281,3 +1281,212 @@ textarea {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
+
+/* ── Mystery bags ───────────────────────────────────────── */
+
+.mystery-hero {
+    background:
+        radial-gradient(circle at 85% 10%, rgba(212, 175, 55, 0.16), transparent 42%),
+        linear-gradient(145deg, rgba(31, 31, 31, 0.98), rgba(14, 14, 14, 0.98));
+    border-color: rgba(212, 175, 55, 0.26);
+}
+
+.mystery-hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+    gap: 1rem;
+    align-items: center;
+}
+
+.mystery-bag-photo-wrap {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.mystery-bag-photo {
+    width: 100%;
+    height: auto;
+    max-height: 500px;
+    object-fit: cover;
+    display: block;
+}
+
+.mystery-stat-grid {
+    margin-top: 0.9rem;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.mystery-stat-card {
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 12px;
+    padding: 0.8rem;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.mystery-stat-card p {
+    margin: 0 0 0.35rem;
+}
+
+.mystery-stat-card strong {
+    font-size: clamp(1.1rem, 2vw, 1.45rem);
+}
+
+.mystery-summary-grid {
+    align-items: stretch;
+}
+
+.mystery-top-list {
+    list-style: decimal;
+    margin: 0;
+    padding-left: 1.15rem;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.mystery-top-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.65rem 0.75rem;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.mystery-top-name {
+    margin: 0;
+    font-weight: 700;
+}
+
+.mystery-top-item p {
+    margin: 0;
+}
+
+.mystery-current-price {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    margin: 0.15rem 0 0.55rem;
+    color: var(--accent-hover);
+    text-shadow: 0 3px 12px rgba(212, 175, 55, 0.16);
+}
+
+.mystery-list-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+}
+
+.mystery-list-head h2,
+.mystery-list-head p {
+    margin: 0;
+}
+
+.mystery-marquee {
+    max-height: 780px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.005));
+    scrollbar-width: thin;
+}
+
+.mystery-marquee-inner {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+}
+
+.mystery-card-tile {
+    display: grid;
+    grid-template-columns: 94px minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(17, 17, 17, 0.85);
+    overflow: hidden;
+}
+
+.mystery-card-image-wrap {
+    width: 94px;
+    height: 124px;
+    background: rgba(255, 255, 255, 0.03);
+    border-right: 1px solid var(--line);
+    overflow: hidden;
+}
+
+.mystery-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mystery-card-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+}
+
+.mystery-card-copy {
+    padding: 0.6rem 0.75rem 0.6rem 0;
+    display: grid;
+    gap: 0.2rem;
+}
+
+.mystery-card-copy h3,
+.mystery-card-copy p {
+    margin: 0;
+}
+
+.mystery-card-price {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--accent-hover);
+}
+
+@media (max-width: 900px) {
+    .mystery-hero-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mystery-bag-photo {
+        max-height: 360px;
+    }
+
+    .mystery-stat-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mystery-list-head {
+        align-items: start;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 560px) {
+    .mystery-marquee {
+        max-height: 620px;
+    }
+
+    .mystery-card-tile {
+        grid-template-columns: 74px minmax(0, 1fr);
+    }
+
+    .mystery-card-image-wrap {
+        width: 74px;
+        height: 104px;
+    }
+}
