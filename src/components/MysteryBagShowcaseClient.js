@@ -13,6 +13,12 @@ function formatMoney(value) {
     return currencyFormatter.format(Number(value || 0));
 }
 
+function formatDisplayName(name) {
+    return String(name || "")
+        .split(/\s[-\u2013\u2014]\s|-/)[0]
+        .trim();
+}
+
 export default function MysteryBagShowcaseClient({ cards }) {
     const scrollRef = useRef(null);
     const runningRef = useRef(true);
@@ -73,11 +79,23 @@ export default function MysteryBagShowcaseClient({ cards }) {
             {topCards.map((card, index) => (
                 <article key={card.id} className="mystery-leaderboard-item">
                     <p className="mystery-leaderboard-rank">#{index + 1}</p>
+                    <div className="mystery-leaderboard-image-wrap">
+                        {card.imageUrl ? (
+                            <img
+                                src={card.imageUrl}
+                                alt={card.name}
+                                className="mystery-leaderboard-image"
+                                loading="lazy"
+                                decoding="async"
+                            />
+                        ) : (
+                            <div className="mystery-card-image-placeholder" aria-hidden="true">
+                                No image
+                            </div>
+                        )}
+                    </div>
                     <div className="mystery-leaderboard-copy">
-                        <h3>{card.name}</h3>
-                        <p>
-                            {card.set} #{card.number}
-                        </p>
+                        <h3>{formatDisplayName(card.name)}</h3>
                     </div>
                     <p className="mystery-leaderboard-price">{formatMoney(card.marketValue)}</p>
                 </article>
@@ -138,10 +156,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
                                 )}
                             </div>
                             <div className="mystery-card-copy">
-                                <h3 className="mystery-card-name">{card.name}</h3>
-                                <p className="mystery-card-meta secondary">
-                                    {card.set} #{card.number}
-                                </p>
+                                <h3 className="mystery-card-name">{formatDisplayName(card.name)}</h3>
                                 <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
                             </div>
                         </article>
