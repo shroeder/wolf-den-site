@@ -1435,7 +1435,7 @@ textarea {
 
 .mystery-marquee-inner {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(390px, 1fr));
     gap: 1rem;
     padding: 1rem;
 }
@@ -1522,6 +1522,8 @@ textarea {
 .mystery-side-panel {
     display: grid;
     align-content: start;
+    justify-items: center;
+    text-align: center;
     gap: 1rem;
     padding: 1.15rem;
     border: 1px solid rgba(212, 175, 55, 0.24);
@@ -1539,9 +1541,10 @@ textarea {
 
 .mystery-leaderboard-item {
     display: grid;
-    grid-template-columns: auto 176px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.7rem;
-    align-items: center;
+    justify-items: center;
+    text-align: center;
     padding: 0.8rem;
     border: 1px solid rgba(212, 175, 55, 0.18);
     border-radius: 16px;
@@ -1549,7 +1552,7 @@ textarea {
 }
 
 .mystery-leaderboard-image-wrap {
-    width: 176px;
+    width: 141px;
     aspect-ratio: 0.6;
     border-radius: 14px;
     overflow: hidden;
@@ -1566,19 +1569,12 @@ textarea {
     transform-origin: center;
 }
 
-.mystery-leaderboard-rank,
 .mystery-leaderboard-price,
 .mystery-leaderboard-copy h3,
 .mystery-leaderboard-copy p,
 .mystery-side-panel h2,
 .mystery-side-eyebrow {
     margin: 0;
-}
-
-.mystery-leaderboard-rank {
-    font-size: 1.2rem;
-    font-weight: 800;
-    color: var(--accent-hover);
 }
 
 .mystery-leaderboard-copy h3 {
@@ -1590,7 +1586,7 @@ textarea {
     font-size: 1rem;
     font-weight: 800;
     color: var(--accent-hover);
-    text-align: left;
+    text-align: center;
 }
 
 .mystery-side-eyebrow {
@@ -1733,7 +1729,7 @@ body.tv-mode .mystery-marquee {
 
 html.tv-mode .mystery-marquee-inner,
 body.tv-mode .mystery-marquee-inner {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
     gap: 0.85rem;
     padding: 0.7rem;
 }
@@ -1988,13 +1984,17 @@ body.tv-mode .mystery-marquee-inner {
 
 html.tv-mode .mystery-card-tile,
 body.tv-mode .mystery-card-tile {
-    grid-template-columns: 108px minmax(0, 1fr);
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
 }
 
 html.tv-mode .mystery-card-image-wrap,
 body.tv-mode .mystery-card-image-wrap {
-    width: 108px;
-    height: 150px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 0.72;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
 }
 
 html.tv-mode .mystery-card-name,

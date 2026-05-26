@@ -22,6 +22,7 @@ function formatDisplayName(name) {
 export default function MysteryBagShowcaseClient({ cards }) {
     const scrollRef = useRef(null);
     const runningRef = useRef(true);
+    const refreshTriggeredRef = useRef(false);
     const [tvMode] = useTvMode();
 
     const visibleCards = useMemo(() => cards, [cards]);
@@ -32,15 +33,39 @@ export default function MysteryBagShowcaseClient({ cards }) {
 
     useEffect(() => {
         const scroller = scrollRef.current;
+        refreshTriggeredRef.current = false;
 
-        if (!scroller || cards.length < 2) {
-            return undefined;
+        const triggerRefresh = () => {
+            if (refreshTriggeredRef.current) {
+                return;
+            }
+
+            refreshTriggeredRef.current = true;
+            window.location.reload();
+        };
+
+        let refreshTimer = null;
+
+        if (!scroller) {
+            refreshTimer = window.setInterval(triggerRefresh, 30000);
+
+            return () => {
+                if (refreshTimer) {
+                    window.clearInterval(refreshTimer);
+                }
+            };
         }
 
         const hasOverflow = scroller.scrollHeight > scroller.clientHeight;
 
         if (!hasOverflow) {
-            return undefined;
+            refreshTimer = window.setInterval(triggerRefresh, 30000);
+
+            return () => {
+                if (refreshTimer) {
+                    window.clearInterval(refreshTimer);
+                }
+            };
         }
 
         let frameId = null;
@@ -55,7 +80,8 @@ export default function MysteryBagShowcaseClient({ cards }) {
             scroller.scrollTop += tvMode ? 0.8 : 0.45;
 
             if (scroller.scrollTop >= maxScroll) {
-                scroller.scrollTop = 0;
+                triggerRefresh();
+                return;
             }
 
             frameId = window.requestAnimationFrame(step);
@@ -67,6 +93,10 @@ export default function MysteryBagShowcaseClient({ cards }) {
             if (frameId) {
                 window.cancelAnimationFrame(frameId);
             }
+
+            if (refreshTimer) {
+                window.clearInterval(refreshTimer);
+            }
         };
     }, [cards.length, tvMode]);
 
@@ -76,9 +106,8 @@ export default function MysteryBagShowcaseClient({ cards }) {
 
     const leaderboard = topCards.length ? (
         <div className="mystery-leaderboard-list">
-            {topCards.map((card, index) => (
+            {topCards.map((card) => (
                 <article key={card.id} className="mystery-leaderboard-item">
-                    <p className="mystery-leaderboard-rank">#{index + 1}</p>
                     <div className="mystery-leaderboard-image-wrap">
                         {card.imageUrl ? (
                             <img
