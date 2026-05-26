@@ -25,7 +25,7 @@ export default function SellCardsPage() {
                     <Link className="button primary" href="/contact">
                         Start a Buylist Request
                     </Link>
-                    <a className="button" href="tel:+15073016434">
+                    <a className="button" href="tel:+17014090782">
                         Call Store
                     </a>
                 </div>

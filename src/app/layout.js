@@ -78,7 +78,7 @@ const localBusinessSchema = {
     description:
         "Locally owned trading card game store in Montgomery, Minnesota offering Pokemon cards, Magic: The Gathering, singles, sealed product, accessories, and community play.",
     url: SITE_URL,
-    telephone: "+15073016434",
+    telephone: "+17014090782",
     email: "luke@wolfdengamingmn.com",
     address: {
         "@type": "PostalAddress",

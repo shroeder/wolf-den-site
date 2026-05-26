@@ -25,7 +25,7 @@ export default function ContactPage() {
                     <h2>Store Information</h2>
                     <ul>
                         <li>Email: luke@wolfdengamingmn.com</li>
-                        <li>Phone: (507) 301-6434</li>
+                        <li>Phone: (701) 409-0782</li>
                         <li>Address: 300 1st St S, Montgomery, MN 56069</li>
                         <li>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm</li>
                     </ul>
@@ -33,7 +33,7 @@ export default function ContactPage() {
                         <strong>Best for:</strong> store questions, inventory checks, event timing, trade-in questions, vendor contact, and local pickup coordination.
                     </p>
                     <div className="cta-row">
-                        <a className="button primary" href="tel:+15073016434">
+                        <a className="button primary" href="tel:+17014090782">
                             Call Store
                         </a>
                         <a

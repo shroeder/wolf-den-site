@@ -149,8 +149,8 @@ export default function PokemonCardsPage() {
                     The Wolf Den is a locally owned trading card game store focused on building a fun, welcoming environment for collectors and players throughout southern Minnesota.
                 </p>
                 <div className="cta-row">
-                    <a className="button primary" href="tel:+15073016434">
-                        Call Now: (507) 301-6434
+                    <a className="button primary" href="tel:+17014090782">
+                        Call Now: (701) 409-0782
                     </a>
                     <a
                         className="button"
