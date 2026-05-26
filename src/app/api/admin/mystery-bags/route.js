@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
 import { listMysteryBagCards, upsertMysteryBagCard } from "@/lib/mystery-bags";
@@ -110,6 +111,8 @@ export async function POST(request) {
 
         try {
             const card = await upsertMysteryBagCard(payload);
+            revalidatePath("/mystery-bags");
+            revalidatePath("/api/mystery-bags");
 
             logger.info("admin.mystery_bags.create.success", {
                 cardId: card.cardId,

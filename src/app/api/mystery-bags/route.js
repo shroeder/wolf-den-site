@@ -4,6 +4,8 @@ import { getMysteryBagDashboardData } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/mystery-bags", async ({ logger, internalError }) => {

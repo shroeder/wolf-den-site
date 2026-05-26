@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
 import { deleteMysteryBagCardByIdOrCardId } from "@/lib/mystery-bags";
@@ -40,6 +41,9 @@ export async function DELETE(request, { params }) {
                 deletedCardId: deleted.cardId,
                 deletedId: deleted.id,
             });
+
+            revalidatePath("/mystery-bags");
+            revalidatePath("/api/mystery-bags");
 
             return NextResponse.json({
                 success: true,
