@@ -1536,25 +1536,25 @@ textarea {
 
 .mystery-leaderboard-list {
     display: grid;
-    gap: 1rem;
+    gap: 0.8rem;
 }
 
 .mystery-leaderboard-item {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 0.7rem;
+    gap: 0.56rem;
     justify-items: center;
     text-align: center;
-    padding: 0.8rem;
+    padding: 0.64rem;
     border: 1px solid rgba(212, 175, 55, 0.18);
-    border-radius: 16px;
+    border-radius: 13px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
 }
 
 .mystery-leaderboard-image-wrap {
-    width: 141px;
+    width: 113px;
     aspect-ratio: 0.6;
-    border-radius: 14px;
+    border-radius: 11px;
     overflow: hidden;
     border: 1px solid rgba(212, 175, 55, 0.2);
     background: rgba(255, 255, 255, 0.04);
