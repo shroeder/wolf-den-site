@@ -101,8 +101,8 @@ export default function MysteryBagShowcaseClient({ cards }) {
                             )}
                         </div>
                         <div className="mystery-card-copy">
-                            <h3>{card.name}</h3>
-                            <p className="secondary">
+                            <h3 className="mystery-card-name">{card.name}</h3>
+                            <p className="mystery-card-meta secondary">
                                 {card.set} #{card.number}
                             </p>
                             <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
