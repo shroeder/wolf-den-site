@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const formatPrice = (price) => {
     if (!price) return null;
@@ -81,10 +82,10 @@ export default function ShopInventoryClient({ categories }) {
 
     const visibleItems = isSearching
         ? orderedCategories.flatMap((category) =>
-              category.items
-                  .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
-                  .map((item) => ({ ...item, categoryName: category.name }))
-          )
+            category.items
+                .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+                .map((item) => ({ ...item, categoryName: category.name }))
+        )
         : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
 
     const detailIndex = detailItemKey === null
@@ -195,134 +196,134 @@ export default function ShopInventoryClient({ categories }) {
         };
     }, [detailItem]);
 
-    return (
-        <div className={`shop-inventory${detailItem ? " shop-inventory-inspecting" : ""}`}>
-            {!detailItem && (
-                <>
-                    <div className="shop-search-row">
-                        <label htmlFor="shop-product-search" className="sr-only">
-                            Search products across categories
-                        </label>
-                        <input
-                            id="shop-product-search"
-                            type="search"
-                            className="shop-search-input"
-                            placeholder="Search products across all categories"
-                            value={searchTerm}
-                            onChange={(event) => setSearchTerm(event.target.value)}
-                        />
-                        {isSearching && (
-                            <p className="secondary shop-search-meta">
-                                {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
-                            </p>
-                        )}
-                    </div>
+    const detailView = detailItem ? (
+        <section className="shop-detail-viewport" aria-live="polite" aria-label="Product detail view">
+            <div className="shop-detail-shell">
+                <div className="shop-detail-head">
+                    <button type="button" className="shop-detail-back" onClick={closeDetail}>
+                        Back to results
+                    </button>
+                    <p className="shop-detail-breadcrumb">
+                        Shop / {detailItem.categoryName} / {detailItem.name}
+                    </p>
+                    {visibleItems.length > 1 && (
+                        <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
+                    )}
+                </div>
 
-                    <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
-                        <label htmlFor="shop-category-select" className="shop-category-mobile-label">
-                            Category
-                        </label>
-                        <select
-                            id="shop-category-select"
-                            className="shop-category-mobile-select"
-                            value={selectedCategoryId ?? ""}
-                            onChange={(event) => setActiveId(event.target.value)}
-                            disabled={isSearching}
+                <div
+                    className="shop-detail-stage"
+                    onTouchStart={onDetailTouchStart}
+                    onTouchEnd={onDetailTouchEnd}
+                >
+                    {visibleItems.length > 1 && (
+                        <button
+                            type="button"
+                            className="shop-detail-nav shop-detail-nav-prev"
+                            onClick={goToPreviousDetailItem}
+                            aria-label="View previous product"
                         >
-                            {orderedCategories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                    {category.name} ({category.items.length})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                            &lt;
+                        </button>
+                    )}
 
-                    <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
-                        {orderedCategories.map((category) => (
-                            <button
-                                key={category.id}
-                                role="tab"
-                                aria-selected={category.id === selectedCategoryId}
-                                className={`shop-tab${category.id === selectedCategoryId ? " shop-tab-active" : ""}`}
-                                onClick={() => setActiveId(category.id)}
-                            >
-                                {category.name}
-                                <span className="shop-tab-count">{category.items.length}</span>
-                            </button>
-                        ))}
-                    </div>
-                </>
-            )}
-
-            {active && (
-                <div role="tabpanel" className={`shop-panel${detailItem ? " shop-panel-inspecting" : ""}`}>
-                    {detailItem ? (
-                        <section className="shop-detail shop-detail-fullscreen" aria-live="polite" aria-label="Product detail view">
-                            <div className="shop-detail-head">
-                                <button type="button" className="shop-detail-back" onClick={closeDetail}>
-                                    Back to results
-                                </button>
-                                <p className="shop-detail-breadcrumb">
-                                    Shop / {detailItem.categoryName} / {detailItem.name}
-                                </p>
-                                {visibleItems.length > 1 && (
-                                    <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
-                                )}
-                            </div>
-
-                            <div
-                                className="shop-detail-stage"
-                                onTouchStart={onDetailTouchStart}
-                                onTouchEnd={onDetailTouchEnd}
-                            >
-                                {visibleItems.length > 1 && (
-                                    <button
-                                        type="button"
-                                        className="shop-detail-nav shop-detail-nav-prev"
-                                        onClick={goToPreviousDetailItem}
-                                        aria-label="View previous product"
-                                    >
-                                        &lt;
-                                    </button>
-                                )}
-
-                                {detailItem.imageUrl ? (
-                                    <img
-                                        src={detailItem.imageUrl}
-                                        alt={detailItem.name}
-                                        className="shop-detail-photo"
-                                        decoding="async"
-                                    />
-                                ) : (
-                                    <div className="shop-detail-photo-placeholder" aria-hidden="true">
-                                        No image available
-                                    </div>
-                                )}
-
-                                {visibleItems.length > 1 && (
-                                    <button
-                                        type="button"
-                                        className="shop-detail-nav shop-detail-nav-next"
-                                        onClick={goToNextDetailItem}
-                                        aria-label="View next product"
-                                    >
-                                        &gt;
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="shop-detail-meta">
-                                <h3>{detailItem.name}</h3>
-                                <p className="secondary">{detailItem.categoryName}</p>
-                                <p className="shop-detail-summary">
-                                    {formatPrice(detailItem.price) ?? "Price unavailable"} | In stock: {detailItem.quantity}
-                                </p>
-                                {visibleItems.length > 1 && (
-                                    <p className="shop-detail-help secondary">Swipe on mobile, or use left/right arrow keys.</p>
-                                )}
-                            </div>
-                        </section>
+                    {detailItem.imageUrl ? (
+                        <img
+                            src={detailItem.imageUrl}
+                            alt={detailItem.name}
+                            className="shop-detail-photo"
+                            decoding="async"
+                        />
                     ) : (
+                        <div className="shop-detail-photo-placeholder" aria-hidden="true">
+                            No image available
+                        </div>
+                    )}
+
+                    {visibleItems.length > 1 && (
+                        <button
+                            type="button"
+                            className="shop-detail-nav shop-detail-nav-next"
+                            onClick={goToNextDetailItem}
+                            aria-label="View next product"
+                        >
+                            &gt;
+                        </button>
+                    )}
+                </div>
+
+                <div className="shop-detail-meta">
+                    <h3>{detailItem.name}</h3>
+                    <p className="secondary">{detailItem.categoryName}</p>
+                    <p className="shop-detail-summary">
+                        {formatPrice(detailItem.price) ?? "Price unavailable"} | In stock: {detailItem.quantity}
+                    </p>
+                    {visibleItems.length > 1 && (
+                        <p className="shop-detail-help secondary">Swipe on mobile, or use left/right arrow keys.</p>
+                    )}
+                </div>
+            </div>
+        </section>
+    ) : null;
+
+    return (
+        <>
+            <div className="shop-inventory">
+                <div className="shop-search-row">
+                    <label htmlFor="shop-product-search" className="sr-only">
+                        Search products across categories
+                    </label>
+                    <input
+                        id="shop-product-search"
+                        type="search"
+                        className="shop-search-input"
+                        placeholder="Search products across all categories"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                    />
+                    {isSearching && (
+                        <p className="secondary shop-search-meta">
+                            {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
+                        </p>
+                    )}
+                </div>
+
+                <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
+                    <label htmlFor="shop-category-select" className="shop-category-mobile-label">
+                        Category
+                    </label>
+                    <select
+                        id="shop-category-select"
+                        className="shop-category-mobile-select"
+                        value={selectedCategoryId ?? ""}
+                        onChange={(event) => setActiveId(event.target.value)}
+                        disabled={isSearching}
+                    >
+                        {orderedCategories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                                {category.name} ({category.items.length})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
+                    {orderedCategories.map((category) => (
+                        <button
+                            key={category.id}
+                            role="tab"
+                            aria-selected={category.id === selectedCategoryId}
+                            className={`shop-tab${category.id === selectedCategoryId ? " shop-tab-active" : ""}`}
+                            onClick={() => setActiveId(category.id)}
+                        >
+                            {category.name}
+                            <span className="shop-tab-count">{category.items.length}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {active && (
+                    <div role="tabpanel" className="shop-panel">
                         <div className="shop-grid" aria-live="polite">
                             {visibleItems.map((item) => (
                                 <article
@@ -372,9 +373,11 @@ export default function ShopInventoryClient({ categories }) {
                                 <p className="consignment-empty shop-empty">No products matched &quot;{searchTerm}&quot;.</p>
                             )}
                         </div>
-                    )}
-                </div>
-            )}
-        </div>
+                    </div>
+                )}
+            </div>
+
+            {typeof document !== "undefined" && detailView ? createPortal(detailView, document.body) : null}
+        </>
     );
 }
