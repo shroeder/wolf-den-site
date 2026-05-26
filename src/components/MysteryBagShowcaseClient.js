@@ -15,18 +15,18 @@ export default function MysteryBagShowcaseClient({ cards }) {
     const scrollRef = useRef(null);
     const runningRef = useRef(true);
 
-    const marqueeCards = useMemo(() => {
-        if (!cards.length) {
-            return [];
-        }
-
-        return [...cards, ...cards];
-    }, [cards]);
+    const visibleCards = useMemo(() => cards, [cards]);
 
     useEffect(() => {
         const scroller = scrollRef.current;
 
         if (!scroller || cards.length < 2) {
+            return undefined;
+        }
+
+        const hasOverflow = scroller.scrollHeight > scroller.clientHeight;
+
+        if (!hasOverflow) {
             return undefined;
         }
 
@@ -38,11 +38,11 @@ export default function MysteryBagShowcaseClient({ cards }) {
                 return;
             }
 
-            const midpoint = scroller.scrollHeight / 2;
+            const maxScroll = scroller.scrollHeight - scroller.clientHeight;
             scroller.scrollTop += 0.45;
 
-            if (scroller.scrollTop >= midpoint) {
-                scroller.scrollTop -= midpoint;
+            if (scroller.scrollTop >= maxScroll) {
+                scroller.scrollTop = 0;
             }
 
             frameId = window.requestAnimationFrame(step);
@@ -79,9 +79,9 @@ export default function MysteryBagShowcaseClient({ cards }) {
             }}
         >
             <div className="mystery-marquee-inner" aria-live="polite">
-                {marqueeCards.map((card, index) => (
+                {visibleCards.map((card) => (
                     <article
-                        key={`${card.id}-${index}`}
+                        key={card.id}
                         className="mystery-card-tile"
                         aria-label={`Mystery bag card ${card.name} market value ${formatMoney(card.marketValue)}`}
                     >
