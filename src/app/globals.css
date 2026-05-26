@@ -1435,7 +1435,7 @@ textarea {
 
 .mystery-marquee-inner {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
     padding: 1rem;
 }
@@ -1455,7 +1455,7 @@ textarea {
 .mystery-card-image-wrap {
     width: 100%;
     height: auto;
-    aspect-ratio: 0.7;
+    aspect-ratio: 0.64;
     background: rgba(255, 255, 255, 0.03);
     border-bottom: 1px solid var(--line);
     overflow: hidden;
@@ -1479,7 +1479,7 @@ textarea {
 }
 
 .mystery-card-copy {
-    padding: 1rem 1rem 1.05rem;
+    padding: 1.1rem 1.1rem 1.2rem;
     display: grid;
     gap: 0.4rem;
 }
@@ -1491,7 +1491,7 @@ textarea {
 }
 
 .mystery-card-name {
-    font-size: 1.08rem;
+    font-size: 1.2rem;
     line-height: 1.2;
     font-weight: 700;
 }
@@ -1502,14 +1502,14 @@ textarea {
 }
 
 .mystery-card-price {
-    font-size: 1.16rem;
+    font-size: 1.28rem;
     font-weight: 800;
     color: var(--accent-hover);
 }
 
 .mystery-live-board {
     display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(520px, 1fr);
+    grid-template-columns: minmax(0, 1.85fr) minmax(260px, 0.5fr);
     gap: 1.15rem;
     align-items: start;
 }
@@ -1534,17 +1534,17 @@ textarea {
 
 .mystery-leaderboard-item {
     display: grid;
-    grid-template-columns: auto 148px minmax(0, 1fr) auto;
-    gap: 0.9rem;
+    grid-template-columns: auto 88px minmax(0, 1fr);
+    gap: 0.7rem;
     align-items: center;
-    padding: 1rem;
+    padding: 0.8rem;
     border: 1px solid rgba(212, 175, 55, 0.18);
     border-radius: 16px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
 }
 
 .mystery-leaderboard-image-wrap {
-    width: 148px;
+    width: 88px;
     aspect-ratio: 0.72;
     border-radius: 14px;
     overflow: hidden;
@@ -1569,21 +1569,21 @@ textarea {
 }
 
 .mystery-leaderboard-rank {
-    font-size: 1.7rem;
+    font-size: 1.2rem;
     font-weight: 800;
     color: var(--accent-hover);
 }
 
 .mystery-leaderboard-copy h3 {
-    font-size: 1.28rem;
-    line-height: 1.15;
+    font-size: 0.98rem;
+    line-height: 1.1;
 }
 
 .mystery-leaderboard-price {
-    font-size: 1.4rem;
+    font-size: 1rem;
     font-weight: 800;
     color: var(--accent-hover);
-    text-align: right;
+    text-align: left;
 }
 
 .mystery-side-eyebrow {
@@ -1594,7 +1594,7 @@ textarea {
 }
 
 .mystery-side-panel h2 {
-    font-size: 1.65rem;
+    font-size: 1.25rem;
     line-height: 1.1;
 }
 
@@ -1713,7 +1713,7 @@ body.tv-mode .mystery-bag-photo {
 
 html.tv-mode .mystery-side-panel h2,
 body.tv-mode .mystery-side-panel h2 {
-    font-size: 1.7rem;
+    font-size: 1.3rem;
     line-height: 1.1;
 }
 
@@ -1726,7 +1726,7 @@ body.tv-mode .mystery-marquee {
 
 html.tv-mode .mystery-marquee-inner,
 body.tv-mode .mystery-marquee-inner {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.85rem;
     padding: 0.7rem;
 }
@@ -1789,7 +1789,7 @@ body.tv-mode .mystery-card-price {
 
     html.tv-mode .mystery-marquee-inner,
     body.tv-mode .mystery-marquee-inner {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
     }
 }
 
