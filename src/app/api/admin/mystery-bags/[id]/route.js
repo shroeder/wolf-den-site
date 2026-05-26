@@ -17,6 +17,10 @@ export async function DELETE(request, { params }) {
         const { id } = await params;
 
         if (!id || typeof id !== "string") {
+            logger.warn("admin.mystery_bags.delete.invalid_id", {
+                id: id || null,
+            });
+
             return NextResponse.json({ error: "invalid_id" }, { status: 400 });
         }
 
@@ -24,8 +28,18 @@ export async function DELETE(request, { params }) {
             const deleted = await deleteMysteryBagCardByIdOrCardId(id);
 
             if (!deleted) {
+                logger.warn("admin.mystery_bags.delete.not_found", {
+                    id,
+                });
+
                 return NextResponse.json({ error: "card_not_found" }, { status: 404 });
             }
+
+            logger.info("admin.mystery_bags.delete.success", {
+                id,
+                deletedCardId: deleted.cardId,
+                deletedId: deleted.id,
+            });
 
             return NextResponse.json({
                 success: true,

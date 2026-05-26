@@ -6,9 +6,14 @@ import { withRequestLogging } from "@/lib/server-logger";
 export const runtime = "nodejs";
 
 export async function GET(request) {
-    return withRequestLogging(request, "GET /api/mystery-bags", async ({ internalError }) => {
+    return withRequestLogging(request, "GET /api/mystery-bags", async ({ logger, internalError }) => {
         try {
             const data = await getMysteryBagDashboardData();
+
+            logger.info("mystery_bags.list.success", {
+                itemCount: data.metrics.itemCount,
+                topCount: data.topCards.length,
+            });
 
             return NextResponse.json(data, {
                 headers: {

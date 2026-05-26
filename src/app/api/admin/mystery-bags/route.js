@@ -58,6 +58,10 @@ export async function GET(request) {
         try {
             const cards = await listMysteryBagCards();
 
+            logger.info("admin.mystery_bags.list.success", {
+                count: cards.length,
+            });
+
             return NextResponse.json(
                 { cards },
                 {
@@ -87,6 +91,8 @@ export async function POST(request) {
         try {
             body = await request.json();
         } catch {
+            logger.warn("admin.mystery_bags.create.invalid_json");
+
             return NextResponse.json({ error: "invalid_json" }, { status: 400 });
         }
 
@@ -94,11 +100,22 @@ export async function POST(request) {
         const payloadError = validatePayload(payload);
 
         if (payloadError) {
+            logger.warn("admin.mystery_bags.create.validation_failure", {
+                reason: payloadError,
+                cardId: payload.cardId || null,
+            });
+
             return NextResponse.json({ error: payloadError }, { status: 400 });
         }
 
         try {
             const card = await upsertMysteryBagCard(payload);
+
+            logger.info("admin.mystery_bags.create.success", {
+                cardId: card.cardId,
+                id: card.id,
+                marketValue: card.marketValue,
+            });
 
             return NextResponse.json(
                 {
