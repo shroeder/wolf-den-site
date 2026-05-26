@@ -427,3 +427,243 @@ Deliverables:
 3. Show current owed and payout history.
 4. When payout is made in person, call create payout endpoint.
 5. Offer "View Receipt" by opening payout receipt endpoint.
+
+## Mystery Pack API (Phone Agent)
+
+Use these endpoints for managing and viewing singles packed into mystery bags.
+
+### 10) List mystery pack cards (admin)
+
+`GET /api/admin/mystery-bags`
+
+Response:
+
+```json
+{
+  "cards": [
+    {
+      "id": "uuid",
+      "cardId": "xy7-54",
+      "name": "M Rayquaza EX",
+      "set": "Roaring Skies",
+      "number": "61",
+      "marketValue": 42.75,
+      "imageUrl": "https://...",
+      "createdAt": "2026-05-25T14:10:00.000Z",
+      "updatedAt": "2026-05-25T14:10:00.000Z"
+    }
+  ]
+}
+```
+
+### 11) Add or update a mystery pack card (admin)
+
+`POST /api/admin/mystery-bags`
+
+Body:
+
+```json
+{
+  "cardId": "xy7-54",
+  "name": "M Rayquaza EX",
+  "set": "Roaring Skies",
+  "number": "61",
+  "marketValue": 42.75,
+  "imageUrl": "https://images.example.com/rayquaza.jpg"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "card": {
+    "id": "uuid",
+    "cardId": "xy7-54",
+    "name": "M Rayquaza EX",
+    "set": "Roaring Skies",
+    "number": "61",
+    "marketValue": 42.75,
+    "imageUrl": "https://images.example.com/rayquaza.jpg",
+    "createdAt": "2026-05-25T14:10:00.000Z",
+    "updatedAt": "2026-05-25T14:10:00.000Z"
+  }
+}
+```
+
+Notes:
+
+- This endpoint upserts by `cardId`.
+- If `cardId` already exists, the record is updated and returned.
+
+### 12) Remove a mystery pack card (admin)
+
+`DELETE /api/admin/mystery-bags/{id}`
+
+`{id}` can be either:
+
+- DB UUID `id`
+- or `cardId`
+
+Response:
+
+```json
+{
+  "success": true,
+  "card": {
+    "id": "uuid",
+    "cardId": "xy7-54",
+    "name": "M Rayquaza EX",
+    "set": "Roaring Skies",
+    "number": "61",
+    "marketValue": 42.75,
+    "imageUrl": "https://images.example.com/rayquaza.jpg",
+    "createdAt": "2026-05-25T14:10:00.000Z",
+    "updatedAt": "2026-05-25T14:10:00.000Z"
+  }
+}
+```
+
+### 13) Mystery pack dashboard payload (public/read-only)
+
+`GET /api/mystery-bags`
+
+Response:
+
+```json
+{
+  "metrics": {
+    "itemCount": 24,
+    "marketTotal": 512.8,
+    "marketAverage": 21.37
+  },
+  "topCards": [
+    {
+      "id": "uuid",
+      "cardId": "xy7-54",
+      "name": "M Rayquaza EX",
+      "set": "Roaring Skies",
+      "number": "61",
+      "marketValue": 42.75,
+      "imageUrl": "https://...",
+      "createdAt": "2026-05-25T14:10:00.000Z",
+      "updatedAt": "2026-05-25T14:10:00.000Z"
+    }
+  ],
+  "cards": []
+}
+```
+
+Common mystery pack errors:
+
+- `401 unauthorized`
+- `400 invalid_json`
+- `400 missing_required_fields`
+- `400 invalid_market_value`
+- `400 invalid_image_url`
+- `400 invalid_id`
+- `404 card_not_found`
+- `500 Internal Server Error` (may include `requestId`)
+
+## Phone Agent Mystery Pack Playbook
+
+1. Load cards for admin screen:
+   - Call `GET /api/admin/mystery-bags`.
+   - Sort by `marketValue` descending if needed.
+
+2. Add or update a card:
+   - Call `POST /api/admin/mystery-bags` with `cardId`, `name`, `set`, `number`, `marketValue`, optional `imageUrl`.
+   - On success, refresh list via `GET /api/admin/mystery-bags`.
+
+3. Remove a card:
+   - Call `DELETE /api/admin/mystery-bags/{id}` using the row `id` (or `cardId`).
+   - On success, refresh list and metrics.
+
+4. Show market totals and bag price estimate:
+   - Call `GET /api/mystery-bags`.
+   - Display:
+     - `metrics.marketTotal` as total market value of packed singles.
+     - `metrics.marketAverage` as current mystery pack price estimate.
+     - `topCards` as the top 3 high-value singles.
+
+5. Error handling:
+   - `401 unauthorized`: re-auth and retry.
+   - `400` validation failures: show field-specific message.
+   - `404 card_not_found`: refresh list and show "already removed" message.
+   - `500`: retry once, then show error with `requestId` if present.
+
+## Copy-Paste Prompt For Phone App Agent (Mystery Pack)
+
+```text
+Build a Mystery Pack Management screen for the Wolf Den phone app using the existing mystery bag API.
+
+Goal:
+- Let staff add/update packed singles in mystery bags.
+- Let staff remove singles from mystery bags.
+- Show live market metrics (market total and market average).
+- Show top 3 most expensive cards.
+
+Auth:
+- Use Authorization: Bearer <ADMIN_API_KEY> for admin endpoints.
+
+Base URL:
+- Production base URL is the site domain.
+
+Endpoints:
+1) GET /api/admin/mystery-bags
+   - Returns all mystery bag cards for admin management.
+
+2) POST /api/admin/mystery-bags
+   - Upserts one card by cardId.
+   - Body:
+     {
+       "cardId": "string",
+       "name": "string",
+       "set": "string",
+       "number": "string",
+       "marketValue": number,
+       "imageUrl": "https://..." // optional
+     }
+
+3) DELETE /api/admin/mystery-bags/{id}
+   - Removes a card by id (UUID) or cardId.
+
+4) GET /api/mystery-bags
+   - Public read-only dashboard payload.
+   - Use for metrics + topCards + full list.
+
+Required screens:
+
+Screen 1: Mystery Pack Admin
+- Fetch GET /api/admin/mystery-bags on load.
+- Show each card with image, name, set, number, market value.
+- Include add/edit form with fields: cardId, name, set, number, marketValue, imageUrl.
+- Save button calls POST /api/admin/mystery-bags.
+- Include remove action per row with confirmation.
+- Remove button calls DELETE /api/admin/mystery-bags/{id}.
+- Pull-to-refresh re-fetches the admin list.
+
+Screen 2: Mystery Pack Market Dashboard
+- Fetch GET /api/mystery-bags.
+- Show metrics:
+  - marketTotal
+  - marketAverage (label as "Mystery Pack Price")
+  - itemCount
+- Show top 3 cards from topCards.
+- Show full card list with image, name, market value.
+
+Behavior requirements:
+- Always treat server response as source of truth.
+- Disable submit/remove controls while request is in flight.
+- Show clear inline validation errors.
+- If 401, route to auth handling.
+- If 500, show retry and include requestId when available.
+
+Deliverables:
+- Mystery Pack Admin screen
+- Mystery Pack Market screen
+- API client methods for all four endpoints
+- Loading, error, empty, and success states
+- Brief summary of files changed
+```
