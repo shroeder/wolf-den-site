@@ -19,7 +19,10 @@ export default function MysteryBagShowcaseClient({ cards }) {
     const [tvMode] = useTvMode();
 
     const visibleCards = useMemo(() => cards, [cards]);
-    const topCards = useMemo(() => cards.slice(0, 3), [cards]);
+    const topCards = useMemo(
+        () => [...cards].sort((left, right) => Number(right.marketValue || 0) - Number(left.marketValue || 0)).slice(0, 3),
+        [cards]
+    );
 
     useEffect(() => {
         const scroller = scrollRef.current;
@@ -83,15 +86,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
     ) : null;
 
     return (
-        <div className={tvMode ? "mystery-live-board mystery-live-board-tv" : "mystery-live-board"}>
-            {tvMode ? (
-                <aside className="mystery-side-panel mystery-side-panel-left" aria-label="Top three mystery bag cards">
-                    <p className="mystery-side-eyebrow">Highest Value</p>
-                    <h2>Top 3 cards</h2>
-                    {leaderboard}
-                </aside>
-            ) : null}
-
+        <div className="mystery-live-board">
             <div
                 className="mystery-marquee"
                 ref={scrollRef}
@@ -154,13 +149,11 @@ export default function MysteryBagShowcaseClient({ cards }) {
                 </div>
             </div>
 
-            {tvMode ? (
-                <aside className="mystery-side-panel mystery-side-panel-right" aria-label="Top three mystery bag cards">
-                    <p className="mystery-side-eyebrow">Highest Value</p>
-                    <h2>Top 3 cards</h2>
-                    {leaderboard}
-                </aside>
-            ) : null}
+            <aside className="mystery-side-panel" aria-label="Top three mystery bag cards">
+                <p className="mystery-side-eyebrow">Highest Value</p>
+                <h2>Top 3 cards</h2>
+                {leaderboard}
+            </aside>
         </div>
     );
 }
