@@ -201,14 +201,9 @@ export default function ShopInventoryClient({ categories }) {
             <div className="shop-detail-shell">
                 <div className="shop-detail-head">
                     <button type="button" className="shop-detail-back" onClick={closeDetail}>
-                        Back to results
+                        Back
                     </button>
-                    <p className="shop-detail-breadcrumb">
-                        Shop / {detailItem.categoryName} / {detailItem.name}
-                    </p>
-                    {visibleItems.length > 1 && (
-                        <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
-                    )}
+                    <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
                 </div>
 
                 <div
@@ -254,13 +249,10 @@ export default function ShopInventoryClient({ categories }) {
 
                 <div className="shop-detail-meta">
                     <h3>{detailItem.name}</h3>
-                    <p className="secondary">{detailItem.categoryName}</p>
                     <p className="shop-detail-summary">
-                        {formatPrice(detailItem.price) ?? "Price unavailable"} | In stock: {detailItem.quantity}
+                        {formatPrice(detailItem.price) ?? "Price unavailable"} | {detailItem.quantity} in stock
                     </p>
-                    {visibleItems.length > 1 && (
-                        <p className="shop-detail-help secondary">Swipe on mobile, or use left/right arrow keys.</p>
-                    )}
+                    <p className="shop-detail-category secondary">{detailItem.categoryName}</p>
                 </div>
             </div>
         </section>

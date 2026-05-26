@@ -1032,24 +1032,29 @@ textarea {
     z-index: 3200;
     height: 100svh;
     width: 100vw;
-    padding: 0.8rem;
+    padding: 0.4rem;
     background: var(--bg);
 }
 
 .shop-detail-shell {
-    width: min(1120px, 100%);
+    width: 100%;
     height: 100%;
     margin: 0 auto;
     display: grid;
-    gap: 0.85rem;
+    gap: 0.38rem;
     grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .shop-detail-head {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 0.7rem;
+    gap: 0.5rem;
+    min-height: 2.4rem;
+    padding: 0.32rem 0.48rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(22, 22, 22, 0.88);
 }
 
 .shop-detail-back {
@@ -1058,32 +1063,23 @@ textarea {
     justify-content: center;
     border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 0.35rem 0.75rem;
+    padding: 0.22rem 0.62rem;
     background: var(--surface);
     color: var(--ink);
     font: inherit;
-    font-size: 0.84rem;
+    font-size: 0.78rem;
     cursor: pointer;
-}
-
-.shop-detail-breadcrumb {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--ink-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .shop-detail-counter {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--ink-secondary);
     border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 0.28rem 0.52rem;
+    padding: 0.22rem 0.5rem;
 }
 
 .shop-detail-stage {
@@ -1103,14 +1099,14 @@ textarea {
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
-    min-width: 3rem;
-    height: 3rem;
+    min-width: 2.6rem;
+    height: 2.6rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.25);
     background: rgba(19, 19, 19, 0.78);
     color: var(--ink);
     font: inherit;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
 }
@@ -1150,7 +1146,12 @@ textarea {
 
 .shop-detail-meta {
     display: grid;
-    gap: 0.35rem;
+    gap: 0.18rem;
+    min-height: 2.8rem;
+    padding: 0.32rem 0.52rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(22, 22, 22, 0.9);
 }
 
 .shop-detail-meta h3,
@@ -1158,12 +1159,19 @@ textarea {
     margin: 0;
 }
 
-.shop-detail-summary {
-    font-weight: 700;
+.shop-detail-meta h3 {
+    font-size: 0.94rem;
+    line-height: 1.25;
 }
 
-.shop-detail-help {
+.shop-detail-summary {
+    font-weight: 700;
     font-size: 0.82rem;
+}
+
+.shop-detail-category {
+    font-size: 0.74rem;
+    line-height: 1.2;
 }
 
 @media (max-width: 760px) {
@@ -1173,13 +1181,8 @@ textarea {
     }
 
     .shop-detail-head {
-        grid-template-columns: auto 1fr;
-        align-items: start;
-    }
-
-    .shop-detail-counter {
-        grid-column: 2;
-        justify-self: start;
+        min-height: 2.2rem;
+        padding: 0.28rem 0.42rem;
     }
 
     .shop-detail-nav {
@@ -1201,16 +1204,33 @@ textarea {
 
     .shop-detail-photo,
     .shop-detail-photo-placeholder {
-        max-height: min(60vh, 560px);
-        min-height: min(60vh, 360px);
+        max-height: min(88svh, 900px);
+        min-height: min(70svh, 360px);
     }
 
     .shop-detail-viewport {
-        padding: 0.7rem;
+        padding: 0.3rem;
     }
 
     .shop-detail-shell {
-        gap: 0.65rem;
+        gap: 0.32rem;
+    }
+
+    .shop-detail-meta {
+        min-height: 2.55rem;
+        padding: 0.28rem 0.45rem;
+    }
+
+    .shop-detail-meta h3 {
+        font-size: 0.88rem;
+    }
+
+    .shop-detail-summary {
+        font-size: 0.77rem;
+    }
+
+    .shop-detail-category {
+        font-size: 0.7rem;
     }
 }
 
