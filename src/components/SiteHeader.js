@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
+import { useTvMode } from "@/lib/tv-mode-client";
+
 const navItems = [
     { href: "/about", label: "About" },
     { href: "/pokemon-cards", label: "Pokemon Cards" },
@@ -20,6 +22,16 @@ const navItems = [
 
 export default function SiteHeader() {
     const [open, setOpen] = useState(false);
+    const [tvMode, setTvMode] = useTvMode();
+
+    const toggleTvMode = () => {
+        const nextValue = !tvMode;
+        setTvMode(nextValue);
+
+        if (nextValue) {
+            setOpen(false);
+        }
+    };
 
     return (
         <header className="site-header">
@@ -40,9 +52,19 @@ export default function SiteHeader() {
                     Join Discord
                 </a>
                 <button
+                    type="button"
+                    className={`pill tv-toggle${tvMode ? " tv-toggle-active" : ""}`}
+                    onClick={toggleTvMode}
+                    aria-pressed={tvMode}
+                    title="Toggle TV mode"
+                >
+                    TV Mode: {tvMode ? "On" : "Off"}
+                </button>
+                <button
                     className="hamburger"
                     aria-label={open ? "Close menu" : "Open menu"}
                     aria-expanded={open}
+                    disabled={tvMode}
                     onClick={() => setOpen((v) => !v)}
                 >
                     <span className={`ham-bar${open ? " open" : ""}`} />

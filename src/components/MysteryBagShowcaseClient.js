@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
+import { useTvMode } from "@/lib/tv-mode-client";
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -14,6 +16,7 @@ function formatMoney(value) {
 export default function MysteryBagShowcaseClient({ cards }) {
     const scrollRef = useRef(null);
     const runningRef = useRef(true);
+    const [tvMode] = useTvMode();
 
     const visibleCards = useMemo(() => cards, [cards]);
 
@@ -39,7 +42,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
             }
 
             const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-            scroller.scrollTop += 0.45;
+            scroller.scrollTop += tvMode ? 0.8 : 0.45;
 
             if (scroller.scrollTop >= maxScroll) {
                 scroller.scrollTop = 0;
@@ -55,7 +58,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
                 window.cancelAnimationFrame(frameId);
             }
         };
-    }, [cards.length]);
+    }, [cards.length, tvMode]);
 
     if (!cards.length) {
         return <p className="consignment-empty">No cards are currently packed in mystery bags.</p>;
@@ -66,15 +69,27 @@ export default function MysteryBagShowcaseClient({ cards }) {
             className="mystery-marquee"
             ref={scrollRef}
             onMouseEnter={() => {
+                if (tvMode) {
+                    return;
+                }
                 runningRef.current = false;
             }}
             onMouseLeave={() => {
+                if (tvMode) {
+                    return;
+                }
                 runningRef.current = true;
             }}
             onTouchStart={() => {
+                if (tvMode) {
+                    return;
+                }
                 runningRef.current = false;
             }}
             onTouchEnd={() => {
+                if (tvMode) {
+                    return;
+                }
                 runningRef.current = true;
             }}
         >

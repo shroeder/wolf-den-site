@@ -125,6 +125,17 @@ export default function RootLayout({ children }) {
     return (
         <html lang="en">
             <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
+                <Script id="tv-mode-init" strategy="beforeInteractive">{`
+                    try {
+                        var isTv = window.localStorage.getItem("wolfden-tv-mode") === "1";
+                        if (isTv) {
+                            document.documentElement.classList.add("tv-mode");
+                            document.body.classList.add("tv-mode");
+                        }
+                    } catch (error) {
+                        // Ignore storage access failures.
+                    }
+                `}</Script>
                 <Script
                     src="https://www.googletagmanager.com/gtag/js?id=G-MQGDR0X2L0"
                     strategy="afterInteractive"

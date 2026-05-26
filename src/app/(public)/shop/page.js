@@ -42,7 +42,7 @@ export default async function ShopPage() {
                 </section>
             )}
 
-            <section className="card">
+            <section className="card shop-secondary">
                 <h2>Serving Southern Minnesota Shoppers</h2>
                 <p>
                     The Wolf Den serves Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and nearby southern Minnesota communities looking for a real local game store with real shelf inventory.

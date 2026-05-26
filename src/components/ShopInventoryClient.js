@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useTvMode } from "@/lib/tv-mode-client";
+
 const formatPrice = (price) => {
     if (!price) return null;
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
@@ -71,6 +73,8 @@ export default function ShopInventoryClient({ categories }) {
     const [detailItemKey, setDetailItemKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const swipeStartRef = useRef(null);
+    const panelRef = useRef(null);
+    const [tvMode] = useTvMode();
 
     const selectedCategoryId = orderedCategories.some((category) => category.id === activeId)
         ? activeId
@@ -196,6 +200,83 @@ export default function ShopInventoryClient({ categories }) {
         };
     }, [detailItem]);
 
+    useEffect(() => {
+        if (!tvMode || isSearching || orderedCategories.length < 1) {
+            return undefined;
+        }
+
+        const autoRotateDelayMs = 2600;
+        let frameId = null;
+        let switchTimeoutId = null;
+
+        const selectNextCategory = () => {
+            setActiveId((current) => {
+                const activeIndex = orderedCategories.findIndex((category) => category.id === current);
+
+                if (activeIndex < 0) {
+                    return orderedCategories[0].id;
+                }
+
+                const nextIndex = (activeIndex + 1) % orderedCategories.length;
+                return orderedCategories[nextIndex].id;
+            });
+        };
+
+        const scheduleCategorySwitch = () => {
+            if (switchTimeoutId !== null) {
+                return;
+            }
+
+            switchTimeoutId = window.setTimeout(() => {
+                switchTimeoutId = null;
+                selectNextCategory();
+            }, autoRotateDelayMs);
+        };
+
+        const panel = panelRef.current;
+
+        if (panel) {
+            panel.scrollTop = 0;
+        }
+
+        const tick = () => {
+            const scroller = panelRef.current;
+
+            if (!scroller) {
+                frameId = window.requestAnimationFrame(tick);
+                return;
+            }
+
+            const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+
+            if (maxScroll <= 1) {
+                scheduleCategorySwitch();
+                frameId = window.requestAnimationFrame(tick);
+                return;
+            }
+
+            scroller.scrollTop = Math.min(scroller.scrollTop + 0.65, maxScroll);
+
+            if (scroller.scrollTop >= maxScroll - 1) {
+                scheduleCategorySwitch();
+            }
+
+            frameId = window.requestAnimationFrame(tick);
+        };
+
+        frameId = window.requestAnimationFrame(tick);
+
+        return () => {
+            if (frameId !== null) {
+                window.cancelAnimationFrame(frameId);
+            }
+
+            if (switchTimeoutId !== null) {
+                window.clearTimeout(switchTimeoutId);
+            }
+        };
+    }, [tvMode, isSearching, orderedCategories, selectedCategoryId, visibleItems.length]);
+
     const detailView = detailItem ? (
         <section className="shop-detail-viewport" aria-live="polite" aria-label="Product detail view">
             <div className="shop-detail-shell">
@@ -280,6 +361,12 @@ export default function ShopInventoryClient({ categories }) {
                     )}
                 </div>
 
+                {tvMode && active && !isSearching && (
+                    <p className="shop-tv-now secondary" aria-live="polite">
+                        Showing category: <strong>{active.name}</strong>
+                    </p>
+                )}
+
                 <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
                     <label htmlFor="shop-category-select" className="shop-category-mobile-label">
                         Category
@@ -315,7 +402,7 @@ export default function ShopInventoryClient({ categories }) {
                 </div>
 
                 {active && (
-                    <div role="tabpanel" className="shop-panel">
+                    <div role="tabpanel" className="shop-panel" ref={panelRef}>
                         <div className="shop-grid" aria-live="polite">
                             {visibleItems.map((item) => (
                                 <article
