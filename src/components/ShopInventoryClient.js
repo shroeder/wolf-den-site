@@ -182,65 +182,82 @@ export default function ShopInventoryClient({ categories }) {
         return () => window.removeEventListener("keydown", onDetailKeys);
     }, [detailIndex, detailItem, visibleItems]);
 
+    useEffect(() => {
+        if (!detailItem) {
+            return undefined;
+        }
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [detailItem]);
+
     return (
-        <div className="shop-inventory">
-            <div className="shop-search-row">
-                <label htmlFor="shop-product-search" className="sr-only">
-                    Search products across categories
-                </label>
-                <input
-                    id="shop-product-search"
-                    type="search"
-                    className="shop-search-input"
-                    placeholder="Search products across all categories"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                />
-                {isSearching && (
-                    <p className="secondary shop-search-meta">
-                        {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
-                    </p>
-                )}
-            </div>
+        <div className={`shop-inventory${detailItem ? " shop-inventory-inspecting" : ""}`}>
+            {!detailItem && (
+                <>
+                    <div className="shop-search-row">
+                        <label htmlFor="shop-product-search" className="sr-only">
+                            Search products across categories
+                        </label>
+                        <input
+                            id="shop-product-search"
+                            type="search"
+                            className="shop-search-input"
+                            placeholder="Search products across all categories"
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                        />
+                        {isSearching && (
+                            <p className="secondary shop-search-meta">
+                                {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
+                            </p>
+                        )}
+                    </div>
 
-            <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
-                <label htmlFor="shop-category-select" className="shop-category-mobile-label">
-                    Category
-                </label>
-                <select
-                    id="shop-category-select"
-                    className="shop-category-mobile-select"
-                    value={selectedCategoryId ?? ""}
-                    onChange={(event) => setActiveId(event.target.value)}
-                    disabled={isSearching}
-                >
-                    {orderedCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                            {category.name} ({category.items.length})
-                        </option>
-                    ))}
-                </select>
-            </div>
+                    <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
+                        <label htmlFor="shop-category-select" className="shop-category-mobile-label">
+                            Category
+                        </label>
+                        <select
+                            id="shop-category-select"
+                            className="shop-category-mobile-select"
+                            value={selectedCategoryId ?? ""}
+                            onChange={(event) => setActiveId(event.target.value)}
+                            disabled={isSearching}
+                        >
+                            {orderedCategories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                    {category.name} ({category.items.length})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-            <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
-                {orderedCategories.map((category) => (
-                    <button
-                        key={category.id}
-                        role="tab"
-                        aria-selected={category.id === selectedCategoryId}
-                        className={`shop-tab${category.id === selectedCategoryId ? " shop-tab-active" : ""}`}
-                        onClick={() => setActiveId(category.id)}
-                    >
-                        {category.name}
-                        <span className="shop-tab-count">{category.items.length}</span>
-                    </button>
-                ))}
-            </div>
+                    <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
+                        {orderedCategories.map((category) => (
+                            <button
+                                key={category.id}
+                                role="tab"
+                                aria-selected={category.id === selectedCategoryId}
+                                className={`shop-tab${category.id === selectedCategoryId ? " shop-tab-active" : ""}`}
+                                onClick={() => setActiveId(category.id)}
+                            >
+                                {category.name}
+                                <span className="shop-tab-count">{category.items.length}</span>
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
 
             {active && (
-                <div role="tabpanel" className="shop-panel">
+                <div role="tabpanel" className={`shop-panel${detailItem ? " shop-panel-inspecting" : ""}`}>
                     {detailItem ? (
-                        <section className="shop-detail" aria-live="polite" aria-label="Product detail view">
+                        <section className="shop-detail shop-detail-fullscreen" aria-live="polite" aria-label="Product detail view">
                             <div className="shop-detail-head">
                                 <button type="button" className="shop-detail-back" onClick={closeDetail}>
                                     Back to results
@@ -265,7 +282,7 @@ export default function ShopInventoryClient({ categories }) {
                                         onClick={goToPreviousDetailItem}
                                         aria-label="View previous product"
                                     >
-                                        Prev
+                                        &lt;
                                     </button>
                                 )}
 
@@ -289,7 +306,7 @@ export default function ShopInventoryClient({ categories }) {
                                         onClick={goToNextDetailItem}
                                         aria-label="View next product"
                                     >
-                                        Next
+                                        &gt;
                                     </button>
                                 )}
                             </div>
@@ -301,7 +318,7 @@ export default function ShopInventoryClient({ categories }) {
                                     {formatPrice(detailItem.price) ?? "Price unavailable"} | In stock: {detailItem.quantity}
                                 </p>
                                 {visibleItems.length > 1 && (
-                                    <p className="shop-detail-help secondary">Swipe on mobile, or use arrow keys and Prev/Next.</p>
+                                    <p className="shop-detail-help secondary">Swipe on mobile, or use left/right arrow keys.</p>
                                 )}
                             </div>
                         </section>
