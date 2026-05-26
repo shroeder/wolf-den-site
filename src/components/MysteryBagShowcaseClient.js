@@ -19,6 +19,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
     const [tvMode] = useTvMode();
 
     const visibleCards = useMemo(() => cards, [cards]);
+    const topCards = useMemo(() => cards.slice(0, 3), [cards]);
 
     useEffect(() => {
         const scroller = scrollRef.current;
@@ -64,67 +65,102 @@ export default function MysteryBagShowcaseClient({ cards }) {
         return <p className="consignment-empty">No cards are currently packed in mystery bags.</p>;
     }
 
+    const leaderboard = topCards.length ? (
+        <div className="mystery-leaderboard-list">
+            {topCards.map((card, index) => (
+                <article key={card.id} className="mystery-leaderboard-item">
+                    <p className="mystery-leaderboard-rank">#{index + 1}</p>
+                    <div className="mystery-leaderboard-copy">
+                        <h3>{card.name}</h3>
+                        <p>
+                            {card.set} #{card.number}
+                        </p>
+                    </div>
+                    <p className="mystery-leaderboard-price">{formatMoney(card.marketValue)}</p>
+                </article>
+            ))}
+        </div>
+    ) : null;
+
     return (
-        <div
-            className="mystery-marquee"
-            ref={scrollRef}
-            onMouseEnter={() => {
-                if (tvMode) {
-                    return;
-                }
-                runningRef.current = false;
-            }}
-            onMouseLeave={() => {
-                if (tvMode) {
-                    return;
-                }
-                runningRef.current = true;
-            }}
-            onTouchStart={() => {
-                if (tvMode) {
-                    return;
-                }
-                runningRef.current = false;
-            }}
-            onTouchEnd={() => {
-                if (tvMode) {
-                    return;
-                }
-                runningRef.current = true;
-            }}
-        >
-            <div className="mystery-marquee-inner" aria-live="polite">
-                {visibleCards.map((card) => (
-                    <article
-                        key={card.id}
-                        className="mystery-card-tile"
-                        aria-label={`Mystery bag card ${card.name} market value ${formatMoney(card.marketValue)}`}
-                    >
-                        <div className="mystery-card-image-wrap">
-                            {card.imageUrl ? (
-                                <img
-                                    src={card.imageUrl}
-                                    alt={card.name}
-                                    className="mystery-card-image"
-                                    loading="lazy"
-                                    decoding="async"
-                                />
-                            ) : (
-                                <div className="mystery-card-image-placeholder" aria-hidden="true">
-                                    No image
-                                </div>
-                            )}
-                        </div>
-                        <div className="mystery-card-copy">
-                            <h3 className="mystery-card-name">{card.name}</h3>
-                            <p className="mystery-card-meta secondary">
-                                {card.set} #{card.number}
-                            </p>
-                            <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
-                        </div>
-                    </article>
-                ))}
+        <div className={tvMode ? "mystery-live-board mystery-live-board-tv" : "mystery-live-board"}>
+            {tvMode ? (
+                <aside className="mystery-side-panel mystery-side-panel-left" aria-label="Top three mystery bag cards">
+                    <p className="mystery-side-eyebrow">Highest Value</p>
+                    <h2>Top 3 cards</h2>
+                    {leaderboard}
+                </aside>
+            ) : null}
+
+            <div
+                className="mystery-marquee"
+                ref={scrollRef}
+                onMouseEnter={() => {
+                    if (tvMode) {
+                        return;
+                    }
+                    runningRef.current = false;
+                }}
+                onMouseLeave={() => {
+                    if (tvMode) {
+                        return;
+                    }
+                    runningRef.current = true;
+                }}
+                onTouchStart={() => {
+                    if (tvMode) {
+                        return;
+                    }
+                    runningRef.current = false;
+                }}
+                onTouchEnd={() => {
+                    if (tvMode) {
+                        return;
+                    }
+                    runningRef.current = true;
+                }}
+            >
+                <div className="mystery-marquee-inner" aria-live="polite">
+                    {visibleCards.map((card) => (
+                        <article
+                            key={card.id}
+                            className="mystery-card-tile"
+                            aria-label={`Mystery bag card ${card.name} market value ${formatMoney(card.marketValue)}`}
+                        >
+                            <div className="mystery-card-image-wrap">
+                                {card.imageUrl ? (
+                                    <img
+                                        src={card.imageUrl}
+                                        alt={card.name}
+                                        className="mystery-card-image"
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
+                                ) : (
+                                    <div className="mystery-card-image-placeholder" aria-hidden="true">
+                                        No image
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mystery-card-copy">
+                                <h3 className="mystery-card-name">{card.name}</h3>
+                                <p className="mystery-card-meta secondary">
+                                    {card.set} #{card.number}
+                                </p>
+                                <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
+                            </div>
+                        </article>
+                    ))}
+                </div>
             </div>
+
+            {tvMode ? (
+                <aside className="mystery-side-panel mystery-side-panel-right" aria-label="Top three mystery bag cards">
+                    <p className="mystery-side-eyebrow">Highest Value</p>
+                    <h2>Top 3 cards</h2>
+                    {leaderboard}
+                </aside>
+            ) : null}
         </div>
     );
 }

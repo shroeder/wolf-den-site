@@ -31,7 +31,7 @@ export default async function MysteryBagsPage() {
     };
 
     return (
-        <div className="stack reveal">
+        <div className="stack reveal mystery-board-page">
             <section className="card mystery-board">
                 <div className="mystery-board-head">
                     <div className="mystery-board-copy">
