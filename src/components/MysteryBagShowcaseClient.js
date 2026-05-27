@@ -69,6 +69,8 @@ export default function MysteryBagShowcaseClient({ cards }) {
         }
 
         let frameId = null;
+        let previousScrollTop = -1;
+        let stalledFrames = 0;
 
         const step = () => {
             if (!runningRef.current) {
@@ -77,9 +79,30 @@ export default function MysteryBagShowcaseClient({ cards }) {
             }
 
             const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+
+            if (maxScroll <= 1) {
+                triggerRefresh();
+                return;
+            }
+
             scroller.scrollTop += tvMode ? 0.8 : 0.45;
 
-            if (scroller.scrollTop >= maxScroll) {
+            const distanceToBottom = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+
+            if (distanceToBottom <= 2) {
+                triggerRefresh();
+                return;
+            }
+
+            if (Math.abs(scroller.scrollTop - previousScrollTop) < 0.01) {
+                stalledFrames += 1;
+            } else {
+                stalledFrames = 0;
+            }
+
+            previousScrollTop = scroller.scrollTop;
+
+            if (stalledFrames >= 90 && distanceToBottom <= 20) {
                 triggerRefresh();
                 return;
             }
