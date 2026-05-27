@@ -1456,7 +1456,7 @@ textarea {
     width: 100%;
     height: auto;
     min-height: 0;
-    aspect-ratio: 0.72;
+    aspect-ratio: 0.54;
     background: rgba(255, 255, 255, 0.03);
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -1483,10 +1483,10 @@ textarea {
 }
 
 .mystery-card-copy {
-    padding: 0.95rem 1rem 1rem;
+    padding: 0.78rem 0.85rem 0.8rem;
     display: grid;
     align-content: start;
-    gap: 0.32rem;
+    gap: 0.2rem;
 }
 
 .mystery-card-name,
@@ -1524,8 +1524,8 @@ textarea {
     align-content: start;
     justify-items: center;
     text-align: center;
-    gap: 1rem;
-    padding: 1.15rem;
+    gap: 0.55rem;
+    padding: 0.78rem;
     border: 1px solid rgba(212, 175, 55, 0.24);
     border-radius: 18px;
     background:
@@ -1536,25 +1536,30 @@ textarea {
 
 .mystery-leaderboard-list {
     display: grid;
-    gap: 0.8rem;
+    gap: 0.5rem;
+    width: 100%;
+    max-height: min(74vh, 820px);
+    overflow: auto;
+    padding-right: 0.15rem;
+    scrollbar-width: thin;
 }
 
 .mystery-leaderboard-item {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 0.56rem;
+    gap: 0.3rem;
     justify-items: center;
     text-align: center;
-    padding: 0.64rem;
+    padding: 0.5rem;
     border: 1px solid rgba(212, 175, 55, 0.18);
     border-radius: 13px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
 }
 
 .mystery-leaderboard-image-wrap {
-    width: 113px;
+    width: 102px;
     aspect-ratio: 0.6;
-    border-radius: 11px;
+    border-radius: 10px;
     overflow: hidden;
     border: 1px solid rgba(212, 175, 55, 0.2);
     background: rgba(255, 255, 255, 0.04);
@@ -1578,12 +1583,12 @@ textarea {
 }
 
 .mystery-leaderboard-copy h3 {
-    font-size: 1.04rem;
-    line-height: 1.1;
+    font-size: 0.94rem;
+    line-height: 1.05;
 }
 
 .mystery-leaderboard-price {
-    font-size: 1rem;
+    font-size: 0.92rem;
     font-weight: 800;
     color: var(--accent-hover);
     text-align: center;
@@ -1732,6 +1737,11 @@ body.tv-mode .mystery-marquee-inner {
     grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
     gap: 0.85rem;
     padding: 0.7rem;
+}
+
+html.tv-mode .mystery-leaderboard-list,
+body.tv-mode .mystery-leaderboard-list {
+    max-height: min(72vh, 860px);
 }
 
 html.tv-mode .mystery-card-tile,

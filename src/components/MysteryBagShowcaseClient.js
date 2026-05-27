@@ -21,6 +21,7 @@ function formatDisplayName(name) {
 
 export default function MysteryBagShowcaseClient({ cards }) {
     const scrollRef = useRef(null);
+    const leaderboardRef = useRef(null);
     const runningRef = useRef(true);
     const refreshTriggeredRef = useRef(false);
     const [tvMode] = useTvMode();
@@ -123,12 +124,53 @@ export default function MysteryBagShowcaseClient({ cards }) {
         };
     }, [cards.length, tvMode]);
 
+    useEffect(() => {
+        const leaderboardScroller = leaderboardRef.current;
+
+        if (!tvMode || !leaderboardScroller) {
+            return;
+        }
+
+        const hasOverflow = leaderboardScroller.scrollHeight > leaderboardScroller.clientHeight;
+
+        if (!hasOverflow) {
+            return;
+        }
+
+        let frameId = null;
+
+        const step = () => {
+            const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
+
+            if (maxScroll <= 1) {
+                frameId = window.requestAnimationFrame(step);
+                return;
+            }
+
+            leaderboardScroller.scrollTop += 0.35;
+
+            if (leaderboardScroller.scrollTop >= maxScroll - 1) {
+                leaderboardScroller.scrollTop = 0;
+            }
+
+            frameId = window.requestAnimationFrame(step);
+        };
+
+        frameId = window.requestAnimationFrame(step);
+
+        return () => {
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+        };
+    }, [cards.length, tvMode]);
+
     if (!cards.length) {
         return <p className="consignment-empty">No cards are currently packed in mystery bags.</p>;
     }
 
     const leaderboard = topCards.length ? (
-        <div className="mystery-leaderboard-list">
+        <div className="mystery-leaderboard-list" ref={leaderboardRef}>
             {topCards.map((card) => (
                 <article key={card.id} className="mystery-leaderboard-item">
                     <div className="mystery-leaderboard-image-wrap">
@@ -217,8 +259,6 @@ export default function MysteryBagShowcaseClient({ cards }) {
             </div>
 
             <aside className="mystery-side-panel" aria-label="Top three mystery bag cards">
-                <p className="mystery-side-eyebrow">Highest Value</p>
-                <h2>Top 3 cards</h2>
                 {leaderboard}
             </aside>
         </div>
