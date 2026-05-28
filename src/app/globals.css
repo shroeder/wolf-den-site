@@ -1844,7 +1844,7 @@ html.tv-mode,
 body.tv-mode {
     height: 100%;
     overflow-y: hidden;
-    overflow-x: clip;
+    overflow-x: visible;
 }
 
 .tv-toggle {
@@ -1894,7 +1894,7 @@ html.tv-mode .content,
 body.tv-mode .content {
     padding-top: 0.55rem;
     padding-bottom: 0.6rem;
-    overflow: hidden;
+    overflow: visible;
 }
 
 html.tv-mode .reveal>*,
@@ -1983,8 +1983,8 @@ body.tv-mode .mystery-board {
 
 html.tv-mode .mystery-board-page,
 body.tv-mode .mystery-board-page {
-    width: calc(100vw - 1rem);
-    margin-inline: calc(50% - 50vw + 0.5rem);
+    width: 100%;
+    margin-inline: 0;
     height: 100%;
 }
 
