@@ -1734,7 +1734,7 @@ body.tv-mode .mystery-marquee {
 
 html.tv-mode .mystery-marquee-inner,
 body.tv-mode .mystery-marquee-inner {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 0.62rem;
     padding: 0.55rem;
 }
