@@ -1843,7 +1843,8 @@ body.tv-mode .mystery-leaderboard-price {
 html.tv-mode,
 body.tv-mode {
     height: 100%;
-    overflow: hidden;
+    overflow-y: hidden;
+    overflow-x: clip;
 }
 
 .tv-toggle {
@@ -1982,14 +1983,14 @@ body.tv-mode .mystery-board {
 
 html.tv-mode .mystery-board-page,
 body.tv-mode .mystery-board-page {
-    width: 100vw;
-    margin-inline: calc(50% - 50vw);
+    width: calc(100vw - 1rem);
+    margin-inline: calc(50% - 50vw + 0.5rem);
     height: 100%;
 }
 
 html.tv-mode .mystery-live-board,
 body.tv-mode .mystery-live-board {
-    grid-template-columns: minmax(0, 1.45fr) minmax(195px, 0.55fr);
+    grid-template-columns: minmax(0, 1.5fr) minmax(160px, 0.5fr);
     gap: 0.6rem;
     align-items: stretch;
     min-height: 0;
@@ -2000,6 +2001,7 @@ body.tv-mode .mystery-side-panel {
     display: grid;
     height: 100%;
     min-height: 0;
+    min-width: 0;
 }
 
 html.tv-mode .mystery-board-copy .eyebrow,
@@ -2039,6 +2041,7 @@ body.tv-mode .mystery-marquee {
     max-height: none;
     min-height: 0;
     height: 100%;
+    min-width: 0;
 }
 
 html.tv-mode .mystery-marquee-inner,
