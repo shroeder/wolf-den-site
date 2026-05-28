@@ -1859,6 +1859,14 @@ body.tv-mode {
     color: var(--accent-hover);
 }
 
+html.tv-mode .shell,
+body.tv-mode .shell {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    padding-inline: 0.6rem;
+}
+
 html.tv-mode .site-header,
 body.tv-mode .site-header {
     background: rgba(12, 12, 12, 0.96);
