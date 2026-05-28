@@ -138,6 +138,8 @@ export default function MysteryBagShowcaseClient({ cards }) {
         }
 
         let frameId = null;
+        let direction = 1;
+        let pauseFrames = 0;
 
         const step = () => {
             const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
@@ -147,10 +149,22 @@ export default function MysteryBagShowcaseClient({ cards }) {
                 return;
             }
 
-            leaderboardScroller.scrollTop += 0.35;
+            if (pauseFrames > 0) {
+                pauseFrames -= 1;
+                frameId = window.requestAnimationFrame(step);
+                return;
+            }
+
+            leaderboardScroller.scrollTop += direction * 0.2;
 
             if (leaderboardScroller.scrollTop >= maxScroll - 1) {
+                leaderboardScroller.scrollTop = maxScroll;
+                direction = -1;
+                pauseFrames = 48;
+            } else if (leaderboardScroller.scrollTop <= 1) {
                 leaderboardScroller.scrollTop = 0;
+                direction = 1;
+                pauseFrames = 48;
             }
 
             frameId = window.requestAnimationFrame(step);
