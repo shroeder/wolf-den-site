@@ -1840,6 +1840,12 @@ body.tv-mode .mystery-leaderboard-price {
 
 /* ── TV mode ────────────────────────────────────────────── */
 
+html.tv-mode,
+body.tv-mode {
+    height: 100%;
+    overflow: hidden;
+}
+
 .tv-toggle {
     min-width: 7.8rem;
     font-size: 0.83rem;
@@ -1887,6 +1893,7 @@ html.tv-mode .content,
 body.tv-mode .content {
     padding-top: 0.55rem;
     padding-bottom: 0.6rem;
+    overflow: hidden;
 }
 
 html.tv-mode .reveal>*,
@@ -1968,13 +1975,31 @@ body.tv-mode .shop-qty-badge {
 html.tv-mode .mystery-board,
 body.tv-mode .mystery-board {
     padding: 0.7rem;
-    min-height: calc(100vh - 3.8rem);
+    height: calc(100vh - 5.1rem);
+    min-height: 0;
     gap: 0.55rem;
+}
+
+html.tv-mode .mystery-board-page,
+body.tv-mode .mystery-board-page {
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    height: 100%;
+}
+
+html.tv-mode .mystery-live-board,
+body.tv-mode .mystery-live-board {
+    grid-template-columns: minmax(0, 1.45fr) minmax(195px, 0.55fr);
+    gap: 0.6rem;
+    align-items: stretch;
+    min-height: 0;
 }
 
 html.tv-mode .mystery-side-panel,
 body.tv-mode .mystery-side-panel {
     display: grid;
+    height: 100%;
+    min-height: 0;
 }
 
 html.tv-mode .mystery-board-copy .eyebrow,
@@ -2011,7 +2036,9 @@ body.tv-mode .mystery-kpi {
 
 html.tv-mode .mystery-marquee,
 body.tv-mode .mystery-marquee {
-    max-height: calc(100vh - 10.8rem);
+    max-height: none;
+    min-height: 0;
+    height: 100%;
 }
 
 html.tv-mode .mystery-marquee-inner,
@@ -2030,9 +2057,14 @@ html.tv-mode .mystery-card-image-wrap,
 body.tv-mode .mystery-card-image-wrap {
     width: 100%;
     height: auto;
-    aspect-ratio: 0.72;
+    aspect-ratio: 0.46;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+}
+
+html.tv-mode .mystery-leaderboard-list,
+body.tv-mode .mystery-leaderboard-list {
+    max-height: 100%;
 }
 
 html.tv-mode .mystery-card-name,

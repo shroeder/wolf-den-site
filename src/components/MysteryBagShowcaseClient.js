@@ -131,12 +131,6 @@ export default function MysteryBagShowcaseClient({ cards }) {
             return;
         }
 
-        const hasOverflow = leaderboardScroller.scrollHeight > leaderboardScroller.clientHeight;
-
-        if (!hasOverflow) {
-            return;
-        }
-
         let frameId = null;
         let direction = 1;
         let pauseFrames = 0;
@@ -145,6 +139,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
             const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
 
             if (maxScroll <= 1) {
+                leaderboardScroller.scrollTop = 0;
                 frameId = window.requestAnimationFrame(step);
                 return;
             }
