@@ -134,12 +134,12 @@ export default function MysteryBagShowcaseClient({ cards }) {
         let frameId = null;
         let direction = 1;
         let pauseFrames = 0;
+        let running = false;
 
         const step = () => {
             const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
 
             if (maxScroll <= 1) {
-                leaderboardScroller.scrollTop = 0;
                 frameId = window.requestAnimationFrame(step);
                 return;
             }
@@ -150,24 +150,37 @@ export default function MysteryBagShowcaseClient({ cards }) {
                 return;
             }
 
-            leaderboardScroller.scrollTop += direction * 0.2;
+            leaderboardScroller.scrollTop += direction * 0.25;
 
             if (leaderboardScroller.scrollTop >= maxScroll - 1) {
                 leaderboardScroller.scrollTop = maxScroll;
                 direction = -1;
-                pauseFrames = 48;
+                pauseFrames = 90;
             } else if (leaderboardScroller.scrollTop <= 1) {
                 leaderboardScroller.scrollTop = 0;
                 direction = 1;
-                pauseFrames = 48;
+                pauseFrames = 90;
             }
 
             frameId = window.requestAnimationFrame(step);
         };
 
-        frameId = window.requestAnimationFrame(step);
+        const startIfOverflowing = () => {
+            const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
+            if (maxScroll > 1 && !running) {
+                running = true;
+                frameId = window.requestAnimationFrame(step);
+            }
+        };
+
+        const observer = new ResizeObserver(startIfOverflowing);
+        observer.observe(leaderboardScroller);
+
+        // Also try immediately in case content is already laid out
+        startIfOverflowing();
 
         return () => {
+            observer.disconnect();
             if (frameId) {
                 window.cancelAnimationFrame(frameId);
             }
