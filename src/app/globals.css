@@ -1757,14 +1757,15 @@ body.tv-mode .mystery-card-image-wrap {
     width: 100%;
     height: auto;
     min-height: 0;
-    aspect-ratio: 0.46;
+    aspect-ratio: 0.714;
     border-right: 0;
     border-bottom: 1px solid var(--line);
 }
 
 html.tv-mode .mystery-card-image,
 body.tv-mode .mystery-card-image {
-    object-fit: cover;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.18);
 }
 
 html.tv-mode .mystery-card-copy,
@@ -2068,7 +2069,7 @@ html.tv-mode .mystery-card-image-wrap,
 body.tv-mode .mystery-card-image-wrap {
     width: 100%;
     height: auto;
-    aspect-ratio: 0.46;
+    aspect-ratio: 0.714;
     border-right: 0;
     border-bottom: 1px solid var(--line);
 }
