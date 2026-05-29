@@ -39,35 +39,36 @@ export default async function MysteryBagsPage() {
     return (
         <div className="stack reveal mystery-board-page">
             <section className="card mystery-board">
-                <div className="mystery-board-head">
-                    <div className="mystery-board-copy">
-                        <p className="eyebrow">Mystery Bag Tracker</p>
-                        <h1>Mystery Bag Live Board</h1>
-                        <p className="mystery-subtle">
-                            One nonstop list of all currently packed singles. Hover or touch to pause scrolling.
-                        </p>
-                        <div className="mystery-kpis">
-                            <p className="mystery-kpi">Bag Price: <strong>{formatMoney(bagPrice)}</strong></p>
-                            <p className="mystery-kpi">Market Total: <strong>{formatMoney(metrics.marketTotal)}</strong></p>
-                            <p className="mystery-kpi">Singles: <strong>{metrics.itemCount}</strong></p>
-                            <p className="mystery-kpi">Pull &gt; Bag: <strong>{formatPct(pullAboveBagPct)}</strong></p>
-                            <p className="mystery-kpi">Pull &le; Bag: <strong>{formatPct(pullAtOrBelowBagPct)}</strong></p>
+                <MysteryBagShowcaseClient cards={cards}>
+                    <div className="mystery-board-head">
+                        <div className="mystery-board-copy">
+                            <p className="eyebrow">Mystery Bag Tracker</p>
+                            <h1>Mystery Bag Live Board</h1>
+                            <p className="mystery-subtle">
+                                One nonstop list of all currently packed singles. Hover or touch to pause scrolling.
+                            </p>
+                            <div className="mystery-kpis">
+                                <p className="mystery-kpi">Bag Price: <strong>{formatMoney(bagPrice)}</strong></p>
+                                <p className="mystery-kpi">Market Total: <strong>{formatMoney(metrics.marketTotal)}</strong></p>
+                                <p className="mystery-kpi">Singles: <strong>{metrics.itemCount}</strong></p>
+                                <p className="mystery-kpi">Pull &gt; Bag: <strong>{formatPct(pullAboveBagPct)}</strong></p>
+                                <p className="mystery-kpi">Pull &le; Bag: <strong>{formatPct(pullAtOrBelowBagPct)}</strong></p>
+                            </div>
+                        </div>
+
+                        <div className="mystery-bag-photo-wrap">
+                            <Image
+                                src="/images/mystery_bag.jpg"
+                                alt="Sealed mystery bag used for card singles at The Wolf Den"
+                                width={1200}
+                                height={1600}
+                                sizes="(max-width: 900px) 100vw, 28vw"
+                                className="mystery-bag-photo"
+                                priority
+                            />
                         </div>
                     </div>
-
-                    <div className="mystery-bag-photo-wrap">
-                        <Image
-                            src="/images/mystery_bag.jpg"
-                            alt="Sealed mystery bag used for card singles at The Wolf Den"
-                            width={1200}
-                            height={1600}
-                            sizes="(max-width: 900px) 100vw, 28vw"
-                            className="mystery-bag-photo"
-                            priority
-                        />
-                    </div>
-                </div>
-                <MysteryBagShowcaseClient cards={cards} />
+                </MysteryBagShowcaseClient>
             </section>
         </div>
     );

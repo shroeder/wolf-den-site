@@ -19,7 +19,7 @@ function formatDisplayName(name) {
         .trim();
 }
 
-export default function MysteryBagShowcaseClient({ cards }) {
+export default function MysteryBagShowcaseClient({ cards, children }) {
     const scrollRef = useRef(null);
     const runningRef = useRef(true);
     const refreshTriggeredRef = useRef(false);
@@ -147,63 +147,66 @@ export default function MysteryBagShowcaseClient({ cards }) {
     const activeTopCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
 
     return (
-        <div className="mystery-live-board">
-            <div
-                className="mystery-marquee"
-                ref={scrollRef}
-                onMouseEnter={() => {
-                    if (tvMode) {
-                        return;
-                    }
-                    runningRef.current = false;
-                }}
-                onMouseLeave={() => {
-                    if (tvMode) {
-                        return;
-                    }
-                    runningRef.current = true;
-                }}
-                onTouchStart={() => {
-                    if (tvMode) {
-                        return;
-                    }
-                    runningRef.current = false;
-                }}
-                onTouchEnd={() => {
-                    if (tvMode) {
-                        return;
-                    }
-                    runningRef.current = true;
-                }}
-            >
-                <div className="mystery-marquee-inner" aria-live="polite">
-                    {visibleCards.map((card) => (
-                        <article
-                            key={card.id}
-                            className="mystery-card-tile"
-                            aria-label={`Mystery bag card ${card.name} market value ${formatMoney(card.marketValue)}`}
-                        >
-                            <div className="mystery-card-image-wrap">
-                                {card.imageUrl ? (
-                                    <img
-                                        src={card.imageUrl}
-                                        alt={card.name}
-                                        className="mystery-card-image"
-                                        loading="lazy"
-                                        decoding="async"
-                                    />
-                                ) : (
-                                    <div className="mystery-card-image-placeholder" aria-hidden="true">
-                                        No image
-                                    </div>
-                                )}
-                            </div>
-                            <div className="mystery-card-copy">
-                                <h3 className="mystery-card-name">{formatDisplayName(card.name)}</h3>
-                                <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
-                            </div>
-                        </article>
-                    ))}
+        <div className="mystery-board-columns">
+            <div className="mystery-main-column">
+                {children}
+                <div
+                    className="mystery-marquee"
+                    ref={scrollRef}
+                    onMouseEnter={() => {
+                        if (tvMode) {
+                            return;
+                        }
+                        runningRef.current = false;
+                    }}
+                    onMouseLeave={() => {
+                        if (tvMode) {
+                            return;
+                        }
+                        runningRef.current = true;
+                    }}
+                    onTouchStart={() => {
+                        if (tvMode) {
+                            return;
+                        }
+                        runningRef.current = false;
+                    }}
+                    onTouchEnd={() => {
+                        if (tvMode) {
+                            return;
+                        }
+                        runningRef.current = true;
+                    }}
+                >
+                    <div className="mystery-marquee-inner" aria-live="polite">
+                        {visibleCards.map((card) => (
+                            <article
+                                key={card.id}
+                                className="mystery-card-tile"
+                                aria-label={`Mystery bag card ${card.name} market value ${formatMoney(card.marketValue)}`}
+                            >
+                                <div className="mystery-card-image-wrap">
+                                    {card.imageUrl ? (
+                                        <img
+                                            src={card.imageUrl}
+                                            alt={card.name}
+                                            className="mystery-card-image"
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
+                                    ) : (
+                                        <div className="mystery-card-image-placeholder" aria-hidden="true">
+                                            No image
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mystery-card-copy">
+                                    <h3 className="mystery-card-name">{formatDisplayName(card.name)}</h3>
+                                    <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
                 </div>
             </div>
 

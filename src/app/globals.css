@@ -1512,11 +1512,19 @@ textarea {
     color: var(--accent-hover);
 }
 
-.mystery-live-board {
+.mystery-board-columns {
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.45fr);
     gap: 1.15rem;
-    align-items: start;
+    align-items: stretch;
+    min-height: 0;
+}
+
+.mystery-main-column {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.9rem;
+    min-height: 0;
 }
 
 .mystery-side-panel {
@@ -1705,7 +1713,7 @@ textarea {
         max-height: 240px;
     }
 
-    .mystery-live-board {
+    .mystery-board-columns {
         grid-template-columns: 1fr;
     }
 
@@ -1945,8 +1953,8 @@ body.tv-mode .mystery-leaderboard-price {
 
 @media (max-width: 1200px) {
 
-    html.tv-mode .mystery-live-board,
-    body.tv-mode .mystery-live-board {
+    html.tv-mode .mystery-board-columns,
+    body.tv-mode .mystery-board-columns {
         grid-template-columns: minmax(0, 1.3fr) minmax(220px, 0.7fr);
     }
 
@@ -2112,7 +2120,6 @@ body.tv-mode .mystery-board {
     padding: 0.7rem;
     height: calc(100vh - 5.1rem);
     min-height: 0;
-    grid-template-rows: auto minmax(0, 1fr);
     gap: 0.55rem;
 }
 
@@ -2123,13 +2130,18 @@ body.tv-mode .mystery-board-page {
     height: 100%;
 }
 
-html.tv-mode .mystery-live-board,
-body.tv-mode .mystery-live-board {
+html.tv-mode .mystery-board-columns,
+body.tv-mode .mystery-board-columns {
     grid-template-columns: minmax(0, 1.5fr) minmax(160px, 0.5fr);
     gap: 0.6rem;
     align-items: stretch;
     height: 100%;
     min-height: 0;
+}
+
+html.tv-mode .mystery-main-column,
+body.tv-mode .mystery-main-column {
+    gap: 0.35rem;
 }
 
 html.tv-mode .mystery-side-panel,
