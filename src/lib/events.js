@@ -1,10 +1,73 @@
 export const events = [
     {
+        slug: "thursday-kids-card-club",
+        title: "Thursday Kids Card Club at The Wolf Den",
+        seoTitle: "Thursday Kids Card Club | The Wolf Den",
+        metaDescription:
+            "Join The Wolf Den in Montgomery, MN every Thursday from 4 to 7 PM for a kid-friendly card trading night where young collectors can trade, browse bulk cards, and have fun.",
+        keywords: [
+            "Thursday Kids Card Club",
+            "kids card trading Montgomery MN",
+            "Pokemon kids event Montgomery MN",
+            "family friendly card shop Montgomery",
+            "kids trade night Minnesota",
+            "Pokemon trading for kids near me",
+        ],
+        day: "Thursdays",
+        date: "Weekly",
+        time: "4:00 PM - 7:00 PM",
+        schedule: {
+            byDay: "https://schema.org/Thursday",
+            startTime: "16:00",
+            endTime: "19:00",
+        },
+        format: "Kid-friendly trading, bulk-box browsing, collection sharing, fair-trade guidance, and casual collecting fun",
+        entryFee: "Free",
+        rsvp: "Stop in on Thursdays or join Discord for weekly updates",
+        capacity: "Open community seating",
+        seatsRemaining: "Open",
+        beginnerFriendly: true,
+        familyFriendly: true,
+        audience: "Kids, young collectors, parents, and families",
+        description:
+            "Every Thursday from 4:00 PM to 7:00 PM, The Wolf Den hosts a casual, kid-friendly card collecting night for young collectors and families in Montgomery, Minnesota.",
+        rules:
+            "This is a relaxed weekly hangout for kids who love Pokemon cards and other trading cards. The goal is to give younger collectors a welcoming place to trade, browse bulk boxes, show off favorite cards, and learn collecting basics without the pressure of a tournament.",
+        details: {
+            whatToExpect: [
+                "Kid-friendly card trading with other young collectors",
+                "Bulk boxes to browse for fun finds",
+                "A welcoming space to show off favorite cards and recent pulls",
+                "Help learning basic card values and fair trading etiquette",
+                "Pokemon-focused collecting, with other trading cards welcome when appropriate",
+                "Casual, no-pressure hobby time for kids and families",
+            ],
+            whoShould: "Kids, young collectors, parents, and families looking for a casual local card night centered on trading, collecting, and community.",
+            note: "Parents and guardians are encouraged to stay and help younger collectors. The Wolf Den is happy to help answer questions and encourage fair, respectful trading, but trades are ultimately between collectors and families.",
+        },
+        ctaLabel: "Stop In Thursday",
+        ctaHref: "https://www.google.com/maps/search/?api=1&query=300+1st+St+S,+Montgomery,+MN+56069",
+        ctaExternal: true,
+        futurePlans:
+            "As the local collecting community grows, Thursday nights may expand with themed trade nights, special kids-focused collecting activities, and other casual community features based on family interest.",
+        refundPolicy:
+            "No paid entry required for this event.",
+    },
+    {
         slug: "friday-night-magic",
         title: "Friday Commander Night at The Wolf Den",
+        seoTitle: "Friday Commander Night | The Wolf Den",
+        metaDescription:
+            "Join The Wolf Den in Montgomery, MN every Friday from 4 to 7 PM for casual Commander pods, deck tuning, trading, and community-focused MTG play.",
+        keywords: ["Friday Commander Night", "Commander Montgomery MN", "Magic event Montgomery MN"],
         day: "Fridays",
         date: "Weekly",
         time: "4:00 PM - 7:00 PM",
+        schedule: {
+            byDay: "https://schema.org/Friday",
+            startTime: "16:00",
+            endTime: "19:00",
+        },
         format: "Casual Commander pods, open play, trading, deck tuning, and learn-to-play support",
         entryFee: "Free",
         rsvp: "RSVP online to reserve a seat",
@@ -24,9 +87,18 @@ export const events = [
     {
         slug: "pokemon-community-saturday",
         title: "Pokemon Community Saturdays at The Wolf Den",
+        seoTitle: "Pokemon Community Saturdays | The Wolf Den",
+        metaDescription:
+            "Spend Saturdays at The Wolf Den in Montgomery, MN with casual Pokemon gameplay, trading, collecting, and family-friendly community time from 12 to 6 PM.",
+        keywords: ["Pokemon event Montgomery MN", "Saturday Pokemon Montgomery", "family Pokemon store Minnesota"],
         day: "Saturdays",
         date: "Weekly",
         time: "12:00 PM - 6:00 PM",
+        schedule: {
+            byDay: "https://schema.org/Saturday",
+            startTime: "12:00",
+            endTime: "18:00",
+        },
         format: "Casual Pokemon gameplay, trading cards, pack battles, collection discussions, and learn-to-play opportunities",
         entryFee: "Free",
         rsvp: "Discord for updates",
@@ -45,9 +117,17 @@ export const events = [
     {
         slug: "pokemon-beginner-community-day",
         title: "Pokemon Beginner Community Day at The Wolf Den",
+        seoTitle: "Pokemon Beginner Community Day | The Wolf Den",
+        metaDescription:
+            "Learn Pokemon in a relaxed, beginner-friendly Saturday meetup at The Wolf Den in Montgomery, MN for kids, parents, and new players.",
+        keywords: ["beginner Pokemon Montgomery MN", "learn Pokemon Minnesota", "kids Pokemon event Montgomery"],
         day: "Saturdays",
         date: "Weekly",
         time: "2:00 PM",
+        schedule: {
+            byDay: "https://schema.org/Saturday",
+            startTime: "14:00",
+        },
         format: "Casual open-play games, trading, learning, and community hangout",
         entryFee: "Free",
         rsvp: "Discord for updates",

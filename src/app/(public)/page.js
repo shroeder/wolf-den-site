@@ -1,7 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
+import { events } from "@/lib/events";
 
 const categories = ["Pokemon", "Magic", "Singles", "Accessories", "Events"];
+const featuredEvents = events.slice(0, 3);
 
 export const metadata = {
     title: "Game Store in Montgomery, MN | Pokemon & MTG",
@@ -90,9 +92,31 @@ export default function HomePage() {
                         </div>
                         <div className="hero-stat">
                             <span className="hero-stat-label">Community</span>
-                            <strong>Friday Commander and Saturday Pokemon</strong>
+                            <strong>Thursday kids, Friday Commander, Saturday Pokemon</strong>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section className="card">
+                <h2>This Week at The Wolf Den</h2>
+                <p>Recurring weekly events for kids, families, collectors, and casual players in Montgomery, Minnesota.</p>
+                <div className="grid three-col">
+                    {featuredEvents.map((event) => (
+                        <article key={event.slug} className="card lift">
+                            <p className="eyebrow">
+                                {event.day} · {event.time}
+                            </p>
+                            <h3>{event.title}</h3>
+                            <p>{event.description}</p>
+                            <p>
+                                <strong>Entry:</strong> {event.entryFee}
+                            </p>
+                            <Link className="text-link" href={`/events/${event.slug}`}>
+                                View Event Details
+                            </Link>
+                        </article>
+                    ))}
                 </div>
             </section>
 
@@ -221,7 +245,7 @@ export default function HomePage() {
                 </article>
                 <article className="card lift">
                     <h2>Events</h2>
-                    <p>Weekly leagues, Friday tournaments, and beginner-friendly play nights.</p>
+                    <p>Thursday kids collecting, Friday Commander, and Saturday Pokemon community time.</p>
                     <Link className="text-link" href="/events">
                         See Calendar
                     </Link>

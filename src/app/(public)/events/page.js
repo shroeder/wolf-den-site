@@ -2,9 +2,9 @@ import { events } from "@/lib/events";
 import Image from "next/image";
 
 export const metadata = {
-    title: "Weekly Pokemon & Magic Events",
+    title: "Weekly Card Events in Montgomery, MN",
     description:
-        "Events at The Wolf Den in Montgomery, MN, including Friday Commander community nights and Saturday Pokemon community days for players across southern Minnesota.",
+        "Weekly events at The Wolf Den in Montgomery, MN, including Thursday Kids Card Club, Friday Commander Night, and Saturday Pokemon community time for southern Minnesota players and families.",
     alternates: {
         canonical: "/events",
     },
@@ -19,15 +19,15 @@ export default function EventsPage() {
                     The Wolf Den is building a local trading card game community in Montgomery, Minnesota.
                 </p>
                 <p>
-                    We are starting with casual, community-focused events designed to help players meet each other, trade cards, learn games, and grow the local scene.
+                    Our weekly schedule is built around casual, community-focused events that help players, collectors, kids, and families meet each other, trade cards, learn games, and grow the local scene.
                 </p>
             </section>
 
             <section className="card">
                 <h2>Weekly Event Schedule</h2>
                 <p>
-                    Friday Commander community play runs during store hours from 4:00 PM to 7:00 PM, and Saturday Pokemon community play runs
-                    during store hours from 12:00 PM to 6:00 PM.
+                    Thursday Kids Card Club runs from 4:00 PM to 7:00 PM, Friday Commander community play runs from 4:00 PM to 7:00 PM,
+                    and Saturday Pokemon community play runs during store hours from 12:00 PM to 6:00 PM.
                 </p>
             </section>
 
@@ -58,7 +58,7 @@ export default function EventsPage() {
             <section className="card">
                 <h2>Community First</h2>
                 <p>
-                    The Wolf Den is currently focused on growing a healthy local player base and building a welcoming environment for players of all experience levels.
+                    The Wolf Den is currently focused on growing a healthy local player base and building a welcoming environment for players, collectors, and families of all experience levels.
                 </p>
                 <p>Whether you are brand new to trading card games or have been playing for years, you are welcome here.</p>
             </section>

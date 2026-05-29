@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const GIVEAWAY_STORAGE_KEY = "wolfden_giveaway_spin_v1";
 const GIVEAWAY_END_AT = "2026-05-21T19:00:00-05:00";
+const GIVEAWAY_END_TIMESTAMP = new Date(GIVEAWAY_END_AT).getTime();
+const GIVEAWAY_IS_EXPIRED = Date.now() >= GIVEAWAY_END_TIMESTAMP;
 
 const PRIZES = [
     { label: "$5 Off", detail: "Get $5 off your next purchase.", code: "WOLF5" },
@@ -42,41 +44,55 @@ function buildWheelGradient(size) {
     return `conic-gradient(${stops.join(",")})`;
 }
 
+function getInitialSpinState() {
+    if (typeof window === "undefined") {
+        return {
+            resultIndex: null,
+            hasSpun: false,
+        };
+    }
+
+    try {
+        const raw = window.localStorage.getItem(GIVEAWAY_STORAGE_KEY);
+
+        if (!raw) {
+            return {
+                resultIndex: null,
+                hasSpun: false,
+            };
+        }
+
+        const parsed = JSON.parse(raw);
+        const index = Number(parsed?.resultIndex);
+
+        if (Number.isInteger(index) && index >= 0 && index < PRIZES.length) {
+            return {
+                resultIndex: index,
+                hasSpun: true,
+            };
+        }
+    } catch {
+        // Ignore bad local storage values and continue.
+    }
+
+    return {
+        resultIndex: null,
+        hasSpun: false,
+    };
+}
+
 export default function GiveawayWheelClient() {
+    const initialSpinState = useMemo(() => getInitialSpinState(), []);
     const [rotation, setRotation] = useState(0);
     const [spinning, setSpinning] = useState(false);
-    const [resultIndex, setResultIndex] = useState(null);
-    const [hasSpun, setHasSpun] = useState(false);
+    const [resultIndex, setResultIndex] = useState(initialSpinState.resultIndex);
+    const [hasSpun, setHasSpun] = useState(initialSpinState.hasSpun);
 
     const segmentAngle = 360 / PRIZES.length;
     const wheelBackground = useMemo(() => buildWheelGradient(PRIZES.length), []);
-    const hasExpired = Date.now() >= new Date(GIVEAWAY_END_AT).getTime();
+    const hasExpired = GIVEAWAY_IS_EXPIRED;
 
     const result = resultIndex === null ? null : PRIZES[resultIndex];
-
-    useEffect(() => {
-        if (hasExpired) {
-            return;
-        }
-
-        try {
-            const raw = window.localStorage.getItem(GIVEAWAY_STORAGE_KEY);
-
-            if (!raw) {
-                return;
-            }
-
-            const parsed = JSON.parse(raw);
-            const index = Number(parsed?.resultIndex);
-
-            if (Number.isInteger(index) && index >= 0 && index < PRIZES.length) {
-                setResultIndex(index);
-                setHasSpun(true);
-            }
-        } catch {
-            // Ignore bad local storage values and continue.
-        }
-    }, [hasExpired]);
 
     const spin = () => {
         if (spinning || hasExpired || hasSpun) {

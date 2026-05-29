@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export const metadata = {
     title: "Local TCG Community",
     description:
@@ -86,9 +88,9 @@ export default function CommunityPage() {
                     <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
                         Join Discord
                     </a>
-                    <a className="button" href="/events">
+                    <Link className="button" href="/events">
                         View Weekly Events
-                    </a>
+                    </Link>
                 </div>
             </section>
         </div>
