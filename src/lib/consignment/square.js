@@ -4,6 +4,7 @@ import { createServerLogger } from "@/lib/server-logger";
 
 const SQUARE_API_BASE = "https://connect.squareup.com";
 const DEFAULT_SALES_LOOKBACK_DAYS = 90;
+const DEFAULT_MYSTERY_PACK_ITEM_ID = "XGXASEUSGRYBX2XQDIKVU4FA";
 const squareLogger = createServerLogger({ source: "api", subsystem: "square" });
 
 const normalizeLookbackDays = (value) => {
@@ -715,7 +716,7 @@ export async function getMysteryBagPriceFromSquare() {
 
 export async function getMysteryBagPriceInfoFromSquare() {
     const variationId = process.env.SQUARE_MYSTERY_BAG_VARIATION_ID;
-    const itemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID;
+    const itemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID || DEFAULT_MYSTERY_PACK_ITEM_ID;
     const nameQuery = process.env.SQUARE_MYSTERY_BAG_NAME || "mystery pack";
 
     if (variationId) {
