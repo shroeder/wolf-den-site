@@ -1354,6 +1354,10 @@ textarea {
     width: min(1920px, calc(100vw - 1rem));
     max-width: none;
     margin-inline: calc(50% - 50vw + 0.5rem);
+    height: calc(100dvh - var(--mystery-shell-offset, 11.4rem));
+    max-height: calc(100dvh - var(--mystery-shell-offset, 11.4rem));
+    overflow: clip;
+    display: grid;
 }
 
 .mystery-board {
@@ -1364,11 +1368,16 @@ textarea {
     border-color: rgba(212, 175, 55, 0.36);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 48px rgba(0, 0, 0, 0.5);
     padding: 1rem;
+    height: 100%;
+    overflow: clip;
 }
 
 .mystery-chase-board {
     display: grid;
     gap: 1rem;
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .mystery-vault-head {
@@ -1453,6 +1462,7 @@ textarea {
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.72fr);
     gap: 1rem;
+    min-height: 0;
 }
 
 .mystery-hero-stage {
@@ -1461,7 +1471,7 @@ textarea {
     background:
         radial-gradient(circle at 84% 14%, rgba(255, 197, 92, 0.26), transparent 40%),
         linear-gradient(165deg, rgba(17, 16, 13, 0.93), rgba(10, 10, 9, 0.98));
-    min-height: min(56vh, 820px);
+    min-height: 0;
     padding: 0.9rem;
     overflow: hidden;
 }
@@ -1558,6 +1568,8 @@ textarea {
     padding: 0.75rem;
     display: grid;
     gap: 0.62rem;
+    min-height: 0;
+    overflow: clip;
 }
 
 .mystery-top-hits h3 {
@@ -1743,15 +1755,11 @@ textarea {
 
 @media (max-width: 1280px) {
     .mystery-live-metrics {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .mystery-hero-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .mystery-hero-stage {
-        min-height: 0;
+        grid-template-columns: minmax(0, 1.4fr) minmax(250px, 0.8fr);
     }
 }
 
@@ -1818,11 +1826,116 @@ textarea {
     }
 }
 
+@media (max-height: 980px) {
+    .mystery-board-page {
+        --mystery-shell-offset: 10.8rem;
+    }
+
+    .mystery-board {
+        padding: 0.68rem;
+    }
+
+    .mystery-chase-board {
+        gap: 0.62rem;
+    }
+
+    .mystery-vault-head h1 {
+        font-size: clamp(1.65rem, 2.5vw, 2.7rem);
+    }
+
+    .mystery-live-metrics {
+        gap: 0.46rem;
+    }
+
+    .mystery-metric-card {
+        padding: 0.5rem 0.62rem;
+    }
+
+    .mystery-metric-card p {
+        font-size: 0.56rem;
+    }
+
+    .mystery-metric-card strong {
+        margin-top: 0.2rem;
+        font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+    }
+
+    .mystery-hero-layout {
+        gap: 0.62rem;
+    }
+
+    .mystery-hero-card {
+        gap: 0.62rem;
+    }
+
+    .mystery-hero-copy h2 {
+        font-size: clamp(1.45rem, 2.9vw, 2.6rem);
+    }
+
+    .mystery-hero-price {
+        font-size: clamp(1.8rem, 3.8vw, 3.5rem);
+    }
+
+    .mystery-top-hit:nth-child(n+6) {
+        display: none;
+    }
+}
+
+@media (max-height: 860px) {
+    .mystery-board-page {
+        --mystery-shell-offset: 9.9rem;
+    }
+
+    .mystery-live-metrics {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .mystery-vault-kicker,
+    .mystery-live-pill {
+        font-size: 0.62rem;
+    }
+
+    .mystery-hot-ticker {
+        display: none;
+    }
+
+    .mystery-top-hit:nth-child(n+5) {
+        display: none;
+    }
+}
+
+@media (max-height: 760px) {
+    .mystery-board-page {
+        --mystery-shell-offset: 8.8rem;
+    }
+
+    .mystery-top-hit:nth-child(n+4) {
+        display: none;
+    }
+}
+
+html:has(.mystery-board-page),
+body:has(.mystery-board-page) {
+    overflow: hidden;
+}
+
+body:has(.mystery-board-page) .content {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+body:has(.mystery-board-page) .site-footer {
+    display: none;
+}
+
 html.tv-mode .mystery-board-page,
 body.tv-mode .mystery-board-page {
     width: calc(100vw - 1rem);
     max-width: none;
     margin-inline: calc(50% - 50vw + 0.5rem);
+    height: calc(100dvh - 4.6rem);
+    max-height: calc(100dvh - 4.6rem);
 }
 
 html.tv-mode .mystery-board,

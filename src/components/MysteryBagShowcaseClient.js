@@ -26,7 +26,6 @@ function toNumber(value) {
 export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
     const [tvMode] = useTvMode();
     const [activeTopIndex, setActiveTopIndex] = useState(0);
-    const [showFullPool, setShowFullPool] = useState(false);
     const [tickerIndex, setTickerIndex] = useState(0);
 
     const sortedCards = useMemo(
@@ -208,30 +207,6 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
                 <p className="mystery-hot-ticker-total">
                     Featured Pool Value: <strong>{formatMoney(headlineStats.totalChaseValue)}</strong>
                 </p>
-            </section>
-
-            <section className="mystery-transparency">
-                <button
-                    type="button"
-                    className="mystery-transparency-toggle"
-                    onClick={() => {
-                        setShowFullPool((current) => !current);
-                    }}
-                    aria-expanded={showFullPool}
-                >
-                    {showFullPool ? "Hide Full Pool" : "View Full Pool"}
-                </button>
-
-                {showFullPool ? (
-                    <div className="mystery-full-pool" aria-label="Full mystery bag card pool">
-                        {sortedCards.map((card) => (
-                            <article key={card.id} className="mystery-full-pool-row">
-                                <p>{formatDisplayName(card.name)}</p>
-                                <strong>{formatMoney(card.marketValue)}</strong>
-                            </article>
-                        ))}
-                    </div>
-                ) : null}
             </section>
         </div>
     );
