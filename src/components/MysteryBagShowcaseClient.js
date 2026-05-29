@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -19,222 +19,220 @@ function formatDisplayName(name) {
         .trim();
 }
 
-export default function MysteryBagShowcaseClient({ cards, children }) {
-    const scrollRef = useRef(null);
-    const runningRef = useRef(true);
-    const refreshTriggeredRef = useRef(false);
+function toNumber(value) {
+    return Number(value || 0);
+}
+
+export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
     const [tvMode] = useTvMode();
     const [activeTopIndex, setActiveTopIndex] = useState(0);
+    const [showFullPool, setShowFullPool] = useState(false);
+    const [tickerIndex, setTickerIndex] = useState(0);
 
-    const visibleCards = useMemo(() => cards, [cards]);
-    const topCards = useMemo(() => {
-        return [...cards]
-            .sort((left, right) => Number(right.marketValue || 0) - Number(left.marketValue || 0))
-            .slice(0, 5);
-    }, [cards]);
+    const sortedCards = useMemo(
+        () => [...cards].sort((left, right) => toNumber(right.marketValue) - toNumber(left.marketValue)),
+        [cards]
+    );
+
+    const featuredCards = useMemo(() => {
+        const chaseThreshold = Math.max(toNumber(bagPrice) * 1.6, 20);
+        const thresholdMatches = sortedCards.filter((card) => toNumber(card.marketValue) >= chaseThreshold);
+
+        if (thresholdMatches.length >= 6) {
+            return thresholdMatches.slice(0, 12);
+        }
+
+        return sortedCards.slice(0, 10);
+    }, [bagPrice, sortedCards]);
+
+    const topCards = useMemo(() => featuredCards.slice(0, 6), [featuredCards]);
+
+    const spotlightCards = useMemo(() => {
+        if (!featuredCards.length) {
+            return [];
+        }
+
+        return featuredCards.slice(0, 10);
+    }, [featuredCards]);
+
+    const headlineStats = useMemo(() => {
+        const biggestRemainingHit = sortedCards[0] || null;
+
+        return {
+            bagsRemaining: Number(metrics?.itemCount || cards.length || 0),
+            totalLiveValue: toNumber(metrics?.marketTotal),
+            biggestRemainingHit,
+            chaseHitsRemaining: featuredCards.length,
+            pricePerBag: toNumber(bagPrice),
+            totalChaseValue: featuredCards.reduce((sum, card) => sum + toNumber(card.marketValue), 0),
+        };
+    }, [bagPrice, cards.length, featuredCards, metrics?.itemCount, metrics?.marketTotal, sortedCards]);
+
+    const activeTopCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
+    const activeTickerCard = spotlightCards.length ? spotlightCards[tickerIndex % spotlightCards.length] : null;
 
     useEffect(() => {
-        const scroller = scrollRef.current;
-        refreshTriggeredRef.current = false;
-
-        const triggerRefresh = () => {
-            if (refreshTriggeredRef.current) {
-                return;
-            }
-
-            refreshTriggeredRef.current = true;
+        const refreshTimer = window.setInterval(() => {
             window.location.reload();
-        };
-
-        let refreshTimer = null;
-
-        if (!scroller) {
-            refreshTimer = window.setInterval(triggerRefresh, 30000);
-
-            return () => {
-                if (refreshTimer) {
-                    window.clearInterval(refreshTimer);
-                }
-            };
-        }
-
-        const hasOverflow = scroller.scrollHeight > scroller.clientHeight;
-
-        if (!hasOverflow) {
-            refreshTimer = window.setInterval(triggerRefresh, 30000);
-
-            return () => {
-                if (refreshTimer) {
-                    window.clearInterval(refreshTimer);
-                }
-            };
-        }
-
-        let frameId = null;
-        let previousScrollTop = -1;
-        let stalledFrames = 0;
-
-        const step = () => {
-            if (!runningRef.current) {
-                frameId = window.requestAnimationFrame(step);
-                return;
-            }
-
-            const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-
-            if (maxScroll <= 1) {
-                triggerRefresh();
-                return;
-            }
-
-            scroller.scrollTop += tvMode ? 0.8 : 0.45;
-
-            const distanceToBottom = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
-
-            if (distanceToBottom <= 2) {
-                triggerRefresh();
-                return;
-            }
-
-            if (Math.abs(scroller.scrollTop - previousScrollTop) < 0.01) {
-                stalledFrames += 1;
-            } else {
-                stalledFrames = 0;
-            }
-
-            previousScrollTop = scroller.scrollTop;
-
-            if (stalledFrames >= 90 && distanceToBottom <= 20) {
-                triggerRefresh();
-                return;
-            }
-
-            frameId = window.requestAnimationFrame(step);
-        };
-
-        frameId = window.requestAnimationFrame(step);
+        }, 30000);
 
         return () => {
-            if (frameId) {
-                window.cancelAnimationFrame(frameId);
-            }
-
-            if (refreshTimer) {
-                window.clearInterval(refreshTimer);
-            }
+            window.clearInterval(refreshTimer);
         };
-    }, [cards.length, tvMode]);
+    }, []);
 
     useEffect(() => {
         if (topCards.length <= 1) {
-            setActiveTopIndex(0);
             return;
         }
 
         const intervalId = window.setInterval(() => {
             setActiveTopIndex((current) => (current + 1) % topCards.length);
-        }, 5000);
+        }, tvMode ? 7000 : 5500);
 
         return () => {
             window.clearInterval(intervalId);
         };
     }, [topCards.length, tvMode]);
 
+    useEffect(() => {
+        if (spotlightCards.length <= 1) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            setTickerIndex((current) => (current + 1) % spotlightCards.length);
+        }, tvMode ? 4200 : 3200);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [spotlightCards.length, tvMode]);
+
     if (!cards.length) {
         return <p className="consignment-empty">No cards are currently packed in mystery bags.</p>;
     }
 
-    const activeTopCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
-
     return (
-        <div className="mystery-board-columns">
-            <div className="mystery-main-column">
-                {children}
-                <div
-                    className="mystery-marquee"
-                    ref={scrollRef}
-                    onMouseEnter={() => {
-                        if (tvMode) {
-                            return;
-                        }
-                        runningRef.current = false;
-                    }}
-                    onMouseLeave={() => {
-                        if (tvMode) {
-                            return;
-                        }
-                        runningRef.current = true;
-                    }}
-                    onTouchStart={() => {
-                        if (tvMode) {
-                            return;
-                        }
-                        runningRef.current = false;
-                    }}
-                    onTouchEnd={() => {
-                        if (tvMode) {
-                            return;
-                        }
-                        runningRef.current = true;
-                    }}
-                >
-                    <div className="mystery-marquee-inner" aria-live="polite">
-                        {visibleCards.map((card) => (
+        <div className="mystery-chase-board">
+            <header className="mystery-vault-head">
+                <div>
+                    <p className="mystery-vault-kicker">The Wolf Den Mystery Bags</p>
+                    <h1>Mystery Chase Board</h1>
+                </div>
+                <div className="mystery-live-pill" aria-label="Live status">
+                    <span className="mystery-live-dot" aria-hidden="true" />
+                    STILL LIVE
+                </div>
+            </header>
+
+            <section className="mystery-live-metrics" aria-label="Live mystery bag metrics">
+                <article className="mystery-metric-card">
+                    <p>Bags Remaining</p>
+                    <strong>{headlineStats.bagsRemaining}</strong>
+                </article>
+                <article className="mystery-metric-card">
+                    <p>Total Live Value</p>
+                    <strong>{formatMoney(headlineStats.totalLiveValue)}</strong>
+                </article>
+                <article className="mystery-metric-card">
+                    <p>Biggest Remaining Hit</p>
+                    <strong>
+                        {headlineStats.biggestRemainingHit
+                            ? formatMoney(headlineStats.biggestRemainingHit.marketValue)
+                            : formatMoney(0)}
+                    </strong>
+                </article>
+                <article className="mystery-metric-card">
+                    <p>Price Per Bag</p>
+                    <strong>{formatMoney(headlineStats.pricePerBag)}</strong>
+                </article>
+                <article className="mystery-metric-card">
+                    <p>Chase Hits Remaining</p>
+                    <strong>{headlineStats.chaseHitsRemaining}</strong>
+                </article>
+            </section>
+
+            <div className="mystery-hero-layout">
+                <section className="mystery-hero-stage" aria-live="polite" aria-label="Featured chase hit">
+                    {activeTopCard ? (
+                        <article key={activeTopCard.id} className="mystery-hero-card">
+                            <div className="mystery-hero-image-wrap">
+                                {activeTopCard.imageUrl ? (
+                                    <img
+                                        src={activeTopCard.imageUrl}
+                                        alt={activeTopCard.name}
+                                        className="mystery-hero-image"
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
+                                ) : (
+                                    <div className="mystery-card-image-placeholder" aria-hidden="true">
+                                        No image
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mystery-hero-copy">
+                                <p className="mystery-hero-flag">Featured Chase Hit</p>
+                                <h2>{formatDisplayName(activeTopCard.name)}</h2>
+                                <p className="mystery-hero-price">{formatMoney(activeTopCard.marketValue)}</p>
+                                <p className="mystery-hero-status">STILL LIVE</p>
+                            </div>
+                        </article>
+                    ) : null}
+                </section>
+
+                <aside className="mystery-top-hits" aria-label="Top live chase hits">
+                    <h3>Top Live Hits</h3>
+                    <div className="mystery-top-hits-grid">
+                        {topCards.map((card, index) => (
                             <article
                                 key={card.id}
-                                className="mystery-card-tile"
-                                aria-label={`Mystery bag card ${card.name} market value ${formatMoney(card.marketValue)}`}
+                                className={`mystery-top-hit ${activeTopCard?.id === card.id ? "is-active" : ""}`}
+                                aria-label={`Top hit ${index + 1} ${card.name} worth ${formatMoney(card.marketValue)}`}
                             >
-                                <div className="mystery-card-image-wrap">
-                                    {card.imageUrl ? (
-                                        <img
-                                            src={card.imageUrl}
-                                            alt={card.name}
-                                            className="mystery-card-image"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                    ) : (
-                                        <div className="mystery-card-image-placeholder" aria-hidden="true">
-                                            No image
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mystery-card-copy">
-                                    <h3 className="mystery-card-name">{formatDisplayName(card.name)}</h3>
-                                    <p className="mystery-card-price">{formatMoney(card.marketValue)}</p>
-                                </div>
+                                <p className="mystery-top-hit-rank">#{index + 1}</p>
+                                <p className="mystery-top-hit-name">{formatDisplayName(card.name)}</p>
+                                <p className="mystery-top-hit-price">{formatMoney(card.marketValue)}</p>
                             </article>
                         ))}
                     </div>
-                </div>
+                </aside>
             </div>
 
-            <aside className="mystery-side-panel" aria-label="Top five mystery bag chase cards">
-                {activeTopCard ? (
-                    <article key={activeTopCard.id} className="mystery-feature-card">
-                        <div className="mystery-feature-image-wrap">
-                            {activeTopCard.imageUrl ? (
-                                <img
-                                    src={activeTopCard.imageUrl}
-                                    alt={activeTopCard.name}
-                                    className="mystery-feature-image"
-                                    loading="lazy"
-                                    decoding="async"
-                                />
-                            ) : (
-                                <div className="mystery-card-image-placeholder" aria-hidden="true">
-                                    No image
-                                </div>
-                            )}
-                        </div>
-                        <div className="mystery-feature-meta">
-                            <h3 className="mystery-feature-name">{formatDisplayName(activeTopCard.name)}</h3>
-                            <p className="mystery-feature-price">{formatMoney(activeTopCard.marketValue)}</p>
-                        </div>
-                    </article>
+            <section className="mystery-hot-ticker" aria-live="polite">
+                <p className="mystery-hot-ticker-label">Hot Pulls In The Vault</p>
+                <p className="mystery-hot-ticker-value">
+                    {activeTickerCard ? `${formatDisplayName(activeTickerCard.name)} - ${formatMoney(activeTickerCard.marketValue)}` : "Loading live hits"}
+                </p>
+                <p className="mystery-hot-ticker-total">
+                    Featured Pool Value: <strong>{formatMoney(headlineStats.totalChaseValue)}</strong>
+                </p>
+            </section>
+
+            <section className="mystery-transparency">
+                <button
+                    type="button"
+                    className="mystery-transparency-toggle"
+                    onClick={() => {
+                        setShowFullPool((current) => !current);
+                    }}
+                    aria-expanded={showFullPool}
+                >
+                    {showFullPool ? "Hide Full Pool" : "View Full Pool"}
+                </button>
+
+                {showFullPool ? (
+                    <div className="mystery-full-pool" aria-label="Full mystery bag card pool">
+                        {sortedCards.map((card) => (
+                            <article key={card.id} className="mystery-full-pool-row">
+                                <p>{formatDisplayName(card.name)}</p>
+                                <strong>{formatMoney(card.marketValue)}</strong>
+                            </article>
+                        ))}
+                    </div>
                 ) : null}
-            </aside>
+            </section>
         </div>
     );
 }
