@@ -71,16 +71,6 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
     const activeTickerCard = spotlightCards.length ? spotlightCards[tickerIndex % spotlightCards.length] : null;
 
     useEffect(() => {
-        const refreshTimer = window.setInterval(() => {
-            window.location.reload();
-        }, 30000);
-
-        return () => {
-            window.clearInterval(refreshTimer);
-        };
-    }, []);
-
-    useEffect(() => {
         if (topCards.length <= 1) {
             return;
         }
