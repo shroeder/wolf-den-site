@@ -138,7 +138,7 @@ export default function MysteryBagShowcaseClient({ cards }) {
         const step = () => {
             const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
 
-            if (maxScroll <= 1) {
+            if (maxScroll <= 0.1) {
                 leaderboardScroller.scrollTop = 0;
                 frameId = window.requestAnimationFrame(step);
                 return;
@@ -152,11 +152,11 @@ export default function MysteryBagShowcaseClient({ cards }) {
 
             leaderboardScroller.scrollTop += direction * 0.25;
 
-            if (leaderboardScroller.scrollTop >= maxScroll - 1) {
+            if (leaderboardScroller.scrollTop >= maxScroll - 0.25) {
                 leaderboardScroller.scrollTop = maxScroll;
                 direction = -1;
                 pauseFrames = 90;
-            } else if (leaderboardScroller.scrollTop <= 1) {
+            } else if (leaderboardScroller.scrollTop <= 0.25) {
                 leaderboardScroller.scrollTop = 0;
                 direction = 1;
                 pauseFrames = 90;

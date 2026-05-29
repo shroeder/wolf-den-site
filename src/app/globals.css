@@ -2009,7 +2009,10 @@ body.tv-mode .mystery-live-board {
 
 html.tv-mode .mystery-side-panel,
 body.tv-mode .mystery-side-panel {
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
     align-self: stretch;
     height: 100%;
     min-height: 0;
@@ -2079,9 +2082,11 @@ body.tv-mode .mystery-card-image-wrap {
 
 html.tv-mode .mystery-leaderboard-list,
 body.tv-mode .mystery-leaderboard-list {
+    flex: 1 1 auto;
     overflow-y: auto;
     overflow-x: hidden;
     height: 100%;
+    min-height: 0;
     max-height: 100%;
 }
 
