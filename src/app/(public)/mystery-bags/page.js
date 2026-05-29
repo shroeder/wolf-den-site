@@ -10,7 +10,13 @@ const formatMoney = (value) => currencyFormatter.format(Number(value || 0));
 
 const DEFAULT_BAG_PRICE = 25;
 
-function resolveBagPrice(metrics) {
+function resolveBagPrice(squareBagPrice, metrics) {
+    const squarePrice = Number(squareBagPrice || 0);
+
+    if (squarePrice > 0) {
+        return squarePrice;
+    }
+
     const explicitPrice = Number(process.env.MYSTERY_BAG_PRICE || process.env.NEXT_PUBLIC_MYSTERY_BAG_PRICE || 0);
 
     if (explicitPrice > 0) {
@@ -34,12 +40,13 @@ export const dynamic = "force-dynamic";
 export default async function MysteryBagsPage() {
     const data = await getMysteryBagDashboardData().catch(() => null);
     const cards = data?.cards || [];
+    const squareBagPrice = data?.bagPrice || 0;
     const metrics = data?.metrics || {
         itemCount: 0,
         marketTotal: 0,
         marketAverage: 0,
     };
-    const bagPrice = resolveBagPrice(metrics);
+    const bagPrice = resolveBagPrice(squareBagPrice, metrics);
 
     return (
         <div className="stack reveal mystery-board-page">

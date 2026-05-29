@@ -562,3 +562,119 @@ export async function listShopInventory() {
 
     return result;
 }
+
+function normalizeName(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase();
+}
+
+function selectVariationForItem(item) {
+    const variations = item?.item_data?.variations || [];
+
+    if (!variations.length) {
+        return null;
+    }
+
+    const preferredVariationName = normalizeName(process.env.SQUARE_MYSTERY_BAG_VARIATION_NAME || "regular");
+    const exactMatch = variations.find(
+        (variation) => normalizeName(variation?.item_variation_data?.name) === preferredVariationName
+    );
+
+    if (exactMatch) {
+        return exactMatch;
+    }
+
+    const pricedVariation = variations.find(
+        (variation) => Number(variation?.item_variation_data?.price_money?.amount || 0) > 0
+    );
+
+    return pricedVariation || variations[0];
+}
+
+function toMysteryBagPrice(variation) {
+    const amount = variation?.item_variation_data?.price_money?.amount;
+
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+        return null;
+    }
+
+    return normalizeMoney(amount);
+}
+
+async function findMysteryBagVariationByName(nameQuery) {
+    const normalizedNameQuery = normalizeName(nameQuery);
+
+    if (!normalizedNameQuery) {
+        return null;
+    }
+
+    let cursor = null;
+
+    do {
+        const params = new URLSearchParams({ types: "ITEM" });
+
+        if (cursor) {
+            params.set("cursor", cursor);
+        }
+
+        const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+
+        for (const item of payload.objects || []) {
+            if (item.type !== "ITEM") {
+                continue;
+            }
+
+            const itemName = normalizeName(item.item_data?.name);
+
+            if (!itemName.includes(normalizedNameQuery)) {
+                continue;
+            }
+
+            const variation = selectVariationForItem(item);
+
+            if (variation) {
+                return variation;
+            }
+        }
+
+        cursor = payload.cursor || null;
+    } while (cursor);
+
+    return null;
+}
+
+export async function getMysteryBagPriceFromSquare() {
+    const variationId = process.env.SQUARE_MYSTERY_BAG_VARIATION_ID;
+    const itemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID;
+    const nameQuery = process.env.SQUARE_MYSTERY_BAG_NAME || "mystery bag";
+
+    if (variationId) {
+        const payload = await squareFetch(`/v2/catalog/object/${variationId}`);
+        const variation = payload?.object;
+        const price = toMysteryBagPrice(variation);
+
+        if (price !== null) {
+            return price;
+        }
+    }
+
+    if (itemId) {
+        const payload = await squareFetch(`/v2/catalog/object/${itemId}`);
+        const variation = selectVariationForItem(payload?.object);
+        const price = toMysteryBagPrice(variation);
+
+        if (price !== null) {
+            return price;
+        }
+    }
+
+    const variation = await findMysteryBagVariationByName(nameQuery);
+    const price = toMysteryBagPrice(variation);
+
+    if (price !== null) {
+        return price;
+    }
+
+    return null;
+}
