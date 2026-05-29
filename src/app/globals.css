@@ -1987,6 +1987,7 @@ body.tv-mode .mystery-board {
     padding: 0.7rem;
     height: calc(100vh - 5.1rem);
     min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 0.55rem;
 }
 
@@ -2002,12 +2003,14 @@ body.tv-mode .mystery-live-board {
     grid-template-columns: minmax(0, 1.5fr) minmax(160px, 0.5fr);
     gap: 0.6rem;
     align-items: stretch;
+    height: 100%;
     min-height: 0;
 }
 
 html.tv-mode .mystery-side-panel,
 body.tv-mode .mystery-side-panel {
     display: grid;
+    align-self: stretch;
     height: 100%;
     min-height: 0;
     min-width: 0;
@@ -2076,6 +2079,9 @@ body.tv-mode .mystery-card-image-wrap {
 
 html.tv-mode .mystery-leaderboard-list,
 body.tv-mode .mystery-leaderboard-list {
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
     max-height: 100%;
 }
 

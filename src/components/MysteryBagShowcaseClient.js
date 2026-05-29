@@ -134,12 +134,12 @@ export default function MysteryBagShowcaseClient({ cards }) {
         let frameId = null;
         let direction = 1;
         let pauseFrames = 0;
-        let running = false;
 
         const step = () => {
             const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
 
             if (maxScroll <= 1) {
+                leaderboardScroller.scrollTop = 0;
                 frameId = window.requestAnimationFrame(step);
                 return;
             }
@@ -165,22 +165,9 @@ export default function MysteryBagShowcaseClient({ cards }) {
             frameId = window.requestAnimationFrame(step);
         };
 
-        const startIfOverflowing = () => {
-            const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
-            if (maxScroll > 1 && !running) {
-                running = true;
-                frameId = window.requestAnimationFrame(step);
-            }
-        };
-
-        const observer = new ResizeObserver(startIfOverflowing);
-        observer.observe(leaderboardScroller);
-
-        // Also try immediately in case content is already laid out
-        startIfOverflowing();
+        frameId = window.requestAnimationFrame(step);
 
         return () => {
-            observer.disconnect();
             if (frameId) {
                 window.cancelAnimationFrame(frameId);
             }
