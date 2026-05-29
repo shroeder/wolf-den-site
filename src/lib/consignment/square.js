@@ -602,6 +602,26 @@ function toMysteryBagPrice(variation) {
     return normalizeMoney(amount);
 }
 
+function getNameMatchScore(itemName, query) {
+    if (!itemName || !query) {
+        return 0;
+    }
+
+    if (itemName === query) {
+        return 3;
+    }
+
+    if (itemName.startsWith(query)) {
+        return 2;
+    }
+
+    if (itemName.includes(query)) {
+        return 1;
+    }
+
+    return 0;
+}
+
 async function findMysteryBagVariationByName(nameQuery) {
     const normalizedNameQuery = normalizeName(nameQuery);
 
@@ -610,6 +630,7 @@ async function findMysteryBagVariationByName(nameQuery) {
     }
 
     let cursor = null;
+    let bestCandidate = null;
 
     do {
         const params = new URLSearchParams({ types: "ITEM" });
@@ -625,26 +646,74 @@ async function findMysteryBagVariationByName(nameQuery) {
                 continue;
             }
 
-            const itemName = normalizeName(item.item_data?.name);
+            if (item.is_deleted) {
+                continue;
+            }
 
-            if (!itemName.includes(normalizedNameQuery)) {
+            const itemName = normalizeName(item.item_data?.name);
+            const matchScore = getNameMatchScore(itemName, normalizedNameQuery);
+
+            if (matchScore === 0) {
                 continue;
             }
 
             const variation = selectVariationForItem(item);
+            const price = toMysteryBagPrice(variation);
 
-            if (variation) {
-                return variation;
+            if (!variation || price === null) {
+                continue;
+            }
+
+            const updatedAt = item.updated_at || variation.updated_at || null;
+
+            if (!bestCandidate) {
+                bestCandidate = {
+                    variation,
+                    itemName: item.item_data?.name || null,
+                    matchScore,
+                    updatedAt,
+                };
+                continue;
+            }
+
+            if (matchScore > bestCandidate.matchScore) {
+                bestCandidate = {
+                    variation,
+                    itemName: item.item_data?.name || null,
+                    matchScore,
+                    updatedAt,
+                };
+                continue;
+            }
+
+            if (matchScore === bestCandidate.matchScore) {
+                const currentTime = Date.parse(updatedAt || "");
+                const bestTime = Date.parse(bestCandidate.updatedAt || "");
+
+                if (!Number.isNaN(currentTime) && (Number.isNaN(bestTime) || currentTime > bestTime)) {
+                    bestCandidate = {
+                        variation,
+                        itemName: item.item_data?.name || null,
+                        matchScore,
+                        updatedAt,
+                    };
+                }
             }
         }
 
         cursor = payload.cursor || null;
     } while (cursor);
 
-    return null;
+    return bestCandidate;
 }
 
 export async function getMysteryBagPriceFromSquare() {
+    const priceInfo = await getMysteryBagPriceInfoFromSquare();
+
+    return priceInfo.price;
+}
+
+export async function getMysteryBagPriceInfoFromSquare() {
     const variationId = process.env.SQUARE_MYSTERY_BAG_VARIATION_ID;
     const itemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID;
     const nameQuery = process.env.SQUARE_MYSTERY_BAG_NAME || "mystery bag";
@@ -655,7 +724,10 @@ export async function getMysteryBagPriceFromSquare() {
         const price = toMysteryBagPrice(variation);
 
         if (price !== null) {
-            return price;
+            return {
+                price,
+                source: "square_variation_id",
+            };
         }
     }
 
@@ -665,16 +737,26 @@ export async function getMysteryBagPriceFromSquare() {
         const price = toMysteryBagPrice(variation);
 
         if (price !== null) {
-            return price;
+            return {
+                price,
+                source: "square_item_id",
+            };
         }
     }
 
-    const variation = await findMysteryBagVariationByName(nameQuery);
-    const price = toMysteryBagPrice(variation);
+    const matchedCandidate = await findMysteryBagVariationByName(nameQuery);
+    const price = toMysteryBagPrice(matchedCandidate?.variation);
 
     if (price !== null) {
-        return price;
+        return {
+            price,
+            source: "square_name_match",
+            matchedItemName: matchedCandidate?.itemName || null,
+        };
     }
 
-    return null;
+    return {
+        price: null,
+        source: "square_not_found",
+    };
 }

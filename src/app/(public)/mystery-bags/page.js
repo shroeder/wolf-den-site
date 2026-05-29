@@ -14,16 +14,34 @@ function resolveBagPrice(squareBagPrice, metrics) {
     const squarePrice = Number(squareBagPrice || 0);
 
     if (squarePrice > 0) {
-        return squarePrice;
+        return {
+            value: squarePrice,
+            source: "square",
+        };
     }
 
     const explicitPrice = Number(process.env.MYSTERY_BAG_PRICE || process.env.NEXT_PUBLIC_MYSTERY_BAG_PRICE || 0);
 
     if (explicitPrice > 0) {
-        return explicitPrice;
+        return {
+            value: explicitPrice,
+            source: "env_fallback",
+        };
     }
 
-    return Number(metrics?.marketAverage || DEFAULT_BAG_PRICE || 0);
+    const averageBasedPrice = Number(metrics?.marketAverage || 0);
+
+    if (averageBasedPrice > 0) {
+        return {
+            value: averageBasedPrice,
+            source: "average_fallback",
+        };
+    }
+
+    return {
+        value: DEFAULT_BAG_PRICE,
+        source: "default_fallback",
+    };
 }
 
 export const metadata = {
@@ -41,12 +59,15 @@ export default async function MysteryBagsPage() {
     const data = await getMysteryBagDashboardData().catch(() => null);
     const cards = data?.cards || [];
     const squareBagPrice = data?.bagPrice || 0;
+    const squareBagPriceSource = data?.bagPriceSource || "square_unknown";
+    const matchedSquareItemName = data?.bagPriceMatchedItemName || null;
     const metrics = data?.metrics || {
         itemCount: 0,
         marketTotal: 0,
         marketAverage: 0,
     };
-    const bagPrice = resolveBagPrice(squareBagPrice, metrics);
+    const bagPriceResolution = resolveBagPrice(squareBagPrice, metrics);
+    const bagPrice = bagPriceResolution.value;
 
     return (
         <div className="stack reveal mystery-board-page">
@@ -54,6 +75,10 @@ export default async function MysteryBagsPage() {
                 <MysteryBagShowcaseClient cards={cards} metrics={metrics} bagPrice={bagPrice} />
                 <p className="mystery-valuation-note" aria-label="valuation source">
                     Live values are based on current card market pricing.
+                    {bagPriceResolution.source === "square"
+                        ? " Price per bag source: live Square catalog."
+                        : ` Price per bag source: fallback (${bagPriceResolution.source}; square status ${squareBagPriceSource}).`}
+                    {matchedSquareItemName ? ` Square match: ${matchedSquareItemName}.` : ""}
                     {Number(metrics.marketAverage || 0) > 0
                         ? ` Current average card value in pool: ${formatMoney(metrics.marketAverage)}.`
                         : ""}

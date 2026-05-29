@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getMysteryBagPriceFromSquare } from "@/lib/consignment/square";
+import { getMysteryBagPriceInfoFromSquare } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 
 function toIso(value) {
@@ -57,11 +57,16 @@ export async function getMysteryBagMetrics() {
 export async function getMysteryBagDashboardData() {
     const cards = await listMysteryBagCards();
     const metrics = await getMysteryBagMetrics();
-    const bagPrice = await getMysteryBagPriceFromSquare().catch(() => null);
+    const bagPriceInfo = await getMysteryBagPriceInfoFromSquare().catch(() => ({
+        price: null,
+        source: "square_error",
+    }));
 
     return {
         metrics,
-        bagPrice,
+        bagPrice: bagPriceInfo.price,
+        bagPriceSource: bagPriceInfo.source,
+        bagPriceMatchedItemName: bagPriceInfo.matchedItemName || null,
         topCards: cards.slice(0, 3),
         cards,
     };
