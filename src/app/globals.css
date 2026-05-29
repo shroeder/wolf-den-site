@@ -2090,6 +2090,15 @@ body.tv-mode .mystery-leaderboard-list {
     max-height: 100%;
 }
 
+html.tv-mode .mystery-leaderboard-list::before,
+body.tv-mode .mystery-leaderboard-list::before,
+html.tv-mode .mystery-leaderboard-list::after,
+body.tv-mode .mystery-leaderboard-list::after {
+    content: "";
+    display: block;
+    height: 1.1rem;
+}
+
 html.tv-mode .mystery-card-name,
 body.tv-mode .mystery-card-name {
     font-size: 0.8rem;
