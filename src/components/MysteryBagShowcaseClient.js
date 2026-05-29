@@ -213,7 +213,6 @@ export default function MysteryBagShowcaseClient({ cards, children }) {
             <aside className="mystery-side-panel" aria-label="Top five mystery bag chase cards">
                 {activeTopCard ? (
                     <article key={activeTopCard.id} className="mystery-feature-card">
-                        <p className="mystery-feature-rank">Chase #{activeTopIndex + 1} of {topCards.length}</p>
                         <div className="mystery-feature-image-wrap">
                             {activeTopCard.imageUrl ? (
                                 <img
