@@ -716,7 +716,7 @@ export async function getMysteryBagPriceFromSquare() {
 export async function getMysteryBagPriceInfoFromSquare() {
     const variationId = process.env.SQUARE_MYSTERY_BAG_VARIATION_ID;
     const itemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID;
-    const nameQuery = process.env.SQUARE_MYSTERY_BAG_NAME || "mystery bag";
+    const nameQuery = process.env.SQUARE_MYSTERY_BAG_NAME || "mystery pack";
 
     if (variationId) {
         const payload = await squareFetch(`/v2/catalog/object/${variationId}`);

@@ -6,8 +6,6 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
     currency: "USD",
 });
 
-const formatMoney = (value) => currencyFormatter.format(Number(value || 0));
-
 const DEFAULT_BAG_PRICE = 25;
 
 function resolveBagPrice(squareBagPrice, metrics) {
@@ -59,8 +57,6 @@ export default async function MysteryBagsPage() {
     const data = await getMysteryBagDashboardData().catch(() => null);
     const cards = data?.cards || [];
     const squareBagPrice = data?.bagPrice || 0;
-    const squareBagPriceSource = data?.bagPriceSource || "square_unknown";
-    const matchedSquareItemName = data?.bagPriceMatchedItemName || null;
     const metrics = data?.metrics || {
         itemCount: 0,
         marketTotal: 0,
@@ -73,16 +69,6 @@ export default async function MysteryBagsPage() {
         <div className="stack reveal mystery-board-page">
             <section className="card mystery-board">
                 <MysteryBagShowcaseClient cards={cards} metrics={metrics} bagPrice={bagPrice} />
-                <p className="mystery-valuation-note" aria-label="valuation source">
-                    Live values are based on current card market pricing.
-                    {bagPriceResolution.source === "square"
-                        ? " Price per bag source: live Square catalog."
-                        : ` Price per bag source: fallback (${bagPriceResolution.source}; square status ${squareBagPriceSource}).`}
-                    {matchedSquareItemName ? ` Square match: ${matchedSquareItemName}.` : ""}
-                    {Number(metrics.marketAverage || 0) > 0
-                        ? ` Current average card value in pool: ${formatMoney(metrics.marketAverage)}.`
-                        : ""}
-                </p>
             </section>
         </div>
     );
