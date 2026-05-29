@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -21,16 +21,17 @@ function formatDisplayName(name) {
 
 export default function MysteryBagShowcaseClient({ cards }) {
     const scrollRef = useRef(null);
-    const leaderboardRef = useRef(null);
     const runningRef = useRef(true);
     const refreshTriggeredRef = useRef(false);
     const [tvMode] = useTvMode();
+    const [activeTopIndex, setActiveTopIndex] = useState(0);
 
     const visibleCards = useMemo(() => cards, [cards]);
-    const topCards = useMemo(
-        () => [...cards].sort((left, right) => Number(right.marketValue || 0) - Number(left.marketValue || 0)).slice(0, 3),
-        [cards]
-    );
+    const topCards = useMemo(() => {
+        return [...cards]
+            .sort((left, right) => Number(right.marketValue || 0) - Number(left.marketValue || 0))
+            .slice(0, 5);
+    }, [cards]);
 
     useEffect(() => {
         const scroller = scrollRef.current;
@@ -125,86 +126,25 @@ export default function MysteryBagShowcaseClient({ cards }) {
     }, [cards.length, tvMode]);
 
     useEffect(() => {
-        const leaderboardScroller = leaderboardRef.current;
-
-        if (!tvMode || !leaderboardScroller) {
+        if (topCards.length <= 1) {
+            setActiveTopIndex(0);
             return;
         }
 
-        let frameId = null;
-        let direction = 1;
-        let pauseFrames = 0;
-
-        const step = () => {
-            const maxScroll = leaderboardScroller.scrollHeight - leaderboardScroller.clientHeight;
-
-            if (maxScroll <= 0.1) {
-                leaderboardScroller.scrollTop = 0;
-                frameId = window.requestAnimationFrame(step);
-                return;
-            }
-
-            if (pauseFrames > 0) {
-                pauseFrames -= 1;
-                frameId = window.requestAnimationFrame(step);
-                return;
-            }
-
-            leaderboardScroller.scrollTop += direction * 0.25;
-
-            if (leaderboardScroller.scrollTop >= maxScroll - 0.25) {
-                leaderboardScroller.scrollTop = maxScroll;
-                direction = -1;
-                pauseFrames = 90;
-            } else if (leaderboardScroller.scrollTop <= 0.25) {
-                leaderboardScroller.scrollTop = 0;
-                direction = 1;
-                pauseFrames = 90;
-            }
-
-            frameId = window.requestAnimationFrame(step);
-        };
-
-        frameId = window.requestAnimationFrame(step);
+        const intervalId = window.setInterval(() => {
+            setActiveTopIndex((current) => (current + 1) % topCards.length);
+        }, 5000);
 
         return () => {
-            if (frameId) {
-                window.cancelAnimationFrame(frameId);
-            }
+            window.clearInterval(intervalId);
         };
-    }, [cards.length, tvMode]);
+    }, [topCards.length, tvMode]);
 
     if (!cards.length) {
         return <p className="consignment-empty">No cards are currently packed in mystery bags.</p>;
     }
 
-    const leaderboard = topCards.length ? (
-        <div className="mystery-leaderboard-list" ref={leaderboardRef}>
-            {topCards.map((card) => (
-                <article key={card.id} className="mystery-leaderboard-item">
-                    <div className="mystery-leaderboard-image-wrap">
-                        {card.imageUrl ? (
-                            <img
-                                src={card.imageUrl}
-                                alt={card.name}
-                                className="mystery-leaderboard-image"
-                                loading="lazy"
-                                decoding="async"
-                            />
-                        ) : (
-                            <div className="mystery-card-image-placeholder" aria-hidden="true">
-                                No image
-                            </div>
-                        )}
-                    </div>
-                    <div className="mystery-leaderboard-copy">
-                        <h3>{formatDisplayName(card.name)}</h3>
-                    </div>
-                    <p className="mystery-leaderboard-price">{formatMoney(card.marketValue)}</p>
-                </article>
-            ))}
-        </div>
-    ) : null;
+    const activeTopCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
 
     return (
         <div className="mystery-live-board">
@@ -267,8 +207,29 @@ export default function MysteryBagShowcaseClient({ cards }) {
                 </div>
             </div>
 
-            <aside className="mystery-side-panel" aria-label="Top three mystery bag cards">
-                {leaderboard}
+            <aside className="mystery-side-panel" aria-label="Top five mystery bag chase cards">
+                {activeTopCard ? (
+                    <article key={activeTopCard.id} className="mystery-feature-card">
+                        <p className="mystery-feature-rank">Chase #{activeTopIndex + 1} of {topCards.length}</p>
+                        <div className="mystery-feature-image-wrap">
+                            {activeTopCard.imageUrl ? (
+                                <img
+                                    src={activeTopCard.imageUrl}
+                                    alt={activeTopCard.name}
+                                    className="mystery-feature-image"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            ) : (
+                                <div className="mystery-card-image-placeholder" aria-hidden="true">
+                                    No image
+                                </div>
+                            )}
+                        </div>
+                        <h3 className="mystery-feature-name">{formatDisplayName(activeTopCard.name)}</h3>
+                        <p className="mystery-feature-price">{formatMoney(activeTopCard.marketValue)}</p>
+                    </article>
+                ) : null}
             </aside>
         </div>
     );
