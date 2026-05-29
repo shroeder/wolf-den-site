@@ -226,8 +226,10 @@ export default function MysteryBagShowcaseClient({ cards }) {
                                 </div>
                             )}
                         </div>
-                        <h3 className="mystery-feature-name">{formatDisplayName(activeTopCard.name)}</h3>
-                        <p className="mystery-feature-price">{formatMoney(activeTopCard.marketValue)}</p>
+                        <div className="mystery-feature-meta">
+                            <h3 className="mystery-feature-name">{formatDisplayName(activeTopCard.name)}</h3>
+                            <p className="mystery-feature-price">{formatMoney(activeTopCard.marketValue)}</p>
+                        </div>
                     </article>
                 ) : null}
             </aside>
