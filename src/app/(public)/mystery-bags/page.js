@@ -9,7 +9,7 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 });
 
 const formatMoney = (value) => currencyFormatter.format(Number(value || 0));
-const formatPct = (value) => `${value >= 0 ? "+" : ""}${Number(value || 0).toFixed(1)}%`;
+const formatPct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
 export const metadata = {
     title: "Mystery Bag Market Dashboard",
@@ -31,9 +31,10 @@ export default async function MysteryBagsPage() {
         marketAverage: 0,
     };
     const bagPrice = Number(metrics.marketAverage || 0);
-    const topCardValue = cards.length ? Math.max(...cards.map((card) => Number(card.marketValue || 0))) : 0;
-    const upsideFromBagPct = bagPrice > 0 ? ((topCardValue - bagPrice) / bagPrice) * 100 : 0;
-    const inverseFromTopPct = topCardValue > 0 ? ((bagPrice - topCardValue) / topCardValue) * 100 : 0;
+    const cardsAboveBagPrice = cards.filter((card) => Number(card.marketValue || 0) > bagPrice).length;
+    const cardsAtOrBelowBagPrice = cards.filter((card) => Number(card.marketValue || 0) <= bagPrice).length;
+    const pullAboveBagPct = cards.length ? (cardsAboveBagPrice / cards.length) * 100 : 0;
+    const pullAtOrBelowBagPct = cards.length ? (cardsAtOrBelowBagPrice / cards.length) * 100 : 0;
 
     return (
         <div className="stack reveal mystery-board-page">
@@ -49,8 +50,8 @@ export default async function MysteryBagsPage() {
                             <p className="mystery-kpi">Bag Price: <strong>{formatMoney(bagPrice)}</strong></p>
                             <p className="mystery-kpi">Market Total: <strong>{formatMoney(metrics.marketTotal)}</strong></p>
                             <p className="mystery-kpi">Singles: <strong>{metrics.itemCount}</strong></p>
-                            <p className="mystery-kpi">Top vs Bag: <strong>{formatPct(upsideFromBagPct)}</strong></p>
-                            <p className="mystery-kpi">Bag vs Top: <strong>{formatPct(inverseFromTopPct)}</strong></p>
+                            <p className="mystery-kpi">Pull &gt; Bag: <strong>{formatPct(pullAboveBagPct)}</strong></p>
+                            <p className="mystery-kpi">Pull &le; Bag: <strong>{formatPct(pullAtOrBelowBagPct)}</strong></p>
                         </div>
                     </div>
 
