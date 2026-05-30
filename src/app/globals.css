@@ -1354,6 +1354,9 @@ textarea {
 
 /* Page shell -------------------------------------------------------- */
 .mb-page {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
     border-radius: 18px;
     border: 1px solid rgba(212, 175, 55, 0.3);
     background:
@@ -1364,6 +1367,18 @@ textarea {
     padding: 1.1rem;
 }
 
+body:has(.mb-page) .shell.content {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+}
+
+body:has(.mb-page) .content {
+    padding-inline: clamp(0.5rem, 1vw, 1rem);
+    padding-top: clamp(0.5rem, 1vw, 0.9rem);
+    padding-bottom: clamp(0.75rem, 1.2vw, 1rem);
+}
+
 body:has(.mb-page) .site-footer {
     display: none;
 }
@@ -1372,6 +1387,7 @@ body:has(.mb-page) .site-footer {
 .mb-board {
     display: grid;
     gap: 1rem;
+    min-width: 0;
 }
 
 /* Header ------------------------------------------------------------ */
@@ -1459,6 +1475,7 @@ body:has(.mb-page) .site-footer {
 .mb-main {
     display: grid;
     gap: 1rem;
+    min-width: 0;
 }
 
 /* Featured card ----------------------------------------------------- */
@@ -1469,6 +1486,7 @@ body:has(.mb-page) .site-footer {
         radial-gradient(circle at 80% 10%, rgba(255, 197, 92, 0.16), transparent 44%),
         linear-gradient(165deg, rgba(17, 16, 13, 0.93), rgba(10, 10, 9, 0.98));
     padding: 1rem;
+    min-width: 0;
 }
 
 /* Mobile: image above info  |  640px+: image beside info          */
@@ -1476,6 +1494,7 @@ body:has(.mb-page) .site-footer {
     display: grid;
     gap: 1rem;
     animation: mb-card-in 480ms ease;
+    min-width: 0;
 }
 
 .mb-feature-image {
@@ -1512,6 +1531,7 @@ body:has(.mb-page) .site-footer {
     display: grid;
     gap: 0.5rem;
     align-content: center;
+    min-width: 0;
 }
 
 .mb-flag {
@@ -1558,6 +1578,7 @@ body:has(.mb-page) .site-footer {
     border: 1px solid rgba(214, 176, 88, 0.26);
     background: linear-gradient(180deg, rgba(22, 21, 18, 0.95), rgba(12, 12, 11, 0.98));
     padding: 0.85rem;
+    min-width: 0;
 }
 
 .mb-hits h3 {
@@ -1574,6 +1595,7 @@ body:has(.mb-page) .site-footer {
     padding: 0;
     display: grid;
     gap: 0.45rem;
+    min-width: 0;
 }
 
 .mb-hit {
@@ -1625,6 +1647,7 @@ body:has(.mb-page) .site-footer {
     border-radius: 12px;
     background: rgba(16, 14, 11, 0.88);
     padding: 0.7rem 0.9rem;
+    min-width: 0;
 }
 
 .mb-ticker-label {
@@ -1694,7 +1717,7 @@ body:has(.mb-page) .site-footer {
     }
 
     .mb-feature-image {
-        max-width: 200px;
+        max-width: min(200px, 38vw);
         margin: 0;
     }
 
@@ -1719,14 +1742,14 @@ body:has(.mb-page) .site-footer {
     }
 
     .mb-feature-image {
-        max-width: 230px;
+        max-width: min(230px, 24vw);
     }
 }
 
 /* 1200px: bigger feature image -------------------------------------- */
 @media (min-width: 1200px) {
     .mb-feature-image {
-        max-width: 290px;
+        max-width: min(290px, 22vw);
     }
 }
 
