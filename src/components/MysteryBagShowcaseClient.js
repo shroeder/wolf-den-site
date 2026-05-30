@@ -29,16 +29,16 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
     const [tickerIndex, setTickerIndex] = useState(0);
 
     const sortedCards = useMemo(
-        () => [...cards].sort((left, right) => toNumber(right.marketValue) - toNumber(left.marketValue)),
+        () => [...cards].sort((a, b) => toNumber(b.marketValue) - toNumber(a.marketValue)),
         [cards]
     );
 
     const featuredCards = useMemo(() => {
-        const chaseThreshold = Math.max(toNumber(bagPrice) * 1.6, 20);
-        const thresholdMatches = sortedCards.filter((card) => toNumber(card.marketValue) >= chaseThreshold);
+        const threshold = Math.max(toNumber(bagPrice) * 1.6, 20);
+        const matches = sortedCards.filter((c) => toNumber(c.marketValue) >= threshold);
 
-        if (thresholdMatches.length >= 6) {
-            return thresholdMatches.slice(0, 12);
+        if (matches.length >= 6) {
+            return matches.slice(0, 12);
         }
 
         return sortedCards.slice(0, 10);
@@ -46,56 +46,41 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
 
     const topCards = useMemo(() => featuredCards.slice(0, 6), [featuredCards]);
 
-    const spotlightCards = useMemo(() => {
-        if (!featuredCards.length) {
-            return [];
-        }
+    const spotlightCards = useMemo(() => featuredCards.slice(0, 10), [featuredCards]);
 
-        return featuredCards.slice(0, 10);
-    }, [featuredCards]);
-
-    const headlineStats = useMemo(() => {
-        const biggestRemainingHit = sortedCards[0] || null;
-
-        return {
+    const stats = useMemo(
+        () => ({
             bagsRemaining: Number(metrics?.itemCount || cards.length || 0),
             totalLiveValue: toNumber(metrics?.marketTotal),
-            biggestRemainingHit,
-            chaseHitsRemaining: featuredCards.length,
+            biggestHit: sortedCards[0] || null,
+            chaseHitsLeft: featuredCards.length,
             pricePerBag: toNumber(bagPrice),
-            totalChaseValue: featuredCards.reduce((sum, card) => sum + toNumber(card.marketValue), 0),
-        };
-    }, [bagPrice, cards.length, featuredCards, metrics?.itemCount, metrics?.marketTotal, sortedCards]);
+            totalChaseValue: featuredCards.reduce((sum, c) => sum + toNumber(c.marketValue), 0),
+        }),
+        [bagPrice, cards.length, featuredCards, metrics?.itemCount, metrics?.marketTotal, sortedCards]
+    );
 
-    const activeTopCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
-    const activeTickerCard = spotlightCards.length ? spotlightCards[tickerIndex % spotlightCards.length] : null;
+    const activeCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
+    const tickerCard = spotlightCards.length ? spotlightCards[tickerIndex % spotlightCards.length] : null;
 
     useEffect(() => {
-        if (topCards.length <= 1) {
-            return;
-        }
+        if (topCards.length <= 1) return;
 
-        const intervalId = window.setInterval(() => {
-            setActiveTopIndex((current) => (current + 1) % topCards.length);
+        const id = window.setInterval(() => {
+            setActiveTopIndex((i) => (i + 1) % topCards.length);
         }, tvMode ? 7000 : 5500);
 
-        return () => {
-            window.clearInterval(intervalId);
-        };
+        return () => window.clearInterval(id);
     }, [topCards.length, tvMode]);
 
     useEffect(() => {
-        if (spotlightCards.length <= 1) {
-            return;
-        }
+        if (spotlightCards.length <= 1) return;
 
-        const intervalId = window.setInterval(() => {
-            setTickerIndex((current) => (current + 1) % spotlightCards.length);
+        const id = window.setInterval(() => {
+            setTickerIndex((i) => (i + 1) % spotlightCards.length);
         }, tvMode ? 4200 : 3200);
 
-        return () => {
-            window.clearInterval(intervalId);
-        };
+        return () => window.clearInterval(id);
     }, [spotlightCards.length, tvMode]);
 
     if (!cards.length) {
@@ -103,100 +88,97 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
     }
 
     return (
-        <div className="mystery-chase-board">
-            <header className="mystery-vault-head">
-                <div>
-                    <p className="mystery-vault-kicker">The Wolf Den Mystery Bags</p>
+        <div className="mb-board">
+            <header className="mb-head">
+                <div className="mb-head-copy">
+                    <p className="mb-kicker">The Wolf Den Mystery Bags</p>
                     <h1>Mystery Chase Board</h1>
                 </div>
-                <div className="mystery-live-pill" aria-label="Live status">
-                    <span className="mystery-live-dot" aria-hidden="true" />
+                <div className="mb-live-pill" aria-label="Live status">
+                    <span className="mb-live-dot" aria-hidden="true" />
                     STILL LIVE
                 </div>
             </header>
 
-            <section className="mystery-live-metrics" aria-label="Live mystery bag metrics">
-                <article className="mystery-metric-card">
+            <section className="mb-metrics" aria-label="Live mystery bag metrics">
+                <article className="mb-metric">
                     <p>Bags Remaining</p>
-                    <strong>{headlineStats.bagsRemaining}</strong>
+                    <strong>{stats.bagsRemaining}</strong>
                 </article>
-                <article className="mystery-metric-card">
+                <article className="mb-metric">
                     <p>Total Live Value</p>
-                    <strong>{formatMoney(headlineStats.totalLiveValue)}</strong>
+                    <strong>{formatMoney(stats.totalLiveValue)}</strong>
                 </article>
-                <article className="mystery-metric-card">
-                    <p>Biggest Remaining Hit</p>
-                    <strong>
-                        {headlineStats.biggestRemainingHit
-                            ? formatMoney(headlineStats.biggestRemainingHit.marketValue)
-                            : formatMoney(0)}
-                    </strong>
+                <article className="mb-metric">
+                    <p>Biggest Hit Left</p>
+                    <strong>{stats.biggestHit ? formatMoney(stats.biggestHit.marketValue) : formatMoney(0)}</strong>
                 </article>
-                <article className="mystery-metric-card">
+                <article className="mb-metric">
                     <p>Price Per Bag</p>
-                    <strong>{formatMoney(headlineStats.pricePerBag)}</strong>
+                    <strong>{formatMoney(stats.pricePerBag)}</strong>
                 </article>
-                <article className="mystery-metric-card">
-                    <p>Chase Hits Remaining</p>
-                    <strong>{headlineStats.chaseHitsRemaining}</strong>
+                <article className="mb-metric">
+                    <p>Chase Hits Left</p>
+                    <strong>{stats.chaseHitsLeft}</strong>
                 </article>
             </section>
 
-            <div className="mystery-hero-layout">
-                <section className="mystery-hero-stage" aria-live="polite" aria-label="Featured chase hit">
-                    {activeTopCard ? (
-                        <article key={activeTopCard.id} className="mystery-hero-card">
-                            <div className="mystery-hero-image-wrap">
-                                {activeTopCard.imageUrl ? (
+            <div className="mb-main">
+                <section className="mb-feature" aria-live="polite" aria-label="Featured chase hit">
+                    {activeCard ? (
+                        <article key={activeTopIndex} className="mb-feature-card">
+                            <div className="mb-feature-image">
+                                {activeCard.imageUrl ? (
                                     <img
-                                        src={activeTopCard.imageUrl}
-                                        alt={activeTopCard.name}
-                                        className="mystery-hero-image"
+                                        src={activeCard.imageUrl}
+                                        alt={activeCard.name}
                                         loading="lazy"
                                         decoding="async"
                                     />
                                 ) : (
-                                    <div className="mystery-card-image-placeholder" aria-hidden="true">
+                                    <div className="mb-feature-placeholder" aria-hidden="true">
                                         No image
                                     </div>
                                 )}
                             </div>
-                            <div className="mystery-hero-copy">
-                                <p className="mystery-hero-flag">Featured Chase Hit</p>
-                                <h2>{formatDisplayName(activeTopCard.name)}</h2>
-                                <p className="mystery-hero-price">{formatMoney(activeTopCard.marketValue)}</p>
-                                <p className="mystery-hero-status">STILL LIVE</p>
+                            <div className="mb-feature-info">
+                                <p className="mb-flag">Featured Chase Hit</p>
+                                <h2>{formatDisplayName(activeCard.name)}</h2>
+                                <p className="mb-price">{formatMoney(activeCard.marketValue)}</p>
+                                <p className="mb-status">Still Live</p>
                             </div>
                         </article>
                     ) : null}
                 </section>
 
-                <aside className="mystery-top-hits" aria-label="Top live chase hits">
+                <aside className="mb-hits" aria-label="Top live chase hits">
                     <h3>Top Live Hits</h3>
-                    <div className="mystery-top-hits-grid">
-                        {topCards.map((card, index) => (
-                            <article
+                    <ol className="mb-hits-list">
+                        {topCards.map((card, i) => (
+                            <li
                                 key={card.id}
-                                className={`mystery-top-hit ${activeTopCard?.id === card.id ? "is-active" : ""}`}
-                                aria-label={`Top hit ${index + 1} ${card.name} worth ${formatMoney(card.marketValue)}`}
+                                className={`mb-hit${activeCard?.id === card.id ? " is-active" : ""}`}
+                                aria-label={`#${i + 1} ${card.name}`}
                             >
-                                <p className="mystery-top-hit-rank">#{index + 1}</p>
-                                <p className="mystery-top-hit-name">{formatDisplayName(card.name)}</p>
-                                <p className="mystery-top-hit-price">{formatMoney(card.marketValue)}</p>
-                            </article>
+                                <span className="mb-hit-rank">#{i + 1}</span>
+                                <span className="mb-hit-name">{formatDisplayName(card.name)}</span>
+                                <span className="mb-hit-price">{formatMoney(card.marketValue)}</span>
+                            </li>
                         ))}
-                    </div>
+                    </ol>
                 </aside>
             </div>
 
-            <section className="mystery-hot-ticker" aria-live="polite">
-                <p className="mystery-hot-ticker-label">Hot Pulls In The Vault</p>
-                <p className="mystery-hot-ticker-value">
-                    {activeTickerCard ? `${formatDisplayName(activeTickerCard.name)} - ${formatMoney(activeTickerCard.marketValue)}` : "Loading live hits"}
-                </p>
-                <p className="mystery-hot-ticker-total">
-                    Featured Pool Value: <strong>{formatMoney(headlineStats.totalChaseValue)}</strong>
-                </p>
+            <section className="mb-ticker" aria-live="polite">
+                <span className="mb-ticker-label">Hot Pulls In The Vault</span>
+                <span className="mb-ticker-value" key={tickerIndex}>
+                    {tickerCard
+                        ? `${formatDisplayName(tickerCard.name)} -- ${formatMoney(tickerCard.marketValue)}`
+                        : "Loading live hits"}
+                </span>
+                <span className="mb-ticker-total">
+                    Featured Pool: <strong>{formatMoney(stats.totalChaseValue)}</strong>
+                </span>
             </section>
         </div>
     );

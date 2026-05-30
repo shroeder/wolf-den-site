@@ -66,10 +66,8 @@ export default async function MysteryBagsPage() {
     const bagPrice = bagPriceResolution.value;
 
     return (
-        <div className="stack reveal mystery-board-page">
-            <section className="card mystery-board">
-                <MysteryBagShowcaseClient cards={cards} metrics={metrics} bagPrice={bagPrice} />
-            </section>
+        <div className="mb-page">
+            <MysteryBagShowcaseClient cards={cards} metrics={metrics} bagPrice={bagPrice} />
         </div>
     );
 }
