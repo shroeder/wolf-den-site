@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -24,6 +25,7 @@ function toNumber(value) {
 }
 
 export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
+    const router = useRouter();
     const [tvMode] = useTvMode();
     const [activeTopIndex, setActiveTopIndex] = useState(0);
     const [tickerIndex, setTickerIndex] = useState(0);
@@ -82,6 +84,14 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
 
         return () => window.clearInterval(id);
     }, [spotlightCards.length, tvMode]);
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            router.refresh();
+        }, 180000);
+
+        return () => window.clearInterval(id);
+    }, [router]);
 
     if (!cards.length) {
         return <p className="consignment-empty">No cards are currently packed in mystery bags.</p>;
