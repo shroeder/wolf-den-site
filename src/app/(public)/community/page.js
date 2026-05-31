@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata = {
@@ -76,6 +77,30 @@ export default function CommunityPage() {
                         <li>Families and younger Pokemon fans</li>
                         <li>Returning players getting back into the hobby</li>
                     </ul>
+                </article>
+            </section>
+
+            <section className="grid two-col">
+                <article className="card lift">
+                    <h2>At The Tables</h2>
+                    <Image
+                        src="/images/people_hanging.jpg"
+                        alt="Players hanging out and playing cards together at The Wolf Den tables"
+                        width={1200}
+                        height={900}
+                        sizes="(max-width: 900px) 100vw, 48vw"
+                        className="content-photo"
+                    />
+                    <p className="muted">The kind of local play environment we are building every week.</p>
+                </article>
+                <article className="card">
+                    <h2>Why This Matters</h2>
+                    <p>
+                        A healthy local scene starts with people having a comfortable place to sit down, play, learn, and talk cards. This is the environment we want to keep growing at The Wolf Den.
+                    </p>
+                    <p>
+                        If you are brand new, you do not need to know everyone already. Show up, introduce yourself, and we will help you find a table.
+                    </p>
                 </article>
             </section>
 
