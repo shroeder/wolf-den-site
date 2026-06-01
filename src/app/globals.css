@@ -1470,6 +1470,82 @@ body:has(.mb-page) .site-footer {
     color: #fff8e7;
 }
 
+/* Recent hits ------------------------------------------------------- */
+.mb-recent {
+    border-radius: 14px;
+    border: 1px solid rgba(214, 176, 88, 0.3);
+    background: linear-gradient(180deg, rgba(30, 25, 18, 0.86), rgba(12, 12, 11, 0.97));
+    padding: 0.8rem;
+}
+
+.mb-recent-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.65rem;
+}
+
+.mb-recent-head h3 {
+    margin: 0;
+    color: rgba(231, 206, 149, 0.95);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.mb-recent-head p {
+    margin: 0;
+    font-size: 0.72rem;
+    color: rgba(216, 216, 216, 0.78);
+}
+
+.mb-recent-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.mb-recent-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 10px;
+    border: 1px solid rgba(212, 175, 55, 0.16);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 0.46rem 0.58rem;
+}
+
+.mb-recent-name {
+    font-weight: 700;
+    font-size: 0.86rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mb-recent-value {
+    color: #ffd787;
+    font-size: 0.92rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.mb-recent-time {
+    color: rgba(215, 215, 215, 0.72);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.mb-recent-empty {
+    margin: 0;
+    color: rgba(215, 215, 215, 0.75);
+    font-size: 0.84rem;
+}
+
 /* Main area --------------------------------------------------------- */
 /* Mobile: stacked  |  900px+: feature + hits side by side         */
 .mb-main {

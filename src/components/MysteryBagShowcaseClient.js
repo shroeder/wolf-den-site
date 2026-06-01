@@ -24,7 +24,31 @@ function toNumber(value) {
     return Number(value || 0);
 }
 
-export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
+function formatRelativeTime(value) {
+    if (!value) {
+        return "Just pulled";
+    }
+
+    const date = new Date(value);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const absMinutes = Math.abs(diffMs) / 60000;
+    const absHours = absMinutes / 60;
+    const absDays = absHours / 24;
+    const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+    if (absMinutes < 60) {
+        return rtf.format(Math.round(diffMs / 60000), "minute");
+    }
+
+    if (absHours < 24) {
+        return rtf.format(Math.round(diffMs / 3600000), "hour");
+    }
+
+    return rtf.format(Math.round(diffMs / 86400000), "day");
+}
+
+export default function MysteryBagShowcaseClient({ cards, recentHits, metrics, bagPrice }) {
     const router = useRouter();
     const [tvMode] = useTvMode();
     const [activeTopIndex, setActiveTopIndex] = useState(0);
@@ -131,6 +155,26 @@ export default function MysteryBagShowcaseClient({ cards, metrics, bagPrice }) {
                     <p>Chase Hits Left</p>
                     <strong>{stats.chaseHitsLeft}</strong>
                 </article>
+            </section>
+
+            <section className="mb-recent" aria-label="Recent mystery bag hits">
+                <div className="mb-recent-head">
+                    <h3>Recent Hits</h3>
+                    <p>Proof this board is still connecting</p>
+                </div>
+                {recentHits?.length ? (
+                    <ol className="mb-recent-list">
+                        {recentHits.map((hit) => (
+                            <li key={hit.id} className="mb-recent-item">
+                                <span className="mb-recent-name">{formatDisplayName(hit.name)}</span>
+                                <span className="mb-recent-value">{formatMoney(hit.marketValue)}</span>
+                                <span className="mb-recent-time">{formatRelativeTime(hit.pulledAt)}</span>
+                            </li>
+                        ))}
+                    </ol>
+                ) : (
+                    <p className="mb-recent-empty">No recent pulls logged yet.</p>
+                )}
             </section>
 
             <div className="mb-main">

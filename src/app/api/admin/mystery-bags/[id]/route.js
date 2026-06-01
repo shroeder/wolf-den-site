@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { deleteMysteryBagCardByIdOrCardId } from "@/lib/mystery-bags";
+import { deleteMysteryBagCardByIdOrCardId, recordMysteryBagHitFromCard } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -36,10 +36,13 @@ export async function DELETE(request, { params }) {
                 return NextResponse.json({ error: "card_not_found" }, { status: 404 });
             }
 
+            const recentHit = await recordMysteryBagHitFromCard(deleted).catch(() => null);
+
             logger.info("admin.mystery_bags.delete.success", {
                 id,
                 deletedCardId: deleted.cardId,
                 deletedId: deleted.id,
+                recentHitId: recentHit?.id || null,
             });
 
             revalidatePath("/mystery-bags");
