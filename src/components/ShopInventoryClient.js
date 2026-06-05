@@ -14,6 +14,10 @@ const normalizeCategoryName = (value) => value.toLowerCase().replace(/[^a-z0-9]+
 
 const CATEGORY_PRIORITY_RULES = [
     {
+        score: 1,
+        match: (name) => name.includes("new") && name.includes("last 4 days"),
+    },
+    {
         score: 10,
         match: (name) => name.includes("pokemon") && (name.includes("single") || name.includes("singles")),
     },
@@ -281,8 +285,8 @@ export default function ShopInventoryClient({ categories }) {
         <section className="shop-detail-viewport" aria-live="polite" aria-label="Product detail view">
             <div className="shop-detail-shell">
                 <div className="shop-detail-head">
-                    <button type="button" className="shop-detail-back" onClick={closeDetail}>
-                        Back
+                    <button type="button" className="shop-detail-back" onClick={closeDetail} aria-label="Back to shop items">
+                        < Back to items
                     </button>
                     <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
                 </div>
