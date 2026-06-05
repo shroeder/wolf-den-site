@@ -1896,6 +1896,242 @@ body.tv-mode .site-header {
     background: rgba(12, 12, 12, 0.96);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Mystery Bags (Rare Cards Focused Layout)                           */
+/* ------------------------------------------------------------------ */
+
+.mb2-board {
+    display: grid;
+    gap: 0.95rem;
+}
+
+.mb2-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.mb2-kicker {
+    margin: 0;
+    color: rgba(227, 195, 118, 0.88);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+}
+
+.mb2-head h1 {
+    margin: 0.14rem 0 0;
+    font-size: clamp(1.65rem, 4.8vw, 2.8rem);
+    line-height: 1;
+}
+
+.mb2-count {
+    padding: 0.4rem 0.78rem;
+    border-radius: 999px;
+    border: 1px solid rgba(84, 223, 144, 0.5);
+    background: rgba(23, 61, 40, 0.46);
+    color: #d8ffe5;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.mb2-spotlight {
+    border: 1px solid rgba(214, 176, 88, 0.28);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 78% 18%, rgba(255, 197, 92, 0.2), transparent 44%),
+        linear-gradient(160deg, rgba(23, 20, 15, 0.95), rgba(10, 10, 9, 0.98));
+    padding: 0.65rem;
+    min-height: 145px;
+}
+
+.mb2-spotlight-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    animation: mb2-fade-in 360ms ease;
+}
+
+.mb2-spotlight-card img {
+    width: clamp(80px, 14vw, 130px);
+    height: clamp(108px, 18vw, 172px);
+    object-fit: contain;
+    border-radius: 10px;
+    border: 1px solid rgba(233, 198, 118, 0.42);
+    background: rgba(0, 0, 0, 0.28);
+    box-shadow: 0 0 24px rgba(212, 175, 55, 0.18);
+}
+
+.mb2-spotlight-meta h2,
+.mb2-spotlight-meta p {
+    margin: 0;
+}
+
+.mb2-spotlight-meta h2 {
+    font-size: clamp(1.1rem, 3.4vw, 2rem);
+    line-height: 1.1;
+}
+
+.mb2-spotlight-meta p {
+    margin-top: 0.26rem;
+    color: #ffe1a0;
+    font-size: clamp(1.35rem, 4.6vw, 2.8rem);
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 0 18px rgba(212, 175, 55, 0.24);
+}
+
+.mb2-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 0.65rem;
+}
+
+.mb2-tile {
+    border: 1px solid rgba(214, 176, 88, 0.24);
+    border-radius: 12px;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+        rgba(20, 18, 14, 0.95);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.mb2-tile:hover {
+    transform: translateY(-2px) scale(1.01);
+    border-color: rgba(233, 198, 118, 0.44);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(212, 175, 55, 0.18);
+}
+
+.mb2-tile-media {
+    aspect-ratio: 5 / 7;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.26);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.mb2-tile-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.mb2-tile-placeholder {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.mb2-tile-meta {
+    padding: 0.55rem;
+    display: grid;
+    gap: 0.24rem;
+}
+
+.mb2-tile-meta h3,
+.mb2-value,
+.mb2-multiplier {
+    margin: 0;
+}
+
+.mb2-tile-meta h3 {
+    font-size: 0.81rem;
+    line-height: 1.2;
+    min-height: 2.4em;
+    overflow: hidden;
+}
+
+.mb2-value {
+    font-size: 1.12rem;
+    font-weight: 900;
+    color: #ffd787;
+    line-height: 1;
+}
+
+.mb2-multiplier {
+    color: rgba(216, 216, 216, 0.82);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.mb2-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    border-radius: 12px;
+    border: 1px solid rgba(214, 176, 88, 0.26);
+    background: rgba(16, 14, 11, 0.88);
+    padding: 0.62rem 0.78rem;
+}
+
+.mb2-footer span {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.67rem;
+    color: rgba(224, 201, 148, 0.85);
+}
+
+.mb2-footer strong {
+    font-size: 1.06rem;
+    color: #ffe2a1;
+}
+
+@media (max-width: 720px) {
+    .mb2-grid {
+        grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+        gap: 0.55rem;
+    }
+
+    .mb2-spotlight-card {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+        gap: 0.55rem;
+    }
+
+    .mb2-spotlight-meta h2 {
+        max-width: 20ch;
+    }
+
+    .mb2-footer {
+        padding: 0.55rem 0.65rem;
+    }
+}
+
+@media (max-width: 430px) {
+    .mb2-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@keyframes mb2-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 html.tv-mode .top-row,
 body.tv-mode .top-row {
     padding: 0.4rem 0;

@@ -56,7 +56,6 @@ export const dynamic = "force-dynamic";
 export default async function MysteryBagsPage() {
     const data = await getMysteryBagDashboardData().catch(() => null);
     const cards = data?.cards || [];
-    const recentHits = data?.recentHits || [];
     const squareBagPrice = data?.bagPrice || 0;
     const metrics = data?.metrics || {
         itemCount: 0,
@@ -68,7 +67,7 @@ export default async function MysteryBagsPage() {
 
     return (
         <div className="mb-page">
-            <MysteryBagShowcaseClient cards={cards} recentHits={recentHits} metrics={metrics} bagPrice={bagPrice} />
+            <MysteryBagShowcaseClient cards={cards} bagPrice={bagPrice} />
         </div>
     );
 }

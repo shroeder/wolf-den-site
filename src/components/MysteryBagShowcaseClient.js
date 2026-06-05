@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { useTvMode } from "@/lib/tv-mode-client";
-
 const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -24,35 +22,9 @@ function toNumber(value) {
     return Number(value || 0);
 }
 
-function formatRelativeTime(value) {
-    if (!value) {
-        return "Just pulled";
-    }
-
-    const date = new Date(value);
-    const now = new Date();
-    const diffMs = date.getTime() - now.getTime();
-    const absMinutes = Math.abs(diffMs) / 60000;
-    const absHours = absMinutes / 60;
-    const absDays = absHours / 24;
-    const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-    if (absMinutes < 60) {
-        return rtf.format(Math.round(diffMs / 60000), "minute");
-    }
-
-    if (absHours < 24) {
-        return rtf.format(Math.round(diffMs / 3600000), "hour");
-    }
-
-    return rtf.format(Math.round(diffMs / 86400000), "day");
-}
-
-export default function MysteryBagShowcaseClient({ cards, recentHits, metrics, bagPrice }) {
+export default function MysteryBagShowcaseClient({ cards, bagPrice }) {
     const router = useRouter();
-    const [tvMode] = useTvMode();
-    const [activeTopIndex, setActiveTopIndex] = useState(0);
-    const [tickerIndex, setTickerIndex] = useState(0);
+    const [featuredIndex, setFeaturedIndex] = useState(0);
 
     const sortedCards = useMemo(
         () => [...cards].sort((a, b) => toNumber(b.marketValue) - toNumber(a.marketValue)),
@@ -63,51 +35,31 @@ export default function MysteryBagShowcaseClient({ cards, recentHits, metrics, b
         const threshold = Math.max(toNumber(bagPrice) * 1.6, 20);
         const matches = sortedCards.filter((c) => toNumber(c.marketValue) >= threshold);
 
-        if (matches.length >= 6) {
-            return matches.slice(0, 12);
+        if (matches.length >= 8) {
+            return matches.slice(0, 36);
         }
 
-        return sortedCards.slice(0, 10);
+        return sortedCards.slice(0, 36);
     }, [bagPrice, sortedCards]);
 
-    const topCards = useMemo(() => featuredCards.slice(0, 6), [featuredCards]);
-
-    const spotlightCards = useMemo(() => featuredCards.slice(0, 10), [featuredCards]);
-
-    const stats = useMemo(
-        () => ({
-            bagsRemaining: Number(metrics?.itemCount || cards.length || 0),
-            totalLiveValue: toNumber(metrics?.marketTotal),
-            biggestHit: sortedCards[0] || null,
-            chaseHitsLeft: featuredCards.length,
-            pricePerBag: toNumber(bagPrice),
-            totalChaseValue: featuredCards.reduce((sum, c) => sum + toNumber(c.marketValue), 0),
-        }),
-        [bagPrice, cards.length, featuredCards, metrics?.itemCount, metrics?.marketTotal, sortedCards]
+    const spotlightCards = useMemo(() => featuredCards.slice(0, 3), [featuredCards]);
+    const totalRareValue = useMemo(
+        () => featuredCards.reduce((sum, card) => sum + toNumber(card.marketValue), 0),
+        [featuredCards]
     );
-
-    const activeCard = topCards.length ? topCards[activeTopIndex % topCards.length] : null;
-    const tickerCard = spotlightCards.length ? spotlightCards[tickerIndex % spotlightCards.length] : null;
+    const activeFeatured = spotlightCards.length ? spotlightCards[featuredIndex % spotlightCards.length] : null;
 
     useEffect(() => {
-        if (topCards.length <= 1) return;
+        if (spotlightCards.length <= 1) {
+            return undefined;
+        }
 
         const id = window.setInterval(() => {
-            setActiveTopIndex((i) => (i + 1) % topCards.length);
-        }, tvMode ? 7000 : 5500);
+            setFeaturedIndex((index) => (index + 1) % spotlightCards.length);
+        }, 4200);
 
         return () => window.clearInterval(id);
-    }, [topCards.length, tvMode]);
-
-    useEffect(() => {
-        if (spotlightCards.length <= 1) return;
-
-        const id = window.setInterval(() => {
-            setTickerIndex((i) => (i + 1) % spotlightCards.length);
-        }, tvMode ? 4200 : 3200);
-
-        return () => window.clearInterval(id);
-    }, [spotlightCards.length, tvMode]);
+    }, [spotlightCards.length]);
 
     useEffect(() => {
         const id = window.setInterval(() => {
@@ -122,118 +74,65 @@ export default function MysteryBagShowcaseClient({ cards, recentHits, metrics, b
     }
 
     return (
-        <div className="mb-board">
-            <header className="mb-head">
-                <div className="mb-head-copy">
-                    <p className="mb-kicker">The Wolf Den Mystery Bags</p>
-                    <h1>Mystery Chase Board</h1>
+        <div className="mb2-board">
+            <header className="mb2-head">
+                <div>
+                    <p className="mb2-kicker">Mystery Bags</p>
+                    <h1>Rare Cards Left</h1>
                 </div>
-                <div className="mb-live-pill" aria-label="Live status">
-                    <span className="mb-live-dot" aria-hidden="true" />
-                    STILL LIVE
+                <div className="mb2-count" aria-live="polite">
+                    {featuredCards.length} live rare cards
                 </div>
             </header>
 
-            <section className="mb-metrics" aria-label="Live mystery bag metrics">
-                <article className="mb-metric">
-                    <p>Bags Remaining</p>
-                    <strong>{stats.bagsRemaining}</strong>
-                </article>
-                <article className="mb-metric">
-                    <p>Total Live Value</p>
-                    <strong>{formatMoney(stats.totalLiveValue)}</strong>
-                </article>
-                <article className="mb-metric">
-                    <p>Biggest Hit Left</p>
-                    <strong>{stats.biggestHit ? formatMoney(stats.biggestHit.marketValue) : formatMoney(0)}</strong>
-                </article>
-                <article className="mb-metric">
-                    <p>Price Per Bag</p>
-                    <strong>{formatMoney(stats.pricePerBag)}</strong>
-                </article>
-                <article className="mb-metric">
-                    <p>Chase Hits Left</p>
-                    <strong>{stats.chaseHitsLeft}</strong>
-                </article>
+            <section className="mb2-spotlight" aria-live="polite" aria-label="Featured rare card">
+                {activeFeatured ? (
+                    <article className="mb2-spotlight-card" key={`${activeFeatured.id}-${featuredIndex}`}>
+                        {activeFeatured.imageUrl ? (
+                            <img src={activeFeatured.imageUrl} alt={activeFeatured.name} loading="lazy" decoding="async" />
+                        ) : (
+                            <div className="mb2-tile-placeholder" aria-hidden="true">
+                                No image
+                            </div>
+                        )}
+                        <div className="mb2-spotlight-meta">
+                            <h2>{formatDisplayName(activeFeatured.name)}</h2>
+                            <p>{formatMoney(activeFeatured.marketValue)}</p>
+                        </div>
+                    </article>
+                ) : null}
             </section>
 
-            <section className="mb-recent" aria-label="Recent mystery bag hits">
-                <div className="mb-recent-head">
-                    <h3>Recent Hits</h3>
-                    <p>Proof this board is still connecting</p>
-                </div>
-                {recentHits?.length ? (
-                    <ol className="mb-recent-list">
-                        {recentHits.map((hit) => (
-                            <li key={hit.id} className="mb-recent-item">
-                                <span className="mb-recent-name">{formatDisplayName(hit.name)}</span>
-                                <span className="mb-recent-value">{formatMoney(hit.marketValue)}</span>
-                                <span className="mb-recent-time">{formatRelativeTime(hit.pulledAt)}</span>
-                            </li>
-                        ))}
-                    </ol>
-                ) : (
-                    <p className="mb-recent-empty">No recent pulls logged yet.</p>
-                )}
-            </section>
+            <section className="mb2-grid" aria-label="All rare cards left">
+                {featuredCards.map((card) => {
+                    const marketValue = toNumber(card.marketValue);
+                    const valueMultiplier = bagPrice > 0 ? marketValue / bagPrice : null;
 
-            <div className="mb-main">
-                <section className="mb-feature" aria-live="polite" aria-label="Featured chase hit">
-                    {activeCard ? (
-                        <article key={activeTopIndex} className="mb-feature-card">
-                            <div className="mb-feature-image">
-                                {activeCard.imageUrl ? (
-                                    <img
-                                        src={activeCard.imageUrl}
-                                        alt={activeCard.name}
-                                        loading="lazy"
-                                        decoding="async"
-                                    />
+                    return (
+                        <article key={card.id} className="mb2-tile">
+                            <div className="mb2-tile-media">
+                                {card.imageUrl ? (
+                                    <img src={card.imageUrl} alt={card.name} loading="lazy" decoding="async" />
                                 ) : (
-                                    <div className="mb-feature-placeholder" aria-hidden="true">
+                                    <div className="mb2-tile-placeholder" aria-hidden="true">
                                         No image
                                     </div>
                                 )}
                             </div>
-                            <div className="mb-feature-info">
-                                <p className="mb-flag">Featured Chase Hit</p>
-                                <h2>{formatDisplayName(activeCard.name)}</h2>
-                                <p className="mb-price">{formatMoney(activeCard.marketValue)}</p>
-                                <p className="mb-status">Still Live</p>
+                            <div className="mb2-tile-meta">
+                                <h3>{formatDisplayName(card.name)}</h3>
+                                <p className="mb2-value">{formatMoney(marketValue)}</p>
+                                {valueMultiplier ? <p className="mb2-multiplier">{valueMultiplier.toFixed(1)}x bag value</p> : null}
                             </div>
                         </article>
-                    ) : null}
-                </section>
-
-                <aside className="mb-hits" aria-label="Top live chase hits">
-                    <h3>Top Live Hits</h3>
-                    <ol className="mb-hits-list">
-                        {topCards.map((card, i) => (
-                            <li
-                                key={card.id}
-                                className={`mb-hit${activeCard?.id === card.id ? " is-active" : ""}`}
-                                aria-label={`#${i + 1} ${card.name}`}
-                            >
-                                <span className="mb-hit-rank">#{i + 1}</span>
-                                <span className="mb-hit-name">{formatDisplayName(card.name)}</span>
-                                <span className="mb-hit-price">{formatMoney(card.marketValue)}</span>
-                            </li>
-                        ))}
-                    </ol>
-                </aside>
-            </div>
-
-            <section className="mb-ticker" aria-live="polite">
-                <span className="mb-ticker-label">Hot Pulls In The Vault</span>
-                <span className="mb-ticker-value" key={tickerIndex}>
-                    {tickerCard
-                        ? `${formatDisplayName(tickerCard.name)} -- ${formatMoney(tickerCard.marketValue)}`
-                        : "Loading live hits"}
-                </span>
-                <span className="mb-ticker-total">
-                    Featured Pool: <strong>{formatMoney(stats.totalChaseValue)}</strong>
-                </span>
+                    );
+                })}
             </section>
+
+            <footer className="mb2-footer" aria-live="polite">
+                <span>Total rare value left</span>
+                <strong>{formatMoney(totalRareValue)}</strong>
+            </footer>
         </div>
     );
 }
