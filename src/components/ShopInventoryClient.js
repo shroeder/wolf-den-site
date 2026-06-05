@@ -114,7 +114,8 @@ export default function ShopInventoryClient({
     });
     const [cartCount, setCartCount] = useState(0);
     const [cartItemQuantities, setCartItemQuantities] = useState({});
-    const [cartMutating, setCartMutating] = useState(false);
+    const [cartMutatingItemId, setCartMutatingItemId] = useState("");
+    const [cartSyncing, setCartSyncing] = useState(false);
     const [cartError, setCartError] = useState("");
     const swipeStartRef = useRef(null);
     const panelRef = useRef(null);
@@ -175,14 +176,20 @@ export default function ShopInventoryClient({
             return;
         }
 
-        const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
-        const payload = response ? await response.json().catch(() => null) : null;
+        setCartSyncing(true);
 
-        if (!response?.ok || !payload) {
-            return;
+        try {
+            const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
+            const payload = response ? await response.json().catch(() => null) : null;
+
+            if (!response?.ok || !payload) {
+                return;
+            }
+
+            applyCartSnapshot(payload);
+        } finally {
+            setCartSyncing(false);
         }
-
-        applyCartSnapshot(payload);
     }, [applyCartSnapshot, canShowPaymentUi]);
 
     const addToCart = useCallback(async (item) => {
@@ -190,7 +197,7 @@ export default function ShopInventoryClient({
             return;
         }
 
-        setCartMutating(true);
+        setCartMutatingItemId(item.id);
         setCartError("");
 
         try {
@@ -216,7 +223,7 @@ export default function ShopInventoryClient({
         } catch (error) {
             setCartError(error instanceof Error ? error.message : "Could not update cart.");
         } finally {
-            setCartMutating(false);
+            setCartMutatingItemId("");
         }
     }, [applyCartSnapshot, canShowPaymentUi]);
 
@@ -512,12 +519,12 @@ export default function ShopInventoryClient({
                                 type="button"
                                 className="button primary shop-payment-submit"
                                 onClick={() => addToCart(detailItem)}
-                                disabled={cartMutating}
+                                disabled={Boolean(cartMutatingItemId)}
                             >
-                                {cartMutating ? "Updating cart..." : "Add to cart"}
+                                {cartMutatingItemId === detailItem.id ? "Adding to cart..." : "Add to cart"}
                             </button>
                             <Link href="/cart" className="button shop-payment-submit">
-                                View cart ({cartCount})
+                                View cart ({cartCount}){cartSyncing ? " • Syncing" : ""}
                             </Link>
                         </div>
                     )}

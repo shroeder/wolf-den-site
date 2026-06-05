@@ -116,6 +116,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     });
     const [cartLoading, setCartLoading] = useState(false);
     const [cartMutating, setCartMutating] = useState(false);
+    const [lineItemMutatingId, setLineItemMutatingId] = useState("");
     const [checkoutCardState, setCheckoutCardState] = useState("idle");
     const [checkoutBusy, setCheckoutBusy] = useState(false);
     const [error, setError] = useState("");
@@ -160,7 +161,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     }, [canShowCart]);
 
     const mutateCart = useCallback(async (payload) => {
+        const targetCatalogObjectId = String(payload?.catalogObjectId || "").trim();
+
         setCartMutating(true);
+        setLineItemMutatingId(targetCatalogObjectId);
         setError("");
         setSuccess("");
 
@@ -184,6 +188,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             setError(nextError instanceof Error ? nextError.message : "Could not update cart.");
         } finally {
             setCartMutating(false);
+            setLineItemMutatingId("");
         }
     }, []);
 
@@ -210,12 +215,25 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     }, [canShowCart, refreshCart]);
 
     useEffect(() => {
-        if (!canShowCart || !cartData.items.length) {
-            if (cardRef.current?.destroy) {
-                cardRef.current.destroy().catch(() => undefined);
-            }
+        if (canShowCart && cartData.items.length) {
+            return;
+        }
 
-            cardRef.current = null;
+        if (cardRef.current?.destroy) {
+            cardRef.current.destroy().catch(() => undefined);
+        }
+
+        cardRef.current = null;
+
+        const mountNode = document.getElementById(mountId);
+
+        if (mountNode) {
+            mountNode.innerHTML = "";
+        }
+    }, [canShowCart, cartData.items.length]);
+
+    useEffect(() => {
+        if (!canShowCart || !cartData.items.length) {
             return;
         }
 
@@ -223,7 +241,13 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             return;
         }
 
+        if (cardRef.current) {
+            setCheckoutCardState("ready");
+            return;
+        }
+
         let disposed = false;
+        let mountedCard = null;
 
         const mountCard = async () => {
             try {
@@ -241,7 +265,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                     throw new Error("Square Web Payments SDK did not initialize.");
                 }
 
+                const mountNode = document.getElementById(mountId);
+
+                if (mountNode) {
+                    mountNode.innerHTML = "";
+                }
+
                 const card = await payments.card();
+                mountedCard = card;
                 await card.attach(`#${mountId}`);
 
                 if (disposed) {
@@ -265,6 +296,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
         return () => {
             disposed = true;
+
+            if (mountedCard?.destroy) {
+                mountedCard.destroy().catch(() => undefined);
+            }
         };
     }, [canShowCart, cartData.items.length, missingSquareConfig, squareApplicationId, squareLocationId]);
 
@@ -339,7 +374,15 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 </div>
             </article>
 
-            {cartLoading && <article className="card"><p className="secondary">Loading cart...</p></article>}
+            {cartLoading && !cartData.items.length && (
+                <article className="card cart-loading-card" aria-busy="true" aria-live="polite">
+                    <div className="cart-loading-line cart-loading-line-title" />
+                    <div className="cart-loading-line" />
+                    <div className="cart-loading-line cart-loading-line-short" />
+                </article>
+            )}
+
+            {cartLoading && cartData.items.length > 0 && <p className="secondary cart-loading-inline">Refreshing cart totals...</p>}
 
             {!cartLoading && !cartData.items.length && (
                 <article className="card cart-empty-card">
@@ -353,7 +396,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 <div className="cart-grid-layout">
                     <article className="card cart-items-card">
                         {cartData.items.map((item) => (
-                            <div key={item.catalogObjectId} className="cart-line-item">
+                            <div key={item.catalogObjectId} className="cart-line-item" aria-busy={lineItemMutatingId === item.catalogObjectId ? "true" : "false"}>
                                 <div className="cart-line-image-wrap">
                                     {item.imageUrl ? (
                                         <img src={item.imageUrl} alt={item.name} className="cart-line-image" />
@@ -372,8 +415,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                     <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "update", catalogObjectId: item.catalogObjectId, quantity: Math.max(0, item.quantity - 1) })}>-</button>
                                     <span>{item.quantity}</span>
                                     <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "update", catalogObjectId: item.catalogObjectId, quantity: item.quantity + 1 })}>+</button>
-                                    <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "remove", catalogObjectId: item.catalogObjectId })}>Remove</button>
+                                    <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "remove", catalogObjectId: item.catalogObjectId })}>
+                                        {lineItemMutatingId === item.catalogObjectId ? "Updating..." : "Remove"}
+                                    </button>
                                 </div>
+                                {lineItemMutatingId === item.catalogObjectId && <p className="cart-line-status secondary">Updating item...</p>}
                             </div>
                         ))}
                     </article>
@@ -385,7 +431,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             <p className="shop-payment-total"><span>Total</span><strong>{formatMoney(cartData.totalCents)}</strong></p>
                         </div>
 
-                        {!missingSquareConfig && <div id={mountId} className="shop-payment-card" />}
+                        {!missingSquareConfig && (
+                            <div className={checkoutCardState === "loading" ? "shop-payment-card shop-payment-card-loading" : "shop-payment-card"}>
+                                <div id={mountId} />
+                            </div>
+                        )}
 
                         {missingSquareConfig && <p className="shop-payment-error">Square public configuration is missing.</p>}
                         {!missingSquareConfig && checkoutCardState === "loading" && <p className="secondary">Loading secure card form...</p>}

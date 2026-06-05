@@ -881,6 +881,34 @@ textarea {
     justify-items: start;
 }
 
+.cart-loading-card {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.cart-loading-line {
+    height: 0.72rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
+    background-size: 200% 100%;
+    animation: cart-shimmer 1.05s linear infinite;
+}
+
+.cart-loading-line-title {
+    width: min(320px, 72%);
+    height: 1rem;
+}
+
+.cart-loading-line-short {
+    width: min(220px, 48%);
+}
+
+.cart-loading-inline {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--ink-secondary);
+}
+
 .cart-empty-card h2,
 .cart-empty-card p {
     margin: 0;
@@ -906,6 +934,11 @@ textarea {
     border: 1px solid var(--line);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.02);
+}
+
+.cart-line-item[aria-busy="true"] {
+    border-color: rgba(212, 175, 55, 0.45);
+    background: rgba(212, 175, 55, 0.07);
 }
 
 .cart-line-image-wrap {
@@ -946,6 +979,12 @@ textarea {
     align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
+}
+
+.cart-line-status {
+    grid-column: 2 / -1;
+    margin: 0;
+    font-size: 0.76rem;
 }
 
 .cart-checkout-card {
@@ -1500,6 +1539,23 @@ textarea {
     min-height: 58px;
 }
 
+.shop-payment-card-loading {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.16);
+}
+
+.shop-payment-card-loading::before {
+    content: "";
+    display: block;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
+    background-size: 200% 100%;
+    animation: cart-shimmer 1.05s linear infinite;
+}
+
 .shop-payment-submit {
     width: 100%;
 }
@@ -1516,6 +1572,16 @@ textarea {
 
 .shop-payment-success {
     color: #9de5a9;
+}
+
+@keyframes cart-shimmer {
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: -200% 0;
+    }
 }
 
 @media (max-width: 760px) {
