@@ -301,19 +301,6 @@ export default function ShopInventoryClient({
         };
     }, [canShowPaymentUi, detailItem, missingSquareConfig, squareApplicationId, squareLocationId, squareMountId]);
 
-    const toggleLocalPayments = () => {
-        const nextValue = !isLocalPaymentsEnabled;
-        resetCheckoutFeedback();
-        setIsLocalPaymentsEnabled(nextValue);
-        setCheckoutCardState("idle");
-
-        try {
-            window.localStorage.setItem(PAYMENT_TOGGLE_STORAGE_KEY, nextValue ? "1" : "0");
-        } catch {
-            // Ignore local storage issues; this toggle is test-only.
-        }
-    };
-
     const handleCheckout = async () => {
         if (!detailItem || !cardRef.current || !checkoutReady || checkoutBusy) {
             return;
@@ -605,15 +592,6 @@ export default function ShopInventoryClient({
                         <p className="secondary shop-search-meta">
                             {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
                         </p>
-                    )}
-                    {paymentsEnabled && (
-                        <button
-                            type="button"
-                            className={`shop-payments-toggle${isLocalPaymentsEnabled ? " shop-payments-toggle-active" : ""}`}
-                            onClick={toggleLocalPayments}
-                        >
-                            {isLocalPaymentsEnabled ? "Disable test checkout" : "Enable test checkout"}
-                        </button>
                     )}
                 </div>
 
