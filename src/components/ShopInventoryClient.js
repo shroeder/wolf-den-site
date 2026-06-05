@@ -159,11 +159,12 @@ export default function ShopInventoryClient({
         ? -1
         : visibleItems.findIndex((item) => getDetailKey(item) === detailItemKey);
     const detailItem = detailIndex >= 0 ? visibleItems[detailIndex] : null;
+    const detailItemId = detailItem?.id || null;
     const canShowPaymentUi = Boolean(paymentsEnabled && isLocalPaymentsEnabled);
     const detailSubtotalCents = detailItem ? Math.round(Number(detailItem.price || 0) * 100) : 0;
     const detailFeeCents = detailSubtotalCents > 0 ? Math.round(detailSubtotalCents * 0.035) : 0;
     const detailTotalCents = detailSubtotalCents + detailFeeCents;
-    const squareMountId = detailItem ? `square-card-${detailItem.id.replace(/[^a-zA-Z0-9_-]/g, "-")}` : "";
+    const squareMountId = detailItemId ? `square-card-${detailItemId.replace(/[^a-zA-Z0-9_-]/g, "-")}` : "";
     const missingSquareConfig = canShowPaymentUi && (!squareApplicationId || !squareLocationId);
     const checkoutReady = checkoutCardState === "ready";
 
@@ -235,7 +236,7 @@ export default function ShopInventoryClient({
     };
 
     useEffect(() => {
-        if (!detailItem || !canShowPaymentUi) {
+        if (!detailItemId || !canShowPaymentUi) {
             if (cardRef.current && typeof cardRef.current.destroy === "function") {
                 cardRef.current.destroy().catch(() => undefined);
             }
@@ -246,6 +247,10 @@ export default function ShopInventoryClient({
         }
 
         if (missingSquareConfig) {
+            return undefined;
+        }
+
+        if (mountedCardItemIdRef.current === detailItemId && cardRef.current) {
             return undefined;
         }
 
@@ -266,7 +271,7 @@ export default function ShopInventoryClient({
                     throw new Error("Square Web Payments SDK did not load correctly.");
                 }
 
-                if (mountedCardItemIdRef.current !== detailItem.id && cardRef.current?.destroy) {
+                if (mountedCardItemIdRef.current !== detailItemId && cardRef.current?.destroy) {
                     await cardRef.current.destroy().catch(() => undefined);
                     cardRef.current = null;
                 }
@@ -282,7 +287,7 @@ export default function ShopInventoryClient({
                 }
 
                 cardRef.current = card;
-                mountedCardItemIdRef.current = detailItem.id;
+                mountedCardItemIdRef.current = detailItemId;
                 setCheckoutCardState("ready");
             } catch (error) {
                 if (disposed) {
@@ -299,7 +304,7 @@ export default function ShopInventoryClient({
         return () => {
             disposed = true;
         };
-    }, [canShowPaymentUi, detailItem, missingSquareConfig, squareApplicationId, squareLocationId, squareMountId]);
+    }, [canShowPaymentUi, detailItemId, missingSquareConfig, squareApplicationId, squareLocationId, squareMountId]);
 
     const handleCheckout = async () => {
         if (!detailItem || !cardRef.current || !checkoutReady || checkoutBusy) {
