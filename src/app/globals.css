@@ -344,6 +344,28 @@ a:visited {
     border: 1px solid rgba(212, 175, 55, 0.28);
 }
 
+.nav-cart-count-loading,
+.shop-cart-badge-loading,
+.shop-inline-cart-badge-loading {
+    color: rgba(255, 247, 227, 0.92);
+    position: relative;
+}
+
+.nav-cart-count-loading::after,
+.shop-cart-badge-loading::after,
+.shop-inline-cart-badge-loading::after {
+    content: "";
+    width: 0.58rem;
+    height: 0.58rem;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.72;
+    animation: cart-badge-pulse 820ms ease-in-out infinite;
+    position: absolute;
+    inset: 0;
+    margin: auto;
+}
+
 .nav-discord:visited {
     color: #ffffff;
 }
@@ -828,6 +850,22 @@ textarea {
     font-weight: 900;
     line-height: 1;
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.34);
+}
+
+.shop-inline-cart-badge {
+    min-width: 1.32rem;
+    height: 1.32rem;
+    padding: 0 0.32rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--ink);
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1;
 }
 
 .shop-mobile-cart-fab {
@@ -1603,6 +1641,7 @@ textarea {
 }
 
 .shop-payment-submit {
+    gap: 0.45rem;
     width: 100%;
 }
 
@@ -1627,6 +1666,19 @@ textarea {
 
     to {
         background-position: -200% 0;
+    }
+}
+
+@keyframes cart-badge-pulse {
+    0%,
+    100% {
+        transform: scale(0.86);
+        opacity: 0.55;
+    }
+
+    50% {
+        transform: scale(1);
+        opacity: 0.95;
     }
 }
 

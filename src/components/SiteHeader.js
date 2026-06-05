@@ -23,7 +23,8 @@ const navItems = [
 export default function SiteHeader() {
     const [open, setOpen] = useState(false);
     const [tvMode, setTvMode] = useTvMode();
-    const [cartCount, setCartCount] = useState(0);
+    const [cartCount, setCartCount] = useState(null);
+    const [cartLoading, setCartLoading] = useState(false);
     const [cartEnabled, setCartEnabled] = useState(false);
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
@@ -34,6 +35,7 @@ export default function SiteHeader() {
         }
 
         const syncCartState = async () => {
+            setCartLoading(true);
             let localToggleEnabled = false;
 
             try {
@@ -46,17 +48,23 @@ export default function SiteHeader() {
 
             if (!localToggleEnabled) {
                 setCartCount(0);
+                setCartLoading(false);
                 return;
             }
 
-            const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
-            const payload = response ? await response.json().catch(() => null) : null;
+            try {
+                const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
+                const payload = response ? await response.json().catch(() => null) : null;
 
-            if (!response?.ok || !payload) {
-                return;
+                if (!response?.ok || !payload) {
+                    setCartCount(0);
+                    return;
+                }
+
+                setCartCount(Number(payload.itemCount || 0));
+            } finally {
+                setCartLoading(false);
             }
-
-            setCartCount(Number(payload.itemCount || 0));
         };
 
         syncCartState();
@@ -105,7 +113,9 @@ export default function SiteHeader() {
                 {paymentsEnabled && cartEnabled && (
                     <Link href="/cart" className="pill nav-cart" onClick={() => setOpen(false)}>
                         Cart
-                        <span className="nav-cart-count">{cartCount}</span>
+                        <span className={cartLoading ? "nav-cart-count nav-cart-count-loading" : "nav-cart-count"} aria-live="polite">
+                            {cartLoading ? "" : Number(cartCount || 0)}
+                        </span>
                     </Link>
                 )}
                 <a className="pill nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">

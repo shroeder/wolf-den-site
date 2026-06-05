@@ -129,7 +129,7 @@ export default function ShopInventoryClient({
             return false;
         }
     });
-    const [cartCount, setCartCount] = useState(0);
+    const [cartCount, setCartCount] = useState(null);
     const [cartItemQuantities, setCartItemQuantities] = useState({});
     const [cartMutatingItemId, setCartMutatingItemId] = useState("");
     const [cartSyncing, setCartSyncing] = useState(false);
@@ -137,6 +137,8 @@ export default function ShopInventoryClient({
     const swipeStartRef = useRef(null);
     const panelRef = useRef(null);
     const [tvMode] = useTvMode();
+    const resolvedCartCount = Number(cartCount || 0);
+    const cartCountLoading = cartCount === null || cartSyncing;
 
     const selectedCategoryId = orderedCategories.some((category) => category.id === activeId)
         ? activeId
@@ -541,7 +543,10 @@ export default function ShopInventoryClient({
                                 {cartMutatingItemId === detailItem.id ? "Adding to cart..." : "Add to cart"}
                             </button>
                             <Link href="/cart" className="button shop-payment-submit">
-                                View cart ({cartCount}){cartSyncing ? " • Syncing" : ""}
+                                View cart
+                                <span className={cartCountLoading ? "shop-inline-cart-badge shop-inline-cart-badge-loading" : "shop-inline-cart-badge"} aria-live="polite">
+                                    {cartCountLoading ? "" : resolvedCartCount}
+                                </span>
                             </Link>
                         </div>
                     )}
@@ -572,9 +577,11 @@ export default function ShopInventoryClient({
                     )}
 
                     {canShowPaymentUi && (
-                        <Link href="/cart" className="shop-cart-launch" aria-label={`Open cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}>
+                        <Link href="/cart" className="shop-cart-launch" aria-label={`Open cart with ${resolvedCartCount} item${resolvedCartCount === 1 ? "" : "s"}`}>
                             <CartGlyph />
-                            <span className="shop-cart-badge" aria-hidden="true">{cartCount}</span>
+                            <span className={cartCountLoading ? "shop-cart-badge shop-cart-badge-loading" : "shop-cart-badge"} aria-live="polite">
+                                {cartCountLoading ? "" : resolvedCartCount}
+                            </span>
                             <span className="sr-only">Open cart</span>
                         </Link>
                     )}
@@ -679,10 +686,12 @@ export default function ShopInventoryClient({
                     </div>
                 )}
 
-                {canShowPaymentUi && cartCount > 0 && (
-                    <Link href="/cart" className="shop-mobile-cart-fab" aria-label={`Go to cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}>
+                {canShowPaymentUi && (cartCountLoading || resolvedCartCount > 0) && (
+                    <Link href="/cart" className="shop-mobile-cart-fab" aria-label={`Go to cart with ${resolvedCartCount} item${resolvedCartCount === 1 ? "" : "s"}`}>
                         <CartGlyph />
-                        <span className="shop-cart-badge" aria-hidden="true">{cartCount}</span>
+                        <span className={cartCountLoading ? "shop-cart-badge shop-cart-badge-loading" : "shop-cart-badge"} aria-live="polite">
+                            {cartCountLoading ? "" : resolvedCartCount}
+                        </span>
                         <span className="sr-only">Go to cart</span>
                     </Link>
                 )}
