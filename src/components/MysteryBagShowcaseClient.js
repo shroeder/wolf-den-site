@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -43,11 +44,14 @@ export default function MysteryBagShowcaseClient({ cards, bagPrice }) {
     }, [bagPrice, sortedCards]);
 
     const spotlightCards = useMemo(() => featuredCards.slice(0, 3), [featuredCards]);
+    const tickerCards = useMemo(() => featuredCards.slice(0, 8), [featuredCards]);
     const totalRareValue = useMemo(
         () => featuredCards.reduce((sum, card) => sum + toNumber(card.marketValue), 0),
         [featuredCards]
     );
     const activeFeatured = spotlightCards.length ? spotlightCards[featuredIndex % spotlightCards.length] : null;
+    const topHitValue = toNumber(featuredCards[0]?.marketValue || 0);
+    const topHitMultiplier = bagPrice > 0 ? topHitValue / bagPrice : null;
 
     useEffect(() => {
         if (spotlightCards.length <= 1) {
@@ -76,14 +80,32 @@ export default function MysteryBagShowcaseClient({ cards, bagPrice }) {
     return (
         <div className="mb2-board">
             <header className="mb2-head">
-                <div>
+                <div className="mb2-head-copy">
                     <p className="mb2-kicker">Mystery Bags</p>
-                    <h1>Rare Cards Left</h1>
+                    <h1>Live Chase Board</h1>
+                    <p className="mb2-subhead">
+                        Chase cards shown here are currently still in circulation. Pull one and it is gone from the board.
+                    </p>
                 </div>
                 <div className="mb2-count" aria-live="polite">
                     {featuredCards.length} live rare cards
                 </div>
             </header>
+
+            <section className="mb2-stats" aria-label="Mystery bag value highlights">
+                <article className="mb2-stat-card">
+                    <span>Bag price</span>
+                    <strong>{formatMoney(bagPrice)}</strong>
+                </article>
+                <article className="mb2-stat-card">
+                    <span>Current top hit</span>
+                    <strong>{formatMoney(topHitValue)}</strong>
+                </article>
+                <article className="mb2-stat-card">
+                    <span>Best possible pull</span>
+                    <strong>{topHitMultiplier ? `${topHitMultiplier.toFixed(1)}x` : "-"}</strong>
+                </article>
+            </section>
 
             <section className="mb2-spotlight" aria-live="polite" aria-label="Featured rare card">
                 {activeFeatured ? (
@@ -96,12 +118,33 @@ export default function MysteryBagShowcaseClient({ cards, bagPrice }) {
                             </div>
                         )}
                         <div className="mb2-spotlight-meta">
+                            <p className="mb2-spotlight-label">Now spotlighting</p>
                             <h2>{formatDisplayName(activeFeatured.name)}</h2>
                             <p>{formatMoney(activeFeatured.marketValue)}</p>
                         </div>
                     </article>
                 ) : null}
+                <div className="mb2-spotlight-dots" aria-hidden="true">
+                    {spotlightCards.map((card, index) => (
+                        <span
+                            key={card.id}
+                            className={index === featuredIndex % spotlightCards.length ? "mb2-dot mb2-dot-active" : "mb2-dot"}
+                        />
+                    ))}
+                </div>
             </section>
+
+            {tickerCards.length ? (
+                <section className="mb2-ticker-wrap" aria-label="Top chase cards">
+                    <div className="mb2-ticker-track">
+                        {[...tickerCards, ...tickerCards].map((card, index) => (
+                            <span className="mb2-ticker-item" key={`${card.id}-${index}`}>
+                                {formatDisplayName(card.name)} <strong>{formatMoney(card.marketValue)}</strong>
+                            </span>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
 
             <section className="mb2-grid" aria-label="All rare cards left">
                 {featuredCards.map((card) => {
@@ -130,8 +173,18 @@ export default function MysteryBagShowcaseClient({ cards, bagPrice }) {
             </section>
 
             <footer className="mb2-footer" aria-live="polite">
-                <span>Total rare value left</span>
-                <strong>{formatMoney(totalRareValue)}</strong>
+                <div className="mb2-footer-value">
+                    <span>Total rare value left</span>
+                    <strong>{formatMoney(totalRareValue)}</strong>
+                </div>
+                <div className="mb2-footer-actions">
+                    <Link href="/shop" className="mb2-cta-primary">
+                        Grab a Mystery Bag
+                    </Link>
+                    <Link href="/events" className="mb2-cta-secondary">
+                        Watch Live Pulls
+                    </Link>
+                </div>
             </footer>
         </div>
     );
