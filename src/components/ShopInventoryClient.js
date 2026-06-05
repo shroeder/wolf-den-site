@@ -286,7 +286,7 @@ export default function ShopInventoryClient({ categories }) {
             <div className="shop-detail-shell">
                 <div className="shop-detail-head">
                     <button type="button" className="shop-detail-back" onClick={closeDetail} aria-label="Back to shop items">
-                        < Back to items
+                        &lt; Back to items
                     </button>
                     <p className="shop-detail-counter">{detailIndex + 1} / {visibleItems.length}</p>
                 </div>

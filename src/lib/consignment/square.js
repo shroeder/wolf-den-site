@@ -5,6 +5,7 @@ import { createServerLogger } from "@/lib/server-logger";
 const SQUARE_API_BASE = "https://connect.squareup.com";
 const DEFAULT_SALES_LOOKBACK_DAYS = 90;
 const DEFAULT_MYSTERY_PACK_ITEM_ID = "XGXASEUSGRYBX2XQDIKVU4FA";
+const SHOP_NEW_ITEMS_LOOKBACK_DAYS = 4;
 const squareLogger = createServerLogger({ source: "api", subsystem: "square" });
 
 const normalizeLookbackDays = (value) => {
@@ -522,6 +523,7 @@ export async function listShopInventory() {
                             name: toDisplayName(item.item_data?.name || "Unnamed Item", variation.item_variation_data?.name),
                             price: normalizeMoney(variation.item_variation_data?.price_money?.amount),
                             imageId,
+                            createdAt: variation.created_at || item.created_at || null,
                         });
                     }
                 }
@@ -537,6 +539,9 @@ export async function listShopInventory() {
 
     // 4. Build result — only categories/items that have in-stock quantity
     const result = [];
+    const nowMs = Date.now();
+    const newItemCutoffMs = nowMs - SHOP_NEW_ITEMS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    const newItemsById = new Map();
 
     for (const [categoryId, categoryName] of categories) {
         const variations = itemsByCategory.get(categoryId) || [];
@@ -549,9 +554,31 @@ export async function listShopInventory() {
             .filter((v) => v.quantity > 0)
             .sort((a, b) => a.name.localeCompare(b.name));
 
+        for (const item of inStock) {
+            const createdTime = Date.parse(item.createdAt || "");
+
+            if (Number.isNaN(createdTime) || createdTime < newItemCutoffMs) {
+                continue;
+            }
+
+            if (!newItemsById.has(item.id)) {
+                newItemsById.set(item.id, item);
+            }
+        }
+
         if (inStock.length > 0) {
             result.push({ id: categoryId, name: categoryName, items: inStock });
         }
+    }
+
+    const newItems = Array.from(newItemsById.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    if (newItems.length > 0) {
+        result.push({
+            id: "new-last-4-days",
+            name: "New (Last 4 Days)",
+            items: newItems,
+        });
     }
 
     result.sort((a, b) => a.name.localeCompare(b.name));
