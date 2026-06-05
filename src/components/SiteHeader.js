@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -23,6 +23,60 @@ const navItems = [
 export default function SiteHeader() {
     const [open, setOpen] = useState(false);
     const [tvMode, setTvMode] = useTvMode();
+    const [cartCount, setCartCount] = useState(0);
+    const [cartEnabled, setCartEnabled] = useState(false);
+
+    const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
+
+    useEffect(() => {
+        if (!paymentsEnabled) {
+            return;
+        }
+
+        const syncCartState = async () => {
+            let localToggleEnabled = false;
+
+            try {
+                localToggleEnabled = window.localStorage.getItem("wolfden-payments-test-enabled") === "1";
+            } catch {
+                localToggleEnabled = false;
+            }
+
+            setCartEnabled(localToggleEnabled);
+
+            if (!localToggleEnabled) {
+                setCartCount(0);
+                return;
+            }
+
+            const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
+            const payload = response ? await response.json().catch(() => null) : null;
+
+            if (!response?.ok || !payload) {
+                return;
+            }
+
+            setCartCount(Number(payload.itemCount || 0));
+        };
+
+        syncCartState();
+
+        const onStorage = () => {
+            syncCartState();
+        };
+
+        const onCartUpdated = () => {
+            syncCartState();
+        };
+
+        window.addEventListener("storage", onStorage);
+        window.addEventListener("wolfden-shop-cart-updated", onCartUpdated);
+
+        return () => {
+            window.removeEventListener("storage", onStorage);
+            window.removeEventListener("wolfden-shop-cart-updated", onCartUpdated);
+        };
+    }, [paymentsEnabled]);
 
     const toggleTvMode = () => {
         const nextValue = !tvMode;
@@ -48,6 +102,12 @@ export default function SiteHeader() {
                     />
                     <span>The Wolf Den</span>
                 </Link>
+                {paymentsEnabled && cartEnabled && (
+                    <Link href="/cart" className="pill nav-cart" onClick={() => setOpen(false)}>
+                        Cart
+                        <span className="nav-cart-count">{cartCount}</span>
+                    </Link>
+                )}
                 <a className="pill nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
                     Join Discord
                 </a>

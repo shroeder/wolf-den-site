@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -12,92 +13,6 @@ const formatPrice = (price) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
 };
 
-const formatCents = (cents) => formatPrice((Number(cents || 0) / 100));
-
-function loadSquarePaymentsScript() {
-    if (typeof window === "undefined") {
-        return Promise.resolve(null);
-    }
-
-    if (window.Square) {
-        return Promise.resolve(window.Square);
-    }
-
-    const existing = document.querySelector('script[data-square-payments="1"]');
-
-    if (existing) {
-        if (window.Square) {
-            return Promise.resolve(window.Square);
-        }
-
-        if (existing.dataset.squarePaymentsState === "error") {
-            return Promise.reject(new Error("Failed to load Square Web Payments SDK."));
-        }
-
-        return new Promise((resolve, reject) => {
-            const timeoutId = window.setTimeout(() => {
-                cleanup();
-                reject(new Error("Timed out loading Square Web Payments SDK."));
-            }, 12000);
-
-            const onLoad = () => {
-                cleanup();
-
-                if (window.Square) {
-                    resolve(window.Square);
-                    return;
-                }
-
-                reject(new Error("Square Web Payments SDK loaded without exposing window.Square."));
-            };
-
-            const onError = () => {
-                cleanup();
-                reject(new Error("Failed to load Square Web Payments SDK."));
-            };
-
-            const cleanup = () => {
-                window.clearTimeout(timeoutId);
-                existing.removeEventListener("load", onLoad);
-                existing.removeEventListener("error", onError);
-            };
-
-            existing.addEventListener("load", onLoad, { once: true });
-            existing.addEventListener("error", onError, { once: true });
-        });
-    }
-
-    return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        const timeoutId = window.setTimeout(() => {
-            script.dataset.squarePaymentsState = "error";
-            reject(new Error("Timed out loading Square Web Payments SDK."));
-        }, 12000);
-
-        script.src = "https://web.squarecdn.com/v1/square.js";
-        script.async = true;
-        script.dataset.squarePayments = "1";
-        script.dataset.squarePaymentsState = "loading";
-        script.onload = () => {
-            window.clearTimeout(timeoutId);
-            script.dataset.squarePaymentsState = "loaded";
-
-            if (window.Square) {
-                resolve(window.Square);
-                return;
-            }
-
-            reject(new Error("Square Web Payments SDK loaded without exposing window.Square."));
-        };
-        script.onerror = () => {
-            window.clearTimeout(timeoutId);
-            script.dataset.squarePaymentsState = "error";
-            reject(new Error("Failed to load Square Web Payments SDK."));
-        };
-
-        document.head.appendChild(script);
-    });
-}
 
 const normalizeCategoryName = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
@@ -181,8 +96,6 @@ function dedupeSearchItems(items) {
 export default function ShopInventoryClient({
     categories,
     paymentsEnabled,
-    squareApplicationId,
-    squareLocationId,
 }) {
     const orderedCategories = useMemo(() => sortShopCategories(categories), [categories]);
     const [activeId, setActiveId] = useState(orderedCategories[0]?.id ?? null);
@@ -199,25 +112,11 @@ export default function ShopInventoryClient({
             return false;
         }
     });
-    const [checkoutCardState, setCheckoutCardState] = useState("idle");
-    const [checkoutError, setCheckoutError] = useState("");
-    const [checkoutMessage, setCheckoutMessage] = useState("");
-    const [checkoutBusy, setCheckoutBusy] = useState(false);
-    const [cartOpen, setCartOpen] = useState(false);
-    const [cartLoading, setCartLoading] = useState(false);
+    const [cartCount, setCartCount] = useState(0);
     const [cartMutating, setCartMutating] = useState(false);
-    const [cartData, setCartData] = useState({
-        items: [],
-        itemCount: 0,
-        subtotalCents: 0,
-        onlineFeeCents: 0,
-        totalCents: 0,
-        hasUnavailableItems: false,
-    });
+    const [cartError, setCartError] = useState("");
     const swipeStartRef = useRef(null);
     const panelRef = useRef(null);
-    const cardRef = useRef(null);
-    const cartCardMountedRef = useRef(false);
     const [tvMode] = useTvMode();
 
     const selectedCategoryId = orderedCategories.some((category) => category.id === activeId)
@@ -242,47 +141,30 @@ export default function ShopInventoryClient({
         ? -1
         : visibleItems.findIndex((item) => getDetailKey(item) === detailItemKey);
     const detailItem = detailIndex >= 0 ? visibleItems[detailIndex] : null;
-    const detailItemId = detailItem?.id || null;
     const canShowPaymentUi = Boolean(paymentsEnabled && isLocalPaymentsEnabled);
-    const squareMountId = "square-cart-card";
-    const missingSquareConfig = canShowPaymentUi && (!squareApplicationId || !squareLocationId);
-    const checkoutReady = checkoutCardState === "ready";
 
-    const resetCheckoutFeedback = () => {
-        setCheckoutError("");
-        setCheckoutMessage("");
-    };
-
-    const refreshCart = useCallback(async () => {
+    const refreshCartCount = useCallback(async () => {
         if (!canShowPaymentUi) {
             return;
         }
 
-        setCartLoading(true);
+        const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
+        const payload = response ? await response.json().catch(() => null) : null;
 
-        try {
-            const response = await fetch("/api/shop/cart", { cache: "no-store" });
-            const payload = await response.json().catch(() => null);
-
-            if (!response.ok || !payload) {
-                throw new Error(payload?.error || "Could not load cart.");
-            }
-
-            setCartData(payload);
-        } catch (error) {
-            setCheckoutError(error instanceof Error ? error.message : "Could not load cart.");
-        } finally {
-            setCartLoading(false);
+        if (!response?.ok || !payload) {
+            return;
         }
+
+        setCartCount(Number(payload.itemCount || 0));
     }, [canShowPaymentUi]);
 
-    const mutateCart = useCallback(async (requestBody) => {
+    const addToCart = useCallback(async (item) => {
         if (!canShowPaymentUi) {
             return;
         }
 
         setCartMutating(true);
-        resetCheckoutFeedback();
+        setCartError("");
 
         try {
             const response = await fetch("/api/shop/cart", {
@@ -290,7 +172,11 @@ export default function ShopInventoryClient({
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(requestBody),
+                body: JSON.stringify({
+                    action: "add",
+                    catalogObjectId: item.id,
+                    quantity: 1,
+                }),
             });
             const payload = await response.json().catch(() => null);
 
@@ -298,59 +184,41 @@ export default function ShopInventoryClient({
                 throw new Error(payload?.error || "Could not update cart.");
             }
 
-            setCartData(payload);
+            setCartCount(Number(payload.itemCount || 0));
+            window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
         } catch (error) {
-            setCheckoutError(error instanceof Error ? error.message : "Could not update cart.");
+            setCartError(error instanceof Error ? error.message : "Could not update cart.");
         } finally {
             setCartMutating(false);
         }
     }, [canShowPaymentUi]);
 
-    const addToCart = async (item) => {
-        await mutateCart({
-            action: "add",
-            catalogObjectId: item.id,
-            quantity: 1,
-        });
-
-        setCartOpen(true);
-    };
-
-    const updateCartItemQuantity = async (catalogObjectId, quantity) => {
-        await mutateCart({
-            action: "update",
-            catalogObjectId,
-            quantity,
-        });
-    };
-
-    const removeCartItem = async (catalogObjectId) => {
-        await mutateCart({
-            action: "remove",
-            catalogObjectId,
-        });
-    };
-
-    const clearCart = async () => {
-        await mutateCart({ action: "clear" });
-    };
-
-    const toggleCart = async () => {
-        const nextOpen = !cartOpen;
-        setCartOpen(nextOpen);
-
-        if (nextOpen) {
-            await refreshCart();
+    useEffect(() => {
+        if (!canShowPaymentUi) {
+            return;
         }
-    };
+
+        const timeoutId = window.setTimeout(() => {
+            refreshCartCount();
+        }, 0);
+
+        const onCartUpdated = () => {
+            refreshCartCount();
+        };
+
+        window.addEventListener("wolfden-shop-cart-updated", onCartUpdated);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+            window.removeEventListener("wolfden-shop-cart-updated", onCartUpdated);
+        };
+    }, [canShowPaymentUi, refreshCartCount]);
 
     const closeDetail = () => {
-        resetCheckoutFeedback();
         setDetailItemKey(null);
     };
 
     const openDetailForItem = (item) => {
-        resetCheckoutFeedback();
         setDetailItemKey(getDetailKey(item));
     };
 
@@ -360,7 +228,6 @@ export default function ShopInventoryClient({
         }
 
         const nextIndex = (detailIndex - 1 + visibleItems.length) % visibleItems.length;
-        resetCheckoutFeedback();
         setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
     };
 
@@ -370,7 +237,6 @@ export default function ShopInventoryClient({
         }
 
         const nextIndex = (detailIndex + 1) % visibleItems.length;
-        resetCheckoutFeedback();
         setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
     };
 
@@ -400,118 +266,6 @@ export default function ShopInventoryClient({
         }
 
         goToNextDetailItem();
-    };
-
-    useEffect(() => {
-        if (!canShowPaymentUi || !cartOpen || !cartData.items?.length) {
-            if (cardRef.current && typeof cardRef.current.destroy === "function") {
-                cardRef.current.destroy().catch(() => undefined);
-            }
-
-            cardRef.current = null;
-            cartCardMountedRef.current = false;
-            return undefined;
-        }
-
-        if (missingSquareConfig) {
-            return undefined;
-        }
-
-        if (cartCardMountedRef.current && cardRef.current) {
-            return undefined;
-        }
-
-        let disposed = false;
-
-        const mountCard = async () => {
-            try {
-                setCheckoutCardState("loading");
-                setCheckoutError("");
-
-                const Square = await loadSquarePaymentsScript();
-
-                if (disposed) {
-                    return;
-                }
-
-                if (!Square?.payments) {
-                    throw new Error("Square Web Payments SDK did not load correctly.");
-                }
-
-                const payments = Square.payments(squareApplicationId, squareLocationId);
-                const card = await payments.card();
-
-                await card.attach(`#${squareMountId}`);
-
-                if (disposed) {
-                    await card.destroy().catch(() => undefined);
-                    return;
-                }
-
-                cardRef.current = card;
-                cartCardMountedRef.current = true;
-                setCheckoutCardState("ready");
-            } catch (error) {
-                if (disposed) {
-                    return;
-                }
-
-                setCheckoutCardState("error");
-                setCheckoutError(error instanceof Error ? error.message : "Could not initialize card checkout.");
-            }
-        };
-
-        mountCard();
-
-        return () => {
-            disposed = true;
-        };
-    }, [canShowPaymentUi, cartData.items, cartOpen, missingSquareConfig, squareApplicationId, squareLocationId, squareMountId]);
-
-    const handleCheckout = async () => {
-        if (!cardRef.current || !checkoutReady || checkoutBusy || !cartData.items?.length) {
-            return;
-        }
-
-        setCheckoutBusy(true);
-        setCheckoutError("");
-        setCheckoutMessage("");
-
-        try {
-            const tokenized = await cardRef.current.tokenize();
-
-            if (tokenized?.status !== "OK" || !tokenized.token) {
-                throw new Error("Card details were not accepted. Please review and try again.");
-            }
-
-            const response = await fetch("/api/shop/checkout", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    sourceId: tokenized.token,
-                }),
-            });
-
-            const payload = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                throw new Error(payload?.error || "Checkout failed. Please try again.");
-            }
-
-            if (payload?.order?.status === "completed") {
-                setCheckoutMessage("Payment complete. Your card was charged successfully.");
-                await refreshCart();
-                return;
-            }
-
-            setCheckoutMessage("Payment submitted and is pending confirmation.");
-        } catch (error) {
-            setCheckoutError(error instanceof Error ? error.message : "Checkout failed.");
-        } finally {
-            setCheckoutBusy(false);
-        }
     };
 
     useEffect(() => {
@@ -704,6 +458,8 @@ export default function ShopInventoryClient({
                         </p>
                     )}
 
+                    {cartError && <p className="shop-payment-error">{cartError}</p>}
+
                     {canShowPaymentUi && detailItem.quantity > 0 && (
                         <div className="shop-payment-panel">
                             <button
@@ -714,13 +470,9 @@ export default function ShopInventoryClient({
                             >
                                 {cartMutating ? "Updating cart..." : "Add to cart"}
                             </button>
-                            <button
-                                type="button"
-                                className="button shop-payment-submit"
-                                onClick={() => setCartOpen(true)}
-                            >
-                                View cart ({cartData.itemCount})
-                            </button>
+                            <Link href="/cart" className="button shop-payment-submit">
+                                View cart ({cartCount})
+                            </Link>
                         </div>
                     )}
                 </div>
@@ -749,106 +501,8 @@ export default function ShopInventoryClient({
                         </p>
                     )}
 
-                    {canShowPaymentUi && (
-                        <button
-                            type="button"
-                            className="shop-cart-launch"
-                            onClick={toggleCart}
-                        >
-                            {cartOpen ? "Hide cart" : `Cart (${cartData.itemCount})`}
-                        </button>
-                    )}
+                    {canShowPaymentUi && <Link href="/cart" className="shop-cart-launch">Cart ({cartCount})</Link>}
                 </div>
-
-                {canShowPaymentUi && cartOpen && (
-                    <section className="shop-cart-panel" aria-live="polite">
-                        <div className="shop-cart-head">
-                            <h3>Your cart</h3>
-                            <button type="button" className="button" onClick={clearCart} disabled={cartMutating || !cartData.items.length}>
-                                Clear cart
-                            </button>
-                        </div>
-
-                        {cartLoading && <p className="secondary">Loading cart...</p>}
-
-                        {!cartLoading && cartData.items.length === 0 && (
-                            <p className="secondary">Your cart is empty.</p>
-                        )}
-
-                        {cartData.items.map((item) => (
-                            <article key={item.catalogObjectId} className="shop-cart-item">
-                                <div>
-                                    <h4>{item.name}</h4>
-                                    <p className="secondary">
-                                        {formatCents(item.priceCents)} each | {item.maxQuantity} in stock
-                                    </p>
-                                    {item.unavailable && (
-                                        <p className="shop-payment-error">Item availability changed. Update quantity to continue.</p>
-                                    )}
-                                </div>
-                                <div className="shop-cart-item-controls">
-                                    <button
-                                        type="button"
-                                        className="button"
-                                        onClick={() => updateCartItemQuantity(item.catalogObjectId, Math.max(0, item.quantity - 1))}
-                                        disabled={cartMutating}
-                                    >
-                                        -
-                                    </button>
-                                    <span>{item.quantity}</span>
-                                    <button
-                                        type="button"
-                                        className="button"
-                                        onClick={() => updateCartItemQuantity(item.catalogObjectId, item.quantity + 1)}
-                                        disabled={cartMutating}
-                                    >
-                                        +
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="button"
-                                        onClick={() => removeCartItem(item.catalogObjectId)}
-                                        disabled={cartMutating}
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </article>
-                        ))}
-
-                        {cartData.items.length > 0 && (
-                            <div className="shop-payment-panel">
-                                <div className="shop-payment-breakdown">
-                                    <p><span>Subtotal</span><strong>{formatCents(cartData.subtotalCents)}</strong></p>
-                                    <p><span>Online fee (3.5%)</span><strong>{formatCents(cartData.onlineFeeCents)}</strong></p>
-                                    <p className="shop-payment-total"><span>Total</span><strong>{formatCents(cartData.totalCents)}</strong></p>
-                                </div>
-
-                                {!missingSquareConfig && <div id={squareMountId} className="shop-payment-card" aria-live="polite" />}
-
-                                {missingSquareConfig && (
-                                    <p className="shop-payment-error">Square configuration is missing. Add public app and location IDs.</p>
-                                )}
-
-                                {!missingSquareConfig && checkoutCardState === "loading" && (
-                                    <p className="shop-payment-note secondary">Loading secure card form...</p>
-                                )}
-
-                                {checkoutError && <p className="shop-payment-error">{checkoutError}</p>}
-                                {checkoutMessage && <p className="shop-payment-success">{checkoutMessage}</p>}
-
-                                <button
-                                    type="button"
-                                    className="button primary shop-payment-submit"
-                                    onClick={handleCheckout}
-                                    disabled={!checkoutReady || checkoutBusy || cartData.hasUnavailableItems}
-                                >
-                                    {checkoutBusy ? "Processing..." : `Pay ${formatCents(cartData.totalCents)}`}
-                                </button>
-                            </div>
-                        )}
-                    </section>
-                )}
 
                 {tvMode && active && !isSearching && (
                     <p className="shop-tv-now secondary" aria-live="polite">
