@@ -781,16 +781,53 @@ textarea {
 }
 
 .shop-cart-launch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     justify-self: start;
-    border: 1px solid rgba(212, 175, 55, 0.35);
+    width: 2.55rem;
+    height: 2.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(244, 241, 234, 0.94);
+    text-decoration: none;
+    transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.shop-cart-launch:hover,
+.shop-cart-launch:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(212, 175, 55, 0.52);
+    background: rgba(212, 175, 55, 0.11);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
+.shop-cart-icon-svg {
+    width: 1.22rem;
+    height: 1.22rem;
+    display: block;
+}
+
+.shop-cart-badge {
+    position: absolute;
+    top: -0.36rem;
+    right: -0.36rem;
+    min-width: 1.24rem;
+    height: 1.24rem;
+    padding: 0 0.26rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 999px;
-    padding: 0.4rem 0.75rem;
-    background: rgba(212, 175, 55, 0.12);
-    color: var(--ink);
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    background: linear-gradient(145deg, #ffc86f, #ff9f42);
+    color: #2d1700;
+    font-size: 0.68rem;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.34);
 }
 
 .shop-mobile-cart-fab {
@@ -1311,15 +1348,24 @@ textarea {
         z-index: 1400;
         align-items: center;
         justify-content: center;
-        border-radius: 999px;
-        border: 1px solid rgba(212, 175, 55, 0.45);
-        background: linear-gradient(135deg, #1f2d20, #2a4730);
-        color: #e6f9ec;
-        font-weight: 700;
-        font-size: 0.82rem;
-        letter-spacing: 0.01em;
-        padding: 0.58rem 0.88rem;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(21, 21, 21, 0.92);
+        color: rgba(255, 247, 227, 0.95);
+        padding: 0;
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32);
+    }
+
+    .shop-mobile-cart-fab .shop-cart-icon-svg {
+        width: 1.34rem;
+        height: 1.34rem;
+    }
+
+    .shop-mobile-cart-fab .shop-cart-badge {
+        top: -0.34rem;
+        right: -0.34rem;
     }
 }
 

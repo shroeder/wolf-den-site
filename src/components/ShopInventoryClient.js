@@ -75,6 +75,23 @@ const sortShopCategories = (categories) =>
 
 const getDetailKey = (item) => `${item.id}-${item.categoryName}`;
 
+function CartGlyph() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="shop-cart-icon-svg">
+            <path
+                d="M3 4h2.1c.4 0 .8.3.9.7l.4 2.3h12.5c.7 0 1.2.7 1 1.4l-1.3 5.1c-.1.4-.5.8-1 .8H8.2c-.5 0-.9-.3-1-.8L5.6 6.1"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <circle cx="9" cy="18.4" r="1.6" fill="currentColor" />
+            <circle cx="16.8" cy="18.4" r="1.6" fill="currentColor" />
+        </svg>
+    );
+}
+
 function dedupeSearchItems(items) {
     const seen = new Set();
     const deduped = [];
@@ -554,7 +571,13 @@ export default function ShopInventoryClient({
                         </p>
                     )}
 
-                    {canShowPaymentUi && <Link href="/cart" className="shop-cart-launch">Cart ({cartCount})</Link>}
+                    {canShowPaymentUi && (
+                        <Link href="/cart" className="shop-cart-launch" aria-label={`Open cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}>
+                            <CartGlyph />
+                            <span className="shop-cart-badge" aria-hidden="true">{cartCount}</span>
+                            <span className="sr-only">Open cart</span>
+                        </Link>
+                    )}
                 </div>
 
                 {tvMode && active && !isSearching && (
@@ -658,7 +681,9 @@ export default function ShopInventoryClient({
 
                 {canShowPaymentUi && cartCount > 0 && (
                     <Link href="/cart" className="shop-mobile-cart-fab" aria-label={`Go to cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}>
-                        Go to cart ({cartCount})
+                        <CartGlyph />
+                        <span className="shop-cart-badge" aria-hidden="true">{cartCount}</span>
+                        <span className="sr-only">Go to cart</span>
                     </Link>
                 )}
             </div>
