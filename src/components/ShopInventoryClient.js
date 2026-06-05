@@ -113,6 +113,7 @@ export default function ShopInventoryClient({
         }
     });
     const [cartCount, setCartCount] = useState(0);
+    const [cartItemQuantities, setCartItemQuantities] = useState({});
     const [cartMutating, setCartMutating] = useState(false);
     const [cartError, setCartError] = useState("");
     const swipeStartRef = useRef(null);
@@ -143,6 +144,32 @@ export default function ShopInventoryClient({
     const detailItem = detailIndex >= 0 ? visibleItems[detailIndex] : null;
     const canShowPaymentUi = Boolean(paymentsEnabled && isLocalPaymentsEnabled);
 
+    const cartQuantityForItem = useCallback((itemId) => {
+        if (!canShowPaymentUi) {
+            return 0;
+        }
+
+        return Number(cartItemQuantities[itemId] || 0);
+    }, [canShowPaymentUi, cartItemQuantities]);
+
+    const applyCartSnapshot = useCallback((payload) => {
+        const itemCount = Number(payload?.itemCount || 0);
+        const quantities = {};
+
+        for (const cartItem of payload?.items || []) {
+            const key = String(cartItem.catalogObjectId || "").trim();
+
+            if (!key) {
+                continue;
+            }
+
+            quantities[key] = Number(cartItem.quantity || 0);
+        }
+
+        setCartCount(itemCount);
+        setCartItemQuantities(quantities);
+    }, []);
+
     const refreshCartCount = useCallback(async () => {
         if (!canShowPaymentUi) {
             return;
@@ -155,8 +182,8 @@ export default function ShopInventoryClient({
             return;
         }
 
-        setCartCount(Number(payload.itemCount || 0));
-    }, [canShowPaymentUi]);
+        applyCartSnapshot(payload);
+    }, [applyCartSnapshot, canShowPaymentUi]);
 
     const addToCart = useCallback(async (item) => {
         if (!canShowPaymentUi) {
@@ -184,14 +211,30 @@ export default function ShopInventoryClient({
                 throw new Error(payload?.error || "Could not update cart.");
             }
 
-            setCartCount(Number(payload.itemCount || 0));
+            applyCartSnapshot(payload);
             window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
         } catch (error) {
             setCartError(error instanceof Error ? error.message : "Could not update cart.");
         } finally {
             setCartMutating(false);
         }
-    }, [canShowPaymentUi]);
+    }, [applyCartSnapshot, canShowPaymentUi]);
+
+    useEffect(() => {
+        const onStorage = () => {
+            try {
+                setIsLocalPaymentsEnabled(window.localStorage.getItem(PAYMENT_TOGGLE_STORAGE_KEY) === "1");
+            } catch {
+                setIsLocalPaymentsEnabled(false);
+            }
+        };
+
+        window.addEventListener("storage", onStorage);
+
+        return () => {
+            window.removeEventListener("storage", onStorage);
+        };
+    }, []);
 
     useEffect(() => {
         if (!canShowPaymentUi) {
@@ -451,6 +494,9 @@ export default function ShopInventoryClient({
                         {formatPrice(detailItem.price) ?? "Price unavailable"} | {detailItem.quantity} in stock
                     </p>
                     <p className="shop-detail-category secondary">{detailItem.categoryName}</p>
+                    {canShowPaymentUi && cartQuantityForItem(detailItem.id) > 0 && (
+                        <p className="shop-in-cart-note">In your cart: {cartQuantityForItem(detailItem.id)}</p>
+                    )}
 
                     {paymentsEnabled && !isLocalPaymentsEnabled && (
                         <p className="shop-payment-note secondary">
@@ -585,7 +631,12 @@ export default function ShopInventoryClient({
                                         {isSearching && <p className="shop-item-category">{item.categoryName}</p>}
                                         <div className="shop-tile-meta-row">
                                             <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
-                                            <span className="shop-qty-badge">{item.quantity} in stock</span>
+                                            <div className="shop-tile-badges">
+                                                {canShowPaymentUi && cartQuantityForItem(item.id) > 0 && (
+                                                    <span className="shop-in-cart-badge">In cart: {cartQuantityForItem(item.id)}</span>
+                                                )}
+                                                <span className="shop-qty-badge">{item.quantity} in stock</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </article>
