@@ -760,6 +760,24 @@ textarea {
     font-size: 0.88rem;
 }
 
+.shop-payments-toggle {
+    justify-self: start;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 999px;
+    padding: 0.42rem 0.8rem;
+    background: rgba(212, 175, 55, 0.07);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.shop-payments-toggle-active {
+    background: rgba(212, 175, 55, 0.18);
+    border-color: rgba(212, 175, 55, 0.6);
+}
+
 .shop-category-mobile {
     display: none;
     gap: 0.35rem;
@@ -1180,6 +1198,69 @@ textarea {
 .shop-detail-category {
     font-size: 0.74rem;
     line-height: 1.2;
+}
+
+.shop-payment-note {
+    margin-top: 0.22rem;
+    font-size: 0.72rem;
+}
+
+.shop-payment-panel {
+    margin-top: 0.4rem;
+    display: grid;
+    gap: 0.38rem;
+    padding: 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.shop-payment-breakdown {
+    display: grid;
+    gap: 0.22rem;
+}
+
+.shop-payment-breakdown p {
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--ink-secondary);
+}
+
+.shop-payment-breakdown strong {
+    color: var(--ink);
+}
+
+.shop-payment-total {
+    padding-top: 0.15rem;
+    border-top: 1px solid var(--line);
+}
+
+.shop-payment-total strong {
+    color: var(--accent);
+}
+
+.shop-payment-card {
+    min-height: 58px;
+}
+
+.shop-payment-submit {
+    width: 100%;
+}
+
+.shop-payment-error,
+.shop-payment-success {
+    margin: 0;
+    font-size: 0.72rem;
+}
+
+.shop-payment-error {
+    color: #f69393;
+}
+
+.shop-payment-success {
+    color: #9de5a9;
 }
 
 @media (max-width: 760px) {

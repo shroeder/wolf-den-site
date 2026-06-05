@@ -27,6 +27,7 @@ const toDisplayName = (itemName, variationName) => {
 };
 
 const normalizeMoney = (amount) => Number(amount || 0) / 100;
+const toAmountCents = (amountDollars) => Math.round(Number(amountDollars || 0) * 100);
 
 const chunk = (values, size) => {
     const chunks = [];
@@ -166,6 +167,29 @@ async function squareFetch(path, init = {}) {
     }
 }
 
+function getSquareLocationId() {
+    const locationId = process.env.SQUARE_LOCATION_ID;
+
+    squareLogger.info("square.location.env.validation.started", {
+        step: "env_validation_started",
+    });
+
+    if (!locationId) {
+        squareLogger.error("square.location.env.validation.failed", {
+            step: "env_validation_failed",
+            reason: "missing_square_location_id",
+        });
+
+        throw new Error("Missing Square location ID.");
+    }
+
+    squareLogger.info("square.location.env.validation.passed", {
+        step: "env_validation_passed",
+    });
+
+    return locationId;
+}
+
 export async function listConsignorCatalog(categoryId) {
     const variations = [];
     const imageIds = new Set();
@@ -232,24 +256,7 @@ export async function listConsignorCatalog(categoryId) {
 }
 
 export async function getInventoryCounts(variationIds) {
-    const locationId = process.env.SQUARE_LOCATION_ID;
-
-    squareLogger.info("square.location.env.validation.started", {
-        step: "env_validation_started",
-    });
-
-    if (!locationId) {
-        squareLogger.error("square.location.env.validation.failed", {
-            step: "env_validation_failed",
-            reason: "missing_square_location_id",
-        });
-
-        throw new Error("Missing Square location ID.");
-    }
-
-    squareLogger.info("square.location.env.validation.passed", {
-        step: "env_validation_passed",
-    });
+    const locationId = getSquareLocationId();
 
     const totals = new Map();
 
@@ -283,24 +290,7 @@ export async function getInventoryCounts(variationIds) {
 }
 
 export async function searchSalesForVariations(variationLookup, options = {}) {
-    const locationId = process.env.SQUARE_LOCATION_ID;
-
-    squareLogger.info("square.location.env.validation.started", {
-        step: "env_validation_started",
-    });
-
-    if (!locationId) {
-        squareLogger.error("square.location.env.validation.failed", {
-            step: "env_validation_failed",
-            reason: "missing_square_location_id",
-        });
-
-        throw new Error("Missing Square location ID.");
-    }
-
-    squareLogger.info("square.location.env.validation.passed", {
-        step: "env_validation_passed",
-    });
+    const locationId = getSquareLocationId();
 
     const lookbackDays = normalizeLookbackDays(options.lookbackDays);
     const parsedStart = options.startAt ? new Date(options.startAt) : null;
@@ -787,4 +777,95 @@ export async function getMysteryBagPriceInfoFromSquare() {
         price: null,
         source: "square_not_found",
     };
+}
+
+export async function findShopItemByVariationId(variationId) {
+    const normalizedVariationId = String(variationId || "").trim();
+
+    if (!normalizedVariationId) {
+        return null;
+    }
+
+    const categories = await listShopInventory();
+
+    for (const category of categories) {
+        const item = category.items.find((entry) => entry.id === normalizedVariationId);
+
+        if (item) {
+            return {
+                ...item,
+                categoryName: category.name,
+            };
+        }
+    }
+
+    return null;
+}
+
+export async function createSquareCardPayment({
+    sourceId,
+    amountCents,
+    idempotencyKey,
+    note,
+    referenceId,
+}) {
+    const normalizedSourceId = String(sourceId || "").trim();
+    const normalizedAmountCents = Number(amountCents || 0);
+    const normalizedIdempotencyKey = String(idempotencyKey || "").trim();
+
+    if (!normalizedSourceId) {
+        throw new Error("Missing payment source id.");
+    }
+
+    if (!Number.isFinite(normalizedAmountCents) || normalizedAmountCents <= 0) {
+        throw new Error("Invalid payment amount.");
+    }
+
+    if (!normalizedIdempotencyKey) {
+        throw new Error("Missing payment idempotency key.");
+    }
+
+    const payload = await squareFetch("/v2/payments", {
+        method: "POST",
+        body: JSON.stringify({
+            source_id: normalizedSourceId,
+            idempotency_key: normalizedIdempotencyKey,
+            location_id: getSquareLocationId(),
+            amount_money: {
+                amount: Math.round(normalizedAmountCents),
+                currency: "USD",
+            },
+            autocomplete: true,
+            note: note || undefined,
+            reference_id: referenceId || undefined,
+        }),
+    });
+
+    return payload.payment || null;
+}
+
+export async function getSquarePaymentById(paymentId) {
+    const normalizedPaymentId = String(paymentId || "").trim();
+
+    if (!normalizedPaymentId) {
+        return null;
+    }
+
+    const payload = await squareFetch(`/v2/payments/${normalizedPaymentId}`);
+
+    return payload.payment || null;
+}
+
+export function calculateOnlineFeeCents(subtotalAmountDollars) {
+    const subtotalCents = toAmountCents(subtotalAmountDollars);
+
+    if (subtotalCents <= 0) {
+        return 0;
+    }
+
+    return Math.round(subtotalCents * 0.035);
+}
+
+export function toPriceCents(amountDollars) {
+    return toAmountCents(amountDollars);
 }

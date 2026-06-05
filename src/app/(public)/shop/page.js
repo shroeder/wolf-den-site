@@ -14,12 +14,20 @@ export const metadata = {
 
 export default async function ShopPage() {
     const categories = await listShopInventory().catch(() => null);
+    const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
+    const squareApplicationId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID || "";
+    const squareLocationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "";
 
     return (
         <div className="stack reveal">
             {categories && categories.length > 0 ? (
                 <section className="card">
-                    <ShopInventoryClient categories={categories} />
+                    <ShopInventoryClient
+                        categories={categories}
+                        paymentsEnabled={paymentsEnabled}
+                        squareApplicationId={squareApplicationId}
+                        squareLocationId={squareLocationId}
+                    />
                 </section>
             ) : (
                 <section className="grid two-col">
