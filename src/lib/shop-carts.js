@@ -59,6 +59,8 @@ export async function setCartItemQuantity(cartId, catalogObjectId, quantity) {
         return;
     }
 
+    await ensureCart(cartId);
+
     await db.query(
         `INSERT INTO shop_cart_items (cart_id, catalog_object_id, quantity)
          VALUES ($1, $2, $3)
