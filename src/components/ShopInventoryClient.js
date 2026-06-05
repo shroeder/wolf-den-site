@@ -26,22 +26,74 @@ function loadSquarePaymentsScript() {
     const existing = document.querySelector('script[data-square-payments="1"]');
 
     if (existing) {
+        if (window.Square) {
+            return Promise.resolve(window.Square);
+        }
+
+        if (existing.dataset.squarePaymentsState === "error") {
+            return Promise.reject(new Error("Failed to load Square Web Payments SDK."));
+        }
+
         return new Promise((resolve, reject) => {
-            existing.addEventListener("load", () => resolve(window.Square), { once: true });
-            existing.addEventListener("error", () => reject(new Error("Failed to load Square Web Payments SDK.")), {
-                once: true,
-            });
+            const timeoutId = window.setTimeout(() => {
+                cleanup();
+                reject(new Error("Timed out loading Square Web Payments SDK."));
+            }, 12000);
+
+            const onLoad = () => {
+                cleanup();
+
+                if (window.Square) {
+                    resolve(window.Square);
+                    return;
+                }
+
+                reject(new Error("Square Web Payments SDK loaded without exposing window.Square."));
+            };
+
+            const onError = () => {
+                cleanup();
+                reject(new Error("Failed to load Square Web Payments SDK."));
+            };
+
+            const cleanup = () => {
+                window.clearTimeout(timeoutId);
+                existing.removeEventListener("load", onLoad);
+                existing.removeEventListener("error", onError);
+            };
+
+            existing.addEventListener("load", onLoad, { once: true });
+            existing.addEventListener("error", onError, { once: true });
         });
     }
 
     return new Promise((resolve, reject) => {
         const script = document.createElement("script");
+        const timeoutId = window.setTimeout(() => {
+            script.dataset.squarePaymentsState = "error";
+            reject(new Error("Timed out loading Square Web Payments SDK."));
+        }, 12000);
 
         script.src = "https://web.squarecdn.com/v1/square.js";
         script.async = true;
         script.dataset.squarePayments = "1";
-        script.onload = () => resolve(window.Square);
-        script.onerror = () => reject(new Error("Failed to load Square Web Payments SDK."));
+        script.dataset.squarePaymentsState = "loading";
+        script.onload = () => {
+            window.clearTimeout(timeoutId);
+            script.dataset.squarePaymentsState = "loaded";
+
+            if (window.Square) {
+                resolve(window.Square);
+                return;
+            }
+
+            reject(new Error("Square Web Payments SDK loaded without exposing window.Square."));
+        };
+        script.onerror = () => {
+            window.clearTimeout(timeoutId);
+            script.dataset.squarePaymentsState = "error";
+            reject(new Error("Failed to load Square Web Payments SDK."));
+        };
 
         document.head.appendChild(script);
     });
