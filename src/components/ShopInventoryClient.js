@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useTvMode } from "@/lib/tv-mode-client";
@@ -185,10 +185,21 @@ export default function ShopInventoryClient({
     const [checkoutError, setCheckoutError] = useState("");
     const [checkoutMessage, setCheckoutMessage] = useState("");
     const [checkoutBusy, setCheckoutBusy] = useState(false);
+    const [cartOpen, setCartOpen] = useState(false);
+    const [cartLoading, setCartLoading] = useState(false);
+    const [cartMutating, setCartMutating] = useState(false);
+    const [cartData, setCartData] = useState({
+        items: [],
+        itemCount: 0,
+        subtotalCents: 0,
+        onlineFeeCents: 0,
+        totalCents: 0,
+        hasUnavailableItems: false,
+    });
     const swipeStartRef = useRef(null);
     const panelRef = useRef(null);
     const cardRef = useRef(null);
-    const mountedCardItemIdRef = useRef(null);
+    const cartCardMountedRef = useRef(false);
     const [tvMode] = useTvMode();
 
     const selectedCategoryId = orderedCategories.some((category) => category.id === activeId)
@@ -213,10 +224,7 @@ export default function ShopInventoryClient({
     const detailItem = detailIndex >= 0 ? visibleItems[detailIndex] : null;
     const detailItemId = detailItem?.id || null;
     const canShowPaymentUi = Boolean(paymentsEnabled && isLocalPaymentsEnabled);
-    const detailSubtotalCents = detailItem ? Math.round(Number(detailItem.price || 0) * 100) : 0;
-    const detailFeeCents = detailSubtotalCents > 0 ? Math.round(detailSubtotalCents * 0.035) : 0;
-    const detailTotalCents = detailSubtotalCents + detailFeeCents;
-    const squareMountId = detailItemId ? `square-card-${detailItemId.replace(/[^a-zA-Z0-9_-]/g, "-")}` : "";
+    const squareMountId = "square-cart-card";
     const missingSquareConfig = canShowPaymentUi && (!squareApplicationId || !squareLocationId);
     const checkoutReady = checkoutCardState === "ready";
 
@@ -225,15 +233,104 @@ export default function ShopInventoryClient({
         setCheckoutMessage("");
     };
 
+    const refreshCart = useCallback(async () => {
+        if (!canShowPaymentUi) {
+            return;
+        }
+
+        setCartLoading(true);
+
+        try {
+            const response = await fetch("/api/shop/cart", { cache: "no-store" });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok || !payload) {
+                throw new Error(payload?.error || "Could not load cart.");
+            }
+
+            setCartData(payload);
+        } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : "Could not load cart.");
+        } finally {
+            setCartLoading(false);
+        }
+    }, [canShowPaymentUi]);
+
+    const mutateCart = useCallback(async (requestBody) => {
+        if (!canShowPaymentUi) {
+            return;
+        }
+
+        setCartMutating(true);
+        resetCheckoutFeedback();
+
+        try {
+            const response = await fetch("/api/shop/cart", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(requestBody),
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok || !payload) {
+                throw new Error(payload?.error || "Could not update cart.");
+            }
+
+            setCartData(payload);
+        } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : "Could not update cart.");
+        } finally {
+            setCartMutating(false);
+        }
+    }, [canShowPaymentUi]);
+
+    const addToCart = async (item) => {
+        await mutateCart({
+            action: "add",
+            catalogObjectId: item.id,
+            quantity: 1,
+        });
+
+        setCartOpen(true);
+    };
+
+    const updateCartItemQuantity = async (catalogObjectId, quantity) => {
+        await mutateCart({
+            action: "update",
+            catalogObjectId,
+            quantity,
+        });
+    };
+
+    const removeCartItem = async (catalogObjectId) => {
+        await mutateCart({
+            action: "remove",
+            catalogObjectId,
+        });
+    };
+
+    const clearCart = async () => {
+        await mutateCart({ action: "clear" });
+    };
+
+    const toggleCart = async () => {
+        const nextOpen = !cartOpen;
+        setCartOpen(nextOpen);
+
+        if (nextOpen) {
+            await refreshCart();
+        }
+    };
+
     const closeDetail = () => {
         resetCheckoutFeedback();
-        setCheckoutCardState("idle");
         setDetailItemKey(null);
     };
 
     const openDetailForItem = (item) => {
         resetCheckoutFeedback();
-        setCheckoutCardState("idle");
         setDetailItemKey(getDetailKey(item));
     };
 
@@ -244,7 +341,6 @@ export default function ShopInventoryClient({
 
         const nextIndex = (detailIndex - 1 + visibleItems.length) % visibleItems.length;
         resetCheckoutFeedback();
-        setCheckoutCardState("idle");
         setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
     };
 
@@ -255,7 +351,6 @@ export default function ShopInventoryClient({
 
         const nextIndex = (detailIndex + 1) % visibleItems.length;
         resetCheckoutFeedback();
-        setCheckoutCardState("idle");
         setDetailItemKey(getDetailKey(visibleItems[nextIndex]));
     };
 
@@ -288,13 +383,13 @@ export default function ShopInventoryClient({
     };
 
     useEffect(() => {
-        if (!detailItemId || !canShowPaymentUi) {
+        if (!canShowPaymentUi || !cartOpen || !cartData.items?.length) {
             if (cardRef.current && typeof cardRef.current.destroy === "function") {
                 cardRef.current.destroy().catch(() => undefined);
             }
 
             cardRef.current = null;
-            mountedCardItemIdRef.current = null;
+            cartCardMountedRef.current = false;
             return undefined;
         }
 
@@ -302,7 +397,7 @@ export default function ShopInventoryClient({
             return undefined;
         }
 
-        if (mountedCardItemIdRef.current === detailItemId && cardRef.current) {
+        if (cartCardMountedRef.current && cardRef.current) {
             return undefined;
         }
 
@@ -323,11 +418,6 @@ export default function ShopInventoryClient({
                     throw new Error("Square Web Payments SDK did not load correctly.");
                 }
 
-                if (mountedCardItemIdRef.current !== detailItemId && cardRef.current?.destroy) {
-                    await cardRef.current.destroy().catch(() => undefined);
-                    cardRef.current = null;
-                }
-
                 const payments = Square.payments(squareApplicationId, squareLocationId);
                 const card = await payments.card();
 
@@ -339,7 +429,7 @@ export default function ShopInventoryClient({
                 }
 
                 cardRef.current = card;
-                mountedCardItemIdRef.current = detailItemId;
+                cartCardMountedRef.current = true;
                 setCheckoutCardState("ready");
             } catch (error) {
                 if (disposed) {
@@ -356,10 +446,10 @@ export default function ShopInventoryClient({
         return () => {
             disposed = true;
         };
-    }, [canShowPaymentUi, detailItemId, missingSquareConfig, squareApplicationId, squareLocationId, squareMountId]);
+    }, [canShowPaymentUi, cartData.items, cartOpen, missingSquareConfig, squareApplicationId, squareLocationId, squareMountId]);
 
     const handleCheckout = async () => {
-        if (!detailItem || !cardRef.current || !checkoutReady || checkoutBusy) {
+        if (!cardRef.current || !checkoutReady || checkoutBusy || !cartData.items?.length) {
             return;
         }
 
@@ -380,7 +470,6 @@ export default function ShopInventoryClient({
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    catalogObjectId: detailItem.id,
                     sourceId: tokenized.token,
                 }),
             });
@@ -393,6 +482,7 @@ export default function ShopInventoryClient({
 
             if (payload?.order?.status === "completed") {
                 setCheckoutMessage("Payment complete. Your card was charged successfully.");
+                await refreshCart();
                 return;
             }
 
@@ -590,38 +680,26 @@ export default function ShopInventoryClient({
 
                     {paymentsEnabled && !isLocalPaymentsEnabled && (
                         <p className="shop-payment-note secondary">
-                            Test checkout is off. Use the toggle above to enable payment testing.
+                            Test checkout is off. Set local storage key <strong>{PAYMENT_TOGGLE_STORAGE_KEY}</strong> to <strong>1</strong>.
                         </p>
                     )}
 
-                    {canShowPaymentUi && detailSubtotalCents > 0 && detailItem.quantity > 0 && (
+                    {canShowPaymentUi && detailItem.quantity > 0 && (
                         <div className="shop-payment-panel">
-                            <div className="shop-payment-breakdown">
-                                <p><span>Subtotal</span><strong>{formatCents(detailSubtotalCents)}</strong></p>
-                                <p><span>Online fee (3.5%)</span><strong>{formatCents(detailFeeCents)}</strong></p>
-                                <p className="shop-payment-total"><span>Total</span><strong>{formatCents(detailTotalCents)}</strong></p>
-                            </div>
-
-                            {!missingSquareConfig && <div id={squareMountId} className="shop-payment-card" aria-live="polite" />}
-
-                            {missingSquareConfig && (
-                                <p className="shop-payment-error">Square configuration is missing. Add public app and location IDs.</p>
-                            )}
-
-                            {!missingSquareConfig && checkoutCardState === "loading" && (
-                                <p className="shop-payment-note secondary">Loading secure card form...</p>
-                            )}
-
-                            {checkoutError && <p className="shop-payment-error">{checkoutError}</p>}
-                            {checkoutMessage && <p className="shop-payment-success">{checkoutMessage}</p>}
-
                             <button
                                 type="button"
                                 className="button primary shop-payment-submit"
-                                onClick={handleCheckout}
-                                disabled={!checkoutReady || checkoutBusy}
+                                onClick={() => addToCart(detailItem)}
+                                disabled={cartMutating}
                             >
-                                {checkoutBusy ? "Processing..." : `Pay ${formatCents(detailTotalCents)}`}
+                                {cartMutating ? "Updating cart..." : "Add to cart"}
+                            </button>
+                            <button
+                                type="button"
+                                className="button shop-payment-submit"
+                                onClick={() => setCartOpen(true)}
+                            >
+                                View cart ({cartData.itemCount})
                             </button>
                         </div>
                     )}
@@ -650,7 +728,107 @@ export default function ShopInventoryClient({
                             {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
                         </p>
                     )}
+
+                    {canShowPaymentUi && (
+                        <button
+                            type="button"
+                            className="shop-cart-launch"
+                            onClick={toggleCart}
+                        >
+                            {cartOpen ? "Hide cart" : `Cart (${cartData.itemCount})`}
+                        </button>
+                    )}
                 </div>
+
+                {canShowPaymentUi && cartOpen && (
+                    <section className="shop-cart-panel" aria-live="polite">
+                        <div className="shop-cart-head">
+                            <h3>Your cart</h3>
+                            <button type="button" className="button" onClick={clearCart} disabled={cartMutating || !cartData.items.length}>
+                                Clear cart
+                            </button>
+                        </div>
+
+                        {cartLoading && <p className="secondary">Loading cart...</p>}
+
+                        {!cartLoading && cartData.items.length === 0 && (
+                            <p className="secondary">Your cart is empty.</p>
+                        )}
+
+                        {cartData.items.map((item) => (
+                            <article key={item.catalogObjectId} className="shop-cart-item">
+                                <div>
+                                    <h4>{item.name}</h4>
+                                    <p className="secondary">
+                                        {formatCents(item.priceCents)} each | {item.maxQuantity} in stock
+                                    </p>
+                                    {item.unavailable && (
+                                        <p className="shop-payment-error">Item availability changed. Update quantity to continue.</p>
+                                    )}
+                                </div>
+                                <div className="shop-cart-item-controls">
+                                    <button
+                                        type="button"
+                                        className="button"
+                                        onClick={() => updateCartItemQuantity(item.catalogObjectId, Math.max(0, item.quantity - 1))}
+                                        disabled={cartMutating}
+                                    >
+                                        -
+                                    </button>
+                                    <span>{item.quantity}</span>
+                                    <button
+                                        type="button"
+                                        className="button"
+                                        onClick={() => updateCartItemQuantity(item.catalogObjectId, item.quantity + 1)}
+                                        disabled={cartMutating}
+                                    >
+                                        +
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="button"
+                                        onClick={() => removeCartItem(item.catalogObjectId)}
+                                        disabled={cartMutating}
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </article>
+                        ))}
+
+                        {cartData.items.length > 0 && (
+                            <div className="shop-payment-panel">
+                                <div className="shop-payment-breakdown">
+                                    <p><span>Subtotal</span><strong>{formatCents(cartData.subtotalCents)}</strong></p>
+                                    <p><span>Online fee (3.5%)</span><strong>{formatCents(cartData.onlineFeeCents)}</strong></p>
+                                    <p className="shop-payment-total"><span>Total</span><strong>{formatCents(cartData.totalCents)}</strong></p>
+                                </div>
+
+                                {!missingSquareConfig && <div id={squareMountId} className="shop-payment-card" aria-live="polite" />}
+
+                                {missingSquareConfig && (
+                                    <p className="shop-payment-error">Square configuration is missing. Add public app and location IDs.</p>
+                                )}
+
+                                {!missingSquareConfig && checkoutCardState === "loading" && (
+                                    <p className="shop-payment-note secondary">Loading secure card form...</p>
+                                )}
+
+                                {checkoutError && <p className="shop-payment-error">{checkoutError}</p>}
+                                {checkoutMessage && <p className="shop-payment-success">{checkoutMessage}</p>}
+
+                                <button
+                                    type="button"
+                                    className="button primary shop-payment-submit"
+                                    onClick={handleCheckout}
+                                    disabled={!checkoutReady || checkoutBusy || cartData.hasUnavailableItems}
+                                >
+                                    {checkoutBusy ? "Processing..." : `Pay ${formatCents(cartData.totalCents)}`}
+                                </button>
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 {tvMode && active && !isSearching && (
                     <p className="shop-tv-now secondary" aria-live="polite">

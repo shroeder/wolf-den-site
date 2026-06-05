@@ -760,6 +760,64 @@ textarea {
     font-size: 0.88rem;
 }
 
+.shop-cart-launch {
+    justify-self: start;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 999px;
+    padding: 0.4rem 0.75rem;
+    background: rgba(212, 175, 55, 0.12);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.shop-cart-panel {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.shop-cart-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.shop-cart-head h3 {
+    margin: 0;
+}
+
+.shop-cart-item {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.shop-cart-item h4 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.shop-cart-item p {
+    margin: 0.2rem 0 0;
+}
+
+.shop-cart-item-controls {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .shop-category-mobile {
     display: none;
     gap: 0.35rem;

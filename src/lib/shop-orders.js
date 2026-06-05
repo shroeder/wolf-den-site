@@ -20,6 +20,8 @@ export async function createPendingShopOrder({
     onlineFeeCents,
     totalCents,
     idempotencyKey,
+    cartId,
+    items,
 }) {
     return db.queryOne(
         `INSERT INTO shop_orders (
@@ -30,8 +32,10 @@ export async function createPendingShopOrder({
             online_fee_cents,
             total_cents,
             idempotency_key,
+            cart_id,
+            items_json,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -41,6 +45,8 @@ export async function createPendingShopOrder({
             onlineFeeCents,
             totalCents,
             idempotencyKey,
+            toNullableText(cartId),
+            JSON.stringify(items || []),
         ]
     );
 }

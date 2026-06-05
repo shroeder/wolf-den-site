@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
+import { cookies } from "next/headers";
 
 import { NextResponse } from "next/server";
 
 import {
-    calculateOnlineFeeCents,
     createSquareCardPayment,
-    findShopItemByVariationId,
-    toPriceCents,
 } from "@/lib/consignment/square";
+import { getExistingCartId } from "@/lib/shop-cart-session";
+import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import {
     createPendingShopOrder,
     updateShopOrderPaymentResult,
@@ -73,44 +73,44 @@ export async function POST(request) {
                 return badRequest("Invalid request body.");
             }
 
-            const catalogObjectId = String(body.catalogObjectId || "").trim();
             const sourceId = String(body.sourceId || "").trim();
-
-            if (!catalogObjectId) {
-                return badRequest("Missing catalog object id.");
-            }
 
             if (!sourceId) {
                 return badRequest("Missing payment source id.");
             }
 
-            const item = await findShopItemByVariationId(catalogObjectId);
+            const cookieStore = await cookies();
+            const cartId = getExistingCartId(cookieStore);
 
-            if (!item) {
-                return NextResponse.json({ error: "Item not found or not available." }, { status: 404 });
+            if (!cartId) {
+                return NextResponse.json({ error: "Cart is empty." }, { status: 409 });
             }
 
-            if (!Number.isFinite(item.price) || item.price <= 0) {
-                return NextResponse.json({ error: "Item price is unavailable." }, { status: 409 });
+            const cart = await getCartSummary(cartId);
+
+            if (!cart.items.length) {
+                return NextResponse.json({ error: "Cart is empty." }, { status: 409 });
             }
 
-            if (!Number.isFinite(item.quantity) || item.quantity < 1) {
-                return NextResponse.json({ error: "Item is out of stock." }, { status: 409 });
+            if (cart.hasUnavailableItems) {
+                return NextResponse.json({
+                    error: "Cart contains unavailable items. Please review your cart and try again.",
+                    cart,
+                }, { status: 409 });
             }
 
-            const subtotalCents = toPriceCents(item.price);
-            const onlineFeeCents = calculateOnlineFeeCents(item.price);
-            const totalCents = subtotalCents + onlineFeeCents;
             const idempotencyKey = randomUUID();
 
             const pendingOrder = await createPendingShopOrder({
-                catalogObjectId: item.id,
-                itemName: item.name,
-                quantity: 1,
-                subtotalCents,
-                onlineFeeCents,
-                totalCents,
+                catalogObjectId: "cart",
+                itemName: `${cart.itemCount} item cart`,
+                quantity: cart.itemCount,
+                subtotalCents: cart.subtotalCents,
+                onlineFeeCents: cart.onlineFeeCents,
+                totalCents: cart.totalCents,
                 idempotencyKey,
+                cartId,
+                items: cart.items,
             });
 
             let payment;
@@ -118,7 +118,7 @@ export async function POST(request) {
             try {
                 payment = await createSquareCardPayment({
                     sourceId,
-                    amountCents: totalCents,
+                    amountCents: cart.totalCents,
                     idempotencyKey,
                     note: `Shop order ${pendingOrder.id}`,
                     referenceId: pendingOrder.id,
@@ -154,6 +154,10 @@ export async function POST(request) {
                 paymentErrorCode: null,
                 paymentErrorMessage: null,
             });
+
+            if (updatedOrder.status === "completed") {
+                await clearCartItems(cartId);
+            }
 
             return NextResponse.json(toCheckoutResponse(updatedOrder, payment), {
                 status: updatedOrder.status === "completed" ? 200 : 202,
