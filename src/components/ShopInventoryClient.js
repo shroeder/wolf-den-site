@@ -648,6 +648,12 @@ export default function ShopInventoryClient({
                         </div>
                     </div>
                 )}
+
+                {canShowPaymentUi && cartCount > 0 && (
+                    <Link href="/cart" className="shop-mobile-cart-fab" aria-label={`Go to cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}>
+                        Go to cart ({cartCount})
+                    </Link>
+                )}
             </div>
 
             {typeof document !== "undefined" && detailView ? createPortal(detailView, document.body) : null}
