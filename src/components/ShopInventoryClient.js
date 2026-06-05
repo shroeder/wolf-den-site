@@ -160,6 +160,24 @@ const sortShopCategories = (categories) =>
 
 const getDetailKey = (item) => `${item.id}-${item.categoryName}`;
 
+function dedupeSearchItems(items) {
+    const seen = new Set();
+    const deduped = [];
+
+    for (const item of items) {
+        const key = String(item.id || "").trim();
+
+        if (!key || seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        deduped.push(item);
+    }
+
+    return deduped;
+}
+
 export default function ShopInventoryClient({
     categories,
     paymentsEnabled,
@@ -211,10 +229,12 @@ export default function ShopInventoryClient({
     const isSearching = normalizedSearch.length > 0;
 
     const visibleItems = isSearching
-        ? orderedCategories.flatMap((category) =>
-            category.items
-                .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
-                .map((item) => ({ ...item, categoryName: category.name }))
+        ? dedupeSearchItems(
+            orderedCategories.flatMap((category) =>
+                category.items
+                    .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+                    .map((item) => ({ ...item, categoryName: category.name }))
+            )
         )
         : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
 
