@@ -993,18 +993,20 @@ textarea {
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
     gap: 1rem;
+    align-items: start;
 }
 
 .cart-items-card {
     display: grid;
     gap: 0.6rem;
+    align-content: start;
 }
 
 .cart-line-item {
     display: grid;
     grid-template-columns: 84px minmax(0, 1fr) auto;
     gap: 0.7rem;
-    align-items: center;
+    align-items: start;
     padding: 0.65rem;
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -1082,9 +1084,17 @@ textarea {
 .cart-account-panel {
     display: grid;
     gap: 0.45rem;
-    border-bottom: 1px solid var(--line);
-    padding-bottom: 0.6rem;
-    margin-bottom: 0.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 0.6rem;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.cart-fulfillment-section {
+    display: grid;
+    gap: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 0.6rem;
 }
 
 .cart-account-row {
@@ -1147,16 +1157,33 @@ textarea {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.45rem;
+    align-items: start;
 }
 
 .cart-field {
     display: grid;
     gap: 0.22rem;
+    min-width: 0;
 }
 
 .cart-field span {
     font-size: 0.74rem;
     color: var(--ink-secondary);
+}
+
+.cart-field input,
+.cart-field select {
+    width: 100%;
+    min-width: 0;
+}
+
+.cart-field select {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.6rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
 }
 
 .cart-field-full {
@@ -1191,6 +1218,10 @@ textarea {
     border-color: rgba(246, 147, 147, 0.82);
 }
 
+.cart-field select[aria-invalid="true"] {
+    border-color: rgba(246, 147, 147, 0.82);
+}
+
 @media (max-width: 900px) {
     .cart-grid-layout {
         grid-template-columns: 1fr;
@@ -1198,6 +1229,10 @@ textarea {
 
     .cart-checkout-card {
         position: static;
+    }
+
+    .cart-shipping-form {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1753,7 +1788,7 @@ textarea {
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 10px;
     padding: 0.5rem;
-    background: rgba(11, 11, 11, 0.9);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .shop-payment-card-loading {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PAYMENT_TOGGLE_STORAGE_KEY = "wolfden-payments-test-enabled";
 const SHOP_CART_UPDATED_EVENT = "wolfden-shop-cart-updated";
@@ -9,29 +9,37 @@ const SHOP_CART_UPDATED_EVENT = "wolfden-shop-cart-updated";
 const formatMoney = (cents) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(cents || 0) / 100));
 
+const US_STATE_OPTIONS = [
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+];
+
 function buildSquareCardStyles() {
     return {
         ".input-container": {
-            borderColor: "rgba(255, 255, 255, 0.18)",
-            borderRadius: "10px",
-            backgroundColor: "rgba(16, 16, 16, 0.96)",
+            "border-color": "rgba(255, 255, 255, 0.18)",
+            "border-radius": "10px",
+            "background-color": "rgba(16, 16, 16, 0.96)",
         },
         ".input-container.is-focus": {
-            borderColor: "rgba(212, 175, 55, 0.65)",
+            "border-color": "rgba(212, 175, 55, 0.65)",
         },
         ".input-container.is-error": {
-            borderColor: "rgba(246, 147, 147, 0.92)",
+            "border-color": "rgba(246, 147, 147, 0.92)",
         },
-        ".input": {
+        input: {
             color: "#f4f2eb",
-            fontSize: "15px",
+            "font-size": "15px",
         },
-        ".input::placeholder": {
+        "input::placeholder": {
             color: "rgba(228, 228, 228, 0.62)",
         },
         ".message-text": {
             color: "rgba(236, 230, 214, 0.86)",
-            fontSize: "12px",
+            "font-size": "12px",
         },
         ".message-icon": {
             color: "rgba(236, 230, 214, 0.86)",
@@ -217,7 +225,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [authPassword, setAuthPassword] = useState("");
     const [authCustomer, setAuthCustomer] = useState(null);
     const [authError, setAuthError] = useState("");
-    const [fulfillmentMode, setFulfillmentMode] = useState("shipping");
+    const [fulfillmentMode, setFulfillmentMode] = useState("");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
     const [profileLookupBusy, setProfileLookupBusy] = useState(false);
     const [profileLookupMessage, setProfileLookupMessage] = useState("");
@@ -248,6 +256,19 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
     const canShowCart = Boolean(paymentsEnabled && localToggleEnabled);
     const missingSquareConfig = canShowCart && (!squareApplicationId || !squareLocationId);
+    const normalizedShipping = useMemo(() => normalizeShippingForm(shippingForm), [shippingForm]);
+    const shippingFieldErrors = useMemo(() => validateShippingForm(normalizedShipping), [normalizedShipping]);
+    const hasFulfillmentChoice = fulfillmentMode === "shipping" || fulfillmentMode === "pickup";
+    const isShippingReady = fulfillmentMode === "shipping" && Object.keys(shippingFieldErrors).length === 0;
+    const isFulfillmentReady = fulfillmentMode === "pickup" || isShippingReady;
+    const canSubmitCheckout = Boolean(
+        checkoutCardState === "ready"
+        && !checkoutBusy
+        && cartData.items.length
+        && !cartData.hasUnavailableItems
+        && hasFulfillmentChoice
+        && isFulfillmentReady
+    );
 
     const refreshCart = useCallback(async () => {
         if (!canShowCart) {
@@ -437,7 +458,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 }
 
                 setCheckoutCardState("error");
-                setError(nextError instanceof Error ? nextError.message : "Could not initialize checkout.");
+                console.warn("Square card initialization failed", nextError);
+                setError("Secure card form is temporarily unavailable. Refresh and try again.");
             }
         };
 
@@ -453,7 +475,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     }, [canShowCart, cartData.items.length, missingSquareConfig, squareApplicationId, squareLocationId]);
 
     const handleCheckout = async () => {
-        if (!cardRef.current || checkoutCardState !== "ready" || checkoutBusy || !cartData.items.length) {
+        if (!canSubmitCheckout) {
             return;
         }
 
@@ -462,6 +484,12 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         setSuccess("");
         setFieldErrors({});
 
+        if (!hasFulfillmentChoice) {
+            setError("Choose shipping or local pickup before paying.");
+            setCheckoutBusy(false);
+            return;
+        }
+
         const checkoutPayload = {
             sourceId: null,
             fulfillmentMode,
@@ -469,7 +497,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         };
 
         if (fulfillmentMode === "shipping") {
-            const normalizedShipping = normalizeShippingForm(shippingForm);
             const localFieldErrors = validateShippingForm(normalizedShipping);
 
             if (Object.keys(localFieldErrors).length > 0) {
@@ -754,30 +781,33 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 {authError ? <p className="shop-payment-error">{authError}</p> : null}
                             </div>
 
-                            <p className="cart-fulfillment-label">Fulfillment</p>
-                            <div className="cart-fulfillment-toggle" role="tablist" aria-label="Choose shipping or pickup">
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={fulfillmentMode === "shipping"}
-                                    className={fulfillmentMode === "shipping" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
-                                    onClick={() => setFulfillmentMode("shipping")}
-                                    disabled={checkoutBusy}
-                                >
-                                    Ship to me
-                                </button>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={fulfillmentMode === "pickup"}
-                                    className={fulfillmentMode === "pickup" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
-                                    onClick={() => setFulfillmentMode("pickup")}
-                                    disabled={checkoutBusy}
-                                >
-                                    Local pickup
-                                </button>
-                            </div>
-                            {fulfillmentMode === "shipping" ? (
+                            <section className="cart-fulfillment-section" aria-label="Fulfillment">
+                                <p className="cart-fulfillment-label">Fulfillment</p>
+                                <div className="cart-fulfillment-toggle" role="tablist" aria-label="Choose shipping or pickup">
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={fulfillmentMode === "shipping"}
+                                        className={fulfillmentMode === "shipping" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                        onClick={() => setFulfillmentMode("shipping")}
+                                        disabled={checkoutBusy}
+                                    >
+                                        Ship to me
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={fulfillmentMode === "pickup"}
+                                        className={fulfillmentMode === "pickup" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                        onClick={() => setFulfillmentMode("pickup")}
+                                        disabled={checkoutBusy}
+                                    >
+                                        Local pickup
+                                    </button>
+                                </div>
+                                {!hasFulfillmentChoice ? <p className="secondary">Choose shipping or pickup to continue.</p> : null}
+
+                                {fulfillmentMode === "shipping" ? (
                                 <div className="cart-shipping-form">
                                     <div className="cart-saved-profile-row cart-field-full">
                                         {authCustomer ? (
@@ -860,15 +890,18 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                         {fieldErrors.shippingCity ? <small className="shop-payment-error">{fieldErrors.shippingCity}</small> : null}
                                     </label>
                                     <label className="cart-field">
-                                        <span>State (2-letter)</span>
-                                        <input
-                                            type="text"
+                                        <span>State</span>
+                                        <select
                                             value={shippingForm.state}
                                             onChange={(event) => setShippingForm((current) => ({ ...current, state: event.target.value }))}
                                             aria-invalid={fieldErrors.shippingState ? "true" : "false"}
                                             autoComplete="address-level1"
-                                            maxLength={2}
-                                        />
+                                        >
+                                            <option value="">Select state</option>
+                                            {US_STATE_OPTIONS.map((stateCode) => (
+                                                <option key={stateCode} value={stateCode}>{stateCode}</option>
+                                            ))}
+                                        </select>
                                         {fieldErrors.shippingState ? <small className="shop-payment-error">{fieldErrors.shippingState}</small> : null}
                                     </label>
                                     <label className="cart-field">
@@ -897,9 +930,12 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                     </label>
                                     {fieldErrors.shippingCountry ? <p className="shop-payment-error cart-field-full">{fieldErrors.shippingCountry}</p> : null}
                                 </div>
-                            ) : (
-                                <p className="secondary">Local pickup selected. Shipping address is not required.</p>
-                            )}
+                                ) : null}
+
+                                {fulfillmentMode === "pickup" ? (
+                                    <p className="secondary">Local pickup selected. Shipping address is not required.</p>
+                                ) : null}
+                            </section>
                         </div>
 
                         <div className="shop-payment-breakdown">
@@ -908,7 +944,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             <p className="shop-payment-total"><span>Total</span><strong>{formatMoney(cartData.totalCents)}</strong></p>
                         </div>
 
-                        {!missingSquareConfig && (
+                        {!missingSquareConfig && checkoutCardState !== "error" && (
                             <div className={checkoutCardState === "loading" ? "shop-payment-card shop-payment-card-loading" : "shop-payment-card"}>
                                 <div id={mountId} />
                             </div>
@@ -922,11 +958,13 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                         <button
                             type="button"
                             className="button primary shop-payment-submit"
-                            disabled={checkoutBusy || checkoutCardState !== "ready" || cartData.hasUnavailableItems}
+                            disabled={!canSubmitCheckout}
                             onClick={handleCheckout}
                         >
                             {checkoutBusy ? "Processing..." : `Pay ${formatMoney(cartData.totalCents)}`}
                         </button>
+                        {!hasFulfillmentChoice ? <p className="secondary">Select shipping or pickup to enable payment.</p> : null}
+                        {fulfillmentMode === "shipping" && !isShippingReady ? <p className="secondary">Complete shipping fields to enable payment.</p> : null}
                     </article>
                 </div>
             )}
