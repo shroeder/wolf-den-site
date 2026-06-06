@@ -11,6 +11,7 @@ import {
     loginShopCustomer,
     registerShopCustomer,
 } from "@/lib/shop-customers";
+import { isTrustedWriteRequest } from "@/lib/request-security";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -135,6 +136,10 @@ export async function GET(request) {
 
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/shop/auth", async ({ internalError }) => {
+        if (!isTrustedWriteRequest(request)) {
+            return jsonNoStore({ error: "Invalid request origin." }, { status: 403 });
+        }
+
         if (!isPaymentsEnabled()) {
             return jsonNoStore({ error: "Payments are currently disabled." }, { status: 403 });
         }
@@ -206,6 +211,10 @@ export async function POST(request) {
 
 export async function DELETE(request) {
     return withRequestLogging(request, "DELETE /api/shop/auth", async ({ internalError }) => {
+        if (!isTrustedWriteRequest(request)) {
+            return jsonNoStore({ error: "Invalid request origin." }, { status: 403 });
+        }
+
         try {
             const cookieStore = await cookies();
             cookieStore.set(SHOP_CUSTOMER_SESSION_COOKIE, "", {

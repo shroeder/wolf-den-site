@@ -9,6 +9,7 @@ import {
 } from "@/lib/consignment/square";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
+import { isTrustedWriteRequest } from "@/lib/request-security";
 import { getExistingCartId } from "@/lib/shop-cart-session";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import {
@@ -19,7 +20,17 @@ import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 
-const badRequest = (message) => NextResponse.json({ error: message }, { status: 400 });
+function jsonNoStore(body, init = {}) {
+    return NextResponse.json(body, {
+        ...init,
+        headers: {
+            "Cache-Control": "no-store",
+            ...(init.headers || {}),
+        },
+    });
+}
+
+const badRequest = (message) => jsonNoStore({ error: message }, { status: 400 });
 
 const US_STATES = new Set([
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
@@ -184,8 +195,12 @@ function toCheckoutResponse(order, payment) {
 
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/shop/checkout", async ({ logger, internalError }) => {
+        if (!isTrustedWriteRequest(request)) {
+            return jsonNoStore({ error: "Invalid request origin." }, { status: 403 });
+        }
+
         if (!isPaymentsEnabled()) {
-            return NextResponse.json({ error: "Payments are currently disabled." }, { status: 403 });
+            return jsonNoStore({ error: "Payments are currently disabled." }, { status: 403 });
         }
 
         try {
@@ -206,14 +221,14 @@ export async function POST(request) {
             const authenticatedCustomer = saveCustomerProfile ? await getAuthenticatedShopCustomerFromCookies() : null;
 
             if (saveCustomerProfile && !authenticatedCustomer) {
-                return NextResponse.json(
+                return jsonNoStore(
                     { error: "Sign in to save checkout info for next time." },
                     { status: 401 }
                 );
             }
 
             if (fulfillment.error) {
-                return NextResponse.json(
+                return jsonNoStore(
                     {
                         error: fulfillment.error,
                         fieldErrors: fulfillment.fieldErrors,
@@ -226,17 +241,17 @@ export async function POST(request) {
             const cartId = getExistingCartId(cookieStore);
 
             if (!cartId) {
-                return NextResponse.json({ error: "Cart is empty." }, { status: 409 });
+                return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
             }
 
             const cart = await getCartSummary(cartId);
 
             if (!cart.items.length) {
-                return NextResponse.json({ error: "Cart is empty." }, { status: 409 });
+                return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
             }
 
             if (cart.hasUnavailableItems) {
-                return NextResponse.json({
+                return jsonNoStore({
                     error: "Cart contains unavailable items. Please review your cart and try again.",
                     cart,
                 }, { status: 409 });
@@ -282,7 +297,7 @@ export async function POST(request) {
                     squareStatus: error?.squareStatus,
                 });
 
-                return NextResponse.json(
+                return jsonNoStore(
                     {
                         error: "Payment could not be processed.",
                         code: error?.squareCode || "payment_create_failed",
@@ -332,7 +347,7 @@ export async function POST(request) {
                 }
             }
 
-            return NextResponse.json(toCheckoutResponse(updatedOrder, payment), {
+            return jsonNoStore(toCheckoutResponse(updatedOrder, payment), {
                 status: updatedOrder.status === "completed" ? 200 : 202,
             });
         } catch (error) {
