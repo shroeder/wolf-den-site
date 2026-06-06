@@ -8,6 +8,7 @@ import {
     createEmailVerificationTokenForCustomer,
 } from "@/lib/shop-customer-auth-tokens";
 import { setShopCustomerSession } from "@/lib/shop-customer-session";
+import { resolveActiveCartId } from "@/lib/shop-carts";
 import { getShopCustomerByEmail } from "@/lib/shop-customers";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -79,6 +80,10 @@ export async function POST(request) {
 
             const cookieStore = await cookies();
             setShopCustomerSession(cookieStore, customer.id);
+            await resolveActiveCartId({
+                cookieStore,
+                customerId: customer.id,
+            });
 
             return jsonNoStore({
                 success: true,

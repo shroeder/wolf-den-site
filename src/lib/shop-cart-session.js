@@ -42,3 +42,11 @@ export function getOrCreateCartId(cookieStore) {
 
     return nextId;
 }
+
+export function setShopCartId(cookieStore, cartId) {
+    if (!isLikelyUuid(cartId)) {
+        return;
+    }
+
+    cookieStore.set(SHOP_CART_COOKIE, cartId, getShopCartCookieOptions());
+}

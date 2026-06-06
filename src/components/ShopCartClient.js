@@ -220,11 +220,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [checkoutCardState, setCheckoutCardState] = useState("idle");
     const [checkoutBusy, setCheckoutBusy] = useState(false);
     const [authLoading, setAuthLoading] = useState(false);
-    const [authMode, setAuthMode] = useState("login");
-    const [authEmail, setAuthEmail] = useState("");
-    const [authPassword, setAuthPassword] = useState("");
     const [authCustomer, setAuthCustomer] = useState(null);
-    const [authError, setAuthError] = useState("");
     const [fulfillmentMode, setFulfillmentMode] = useState("");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
     const [profileLookupBusy, setProfileLookupBusy] = useState(false);
@@ -355,7 +351,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         }
 
         setAuthLoading(true);
-        setAuthError("");
 
         try {
             const response = await fetch("/api/shop/auth", { cache: "no-store" });
@@ -367,7 +362,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
             setAuthCustomer(payload.authenticated ? payload.customer : null);
         } catch (nextError) {
-            setAuthError(nextError instanceof Error ? nextError.message : "Could not load sign-in status.");
             setAuthCustomer(null);
         } finally {
             setAuthLoading(false);
@@ -544,69 +538,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         }
     };
 
-    const handleAuthSubmit = async () => {
-        if (!String(authEmail || "").trim() || !String(authPassword || "")) {
-            setAuthError("Enter email and password.");
-            return;
-        }
-
-        setAuthLoading(true);
-        setAuthError("");
-
-        try {
-            const response = await fetch("/api/shop/auth", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    mode: authMode,
-                    email: authEmail,
-                    password: authPassword,
-                }),
-            });
-            const payload = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                throw new Error(payload?.error || "Could not sign in.");
-            }
-
-            if (payload?.requiresEmailVerification) {
-                setAuthCustomer(null);
-                setAuthPassword("");
-                setAuthError(payload?.message || "Account created. Please verify your email before signing in.");
-                setSaveCustomerProfile(false);
-                return;
-            }
-
-            setAuthCustomer(payload.customer || null);
-            setAuthPassword("");
-            setAuthError("");
-            setSaveCustomerProfile(true);
-        } catch (nextError) {
-            setAuthError(nextError instanceof Error ? nextError.message : "Could not sign in.");
-        } finally {
-            setAuthLoading(false);
-        }
-    };
-
-    const handleLogout = async () => {
-        setAuthLoading(true);
-        setAuthError("");
-
-        try {
-            await fetch("/api/shop/auth", {
-                method: "DELETE",
-            });
-            setAuthCustomer(null);
-            setSaveCustomerProfile(false);
-        } catch (nextError) {
-            setAuthError(nextError instanceof Error ? nextError.message : "Could not sign out.");
-        } finally {
-            setAuthLoading(false);
-        }
-    };
-
     const handleLoadAuthenticatedProfile = async () => {
         setProfileLookupBusy(true);
         setProfileLookupMessage("");
@@ -740,52 +671,16 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                         <div className="cart-fulfillment-panel" aria-live="polite">
                             <div className="cart-account-panel">
                                 <p className="cart-fulfillment-label">Account</p>
-                                {authCustomer ? (
-                                    <div className="cart-account-row">
-                                        <p className="secondary">Signed in as <strong>{authCustomer.email}</strong></p>
-                                        <button type="button" className="button" onClick={handleLogout} disabled={authLoading || checkoutBusy}>
-                                            {authLoading ? "Signing out..." : "Sign out"}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="cart-account-form">
-                                        <div className="cart-account-mode-toggle" role="tablist" aria-label="Choose sign in or create account">
-                                            <button
-                                                type="button"
-                                                className={authMode === "login" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
-                                                onClick={() => setAuthMode("login")}
-                                                disabled={authLoading}
-                                            >
-                                                Sign in
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={authMode === "register" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
-                                                onClick={() => setAuthMode("register")}
-                                                disabled={authLoading}
-                                            >
-                                                Create account
-                                            </button>
-                                        </div>
-                                        <label className="cart-field">
-                                            <span>Email</span>
-                                            <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
-                                        </label>
-                                        <label className="cart-field">
-                                            <span>Password</span>
-                                            <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} autoComplete={authMode === "register" ? "new-password" : "current-password"} />
-                                        </label>
-                                        <button type="button" className="button" onClick={handleAuthSubmit} disabled={authLoading || checkoutBusy}>
-                                            {authLoading ? "Working..." : authMode === "register" ? "Create account" : "Sign in"}
-                                        </button>
-                                        {authMode === "login" ? (
-                                            <p className="secondary">
-                                                Forgot your password? <Link href="/shop/account/reset-password">Reset it here</Link>.
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                )}
-                                {authError ? <p className="shop-payment-error">{authError}</p> : null}
+                                <div className="cart-account-row">
+                                    <p className="secondary">
+                                        {authLoading
+                                            ? "Checking account status..."
+                                            : authCustomer
+                                                ? <>Signed in as <strong>{authCustomer.email}</strong></>
+                                                : "Not signed in. Sign in to load and save shipping info."}
+                                    </p>
+                                    <Link href="/shop/account" className="button" prefetch={false}>Manage account</Link>
+                                </div>
                             </div>
 
                             <section className="cart-fulfillment-section" aria-label="Fulfillment">

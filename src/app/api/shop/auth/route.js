@@ -19,6 +19,7 @@ import {
     isShopAuthTemporarilyBlocked,
     recordFailedShopAuthAttempt,
 } from "@/lib/shop-auth-throttle";
+import { resolveActiveCartId } from "@/lib/shop-carts";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -181,6 +182,10 @@ export async function POST(request) {
             await clearFailedShopAuthAttempts({ ip: clientIp, email });
             const cookieStore = await cookies();
             setShopCustomerSession(cookieStore, customer.id);
+            await resolveActiveCartId({
+                cookieStore,
+                customerId: customer.id,
+            });
 
             return jsonNoStore({
                 success: true,

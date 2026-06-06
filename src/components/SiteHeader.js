@@ -26,6 +26,8 @@ export default function SiteHeader() {
     const [cartCount, setCartCount] = useState(null);
     const [cartLoading, setCartLoading] = useState(false);
     const [cartEnabled, setCartEnabled] = useState(false);
+    const [authLoading, setAuthLoading] = useState(false);
+    const [authCustomer, setAuthCustomer] = useState(null);
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
@@ -36,6 +38,7 @@ export default function SiteHeader() {
 
         const syncCartState = async () => {
             setCartLoading(true);
+            setAuthLoading(true);
             let localToggleEnabled = false;
 
             try {
@@ -49,6 +52,8 @@ export default function SiteHeader() {
             if (!localToggleEnabled) {
                 setCartCount(0);
                 setCartLoading(false);
+                setAuthCustomer(null);
+                setAuthLoading(false);
                 return;
             }
 
@@ -62,8 +67,18 @@ export default function SiteHeader() {
                 }
 
                 setCartCount(Number(payload.itemCount || 0));
+
+                const authResponse = await fetch("/api/shop/auth", { cache: "no-store" }).catch(() => null);
+                const authPayload = authResponse ? await authResponse.json().catch(() => null) : null;
+
+                if (authResponse?.ok && authPayload?.authenticated) {
+                    setAuthCustomer(authPayload.customer || null);
+                } else {
+                    setAuthCustomer(null);
+                }
             } finally {
                 setCartLoading(false);
+                setAuthLoading(false);
             }
         };
 
@@ -111,12 +126,30 @@ export default function SiteHeader() {
                     <span>The Wolf Den</span>
                 </Link>
                 {paymentsEnabled && cartEnabled && (
+                    <>
+                    <Link href="/shop/account" className="pill nav-cart" onClick={() => setOpen(false)}>
+                        {authLoading ? "Account..." : authCustomer ? "My Account" : "Sign In"}
+                    </Link>
+                    {authCustomer ? (
+                        <button
+                            type="button"
+                            className="pill"
+                            onClick={async () => {
+                                await fetch("/api/shop/auth", { method: "DELETE" }).catch(() => undefined);
+                                setAuthCustomer(null);
+                                window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
+                            }}
+                        >
+                            Sign Out
+                        </button>
+                    ) : null}
                     <Link href="/cart" className="pill nav-cart" onClick={() => setOpen(false)}>
                         Cart
                         <span className={cartLoading ? "nav-cart-count nav-cart-count-loading" : "nav-cart-count"} aria-live="polite">
                             {cartLoading ? "" : Number(cartCount || 0)}
                         </span>
                     </Link>
+                    </>
                 )}
                 <a className="pill nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
                     Join Discord

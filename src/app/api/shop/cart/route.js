@@ -2,11 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { findShopItemByVariationId } from "@/lib/consignment/square";
-import { getOrCreateCartId } from "@/lib/shop-cart-session";
+import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import {
     clearCartItems,
     getCartItem,
     getCartSummary,
+    resolveActiveCartId,
     setCartItemQuantity,
 } from "@/lib/shop-carts";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -21,8 +22,12 @@ const badRequest = (message) => NextResponse.json({ error: message }, { status: 
 
 async function getCartIdFromCookies() {
     const cookieStore = await cookies();
+    const customer = await getAuthenticatedShopCustomerFromCookies();
 
-    return getOrCreateCartId(cookieStore);
+    return resolveActiveCartId({
+        cookieStore,
+        customerId: customer?.id || null,
+    });
 }
 
 export async function GET(request) {

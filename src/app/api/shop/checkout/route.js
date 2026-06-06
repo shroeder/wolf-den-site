@@ -10,12 +10,12 @@ import {
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
-import { getExistingCartId } from "@/lib/shop-cart-session";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import {
     createPendingShopOrder,
     updateShopOrderPaymentResult,
 } from "@/lib/shop-orders";
+import { resolveActiveCartId } from "@/lib/shop-carts";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -218,7 +218,7 @@ export async function POST(request) {
 
             const fulfillment = validateFulfillment(body);
             const saveCustomerProfile = body?.saveCustomerProfile === true;
-            const authenticatedCustomer = saveCustomerProfile ? await getAuthenticatedShopCustomerFromCookies() : null;
+            const authenticatedCustomer = await getAuthenticatedShopCustomerFromCookies();
 
             if (saveCustomerProfile && !authenticatedCustomer) {
                 return jsonNoStore(
@@ -238,7 +238,10 @@ export async function POST(request) {
             }
 
             const cookieStore = await cookies();
-            const cartId = getExistingCartId(cookieStore);
+            const cartId = await resolveActiveCartId({
+                cookieStore,
+                customerId: authenticatedCustomer?.id || null,
+            });
 
             if (!cartId) {
                 return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
