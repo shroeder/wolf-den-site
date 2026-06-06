@@ -1132,6 +1132,30 @@ textarea {
     grid-column: 1 / -1;
 }
 
+.cart-saved-profile-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    align-items: end;
+}
+
+.cart-saved-profile-row .button {
+    white-space: nowrap;
+}
+
+.cart-save-profile-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--ink-secondary);
+    font-size: 0.82rem;
+}
+
+.cart-save-profile-toggle input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+}
+
 .cart-field input[aria-invalid="true"] {
     border-color: rgba(246, 147, 147, 0.82);
 }
@@ -1162,6 +1186,10 @@ textarea {
     }
 
     .cart-shipping-form {
+        grid-template-columns: 1fr;
+    }
+
+    .cart-saved-profile-row {
         grid-template-columns: 1fr;
     }
 }

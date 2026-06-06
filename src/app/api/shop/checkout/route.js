@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import {
     createSquareCardPayment,
+    upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
 import { getExistingCartId } from "@/lib/shop-cart-session";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
@@ -199,6 +200,7 @@ export async function POST(request) {
             }
 
             const fulfillment = validateFulfillment(body);
+            const saveCustomerProfile = body?.saveCustomerProfile === true;
 
             if (fulfillment.error) {
                 return NextResponse.json(
@@ -291,6 +293,25 @@ export async function POST(request) {
 
             if (updatedOrder.status === "completed") {
                 await clearCartItems(cartId);
+
+                if (saveCustomerProfile && fulfillment.fulfillmentMode === "shipping" && fulfillment.shipping) {
+                    await upsertSquareCustomerProfile({
+                        email: fulfillment.shipping.email,
+                        name: fulfillment.shipping.name,
+                        phone: fulfillment.shipping.phone,
+                        addressLine1: fulfillment.shipping.addressLine1,
+                        addressLine2: fulfillment.shipping.addressLine2,
+                        city: fulfillment.shipping.city,
+                        state: fulfillment.shipping.state,
+                        postalCode: fulfillment.shipping.postalCode,
+                        country: fulfillment.shipping.country,
+                    }).catch((profileError) => {
+                        logger.warn("shop.checkout.customer_profile.save_failed", {
+                            orderId: updatedOrder.id,
+                            errorMessage: profileError instanceof Error ? profileError.message : "unknown_error",
+                        });
+                    });
+                }
             }
 
             return NextResponse.json(toCheckoutResponse(updatedOrder, payment), {

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { createServerLogger } from "@/lib/server-logger";
 
 const SQUARE_API_BASE = "https://connect.squareup.com";
@@ -188,6 +190,141 @@ function getSquareLocationId() {
     });
 
     return locationId;
+}
+
+function normalizeCustomerEmail(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+
+    return normalized || null;
+}
+
+function splitFullName(fullName) {
+    const normalized = String(fullName || "").trim();
+
+    if (!normalized) {
+        return {
+            givenName: null,
+            familyName: null,
+        };
+    }
+
+    const parts = normalized.split(/\s+/).filter(Boolean);
+
+    if (parts.length === 1) {
+        return {
+            givenName: parts[0],
+            familyName: null,
+        };
+    }
+
+    return {
+        givenName: parts.slice(0, -1).join(" "),
+        familyName: parts[parts.length - 1],
+    };
+}
+
+export async function findSquareCustomerByEmail(email) {
+    const normalizedEmail = normalizeCustomerEmail(email);
+
+    if (!normalizedEmail) {
+        return null;
+    }
+
+    const payload = await squareFetch("/v2/customers/search", {
+        method: "POST",
+        body: JSON.stringify({
+            query: {
+                filter: {
+                    email_address: {
+                        exact: normalizedEmail,
+                    },
+                },
+                sort: {
+                    field: "CREATED_AT",
+                    order: "DESC",
+                },
+            },
+            limit: 1,
+        }),
+    });
+
+    return payload.customers?.[0] || null;
+}
+
+export async function upsertSquareCustomerProfile({
+    email,
+    name,
+    phone,
+    addressLine1,
+    addressLine2,
+    city,
+    state,
+    postalCode,
+    country,
+}) {
+    const normalizedEmail = normalizeCustomerEmail(email);
+
+    if (!normalizedEmail) {
+        throw new Error("Missing customer email.");
+    }
+
+    const { givenName, familyName } = splitFullName(name);
+    const existingCustomer = await findSquareCustomerByEmail(normalizedEmail);
+    const address = {
+        address_line_1: String(addressLine1 || "").trim() || undefined,
+        address_line_2: String(addressLine2 || "").trim() || undefined,
+        locality: String(city || "").trim() || undefined,
+        administrative_district_level_1: String(state || "").trim().toUpperCase() || undefined,
+        postal_code: String(postalCode || "").trim() || undefined,
+        country: String(country || "US").trim().toUpperCase() || "US",
+    };
+
+    const payload = {
+        email_address: normalizedEmail,
+        phone_number: String(phone || "").trim() || undefined,
+        given_name: givenName || undefined,
+        family_name: familyName || undefined,
+        address,
+    };
+
+    if (existingCustomer?.id) {
+        const updated = await squareFetch(`/v2/customers/${existingCustomer.id}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+        });
+
+        return updated.customer || null;
+    }
+
+    const created = await squareFetch("/v2/customers", {
+        method: "POST",
+        body: JSON.stringify({
+            ...payload,
+            idempotency_key: randomUUID(),
+        }),
+    });
+
+    return created.customer || null;
+}
+
+export function toCheckoutProfileFromSquareCustomer(customer) {
+    if (!customer) {
+        return null;
+    }
+
+    const fullName = [customer.given_name, customer.family_name].filter(Boolean).join(" ").trim();
+
+    return {
+        name: fullName || null,
+        email: customer.email_address || null,
+        phone: customer.phone_number || null,
+        addressLine1: customer.address?.address_line_1 || null,
+        addressLine2: customer.address?.address_line_2 || null,
+        city: customer.address?.locality || null,
+        state: customer.address?.administrative_district_level_1 || null,
+        postalCode: customer.address?.postal_code || null,
+        country: customer.address?.country || null,
+    };
 }
 
 export async function listConsignorCatalog(categoryId) {

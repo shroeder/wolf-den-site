@@ -212,6 +212,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [checkoutCardState, setCheckoutCardState] = useState("idle");
     const [checkoutBusy, setCheckoutBusy] = useState(false);
     const [fulfillmentMode, setFulfillmentMode] = useState("shipping");
+    const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
+    const [profileLookupEmail, setProfileLookupEmail] = useState("");
+    const [profileLookupBusy, setProfileLookupBusy] = useState(false);
+    const [profileLookupMessage, setProfileLookupMessage] = useState("");
     const [shippingForm, setShippingForm] = useState({
         name: "",
         email: "",
@@ -422,6 +426,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         const checkoutPayload = {
             sourceId: null,
             fulfillmentMode,
+            saveCustomerProfile,
         };
 
         if (fulfillmentMode === "shipping") {
@@ -470,6 +475,58 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             setError(nextError instanceof Error ? nextError.message : "Checkout failed.");
         } finally {
             setCheckoutBusy(false);
+        }
+    };
+
+    const handleLoadSavedProfile = async () => {
+        const email = String(profileLookupEmail || "").trim().toLowerCase();
+
+        if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+            setProfileLookupMessage("Enter a valid email address to load saved info.");
+            return;
+        }
+
+        setProfileLookupBusy(true);
+        setProfileLookupMessage("");
+        setError("");
+
+        try {
+            const response = await fetch("/api/shop/customer-profile", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ email }),
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(payload?.error || "Could not load saved profile.");
+            }
+
+            if (!payload?.found || !payload?.profile) {
+                setProfileLookupMessage("No saved profile found for that email.");
+                return;
+            }
+
+            setShippingForm((current) => ({
+                ...current,
+                name: payload.profile.name || current.name,
+                email: payload.profile.email || email,
+                phone: payload.profile.phone || current.phone,
+                addressLine1: payload.profile.addressLine1 || current.addressLine1,
+                addressLine2: payload.profile.addressLine2 || current.addressLine2,
+                city: payload.profile.city || current.city,
+                state: payload.profile.state || current.state,
+                postalCode: payload.profile.postalCode || current.postalCode,
+            }));
+            setFieldErrors({});
+            setProfileLookupMessage("Saved profile loaded.");
+            setFulfillmentMode("shipping");
+        } catch (nextError) {
+            setProfileLookupMessage(nextError instanceof Error ? nextError.message : "Could not load saved profile.");
+        } finally {
+            setProfileLookupBusy(false);
         }
     };
 
@@ -582,6 +639,28 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             </div>
                             {fulfillmentMode === "shipping" ? (
                                 <div className="cart-shipping-form">
+                                    <div className="cart-saved-profile-row cart-field-full">
+                                        <label className="cart-field">
+                                            <span>Load saved info by email</span>
+                                            <input
+                                                type="email"
+                                                value={profileLookupEmail}
+                                                onChange={(event) => setProfileLookupEmail(event.target.value)}
+                                                autoComplete="email"
+                                                placeholder="you@example.com"
+                                            />
+                                        </label>
+                                        <button
+                                            type="button"
+                                            className="button"
+                                            onClick={handleLoadSavedProfile}
+                                            disabled={profileLookupBusy || checkoutBusy}
+                                        >
+                                            {profileLookupBusy ? "Loading..." : "Load saved info"}
+                                        </button>
+                                        {profileLookupMessage ? <p className="secondary cart-field-full">{profileLookupMessage}</p> : null}
+                                    </div>
+
                                     <label className="cart-field cart-field-full">
                                         <span>Full name</span>
                                         <input
@@ -668,6 +747,15 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                             autoComplete="postal-code"
                                         />
                                         {fieldErrors.shippingPostalCode ? <small className="shop-payment-error">{fieldErrors.shippingPostalCode}</small> : null}
+                                    </label>
+                                    <label className="cart-field-full cart-save-profile-toggle">
+                                        <input
+                                            type="checkbox"
+                                            checked={saveCustomerProfile}
+                                            onChange={(event) => setSaveCustomerProfile(event.target.checked)}
+                                            disabled={checkoutBusy}
+                                        />
+                                        <span>Save this shipping info for faster checkout next time.</span>
                                     </label>
                                     {fieldErrors.shippingCountry ? <p className="shop-payment-error cart-field-full">{fieldErrors.shippingCountry}</p> : null}
                                 </div>
