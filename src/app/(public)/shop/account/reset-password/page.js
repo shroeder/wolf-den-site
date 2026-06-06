@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function ShopResetPasswordPage() {
+function ShopResetPasswordPageContent() {
     const searchParams = useSearchParams();
     const initialToken = useMemo(() => String(searchParams?.get("token") || "").trim(), [searchParams]);
 
@@ -159,5 +159,13 @@ export default function ShopResetPasswordPage() {
             {status ? <p className="shop-payment-success">{status}</p> : null}
             {error ? <p className="shop-payment-error">{error}</p> : null}
         </section>
+    );
+}
+
+export default function ShopResetPasswordPage() {
+    return (
+        <Suspense fallback={<section className="card cart-page-shell"><h1>Reset password</h1><p className="secondary">Loading...</p></section>}>
+            <ShopResetPasswordPageContent />
+        </Suspense>
     );
 }

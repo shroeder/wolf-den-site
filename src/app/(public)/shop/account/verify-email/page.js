@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function ShopVerifyEmailPage() {
+function ShopVerifyEmailPageContent() {
     const searchParams = useSearchParams();
     const initialToken = useMemo(() => String(searchParams?.get("token") || "").trim(), [searchParams]);
 
@@ -74,5 +74,13 @@ export default function ShopVerifyEmailPage() {
                 Need a new verification email? Go back to <Link href="/cart">cart sign-in</Link> and sign in once to resend.
             </p>
         </section>
+    );
+}
+
+export default function ShopVerifyEmailPage() {
+    return (
+        <Suspense fallback={<section className="card cart-page-shell"><h1>Verify your email</h1><p className="secondary">Loading...</p></section>}>
+            <ShopVerifyEmailPageContent />
+        </Suspense>
     );
 }
