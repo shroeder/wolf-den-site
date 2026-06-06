@@ -20,6 +20,7 @@ const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS_PER_WINDOW = 8;
 const MAX_IP_ATTEMPTS_PER_WINDOW = 30;
 const LOCKOUT_MS = 20 * 60 * 1000;
+const MAX_TRACKED_ATTEMPT_KEYS = 5000;
 const authAttemptsByIdentity = new Map();
 const authAttemptsByIp = new Map();
 
@@ -67,6 +68,28 @@ function pruneAttempts(map) {
     }
 }
 
+function enforceAttemptCapacity(map) {
+    if (map.size <= MAX_TRACKED_ATTEMPT_KEYS) {
+        return;
+    }
+
+    let oldestKey = null;
+    let oldestWindowStart = Number.POSITIVE_INFINITY;
+
+    for (const [key, state] of map.entries()) {
+        const windowStart = Number(state?.windowStart || 0);
+
+        if (windowStart < oldestWindowStart) {
+            oldestWindowStart = windowStart;
+            oldestKey = key;
+        }
+    }
+
+    if (oldestKey) {
+        map.delete(oldestKey);
+    }
+}
+
 function isTemporarilyBlocked(map, key) {
     const now = Date.now();
     const state = map.get(key);
@@ -107,6 +130,7 @@ function recordFailedAttempt(map, key, maxAttemptsPerWindow) {
     }
 
     map.set(key, state);
+    enforceAttemptCapacity(map);
 }
 
 function clearFailedAttempts(map, key) {
@@ -166,6 +190,12 @@ export async function POST(request) {
                 return unauthorized();
             }
 
+            if (mode !== "login" && mode !== "register") {
+                recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
+                recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
+                return unauthorized();
+            }
+
             let customer = null;
 
             if (mode === "register") {
@@ -191,6 +221,7 @@ export async function POST(request) {
             }
 
             clearFailedAttempts(authAttemptsByIdentity, identityAttemptKey);
+            clearFailedAttempts(authAttemptsByIp, ipAttemptKey);
 
             const token = createShopCustomerSessionToken(customer.id);
             const cookieStore = await cookies();

@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 
+const DUMMY_PASSWORD_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -104,6 +106,7 @@ export async function loginShopCustomer(email, password) {
     const customer = await getShopCustomerByEmail(normalizedEmail);
 
     if (!customer?.password_hash) {
+        await verifyPassword(password, DUMMY_PASSWORD_HASH);
         return null;
     }
 

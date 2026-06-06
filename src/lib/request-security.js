@@ -4,10 +4,6 @@ function getRequestHost(request) {
     return request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
 }
 
-function getRequestProtocol(request) {
-    return request.headers.get("x-forwarded-proto") || (process.env.NODE_ENV === "production" ? "https" : "http");
-}
-
 function matchesHost(originValue, expectedHost) {
     try {
         const parsed = new URL(originValue);
@@ -37,7 +33,5 @@ export function isTrustedWriteRequest(request) {
         return matchesHost(referer, host);
     }
 
-    const expectedProtocol = getRequestProtocol(request);
-
-    return Boolean(expectedProtocol && host);
+    return false;
 }
