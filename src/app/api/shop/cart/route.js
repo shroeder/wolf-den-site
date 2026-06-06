@@ -80,6 +80,19 @@ export async function POST(request) {
                 return NextResponse.json(await getCartSummary(cartId));
             }
 
+            if (action === "update") {
+                const requestedQuantity = Math.floor(Number(body.quantity || 0));
+
+                if (!Number.isFinite(requestedQuantity)) {
+                    return badRequest("Invalid quantity.");
+                }
+
+                if (requestedQuantity <= 0) {
+                    await setCartItemQuantity(cartId, catalogObjectId, 0);
+                    return NextResponse.json(await getCartSummary(cartId));
+                }
+            }
+
             const item = await findShopItemByVariationId(catalogObjectId);
 
             if (!item || !Number.isFinite(item.quantity) || item.quantity < 1) {
@@ -91,6 +104,12 @@ export async function POST(request) {
                 const existing = await getCartItem(cartId, catalogObjectId);
                 const nextQuantity = Number(existing?.quantity || 0) + quantityToAdd;
 
+                if (nextQuantity > item.quantity) {
+                    return NextResponse.json({
+                        error: `Only ${item.quantity} available in stock.`,
+                    }, { status: 409 });
+                }
+
                 await setCartItemQuantity(cartId, catalogObjectId, nextQuantity);
                 return NextResponse.json(await getCartSummary(cartId));
             }
@@ -100,6 +119,15 @@ export async function POST(request) {
 
                 if (!Number.isFinite(nextQuantity)) {
                     return badRequest("Invalid quantity.");
+                }
+
+                const existing = await getCartItem(cartId, catalogObjectId);
+                const existingQuantity = Number(existing?.quantity || 0);
+
+                if (nextQuantity > item.quantity && nextQuantity >= existingQuantity) {
+                    return NextResponse.json({
+                        error: `Only ${item.quantity} available in stock.`,
+                    }, { status: 409 });
                 }
 
                 await setCartItemQuantity(cartId, catalogObjectId, Math.max(0, nextQuantity));

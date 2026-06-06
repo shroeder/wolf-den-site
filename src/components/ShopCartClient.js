@@ -719,7 +719,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 <div className="cart-line-actions">
                                     <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "update", catalogObjectId: item.catalogObjectId, quantity: Math.max(0, item.quantity - 1) })}>-</button>
                                     <span>{item.quantity}</span>
-                                    <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "update", catalogObjectId: item.catalogObjectId, quantity: item.quantity + 1 })}>+</button>
+                                    <button
+                                        type="button"
+                                        className="button"
+                                        disabled={cartMutating || item.unavailable || item.quantity >= item.maxQuantity}
+                                        onClick={() => mutateCart({ action: "update", catalogObjectId: item.catalogObjectId, quantity: Math.min(item.maxQuantity, item.quantity + 1) })}
+                                    >
+                                        +
+                                    </button>
                                     <button type="button" className="button" disabled={cartMutating} onClick={() => mutateCart({ action: "remove", catalogObjectId: item.catalogObjectId })}>
                                         {lineItemMutatingId === item.catalogObjectId ? "Updating..." : "Remove"}
                                     </button>
