@@ -957,7 +957,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                         <button
                             type="button"
-                            className="button primary shop-payment-submit"
+                            className="button primary shop-payment-submit shop-payment-submit-desktop"
                             disabled={!canSubmitCheckout}
                             onClick={handleCheckout}
                         >
@@ -966,6 +966,23 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                         {!hasFulfillmentChoice ? <p className="secondary">Select shipping or pickup to enable payment.</p> : null}
                         {fulfillmentMode === "shipping" && !isShippingReady ? <p className="secondary">Complete shipping fields to enable payment.</p> : null}
                     </article>
+                </div>
+            )}
+
+            {cartData.items.length > 0 && (
+                <div className="shop-payment-mobile-bar" aria-live="polite">
+                    <div className="shop-payment-mobile-meta">
+                        <p className="shop-payment-mobile-total-label">Total</p>
+                        <strong className="shop-payment-mobile-total-value">{formatMoney(cartData.totalCents)}</strong>
+                    </div>
+                    <button
+                        type="button"
+                        className="button primary shop-payment-submit shop-payment-submit-mobile"
+                        disabled={!canSubmitCheckout}
+                        onClick={handleCheckout}
+                    >
+                        {checkoutBusy ? "Processing..." : "Pay now"}
+                    </button>
                 </div>
             )}
         </section>

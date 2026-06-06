@@ -1813,6 +1813,32 @@ textarea {
     width: 100%;
 }
 
+.shop-payment-submit-mobile {
+    display: none;
+}
+
+.shop-payment-mobile-bar {
+    display: none;
+}
+
+.shop-payment-mobile-meta {
+    display: grid;
+    gap: 0.05rem;
+}
+
+.shop-payment-mobile-total-label {
+    margin: 0;
+    font-size: 0.72rem;
+    color: var(--ink-secondary);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.shop-payment-mobile-total-value {
+    font-size: 1rem;
+    color: var(--accent-hover);
+}
+
 .shop-payment-error,
 .shop-payment-success {
     margin: 0;
@@ -1851,6 +1877,64 @@ textarea {
 }
 
 @media (max-width: 760px) {
+    .cart-checkout-card {
+        gap: 0.7rem;
+        padding-bottom: 0.9rem;
+    }
+
+    .cart-fulfillment-mode {
+        min-height: 2.85rem;
+        font-size: 0.9rem;
+    }
+
+    .cart-line-item {
+        gap: 0.55rem;
+        padding: 0.55rem;
+    }
+
+    .cart-line-actions {
+        gap: 0.3rem;
+    }
+
+    .cart-line-actions .button {
+        min-height: 2.5rem;
+        min-width: 2.5rem;
+        padding: 0.45rem 0.62rem;
+        font-size: 0.82rem;
+    }
+
+    .shop-payment-submit-desktop {
+        display: none;
+    }
+
+    .shop-payment-mobile-bar {
+        position: fixed;
+        left: 0.7rem;
+        right: 0.7rem;
+        bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+        z-index: 1500;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 0.6rem;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(14, 14, 14, 0.96);
+        box-shadow: 0 14px 26px rgba(0, 0, 0, 0.35);
+    }
+
+    .shop-payment-submit-mobile {
+        display: inline-flex;
+        width: auto;
+        min-height: 2.8rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .cart-page-shell {
+        padding-bottom: 6rem;
+    }
+
     .shop-detail {
         padding: 0.7rem;
         gap: 0.65rem;
