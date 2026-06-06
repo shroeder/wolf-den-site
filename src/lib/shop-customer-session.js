@@ -8,13 +8,11 @@ import { getShopCustomerBySessionSubject } from "@/lib/shop-customers";
 export const SHOP_CUSTOMER_SESSION_COOKIE = "wolfden-shop-customer-session";
 export const SHOP_CUSTOMER_2FA_PENDING_COOKIE = "wolfden-shop-customer-2fa-pending";
 export const SHOP_CUSTOMER_TRUSTED_DEVICE_COOKIE = "wolfden-shop-customer-trusted-device";
-export const SHOP_CUSTOMER_OAUTH_STATE_COOKIE = "wolfden-shop-customer-oauth-state";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_RENEWAL_WINDOW_SECONDS = 60 * 60 * 24;
 const PENDING_2FA_TTL_SECONDS = 60 * 10;
 const TRUSTED_DEVICE_TTL_SECONDS = 60 * 60 * 24 * 30;
-const OAUTH_STATE_TTL_SECONDS = 60 * 10;
 
 const encodePayload = (value) => Buffer.from(value, "utf8").toString("base64url");
 const decodePayload = (value) => Buffer.from(value, "base64url").toString("utf8");
@@ -141,16 +139,6 @@ export function getShopCustomerTrustedDeviceCookieOptions() {
         secure: process.env.NODE_ENV === "production",
         path: "/",
         maxAge: TRUSTED_DEVICE_TTL_SECONDS,
-    };
-}
-
-export function getShopCustomerOAuthStateCookieOptions() {
-    return {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: OAUTH_STATE_TTL_SECONDS,
     };
 }
 

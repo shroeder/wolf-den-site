@@ -257,8 +257,6 @@ export default function ShopAccountPage() {
                 ) : (
                     <div className="cart-account-panel">
                         <p className="cart-fulfillment-label">Sign in</p>
-                        <a href="/api/shop/auth/oauth/google/start" className="button" aria-label="Continue with Google">Continue with Google</a>
-                        <p className="secondary">Or sign in with email and password:</p>
                         <div className="cart-account-mode-toggle" role="tablist" aria-label="Choose sign in or create account">
                             <button
                                 type="button"

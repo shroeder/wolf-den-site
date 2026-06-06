@@ -1,7 +1,5 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
 import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 
@@ -206,106 +204,6 @@ export async function getShopCustomerBySessionSubject(customerId) {
 
 export async function getShopPublicCustomerById(customerId) {
     const customer = await getShopCustomerById(customerId);
-
-    return toPublicCustomer(customer);
-}
-
-export async function getShopCustomerByOauthIdentity(provider, providerSubject) {
-    const identity = await db.queryOne(
-        `SELECT c.*
-         FROM shop_customer_oauth_identities i
-         INNER JOIN shop_customer_accounts c ON c.id = i.customer_id
-         WHERE i.provider = $1
-           AND i.provider_subject = $2
-           AND c.active = TRUE`,
-        [String(provider || "").trim().toLowerCase(), String(providerSubject || "").trim()]
-    );
-
-    return identity || null;
-}
-
-export async function upsertShopCustomerOauthIdentity({ provider, providerSubject, email, emailVerified }) {
-    const normalizedProvider = String(provider || "").trim().toLowerCase();
-    const normalizedSubject = String(providerSubject || "").trim();
-    const normalizedEmail = normalizeEmail(email);
-
-    if (!normalizedProvider || !normalizedSubject || !normalizedEmail) {
-        return null;
-    }
-
-    const existingByIdentity = await getShopCustomerByOauthIdentity(normalizedProvider, normalizedSubject);
-
-    if (existingByIdentity) {
-        return toPublicCustomer(existingByIdentity);
-    }
-
-    let customer = await getShopCustomerByEmail(normalizedEmail);
-
-    if (!customer) {
-        const generatedPasswordHash = await hashPassword(randomUUID());
-        customer = await db.queryOne(
-            `INSERT INTO shop_customer_accounts (
-                email,
-                email_normalized,
-                password_hash,
-                email_verified_at
-            ) VALUES (
-                $1,
-                $2,
-                $3,
-                $4
-            )
-            RETURNING *`,
-            [
-                String(email || "").trim(),
-                normalizedEmail,
-                generatedPasswordHash,
-                emailVerified ? new Date().toISOString() : null,
-            ]
-        );
-    } else if (emailVerified && !customer.email_verified_at) {
-        customer = await db.queryOne(
-            `UPDATE shop_customer_accounts
-             SET email_verified_at = NOW(),
-                 updated_at = NOW()
-             WHERE id = $1
-             RETURNING *`,
-            [customer.id]
-        );
-    }
-
-    await db.query(
-        `INSERT INTO shop_customer_oauth_identities (
-            customer_id,
-            provider,
-            provider_subject,
-            email,
-            email_normalized,
-            created_at,
-            updated_at
-        ) VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            NOW(),
-            NOW()
-        )
-        ON CONFLICT (provider, provider_subject)
-        DO UPDATE SET
-            customer_id = EXCLUDED.customer_id,
-            email = EXCLUDED.email,
-            email_normalized = EXCLUDED.email_normalized,
-            updated_at = NOW()`,
-        [
-            customer.id,
-            normalizedProvider,
-            normalizedSubject,
-            String(email || "").trim(),
-            normalizedEmail,
-        ]
-    );
 
     return toPublicCustomer(customer);
 }
