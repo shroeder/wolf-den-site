@@ -16,6 +16,18 @@ function toPublicCustomer(customer) {
         id: customer.id,
         email: customer.email,
         hasSavedProfile: Boolean(customer.square_customer_id),
+    };
+}
+
+function toSessionCustomer(customer) {
+    if (!customer) {
+        return null;
+    }
+
+    return {
+        id: customer.id,
+        email: customer.email,
+        hasSavedProfile: Boolean(customer.square_customer_id),
         squareCustomerId: customer.square_customer_id || null,
     };
 }
@@ -131,5 +143,5 @@ export async function updateShopCustomerSquareId(customerId, squareCustomerId) {
 export async function getShopCustomerBySessionSubject(customerId) {
     const customer = await getShopCustomerById(customerId);
 
-    return toPublicCustomer(customer);
+    return toSessionCustomer(customer);
 }

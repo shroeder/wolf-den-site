@@ -265,6 +265,7 @@ export async function getSquareCustomerById(customerId) {
 
 export async function upsertSquareCustomerProfile({
     preferredCustomerId,
+    allowEmailLookup = true,
     email,
     name,
     phone,
@@ -285,7 +286,7 @@ export async function upsertSquareCustomerProfile({
     const preferredId = String(preferredCustomerId || "").trim();
     const existingCustomer = preferredId
         ? await getSquareCustomerById(preferredId).catch(() => null)
-        : await findSquareCustomerByEmail(normalizedEmail);
+        : (allowEmailLookup ? await findSquareCustomerByEmail(normalizedEmail) : null);
     const address = {
         address_line_1: String(addressLine1 || "").trim() || undefined,
         address_line_2: String(addressLine2 || "").trim() || undefined,

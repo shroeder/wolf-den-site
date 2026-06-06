@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 
-import {
-    findSquareCustomerByEmail,
-    getSquareCustomerById,
-    toCheckoutProfileFromSquareCustomer,
-} from "@/lib/consignment/square";
+import { getSquareCustomerById, toCheckoutProfileFromSquareCustomer } from "@/lib/consignment/square";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -21,18 +17,21 @@ export async function POST(request) {
         }
 
         try {
-            const body = await request.json().catch(() => null);
-            const email = String(body?.email || "").trim().toLowerCase();
+            const customer = await getAuthenticatedShopCustomerFromCookies();
 
-            if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-                return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+            if (!customer) {
+                return NextResponse.json({ found: false, profile: null }, { status: 401 });
             }
 
-            const customer = await findSquareCustomerByEmail(email);
+            if (!customer.hasSavedProfile) {
+                return NextResponse.json({ found: false, profile: null });
+            }
+
+            const squareCustomer = await getSquareCustomerById(customer.squareCustomerId);
 
             return NextResponse.json({
-                found: Boolean(customer),
-                profile: toCheckoutProfileFromSquareCustomer(customer),
+                found: Boolean(squareCustomer),
+                profile: toCheckoutProfileFromSquareCustomer(squareCustomer),
             });
         } catch (error) {
             return internalError(error, {

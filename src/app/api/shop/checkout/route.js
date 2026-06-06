@@ -307,6 +307,7 @@ export async function POST(request) {
                 if (saveCustomerProfile && fulfillment.fulfillmentMode === "shipping" && fulfillment.shipping) {
                     await upsertSquareCustomerProfile({
                         preferredCustomerId: authenticatedCustomer?.squareCustomerId,
+                        allowEmailLookup: false,
                         email: fulfillment.shipping.email,
                         name: fulfillment.shipping.name,
                         phone: fulfillment.shipping.phone,
