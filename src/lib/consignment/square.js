@@ -251,7 +251,20 @@ export async function findSquareCustomerByEmail(email) {
     return payload.customers?.[0] || null;
 }
 
+export async function getSquareCustomerById(customerId) {
+    const normalizedCustomerId = String(customerId || "").trim();
+
+    if (!normalizedCustomerId) {
+        return null;
+    }
+
+    const payload = await squareFetch(`/v2/customers/${normalizedCustomerId}`);
+
+    return payload.customer || null;
+}
+
 export async function upsertSquareCustomerProfile({
+    preferredCustomerId,
     email,
     name,
     phone,
@@ -269,7 +282,10 @@ export async function upsertSquareCustomerProfile({
     }
 
     const { givenName, familyName } = splitFullName(name);
-    const existingCustomer = await findSquareCustomerByEmail(normalizedEmail);
+    const preferredId = String(preferredCustomerId || "").trim();
+    const existingCustomer = preferredId
+        ? await getSquareCustomerById(preferredId).catch(() => null)
+        : await findSquareCustomerByEmail(normalizedEmail);
     const address = {
         address_line_1: String(addressLine1 || "").trim() || undefined,
         address_line_2: String(addressLine2 || "").trim() || undefined,

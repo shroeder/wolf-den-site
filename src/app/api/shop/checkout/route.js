@@ -7,6 +7,8 @@ import {
     createSquareCardPayment,
     upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
+import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
+import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { getExistingCartId } from "@/lib/shop-cart-session";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import {
@@ -201,6 +203,14 @@ export async function POST(request) {
 
             const fulfillment = validateFulfillment(body);
             const saveCustomerProfile = body?.saveCustomerProfile === true;
+            const authenticatedCustomer = saveCustomerProfile ? await getAuthenticatedShopCustomerFromCookies() : null;
+
+            if (saveCustomerProfile && !authenticatedCustomer) {
+                return NextResponse.json(
+                    { error: "Sign in to save checkout info for next time." },
+                    { status: 401 }
+                );
+            }
 
             if (fulfillment.error) {
                 return NextResponse.json(
@@ -296,6 +306,7 @@ export async function POST(request) {
 
                 if (saveCustomerProfile && fulfillment.fulfillmentMode === "shipping" && fulfillment.shipping) {
                     await upsertSquareCustomerProfile({
+                        preferredCustomerId: authenticatedCustomer?.squareCustomerId,
                         email: fulfillment.shipping.email,
                         name: fulfillment.shipping.name,
                         phone: fulfillment.shipping.phone,
@@ -305,6 +316,12 @@ export async function POST(request) {
                         state: fulfillment.shipping.state,
                         postalCode: fulfillment.shipping.postalCode,
                         country: fulfillment.shipping.country,
+                    }).then((squareCustomer) => {
+                        if (authenticatedCustomer?.id && squareCustomer?.id) {
+                            return updateShopCustomerSquareId(authenticatedCustomer.id, squareCustomer.id);
+                        }
+
+                        return null;
                     }).catch((profileError) => {
                         logger.warn("shop.checkout.customer_profile.save_failed", {
                             orderId: updatedOrder.id,

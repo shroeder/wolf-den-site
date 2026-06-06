@@ -1079,6 +1079,37 @@ textarea {
     background: rgba(0, 0, 0, 0.2);
 }
 
+.cart-account-panel {
+    display: grid;
+    gap: 0.45rem;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.1rem;
+}
+
+.cart-account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.cart-account-row p {
+    margin: 0;
+}
+
+.cart-account-form {
+    display: grid;
+    gap: 0.42rem;
+}
+
+.cart-account-mode-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+}
+
 .cart-fulfillment-label {
     margin: 0;
     font-size: 0.72rem;

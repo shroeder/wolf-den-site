@@ -211,6 +211,12 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [lineItemMutatingId, setLineItemMutatingId] = useState("");
     const [checkoutCardState, setCheckoutCardState] = useState("idle");
     const [checkoutBusy, setCheckoutBusy] = useState(false);
+    const [authLoading, setAuthLoading] = useState(false);
+    const [authMode, setAuthMode] = useState("login");
+    const [authEmail, setAuthEmail] = useState("");
+    const [authPassword, setAuthPassword] = useState("");
+    const [authCustomer, setAuthCustomer] = useState(null);
+    const [authError, setAuthError] = useState("");
     const [fulfillmentMode, setFulfillmentMode] = useState("shipping");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
     const [profileLookupEmail, setProfileLookupEmail] = useState("");
@@ -322,6 +328,40 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         return () => window.clearTimeout(timeoutId);
     }, [canShowCart, refreshCart]);
 
+    const refreshAuthSession = useCallback(async () => {
+        if (!canShowCart) {
+            setAuthCustomer(null);
+            return;
+        }
+
+        setAuthLoading(true);
+        setAuthError("");
+
+        try {
+            const response = await fetch("/api/shop/auth", { cache: "no-store" });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok || !payload) {
+                throw new Error("Could not load sign-in status.");
+            }
+
+            setAuthCustomer(payload.authenticated ? payload.customer : null);
+        } catch (nextError) {
+            setAuthError(nextError instanceof Error ? nextError.message : "Could not load sign-in status.");
+            setAuthCustomer(null);
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [canShowCart]);
+
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            refreshAuthSession();
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [refreshAuthSession]);
+
     useEffect(() => {
         if (canShowCart && cartData.items.length) {
             return;
@@ -426,7 +466,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         const checkoutPayload = {
             sourceId: null,
             fulfillmentMode,
-            saveCustomerProfile,
+            saveCustomerProfile: Boolean(saveCustomerProfile && authCustomer),
         };
 
         if (fulfillmentMode === "shipping") {
@@ -475,6 +515,101 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             setError(nextError instanceof Error ? nextError.message : "Checkout failed.");
         } finally {
             setCheckoutBusy(false);
+        }
+    };
+
+    const handleAuthSubmit = async () => {
+        if (!String(authEmail || "").trim() || !String(authPassword || "")) {
+            setAuthError("Enter email and password.");
+            return;
+        }
+
+        setAuthLoading(true);
+        setAuthError("");
+
+        try {
+            const response = await fetch("/api/shop/auth", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    mode: authMode,
+                    email: authEmail,
+                    password: authPassword,
+                }),
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(payload?.error || "Could not sign in.");
+            }
+
+            setAuthCustomer(payload.customer || null);
+            setAuthPassword("");
+            setAuthError("");
+            setSaveCustomerProfile(true);
+        } catch (nextError) {
+            setAuthError(nextError instanceof Error ? nextError.message : "Could not sign in.");
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        setAuthLoading(true);
+        setAuthError("");
+
+        try {
+            await fetch("/api/shop/auth", {
+                method: "DELETE",
+            });
+            setAuthCustomer(null);
+            setSaveCustomerProfile(false);
+        } catch (nextError) {
+            setAuthError(nextError instanceof Error ? nextError.message : "Could not sign out.");
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
+    const handleLoadAuthenticatedProfile = async () => {
+        setProfileLookupBusy(true);
+        setProfileLookupMessage("");
+
+        try {
+            const response = await fetch("/api/shop/customer-profile", {
+                cache: "no-store",
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(payload?.error || "Could not load saved profile.");
+            }
+
+            if (!payload?.found || !payload?.profile) {
+                setProfileLookupMessage("No saved profile is linked to your account yet.");
+                return;
+            }
+
+            setShippingForm((current) => ({
+                ...current,
+                name: payload.profile.name || current.name,
+                email: payload.profile.email || current.email,
+                phone: payload.profile.phone || current.phone,
+                addressLine1: payload.profile.addressLine1 || current.addressLine1,
+                addressLine2: payload.profile.addressLine2 || current.addressLine2,
+                city: payload.profile.city || current.city,
+                state: payload.profile.state || current.state,
+                postalCode: payload.profile.postalCode || current.postalCode,
+            }));
+            setFieldErrors({});
+            setProfileLookupMessage("Saved profile loaded from your account.");
+            setFulfillmentMode("shipping");
+        } catch (nextError) {
+            setProfileLookupMessage(nextError instanceof Error ? nextError.message : "Could not load saved profile.");
+        } finally {
+            setProfileLookupBusy(false);
         }
     };
 
@@ -614,6 +749,51 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                     <article className="card cart-checkout-card">
                         <div className="cart-fulfillment-panel" aria-live="polite">
+                            <div className="cart-account-panel">
+                                <p className="cart-fulfillment-label">Account</p>
+                                {authCustomer ? (
+                                    <div className="cart-account-row">
+                                        <p className="secondary">Signed in as <strong>{authCustomer.email}</strong></p>
+                                        <button type="button" className="button" onClick={handleLogout} disabled={authLoading || checkoutBusy}>
+                                            {authLoading ? "Signing out..." : "Sign out"}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="cart-account-form">
+                                        <div className="cart-account-mode-toggle" role="tablist" aria-label="Choose sign in or create account">
+                                            <button
+                                                type="button"
+                                                className={authMode === "login" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                                onClick={() => setAuthMode("login")}
+                                                disabled={authLoading}
+                                            >
+                                                Sign in
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={authMode === "register" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                                onClick={() => setAuthMode("register")}
+                                                disabled={authLoading}
+                                            >
+                                                Create account
+                                            </button>
+                                        </div>
+                                        <label className="cart-field">
+                                            <span>Email</span>
+                                            <input type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} autoComplete="email" />
+                                        </label>
+                                        <label className="cart-field">
+                                            <span>Password</span>
+                                            <input type="password" value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} autoComplete={authMode === "register" ? "new-password" : "current-password"} />
+                                        </label>
+                                        <button type="button" className="button" onClick={handleAuthSubmit} disabled={authLoading || checkoutBusy}>
+                                            {authLoading ? "Working..." : authMode === "register" ? "Create account" : "Sign in"}
+                                        </button>
+                                    </div>
+                                )}
+                                {authError ? <p className="shop-payment-error">{authError}</p> : null}
+                            </div>
+
                             <p className="cart-fulfillment-label">Fulfillment</p>
                             <div className="cart-fulfillment-toggle" role="tablist" aria-label="Choose shipping or pickup">
                                 <button
@@ -640,24 +820,37 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             {fulfillmentMode === "shipping" ? (
                                 <div className="cart-shipping-form">
                                     <div className="cart-saved-profile-row cart-field-full">
-                                        <label className="cart-field">
-                                            <span>Load saved info by email</span>
-                                            <input
-                                                type="email"
-                                                value={profileLookupEmail}
-                                                onChange={(event) => setProfileLookupEmail(event.target.value)}
-                                                autoComplete="email"
-                                                placeholder="you@example.com"
-                                            />
-                                        </label>
-                                        <button
-                                            type="button"
-                                            className="button"
-                                            onClick={handleLoadSavedProfile}
-                                            disabled={profileLookupBusy || checkoutBusy}
-                                        >
-                                            {profileLookupBusy ? "Loading..." : "Load saved info"}
-                                        </button>
+                                        {authCustomer ? (
+                                            <button
+                                                type="button"
+                                                className="button"
+                                                onClick={handleLoadAuthenticatedProfile}
+                                                disabled={profileLookupBusy || checkoutBusy}
+                                            >
+                                                {profileLookupBusy ? "Loading..." : "Load my saved info"}
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <label className="cart-field">
+                                                    <span>Load saved info by email</span>
+                                                    <input
+                                                        type="email"
+                                                        value={profileLookupEmail}
+                                                        onChange={(event) => setProfileLookupEmail(event.target.value)}
+                                                        autoComplete="email"
+                                                        placeholder="you@example.com"
+                                                    />
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    className="button"
+                                                    onClick={handleLoadSavedProfile}
+                                                    disabled={profileLookupBusy || checkoutBusy}
+                                                >
+                                                    {profileLookupBusy ? "Loading..." : "Load saved info"}
+                                                </button>
+                                            </>
+                                        )}
                                         {profileLookupMessage ? <p className="secondary cart-field-full">{profileLookupMessage}</p> : null}
                                     </div>
 
@@ -753,9 +946,13 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                             type="checkbox"
                                             checked={saveCustomerProfile}
                                             onChange={(event) => setSaveCustomerProfile(event.target.checked)}
-                                            disabled={checkoutBusy}
+                                            disabled={checkoutBusy || !authCustomer}
                                         />
-                                        <span>Save this shipping info for faster checkout next time.</span>
+                                        <span>
+                                            {authCustomer
+                                                ? "Save this shipping info for faster checkout next time."
+                                                : "Sign in to save shipping info to your account."}
+                                        </span>
                                     </label>
                                     {fieldErrors.shippingCountry ? <p className="shop-payment-error cart-field-full">{fieldErrors.shippingCountry}</p> : null}
                                 </div>
