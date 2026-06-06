@@ -18,6 +18,113 @@ export const runtime = "nodejs";
 
 const badRequest = (message) => NextResponse.json({ error: message }, { status: 400 });
 
+const US_STATES = new Set([
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+]);
+
+function normalizeText(value) {
+    const normalized = String(value || "").trim();
+
+    return normalized || null;
+}
+
+function normalizeEmail(value) {
+    const normalized = normalizeText(value);
+
+    return normalized ? normalized.toLowerCase() : null;
+}
+
+function normalizeShippingPayload(value) {
+    const payload = value && typeof value === "object" ? value : {};
+
+    return {
+        name: normalizeText(payload.name),
+        email: normalizeEmail(payload.email),
+        phone: normalizeText(payload.phone),
+        addressLine1: normalizeText(payload.addressLine1),
+        addressLine2: normalizeText(payload.addressLine2),
+        city: normalizeText(payload.city),
+        state: normalizeText(payload.state)?.toUpperCase() || null,
+        postalCode: normalizeText(payload.postalCode),
+        country: normalizeText(payload.country)?.toUpperCase() || "US",
+    };
+}
+
+function validateFulfillment(body) {
+    const mode = String(body?.fulfillmentMode || "shipping").trim().toLowerCase();
+
+    if (mode !== "shipping" && mode !== "pickup") {
+        return {
+            error: "Fulfillment mode must be shipping or pickup.",
+            fieldErrors: {
+                fulfillmentMode: "Choose shipping or pickup.",
+            },
+        };
+    }
+
+    if (mode === "pickup") {
+        return {
+            fulfillmentMode: mode,
+            shipping: null,
+            shippingValidationStatus: "not_required",
+            fieldErrors: null,
+        };
+    }
+
+    const shipping = normalizeShippingPayload(body?.shipping);
+    const fieldErrors = {};
+
+    if (!shipping.name) {
+        fieldErrors.shippingName = "Full name is required.";
+    }
+
+    if (!shipping.email || !/^\S+@\S+\.\S+$/.test(shipping.email)) {
+        fieldErrors.shippingEmail = "Enter a valid email address.";
+    }
+
+    if (!shipping.phone || shipping.phone.replace(/\D/g, "").length < 10) {
+        fieldErrors.shippingPhone = "Enter a valid phone number.";
+    }
+
+    if (!shipping.addressLine1) {
+        fieldErrors.shippingAddressLine1 = "Address line 1 is required.";
+    }
+
+    if (!shipping.city) {
+        fieldErrors.shippingCity = "City is required.";
+    }
+
+    if (!shipping.state || !US_STATES.has(shipping.state)) {
+        fieldErrors.shippingState = "Use a valid 2-letter US state.";
+    }
+
+    if (!shipping.postalCode || !/^\d{5}(?:-\d{4})?$/.test(shipping.postalCode)) {
+        fieldErrors.shippingPostalCode = "Use ZIP format 12345 or 12345-6789.";
+    }
+
+    if (shipping.country !== "US") {
+        fieldErrors.shippingCountry = "Only US domestic shipping is supported right now.";
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+        return {
+            error: "Shipping details are incomplete or invalid.",
+            fieldErrors,
+        };
+    }
+
+    return {
+        fulfillmentMode: mode,
+        shipping,
+        shippingValidationStatus: "valid",
+        fieldErrors: null,
+    };
+}
+
 function isPaymentsEnabled() {
     return process.env.PAYMENTS_ENABLED === "true";
 }
@@ -44,6 +151,18 @@ function toCheckoutResponse(order, payment) {
             subtotalCents: order.subtotal_cents,
             onlineFeeCents: order.online_fee_cents,
             totalCents: order.total_cents,
+            fulfillmentMode: order.fulfillment_mode,
+            shipping: {
+                name: order.shipping_name,
+                email: order.shipping_email,
+                phone: order.shipping_phone,
+                addressLine1: order.shipping_address_line1,
+                addressLine2: order.shipping_address_line2,
+                city: order.shipping_city,
+                state: order.shipping_state,
+                postalCode: order.shipping_postal_code,
+                country: order.shipping_country,
+            },
             squarePaymentId: order.square_payment_id,
             squareStatus: order.square_status,
             receiptUrl: order.receipt_url,
@@ -79,6 +198,18 @@ export async function POST(request) {
                 return badRequest("Missing payment source id.");
             }
 
+            const fulfillment = validateFulfillment(body);
+
+            if (fulfillment.error) {
+                return NextResponse.json(
+                    {
+                        error: fulfillment.error,
+                        fieldErrors: fulfillment.fieldErrors,
+                    },
+                    { status: 400 }
+                );
+            }
+
             const cookieStore = await cookies();
             const cartId = getExistingCartId(cookieStore);
 
@@ -111,6 +242,9 @@ export async function POST(request) {
                 idempotencyKey,
                 cartId,
                 items: cart.items,
+                fulfillmentMode: fulfillment.fulfillmentMode,
+                shipping: fulfillment.shipping,
+                shippingValidationStatus: fulfillment.shippingValidationStatus,
             });
 
             let payment;

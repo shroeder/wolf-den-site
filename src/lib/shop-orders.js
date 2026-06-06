@@ -22,6 +22,9 @@ export async function createPendingShopOrder({
     idempotencyKey,
     cartId,
     items,
+    fulfillmentMode,
+    shipping,
+    shippingValidationStatus,
 }) {
     return db.queryOne(
         `INSERT INTO shop_orders (
@@ -34,8 +37,19 @@ export async function createPendingShopOrder({
             idempotency_key,
             cart_id,
             items_json,
+            fulfillment_mode,
+            shipping_name,
+            shipping_email,
+            shipping_phone,
+            shipping_address_line1,
+            shipping_address_line2,
+            shipping_city,
+            shipping_state,
+            shipping_postal_code,
+            shipping_country,
+            shipping_validation_status,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -47,6 +61,17 @@ export async function createPendingShopOrder({
             idempotencyKey,
             toNullableText(cartId),
             JSON.stringify(items || []),
+            toNullableText(fulfillmentMode) || "shipping",
+            toNullableText(shipping?.name),
+            toNullableText(shipping?.email),
+            toNullableText(shipping?.phone),
+            toNullableText(shipping?.addressLine1),
+            toNullableText(shipping?.addressLine2),
+            toNullableText(shipping?.city),
+            toNullableText(shipping?.state),
+            toNullableText(shipping?.postalCode),
+            toNullableText(shipping?.country),
+            toNullableText(shippingValidationStatus) || "pending",
         ]
     );
 }

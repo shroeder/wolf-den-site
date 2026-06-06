@@ -142,6 +142,62 @@ function emitCartUpdated() {
     window.dispatchEvent(new CustomEvent(SHOP_CART_UPDATED_EVENT));
 }
 
+function validateShippingForm(shipping) {
+    const fieldErrors = {};
+
+    if (!String(shipping.name || "").trim()) {
+        fieldErrors.shippingName = "Full name is required.";
+    }
+
+    const email = String(shipping.email || "").trim();
+
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        fieldErrors.shippingEmail = "Enter a valid email address.";
+    }
+
+    const phone = String(shipping.phone || "").replace(/\D/g, "");
+
+    if (phone.length < 10) {
+        fieldErrors.shippingPhone = "Enter a valid phone number.";
+    }
+
+    if (!String(shipping.addressLine1 || "").trim()) {
+        fieldErrors.shippingAddressLine1 = "Address line 1 is required.";
+    }
+
+    if (!String(shipping.city || "").trim()) {
+        fieldErrors.shippingCity = "City is required.";
+    }
+
+    const state = String(shipping.state || "").trim().toUpperCase();
+
+    if (!/^[A-Z]{2}$/.test(state)) {
+        fieldErrors.shippingState = "Use a valid 2-letter US state.";
+    }
+
+    const postalCode = String(shipping.postalCode || "").trim();
+
+    if (!/^\d{5}(?:-\d{4})?$/.test(postalCode)) {
+        fieldErrors.shippingPostalCode = "Use ZIP format 12345 or 12345-6789.";
+    }
+
+    return fieldErrors;
+}
+
+function normalizeShippingForm(shipping) {
+    return {
+        name: String(shipping.name || "").trim(),
+        email: String(shipping.email || "").trim().toLowerCase(),
+        phone: String(shipping.phone || "").trim(),
+        addressLine1: String(shipping.addressLine1 || "").trim(),
+        addressLine2: String(shipping.addressLine2 || "").trim(),
+        city: String(shipping.city || "").trim(),
+        state: String(shipping.state || "").trim().toUpperCase(),
+        postalCode: String(shipping.postalCode || "").trim(),
+        country: "US",
+    };
+}
+
 export default function ShopCartClient({ paymentsEnabled, squareApplicationId, squareLocationId }) {
     const [localToggleEnabled, setLocalToggleEnabled] = useState(() => {
         if (typeof window === "undefined") {
@@ -155,6 +211,18 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [lineItemMutatingId, setLineItemMutatingId] = useState("");
     const [checkoutCardState, setCheckoutCardState] = useState("idle");
     const [checkoutBusy, setCheckoutBusy] = useState(false);
+    const [fulfillmentMode, setFulfillmentMode] = useState("shipping");
+    const [shippingForm, setShippingForm] = useState({
+        name: "",
+        email: "",
+        phone: "",
+        addressLine1: "",
+        addressLine2: "",
+        city: "",
+        state: "",
+        postalCode: "",
+    });
+    const [fieldErrors, setFieldErrors] = useState({});
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [cartData, setCartData] = useState({
@@ -349,6 +417,25 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         setCheckoutBusy(true);
         setError("");
         setSuccess("");
+        setFieldErrors({});
+
+        const checkoutPayload = {
+            sourceId: null,
+            fulfillmentMode,
+        };
+
+        if (fulfillmentMode === "shipping") {
+            const normalizedShipping = normalizeShippingForm(shippingForm);
+            const localFieldErrors = validateShippingForm(normalizedShipping);
+
+            if (Object.keys(localFieldErrors).length > 0) {
+                setFieldErrors(localFieldErrors);
+                setCheckoutBusy(false);
+                return;
+            }
+
+            checkoutPayload.shipping = normalizedShipping;
+        }
 
         try {
             const tokenized = await cardRef.current.tokenize();
@@ -362,11 +449,17 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ sourceId: tokenized.token }),
+                body: JSON.stringify({
+                    ...checkoutPayload,
+                    sourceId: tokenized.token,
+                }),
             });
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
+                if (payload?.fieldErrors && typeof payload.fieldErrors === "object") {
+                    setFieldErrors(payload.fieldErrors);
+                }
                 throw new Error(payload?.error || "Checkout failed. Please try again.");
             }
 
@@ -463,6 +556,126 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                     </article>
 
                     <article className="card cart-checkout-card">
+                        <div className="cart-fulfillment-panel" aria-live="polite">
+                            <p className="cart-fulfillment-label">Fulfillment</p>
+                            <div className="cart-fulfillment-toggle" role="tablist" aria-label="Choose shipping or pickup">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={fulfillmentMode === "shipping"}
+                                    className={fulfillmentMode === "shipping" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                    onClick={() => setFulfillmentMode("shipping")}
+                                    disabled={checkoutBusy}
+                                >
+                                    Ship to me
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={fulfillmentMode === "pickup"}
+                                    className={fulfillmentMode === "pickup" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                    onClick={() => setFulfillmentMode("pickup")}
+                                    disabled={checkoutBusy}
+                                >
+                                    Local pickup
+                                </button>
+                            </div>
+                            {fulfillmentMode === "shipping" ? (
+                                <div className="cart-shipping-form">
+                                    <label className="cart-field cart-field-full">
+                                        <span>Full name</span>
+                                        <input
+                                            type="text"
+                                            value={shippingForm.name}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, name: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingName ? "true" : "false"}
+                                            autoComplete="name"
+                                        />
+                                        {fieldErrors.shippingName ? <small className="shop-payment-error">{fieldErrors.shippingName}</small> : null}
+                                    </label>
+                                    <label className="cart-field">
+                                        <span>Email</span>
+                                        <input
+                                            type="email"
+                                            value={shippingForm.email}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, email: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingEmail ? "true" : "false"}
+                                            autoComplete="email"
+                                        />
+                                        {fieldErrors.shippingEmail ? <small className="shop-payment-error">{fieldErrors.shippingEmail}</small> : null}
+                                    </label>
+                                    <label className="cart-field">
+                                        <span>Phone</span>
+                                        <input
+                                            type="tel"
+                                            value={shippingForm.phone}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, phone: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingPhone ? "true" : "false"}
+                                            autoComplete="tel"
+                                        />
+                                        {fieldErrors.shippingPhone ? <small className="shop-payment-error">{fieldErrors.shippingPhone}</small> : null}
+                                    </label>
+                                    <label className="cart-field cart-field-full">
+                                        <span>Address line 1</span>
+                                        <input
+                                            type="text"
+                                            value={shippingForm.addressLine1}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, addressLine1: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingAddressLine1 ? "true" : "false"}
+                                            autoComplete="address-line1"
+                                        />
+                                        {fieldErrors.shippingAddressLine1 ? <small className="shop-payment-error">{fieldErrors.shippingAddressLine1}</small> : null}
+                                    </label>
+                                    <label className="cart-field cart-field-full">
+                                        <span>Address line 2 (optional)</span>
+                                        <input
+                                            type="text"
+                                            value={shippingForm.addressLine2}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, addressLine2: event.target.value }))}
+                                            autoComplete="address-line2"
+                                        />
+                                    </label>
+                                    <label className="cart-field">
+                                        <span>City</span>
+                                        <input
+                                            type="text"
+                                            value={shippingForm.city}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, city: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingCity ? "true" : "false"}
+                                            autoComplete="address-level2"
+                                        />
+                                        {fieldErrors.shippingCity ? <small className="shop-payment-error">{fieldErrors.shippingCity}</small> : null}
+                                    </label>
+                                    <label className="cart-field">
+                                        <span>State (2-letter)</span>
+                                        <input
+                                            type="text"
+                                            value={shippingForm.state}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, state: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingState ? "true" : "false"}
+                                            autoComplete="address-level1"
+                                            maxLength={2}
+                                        />
+                                        {fieldErrors.shippingState ? <small className="shop-payment-error">{fieldErrors.shippingState}</small> : null}
+                                    </label>
+                                    <label className="cart-field">
+                                        <span>ZIP code</span>
+                                        <input
+                                            type="text"
+                                            value={shippingForm.postalCode}
+                                            onChange={(event) => setShippingForm((current) => ({ ...current, postalCode: event.target.value }))}
+                                            aria-invalid={fieldErrors.shippingPostalCode ? "true" : "false"}
+                                            autoComplete="postal-code"
+                                        />
+                                        {fieldErrors.shippingPostalCode ? <small className="shop-payment-error">{fieldErrors.shippingPostalCode}</small> : null}
+                                    </label>
+                                    {fieldErrors.shippingCountry ? <p className="shop-payment-error cart-field-full">{fieldErrors.shippingCountry}</p> : null}
+                                </div>
+                            ) : (
+                                <p className="secondary">Local pickup selected. Shipping address is not required.</p>
+                            )}
+                        </div>
+
                         <div className="shop-payment-breakdown">
                             <p><span>Subtotal</span><strong>{formatMoney(cartData.subtotalCents)}</strong></p>
                             <p><span>Online fee (3.5%)</span><strong>{formatMoney(cartData.onlineFeeCents)}</strong></p>

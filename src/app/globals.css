@@ -1070,6 +1070,72 @@ textarea {
     top: 5.6rem;
 }
 
+.cart-fulfillment-panel {
+    display: grid;
+    gap: 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.65rem;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.cart-fulfillment-label {
+    margin: 0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-secondary);
+    font-weight: 700;
+}
+
+.cart-fulfillment-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+}
+
+.cart-fulfillment-mode {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.48rem 0.52rem;
+    cursor: pointer;
+}
+
+.cart-fulfillment-mode-active {
+    border-color: rgba(212, 175, 55, 0.55);
+    background: rgba(212, 175, 55, 0.12);
+    color: #ffe6b0;
+}
+
+.cart-shipping-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.cart-field {
+    display: grid;
+    gap: 0.22rem;
+}
+
+.cart-field span {
+    font-size: 0.74rem;
+    color: var(--ink-secondary);
+}
+
+.cart-field-full {
+    grid-column: 1 / -1;
+}
+
+.cart-field input[aria-invalid="true"] {
+    border-color: rgba(246, 147, 147, 0.82);
+}
+
 @media (max-width: 900px) {
     .cart-grid-layout {
         grid-template-columns: 1fr;
@@ -1093,6 +1159,10 @@ textarea {
     .cart-line-actions {
         grid-column: 1 / -1;
         justify-content: flex-start;
+    }
+
+    .cart-shipping-form {
+        grid-template-columns: 1fr;
     }
 }
 
