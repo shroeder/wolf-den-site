@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { getSquareCustomerById, toCheckoutProfileFromSquareCustomer } from "@/lib/consignment/square";
-import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
+import {
+    getAuthenticatedShopCustomerSessionFromCookies,
+    setShopCustomerSession,
+    shouldRotateShopCustomerSession,
+} from "@/lib/shop-customer-session";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,10 +36,16 @@ export async function GET(request) {
         }
 
         try {
-            const customer = await getAuthenticatedShopCustomerFromCookies();
+            const cookieStore = await cookies();
+            const session = await getAuthenticatedShopCustomerSessionFromCookies();
+            const customer = session?.customer || null;
 
             if (!customer) {
                 return jsonNoStore({ found: false, profile: null }, { status: 401 });
+            }
+
+            if (shouldRotateShopCustomerSession(session.payload)) {
+                setShopCustomerSession(cookieStore, customer.id);
             }
 
             if (!customer.hasSavedProfile) {

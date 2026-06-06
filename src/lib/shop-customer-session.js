@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { getShopCustomerBySessionSubject } from "@/lib/shop-customers";
@@ -8,6 +8,7 @@ import { getShopCustomerBySessionSubject } from "@/lib/shop-customers";
 export const SHOP_CUSTOMER_SESSION_COOKIE = "wolfden-shop-customer-session";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const SESSION_RENEWAL_WINDOW_SECONDS = 60 * 60 * 24;
 
 const encodePayload = (value) => Buffer.from(value, "utf8").toString("base64url");
 const decodePayload = (value) => Buffer.from(value, "base64url").toString("utf8");
@@ -42,7 +43,9 @@ export function createShopCustomerSessionToken(customerId) {
 
     const payload = JSON.stringify({
         customerId,
+        iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+        sid: randomUUID(),
     });
     const encodedPayload = encodePayload(payload);
     const signature = signValue(encodedPayload);
@@ -90,6 +93,22 @@ export function getShopCustomerCookieOptions() {
     };
 }
 
+export function shouldRotateShopCustomerSession(payload) {
+    if (!payload?.exp) {
+        return false;
+    }
+
+    return (Number(payload.exp) - Math.floor(Date.now() / 1000)) <= SESSION_RENEWAL_WINDOW_SECONDS;
+}
+
+export function setShopCustomerSession(cookieStore, customerId) {
+    const token = createShopCustomerSessionToken(customerId);
+
+    cookieStore.set(SHOP_CUSTOMER_SESSION_COOKIE, token, getShopCustomerCookieOptions());
+
+    return token;
+}
+
 export async function getAuthenticatedShopCustomerFromToken(token) {
     const payload = verifyShopCustomerSessionToken(token);
 
@@ -101,6 +120,12 @@ export async function getAuthenticatedShopCustomerFromToken(token) {
 }
 
 export async function getAuthenticatedShopCustomerFromCookies() {
+    const session = await getAuthenticatedShopCustomerSessionFromCookies();
+
+    return session?.customer || null;
+}
+
+export async function getAuthenticatedShopCustomerSessionFromCookies() {
     const cookieStore = await cookies();
     const token = cookieStore.get(SHOP_CUSTOMER_SESSION_COOKIE)?.value;
 
@@ -108,5 +133,21 @@ export async function getAuthenticatedShopCustomerFromCookies() {
         return null;
     }
 
-    return getAuthenticatedShopCustomerFromToken(token);
+    const payload = verifyShopCustomerSessionToken(token);
+
+    if (!payload) {
+        return null;
+    }
+
+    const customer = await getShopCustomerBySessionSubject(payload.customerId);
+
+    if (!customer) {
+        return null;
+    }
+
+    return {
+        token,
+        payload,
+        customer,
+    };
 }

@@ -5,7 +5,7 @@ import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 
 const DUMMY_PASSWORD_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
-function normalizeEmail(value) {
+export function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
 
@@ -17,6 +17,7 @@ function toPublicCustomer(customer) {
     return {
         id: customer.id,
         email: customer.email,
+        emailVerified: Boolean(customer.email_verified_at),
         hasSavedProfile: Boolean(customer.square_customer_id),
     };
 }
@@ -29,6 +30,7 @@ function toSessionCustomer(customer) {
     return {
         id: customer.id,
         email: customer.email,
+        emailVerified: Boolean(customer.email_verified_at),
         hasSavedProfile: Boolean(customer.square_customer_id),
         squareCustomerId: customer.square_customer_id || null,
     };
@@ -107,13 +109,26 @@ export async function loginShopCustomer(email, password) {
 
     if (!customer?.password_hash) {
         await verifyPassword(password, DUMMY_PASSWORD_HASH);
-        return null;
+        return {
+            status: "invalid",
+            customer: null,
+        };
     }
 
     const isValid = await verifyPassword(password, customer.password_hash);
 
     if (!isValid) {
-        return null;
+        return {
+            status: "invalid",
+            customer: null,
+        };
+    }
+
+    if (!customer.email_verified_at) {
+        return {
+            status: "email_verification_required",
+            customer: toPublicCustomer(customer),
+        };
     }
 
     await db.query(
@@ -123,7 +138,45 @@ export async function loginShopCustomer(email, password) {
         [customer.id]
     );
 
-    return toPublicCustomer(customer);
+    return {
+        status: "ok",
+        customer: toPublicCustomer(customer),
+    };
+}
+
+export async function verifyShopCustomerEmail(customerId) {
+    if (!customerId) {
+        return null;
+    }
+
+    const updated = await db.queryOne(
+        `UPDATE shop_customer_accounts
+         SET email_verified_at = COALESCE(email_verified_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [customerId]
+    );
+
+    return toPublicCustomer(updated);
+}
+
+export async function updateShopCustomerPassword(customerId, nextPassword) {
+    if (!customerId || String(nextPassword || "").length < 8) {
+        return null;
+    }
+
+    const nextHash = await hashPassword(nextPassword);
+    const updated = await db.queryOne(
+        `UPDATE shop_customer_accounts
+         SET password_hash = $2,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [customerId, nextHash]
+    );
+
+    return toPublicCustomer(updated);
 }
 
 export async function updateShopCustomerSquareId(customerId, squareCustomerId) {

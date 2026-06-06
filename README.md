@@ -46,8 +46,11 @@ The consignment portal lives at `/consign/[slug]` and is intentionally read-only
    SQUARE_ACCESS_TOKEN=
    SQUARE_LOCATION_ID=
    CONSIGNMENT_SESSION_SECRET=
+   SHOP_CUSTOMER_SESSION_SECRET=
    ADMIN_API_KEY=
    RESEND_API_KEY=
+   UPSTASH_REDIS_REST_URL=
+   UPSTASH_REDIS_REST_TOKEN=
    NEXT_PUBLIC_BASE_URL=https://wolfdengamingmn.com
    ```
 
@@ -59,8 +62,11 @@ Set these manually in Vercel for portal/admin features:
 - `SQUARE_ACCESS_TOKEN`
 - `SQUARE_LOCATION_ID`
 - `CONSIGNMENT_SESSION_SECRET`
+- `SHOP_CUSTOMER_SESSION_SECRET`
 - `ADMIN_API_KEY`
 - `RESEND_API_KEY`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 - `NEXT_PUBLIC_BASE_URL` (optional override)
 
 ### Database Migrations

@@ -3,26 +3,26 @@ import { NextResponse } from "next/server";
 
 import {
     SHOP_CUSTOMER_SESSION_COOKIE,
-    createShopCustomerSessionToken,
-    getAuthenticatedShopCustomerFromCookies,
+    getAuthenticatedShopCustomerSessionFromCookies,
     getShopCustomerCookieOptions,
+    setShopCustomerSession,
+    shouldRotateShopCustomerSession,
 } from "@/lib/shop-customer-session";
 import {
     loginShopCustomer,
     registerShopCustomer,
 } from "@/lib/shop-customers";
+import { sendShopEmailVerificationEmail } from "@/lib/shop-auth-email";
+import { createEmailVerificationTokenForCustomer } from "@/lib/shop-customer-auth-tokens";
+import {
+    clearFailedShopAuthAttempts,
+    isShopAuthTemporarilyBlocked,
+    recordFailedShopAuthAttempt,
+} from "@/lib/shop-auth-throttle";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
-
-const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_ATTEMPTS_PER_WINDOW = 8;
-const MAX_IP_ATTEMPTS_PER_WINDOW = 30;
-const LOCKOUT_MS = 20 * 60 * 1000;
-const MAX_TRACKED_ATTEMPT_KEYS = 5000;
-const authAttemptsByIdentity = new Map();
-const authAttemptsByIp = new Map();
 
 function isPaymentsEnabled() {
     return process.env.PAYMENTS_ENABLED === "true";
@@ -50,93 +50,6 @@ function getClientIp(request) {
     return request.headers.get("x-real-ip") || "unknown";
 }
 
-function getAuthAttemptIdentityKey(ip, email) {
-    return `${ip}|${String(email || "").trim().toLowerCase()}`;
-}
-
-function pruneAttempts(map) {
-    const now = Date.now();
-
-    for (const [key, state] of map.entries()) {
-        if (state.lockedUntil && state.lockedUntil > now) {
-            continue;
-        }
-
-        if (state.windowStart + ATTEMPT_WINDOW_MS < now) {
-            map.delete(key);
-        }
-    }
-}
-
-function enforceAttemptCapacity(map) {
-    if (map.size <= MAX_TRACKED_ATTEMPT_KEYS) {
-        return;
-    }
-
-    let oldestKey = null;
-    let oldestWindowStart = Number.POSITIVE_INFINITY;
-
-    for (const [key, state] of map.entries()) {
-        const windowStart = Number(state?.windowStart || 0);
-
-        if (windowStart < oldestWindowStart) {
-            oldestWindowStart = windowStart;
-            oldestKey = key;
-        }
-    }
-
-    if (oldestKey) {
-        map.delete(oldestKey);
-    }
-}
-
-function isTemporarilyBlocked(map, key) {
-    const now = Date.now();
-    const state = map.get(key);
-
-    if (!state) {
-        return false;
-    }
-
-    if (state.lockedUntil && state.lockedUntil > now) {
-        return true;
-    }
-
-    if (state.windowStart + ATTEMPT_WINDOW_MS < now) {
-        map.delete(key);
-        return false;
-    }
-
-    return false;
-}
-
-function recordFailedAttempt(map, key, maxAttemptsPerWindow) {
-    const now = Date.now();
-    const state = map.get(key);
-
-    if (!state || state.windowStart + ATTEMPT_WINDOW_MS < now) {
-        map.set(key, {
-            count: 1,
-            windowStart: now,
-            lockedUntil: 0,
-        });
-        return;
-    }
-
-    state.count += 1;
-
-    if (state.count >= maxAttemptsPerWindow) {
-        state.lockedUntil = now + LOCKOUT_MS;
-    }
-
-    map.set(key, state);
-    enforceAttemptCapacity(map);
-}
-
-function clearFailedAttempts(map, key) {
-    map.delete(key);
-}
-
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/shop/auth", async ({ internalError }) => {
         if (!isPaymentsEnabled()) {
@@ -144,11 +57,16 @@ export async function GET(request) {
         }
 
         try {
-            const customer = await getAuthenticatedShopCustomerFromCookies();
+            const cookieStore = await cookies();
+            const session = await getAuthenticatedShopCustomerSessionFromCookies();
+
+            if (session?.customer && shouldRotateShopCustomerSession(session.payload)) {
+                setShopCustomerSession(cookieStore, session.customer.id);
+            }
 
             return jsonNoStore({
-                authenticated: Boolean(customer),
-                customer: customer || null,
+                authenticated: Boolean(session?.customer),
+                customer: session?.customer || null,
             });
         } catch (error) {
             return internalError(error, {
@@ -169,30 +87,23 @@ export async function POST(request) {
         }
 
         try {
-            pruneAttempts(authAttemptsByIdentity);
-            pruneAttempts(authAttemptsByIp);
-
             const body = await request.json().catch(() => null);
             const mode = String(body?.mode || "login").trim().toLowerCase();
             const email = String(body?.email || "").trim();
             const password = String(body?.password || "");
             const clientIp = getClientIp(request);
-            const identityAttemptKey = getAuthAttemptIdentityKey(clientIp, email);
-            const ipAttemptKey = clientIp;
 
-            if (isTemporarilyBlocked(authAttemptsByIdentity, identityAttemptKey) || isTemporarilyBlocked(authAttemptsByIp, ipAttemptKey)) {
+            if (await isShopAuthTemporarilyBlocked({ ip: clientIp, email })) {
                 return jsonNoStore({ error: "Too many attempts. Try again later." }, { status: 429 });
             }
 
             if (!email || !password) {
-                recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
-                recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
+                await recordFailedShopAuthAttempt({ ip: clientIp, email });
                 return unauthorized();
             }
 
             if (mode !== "login" && mode !== "register") {
-                recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
-                recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
+                await recordFailedShopAuthAttempt({ ip: clientIp, email });
                 return unauthorized();
             }
 
@@ -203,30 +114,73 @@ export async function POST(request) {
                     customer = await registerShopCustomer(email, password);
                 } catch (error) {
                     if (error?.code === "account_exists") {
-                        recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
-                        recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
+                        await recordFailedShopAuthAttempt({ ip: clientIp, email });
                         return unauthorized();
                     }
 
                     return jsonNoStore({ error: error instanceof Error ? error.message : "Could not create account." }, { status: 400 });
                 }
+
+                await clearFailedShopAuthAttempts({ ip: clientIp, email });
+
+                try {
+                    const verificationToken = await createEmailVerificationTokenForCustomer(customer?.id);
+
+                    if (verificationToken) {
+                        await sendShopEmailVerificationEmail({
+                            to: customer.email,
+                            token: verificationToken,
+                        });
+                    }
+                } catch {
+                    // Keep response generic even if email delivery fails.
+                }
+
+                return jsonNoStore({
+                    success: true,
+                    customer: null,
+                    requiresEmailVerification: true,
+                    message: "Account created. Check your email to verify your account.",
+                });
             } else {
-                customer = await loginShopCustomer(email, password);
+                const loginResult = await loginShopCustomer(email, password);
+
+                if (loginResult.status === "email_verification_required") {
+                    if (loginResult.customer?.id) {
+                        try {
+                            const verificationToken = await createEmailVerificationTokenForCustomer(loginResult.customer.id);
+
+                            if (verificationToken) {
+                                await sendShopEmailVerificationEmail({
+                                    to: loginResult.customer.email,
+                                    token: verificationToken,
+                                });
+                            }
+                        } catch {
+                            // Keep failure mode generic.
+                        }
+                    }
+
+                    return jsonNoStore(
+                        {
+                            error: "Please verify your email before signing in. A fresh verification email has been sent.",
+                            code: "email_verification_required",
+                        },
+                        { status: 403 }
+                    );
+                }
+
+                customer = loginResult.customer;
             }
 
             if (!customer) {
-                recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
-                recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
+                await recordFailedShopAuthAttempt({ ip: clientIp, email });
                 return unauthorized();
             }
 
-            clearFailedAttempts(authAttemptsByIdentity, identityAttemptKey);
-            clearFailedAttempts(authAttemptsByIp, ipAttemptKey);
-
-            const token = createShopCustomerSessionToken(customer.id);
+            await clearFailedShopAuthAttempts({ ip: clientIp, email });
             const cookieStore = await cookies();
-
-            cookieStore.set(SHOP_CUSTOMER_SESSION_COOKIE, token, getShopCustomerCookieOptions());
+            setShopCustomerSession(cookieStore, customer.id);
 
             return jsonNoStore({
                 success: true,

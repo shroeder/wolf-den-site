@@ -544,6 +544,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 throw new Error(payload?.error || "Could not sign in.");
             }
 
+            if (payload?.requiresEmailVerification) {
+                setAuthCustomer(null);
+                setAuthPassword("");
+                setAuthError(payload?.message || "Account created. Please verify your email before signing in.");
+                setSaveCustomerProfile(false);
+                return;
+            }
+
             setAuthCustomer(payload.customer || null);
             setAuthPassword("");
             setAuthError("");
@@ -736,6 +744,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                         <button type="button" className="button" onClick={handleAuthSubmit} disabled={authLoading || checkoutBusy}>
                                             {authLoading ? "Working..." : authMode === "register" ? "Create account" : "Sign in"}
                                         </button>
+                                        {authMode === "login" ? (
+                                            <p className="secondary">
+                                                Forgot your password? <Link href="/shop/account/reset-password">Reset it here</Link>.
+                                            </p>
+                                        ) : null}
                                     </div>
                                 )}
                                 {authError ? <p className="shop-payment-error">{authError}</p> : null}
