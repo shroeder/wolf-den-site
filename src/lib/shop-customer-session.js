@@ -6,9 +6,15 @@ import { cookies } from "next/headers";
 import { getShopCustomerBySessionSubject } from "@/lib/shop-customers";
 
 export const SHOP_CUSTOMER_SESSION_COOKIE = "wolfden-shop-customer-session";
+export const SHOP_CUSTOMER_2FA_PENDING_COOKIE = "wolfden-shop-customer-2fa-pending";
+export const SHOP_CUSTOMER_TRUSTED_DEVICE_COOKIE = "wolfden-shop-customer-trusted-device";
+export const SHOP_CUSTOMER_OAUTH_STATE_COOKIE = "wolfden-shop-customer-oauth-state";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_RENEWAL_WINDOW_SECONDS = 60 * 60 * 24;
+const PENDING_2FA_TTL_SECONDS = 60 * 10;
+const TRUSTED_DEVICE_TTL_SECONDS = 60 * 60 * 24 * 30;
+const OAUTH_STATE_TTL_SECONDS = 60 * 10;
 
 const encodePayload = (value) => Buffer.from(value, "utf8").toString("base64url");
 const decodePayload = (value) => Buffer.from(value, "base64url").toString("utf8");
@@ -53,6 +59,31 @@ export function createShopCustomerSessionToken(customerId) {
     return `${encodedPayload}.${signature}`;
 }
 
+export function createShopCustomerPendingTwoFactorToken(customerId) {
+    assertShopCustomerSessionSecret();
+
+    const payload = JSON.stringify({
+        customerId,
+        exp: Math.floor(Date.now() / 1000) + PENDING_2FA_TTL_SECONDS,
+        purpose: "shop_customer_2fa_pending",
+        sid: randomUUID(),
+    });
+    const encodedPayload = encodePayload(payload);
+    const signature = signValue(encodedPayload);
+
+    return `${encodedPayload}.${signature}`;
+}
+
+export function verifyShopCustomerPendingTwoFactorToken(token) {
+    const payload = verifyShopCustomerSessionToken(token);
+
+    if (!payload || payload.purpose !== "shop_customer_2fa_pending") {
+        return null;
+    }
+
+    return payload;
+}
+
 export function verifyShopCustomerSessionToken(token) {
     if (!token || !getSessionSecret()) {
         return null;
@@ -93,6 +124,36 @@ export function getShopCustomerCookieOptions() {
     };
 }
 
+export function getShopCustomerPendingTwoFactorCookieOptions() {
+    return {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: PENDING_2FA_TTL_SECONDS,
+    };
+}
+
+export function getShopCustomerTrustedDeviceCookieOptions() {
+    return {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: TRUSTED_DEVICE_TTL_SECONDS,
+    };
+}
+
+export function getShopCustomerOAuthStateCookieOptions() {
+    return {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: OAUTH_STATE_TTL_SECONDS,
+    };
+}
+
 export function shouldRotateShopCustomerSession(payload) {
     if (!payload?.exp) {
         return false;
@@ -123,6 +184,17 @@ export async function getAuthenticatedShopCustomerFromCookies() {
     const session = await getAuthenticatedShopCustomerSessionFromCookies();
 
     return session?.customer || null;
+}
+
+export async function getPendingShopCustomerTwoFactorPayloadFromCookies() {
+    const cookieStore = await cookies();
+    const pendingToken = cookieStore.get(SHOP_CUSTOMER_2FA_PENDING_COOKIE)?.value;
+
+    if (!pendingToken) {
+        return null;
+    }
+
+    return verifyShopCustomerPendingTwoFactorToken(pendingToken);
 }
 
 export async function getAuthenticatedShopCustomerSessionFromCookies() {

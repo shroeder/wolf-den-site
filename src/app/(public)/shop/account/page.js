@@ -26,6 +26,9 @@ export default function ShopAccountPage() {
     const [mode, setMode] = useState("login");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [twoFactorCode, setTwoFactorCode] = useState("");
+    const [trustDevice, setTrustDevice] = useState(true);
+    const [twoFactorPending, setTwoFactorPending] = useState(false);
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
 
@@ -59,9 +62,11 @@ export default function ShopAccountPage() {
                 }
 
                 setCustomer(payload.authenticated ? payload.customer : null);
+                setTwoFactorPending(payload?.twoFactorPending === true);
             } catch (nextError) {
                 setError(nextError instanceof Error ? nextError.message : "Could not load account status.");
                 setCustomer(null);
+                setTwoFactorPending(false);
             } finally {
                 setBusy(false);
             }
@@ -105,7 +110,16 @@ export default function ShopAccountPage() {
                 return;
             }
 
+            if (payload?.requiresTwoFactor) {
+                setCustomer(null);
+                setTwoFactorPending(true);
+                setPassword("");
+                setStatus(payload?.message || "Check your email for a sign-in code.");
+                return;
+            }
+
             setCustomer(payload.customer || null);
+            setTwoFactorPending(false);
             setPassword("");
             setStatus(mode === "register" ? "Account ready." : "Signed in successfully.");
             window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
@@ -127,10 +141,50 @@ export default function ShopAccountPage() {
             });
 
             setCustomer(null);
+            setTwoFactorPending(false);
             setStatus("Signed out.");
             window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
         } catch (nextError) {
             setError(nextError instanceof Error ? nextError.message : "Could not sign out.");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleTwoFactorSubmit = async () => {
+        if (!/^\d{6}$/.test(String(twoFactorCode || "").trim())) {
+            setError("Enter the 6-digit sign-in code.");
+            return;
+        }
+
+        setBusy(true);
+        setError("");
+        setStatus("");
+
+        try {
+            const response = await fetch("/api/shop/auth/2fa", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    code: twoFactorCode,
+                    trustDevice,
+                }),
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(payload?.error || "Could not verify sign-in code.");
+            }
+
+            setCustomer(payload.customer || null);
+            setTwoFactorPending(false);
+            setTwoFactorCode("");
+            setStatus("Signed in successfully.");
+            window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
+        } catch (nextError) {
+            setError(nextError instanceof Error ? nextError.message : "Could not verify sign-in code.");
         } finally {
             setBusy(false);
         }
@@ -173,9 +227,38 @@ export default function ShopAccountPage() {
                             <Link href="/cart" className="button primary">Back to checkout</Link>
                         </div>
                     </div>
+                ) : twoFactorPending ? (
+                    <div className="cart-account-panel">
+                        <p className="cart-fulfillment-label">Two-factor verification</p>
+                        <p className="secondary">Enter the 6-digit code sent to your email.</p>
+                        <label className="cart-field cart-field-full">
+                            <span>Sign-in code</span>
+                            <input
+                                type="text"
+                                value={twoFactorCode}
+                                onChange={(event) => setTwoFactorCode(event.target.value)}
+                                autoComplete="one-time-code"
+                                inputMode="numeric"
+                                maxLength={6}
+                            />
+                        </label>
+                        <label className="cart-save-profile-toggle">
+                            <input
+                                type="checkbox"
+                                checked={trustDevice}
+                                onChange={(event) => setTrustDevice(event.target.checked)}
+                            />
+                            <span>Trust this device for 30 days</span>
+                        </label>
+                        <button type="button" className="button primary" onClick={handleTwoFactorSubmit} disabled={busy}>
+                            {busy ? "Verifying..." : "Verify code"}
+                        </button>
+                    </div>
                 ) : (
                     <div className="cart-account-panel">
                         <p className="cart-fulfillment-label">Sign in</p>
+                        <a href="/api/shop/auth/oauth/google/start" className="button" aria-label="Continue with Google">Continue with Google</a>
+                        <p className="secondary">Or sign in with email and password:</p>
                         <div className="cart-account-mode-toggle" role="tablist" aria-label="Choose sign in or create account">
                             <button
                                 type="button"

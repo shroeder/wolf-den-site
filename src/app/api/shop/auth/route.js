@@ -2,7 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import {
+    SHOP_CUSTOMER_2FA_PENDING_COOKIE,
+    SHOP_CUSTOMER_TRUSTED_DEVICE_COOKIE,
+    createShopCustomerPendingTwoFactorToken,
     SHOP_CUSTOMER_SESSION_COOKIE,
+    getPendingShopCustomerTwoFactorPayloadFromCookies,
+    getShopCustomerPendingTwoFactorCookieOptions,
     getAuthenticatedShopCustomerSessionFromCookies,
     getShopCustomerCookieOptions,
     setShopCustomerSession,
@@ -12,8 +17,12 @@ import {
     loginShopCustomer,
     registerShopCustomer,
 } from "@/lib/shop-customers";
-import { sendShopEmailVerificationEmail } from "@/lib/shop-auth-email";
+import { sendShopEmailVerificationEmail, sendShopTwoFactorCodeEmail } from "@/lib/shop-auth-email";
 import { createEmailVerificationTokenForCustomer } from "@/lib/shop-customer-auth-tokens";
+import {
+    createShopTwoFactorCode,
+    isShopTrustedDeviceTokenValid,
+} from "@/lib/shop-auth-2fa";
 import {
     clearFailedShopAuthAttempts,
     isShopAuthTemporarilyBlocked,
@@ -51,6 +60,49 @@ function getClientIp(request) {
     return request.headers.get("x-real-ip") || "unknown";
 }
 
+async function beginTwoFactorSignIn({ request, customer, cookieStore }) {
+    const trustedToken = cookieStore.get(SHOP_CUSTOMER_TRUSTED_DEVICE_COOKIE)?.value || "";
+    const trustedValid = trustedToken
+        ? await isShopTrustedDeviceTokenValid(customer.id, trustedToken)
+        : false;
+
+    if (trustedValid) {
+        setShopCustomerSession(cookieStore, customer.id);
+        await resolveActiveCartId({
+            cookieStore,
+            customerId: customer.id,
+        });
+
+        return {
+            success: true,
+            customer,
+            requiresTwoFactor: false,
+        };
+    }
+
+    const pendingToken = createShopCustomerPendingTwoFactorToken(customer.id);
+
+    cookieStore.set(
+        SHOP_CUSTOMER_2FA_PENDING_COOKIE,
+        pendingToken,
+        getShopCustomerPendingTwoFactorCookieOptions()
+    );
+
+    const code = await createShopTwoFactorCode(customer.id);
+
+    await sendShopTwoFactorCodeEmail({
+        to: customer.email,
+        code,
+    });
+
+    return {
+        success: true,
+        customer: null,
+        requiresTwoFactor: true,
+        message: "Enter the 6-digit code sent to your email.",
+    };
+}
+
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/shop/auth", async ({ internalError }) => {
         if (!isPaymentsEnabled()) {
@@ -60,6 +112,9 @@ export async function GET(request) {
         try {
             const cookieStore = await cookies();
             const session = await getAuthenticatedShopCustomerSessionFromCookies();
+            const pendingTwoFactor = session?.customer
+                ? null
+                : await getPendingShopCustomerTwoFactorPayloadFromCookies();
 
             if (session?.customer && shouldRotateShopCustomerSession(session.payload)) {
                 setShopCustomerSession(cookieStore, session.customer.id);
@@ -68,6 +123,7 @@ export async function GET(request) {
             return jsonNoStore({
                 authenticated: Boolean(session?.customer),
                 customer: session?.customer || null,
+                twoFactorPending: Boolean(pendingTwoFactor),
             });
         } catch (error) {
             return internalError(error, {
@@ -181,16 +237,13 @@ export async function POST(request) {
 
             await clearFailedShopAuthAttempts({ ip: clientIp, email });
             const cookieStore = await cookies();
-            setShopCustomerSession(cookieStore, customer.id);
-            await resolveActiveCartId({
+            const signInResult = await beginTwoFactorSignIn({
+                request,
+                customer,
                 cookieStore,
-                customerId: customer.id,
             });
 
-            return jsonNoStore({
-                success: true,
-                customer,
-            });
+            return jsonNoStore(signInResult);
         } catch (error) {
             return internalError(error, {
                 event: "shop.auth.failed",
@@ -209,6 +262,10 @@ export async function DELETE(request) {
             const cookieStore = await cookies();
             cookieStore.set(SHOP_CUSTOMER_SESSION_COOKIE, "", {
                 ...getShopCustomerCookieOptions(),
+                maxAge: 0,
+            });
+            cookieStore.set(SHOP_CUSTOMER_2FA_PENDING_COOKIE, "", {
+                ...getShopCustomerPendingTwoFactorCookieOptions(),
                 maxAge: 0,
             });
 

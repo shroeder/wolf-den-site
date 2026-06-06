@@ -105,3 +105,34 @@ export async function sendShopPasswordResetEmail({ to, token }) {
 
     return result;
 }
+
+export async function sendShopTwoFactorCodeEmail({ to, code }) {
+    const resend = getResendClient();
+
+    const result = await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to,
+        subject: "Your Wolf Den sign-in code",
+        html: `
+            <div style="background:#0e0e0e;padding:24px;font-family:Segoe UI,Arial,sans-serif;color:#f2f2f2;">
+                <div style="max-width:620px;margin:0 auto;background:#161616;border:1px solid rgba(255,255,255,0.12);border-radius:14px;overflow:hidden;">
+                    <div style="padding:20px 20px 16px;background:linear-gradient(135deg,rgba(212,175,55,0.22),rgba(212,175,55,0.06));border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <p style="margin:0 0 6px;color:#d4af37;font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-size:12px;">The Wolf Den</p>
+                        <h1 style="margin:0;font-size:22px;line-height:1.3;color:#f8f8f8;">Two-Factor Sign-In</h1>
+                    </div>
+                    <div style="padding:20px;">
+                        <p style="margin:0 0 10px;">Enter this code to finish signing in:</p>
+                        <p style="margin:0 0 14px;font-size:28px;letter-spacing:0.18em;font-weight:800;color:#f8e2a6;">${escapeHtml(code)}</p>
+                        <p style="margin:0;color:#b8b8b8;font-size:13px;">This code expires in 10 minutes.</p>
+                    </div>
+                </div>
+            </div>
+        `,
+    });
+
+    if (result.error) {
+        throw new Error(`Failed to send two-factor code email: ${result.error.message}`);
+    }
+
+    return result;
+}
