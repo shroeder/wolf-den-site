@@ -9,6 +9,42 @@ const SHOP_CART_UPDATED_EVENT = "wolfden-shop-cart-updated";
 const formatMoney = (cents) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(cents || 0) / 100));
 
+function buildSquareCardStyles() {
+    return {
+        ".input-container": {
+            borderColor: "rgba(255, 255, 255, 0.18)",
+            borderRadius: "10px",
+            backgroundColor: "rgba(16, 16, 16, 0.96)",
+        },
+        ".input-container.is-focus": {
+            borderColor: "rgba(212, 175, 55, 0.65)",
+        },
+        ".input-container.is-error": {
+            borderColor: "rgba(246, 147, 147, 0.92)",
+        },
+        ".input": {
+            color: "#f4f2eb",
+            fontSize: "15px",
+        },
+        ".input::placeholder": {
+            color: "rgba(228, 228, 228, 0.62)",
+        },
+        ".message-text": {
+            color: "rgba(236, 230, 214, 0.86)",
+            fontSize: "12px",
+        },
+        ".message-icon": {
+            color: "rgba(236, 230, 214, 0.86)",
+        },
+        ".message-text.is-error": {
+            color: "#f7a6a6",
+        },
+        ".message-icon.is-error": {
+            color: "#f7a6a6",
+        },
+    };
+}
+
 function loadSquarePaymentsScript() {
     if (typeof window === "undefined") {
         return Promise.resolve(null);
@@ -271,7 +307,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                     mountNode.innerHTML = "";
                 }
 
-                const card = await payments.card();
+                const card = await payments.card({
+                    style: buildSquareCardStyles(),
+                });
                 mountedCard = card;
                 await card.attach(`#${mountId}`);
 
