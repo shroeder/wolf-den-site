@@ -17,14 +17,26 @@ export const runtime = "nodejs";
 
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS_PER_WINDOW = 8;
+const MAX_IP_ATTEMPTS_PER_WINDOW = 30;
 const LOCKOUT_MS = 20 * 60 * 1000;
-const authAttempts = new Map();
+const authAttemptsByIdentity = new Map();
+const authAttemptsByIp = new Map();
 
 function isPaymentsEnabled() {
     return process.env.PAYMENTS_ENABLED === "true";
 }
 
-const unauthorized = () => NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
+function jsonNoStore(body, init = {}) {
+    return NextResponse.json(body, {
+        ...init,
+        headers: {
+            "Cache-Control": "no-store",
+            ...(init.headers || {}),
+        },
+    });
+}
+
+const unauthorized = () => jsonNoStore({ error: "Invalid credentials." }, { status: 401 });
 
 function getClientIp(request) {
     const forwarded = request.headers.get("x-forwarded-for") || "";
@@ -36,13 +48,27 @@ function getClientIp(request) {
     return request.headers.get("x-real-ip") || "unknown";
 }
 
-function getAuthAttemptKey(request, email) {
-    return `${getClientIp(request)}|${String(email || "").trim().toLowerCase()}`;
+function getAuthAttemptIdentityKey(ip, email) {
+    return `${ip}|${String(email || "").trim().toLowerCase()}`;
 }
 
-function isTemporarilyBlocked(key) {
+function pruneAttempts(map) {
     const now = Date.now();
-    const state = authAttempts.get(key);
+
+    for (const [key, state] of map.entries()) {
+        if (state.lockedUntil && state.lockedUntil > now) {
+            continue;
+        }
+
+        if (state.windowStart + ATTEMPT_WINDOW_MS < now) {
+            map.delete(key);
+        }
+    }
+}
+
+function isTemporarilyBlocked(map, key) {
+    const now = Date.now();
+    const state = map.get(key);
 
     if (!state) {
         return false;
@@ -53,19 +79,19 @@ function isTemporarilyBlocked(key) {
     }
 
     if (state.windowStart + ATTEMPT_WINDOW_MS < now) {
-        authAttempts.delete(key);
+        map.delete(key);
         return false;
     }
 
     return false;
 }
 
-function recordFailedAttempt(key) {
+function recordFailedAttempt(map, key, maxAttemptsPerWindow) {
     const now = Date.now();
-    const state = authAttempts.get(key);
+    const state = map.get(key);
 
     if (!state || state.windowStart + ATTEMPT_WINDOW_MS < now) {
-        authAttempts.set(key, {
+        map.set(key, {
             count: 1,
             windowStart: now,
             lockedUntil: 0,
@@ -75,27 +101,27 @@ function recordFailedAttempt(key) {
 
     state.count += 1;
 
-    if (state.count >= MAX_ATTEMPTS_PER_WINDOW) {
+    if (state.count >= maxAttemptsPerWindow) {
         state.lockedUntil = now + LOCKOUT_MS;
     }
 
-    authAttempts.set(key, state);
+    map.set(key, state);
 }
 
-function clearFailedAttempts(key) {
-    authAttempts.delete(key);
+function clearFailedAttempts(map, key) {
+    map.delete(key);
 }
 
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/shop/auth", async ({ internalError }) => {
         if (!isPaymentsEnabled()) {
-            return NextResponse.json({ authenticated: false, customer: null });
+            return jsonNoStore({ authenticated: false, customer: null });
         }
 
         try {
             const customer = await getAuthenticatedShopCustomerFromCookies();
 
-            return NextResponse.json({
+            return jsonNoStore({
                 authenticated: Boolean(customer),
                 customer: customer || null,
             });
@@ -110,22 +136,28 @@ export async function GET(request) {
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/shop/auth", async ({ internalError }) => {
         if (!isPaymentsEnabled()) {
-            return NextResponse.json({ error: "Payments are currently disabled." }, { status: 403 });
+            return jsonNoStore({ error: "Payments are currently disabled." }, { status: 403 });
         }
 
         try {
+            pruneAttempts(authAttemptsByIdentity);
+            pruneAttempts(authAttemptsByIp);
+
             const body = await request.json().catch(() => null);
             const mode = String(body?.mode || "login").trim().toLowerCase();
             const email = String(body?.email || "").trim();
             const password = String(body?.password || "");
-            const attemptKey = getAuthAttemptKey(request, email);
+            const clientIp = getClientIp(request);
+            const identityAttemptKey = getAuthAttemptIdentityKey(clientIp, email);
+            const ipAttemptKey = clientIp;
 
-            if (isTemporarilyBlocked(attemptKey)) {
-                return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+            if (isTemporarilyBlocked(authAttemptsByIdentity, identityAttemptKey) || isTemporarilyBlocked(authAttemptsByIp, ipAttemptKey)) {
+                return jsonNoStore({ error: "Too many attempts. Try again later." }, { status: 429 });
             }
 
             if (!email || !password) {
-                recordFailedAttempt(attemptKey);
+                recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
+                recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
                 return unauthorized();
             }
 
@@ -136,29 +168,31 @@ export async function POST(request) {
                     customer = await registerShopCustomer(email, password);
                 } catch (error) {
                     if (error?.code === "account_exists") {
-                        recordFailedAttempt(attemptKey);
+                        recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
+                        recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
                         return unauthorized();
                     }
 
-                    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not create account." }, { status: 400 });
+                    return jsonNoStore({ error: error instanceof Error ? error.message : "Could not create account." }, { status: 400 });
                 }
             } else {
                 customer = await loginShopCustomer(email, password);
             }
 
             if (!customer) {
-                recordFailedAttempt(attemptKey);
+                recordFailedAttempt(authAttemptsByIdentity, identityAttemptKey, MAX_ATTEMPTS_PER_WINDOW);
+                recordFailedAttempt(authAttemptsByIp, ipAttemptKey, MAX_IP_ATTEMPTS_PER_WINDOW);
                 return unauthorized();
             }
 
-            clearFailedAttempts(attemptKey);
+            clearFailedAttempts(authAttemptsByIdentity, identityAttemptKey);
 
             const token = createShopCustomerSessionToken(customer.id);
             const cookieStore = await cookies();
 
             cookieStore.set(SHOP_CUSTOMER_SESSION_COOKIE, token, getShopCustomerCookieOptions());
 
-            return NextResponse.json({
+            return jsonNoStore({
                 success: true,
                 customer,
             });
@@ -179,7 +213,7 @@ export async function DELETE(request) {
                 maxAge: 0,
             });
 
-            return NextResponse.json({ success: true });
+            return jsonNoStore({ success: true });
         } catch (error) {
             return internalError(error, {
                 event: "shop.auth.logout.failed",

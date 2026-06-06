@@ -10,57 +10,40 @@ function isPaymentsEnabled() {
     return process.env.PAYMENTS_ENABLED === "true";
 }
 
-export async function POST(request) {
-    return withRequestLogging(request, "POST /api/shop/customer-profile", async ({ internalError }) => {
-        if (!isPaymentsEnabled()) {
-            return NextResponse.json({ error: "Payments are currently disabled." }, { status: 403 });
-        }
-
-        try {
-            const customer = await getAuthenticatedShopCustomerFromCookies();
-
-            if (!customer) {
-                return NextResponse.json({ found: false, profile: null }, { status: 401 });
-            }
-
-            if (!customer.hasSavedProfile) {
-                return NextResponse.json({ found: false, profile: null });
-            }
-
-            const squareCustomer = await getSquareCustomerById(customer.squareCustomerId);
-
-            return NextResponse.json({
-                found: Boolean(squareCustomer),
-                profile: toCheckoutProfileFromSquareCustomer(squareCustomer),
-            });
-        } catch (error) {
-            return internalError(error, {
-                event: "shop.customer_profile.lookup.failed",
-            });
-        }
+function jsonNoStore(body, init = {}) {
+    return NextResponse.json(body, {
+        ...init,
+        headers: {
+            "Cache-Control": "no-store",
+            ...(init.headers || {}),
+        },
     });
+}
+
+export async function POST(request) {
+    return GET(request);
 }
 
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/shop/customer-profile", async ({ internalError }) => {
         if (!isPaymentsEnabled()) {
-            return NextResponse.json({ error: "Payments are currently disabled." }, { status: 403 });
+            return jsonNoStore({ error: "Payments are currently disabled." }, { status: 403 });
         }
 
         try {
             const customer = await getAuthenticatedShopCustomerFromCookies();
 
             if (!customer) {
-                return NextResponse.json({ found: false, profile: null }, { status: 401 });
+                return jsonNoStore({ found: false, profile: null }, { status: 401 });
             }
 
             if (!customer.hasSavedProfile) {
-                return NextResponse.json({ found: false, profile: null });
+                return jsonNoStore({ found: false, profile: null });
             }
 
             const squareCustomer = await getSquareCustomerById(customer.squareCustomerId);
 
-            return NextResponse.json({
+            return jsonNoStore({
                 found: Boolean(squareCustomer),
                 profile: toCheckoutProfileFromSquareCustomer(squareCustomer),
             });

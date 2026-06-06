@@ -7,7 +7,7 @@ import { getShopCustomerBySessionSubject } from "@/lib/shop-customers";
 
 export const SHOP_CUSTOMER_SESSION_COOKIE = "wolfden-shop-customer-session";
 
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 const encodePayload = (value) => Buffer.from(value, "utf8").toString("base64url");
 const decodePayload = (value) => Buffer.from(value, "base64url").toString("utf8");
