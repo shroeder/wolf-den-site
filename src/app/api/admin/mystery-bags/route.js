@@ -10,6 +10,12 @@ export const runtime = "nodejs";
 function normalizePayload(body) {
     return {
         cardId: typeof body?.cardId === "string" ? body.cardId.trim() : "",
+        squareVariationId: typeof body?.squareVariationId === "string"
+            ? body.squareVariationId.trim()
+            : typeof body?.variationId === "string"
+                ? body.variationId.trim()
+                : "",
+        packToken: typeof body?.packToken === "string" ? body.packToken.trim() : "",
         name: typeof body?.name === "string" ? body.name.trim() : "",
         set: typeof body?.set === "string" ? body.set.trim() : "",
         number: typeof body?.number === "string" ? body.number.trim() : "",
@@ -44,6 +50,9 @@ function validatePayload(payload) {
     } else {
         payload.imageUrl = null;
     }
+
+    payload.squareVariationId = payload.squareVariationId || null;
+    payload.packToken = payload.packToken || null;
 
     return null;
 }
