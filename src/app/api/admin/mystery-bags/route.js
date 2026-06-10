@@ -11,7 +11,13 @@ function normalizePayload(body) {
     return {
         cardId: typeof body?.cardId === "string" ? body.cardId.trim() : "",
         squareVariationId: typeof body?.squareVariationId === "string" ? body.squareVariationId.trim() : "",
-        variationSku: typeof body?.variationSku === "string" ? body.variationSku.trim() : "",
+        variationSku: typeof body?.variationSku === "string"
+            ? body.variationSku.trim()
+            : typeof body?.packedVariationSku === "string"
+                ? body.packedVariationSku.trim()
+                : typeof body?.packedSku === "string"
+                    ? body.packedSku.trim()
+                    : "",
         name: typeof body?.name === "string" ? body.name.trim() : "",
         set: typeof body?.set === "string" ? body.set.trim() : "",
         number: typeof body?.number === "string" ? body.number.trim() : "",
