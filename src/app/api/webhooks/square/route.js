@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import {
     createMysteryWebhookEvent,
-    enqueueMysteryWebhookProcessing,
+    runMysteryWebhookProcessing,
 } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -94,15 +94,27 @@ export async function POST(request) {
                 payload,
             });
 
-            enqueueMysteryWebhookProcessing(row.id);
+            // Process inline (awaited) rather than fire-and-forget. On Vercel the function is
+            // frozen once the response is returned, so setImmediate work never finished and the
+            // card removal + Square variation cleanup silently never ran. This is fast (one order
+            // fetch + a few writes + one delete) and stays well within Square's webhook timeout.
+            const result = await runMysteryWebhookProcessing(row.id);
+
+            logger.info("webhooks.square.processed", {
+                eventId: row.id,
+                status: result?.status || "unknown",
+                processed: result?.processed ?? false,
+                assignedCount: result?.assignedCount || 0,
+            });
 
             return NextResponse.json(
                 {
                     success: true,
-                    queued: true,
                     eventId: row.id,
+                    status: result?.status || "queued",
+                    processed: result?.processed ?? false,
                 },
-                { status: 202 }
+                { status: 200 }
             );
         } catch (error) {
             return internalError(error, {

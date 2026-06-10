@@ -1183,26 +1183,39 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
     };
 }
 
+// Run the webhook processing to completion. Must be AWAITED by the caller — on Vercel,
+// any work left running after the HTTP response is returned (e.g. via setImmediate) is
+// frozen with the suspended function and never finishes, so the card removal + Square
+// variation cleanup silently never happened. Returns the processing result; never throws.
+export async function runMysteryWebhookProcessing(eventId) {
+    try {
+        const result = await processQueuedMysteryWebhookEvent(eventId);
+
+        mysteryLogger.info("mystery_bags.webhook.processed", {
+            eventId,
+            status: result?.status || "unknown",
+            assignedCount: result?.assignedCount || 0,
+            remainingUnassignedUnits: result?.remainingUnassignedUnits || 0,
+        });
+
+        return result;
+    } catch (error) {
+        await markMysteryWebhookEventProcessed(eventId, {
+            status: "failed",
+            error: error instanceof Error ? error.message : "unknown_processing_error",
+        }).catch(() => null);
+
+        mysteryLogger.error("mystery_bags.webhook.processing_failed", error, {
+            eventId,
+        });
+
+        return { status: "failed", processed: false };
+    }
+}
+
+// Retained for compatibility; prefer awaiting runMysteryWebhookProcessing in serverless routes.
 export function enqueueMysteryWebhookProcessing(eventId) {
-    setImmediate(async () => {
-        try {
-            const result = await processQueuedMysteryWebhookEvent(eventId);
-
-            mysteryLogger.info("mystery_bags.webhook.processed", {
-                eventId,
-                status: result?.status || "unknown",
-                assignedCount: result?.assignedCount || 0,
-                remainingUnassignedUnits: result?.remainingUnassignedUnits || 0,
-            });
-        } catch (error) {
-            await markMysteryWebhookEventProcessed(eventId, {
-                status: "failed",
-                error: error instanceof Error ? error.message : "unknown_processing_error",
-            }).catch(() => null);
-
-            mysteryLogger.error("mystery_bags.webhook.processing_failed", error, {
-                eventId,
-            });
-        }
+    setImmediate(() => {
+        runMysteryWebhookProcessing(eventId);
     });
 }
