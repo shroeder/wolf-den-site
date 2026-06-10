@@ -25,7 +25,6 @@ function toMysteryBagCard(row) {
         id: row.id,
         cardId: row.card_id,
         squareVariationId: row.square_variation_id || null,
-        packToken: row.pack_token || null,
         name: row.card_name,
         set: row.set_name,
         number: row.card_number,
@@ -56,7 +55,6 @@ export async function listMysteryBagCards() {
         `SELECT id,
                 card_id,
                 square_variation_id,
-                pack_token,
                 card_name,
                 set_name,
                 card_number,
@@ -84,7 +82,6 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
         `SELECT id,
                 card_id,
                 square_variation_id,
-                pack_token,
                 card_name,
                 set_name,
                 card_number,
@@ -180,13 +177,11 @@ export async function getMysteryBagDashboardData() {
 
 export async function upsertMysteryBagCard(payload) {
     const variationId = payload.squareVariationId || payload.variationId || null;
-    const packToken = payload.packToken || null;
 
     const row = await db.queryOne(
         `INSERT INTO mystery_bag_cards (
             card_id,
             square_variation_id,
-            pack_token,
             card_name,
             set_name,
             card_number,
@@ -199,11 +194,10 @@ export async function upsertMysteryBagCard(payload) {
             removed_at,
             updated_at
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', NULL, NULL, NULL, NULL, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NULL, NULL, NULL, NULL, NOW())
          ON CONFLICT (card_id)
          DO UPDATE
          SET square_variation_id = EXCLUDED.square_variation_id,
-             pack_token = EXCLUDED.pack_token,
              card_name = EXCLUDED.card_name,
              set_name = EXCLUDED.set_name,
              card_number = EXCLUDED.card_number,
@@ -218,7 +212,6 @@ export async function upsertMysteryBagCard(payload) {
          RETURNING id,
                    card_id,
                    square_variation_id,
-                   pack_token,
                    card_name,
                    set_name,
                    card_number,
@@ -230,7 +223,6 @@ export async function upsertMysteryBagCard(payload) {
         [
             payload.cardId,
             variationId,
-            packToken,
             payload.name,
             payload.set,
             payload.number,
@@ -242,7 +234,6 @@ export async function upsertMysteryBagCard(payload) {
     await appendMysteryAuditLog(row.id, "updated", {
         cardId: row.card_id,
         squareVariationId: variationId,
-        packToken,
         marketValue: toMoneyNumber(row.market_value),
     });
 
@@ -260,7 +251,6 @@ export async function deleteMysteryBagCardByIdOrCardId(idOrCardId) {
          RETURNING id,
                    card_id,
                    square_variation_id,
-                   pack_token,
                    card_name,
                    set_name,
                    card_number,
@@ -292,7 +282,6 @@ function toSoldAssignment(row) {
             id: row.card_id,
             cardId: row.card_card_id,
             squareVariationId: row.square_variation_id || null,
-            packToken: row.pack_token || null,
             name: row.card_name,
             set: row.set_name,
             number: row.card_number,
@@ -318,7 +307,7 @@ async function appendMysteryAuditLog(mysteryCardId, action, payload = {}) {
     ).catch(() => null);
 }
 
-async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys = [] }) {
+async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys = [], soldPackVariationId = null }) {
     const keys = reservationKeys.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim());
     const assignedIds = [];
 
@@ -339,17 +328,34 @@ async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys =
     }
 
     if (assignedIds.length < quantity) {
-        const activePacked = await db.query(
+        const variationMatches = await db.query(
             `SELECT id
              FROM mystery_bag_cards
              WHERE status = 'active'
-               AND pack_token IS NOT NULL
+               AND square_variation_id = $1
+             ORDER BY created_at ASC
+             LIMIT $2`,
+            [soldPackVariationId, quantity - assignedIds.length]
+        );
+
+        for (const row of variationMatches) {
+            if (!assignedIds.includes(row.id)) {
+                assignedIds.push(row.id);
+            }
+        }
+    }
+
+    if (assignedIds.length < quantity && !soldPackVariationId) {
+        const activeFallback = await db.query(
+            `SELECT id
+             FROM mystery_bag_cards
+             WHERE status = 'active'
              ORDER BY created_at ASC
              LIMIT $1`,
             [quantity - assignedIds.length]
         );
 
-        for (const row of activePacked) {
+        for (const row of activeFallback) {
             if (!assignedIds.includes(row.id)) {
                 assignedIds.push(row.id);
             }
@@ -404,7 +410,6 @@ async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys =
                     mbc.id AS card_id,
                     mbc.card_id AS card_card_id,
                     mbc.square_variation_id,
-                    mbc.pack_token,
                     mbc.card_name,
                     mbc.set_name,
                     mbc.card_number,
@@ -518,6 +523,7 @@ export async function createMysterySoldEvent(payload) {
         soldEventId: soldEvent.id,
         quantity,
         reservationKeys,
+        soldPackVariationId: payload.soldPackVariationId || null,
     });
 
     return {
@@ -560,7 +566,6 @@ export async function getMysterySoldEventByIdempotencyKey(idempotencyKey) {
                 mbc.id AS card_id,
                 mbc.card_id AS card_card_id,
                 mbc.square_variation_id,
-                mbc.pack_token,
                 mbc.card_name,
                 mbc.set_name,
                 mbc.card_number,
@@ -599,7 +604,6 @@ export async function reserveMysteryBagCards(payload = {}) {
     const reservationKey = typeof payload.reservationKey === "string" ? payload.reservationKey.trim() : null;
     const explicitIds = Array.isArray(payload.ids) ? payload.ids.filter((value) => typeof value === "string" && value.trim()) : [];
     const explicitCardIds = Array.isArray(payload.cardIds) ? payload.cardIds.filter((value) => typeof value === "string" && value.trim()) : [];
-    const explicitPackTokens = Array.isArray(payload.packTokens) ? payload.packTokens.filter((value) => typeof value === "string" && value.trim()) : [];
 
     const values = [reservationKey, quantity];
     const conditions = ["status = 'active'"];
@@ -615,12 +619,6 @@ export async function reserveMysteryBagCards(payload = {}) {
         values.push(explicitCardIds);
         paramIndex += 1;
         conditions.push(`card_id = ANY($${paramIndex}::text[])`);
-    }
-
-    if (explicitPackTokens.length > 0) {
-        values.push(explicitPackTokens);
-        paramIndex += 1;
-        conditions.push(`pack_token = ANY($${paramIndex}::text[])`);
     }
 
     const query = `
@@ -641,7 +639,6 @@ export async function reserveMysteryBagCards(payload = {}) {
         RETURNING mbc.id,
                   mbc.card_id,
                   mbc.square_variation_id,
-                  mbc.pack_token,
                   mbc.card_name,
                   mbc.set_name,
                   mbc.card_number,
