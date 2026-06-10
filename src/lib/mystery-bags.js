@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getMysteryBagPriceInfoFromSquare } from "@/lib/consignment/square";
+import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareOrder } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -25,6 +25,7 @@ function toMysteryBagCard(row) {
         id: row.id,
         cardId: row.card_id,
         squareVariationId: row.square_variation_id || null,
+        variationSku: row.variation_sku || null,
         name: row.card_name,
         set: row.set_name,
         number: row.card_number,
@@ -55,6 +56,7 @@ export async function listMysteryBagCards() {
         `SELECT id,
                 card_id,
                 square_variation_id,
+                variation_sku,
                 card_name,
                 set_name,
                 card_number,
@@ -82,6 +84,7 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
         `SELECT id,
                 card_id,
                 square_variation_id,
+                variation_sku,
                 card_name,
                 set_name,
                 card_number,
@@ -177,11 +180,13 @@ export async function getMysteryBagDashboardData() {
 
 export async function upsertMysteryBagCard(payload) {
     const variationId = payload.squareVariationId || payload.variationId || null;
+    const variationSku = payload.variationSku || null;
 
     const row = await db.queryOne(
         `INSERT INTO mystery_bag_cards (
             card_id,
             square_variation_id,
+            variation_sku,
             card_name,
             set_name,
             card_number,
@@ -194,10 +199,11 @@ export async function upsertMysteryBagCard(payload) {
             removed_at,
             updated_at
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NULL, NULL, NULL, NULL, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', NULL, NULL, NULL, NULL, NOW())
          ON CONFLICT (card_id)
          DO UPDATE
          SET square_variation_id = EXCLUDED.square_variation_id,
+             variation_sku = EXCLUDED.variation_sku,
              card_name = EXCLUDED.card_name,
              set_name = EXCLUDED.set_name,
              card_number = EXCLUDED.card_number,
@@ -212,6 +218,7 @@ export async function upsertMysteryBagCard(payload) {
          RETURNING id,
                    card_id,
                    square_variation_id,
+                   variation_sku,
                    card_name,
                    set_name,
                    card_number,
@@ -223,6 +230,7 @@ export async function upsertMysteryBagCard(payload) {
         [
             payload.cardId,
             variationId,
+            variationSku,
             payload.name,
             payload.set,
             payload.number,
@@ -234,6 +242,7 @@ export async function upsertMysteryBagCard(payload) {
     await appendMysteryAuditLog(row.id, "updated", {
         cardId: row.card_id,
         squareVariationId: variationId,
+        variationSku,
         marketValue: toMoneyNumber(row.market_value),
     });
 
@@ -251,6 +260,7 @@ export async function deleteMysteryBagCardByIdOrCardId(idOrCardId) {
          RETURNING id,
                    card_id,
                    square_variation_id,
+                   variation_sku,
                    card_name,
                    set_name,
                    card_number,
@@ -282,6 +292,7 @@ function toSoldAssignment(row) {
             id: row.card_id,
             cardId: row.card_card_id,
             squareVariationId: row.square_variation_id || null,
+            variationSku: row.variation_sku || null,
             name: row.card_name,
             set: row.set_name,
             number: row.card_number,
@@ -410,6 +421,7 @@ async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys =
                     mbc.id AS card_id,
                     mbc.card_id AS card_card_id,
                     mbc.square_variation_id,
+                    mbc.variation_sku,
                     mbc.card_name,
                     mbc.set_name,
                     mbc.card_number,
@@ -433,6 +445,123 @@ async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys =
     return {
         assignments: assignments.map(toSoldAssignment),
         remainingUnassignedUnits: Math.max(0, quantity - assignments.length),
+    };
+}
+
+async function findMysteryBagCardBySquareVariationId(variationId) {
+    if (!variationId) {
+        return null;
+    }
+
+    // 1. Direct DB lookup by square_variation_id
+    const byVariationId = await db.queryOne(
+        `SELECT id, card_id, square_variation_id, variation_sku
+         FROM mystery_bag_cards
+         WHERE square_variation_id = $1
+           AND status IN ('active', 'reserved')`,
+        [variationId]
+    );
+
+    if (byVariationId) {
+        return byVariationId;
+    }
+
+    // 2. Fetch catalog object from Square to get its SKU, then match by variation_sku
+    try {
+        const catalogObj = await getSquareCatalogObjectById(variationId);
+        const sku = catalogObj?.item_variation_data?.sku || null;
+
+        if (sku) {
+            const byVariationSku = await db.queryOne(
+                `SELECT id, card_id, square_variation_id, variation_sku
+                 FROM mystery_bag_cards
+                 WHERE variation_sku = $1
+                   AND status IN ('active', 'reserved')`,
+                [sku]
+            );
+
+            if (byVariationSku) {
+                return byVariationSku;
+            }
+        }
+    } catch (error) {
+        mysteryLogger.warn("mystery_bags.webhook.catalog_lookup_failed", {
+            variationId,
+            reason: error instanceof Error ? error.message : "unknown",
+        });
+    }
+
+    return null;
+}
+
+async function assignExactCardToSoldEvent({ soldEventId, cardId }) {
+    const soldCards = await db.query(
+        `UPDATE mystery_bag_cards
+         SET status = 'sold',
+             sold_at = NOW(),
+             updated_at = NOW(),
+             reservation_key = NULL,
+             reserved_at = NULL
+         WHERE id = $1
+           AND status IN ('active', 'reserved')
+         RETURNING id`,
+        [cardId]
+    );
+
+    if (soldCards.length === 0) {
+        return {
+            assignments: [],
+            remainingUnassignedUnits: 1,
+        };
+    }
+
+    const assignmentRows = await db.query(
+        `INSERT INTO mystery_sold_assignments (sold_event_id, mystery_card_id)
+         VALUES ($1, $2)
+         ON CONFLICT (mystery_card_id) DO NOTHING
+         RETURNING id, sold_event_id, mystery_card_id, assigned_at`,
+        [soldEventId, cardId]
+    );
+
+    if (assignmentRows.length === 0) {
+        return {
+            assignments: [],
+            remainingUnassignedUnits: 1,
+        };
+    }
+
+    const assignmentId = assignmentRows[0].id;
+    const assignments = await db.query(
+        `SELECT msa.id AS assignment_id,
+                msa.sold_event_id,
+                msa.assigned_at,
+                mbc.id AS card_id,
+                mbc.card_id AS card_card_id,
+                mbc.square_variation_id,
+                mbc.variation_sku,
+                mbc.card_name,
+                mbc.set_name,
+                mbc.card_number,
+                mbc.market_value,
+                mbc.image_url,
+                mbc.status,
+                mbc.created_at,
+                mbc.updated_at
+         FROM mystery_sold_assignments msa
+         INNER JOIN mystery_bag_cards mbc ON mbc.id = msa.mystery_card_id
+         WHERE msa.id = $1`,
+        [assignmentId]
+    );
+
+    await Promise.all(assignments.map((assignment) => appendMysteryAuditLog(assignment.card_id, "sold", {
+        soldEventId,
+        assignmentId: assignment.assignment_id,
+        exact: true,
+    })));
+
+    return {
+        assignments: assignments.map(toSoldAssignment),
+        remainingUnassignedUnits: 0,
     };
 }
 
@@ -519,6 +648,21 @@ export async function createMysterySoldEvent(payload) {
     }
 
     const reservationKeys = [payload.squareOrderId, payload.squarePaymentId, payload.squareLineItemUid];
+
+    // If the caller already identified the exact card (webhook exact-match path), skip random assignment
+    if (payload.exactCardId) {
+        const assignmentResult = await assignExactCardToSoldEvent({
+            soldEventId: soldEvent.id,
+            cardId: payload.exactCardId,
+        });
+
+        return {
+            soldEventId: soldEvent.id,
+            assigned: assignmentResult.assignments,
+            remainingUnassignedUnits: assignmentResult.remainingUnassignedUnits,
+        };
+    }
+
     const assignmentResult = await assignCardsToSoldEvent({
         soldEventId: soldEvent.id,
         quantity,
@@ -566,6 +710,7 @@ export async function getMysterySoldEventByIdempotencyKey(idempotencyKey) {
                 mbc.id AS card_id,
                 mbc.card_id AS card_card_id,
                 mbc.square_variation_id,
+                mbc.variation_sku,
                 mbc.card_name,
                 mbc.set_name,
                 mbc.card_number,
@@ -639,6 +784,7 @@ export async function reserveMysteryBagCards(payload = {}) {
         RETURNING mbc.id,
                   mbc.card_id,
                   mbc.square_variation_id,
+                  mbc.variation_sku,
                   mbc.card_name,
                   mbc.set_name,
                   mbc.card_number,
@@ -846,54 +992,126 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
     }
 
     const payload = row.payload_json || {};
-    const extracted = await extractMysterySaleFromSquarePayload(payload);
+    const eventType = payload?.type || null;
+    const providerEventId = payload?.event_id || payload?.id || null;
 
-    if (!extracted.idempotencyKey || extracted.quantity < 1) {
+    // Only handle order.updated events
+    if (eventType !== "order.updated") {
         await markMysteryWebhookEventProcessed(eventId, {
             status: "ignored",
-            error: "no_mystery_sale_units_detected",
+            error: "unsupported_event_type",
         });
-        return {
+        return { status: "ignored", processed: false };
+    }
+
+    // Only process COMPLETED orders
+    const orderState = payload?.data?.object?.order_updated?.state || null;
+    const orderId = payload?.data?.object?.order_updated?.order_id
+        || payload?.data?.id
+        || null;
+
+    if (orderState !== "COMPLETED" || !orderId) {
+        await markMysteryWebhookEventProcessed(eventId, {
             status: "ignored",
-            processed: false,
-        };
+            error: "order_not_completed",
+        });
+        return { status: "ignored", processed: false };
     }
 
-    const result = await createMysterySoldEvent({
-        idempotencyKey: extracted.idempotencyKey,
-        source: "square_webhook",
-        soldAt: extracted.soldAt,
-        quantity: extracted.quantity,
-        squareOrderId: extracted.squareOrderId,
-        squareLineItemUid: extracted.squareLineItemUid,
-        squarePaymentId: extracted.squarePaymentId,
-        soldPackVariationId: extracted.soldPackVariationId,
-        soldPackItemName: extracted.soldPackItemName,
-    });
+    // Fetch the full order from Square to get line items
+    let order;
 
-    if (result?.error === "duplicate_idempotency_key") {
+    try {
+        order = await getSquareOrder(orderId);
+    } catch (error) {
         await markMysteryWebhookEventProcessed(eventId, {
-            status: "duplicated",
-            error: null,
+            status: "failed",
+            error: "square_order_fetch_failed",
         });
-
-        return {
-            status: "duplicated",
-            processed: false,
-        };
+        return { status: "failed", processed: false, error: "square_order_fetch_failed" };
     }
 
-    if (result?.error) {
+    if (!order) {
         await markMysteryWebhookEventProcessed(eventId, {
-            status: "failed",
-            error: result.error,
+            status: "ignored",
+            error: "square_order_not_found",
+        });
+        return { status: "ignored", processed: false };
+    }
+
+    const soldAt = order.closed_at || order.updated_at || new Date().toISOString();
+    const squarePaymentId = order.tenders?.[0]?.id || null;
+    let assignedCount = 0;
+    let ignoredLineItems = 0;
+
+    for (const lineItem of order.line_items || []) {
+        const variationId = lineItem.catalog_object_id || null;
+
+        if (!variationId) {
+            continue;
+        }
+
+        const card = await findMysteryBagCardBySquareVariationId(variationId);
+
+        if (!card) {
+            ignoredLineItems++;
+            continue;
+        }
+
+        const idempotencyKey = toSafeWebhookIdempotencyKey(
+            providerEventId
+                ? `square:${providerEventId}:${variationId}`
+                : `square:order:${orderId}:${variationId}`
+        );
+
+        const result = await createMysterySoldEvent({
+            idempotencyKey,
+            source: "square_webhook",
+            soldAt,
+            quantity: 1,
+            squareOrderId: orderId,
+            squareLineItemUid: lineItem.uid || null,
+            squarePaymentId,
+            soldPackVariationId: variationId,
+            soldPackItemName: lineItem.name || null,
+            exactCardId: card.id,
         });
 
-        return {
-            status: "failed",
-            processed: false,
-            error: result.error,
-        };
+        if (result?.error === "duplicate_idempotency_key") {
+            // Already processed this line item — count as assigned
+            assignedCount++;
+            continue;
+        }
+
+        if (result?.error) {
+            mysteryLogger.warn("mystery_bags.webhook.line_item_sale_failed", {
+                eventId,
+                variationId,
+                error: result.error,
+            });
+            continue;
+        }
+
+        assignedCount++;
+
+        // Delete the Square variation now that the card is sold
+        const variationToDelete = card.square_variation_id || variationId;
+
+        await deleteSquareCatalogObject(variationToDelete).catch((error) => {
+            mysteryLogger.warn("mystery_bags.webhook.variation_delete_failed", {
+                eventId,
+                variationId: variationToDelete,
+                reason: error instanceof Error ? error.message : "unknown",
+            });
+        });
+    }
+
+    if (assignedCount === 0 && ignoredLineItems === (order.line_items || []).length) {
+        await markMysteryWebhookEventProcessed(eventId, {
+            status: "ignored",
+            error: "no_mystery_items_in_order",
+        });
+        return { status: "ignored", processed: false };
     }
 
     await markMysteryWebhookEventProcessed(eventId, {
@@ -904,8 +1122,7 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
     return {
         status: "processed",
         processed: true,
-        assignedCount: result.assigned.length,
-        remainingUnassignedUnits: result.remainingUnassignedUnits,
+        assignedCount,
     };
 }
 

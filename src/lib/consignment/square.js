@@ -1023,3 +1023,37 @@ export function calculateOnlineFeeCents(subtotalAmountDollars) {
 export function toPriceCents(amountDollars) {
     return toAmountCents(amountDollars);
 }
+
+export async function getSquareCatalogObjectById(objectId) {
+    const normalizedId = String(objectId || "").trim();
+
+    if (!normalizedId) {
+        return null;
+    }
+
+    const payload = await squareFetch(`/v2/catalog/object/${normalizedId}`);
+
+    return payload?.object || null;
+}
+
+export async function getSquareOrder(orderId) {
+    const normalizedId = String(orderId || "").trim();
+
+    if (!normalizedId) {
+        return null;
+    }
+
+    const payload = await squareFetch(`/v2/orders/${normalizedId}`);
+
+    return payload?.order || null;
+}
+
+export async function deleteSquareCatalogObject(objectId) {
+    const normalizedId = String(objectId || "").trim();
+
+    if (!normalizedId) {
+        return null;
+    }
+
+    return squareFetch(`/v2/catalog/object/${normalizedId}`, { method: "DELETE" });
+}

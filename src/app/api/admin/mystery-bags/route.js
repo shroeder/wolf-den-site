@@ -15,6 +15,7 @@ function normalizePayload(body) {
             : typeof body?.variationId === "string"
                 ? body.variationId.trim()
                 : "",
+        variationSku: typeof body?.variationSku === "string" ? body.variationSku.trim() : "",
         name: typeof body?.name === "string" ? body.name.trim() : "",
         set: typeof body?.set === "string" ? body.set.trim() : "",
         number: typeof body?.number === "string" ? body.number.trim() : "",
@@ -51,6 +52,7 @@ function validatePayload(payload) {
     }
 
     payload.squareVariationId = payload.squareVariationId || null;
+    payload.variationSku = payload.variationSku || null;
 
     return null;
 }
