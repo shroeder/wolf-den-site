@@ -637,6 +637,10 @@ export async function listShopInventory() {
                     continue;
                 }
 
+                if (isMysteryCatalogItem(item)) {
+                    continue;
+                }
+
                 // Collect all category IDs from both legacy and current API fields
                 const legacyCategoryId = item.item_data?.category_id;
                 const categoriesArray = item.item_data?.categories || [];
@@ -739,6 +743,73 @@ function normalizeName(value) {
     return String(value || "")
         .trim()
         .toLowerCase();
+}
+
+function isLikelyMysteryLabel(value) {
+    const normalized = normalizeName(value);
+
+    if (!normalized) {
+        return false;
+    }
+
+    const hasMystery = normalized.includes("mystery");
+    const hasPackOrBag = normalized.includes("pack") || normalized.includes("bag");
+
+    return hasMystery && hasPackOrBag;
+}
+
+function getConfiguredMysteryVariationIds() {
+    const configured = process.env.MYSTERY_BAG_PACK_VARIATION_IDS || process.env.MYSTERY_BAG_PACK_VARIATION_ID || "";
+
+    return new Set(
+        configured
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+    );
+}
+
+function isMysteryCatalogItem(item) {
+    if (!item || item.type !== "ITEM") {
+        return false;
+    }
+
+    const configuredItemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID || DEFAULT_MYSTERY_PACK_ITEM_ID;
+
+    if (configuredItemId && item.id === configuredItemId) {
+        return true;
+    }
+
+    if (isLikelyMysteryLabel(item.item_data?.name)) {
+        return true;
+    }
+
+    const configuredSingleVariationId = String(process.env.SQUARE_MYSTERY_BAG_VARIATION_ID || "").trim();
+    const configuredVariationIds = getConfiguredMysteryVariationIds();
+
+    for (const variation of item.item_data?.variations || []) {
+        if (!variation?.id) {
+            continue;
+        }
+
+        if (configuredSingleVariationId && variation.id === configuredSingleVariationId) {
+            return true;
+        }
+
+        if (configuredVariationIds.has(variation.id)) {
+            return true;
+        }
+
+        if (isLikelyMysteryLabel(variation.item_variation_data?.name)) {
+            return true;
+        }
+
+        if (isLikelyMysteryLabel(variation.item_variation_data?.sku)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function selectVariationForItem(item) {
