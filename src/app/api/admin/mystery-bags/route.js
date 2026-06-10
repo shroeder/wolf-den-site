@@ -10,11 +10,7 @@ export const runtime = "nodejs";
 function normalizePayload(body) {
     return {
         cardId: typeof body?.cardId === "string" ? body.cardId.trim() : "",
-        squareVariationId: typeof body?.squareVariationId === "string"
-            ? body.squareVariationId.trim()
-            : typeof body?.variationId === "string"
-                ? body.variationId.trim()
-                : "",
+        squareVariationId: typeof body?.squareVariationId === "string" ? body.squareVariationId.trim() : "",
         variationSku: typeof body?.variationSku === "string" ? body.variationSku.trim() : "",
         name: typeof body?.name === "string" ? body.name.trim() : "",
         set: typeof body?.set === "string" ? body.set.trim() : "",
@@ -27,6 +23,10 @@ function normalizePayload(body) {
 function validatePayload(payload) {
     if (!payload.cardId || !payload.name || !payload.set || !payload.number || payload.marketValue === undefined) {
         return "missing_required_fields";
+    }
+
+    if (!payload.variationSku) {
+        return "missing_variation_sku";
     }
 
     const marketValue = Number(payload.marketValue);

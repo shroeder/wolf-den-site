@@ -180,7 +180,21 @@ export async function getMysteryBagDashboardData() {
 
 export async function upsertMysteryBagCard(payload) {
     const variationId = payload.squareVariationId || payload.variationId || null;
-    const variationSku = payload.variationSku || null;
+    let variationSku = typeof payload.variationSku === "string" ? payload.variationSku.trim() : "";
+
+    if (!variationSku && variationId) {
+        try {
+            const variation = await getSquareCatalogObjectById(variationId);
+            variationSku = String(variation?.item_variation_data?.sku || "").trim();
+        } catch (error) {
+            mysteryLogger.warn("mystery_bags.upsert.variation_sku_lookup_failed", {
+                variationId,
+                reason: error instanceof Error ? error.message : "unknown",
+            });
+        }
+    }
+
+    variationSku = variationSku || null;
 
     const row = await db.queryOne(
         `INSERT INTO mystery_bag_cards (
