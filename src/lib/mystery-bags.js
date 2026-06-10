@@ -755,7 +755,7 @@ function parseQuantity(value) {
     return Math.max(0, Math.floor(asNumber));
 }
 
-function getConfiguredMysteryVariationIds() {
+function getEnvConfiguredMysteryVariationIds() {
     const configured = process.env.MYSTERY_BAG_PACK_VARIATION_IDS || process.env.MYSTERY_BAG_PACK_VARIATION_ID || "";
 
     return configured
@@ -764,11 +764,38 @@ function getConfiguredMysteryVariationIds() {
         .filter(Boolean);
 }
 
-function extractMysterySaleFromSquarePayload(payload = {}) {
+async function getConfiguredMysteryVariationIds() {
+    const values = new Set(getEnvConfiguredMysteryVariationIds());
+
+    try {
+        const rows = await db.query(
+            `SELECT DISTINCT square_variation_id
+             FROM mystery_bag_cards
+             WHERE status IN ('active', 'reserved')
+               AND square_variation_id IS NOT NULL`
+        );
+
+        for (const row of rows) {
+            const variationId = typeof row?.square_variation_id === "string" ? row.square_variation_id.trim() : "";
+
+            if (variationId) {
+                values.add(variationId);
+            }
+        }
+    } catch (error) {
+        mysteryLogger.warn("mystery_bags.webhook.variation_lookup_failed", {
+            reason: error instanceof Error ? error.message : "unknown_error",
+        });
+    }
+
+    return Array.from(values);
+}
+
+async function extractMysterySaleFromSquarePayload(payload = {}) {
     const providerEventId = payload.event_id || payload.id || payload.data?.id || null;
     const eventType = payload.type || payload.event_type || payload.data?.type || null;
     const lineItems = toPotentialLineItems(payload);
-    const configuredVariationIds = getConfiguredMysteryVariationIds();
+    const configuredVariationIds = await getConfiguredMysteryVariationIds();
     const mysteryItems = lineItems.filter((item) => {
         const variationId = item?.catalog_object_id || item?.variation_id || item?.catalogObjectId || null;
         const name = String(item?.name || item?.item_name || item?.itemName || "").toLowerCase();
@@ -822,7 +849,7 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
     }
 
     const payload = row.payload_json || {};
-    const extracted = extractMysterySaleFromSquarePayload(payload);
+    const extracted = await extractMysterySaleFromSquarePayload(payload);
 
     if (!extracted.idempotencyKey || extracted.quantity < 1) {
         await markMysteryWebhookEventProcessed(eventId, {
