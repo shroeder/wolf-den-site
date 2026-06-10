@@ -7,6 +7,7 @@ import { createServerLogger } from "@/lib/server-logger";
 const mysteryLogger = createServerLogger({ source: "api", subsystem: "mystery-bags" });
 const ACTIVE_STATUSES = ["active", "reserved"];
 const VALID_CARD_STATUSES = new Set(["active", "reserved", "sold", "removed"]);
+const MYSTERY_CARD_ID_PATTERN = /^MP-[A-Z0-9]+-[A-Z0-9]+$/;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -179,7 +180,15 @@ export async function getMysteryBagDashboardData() {
 }
 
 export async function upsertMysteryBagCard(payload) {
-    const variationId = payload.squareVariationId || payload.variationId || null;
+    const cardId = typeof payload.cardId === "string" ? payload.cardId.trim() : "";
+
+    if (!MYSTERY_CARD_ID_PATTERN.test(cardId)) {
+        const error = new Error("Invalid mystery card id.");
+        error.code = "invalid_card_id";
+        throw error;
+    }
+
+    const variationId = payload.squareVariationId || null;
     let variationSku = typeof payload.variationSku === "string" ? payload.variationSku.trim() : "";
 
     if (!variationSku && variationId) {
@@ -242,7 +251,7 @@ export async function upsertMysteryBagCard(payload) {
                    created_at,
                    updated_at`,
         [
-            payload.cardId,
+            cardId,
             variationId,
             variationSku,
             payload.name,
