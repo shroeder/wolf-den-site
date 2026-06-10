@@ -7,7 +7,6 @@ import { createServerLogger } from "@/lib/server-logger";
 const mysteryLogger = createServerLogger({ source: "api", subsystem: "mystery-bags" });
 const ACTIVE_STATUSES = ["active", "reserved"];
 const VALID_CARD_STATUSES = new Set(["active", "reserved", "sold", "removed"]);
-const MYSTERY_CARD_ID_PATTERN = /^MP-[A-Z0-9]+-[A-Z0-9]+$/;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -180,13 +179,7 @@ export async function getMysteryBagDashboardData() {
 }
 
 export async function upsertMysteryBagCard(payload) {
-    const cardId = typeof payload.cardId === "string" ? payload.cardId.trim() : "";
-
-    if (!MYSTERY_CARD_ID_PATTERN.test(cardId)) {
-        const error = new Error("Invalid mystery card id.");
-        error.code = "invalid_card_id";
-        throw error;
-    }
+    const providedCardId = typeof payload.cardId === "string" ? payload.cardId.trim() : "";
 
     const variationId = payload.squareVariationId || null;
     let variationSku = typeof payload.variationSku === "string" ? payload.variationSku.trim() : "";
@@ -204,6 +197,22 @@ export async function upsertMysteryBagCard(payload) {
     }
 
     variationSku = variationSku || null;
+
+    if (!variationSku) {
+        const error = new Error("Missing mystery variation SKU.");
+        error.code = "missing_variation_sku";
+        throw error;
+    }
+
+    // SKU is the canonical identity for mystery bag cards.
+    const canonicalCardId = variationSku;
+
+    if (providedCardId && providedCardId !== canonicalCardId) {
+        mysteryLogger.warn("mystery_bags.upsert.card_id_ignored", {
+            providedCardId,
+            canonicalCardId,
+        });
+    }
 
     const row = await db.queryOne(
         `INSERT INTO mystery_bag_cards (
@@ -251,7 +260,7 @@ export async function upsertMysteryBagCard(payload) {
                    created_at,
                    updated_at`,
         [
-            cardId,
+            canonicalCardId,
             variationId,
             variationSku,
             payload.name,

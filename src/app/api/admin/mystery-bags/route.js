@@ -6,7 +6,6 @@ import { listMysteryBagCards, upsertMysteryBagCard } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
-const MYSTERY_CARD_ID_PATTERN = /^MP-[A-Z0-9]+-[A-Z0-9]+$/;
 
 function normalizePayload(body) {
     return {
@@ -22,20 +21,12 @@ function normalizePayload(body) {
 }
 
 function validatePayload(payload) {
-    if (!payload.cardId || !payload.name || !payload.set || !payload.number || payload.marketValue === undefined) {
+    if (!payload.name || !payload.set || !payload.number || payload.marketValue === undefined) {
         return "missing_required_fields";
-    }
-
-    if (!MYSTERY_CARD_ID_PATTERN.test(payload.cardId)) {
-        return "invalid_card_id";
     }
 
     if (!payload.variationSku) {
         return "missing_variation_sku";
-    }
-
-    if (payload.squareVariationId && payload.cardId === payload.squareVariationId) {
-        return "identity_conflict_card_id_equals_square_variation_id";
     }
 
     const marketValue = Number(payload.marketValue);
