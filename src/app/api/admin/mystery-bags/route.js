@@ -11,6 +11,11 @@ function normalizePayload(body) {
     return {
         cardId: typeof body?.cardId === "string" ? body.cardId.trim() : "",
         squareVariationId: typeof body?.squareVariationId === "string" ? body.squareVariationId.trim() : "",
+        packedVariationId: typeof body?.packedVariationId === "string"
+            ? body.packedVariationId.trim()
+            : typeof body?.purchasedPackVariationId === "string"
+                ? body.purchasedPackVariationId.trim()
+                : "",
         variationSku: typeof body?.variationSku === "string"
             ? body.variationSku.trim()
             : typeof body?.packedVariationSku === "string"
@@ -58,6 +63,7 @@ function validatePayload(payload) {
     }
 
     payload.squareVariationId = payload.squareVariationId || null;
+    payload.packedVariationId = payload.packedVariationId || null;
     payload.variationSku = payload.variationSku || null;
 
     return null;

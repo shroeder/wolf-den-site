@@ -25,7 +25,9 @@ function toMysteryBagCard(row) {
         id: row.id,
         cardId: row.card_id,
         squareVariationId: row.square_variation_id || null,
+        packedVariationId: row.packed_variation_id || null,
         variationSku: row.variation_sku || null,
+        packedVariationSku: row.variation_sku || null,
         name: row.card_name,
         set: row.set_name,
         number: row.card_number,
@@ -56,6 +58,7 @@ export async function listMysteryBagCards() {
         `SELECT id,
                 card_id,
                 square_variation_id,
+                packed_variation_id,
                 variation_sku,
                 card_name,
                 set_name,
@@ -84,6 +87,7 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
         `SELECT id,
                 card_id,
                 square_variation_id,
+                packed_variation_id,
                 variation_sku,
                 card_name,
                 set_name,
@@ -182,15 +186,20 @@ export async function upsertMysteryBagCard(payload) {
     const providedCardId = typeof payload.cardId === "string" ? payload.cardId.trim() : "";
 
     const variationId = payload.squareVariationId || null;
+    const packedVariationId = payload.packedVariationId || null;
     let variationSku = typeof payload.variationSku === "string" ? payload.variationSku.trim() : "";
 
-    if (!variationSku && variationId) {
+    // The SKU belongs to the packed variation (the one printed/scanned/sold),
+    // so resolve it from packed_variation_id first, then fall back to the source.
+    const skuLookupVariationId = packedVariationId || variationId;
+
+    if (!variationSku && skuLookupVariationId) {
         try {
-            const variation = await getSquareCatalogObjectById(variationId);
+            const variation = await getSquareCatalogObjectById(skuLookupVariationId);
             variationSku = String(variation?.item_variation_data?.sku || "").trim();
         } catch (error) {
             mysteryLogger.warn("mystery_bags.upsert.variation_sku_lookup_failed", {
-                variationId,
+                variationId: skuLookupVariationId,
                 reason: error instanceof Error ? error.message : "unknown",
             });
         }
@@ -218,6 +227,7 @@ export async function upsertMysteryBagCard(payload) {
         `INSERT INTO mystery_bag_cards (
             card_id,
             square_variation_id,
+            packed_variation_id,
             variation_sku,
             card_name,
             set_name,
@@ -231,10 +241,11 @@ export async function upsertMysteryBagCard(payload) {
             removed_at,
             updated_at
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', NULL, NULL, NULL, NULL, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', NULL, NULL, NULL, NULL, NOW())
          ON CONFLICT (card_id)
          DO UPDATE
          SET square_variation_id = EXCLUDED.square_variation_id,
+             packed_variation_id = EXCLUDED.packed_variation_id,
              variation_sku = EXCLUDED.variation_sku,
              card_name = EXCLUDED.card_name,
              set_name = EXCLUDED.set_name,
@@ -250,6 +261,7 @@ export async function upsertMysteryBagCard(payload) {
          RETURNING id,
                    card_id,
                    square_variation_id,
+                   packed_variation_id,
                    variation_sku,
                    card_name,
                    set_name,
@@ -262,6 +274,7 @@ export async function upsertMysteryBagCard(payload) {
         [
             canonicalCardId,
             variationId,
+            packedVariationId,
             variationSku,
             payload.name,
             payload.set,
@@ -274,6 +287,7 @@ export async function upsertMysteryBagCard(payload) {
     await appendMysteryAuditLog(row.id, "updated", {
         cardId: row.card_id,
         squareVariationId: variationId,
+        packedVariationId,
         variationSku,
         marketValue: toMoneyNumber(row.market_value),
     });
@@ -292,6 +306,7 @@ export async function deleteMysteryBagCardByIdOrCardId(idOrCardId) {
          RETURNING id,
                    card_id,
                    square_variation_id,
+                   packed_variation_id,
                    variation_sku,
                    card_name,
                    set_name,
@@ -324,7 +339,9 @@ function toSoldAssignment(row) {
             id: row.card_id,
             cardId: row.card_card_id,
             squareVariationId: row.square_variation_id || null,
+            packedVariationId: row.packed_variation_id || null,
             variationSku: row.variation_sku || null,
+            packedVariationSku: row.variation_sku || null,
             name: row.card_name,
             set: row.set_name,
             number: row.card_number,
@@ -375,7 +392,7 @@ async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys =
             `SELECT id
              FROM mystery_bag_cards
              WHERE status = 'active'
-               AND square_variation_id = $1
+               AND (packed_variation_id = $1 OR square_variation_id = $1)
              ORDER BY created_at ASC
              LIMIT $2`,
             [soldPackVariationId, quantity - assignedIds.length]
@@ -453,6 +470,7 @@ async function assignCardsToSoldEvent({ soldEventId, quantity, reservationKeys =
                     mbc.id AS card_id,
                     mbc.card_id AS card_card_id,
                     mbc.square_variation_id,
+                    mbc.packed_variation_id,
                     mbc.variation_sku,
                     mbc.card_name,
                     mbc.set_name,
@@ -485,11 +503,12 @@ async function findMysteryBagCardBySquareVariationId(variationId) {
         return null;
     }
 
-    // 1. Direct DB lookup by square_variation_id
+    // The scanned catalog_object_id is the packed variation. Match it there first;
+    // square_variation_id (the source single) is kept as a backward-compatible fallback.
     const byVariationId = await db.queryOne(
-        `SELECT id, card_id, square_variation_id, variation_sku
+        `SELECT id, card_id, square_variation_id, packed_variation_id, variation_sku
          FROM mystery_bag_cards
-         WHERE square_variation_id = $1
+         WHERE (packed_variation_id = $1 OR square_variation_id = $1)
            AND status IN ('active', 'reserved')`,
         [variationId]
     );
@@ -499,13 +518,14 @@ async function findMysteryBagCardBySquareVariationId(variationId) {
     }
 
     // 2. Fetch catalog object from Square to get its SKU, then match by variation_sku
+    // (covers pre-migration rows that only carry the source square_variation_id).
     try {
         const catalogObj = await getSquareCatalogObjectById(variationId);
         const sku = catalogObj?.item_variation_data?.sku || null;
 
         if (sku) {
             const byVariationSku = await db.queryOne(
-                `SELECT id, card_id, square_variation_id, variation_sku
+                `SELECT id, card_id, square_variation_id, packed_variation_id, variation_sku
                  FROM mystery_bag_cards
                  WHERE variation_sku = $1
                    AND status IN ('active', 'reserved')`,
@@ -570,6 +590,7 @@ async function assignExactCardToSoldEvent({ soldEventId, cardId }) {
                 mbc.id AS card_id,
                 mbc.card_id AS card_card_id,
                 mbc.square_variation_id,
+                mbc.packed_variation_id,
                 mbc.variation_sku,
                 mbc.card_name,
                 mbc.set_name,
@@ -742,6 +763,7 @@ export async function getMysterySoldEventByIdempotencyKey(idempotencyKey) {
                 mbc.id AS card_id,
                 mbc.card_id AS card_card_id,
                 mbc.square_variation_id,
+                mbc.packed_variation_id,
                 mbc.variation_sku,
                 mbc.card_name,
                 mbc.set_name,
@@ -816,6 +838,7 @@ export async function reserveMysteryBagCards(payload = {}) {
         RETURNING mbc.id,
                   mbc.card_id,
                   mbc.square_variation_id,
+                  mbc.packed_variation_id,
                   mbc.variation_sku,
                   mbc.card_name,
                   mbc.set_name,
@@ -1126,8 +1149,10 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
 
         assignedCount++;
 
-        // Delete the Square variation now that the card is sold
-        const variationToDelete = card.square_variation_id || variationId;
+        // Delete the packed Square variation now that the card is sold.
+        // The scanned variationId IS the packed variation, so prefer the stored
+        // packed_variation_id and fall back to the scanned id — never the source single.
+        const variationToDelete = card.packed_variation_id || variationId;
 
         await deleteSquareCatalogObject(variationToDelete).catch((error) => {
             mysteryLogger.warn("mystery_bags.webhook.variation_delete_failed", {
