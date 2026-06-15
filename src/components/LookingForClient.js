@@ -5,8 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const GAMES = [
-    { id: "magic", label: "Magic: The Gathering" },
     { id: "pokemon", label: "Pokemon" },
+    { id: "magic", label: "Magic: The Gathering" },
 ];
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
@@ -61,7 +61,7 @@ function CardTile({ card, inList, busy, onAdd, onRemove }) {
 }
 
 export default function LookingForClient() {
-    const [game, setGame] = useState("magic");
+    const [game, setGame] = useState("pokemon");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [searching, setSearching] = useState(false);
