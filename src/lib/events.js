@@ -63,6 +63,12 @@ export const events = [
         day: "Fridays",
         date: "Weekly",
         time: "4:00 PM - 7:00 PM",
+        image: {
+            src: "/images/friday-commander-night-players-the-wolf-den-montgomery-mn.jpg",
+            alt: "Local players enjoying casual Commander pods during Friday Commander Night at The Wolf Den in Montgomery, Minnesota",
+            width: 2048,
+            height: 1152,
+        },
         schedule: {
             byDay: "https://schema.org/Friday",
             startTime: "16:00",

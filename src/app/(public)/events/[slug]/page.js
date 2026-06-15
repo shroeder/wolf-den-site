@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { events, getEventBySlug } from "@/lib/events";
@@ -119,6 +120,16 @@ export default async function EventDetailPage({ params }) {
                     {event.day} at {event.time}
                 </p>
                 <p>{event.description}</p>
+                {event.image && (
+                    <Image
+                        src={event.image.src}
+                        alt={event.image.alt}
+                        width={event.image.width}
+                        height={event.image.height}
+                        sizes="(max-width: 900px) 100vw, 70vw"
+                        className="content-photo"
+                    />
+                )}
             </section>
 
             <section className="grid two-col">
