@@ -79,6 +79,23 @@ a:visited {
     font-weight: 700;
 }
 
+.closure-banner {
+    background: linear-gradient(90deg, var(--brand-strong), var(--accent-hover));
+    color: #0E0E0E;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.closure-banner-inner {
+    display: block;
+    padding: 0.65rem 1rem;
+}
+
+.closure-banner strong {
+    font-weight: 800;
+}
+
 .site-header {
     position: sticky;
     top: 0;
@@ -3209,4 +3226,87 @@ body.tv-mode .shop-mobile-cart-fab {
     body.tv-mode .brand {
         flex: 0 1 auto;
     }
+}
+
+/* Looking For (card wishlist) */
+.lf-game-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.lf-game-active {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.28), rgba(212, 175, 55, 0.12));
+    border-color: rgba(212, 175, 55, 0.5);
+    color: var(--ink);
+}
+
+.lf-search-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--ink-secondary);
+    font-size: 0.85rem;
+}
+
+.lf-search-input {
+    width: 100%;
+    max-width: 460px;
+}
+
+.lf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.lf-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.lf-card-art {
+    display: flex;
+    justify-content: center;
+}
+
+.lf-card-image {
+    width: 100%;
+    height: auto;
+    max-width: 146px;
+    border-radius: 8px;
+}
+
+.lf-card-image-empty {
+    aspect-ratio: 146 / 204;
+    background: var(--elevated);
+}
+
+.lf-card-body {
+    flex: 1;
+}
+
+.lf-card-name {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.25;
+}
+
+.lf-card-meta {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.lf-card-price {
+    margin: 0.35rem 0 0;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.9rem;
 }

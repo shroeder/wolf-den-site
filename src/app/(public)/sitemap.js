@@ -56,6 +56,12 @@ export default function sitemap() {
             ],
         },
         {
+            url: `${BASE_URL}/looking-for`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.8,
+        },
+        {
             url: `${BASE_URL}/mystery-bags`,
             lastModified: new Date(),
             changeFrequency: "daily",

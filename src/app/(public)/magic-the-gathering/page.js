@@ -132,6 +132,14 @@ export default function MagicTheGatheringPage() {
                     Friday Commander Night runs during store hours from 4:00 PM to 7:00 PM. The focus is casual Commander pods, trading, learn-to-play support, and future organized Commander events as the community grows.
                 </p>
                 <p>As the community grows, event offerings will continue to expand.</p>
+                <Image
+                    src="/images/friday-commander-night-players-the-wolf-den-montgomery-mn.jpg"
+                    alt="Local players enjoying casual Commander pods during Friday Commander Night at The Wolf Den in Montgomery, Minnesota"
+                    width={2048}
+                    height={1152}
+                    sizes="(max-width: 900px) 100vw, 70vw"
+                    className="content-photo"
+                />
             </section>
 
             <section className="card">

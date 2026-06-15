@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     trailingSlash: false,
+    images: {
+        remotePatterns: [
+            // tcgcsv product imagery (the "Looking For" card thumbnails) is served from
+            // tcgplayer's image CDNs.
+            { protocol: "https", hostname: "tcgplayer-cdn.tcgplayer.com" },
+            { protocol: "https", hostname: "product-images.tcgplayer.com" },
+        ],
+    },
     async redirects() {
         return [
             {

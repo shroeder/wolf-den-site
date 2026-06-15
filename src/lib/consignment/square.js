@@ -739,6 +739,71 @@ export async function listShopInventory() {
     return result;
 }
 
+// Scanned cards are pushed to Square with SKU "TCG-<tcgplayerProductId>"
+// (accounting_app SquareTransactionsService.buildSquareVariationSku). This matches that pattern.
+const TCG_SKU_PATTERN = /^TCG-(\d+)$/i;
+
+/**
+ * Scan the Square catalog for variations whose SKU encodes a tcgplayer product id and that
+ * currently have stock. Returns a Map of tcgplayer productId -> in-stock quantity, used to
+ * match against "Looking For" wishlists. Lean counterpart to listShopInventory (which discards
+ * SKUs and only groups by category).
+ */
+export async function listInStockTcgSkus() {
+    const skuByVariationId = new Map();
+    const productIdByVariationId = new Map();
+
+    let cursor = null;
+
+    do {
+        const params = new URLSearchParams({ types: "ITEM" });
+
+        if (cursor) {
+            params.set("cursor", cursor);
+        }
+
+        const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+
+        for (const item of payload.objects || []) {
+            if (item.type !== "ITEM" || isMysteryCatalogItem(item)) {
+                continue;
+            }
+
+            for (const variation of item.item_data?.variations || []) {
+                const sku = variation.item_variation_data?.sku || "";
+                const match = TCG_SKU_PATTERN.exec(sku.trim());
+
+                if (!match) {
+                    continue;
+                }
+
+                skuByVariationId.set(variation.id, sku);
+                productIdByVariationId.set(variation.id, Number(match[1]));
+            }
+        }
+
+        cursor = payload.cursor || null;
+    } while (cursor);
+
+    const counts = await getInventoryCounts(Array.from(skuByVariationId.keys()));
+    const quantityByProductId = new Map();
+
+    for (const [variationId, productId] of productIdByVariationId) {
+        const quantity = counts.get(variationId) || 0;
+
+        if (quantity > 0) {
+            quantityByProductId.set(productId, (quantityByProductId.get(productId) || 0) + quantity);
+        }
+    }
+
+    squareLogger.info("square.tcg_skus.list.completed", {
+        matchedVariations: skuByVariationId.size,
+        inStockProducts: quantityByProductId.size,
+    });
+
+    return quantityByProductId;
+}
+
 function normalizeName(value) {
     return String(value || "")
         .trim()

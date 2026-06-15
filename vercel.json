@@ -38,6 +38,14 @@
         {
             "path": "/api/jobs/consignment-nightly-reports",
             "schedule": "30 7 * * *"
+        },
+        {
+            "path": "/api/jobs/tcg-catalog-sync",
+            "schedule": "0 6 * * *"
+        },
+        {
+            "path": "/api/jobs/looking-for-alerts",
+            "schedule": "0 8 * * *"
         }
     ]
 }
