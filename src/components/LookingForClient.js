@@ -66,6 +66,8 @@ export default function LookingForClient() {
     const [results, setResults] = useState([]);
     const [searching, setSearching] = useState(false);
     const [searchError, setSearchError] = useState("");
+    const [sets, setSets] = useState([]);
+    const [selectedSetId, setSelectedSetId] = useState("");
 
     const [items, setItems] = useState([]);
     const [email, setEmail] = useState(null);
@@ -122,8 +124,30 @@ export default function LookingForClient() {
         };
     }, [applyListResponse]);
 
-    // Debounced search whenever the query or game changes. All state updates happen inside the
-    // timer callback (never synchronously in the effect body) to avoid cascading renders.
+    // Load the set list for the "Browse by set" picker whenever the game changes.
+    useEffect(() => {
+        let ignore = false;
+
+        (async () => {
+            try {
+                const response = await fetch(`/api/looking-for/sets?game=${game}`, { cache: "no-store" });
+                const data = await response.json().catch(() => null);
+
+                if (!ignore && response.ok && Array.isArray(data?.sets)) {
+                    setSets(data.sets);
+                }
+            } catch {
+                // Non-fatal: the picker just stays empty.
+            }
+        })();
+
+        return () => {
+            ignore = true;
+        };
+    }, [game]);
+
+    // Debounced search. A selected set browses that set; otherwise it's a card/featured query.
+    // All state updates happen inside the timer callback (never synchronously in the effect body).
     useEffect(() => {
         const trimmed = query.trim();
 
@@ -137,8 +161,11 @@ export default function LookingForClient() {
             setSearching(true);
 
             try {
-                // Empty query returns featured cards from the API, so the grid is never blank.
-                const params = new URLSearchParams({ game, q: trimmed });
+                // A set selection browses the whole set; an empty query returns featured cards, so
+                // the grid is never blank.
+                const params = selectedSetId
+                    ? new URLSearchParams({ game, set: selectedSetId })
+                    : new URLSearchParams({ game, q: trimmed });
                 const response = await fetch(`/api/looking-for/search?${params.toString()}`, {
                     cache: "no-store",
                     signal: controller.signal,
@@ -159,10 +186,10 @@ export default function LookingForClient() {
             } finally {
                 setSearching(false);
             }
-        }, trimmed.length < 2 ? 0 : 300);
+        }, selectedSetId || trimmed.length < 2 ? 0 : 300);
 
         return () => clearTimeout(handle);
-    }, [query, game]);
+    }, [query, game, selectedSetId]);
 
     const addCard = useCallback(async (cardId) => {
         setPendingCardId(cardId);
@@ -246,32 +273,71 @@ export default function LookingForClient() {
                             role="tab"
                             aria-selected={game === option.id}
                             className={`pill${game === option.id ? " lf-game-active" : ""}`}
-                            onClick={() => setGame(option.id)}
+                            onClick={() => {
+                                setGame(option.id);
+                                setSelectedSetId("");
+                            }}
                         >
                             {option.label}
                         </button>
                     ))}
                 </div>
 
-                <label className="lf-search-label" htmlFor="lf-search">
-                    Search {game === "magic" ? "Magic" : "Pokemon"} cards by name
-                </label>
-                <input
-                    id="lf-search"
-                    className="lf-search-input"
-                    type="search"
-                    placeholder="e.g. Charizard, Sol Ring..."
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    autoComplete="off"
-                />
+                <div className="lf-search-row">
+                    <div className="lf-search-field">
+                        <label className="lf-search-label" htmlFor="lf-search">
+                            Search by card name
+                        </label>
+                        <input
+                            id="lf-search"
+                            className="lf-search-input"
+                            type="search"
+                            placeholder="e.g. Charizard, Sol Ring..."
+                            value={query}
+                            onChange={(event) => {
+                                setQuery(event.target.value);
+                                setSelectedSetId("");
+                            }}
+                            autoComplete="off"
+                        />
+                    </div>
+
+                    <div className="lf-search-field">
+                        <label className="lf-search-label" htmlFor="lf-set">
+                            …or browse a set
+                        </label>
+                        <select
+                            id="lf-set"
+                            className="lf-set-select"
+                            value={selectedSetId}
+                            onChange={(event) => {
+                                setSelectedSetId(event.target.value);
+                                setQuery("");
+                            }}
+                        >
+                            <option value="">Pick a set…</option>
+                            {sets.map((set) => (
+                                <option key={set.id} value={set.id}>
+                                    {set.name}
+                                    {set.code ? ` (${set.code})` : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
 
                 {searching ? <p className="muted">Searching...</p> : null}
                 {searchError ? <p className="muted">{searchError}</p> : null}
-                {!searching && !searchError && query.trim().length < 2 && results.length > 0 ? (
+                {!searching && !searchError && selectedSetId && results.length > 0 ? (
                     <p className="muted">
-                        Notable {game === "magic" ? "Magic" : "Pokemon"} cards to get you started — search above for any
-                        card or set name.
+                        Showing every card in{" "}
+                        {sets.find((set) => String(set.id) === String(selectedSetId))?.name || "this set"}, in collector-number order.
+                    </p>
+                ) : null}
+                {!searching && !searchError && !selectedSetId && query.trim().length < 2 && results.length > 0 ? (
+                    <p className="muted">
+                        Notable {game === "magic" ? "Magic" : "Pokemon"} cards to get you started — search by card name
+                        above, or browse a whole set.
                     </p>
                 ) : null}
                 {!searching && !searchError && query.trim().length >= 2 && results.length === 0 ? (

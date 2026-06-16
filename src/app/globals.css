@@ -3242,6 +3242,18 @@ body.tv-mode .shop-mobile-cart-fab {
     color: var(--ink);
 }
 
+.lf-search-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.lf-search-field {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
 .lf-search-label {
     display: block;
     margin-bottom: 0.4rem;
@@ -3249,9 +3261,18 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 0.85rem;
 }
 
-.lf-search-input {
+.lf-search-input,
+.lf-set-select {
     width: 100%;
-    max-width: 460px;
+}
+
+.lf-set-select {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.6rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
 }
 
 .lf-grid {

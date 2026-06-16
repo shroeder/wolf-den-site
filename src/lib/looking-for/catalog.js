@@ -133,6 +133,36 @@ export async function searchCards({ game, query, setId }) {
 }
 
 /**
+ * List the sets for a game that contain at least one single card, newest first — powers the
+ * "Browse by set" picker.
+ */
+export async function listSetsForGame(game) {
+    const normalizedGame = normalizeGame(game);
+
+    if (!normalizedGame) {
+        return [];
+    }
+
+    const rows = await db.query(
+        `SELECT s.id, s.name, s.abbreviation, s.published_on
+         FROM tcg_sets s
+         WHERE s.game = $1
+           AND EXISTS (
+               SELECT 1 FROM tcg_cards c
+               WHERE c.set_id = s.id AND ${SINGLES_FILTER}
+           )
+         ORDER BY s.published_on DESC NULLS LAST, s.name ASC`,
+        [normalizedGame]
+    );
+
+    return rows.map((row) => ({
+        id: Number(row.id),
+        name: row.name,
+        code: row.abbreviation,
+    }));
+}
+
+/**
  * Default "featured" cards shown before any search: the most valuable singles for a game, so the
  * page isn't empty on load and visitors can start adding immediately.
  */
