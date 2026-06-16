@@ -68,6 +68,7 @@ export default function LookingForClient() {
     const [searchError, setSearchError] = useState("");
     const [sets, setSets] = useState([]);
     const [selectedSetId, setSelectedSetId] = useState("");
+    const [setFilterText, setSetFilterText] = useState("");
 
     const [items, setItems] = useState([]);
     const [email, setEmail] = useState(null);
@@ -95,6 +96,35 @@ export default function LookingForClient() {
 
     const listIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
     const searchAbortRef = useRef(null);
+
+    // Set options for the type-to-filter picker, plus a resolver from the typed/selected text
+    // back to a set id (matches the full "Name (CODE)" label or just the set name).
+    const setOptions = useMemo(
+        () =>
+            sets.map((set) => ({
+                id: set.id,
+                name: set.name,
+                label: `${set.name}${set.code ? ` (${set.code})` : ""}`,
+            })),
+        [sets]
+    );
+
+    const resolveSetId = useCallback(
+        (value) => {
+            const trimmed = value.trim();
+
+            if (!trimmed) {
+                return "";
+            }
+
+            const match =
+                setOptions.find((option) => option.label === trimmed) ||
+                setOptions.find((option) => option.name.toLowerCase() === trimmed.toLowerCase());
+
+            return match ? String(match.id) : "";
+        },
+        [setOptions]
+    );
 
     const applyListResponse = useCallback((data) => {
         setItems(Array.isArray(data?.items) ? data.items : []);
@@ -276,6 +306,7 @@ export default function LookingForClient() {
                             onClick={() => {
                                 setGame(option.id);
                                 setSelectedSetId("");
+                                setSetFilterText("");
                             }}
                         >
                             {option.label}
@@ -297,6 +328,7 @@ export default function LookingForClient() {
                             onChange={(event) => {
                                 setQuery(event.target.value);
                                 setSelectedSetId("");
+                                setSetFilterText("");
                             }}
                             autoComplete="off"
                         />
@@ -306,23 +338,26 @@ export default function LookingForClient() {
                         <label className="lf-search-label" htmlFor="lf-set">
                             …or browse a set
                         </label>
-                        <select
+                        <input
                             id="lf-set"
                             className="lf-set-select"
-                            value={selectedSetId}
+                            type="text"
+                            list="lf-sets-list"
+                            placeholder="Type to filter sets…"
+                            value={setFilterText}
                             onChange={(event) => {
-                                setSelectedSetId(event.target.value);
+                                const value = event.target.value;
+                                setSetFilterText(value);
                                 setQuery("");
+                                setSelectedSetId(resolveSetId(value));
                             }}
-                        >
-                            <option value="">Pick a set…</option>
-                            {sets.map((set) => (
-                                <option key={set.id} value={set.id}>
-                                    {set.name}
-                                    {set.code ? ` (${set.code})` : ""}
-                                </option>
+                            autoComplete="off"
+                        />
+                        <datalist id="lf-sets-list">
+                            {setOptions.map((option) => (
+                                <option key={option.id} value={option.label} />
                             ))}
-                        </select>
+                        </datalist>
                     </div>
                 </div>
 
