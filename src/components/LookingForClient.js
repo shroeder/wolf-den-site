@@ -344,6 +344,20 @@ export default function LookingForClient() {
                 {confirmBanner ? <p className="statement-copy">{confirmBanner}</p> : null}
             </section>
 
+            <section className="card lf-alert-cta">
+                <h2>Get an email when we get your cards</h2>
+                <EmailCapture
+                    idSuffix="page"
+                    email={email}
+                    emailVerified={emailVerified}
+                    emailInput={emailInput}
+                    onChange={(event) => setEmailInput(event.target.value)}
+                    submitting={emailSubmitting}
+                    message={emailMessage}
+                    onSubmit={submitEmail}
+                />
+            </section>
+
             <section className="card">
                 <div className="lf-game-toggle" role="tablist" aria-label="Choose a game">
                     {GAMES.map((option) => (
@@ -461,20 +475,6 @@ export default function LookingForClient() {
                         ))}
                     </div>
                 )}
-            </section>
-
-            <section className="card">
-                <h2>Get an email when we get your cards</h2>
-                <EmailCapture
-                    idSuffix="page"
-                    email={email}
-                    emailVerified={emailVerified}
-                    emailInput={emailInput}
-                    onChange={(event) => setEmailInput(event.target.value)}
-                    submitting={emailSubmitting}
-                    message={emailMessage}
-                    onSubmit={submitEmail}
-                />
             </section>
 
             <div className="lf-list-fab-wrap">
