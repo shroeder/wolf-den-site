@@ -3404,6 +3404,24 @@ body.tv-mode .shop-mobile-cart-fab {
     margin: 0;
 }
 
+.lf-drawer-alerts {
+    background: rgba(212, 175, 55, 0.1);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.lf-drawer-alerts h3 {
+    margin: 0 0 0.4rem;
+    color: var(--accent-hover);
+}
+
+.lf-drawer-alerts p {
+    margin: 0 0 0.6rem;
+    font-size: 0.9rem;
+}
+
 .lf-drawer-list {
     list-style: none;
     margin: 0;

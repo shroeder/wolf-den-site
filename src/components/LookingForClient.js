@@ -60,6 +60,47 @@ function CardTile({ card, inList, busy, onAdd, onRemove }) {
     );
 }
 
+function EmailCapture({ idSuffix, email, emailVerified, emailInput, onChange, submitting, message, onSubmit, compact }) {
+    if (emailVerified) {
+        return (
+            <p className="statement-copy">
+                Alerts are on for <strong>{email}</strong>. We&apos;ll email you the moment a card on your list comes
+                into the shop.
+            </p>
+        );
+    }
+
+    return (
+        <>
+            <p>
+                {compact
+                    ? "Get an email the moment we get a card on your list — add your address to turn on alerts."
+                    : "Add your email and we'll send a one-click confirmation. After you confirm, you'll get an alert whenever a card on your list shows up in our inventory."}
+            </p>
+            {email ? (
+                <p className="muted">
+                    Pending confirmation for <strong>{email}</strong>. Check your inbox for the link.
+                </p>
+            ) : null}
+            <form className="contact-form" onSubmit={onSubmit}>
+                <label htmlFor={`lf-email-${idSuffix}`}>Email</label>
+                <input
+                    id={`lf-email-${idSuffix}`}
+                    type="email"
+                    value={emailInput}
+                    onChange={onChange}
+                    placeholder="you@example.com"
+                    required
+                />
+                <button className="button primary" type="submit" disabled={submitting}>
+                    {submitting ? "Sending..." : email ? "Resend confirmation" : "Turn on alerts"}
+                </button>
+            </form>
+            {message ? <p className="statement-copy">{message}</p> : null}
+        </>
+    );
+}
+
 export default function LookingForClient() {
     const [game, setGame] = useState("pokemon");
     const [query, setQuery] = useState("");
@@ -416,40 +457,16 @@ export default function LookingForClient() {
 
             <section className="card">
                 <h2>Get an email when we get your cards</h2>
-                {emailVerified ? (
-                    <p className="statement-copy">
-                        Alerts are on for <strong>{email}</strong>. We&apos;ll email you when a card on your list comes
-                        into the shop.
-                    </p>
-                ) : (
-                    <>
-                        <p>
-                            Add your email and we&apos;ll send a one-click confirmation. After you confirm, you&apos;ll
-                            get an alert whenever a card on your list shows up in our inventory.
-                        </p>
-                        {email ? (
-                            <p className="muted">
-                                Pending confirmation for <strong>{email}</strong>. Check your inbox for the confirmation
-                                link.
-                            </p>
-                        ) : null}
-                        <form className="contact-form" onSubmit={submitEmail}>
-                            <label htmlFor="lf-email">Email</label>
-                            <input
-                                id="lf-email"
-                                type="email"
-                                value={emailInput}
-                                onChange={(event) => setEmailInput(event.target.value)}
-                                placeholder="you@example.com"
-                                required
-                            />
-                            <button className="button primary" type="submit" disabled={emailSubmitting}>
-                                {emailSubmitting ? "Sending..." : email ? "Resend confirmation" : "Turn on alerts"}
-                            </button>
-                        </form>
-                    </>
-                )}
-                {emailMessage ? <p className="statement-copy">{emailMessage}</p> : null}
+                <EmailCapture
+                    idSuffix="page"
+                    email={email}
+                    emailVerified={emailVerified}
+                    emailInput={emailInput}
+                    onChange={(event) => setEmailInput(event.target.value)}
+                    submitting={emailSubmitting}
+                    message={emailMessage}
+                    onSubmit={submitEmail}
+                />
             </section>
 
             <button
@@ -483,7 +500,22 @@ export default function LookingForClient() {
                                 Nothing here yet. Search or browse a set, then tap &ldquo;Add to list.&rdquo;
                             </p>
                         ) : (
-                            <ul className="lf-drawer-list">
+                            <>
+                                <div className="lf-drawer-alerts">
+                                    <h3>{emailVerified ? "Alerts are on" : "Get alerted when we get these"}</h3>
+                                    <EmailCapture
+                                        idSuffix="drawer"
+                                        email={email}
+                                        emailVerified={emailVerified}
+                                        emailInput={emailInput}
+                                        onChange={(event) => setEmailInput(event.target.value)}
+                                        submitting={emailSubmitting}
+                                        message={emailMessage}
+                                        onSubmit={submitEmail}
+                                        compact
+                                    />
+                                </div>
+                                <ul className="lf-drawer-list">
                                 {items.map((card) => (
                                     <li key={card.id} className="lf-drawer-row">
                                         {card.imageUrl ? (
@@ -514,7 +546,8 @@ export default function LookingForClient() {
                                         </button>
                                     </li>
                                 ))}
-                            </ul>
+                                </ul>
+                            </>
                         )}
                     </div>
                 </div>
