@@ -7,6 +7,7 @@ export const SUPPORTED_GAMES = ["magic", "pokemon"];
 const SEARCH_LIMIT = 60;
 const SET_BROWSE_LIMIT = 600;
 const MAX_MATCHED_SETS = 6;
+const FEATURED_LIMIT = 24;
 
 // Singles only: sealed product has neither a collector number nor a rarity, and digital code
 // cards carry the "Code Card" rarity. Keep everything else (including vintage singles such as
@@ -126,6 +127,33 @@ export async function searchCards({ game, query, setId }) {
             c.market_price DESC NULLS LAST
          LIMIT ${SEARCH_LIMIT}`,
         [normalizedGame, trimmedQuery, `%${trimmedQuery}%`]
+    );
+
+    return rows.map(mapCardRow);
+}
+
+/**
+ * Default "featured" cards shown before any search: the most valuable singles for a game, so the
+ * page isn't empty on load and visitors can start adding immediately.
+ */
+export async function getFeaturedCards(game, limit = FEATURED_LIMIT) {
+    const normalizedGame = normalizeGame(game);
+
+    if (!normalizedGame) {
+        return [];
+    }
+
+    const rows = await db.query(
+        `SELECT ${CARD_SELECT}
+         FROM tcg_cards c
+         JOIN tcg_sets s ON s.id = c.set_id
+         WHERE c.game = $1
+           AND ${SINGLES_FILTER}
+           AND c.market_price IS NOT NULL
+           AND c.image_url IS NOT NULL
+         ORDER BY c.market_price DESC
+         LIMIT ${limit}`,
+        [normalizedGame]
     );
 
     return rows.map(mapCardRow);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { normalizeGame, searchCards } from "@/lib/looking-for/catalog";
+import { getFeaturedCards, normalizeGame, searchCards } from "@/lib/looking-for/catalog";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,9 +19,13 @@ export async function GET(request) {
             const setIdRaw = Number(searchParams.get("set"));
             const setId = Number.isInteger(setIdRaw) && setIdRaw > 0 ? setIdRaw : null;
 
-            const results = await searchCards({ game, query, setId });
+            // Empty/short query with no explicit set -> show featured cards instead of nothing.
+            const isFeatured = !setId && query.trim().length < 2;
+            const results = isFeatured
+                ? await getFeaturedCards(game)
+                : await searchCards({ game, query, setId });
 
-            return NextResponse.json({ results });
+            return NextResponse.json({ results, featured: isFeatured });
         } catch (error) {
             return internalError(error, { event: "looking_for.search.failed" });
         }

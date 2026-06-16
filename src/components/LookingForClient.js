@@ -128,13 +128,6 @@ export default function LookingForClient() {
         const trimmed = query.trim();
 
         const handle = setTimeout(async () => {
-            if (trimmed.length < 2) {
-                setResults([]);
-                setSearching(false);
-                setSearchError("");
-                return;
-            }
-
             if (searchAbortRef.current) {
                 searchAbortRef.current.abort();
             }
@@ -144,6 +137,7 @@ export default function LookingForClient() {
             setSearching(true);
 
             try {
+                // Empty query returns featured cards from the API, so the grid is never blank.
                 const params = new URLSearchParams({ game, q: trimmed });
                 const response = await fetch(`/api/looking-for/search?${params.toString()}`, {
                     cache: "no-store",
@@ -274,6 +268,12 @@ export default function LookingForClient() {
 
                 {searching ? <p className="muted">Searching...</p> : null}
                 {searchError ? <p className="muted">{searchError}</p> : null}
+                {!searching && !searchError && query.trim().length < 2 && results.length > 0 ? (
+                    <p className="muted">
+                        Notable {game === "magic" ? "Magic" : "Pokemon"} cards to get you started — search above for any
+                        card or set name.
+                    </p>
+                ) : null}
                 {!searching && !searchError && query.trim().length >= 2 && results.length === 0 ? (
                     <p className="muted">No matches found. Try a different spelling.</p>
                 ) : null}
