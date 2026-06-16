@@ -721,7 +721,9 @@ textarea {
         display: flex;
     }
 
-    .nav-discord {
+    /* Keep "Join Discord" visible on mobile (key call-to-action); drop the TV Mode toggle,
+       which is only useful on an in-store display, to make room. */
+    .tv-toggle {
         display: none;
     }
 
