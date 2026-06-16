@@ -28,7 +28,15 @@ const CARD_SELECT = `
     c.market_price,
     s.id AS set_id,
     s.name AS set_name,
-    s.abbreviation AS set_abbreviation
+    s.abbreviation AS set_abbreviation,
+    COALESCE(st.quantity, 0) AS stock_quantity
+`;
+
+// Shared FROM with the set join and a left join to the in-stock snapshot.
+const CARD_FROM = `
+    FROM tcg_cards c
+    JOIN tcg_sets s ON s.id = c.set_id
+    LEFT JOIN tcg_stock st ON st.product_id = c.id
 `;
 
 function mapCardRow(row) {
@@ -43,6 +51,7 @@ function mapCardRow(row) {
         setId: Number(row.set_id),
         setName: row.set_name,
         setAbbreviation: row.set_abbreviation,
+        stockQuantity: Number(row.stock_quantity || 0),
     };
 }
 
@@ -58,8 +67,7 @@ export function normalizeGame(value) {
 async function browseSets(game, setIds) {
     const rows = await db.query(
         `SELECT ${CARD_SELECT}
-         FROM tcg_cards c
-         JOIN tcg_sets s ON s.id = c.set_id
+        ${CARD_FROM}
          WHERE c.game = $1
            AND c.set_id = ANY($2::bigint[])
            AND ${SINGLES_FILTER}
@@ -115,8 +123,7 @@ export async function searchCards({ game, query, setId }) {
     // Otherwise: card-name search, ranked by relevance.
     const rows = await db.query(
         `SELECT ${CARD_SELECT}
-         FROM tcg_cards c
-         JOIN tcg_sets s ON s.id = c.set_id
+        ${CARD_FROM}
          WHERE c.game = $1
            AND c.name ILIKE $3
            AND ${SINGLES_FILTER}
@@ -175,8 +182,7 @@ export async function getFeaturedCards(game, limit = FEATURED_LIMIT) {
 
     const rows = await db.query(
         `SELECT ${CARD_SELECT}
-         FROM tcg_cards c
-         JOIN tcg_sets s ON s.id = c.set_id
+        ${CARD_FROM}
          WHERE c.game = $1
            AND ${SINGLES_FILTER}
            AND c.market_price IS NOT NULL
@@ -203,8 +209,7 @@ export async function getCardsByIds(ids) {
 
     const rows = await db.query(
         `SELECT ${CARD_SELECT}
-         FROM tcg_cards c
-         JOIN tcg_sets s ON s.id = c.set_id
+        ${CARD_FROM}
          WHERE c.id = ANY($1::bigint[])`,
         [numericIds]
     );

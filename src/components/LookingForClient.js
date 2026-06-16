@@ -23,9 +23,16 @@ function formatPrice(value) {
 }
 
 function CardTile({ card, inList, busy, onAdd, onRemove }) {
+    const inStock = card.stockQuantity > 0;
+
     return (
-        <article className="lf-card">
+        <article className={`lf-card${inStock ? " lf-card-instock" : ""}`}>
             <div className="lf-card-art">
+                {inStock ? (
+                    <span className="lf-instock-badge">
+                        {card.stockQuantity} in stock
+                    </span>
+                ) : null}
                 {card.imageUrl ? (
                     <Image
                         src={card.imageUrl}
@@ -532,7 +539,10 @@ export default function LookingForClient() {
                                 </div>
                                 <ul className="lf-drawer-list">
                                 {items.map((card) => (
-                                    <li key={card.id} className="lf-drawer-row">
+                                    <li
+                                        key={card.id}
+                                        className={`lf-drawer-row${card.stockQuantity > 0 ? " lf-drawer-row-instock" : ""}`}
+                                    >
                                         {card.imageUrl ? (
                                             <Image
                                                 src={card.imageUrl}
@@ -549,7 +559,12 @@ export default function LookingForClient() {
                                                 {card.setName}
                                                 {card.number ? ` · #${card.number}` : ""}
                                             </span>
-                                            <span className="lf-card-price">{formatPrice(card.marketPrice)}</span>
+                                            <span className="lf-card-price">
+                                                {formatPrice(card.marketPrice)}
+                                                {card.stockQuantity > 0 ? (
+                                                    <span className="lf-drawer-instock-tag"> · {card.stockQuantity} in stock</span>
+                                                ) : null}
+                                            </span>
                                         </div>
                                         <button
                                             type="button"

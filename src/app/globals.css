@@ -3299,9 +3299,42 @@ body.tv-mode .shop-mobile-cart-fab {
     background: rgba(255, 255, 255, 0.03);
 }
 
+.lf-card-instock {
+    border-color: var(--brand-strong);
+    background: rgba(212, 175, 55, 0.1);
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.4), 0 8px 20px rgba(212, 175, 55, 0.18);
+}
+
 .lf-card-art {
+    position: relative;
     display: flex;
     justify-content: center;
+}
+
+.lf-instock-badge {
+    position: absolute;
+    top: 0.3rem;
+    left: 0.3rem;
+    z-index: 1;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--brand-strong), var(--accent-hover));
+    color: #0E0E0E;
+    font-size: 0.72rem;
+    font-weight: 800;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.lf-drawer-row-instock {
+    background: rgba(212, 175, 55, 0.1);
+    border-radius: 8px;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+}
+
+.lf-drawer-instock-tag {
+    color: var(--accent-hover);
+    font-weight: 700;
 }
 
 .lf-card-image {
