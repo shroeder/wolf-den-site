@@ -3331,3 +3331,119 @@ body.tv-mode .shop-mobile-cart-fab {
     font-weight: 700;
     font-size: 0.9rem;
 }
+
+/* Persistent "My List" access — pinned so it's reachable while scrolling a long set */
+.lf-list-fab {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    background: linear-gradient(135deg, var(--brand-strong), var(--accent-hover));
+    color: #0E0E0E;
+    font-weight: 800;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+}
+
+.lf-list-fab-count {
+    min-width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.35rem;
+    background: rgba(14, 14, 14, 0.85);
+    color: var(--accent-hover);
+    font-size: 0.8rem;
+}
+
+.lf-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.lf-drawer {
+    width: 100%;
+    max-width: 640px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    padding: 1rem 1.1rem 1.5rem;
+}
+
+.lf-drawer-head {
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+}
+
+.lf-drawer-head h2 {
+    margin: 0;
+}
+
+.lf-drawer-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.lf-drawer-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.lf-drawer-thumb {
+    width: 40px;
+    height: auto;
+    border-radius: 4px;
+    flex: 0 0 auto;
+}
+
+.lf-drawer-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    font-size: 0.85rem;
+}
+
+.lf-drawer-info strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 720px) {
+    .lf-drawer-overlay {
+        align-items: center;
+    }
+
+    .lf-drawer {
+        border-radius: 16px;
+    }
+}

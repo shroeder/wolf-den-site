@@ -78,6 +78,7 @@ export default function LookingForClient() {
     const [emailInput, setEmailInput] = useState("");
     const [emailSubmitting, setEmailSubmitting] = useState(false);
     const [emailMessage, setEmailMessage] = useState("");
+    const [listOpen, setListOpen] = useState(false);
 
     const searchParams = useSearchParams();
     const confirmBanner = useMemo(() => {
@@ -450,6 +451,74 @@ export default function LookingForClient() {
                 )}
                 {emailMessage ? <p className="statement-copy">{emailMessage}</p> : null}
             </section>
+
+            <button
+                type="button"
+                className="lf-list-fab"
+                onClick={() => setListOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={listOpen}
+            >
+                My List
+                <span className="lf-list-fab-count">{items.length}</span>
+            </button>
+
+            {listOpen ? (
+                <div
+                    className="lf-drawer-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="My list"
+                    onClick={() => setListOpen(false)}
+                >
+                    <div className="lf-drawer" onClick={(event) => event.stopPropagation()}>
+                        <div className="lf-drawer-head">
+                            <h2>My List{items.length ? ` (${items.length})` : ""}</h2>
+                            <button type="button" className="pill" onClick={() => setListOpen(false)}>
+                                Close
+                            </button>
+                        </div>
+                        {items.length === 0 ? (
+                            <p className="muted">
+                                Nothing here yet. Search or browse a set, then tap &ldquo;Add to list.&rdquo;
+                            </p>
+                        ) : (
+                            <ul className="lf-drawer-list">
+                                {items.map((card) => (
+                                    <li key={card.id} className="lf-drawer-row">
+                                        {card.imageUrl ? (
+                                            <Image
+                                                src={card.imageUrl}
+                                                alt=""
+                                                width={40}
+                                                height={56}
+                                                sizes="40px"
+                                                className="lf-drawer-thumb"
+                                            />
+                                        ) : null}
+                                        <div className="lf-drawer-info">
+                                            <strong>{card.name}</strong>
+                                            <span className="muted">
+                                                {card.setName}
+                                                {card.number ? ` · #${card.number}` : ""}
+                                            </span>
+                                            <span className="lf-card-price">{formatPrice(card.marketPrice)}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="pill"
+                                            disabled={pendingCardId === card.id}
+                                            onClick={() => removeCard(card.id)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
