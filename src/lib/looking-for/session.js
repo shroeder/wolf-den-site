@@ -11,9 +11,16 @@ const encodePayload = (value) => Buffer.from(value, "utf8").toString("base64url"
 const decodePayload = (value) => Buffer.from(value, "base64url").toString("utf8");
 
 function getSecret() {
-    // Dedicated secret, falling back to the shop customer session secret so the wishlist works
-    // out of the box wherever that is already configured.
-    return process.env.WATCHER_SESSION_SECRET || process.env.SHOP_CUSTOMER_SESSION_SECRET || "";
+    // Dedicated secret if set; otherwise fall back to another server session secret that is
+    // already configured in production so the watcher cookie can actually be signed AND verified
+    // with the same key. (If this resolves to an empty string, verifyWatcherToken rejects every
+    // cookie and each request would mint a new watcher — so a real secret must be present.)
+    return (
+        process.env.WATCHER_SESSION_SECRET ||
+        process.env.SHOP_CUSTOMER_SESSION_SECRET ||
+        process.env.CONSIGNMENT_SESSION_SECRET ||
+        ""
+    );
 }
 
 function signValue(payload) {
