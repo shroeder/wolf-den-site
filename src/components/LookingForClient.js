@@ -138,6 +138,7 @@ export default function LookingForClient() {
 
     const listIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
     const searchAbortRef = useRef(null);
+    const autoOpenedRef = useRef(false);
 
     // Set options for the type-to-filter picker, plus a resolver from the typed/selected text
     // back to a set id (matches the full "Name (CODE)" label or just the set name).
@@ -276,6 +277,13 @@ export default function LookingForClient() {
 
             if (response.ok && data) {
                 applyListResponse(data);
+
+                // First add of the session: open the list so they immediately see the alert
+                // signup (skip if they've already turned alerts on).
+                if (!autoOpenedRef.current && !data.emailVerified) {
+                    setListOpen(true);
+                    autoOpenedRef.current = true;
+                }
             }
         } finally {
             setPendingCardId(null);
@@ -469,16 +477,23 @@ export default function LookingForClient() {
                 />
             </section>
 
-            <button
-                type="button"
-                className="lf-list-fab"
-                onClick={() => setListOpen(true)}
-                aria-haspopup="dialog"
-                aria-expanded={listOpen}
-            >
-                My List
-                <span className="lf-list-fab-count">{items.length}</span>
-            </button>
+            <div className="lf-list-fab-wrap">
+                {items.length > 0 && !emailVerified ? (
+                    <button type="button" className="lf-list-hint" onClick={() => setListOpen(true)}>
+                        🔔 Turn on alerts
+                    </button>
+                ) : null}
+                <button
+                    type="button"
+                    className="lf-list-fab"
+                    onClick={() => setListOpen(true)}
+                    aria-haspopup="dialog"
+                    aria-expanded={listOpen}
+                >
+                    My List
+                    <span className="lf-list-fab-count">{items.length}</span>
+                </button>
+            </div>
 
             {listOpen ? (
                 <div

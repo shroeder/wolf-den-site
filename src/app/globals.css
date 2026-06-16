@@ -3335,11 +3335,18 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 /* Persistent "My List" access — pinned so it's reachable while scrolling a long set */
-.lf-list-fab {
+.lf-list-fab-wrap {
     position: fixed;
     right: 1rem;
     bottom: 1rem;
     z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.lf-list-fab {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -3351,6 +3358,39 @@ body.tv-mode .shop-mobile-cart-fab {
     font-weight: 800;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
     cursor: pointer;
+}
+
+.lf-list-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    background: rgba(14, 14, 14, 0.92);
+    color: var(--accent-hover);
+    font-weight: 700;
+    font-size: 0.82rem;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    animation: lf-hint-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes lf-hint-pulse {
+    0%, 100% {
+        transform: translateY(0);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+    }
+    50% {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 22px rgba(212, 175, 55, 0.35);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lf-list-hint {
+        animation: none;
+    }
 }
 
 .lf-list-fab-count {
