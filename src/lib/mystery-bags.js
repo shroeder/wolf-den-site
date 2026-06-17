@@ -172,11 +172,9 @@ export async function getMysteryBagDashboardData() {
     })),
     ]);
 
-    // Remaining packs come from Square inventory for the mystery bag variation.
-    // It depends on the variation resolved above, so it can't run in the batch.
-    const remainingPacks = bagPriceInfo.variationId
-        ? await getMysteryBagRemainingPacks(bagPriceInfo.variationId).catch(() => null)
-        : null;
+    // Remaining packs = the in-stock total across every variation of the mystery
+    // bag item in Square (each packed bag is its own variation at qty 1).
+    const remainingPacks = await getMysteryBagRemainingPacks().catch(() => null);
 
     // Average value of each pack = total market value still in circulation spread
     // across the packs left to sell (the expected value of opening one bag).

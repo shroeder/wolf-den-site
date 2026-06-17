@@ -1073,17 +1073,75 @@ export async function getMysteryBagPriceInfoFromSquare() {
     };
 }
 
-export async function getMysteryBagRemainingPacks(variationId) {
-    const normalizedVariationId = String(variationId || "").trim();
+// The Mystery Pack item carries many variations — typically one per packed bag
+// (each at qty 1) — so "packs left" is the in-stock total across ALL of them,
+// matching the item-level "available" count Square shows. Reading a single
+// variation (as we used to) misses the rest and can read 0.
+async function collectMysteryBagVariationIds() {
+    const itemId = process.env.SQUARE_MYSTERY_BAG_ITEM_ID || DEFAULT_MYSTERY_PACK_ITEM_ID;
 
-    if (!normalizedVariationId) {
+    // Fast path: fetch the configured item directly and read its variations.
+    if (itemId) {
+        try {
+            const payload = await squareFetch(`/v2/catalog/object/${itemId}`);
+            const variations = payload?.object?.item_data?.variations || [];
+            const ids = variations.map((variation) => variation?.id).filter(Boolean);
+
+            if (ids.length) {
+                return ids;
+            }
+        } catch (error) {
+            // Fall through to the catalog scan below.
+        }
+    }
+
+    // Fallback: scan the catalog for any item that looks like a mystery pack and
+    // gather every variation across the matches.
+    const ids = [];
+    let cursor = null;
+
+    do {
+        const params = new URLSearchParams({ types: "ITEM" });
+
+        if (cursor) {
+            params.set("cursor", cursor);
+        }
+
+        const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+
+        for (const item of payload.objects || []) {
+            if (item.type !== "ITEM" || !isMysteryCatalogItem(item)) {
+                continue;
+            }
+
+            for (const variation of item.item_data?.variations || []) {
+                if (variation?.id) {
+                    ids.push(variation.id);
+                }
+            }
+        }
+
+        cursor = payload.cursor || null;
+    } while (cursor);
+
+    return ids;
+}
+
+export async function getMysteryBagRemainingPacks() {
+    const variationIds = await collectMysteryBagVariationIds();
+
+    if (!variationIds.length) {
         return null;
     }
 
-    const counts = await getInventoryCounts([normalizedVariationId]);
-    const remaining = counts.get(normalizedVariationId);
+    const counts = await getInventoryCounts(variationIds);
 
-    return Number.isFinite(Number(remaining)) ? Number(remaining) : null;
+    let total = 0;
+    for (const variationId of variationIds) {
+        total += Number(counts.get(variationId) || 0);
+    }
+
+    return total;
 }
 
 export async function findShopItemByVariationId(variationId) {
