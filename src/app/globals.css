@@ -2741,7 +2741,7 @@ body.tv-mode .mb-page {
 
 .mb2-stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
     gap: 0.6rem;
 }
 
@@ -2769,6 +2769,102 @@ body.tv-mode .mb-page {
     color: #ffe2a1;
     font-size: clamp(1.1rem, 2.9vw, 1.42rem);
     line-height: 1.1;
+}
+
+/* Layout: main column + QR sidebar ---------------------------------- */
+.mb2-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 248px;
+    gap: 0.95rem;
+    align-items: start;
+}
+
+.mb2-main-col {
+    display: grid;
+    gap: 0.95rem;
+    min-width: 0;
+}
+
+/* QR marketing rail ------------------------------------------------- */
+.mb2-qr-rail {
+    position: sticky;
+    top: 0.75rem;
+    display: grid;
+    gap: 0.7rem;
+    align-content: start;
+    padding: 0.85rem;
+    border: 1px solid rgba(214, 176, 88, 0.28);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 80% 6%, rgba(255, 197, 92, 0.16), transparent 50%),
+        linear-gradient(165deg, rgba(23, 20, 15, 0.95), rgba(10, 10, 9, 0.98));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.mb2-qr-rail-title {
+    margin: 0;
+    color: rgba(227, 195, 118, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.mb2-qr-card {
+    display: grid;
+    gap: 0.65rem;
+    justify-items: center;
+    text-align: center;
+    animation: mb2-fade-in 360ms ease;
+}
+
+.mb2-qr-code {
+    width: 100%;
+    max-width: 188px;
+    padding: 0.6rem;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
+}
+
+.mb2-qr-code svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.mb2-qr-meta h3 {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.2;
+    color: #ffe2a1;
+}
+
+.mb2-qr-meta p {
+    margin: 0.22rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: rgba(236, 230, 214, 0.82);
+}
+
+.mb2-qr-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.mb2-qr-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.26);
+    transition: width 220ms ease, background-color 220ms ease;
+}
+
+.mb2-qr-dot-active {
+    width: 21px;
+    background: linear-gradient(90deg, #ffd98a, #ffaf6b);
 }
 
 .mb2-spotlight {
@@ -3028,9 +3124,24 @@ body.tv-mode .mb-page {
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.34);
 }
 
+@media (max-width: 960px) {
+    .mb2-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .mb2-qr-rail {
+        position: static;
+        justify-items: center;
+    }
+
+    .mb2-qr-card {
+        max-width: 280px;
+    }
+}
+
 @media (max-width: 720px) {
     .mb2-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .mb2-grid {

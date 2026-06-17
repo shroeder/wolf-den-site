@@ -1035,6 +1035,7 @@ export async function getMysteryBagPriceInfoFromSquare() {
             return {
                 price,
                 source: "square_variation_id",
+                variationId: variation?.id || variationId,
             };
         }
     }
@@ -1048,6 +1049,7 @@ export async function getMysteryBagPriceInfoFromSquare() {
             return {
                 price,
                 source: "square_item_id",
+                variationId: variation?.id || null,
             };
         }
     }
@@ -1060,13 +1062,28 @@ export async function getMysteryBagPriceInfoFromSquare() {
             price,
             source: "square_name_match",
             matchedItemName: matchedCandidate?.itemName || null,
+            variationId: matchedCandidate?.variation?.id || null,
         };
     }
 
     return {
         price: null,
         source: "square_not_found",
+        variationId: null,
     };
+}
+
+export async function getMysteryBagRemainingPacks(variationId) {
+    const normalizedVariationId = String(variationId || "").trim();
+
+    if (!normalizedVariationId) {
+        return null;
+    }
+
+    const counts = await getInventoryCounts([normalizedVariationId]);
+    const remaining = counts.get(normalizedVariationId);
+
+    return Number.isFinite(Number(remaining)) ? Number(remaining) : null;
 }
 
 export async function findShopItemByVariationId(variationId) {

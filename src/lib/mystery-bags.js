@@ -1,6 +1,6 @@
 import "server-only";
 
-import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareOrder } from "@/lib/consignment/square";
+import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getMysteryBagRemainingPacks, getSquareOrder } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -168,8 +168,20 @@ export async function getMysteryBagDashboardData() {
         getMysteryBagPriceInfoFromSquare().catch(() => ({
         price: null,
         source: "square_error",
+        variationId: null,
     })),
     ]);
+
+    // Remaining packs come from Square inventory for the mystery bag variation.
+    // It depends on the variation resolved above, so it can't run in the batch.
+    const remainingPacks = bagPriceInfo.variationId
+        ? await getMysteryBagRemainingPacks(bagPriceInfo.variationId).catch(() => null)
+        : null;
+
+    // Average value of each pack = total market value still in circulation spread
+    // across the packs left to sell (the expected value of opening one bag).
+    const averagePackValue =
+        remainingPacks && remainingPacks > 0 ? metrics.marketTotal / remainingPacks : null;
 
     return {
         metrics,
@@ -177,6 +189,8 @@ export async function getMysteryBagDashboardData() {
         bagPrice: bagPriceInfo.price,
         bagPriceSource: bagPriceInfo.source,
         bagPriceMatchedItemName: bagPriceInfo.matchedItemName || null,
+        remainingPacks,
+        averagePackValue,
         topCards: cards.slice(0, 3),
         cards,
     };

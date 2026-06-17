@@ -1,5 +1,6 @@
 import MysteryBagShowcaseClient from "@/components/MysteryBagShowcaseClient";
 import { getMysteryBagDashboardData } from "@/lib/mystery-bags";
+import { getMarketingQrCodes } from "@/lib/marketing-qr";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -54,7 +55,10 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MysteryBagsPage() {
-    const data = await getMysteryBagDashboardData().catch(() => null);
+    const [data, qrCodes] = await Promise.all([
+        getMysteryBagDashboardData().catch(() => null),
+        getMarketingQrCodes().catch(() => []),
+    ]);
     const cards = data?.cards || [];
     const squareBagPrice = data?.bagPrice || 0;
     const metrics = data?.metrics || {
@@ -64,10 +68,20 @@ export default async function MysteryBagsPage() {
     };
     const bagPriceResolution = resolveBagPrice(squareBagPrice, metrics);
     const bagPrice = bagPriceResolution.value;
+    const remainingPacks = data?.remainingPacks ?? null;
+    const averagePackValue = data?.averagePackValue ?? null;
+    const marketTotal = metrics.marketTotal || 0;
 
     return (
         <div className="mb-page">
-            <MysteryBagShowcaseClient cards={cards} bagPrice={bagPrice} />
+            <MysteryBagShowcaseClient
+                cards={cards}
+                bagPrice={bagPrice}
+                remainingPacks={remainingPacks}
+                averagePackValue={averagePackValue}
+                marketTotal={marketTotal}
+                qrCodes={qrCodes}
+            />
         </div>
     );
 }
