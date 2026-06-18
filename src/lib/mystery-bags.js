@@ -1,6 +1,6 @@
 import "server-only";
 
-import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getMysteryBagRemainingPacks, getSquareOrder } from "@/lib/consignment/square";
+import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareOrder } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -168,18 +168,14 @@ export async function getMysteryBagDashboardData() {
         getMysteryBagPriceInfoFromSquare().catch(() => ({
         price: null,
         source: "square_error",
-        variationId: null,
     })),
     ]);
 
-    // Remaining packs = the in-stock total across every variation of the mystery
-    // bag item in Square (each packed bag is its own variation at qty 1).
-    const remainingPacks = await getMysteryBagRemainingPacks().catch(() => null);
-
-    // Average value of each pack = total market value still in circulation spread
-    // across the packs left to sell (the expected value of opening one bag).
-    const averagePackValue =
-        remainingPacks && remainingPacks > 0 ? metrics.marketTotal / remainingPacks : null;
+    // The mystery_bag_cards table is the source of truth: each active row is one
+    // unsold pack (one tracked card per pack), so the remaining pack count and the
+    // average pack value come straight from the table metrics — no Square lookup.
+    const remainingPacks = metrics.itemCount;
+    const averagePackValue = metrics.marketAverage > 0 ? metrics.marketAverage : null;
 
     return {
         metrics,
