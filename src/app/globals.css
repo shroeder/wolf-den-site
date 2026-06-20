@@ -79,23 +79,6 @@ a:visited {
     font-weight: 700;
 }
 
-.closure-banner {
-    background: linear-gradient(90deg, var(--brand-strong), var(--accent-hover));
-    color: #0E0E0E;
-    font-weight: 600;
-    text-align: center;
-    line-height: 1.4;
-}
-
-.closure-banner-inner {
-    display: block;
-    padding: 0.65rem 1rem;
-}
-
-.closure-banner strong {
-    font-weight: 800;
-}
-
 .site-header {
     position: sticky;
     top: 0;
