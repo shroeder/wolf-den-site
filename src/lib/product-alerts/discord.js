@@ -14,6 +14,16 @@ const MAX_EMBEDS_PER_MESSAGE = 10;
 // flooded — this bounds the blast radius if the webhook is configured days after arrivals began
 // accumulating (or after an outage).
 const LOOKBACK_HOURS = 48;
+// Singles (scanned cards, TCG-<id> SKU) only post to Discord at/above this dollar value, so the
+// channel isn't flooded with bulk commons. Sealed product, supplies, etc. always post. Configurable
+// via env; defaults to $20.
+const DEFAULT_SINGLE_MIN_PRICE = 20;
+
+function singleMinPrice() {
+    const parsed = Number(process.env.DISCORD_SINGLE_MIN_PRICE);
+
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_SINGLE_MIN_PRICE;
+}
 
 function baseUrl() {
     return process.env.NEXT_PUBLIC_BASE_URL || SITE_URL;
@@ -55,13 +65,16 @@ async function postMessage(webhookUrl, message) {
     throw new Error("Discord webhook rate-limited after retry.");
 }
 
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
 function buildEmbed(arrival) {
     const isRestock = arrival.kind === "restock";
     const verb = isRestock ? "Back in stock" : "New";
+    const priceLine = typeof arrival.price === "number" ? `\n${currency.format(arrival.price)}` : "";
     const embed = {
         title: arrival.item_name,
         url: new URL("/shop", baseUrl()).toString(),
-        description: `${verb} in **${arrival.categoryNames.join(", ")}**`,
+        description: `${verb} in **${arrival.categoryNames.join(", ")}**${priceLine}`,
         color: EMBED_COLOR,
     };
 
@@ -87,7 +100,8 @@ export async function postNewArrivalsToDiscord() {
     }
 
     const rows = await db.query(
-        `SELECT a.id, a.variation_id, a.item_name, a.kind, a.image_url, a.created_at, cat.name AS category_name
+        `SELECT a.id, a.variation_id, a.item_name, a.kind, a.image_url, a.price, a.is_single,
+                a.created_at, cat.name AS category_name
          FROM product_alert_arrivals a
          JOIN product_alert_categories cat ON cat.square_category_id = a.square_category_id
          WHERE a.discord_posted_at IS NULL
@@ -124,6 +138,8 @@ export async function postNewArrivalsToDiscord() {
                 item_name: row.item_name,
                 image_url: row.image_url,
                 kind: row.kind,
+                price: row.price === null ? null : Number(row.price),
+                isSingle: row.is_single === true,
                 categoryNames: new Set(),
                 arrivalIds: [],
             };
@@ -138,10 +154,43 @@ export async function postNewArrivalsToDiscord() {
         }
     }
 
-    const products = Array.from(byVariation.values()).map((entry) => ({
+    const allProducts = Array.from(byVariation.values()).map((entry) => ({
         ...entry,
         categoryNames: Array.from(entry.categoryNames),
     }));
+
+    // Gate low-value singles: a single only posts at/above the threshold (an unpriced single is
+    // treated as below it). Everything else always posts. Gated singles are marked posted-suppressed
+    // so they don't linger in the unposted set or reappear if the threshold later drops.
+    const minPrice = singleMinPrice();
+    const products = [];
+    const gatedArrivalIds = [];
+
+    for (const product of allProducts) {
+        const gatedSingle = product.isSingle && !(product.price !== null && product.price >= minPrice);
+
+        if (gatedSingle) {
+            gatedArrivalIds.push(...product.arrivalIds);
+        } else {
+            products.push(product);
+        }
+    }
+
+    if (gatedArrivalIds.length) {
+        await db.query(
+            `UPDATE product_alert_arrivals SET discord_posted_at = NOW() WHERE id = ANY($1::uuid[])`,
+            [gatedArrivalIds]
+        );
+    }
+
+    if (!products.length) {
+        discordLogger.info("product_alerts.discord.nothing_after_gate", {
+            suppressed: suppressed.length,
+            gatedSingles: gatedArrivalIds.length,
+        });
+
+        return { posted: 0, suppressed: suppressed.length, gatedSingles: gatedArrivalIds.length, skipped: false };
+    }
 
     let postedProducts = 0;
     const postedArrivalIds = [];
@@ -187,7 +236,13 @@ export async function postNewArrivalsToDiscord() {
     discordLogger.info("product_alerts.discord.completed", {
         postedProducts,
         suppressed: suppressed.length,
+        gatedSingles: gatedArrivalIds.length,
     });
 
-    return { posted: postedProducts, suppressed: suppressed.length, skipped: false };
+    return {
+        posted: postedProducts,
+        suppressed: suppressed.length,
+        gatedSingles: gatedArrivalIds.length,
+        skipped: false,
+    };
 }

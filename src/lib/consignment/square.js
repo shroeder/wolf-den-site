@@ -670,6 +670,7 @@ export async function listShopInventory() {
                             id: variation.id,
                             name: toDisplayName(item.item_data?.name || "Unnamed Item", variation.item_variation_data?.name),
                             price: normalizeMoney(variation.item_variation_data?.price_money?.amount),
+                            sku: variation.item_variation_data?.sku || null,
                             imageId,
                             createdAt: variation.created_at || item.created_at || null,
                         });

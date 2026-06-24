@@ -11,6 +11,15 @@ const detectionLogger = createServerLogger({ source: "job", subsystem: "product-
 // of real categories. It isn't a Square category, so we skip it for both sync and detection.
 const SYNTHETIC_CATEGORY_ID = "new-last-4-days";
 
+// Scanned singles carry a TCG-<tcgplayerProductId> SKU (accounting_app
+// SquareTransactionsService.buildSquareVariationSku). The Discord broadcast uses this to gate
+// low-value singles; sealed/supplies/etc. have other SKUs and always post.
+const TCG_SINGLE_SKU_PATTERN = /^TCG-\d+$/i;
+
+function isSingleSku(sku) {
+    return TCG_SINGLE_SKU_PATTERN.test(String(sku || "").trim());
+}
+
 /**
  * Scan current Square inventory and record new arrivals. An arrival is a variation that flipped
  * from absent/out-of-stock to in-stock: `new` if we've never seen it, `restock` if it was
@@ -41,7 +50,13 @@ export async function runProductAlertScan() {
             let entry = currentInStock.get(item.id);
 
             if (!entry) {
-                entry = { name: item.name, imageUrl: item.imageUrl || null, categoryIds: new Set() };
+                entry = {
+                    name: item.name,
+                    imageUrl: item.imageUrl || null,
+                    price: typeof item.price === "number" ? item.price : null,
+                    isSingle: isSingleSku(item.sku),
+                    categoryIds: new Set(),
+                };
                 currentInStock.set(item.id, entry);
             }
 
@@ -71,7 +86,15 @@ export async function runProductAlertScan() {
             const kind = seenBefore ? "restock" : "new";
 
             for (const categoryId of entry.categoryIds) {
-                arrivals.push({ variationId, categoryId, name: entry.name, imageUrl: entry.imageUrl, kind });
+                arrivals.push({
+                    variationId,
+                    categoryId,
+                    name: entry.name,
+                    imageUrl: entry.imageUrl,
+                    price: entry.price,
+                    isSingle: entry.isSingle,
+                    kind,
+                });
             }
         }
 
@@ -100,9 +123,9 @@ export async function runProductAlertScan() {
     for (const arrival of arrivals) {
         await db.query(
             `INSERT INTO product_alert_arrivals
-                (square_category_id, variation_id, item_name, kind, image_url)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [arrival.categoryId, arrival.variationId, arrival.name, arrival.kind, arrival.imageUrl]
+                (square_category_id, variation_id, item_name, kind, image_url, price, is_single)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [arrival.categoryId, arrival.variationId, arrival.name, arrival.kind, arrival.imageUrl, arrival.price, arrival.isSingle]
         );
     }
 
