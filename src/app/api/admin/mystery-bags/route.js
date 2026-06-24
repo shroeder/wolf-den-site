@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { listMysteryBagCards, upsertMysteryBagCard } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -71,7 +71,7 @@ function validatePayload(payload) {
 
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/admin/mystery-bags", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "mystery.manage", logger);
 
         if (authError) {
             return authError;
@@ -102,7 +102,7 @@ export async function GET(request) {
 
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/admin/mystery-bags", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "mystery.manage", logger);
 
         if (authError) {
             return authError;

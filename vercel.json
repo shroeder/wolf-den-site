@@ -46,6 +46,10 @@
         {
             "path": "/api/jobs/looking-for-alerts",
             "schedule": "0 8 * * *"
+        },
+        {
+            "path": "/api/jobs/product-alerts",
+            "schedule": "0 */4 * * *"
         }
     ]
 }

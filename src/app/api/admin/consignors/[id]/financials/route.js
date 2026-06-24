@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getAdminConsignorDashboard } from "@/lib/admin/consignors";
 import { getConsignorById } from "@/lib/consignment/config";
 import { getTotalPaidForConsignor, listPayoutsForConsignor } from "@/lib/consignment/payouts";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 export async function GET(request, { params }) {
     return withRequestLogging(request, "GET /api/admin/consignors/[id]/financials", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "consignors.manage", logger);
 
         if (authError) {
             return authError;

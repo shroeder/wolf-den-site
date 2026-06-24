@@ -1,10 +1,37 @@
 import { NextResponse } from "next/server";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { createMysterySoldEvent } from "@/lib/mystery-bags";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
+import { createMysterySoldEvent, listMysterySoldCards } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
+
+export async function GET(request) {
+    return withRequestLogging(request, "GET /api/admin/mystery-bags/sold-events", async ({ logger, internalError }) => {
+        const authError = await requireAdminAccess(request, "mystery.manage", logger);
+
+        if (authError) {
+            return authError;
+        }
+
+        try {
+            const cards = await listMysterySoldCards();
+            const marketValueTotal = cards.reduce((sum, card) => sum + (Number(card.marketValue) || 0), 0);
+
+            return NextResponse.json({
+                summary: {
+                    soldCardCount: cards.length,
+                    marketValueTotal: Math.round(marketValueTotal * 100) / 100,
+                },
+                cards,
+            });
+        } catch (error) {
+            return internalError(error, {
+                event: "admin.mystery_bags.sold_events.list_failure",
+            });
+        }
+    });
+}
 
 function normalizeSoldEventPayload(body = {}) {
     return {
@@ -22,7 +49,7 @@ function normalizeSoldEventPayload(body = {}) {
 
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/admin/mystery-bags/sold-events", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "mystery.manage", logger);
 
         if (authError) {
             return authError;

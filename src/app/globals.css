@@ -626,7 +626,7 @@ textarea:focus-visible {
 
 .footer-grid {
     display: grid;
-    grid-template-columns: 2fr 1.2fr 1.2fr;
+    grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr;
     gap: 1rem;
 }
 
@@ -641,6 +641,35 @@ textarea:focus-visible {
 .contact-form {
     display: grid;
     gap: 0.5rem;
+}
+
+.pa-categories {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin: 0;
+}
+
+.pa-categories legend {
+    padding: 0 0.4rem;
+    font-weight: 600;
+}
+
+.pa-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.5rem 1rem;
+}
+
+.pa-category-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.pa-category-option input {
+    width: auto;
 }
 
 input,

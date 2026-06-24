@@ -12,6 +12,7 @@ const navItems = [
     { href: "/magic-the-gathering", label: "Magic: The Gathering" },
     { href: "/shop", label: "Shop" },
     { href: "/looking-for", label: "Looking For" },
+    { href: "/alerts", label: "New-Arrival Alerts" },
     { href: "/mystery-bags", label: "Mystery Bags" },
     { href: "/events", label: "Events" },
     { href: "/sell-cards", label: "Sell Your Cards" },

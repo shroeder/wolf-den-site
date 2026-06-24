@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getConsignorById } from "@/lib/consignment/config";
 import { createPayoutForConsignor, getTotalPaidForConsignor, listPayoutsForConsignor } from "@/lib/consignment/payouts";
 import { getConsignorSummary } from "@/lib/consignment/portal-data";
@@ -47,7 +47,7 @@ function validatePayload(payload) {
 
 export async function GET(request, { params }) {
     return withRequestLogging(request, "GET /api/admin/consignors/[id]/payouts", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "consignors.manage", logger);
 
         if (authError) {
             return authError;
@@ -82,7 +82,7 @@ export async function GET(request, { params }) {
 
 export async function POST(request, { params }) {
     return withRequestLogging(request, "POST /api/admin/consignors/[id]/payouts", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "consignors.manage", logger);
 
         if (authError) {
             return authError;

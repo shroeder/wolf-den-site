@@ -107,6 +107,42 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
     return rows.map(toMysteryBagCard);
 }
 
+/**
+ * Authoritative "cards that went out the door" — every card the system has marked sold (across all
+ * pack-price eras), with its market value. This is what the Mystery Pack Report uses for value-out,
+ * replacing the phone app's local snapshot list. Sold status is set when a card is assigned to a sale
+ * (see assignCardsToSoldEvent), so this is barcode-driven and device-independent.
+ */
+export async function listMysterySoldCards() {
+    const rows = await db.query(
+        `SELECT id,
+                card_id,
+                square_variation_id,
+                card_name,
+                set_name,
+                card_number,
+                market_value,
+                image_url,
+                sold_at,
+                created_at
+         FROM mystery_bag_cards
+         WHERE status = 'sold'
+         ORDER BY market_value DESC, sold_at DESC NULLS LAST`
+    );
+
+    return rows.map((row) => ({
+        id: row.id,
+        cardId: row.card_id,
+        squareVariationId: row.square_variation_id || null,
+        name: row.card_name,
+        set: row.set_name,
+        number: row.card_number,
+        marketValue: toMoneyNumber(row.market_value),
+        imageUrl: row.image_url || null,
+        soldAt: toIso(row.sold_at),
+    }));
+}
+
 export async function getMysteryBagMetrics() {
     const row = await db.queryOne(
         `SELECT COUNT(*)::int AS item_count,

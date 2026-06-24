@@ -37,6 +37,13 @@ export default function SiteFooter() {
                     </ul>
                 </div>
                 <div>
+                    <h3>New-Arrival Alerts</h3>
+                    <p>Be first to know when new product hits the shelves. Pick your categories and we&apos;ll email you when fresh stock and restocks come in.</p>
+                    <p>
+                        <Link href="/alerts" className="button primary">Get new-arrival alerts</Link>
+                    </p>
+                </div>
+                <div>
                     <h3>Visit</h3>
                     <p>300 1st St S, Montgomery, MN 56069</p>
                     <p>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm</p>

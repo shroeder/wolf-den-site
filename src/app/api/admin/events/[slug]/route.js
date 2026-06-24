@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getEventBySlug } from "@/lib/events";
 import { getSignupStatus, listSignupsForEvent, setSignupLimit } from "@/lib/event-signups";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -31,7 +31,7 @@ function validatePatchPayload(payload) {
 
 export async function GET(request, { params }) {
     return withRequestLogging(request, "GET /api/admin/events/[slug]", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "events.manage", logger);
 
         if (authError) {
             return authError;
@@ -78,7 +78,7 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
     return withRequestLogging(request, "PATCH /api/admin/events/[slug]", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "events.manage", logger);
 
         if (authError) {
             return authError;

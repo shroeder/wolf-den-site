@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { reserveMysteryBagCards } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/admin/mystery-bags/reservations", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "mystery.manage", logger);
 
         if (authError) {
             return authError;

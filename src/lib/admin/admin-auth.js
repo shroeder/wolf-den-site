@@ -4,6 +4,8 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { hasPermission } from "@/lib/admin-app/permissions";
+import { resolveAdminAppSession } from "@/lib/admin-app/session";
 import { createServerLogger } from "@/lib/server-logger";
 
 const authLogger = createServerLogger({ source: "api", subsystem: "admin-auth" });
@@ -60,4 +62,47 @@ export function verifyAdminApiKey(request, logger = authLogger) {
     });
 
     return null;
+}
+
+/**
+ * Auth guard for admin routes that accepts EITHER a per-user admin-app staff
+ * session (preferred) OR the legacy shared ADMIN_API_KEY (kept for older app
+ * builds during the Phase 2 migration).
+ *
+ * Same contract as verifyAdminApiKey: returns a NextResponse on failure, or
+ * null on success. When a staff session is used, [permissionKey] is enforced.
+ */
+export async function requireAdminAccess(request, permissionKey, logger = authLogger) {
+    const authHeader = request.headers.get("authorization") || "";
+    const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+
+    if (bearer) {
+        const session = await resolveAdminAppSession(bearer);
+
+        if (session) {
+            if (!hasPermission(session.effectivePermissions, permissionKey)) {
+                logger.warn("admin.auth.failure", {
+                    step: "auth_check_failed",
+                    authType: "admin_app_session",
+                    reason: "missing_permission",
+                    userId: session.user.id,
+                    permissionKey,
+                });
+
+                return NextResponse.json({ error: "forbidden" }, { status: 403 });
+            }
+
+            logger.info("admin.auth.success", {
+                step: "auth_check_passed",
+                authType: "admin_app_session",
+                userId: session.user.id,
+                permissionKey,
+            });
+
+            return null;
+        }
+    }
+
+    // Not a valid staff session — fall back to the legacy shared key.
+    return verifyAdminApiKey(request, logger);
 }

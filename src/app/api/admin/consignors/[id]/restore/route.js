@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { restoreAdminConsignor } from "@/lib/admin/consignors";
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 
 export async function POST(request, { params }) {
     return withRequestLogging(request, "POST /api/admin/consignors/[id]/restore", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "consignors.manage", logger);
 
         if (authError) {
             return authError;

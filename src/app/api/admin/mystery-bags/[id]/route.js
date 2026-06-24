@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { deleteMysteryBagCardByIdOrCardId, recordMysteryBagHitFromCard } from "@/lib/mystery-bags";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 export async function DELETE(request, { params }) {
     return withRequestLogging(request, "DELETE /api/admin/mystery-bags/[id]", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "mystery.manage", logger);
 
         if (authError) {
             return authError;

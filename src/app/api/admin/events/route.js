@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { listAdminEventSummaries } from "@/lib/event-signups";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/admin/events", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "events.manage", logger);
 
         if (authError) {
             return authError;

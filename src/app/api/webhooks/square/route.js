@@ -6,6 +6,7 @@ import {
     createMysteryWebhookEvent,
     runMysteryWebhookProcessing,
 } from "@/lib/mystery-bags";
+import { INVENTORY_EVENT_TYPES, flagInventoryDirty } from "@/lib/product-alerts/state";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -80,6 +81,26 @@ export async function POST(request) {
                 },
                 { status: 401 }
             );
+        }
+
+        const eventType = getEventType(payload);
+
+        // Inventory/catalog changes drive new-arrival alerts, not mystery bags. Flag the
+        // product-alert state dirty (cheap) so the next cron tick scans, and return early — these
+        // events are unrelated to the mystery-bag order flow below.
+        if (INVENTORY_EVENT_TYPES.has(eventType)) {
+            try {
+                await flagInventoryDirty();
+
+                logger.info("webhooks.square.product_alerts.flagged", { eventType });
+            } catch (error) {
+                return internalError(error, {
+                    event: "webhooks.square.product_alerts.flag_failure",
+                    eventType,
+                });
+            }
+
+            return NextResponse.json({ success: true, eventType, flagged: true }, { status: 200 });
         }
 
         try {

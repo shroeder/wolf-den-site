@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAdminConsignorDetail, updateAdminConsignor } from "@/lib/admin/consignors";
-import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -74,7 +74,7 @@ function validatePatchPayload(updates) {
 
 export async function GET(request, { params }) {
     return withRequestLogging(request, "GET /api/admin/consignors/[id]", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "consignors.manage", logger);
 
         if (authError) {
             return authError;
@@ -109,7 +109,7 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
     return withRequestLogging(request, "PATCH /api/admin/consignors/[id]", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
+        const authError = await requireAdminAccess(request, "consignors.manage", logger);
 
         if (authError) {
             return authError;
