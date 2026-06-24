@@ -75,6 +75,38 @@ const sortShopCategories = (categories) =>
 
 const getDetailKey = (item) => `${item.id}-${item.categoryName}`;
 
+const SORT_OPTIONS = [
+    { value: "featured", label: "Featured" },
+    { value: "price-asc", label: "Price: Low to High" },
+    { value: "price-desc", label: "Price: High to Low" },
+];
+
+const sortVisibleItems = (items, sortMode) => {
+    if (sortMode !== "price-asc" && sortMode !== "price-desc") {
+        return items;
+    }
+
+    const direction = sortMode === "price-asc" ? 1 : -1;
+
+    return [...items].sort((left, right) => {
+        const leftHasPrice = typeof left.price === "number" && !Number.isNaN(left.price);
+        const rightHasPrice = typeof right.price === "number" && !Number.isNaN(right.price);
+
+        // Items without a price always sort to the bottom, regardless of direction.
+        if (!leftHasPrice && !rightHasPrice) {
+            return 0;
+        }
+        if (!leftHasPrice) {
+            return 1;
+        }
+        if (!rightHasPrice) {
+            return -1;
+        }
+
+        return (left.price - right.price) * direction;
+    });
+};
+
 function CartGlyph() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className="shop-cart-icon-svg">
@@ -118,6 +150,7 @@ export default function ShopInventoryClient({
     const [activeId, setActiveId] = useState(orderedCategories[0]?.id ?? null);
     const [detailItemKey, setDetailItemKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [sortMode, setSortMode] = useState("featured");
     const [isLocalPaymentsEnabled, setIsLocalPaymentsEnabled] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -148,7 +181,7 @@ export default function ShopInventoryClient({
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const isSearching = normalizedSearch.length > 0;
 
-    const visibleItems = isSearching
+    const matchedItems = isSearching
         ? dedupeSearchItems(
             orderedCategories.flatMap((category) =>
                 category.items
@@ -157,6 +190,8 @@ export default function ShopInventoryClient({
             )
         )
         : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
+
+    const visibleItems = sortVisibleItems(matchedItems, sortMode);
 
     const detailIndex = detailItemKey === null
         ? -1
@@ -575,6 +610,24 @@ export default function ShopInventoryClient({
                             {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
                         </p>
                     )}
+
+                    <div className="shop-sort-control">
+                        <label htmlFor="shop-sort-select" className="shop-sort-label">
+                            Sort by
+                        </label>
+                        <select
+                            id="shop-sort-select"
+                            className="shop-sort-select"
+                            value={sortMode}
+                            onChange={(event) => setSortMode(event.target.value)}
+                        >
+                            {SORT_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     {canShowPaymentUi && (
                         <Link href="/cart" className="shop-cart-launch" aria-label={`Open cart with ${resolvedCartCount} item${resolvedCartCount === 1 ? "" : "s"}`}>
