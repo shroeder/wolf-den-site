@@ -7,7 +7,12 @@ import { createServerLogger } from "@/lib/server-logger";
 const SQUARE_API_BASE = "https://connect.squareup.com";
 const DEFAULT_SALES_LOOKBACK_DAYS = 90;
 const DEFAULT_MYSTERY_PACK_ITEM_ID = "XGXASEUSGRYBX2XQDIKVU4FA";
-const SHOP_NEW_ITEMS_LOOKBACK_DAYS = 4;
+// The shop "Just In" tab surfaces variations Square stamped as created within this window.
+const SHOP_NEW_ITEMS_LOOKBACK_HOURS = 24;
+// Keep the "Just In" tab from filling with bulk single commons: a scanned single (TCG-<id> SKU)
+// only shows there at/above this dollar value. Sealed product, supplies, etc. always show. This
+// mirrors the Discord broadcast's single gate (DISCORD_SINGLE_MIN_PRICE), at a higher threshold.
+const SHOP_NEW_TAB_SINGLE_MIN_PRICE = 50;
 const squareLogger = createServerLogger({ source: "api", subsystem: "square" });
 
 const normalizeLookbackDays = (value) => {
@@ -689,7 +694,7 @@ export async function listShopInventory() {
     // 4. Build result — only categories/items that have in-stock quantity
     const result = [];
     const nowMs = Date.now();
-    const newItemCutoffMs = nowMs - SHOP_NEW_ITEMS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    const newItemCutoffMs = nowMs - SHOP_NEW_ITEMS_LOOKBACK_HOURS * 60 * 60 * 1000;
     const newItemsById = new Map();
 
     for (const [categoryId, categoryName] of categories) {
@@ -710,6 +715,14 @@ export async function listShopInventory() {
                 continue;
             }
 
+            // Gate low-value scanned singles so the tab isn't a pile of bulk commons. A single
+            // (TCG-<id> SKU) only shows at/above the threshold; everything else always shows.
+            const isSingle = TCG_SKU_PATTERN.test(String(item.sku || "").trim());
+
+            if (isSingle && !(typeof item.price === "number" && item.price >= SHOP_NEW_TAB_SINGLE_MIN_PRICE)) {
+                continue;
+            }
+
             if (!newItemsById.has(item.id)) {
                 newItemsById.set(item.id, item);
             }
@@ -724,8 +737,8 @@ export async function listShopInventory() {
 
     if (newItems.length > 0) {
         result.push({
-            id: "new-last-4-days",
-            name: "New (Last 4 Days)",
+            id: "new-just-in",
+            name: "Just In (24h)",
             items: newItems,
         });
     }

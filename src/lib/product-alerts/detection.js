@@ -7,9 +7,9 @@ import { syncCategoriesFromSquare } from "@/lib/product-alerts/categories";
 
 const detectionLogger = createServerLogger({ source: "job", subsystem: "product-alerts-scan" });
 
-// listShopInventory appends a synthetic "recently added" pseudo-category whose items are duplicates
+// listShopInventory appends a synthetic "Just In" pseudo-category whose items are duplicates
 // of real categories. It isn't a Square category, so we skip it for both sync and detection.
-const SYNTHETIC_CATEGORY_ID = "new-last-4-days";
+const SYNTHETIC_CATEGORY_ID = "new-just-in";
 
 // Scanned singles carry a TCG-<tcgplayerProductId> SKU (accounting_app
 // SquareTransactionsService.buildSquareVariationSku). The Discord broadcast uses this to gate

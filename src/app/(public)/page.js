@@ -1,9 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { events } from "@/lib/events";
+import { countRecentArrivals } from "@/lib/product-alerts/feed";
 
 const categories = ["Pokemon", "Magic", "Singles", "Accessories", "Events"];
 const featuredEvents = events.slice(0, 3);
+
+// Refresh the "Just In" arrival count periodically so it stays current as items are scanned in,
+// without a DB query on every homepage request.
+export const revalidate = 300;
 
 export const metadata = {
     title: "Game Store in Montgomery, MN | Pokemon & MTG",
@@ -23,7 +28,13 @@ export const metadata = {
     },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+    const justInCount = await countRecentArrivals({ windowHours: 24 });
+    const justInCountLabel =
+        justInCount > 0
+            ? `${justInCount} fresh ${justInCount === 1 ? "item" : "items"} scanned in over the last 24 hours.`
+            : "New cards and sealed product land here the moment they're scanned in.";
+
     return (
         <div className="stack reveal">
             <section className="hero card hero-split">
@@ -95,6 +106,22 @@ export default function HomePage() {
                             <strong>Thursday kids, Friday Commander, Saturday Pokemon</strong>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section className="card just-in-cta">
+                <div className="just-in-cta-copy">
+                    <p className="eyebrow">🔥 Just In</p>
+                    <h2>Fresh arrivals just hit the shelves</h2>
+                    <p>{justInCountLabel} Be first to grab them before someone else does.</p>
+                </div>
+                <div className="just-in-cta-actions">
+                    <Link className="button primary" href="/just-in">
+                        See What&apos;s New
+                    </Link>
+                    <Link className="button" href="/shop">
+                        Browse Shop
+                    </Link>
                 </div>
             </section>
 

@@ -19,7 +19,7 @@ const normalizeCategoryName = (value) => value.toLowerCase().replace(/[^a-z0-9]+
 const CATEGORY_PRIORITY_RULES = [
     {
         score: 1,
-        match: (name) => name.includes("new") && name.includes("last 4 days"),
+        match: (name) => name.includes("just in"),
     },
     {
         score: 10,
