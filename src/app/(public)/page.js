@@ -37,6 +37,22 @@ export default async function HomePage() {
 
     return (
         <div className="stack reveal">
+            <section className="card just-in-cta">
+                <div className="just-in-cta-copy">
+                    <p className="eyebrow">🔥 Just In</p>
+                    <h2>Fresh arrivals just hit the shelves</h2>
+                    <p>{justInCountLabel} Be first to grab them before someone else does.</p>
+                </div>
+                <div className="just-in-cta-actions">
+                    <Link className="button primary" href="/just-in">
+                        See What&apos;s New
+                    </Link>
+                    <Link className="button" href="/shop">
+                        Browse Shop
+                    </Link>
+                </div>
+            </section>
+
             <section className="hero card hero-split">
                 <div className="hero-copy">
                     <p className="eyebrow">Montgomery, Minnesota</p>
@@ -106,22 +122,6 @@ export default async function HomePage() {
                             <strong>Thursday kids, Friday Commander, Saturday Pokemon</strong>
                         </div>
                     </div>
-                </div>
-            </section>
-
-            <section className="card just-in-cta">
-                <div className="just-in-cta-copy">
-                    <p className="eyebrow">🔥 Just In</p>
-                    <h2>Fresh arrivals just hit the shelves</h2>
-                    <p>{justInCountLabel} Be first to grab them before someone else does.</p>
-                </div>
-                <div className="just-in-cta-actions">
-                    <Link className="button primary" href="/just-in">
-                        See What&apos;s New
-                    </Link>
-                    <Link className="button" href="/shop">
-                        Browse Shop
-                    </Link>
                 </div>
             </section>
 
