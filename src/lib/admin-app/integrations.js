@@ -122,6 +122,54 @@ export async function resolveSquareAccessToken(storeId) {
     return null;
 }
 
+/**
+ * Resolve the OpenAI API key for a store: the store's OWN key, or — ONLY for the
+ * flagship (`uses_env_credentials`) — the global env key. Other stores must bring
+ * their own (so the platform owner's key is never used by tenants).
+ */
+export async function resolveOpenAiKey(storeId) {
+    const cred = await getDecryptedCredential(storeId, "openai");
+
+    if (cred?.credential?.api_key) {
+        return cred.credential.api_key;
+    }
+
+    const store = await db.queryOne("SELECT uses_env_credentials FROM stores WHERE id = $1", [storeId]);
+
+    if (store?.uses_env_credentials && process.env.OPENAI_API_KEY) {
+        return process.env.OPENAI_API_KEY;
+    }
+
+    return null;
+}
+
+/**
+ * Connector status for a store, used to gate app access. Square + OpenAI are
+ * required; Plaid is optional. A connector counts as connected if the store has
+ * its own credential, or (flagship only) the matching env var is set.
+ */
+export async function getConnectorStatus(storeId) {
+    const store = await db.queryOne("SELECT uses_env_credentials FROM stores WHERE id = $1", [storeId]);
+    const usesEnv = Boolean(store?.uses_env_credentials);
+
+    const [square, openai, plaid] = await Promise.all([
+        getDecryptedCredential(storeId, "square"),
+        getDecryptedCredential(storeId, "openai"),
+        getDecryptedCredential(storeId, "plaid"),
+    ]);
+
+    const squareConnected = Boolean(square?.credential?.access_token) || (usesEnv && Boolean(process.env.SQUARE_ACCESS_TOKEN));
+    const openaiConnected = Boolean(openai?.credential?.api_key) || (usesEnv && Boolean(process.env.OPENAI_API_KEY));
+    const plaidConnected = Boolean(plaid?.credential?.access_token);
+
+    return {
+        square: { connected: squareConnected, required: true },
+        openai: { connected: openaiConnected, required: true },
+        plaid: { connected: plaidConnected, required: false },
+        allRequiredConnected: squareConnected && openaiConnected,
+    };
+}
+
 export async function refreshSquareToken(storeId, refreshToken) {
     const clientId = process.env.SQUARE_OAUTH_CLIENT_ID || "";
     const clientSecret = process.env.SQUARE_OAUTH_CLIENT_SECRET || "";

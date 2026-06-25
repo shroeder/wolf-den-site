@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAppAuth } from "@/lib/admin-app/auth";
+import { getConnectorStatus } from "@/lib/admin-app/integrations";
 import { getStorePublic } from "@/lib/admin-app/store-status";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -16,10 +17,13 @@ export async function GET(request) {
 
         try {
             const { user, effectivePermissions } = auth.session;
-            const store = await getStorePublic(user.storeId);
+            const [store, connectors] = await Promise.all([
+                getStorePublic(user.storeId),
+                getConnectorStatus(user.storeId),
+            ]);
 
             return NextResponse.json(
-                { user, permissions: effectivePermissions, store },
+                { user, permissions: effectivePermissions, store, connectors },
                 { headers: { "Cache-Control": "no-store" } }
             );
         } catch (error) {

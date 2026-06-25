@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { hashPassword } from "@/lib/consignment/password";
 import { isValidEmail, isValidPassword } from "@/lib/admin-app/users";
 import { createAdminAppSession } from "@/lib/admin-app/session";
+import { getConnectorStatus } from "@/lib/admin-app/integrations";
 import { resolveEffectivePermissions } from "@/lib/admin-app/permissions";
 import { isAdminAppSignupBlocked, recordAdminAppSignupAttempt } from "@/lib/admin-app/throttle";
 import { db } from "@/lib/db";
@@ -124,6 +125,7 @@ export async function POST(request) {
             });
 
             const permissions = resolveEffectivePermissions("owner", []);
+            const connectors = await getConnectorStatus(result.store.id);
 
             logger.info("admin_app.signup.success", { storeId: result.store.id, slug });
 
@@ -140,6 +142,7 @@ export async function POST(request) {
                         mustChangePassword: false,
                     },
                     permissions,
+                    connectors,
                     store: {
                         id: result.store.id,
                         slug: result.store.slug,

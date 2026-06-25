@@ -5,6 +5,7 @@ import {
     touchAdminAppUserLogin,
 } from "@/lib/admin-app/users";
 import { createAdminAppSession } from "@/lib/admin-app/session";
+import { getConnectorStatus } from "@/lib/admin-app/integrations";
 import { resolveEffectivePermissions } from "@/lib/admin-app/permissions";
 import {
     clearFailedAdminAppAuthAttempts,
@@ -73,6 +74,7 @@ export async function POST(request) {
                 [userRow.id]
             );
             const effectivePermissions = resolveEffectivePermissions(userRow.role, overrides);
+            const connectors = await getConnectorStatus(userRow.store_id);
 
             logger.info("admin_app.auth.login.success", { userId: userRow.id, role: userRow.role });
 
@@ -88,6 +90,7 @@ export async function POST(request) {
                         mustChangePassword: Boolean(userRow.must_change_password),
                     },
                     permissions: effectivePermissions,
+                    connectors,
                 },
                 { headers: { "Cache-Control": "no-store" } }
             );

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAppAuth } from "@/lib/admin-app/auth";
 import { hasPermission } from "@/lib/admin-app/permissions";
-import { getDecryptedCredential, resolveSquareAccessToken } from "@/lib/admin-app/integrations";
+import { getDecryptedCredential, resolveOpenAiKey, resolveSquareAccessToken } from "@/lib/admin-app/integrations";
 import { createServerLogger } from "@/lib/server-logger";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
@@ -62,10 +62,10 @@ const UPSTREAMS = {
         rules: [
             { prefix: "/v1", anyOf: [P.AI_USE] },
         ],
-        applyAuth: async ({ headers, bodyText }) => {
-            // OpenAI stays a single global vendor key (no per-tenant key).
-            const token = process.env.OPENAI_API_KEY || "";
-            if (!token) throw new ProxyConfigError("openai_not_configured");
+        applyAuth: async ({ headers, bodyText, storeId }) => {
+            // Per-store OpenAI key (env fallback ONLY for the flagship store).
+            const token = await resolveOpenAiKey(storeId);
+            if (!token) throw new ProxyConfigError("openai_not_connected");
             headers.set("Authorization", `Bearer ${token}`);
             return { headers, bodyText };
         },
