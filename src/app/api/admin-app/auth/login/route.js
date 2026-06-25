@@ -64,7 +64,7 @@ export async function POST(request) {
 
             await clearFailedAdminAppAuthAttempts({ ip: clientIp, email });
 
-            const { token, expiresAt } = await createAdminAppSession(userRow.id, { deviceLabel });
+            const { token, expiresAt } = await createAdminAppSession(userRow.id, userRow.store_id, { deviceLabel });
 
             await touchAdminAppUserLogin(userRow.id);
 

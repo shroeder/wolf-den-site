@@ -1,5 +1,13 @@
 # Admin App Multi-User Auth & Permissions — Rollout Tracker
 
+> **2026-06-24 update — Multi-tenant SaaS pivot is BUILT (untested on device).** The app is now
+> a multi-tenant product: owners self-sign-up in-app (creating their store), and each store
+> connects its own Square/Plaid. Migrations 027/028 + `src/lib/admin-app/{crypto,integrations,
+> square-oauth,store-status}.js`, `/api/admin-app/signup`, `/api/admin-app/integrations/**`, and
+> Android `CreateStoreScreen`/`StoreIntegrationsScreen`/`IntegrationsApiClient`. Compiles + the
+> site `npm run build` passes. See the **Multi-tenant SaaS** section at the bottom for the new
+> env vars + the Square OAuth app you must register.
+
 Goal: turn the `accounting_app` Android app from a single-user (owner) local app into a
 multi-user app that store staff can log into with email + password, with permissions
 enforced **server-side** (not just hidden in the UI).
@@ -126,3 +134,48 @@ not been run on the phone. Must `./gradlew installDebug` and exercise scan / lab
 | `staff.manage`      | Manage staff accounts (this system)   |  ✓    |         |       |
 
 Owner always has every permission regardless of overrides.
+
+---
+
+# Multi-tenant SaaS pivot (built 2026-06-24)
+
+Turns the admin app into a product resold to other game stores. Decisions: **global-unique email**
+(login stays email+password), **admin app only** (public storefront stays the flagship), **all phases
+built in one push**, per-tenant **Square OAuth** + **Plaid item token** (encrypted in DB), OpenAI stays
+a global vendor key, flagship keeps working via env fallback.
+
+### What was built
+- **A — Tenancy:** `migrations/027-add-store-tenancy.sql` (`stores` table; `store_id` on
+  `admin_app_users` + `admin_app_sessions`; flagship `wolf-den` backfill). `db.tx()` helper.
+  `users.js`/`session.js` + login/users routes scoped by `store_id`. Seed script assigns flagship store.
+- **B — Per-tenant creds:** `migrations/028-add-store-integrations.sql`; `crypto.js` (AES-256-GCM,
+  `INTEGRATION_ENCRYPTION_KEY`); `integrations.js`; `proxy.js` `applyAuth` is async and resolves the
+  store's Square/Plaid creds (env fallback for flagship Square).
+- **C — Square OAuth:** `square-oauth.js` + `/api/admin-app/integrations/square/{connect,callback,status}`
+  (HMAC-signed state, code exchange, location fetch, refresh).
+- **D — Plaid per-store:** `/api/admin-app/integrations/plaid/{link-token,exchange,status}`; token stored
+  server-side; proxy injects it.
+- **E — Self-signup:** `/api/admin-app/signup` (atomic store+owner+session, 14-day trial, IP throttle);
+  `store-status.js` (trial gate STUB — always allows for now); `/auth/me` returns `store`.
+- **Android:** `auth/IntegrationsApiClient.kt`; `ui/auth/CreateStoreScreen.kt` +
+  `StoreIntegrationsScreen.kt`; signup in `AuthRepository`/`AuthApiClient`; `AppShell`/`LoginScreen`
+  "Create your store" path; Plaid link/exchange moved to the integrations endpoints (`markConnected()`
+  marker; real token server-side). Drawer gains owner-only "Store & Integrations".
+
+### YOU must do (before it's usable)
+- **Register ONE Square OAuth app** (Square Developer dashboard, production): redirect
+  `https://wolfdengamingmn.com/api/admin-app/integrations/square/callback`; scopes: merchant profile read,
+  items R/W, inventory R/W, orders read, payments read, gift cards read.
+- **Add Vercel env vars:** `INTEGRATION_ENCRYPTION_KEY` (32 bytes hex/base64 — **back it up; losing it
+  orphans all stored creds**), `SQUARE_OAUTH_CLIENT_ID`, `SQUARE_OAUTH_CLIENT_SECRET`,
+  `SQUARE_OAUTH_REDIRECT_URL`. Keep `PLAID_*`, `OPENAI_API_KEY` (vendor-global), `SQUARE_ACCESS_TOKEN`
+  (flagship fallback).
+- **Deploy** (runs migrations 027/028). The flagship store + your existing owner are backfilled.
+
+### Remaining / deferred
+- Trial/subscription **enforcement** is stubbed (`assertStoreActive` always allows) — flip on with billing later.
+- Square **multi-location** merchants: MVP auto-picks the first active location.
+- OAuth **state** is TTL+HMAC bound but not single-use (replay mitigated by Square's one-time code).
+- Encryption-key **rotation** has no story yet.
+- Plaid **disconnect** clears the local marker only (server row remains) — add a server disconnect later.
+- **None of the Android multi-tenant flows are device-tested** — sign up a store, connect Square + bank, run a scan/banking fetch on the phone.

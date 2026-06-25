@@ -66,6 +66,16 @@ async function main() {
     const client = await pool.connect();
 
     try {
+        // The flagship store (created by migration 027). This seed is for the flagship owner;
+        // new stores are created via the in-app self-signup flow, not this script.
+        const storeResult = await client.query("SELECT id FROM stores WHERE slug = 'wolf-den'");
+        const storeId = storeResult.rows[0]?.id;
+
+        if (!storeId) {
+            console.error("ERROR: flagship store ('wolf-den') not found. Run `npm run db:migrate` first.");
+            process.exit(1);
+        }
+
         const existing = await client.query(
             "SELECT id FROM admin_app_users WHERE email_normalized = $1",
             [emailNormalized]
@@ -83,10 +93,10 @@ async function main() {
             console.log(`[seed] Existing user ${email} promoted to active owner and password reset.`);
         } else {
             const result = await client.query(
-                `INSERT INTO admin_app_users (email, email_normalized, display_name, password_hash, role, active, must_change_password)
-                 VALUES ($1, $2, $3, $4, 'owner', TRUE, FALSE)
+                `INSERT INTO admin_app_users (store_id, email, email_normalized, display_name, password_hash, role, active, must_change_password)
+                 VALUES ($1, $2, $3, $4, $5, 'owner', TRUE, FALSE)
                  RETURNING id`,
-                [email, emailNormalized, displayName, passwordHash]
+                [storeId, email, emailNormalized, displayName, passwordHash]
             );
 
             console.log(`[seed] Owner created: ${email} (id ${result.rows[0].id}).`);

@@ -41,7 +41,7 @@ export async function POST(request) {
                 return NextResponse.json({ error: "invalid_current_password" }, { status: 401 });
             }
 
-            const result = await setAdminAppUserPassword(user.id, newPassword, { mustChangePassword: false });
+            const result = await setAdminAppUserPassword(user.storeId, user.id, newPassword, { mustChangePassword: false });
 
             if (result.error) {
                 return NextResponse.json({ error: result.error }, { status: result.status || 400 });

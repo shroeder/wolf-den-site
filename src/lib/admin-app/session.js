@@ -22,15 +22,16 @@ function hashToken(token) {
  * Create a new session for a user. Returns the RAW token (shown once to the
  * client) and its expiry. Only the hash is persisted.
  */
-export async function createAdminAppSession(userId, { deviceLabel = null } = {}) {
+export async function createAdminAppSession(userId, storeId, { deviceLabel = null, client = null } = {}) {
     const token = generateToken();
     const tokenHash = hashToken(token);
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    const exec = client || db;
 
-    await db.query(
-        `INSERT INTO admin_app_sessions (user_id, token_hash, device_label, expires_at)
-         VALUES ($1, $2, $3, $4)`,
-        [userId, tokenHash, deviceLabel, expiresAt]
+    await exec.query(
+        `INSERT INTO admin_app_sessions (user_id, store_id, token_hash, device_label, expires_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [userId, storeId, tokenHash, deviceLabel, expiresAt]
     );
 
     return { token, expiresAt: expiresAt.toISOString() };
@@ -50,7 +51,7 @@ export async function resolveAdminAppSession(token) {
 
     const row = await db.queryOne(
         `SELECT s.id AS session_id, s.expires_at, s.revoked_at,
-                u.id, u.email, u.display_name, u.role, u.active, u.must_change_password,
+                u.id, u.store_id, u.email, u.display_name, u.role, u.active, u.must_change_password,
                 u.last_login_at, u.created_at, u.updated_at
          FROM admin_app_sessions s
          JOIN admin_app_users u ON u.id = s.user_id
@@ -82,6 +83,7 @@ export async function resolveAdminAppSession(token) {
         sessionId: row.session_id,
         user: {
             id: row.id,
+            storeId: row.store_id,
             email: row.email,
             displayName: row.display_name,
             role: row.role,

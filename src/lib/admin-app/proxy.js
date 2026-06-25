@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAppAuth } from "@/lib/admin-app/auth";
 import { hasPermission } from "@/lib/admin-app/permissions";
+import { getDecryptedCredential, resolveSquareAccessToken } from "@/lib/admin-app/integrations";
 import { createServerLogger } from "@/lib/server-logger";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
@@ -45,9 +46,10 @@ const UPSTREAMS = {
             { prefix: "/v2/gift-cards", anyOf: [P.TRADES_EDIT, P.TRADES_VIEW, P.REPORTS_VIEW] },
             { prefix: "/v2/locations", anyOf: [P.INVENTORY_SCAN, P.LABELS_PRINT, P.REPORTS_VIEW, P.COGS_VIEW, P.MYSTERY_MANAGE, P.CONSIGNORS_MANAGE, P.TRADES_EDIT] },
         ],
-        applyAuth: ({ headers, bodyText }) => {
-            const token = process.env.SQUARE_ACCESS_TOKEN || "";
-            if (!token) throw new ProxyConfigError("square_not_configured");
+        applyAuth: async ({ headers, bodyText, storeId }) => {
+            // The store's OWN Square token (env fallback ONLY for the flagship store).
+            const token = await resolveSquareAccessToken(storeId);
+            if (!token) throw new ProxyConfigError("square_not_connected");
             headers.set("Authorization", `Bearer ${token}`);
             if (process.env.SQUARE_API_VERSION) {
                 headers.set("Square-Version", process.env.SQUARE_API_VERSION);
@@ -60,7 +62,8 @@ const UPSTREAMS = {
         rules: [
             { prefix: "/v1", anyOf: [P.AI_USE] },
         ],
-        applyAuth: ({ headers, bodyText }) => {
+        applyAuth: async ({ headers, bodyText }) => {
+            // OpenAI stays a single global vendor key (no per-tenant key).
             const token = process.env.OPENAI_API_KEY || "";
             if (!token) throw new ProxyConfigError("openai_not_configured");
             headers.set("Authorization", `Bearer ${token}`);
@@ -79,8 +82,9 @@ const UPSTREAMS = {
             { prefix: "/accounts", anyOf: [P.BANKING_VIEW] },
             { prefix: "/institutions", anyOf: [P.BANKING_VIEW] },
         ],
-        // Plaid authenticates via client_id + secret in the JSON body.
-        applyAuth: ({ headers, bodyText }) => {
+        // Plaid: vendor client_id/secret stay global; the per-store item access_token
+        // is injected from store_integrations for non-/link data calls.
+        applyAuth: async ({ headers, bodyText, storeId, path }) => {
             const clientId = process.env.PLAID_CLIENT_ID || "";
             const secret = process.env.PLAID_SECRET || "";
             if (!clientId || !secret) throw new ProxyConfigError("plaid_not_configured");
@@ -95,6 +99,14 @@ const UPSTREAMS = {
             }
             payload.client_id = clientId;
             payload.secret = secret;
+
+            if (!path.startsWith("/link")) {
+                const plaidCred = await getDecryptedCredential(storeId, "plaid");
+                if (plaidCred?.credential?.access_token) {
+                    payload.access_token = plaidCred.credential.access_token;
+                }
+            }
+
             headers.set("Content-Type", "application/json");
             return { headers, bodyText: JSON.stringify(payload) };
         },
@@ -167,7 +179,12 @@ export async function handleProxy(request, upstreamKey, context) {
     }
 
     try {
-        ({ headers, bodyText } = upstream.applyAuth({ headers, bodyText }));
+        ({ headers, bodyText } = await upstream.applyAuth({
+            headers,
+            bodyText,
+            storeId: auth.session.user.storeId,
+            path,
+        }));
     } catch (error) {
         if (error instanceof ProxyConfigError) {
             proxyLogger.error("admin_app.proxy.config_error", error, { upstreamKey, code: error.code });

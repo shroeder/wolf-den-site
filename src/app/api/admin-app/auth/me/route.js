@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAppAuth } from "@/lib/admin-app/auth";
+import { getStorePublic } from "@/lib/admin-app/store-status";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -15,9 +16,10 @@ export async function GET(request) {
 
         try {
             const { user, effectivePermissions } = auth.session;
+            const store = await getStorePublic(user.storeId);
 
             return NextResponse.json(
-                { user, permissions: effectivePermissions },
+                { user, permissions: effectivePermissions, store },
                 { headers: { "Cache-Control": "no-store" } }
             );
         } catch (error) {

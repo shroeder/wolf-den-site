@@ -13,9 +13,10 @@ import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 
-async function countActiveOwners() {
+async function countActiveOwners(storeId) {
     const row = await db.queryOne(
-        "SELECT COUNT(*)::int AS count FROM admin_app_users WHERE role = 'owner' AND active = TRUE"
+        "SELECT COUNT(*)::int AS count FROM admin_app_users WHERE role = 'owner' AND active = TRUE AND store_id = $1",
+        [storeId]
     );
 
     return row?.count || 0;
@@ -30,9 +31,10 @@ export async function GET(request, { params }) {
         }
 
         const { id } = await params;
+        const storeId = gate.session.user.storeId;
 
         try {
-            const user = await getAdminAppUserById(id);
+            const user = await getAdminAppUserById(storeId, id);
 
             if (!user) {
                 return NextResponse.json({ error: "user_not_found" }, { status: 404 });
@@ -63,9 +65,10 @@ export async function PATCH(request, { params }) {
 
         const { id } = await params;
         const callerId = gate.session.user.id;
+        const storeId = gate.session.user.storeId;
 
         try {
-            const target = await getAdminAppUserById(id);
+            const target = await getAdminAppUserById(storeId, id);
 
             if (!target) {
                 return NextResponse.json({ error: "user_not_found" }, { status: 404 });
@@ -80,7 +83,7 @@ export async function PATCH(request, { params }) {
             }
 
             if ((deactivating || demotingFromOwner) && target.role === "owner" && target.active) {
-                if ((await countActiveOwners()) <= 1) {
+                if ((await countActiveOwners(storeId)) <= 1) {
                     return NextResponse.json({ error: "last_owner" }, { status: 400 });
                 }
             }
@@ -94,7 +97,7 @@ export async function PATCH(request, { params }) {
             let roleChanged = false;
 
             if (Object.keys(fieldUpdates).length) {
-                const result = await updateAdminAppUser(id, fieldUpdates);
+                const result = await updateAdminAppUser(storeId, id, fieldUpdates);
 
                 if (result.error) {
                     return NextResponse.json({ error: result.error }, { status: result.status || 400 });
@@ -104,7 +107,7 @@ export async function PATCH(request, { params }) {
             }
 
             if (body?.permissionOverrides !== undefined) {
-                const result = await setAdminAppUserPermissionOverrides(id, body.permissionOverrides);
+                const result = await setAdminAppUserPermissionOverrides(storeId, id, body.permissionOverrides);
 
                 if (result.error) {
                     return NextResponse.json({ error: result.error }, { status: result.status || 400 });
@@ -114,7 +117,7 @@ export async function PATCH(request, { params }) {
             let passwordChanged = false;
 
             if (body?.password !== undefined) {
-                const result = await setAdminAppUserPassword(id, body.password, { mustChangePassword: true });
+                const result = await setAdminAppUserPassword(storeId, id, body.password, { mustChangePassword: true });
 
                 if (result.error) {
                     return NextResponse.json({ error: result.error }, { status: result.status || 400 });
@@ -130,7 +133,7 @@ export async function PATCH(request, { params }) {
 
             logger.info("admin_app.users.update.success", { userId: id });
 
-            const updated = await getAdminAppUserById(id);
+            const updated = await getAdminAppUserById(storeId, id);
 
             return NextResponse.json({ success: true, user: updated }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
@@ -149,9 +152,10 @@ export async function DELETE(request, { params }) {
 
         const { id } = await params;
         const callerId = gate.session.user.id;
+        const storeId = gate.session.user.storeId;
 
         try {
-            const target = await getAdminAppUserById(id);
+            const target = await getAdminAppUserById(storeId, id);
 
             if (!target) {
                 return NextResponse.json({ error: "user_not_found" }, { status: 404 });
@@ -161,12 +165,12 @@ export async function DELETE(request, { params }) {
                 return NextResponse.json({ error: "cannot_modify_self" }, { status: 400 });
             }
 
-            if (target.role === "owner" && target.active && (await countActiveOwners()) <= 1) {
+            if (target.role === "owner" && target.active && (await countActiveOwners(storeId)) <= 1) {
                 return NextResponse.json({ error: "last_owner" }, { status: 400 });
             }
 
             // Soft delete: deactivate + kill sessions (preserve the row for audit).
-            await updateAdminAppUser(id, { active: false });
+            await updateAdminAppUser(storeId, id, { active: false });
             await revokeAllAdminAppSessionsForUser(id);
 
             logger.info("admin_app.users.delete.success", { userId: id });

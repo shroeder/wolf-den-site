@@ -113,6 +113,46 @@ export async function recordFailedAdminAppAuthAttempt({ ip, email }) {
     recordFailureInFallback(ipBaseKey, IP_MAX_ATTEMPTS);
 }
 
+// --- Open self-signup abuse limiting (per IP) ---
+
+const SIGNUP_WINDOW_SECONDS = 60 * 60;
+const SIGNUP_MAX_PER_IP = 5;
+
+function signupKey(ip) {
+    return `admin-app:signup:ip:${hashKey(String(ip || "unknown"))}`;
+}
+
+export async function isAdminAppSignupBlocked({ ip }) {
+    const key = signupKey(ip);
+
+    if (upstashRedis.isConfigured()) {
+        const count = Number(await upstashRedis.get(key)) || 0;
+        return count >= SIGNUP_MAX_PER_IP;
+    }
+
+    pruneFallbackMap(fallbackAttempts);
+    const entry = fallbackAttempts.get(key);
+    return Boolean(entry && entry.expiresAt > Date.now() && entry.count >= SIGNUP_MAX_PER_IP);
+}
+
+export async function recordAdminAppSignupAttempt({ ip }) {
+    const key = signupKey(ip);
+
+    if (upstashRedis.isConfigured()) {
+        const count = Number(await upstashRedis.incr(key));
+        if (count === 1) {
+            await upstashRedis.expire(key, SIGNUP_WINDOW_SECONDS);
+        }
+        return;
+    }
+
+    pruneFallbackMap(fallbackAttempts);
+    const now = Date.now();
+    const entry = fallbackAttempts.get(key);
+    const count = entry && entry.expiresAt > now ? Number(entry.count || 0) + 1 : 1;
+    fallbackAttempts.set(key, { count, expiresAt: now + SIGNUP_WINDOW_SECONDS * 1000 });
+}
+
 export async function clearFailedAdminAppAuthAttempts({ ip, email }) {
     const identityBaseKey = identityKey(ip, email);
     const ipBaseKey = ipKey(ip);

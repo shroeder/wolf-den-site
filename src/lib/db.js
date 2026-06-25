@@ -82,6 +82,32 @@ export const db = {
 
         return rows[0] || null;
     },
+    /**
+     * Run a function inside a single transaction. The callback receives a
+     * dedicated client with `.query(text, params)`; the transaction commits if it
+     * resolves and rolls back if it throws.
+     */
+    tx: async (fn) => {
+        const client = await getPool().connect();
+
+        try {
+            await client.query("BEGIN");
+            const result = await fn(client);
+            await client.query("COMMIT");
+
+            return result;
+        } catch (error) {
+            try {
+                await client.query("ROLLBACK");
+            } catch (rollbackError) {
+                dbLogger.error("db.tx.rollback_failed", rollbackError, { step: "tx_rollback_failed" });
+            }
+
+            throw error;
+        } finally {
+            client.release();
+        }
+    },
 };
 
 /**

@@ -15,7 +15,7 @@ export async function GET(request) {
         }
 
         try {
-            const users = await listAdminAppUsers();
+            const users = await listAdminAppUsers(gate.session.user.storeId);
 
             return NextResponse.json({ users }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
@@ -42,6 +42,7 @@ export async function POST(request) {
 
         try {
             const result = await createAdminAppUser({
+                storeId: gate.session.user.storeId,
                 email: body?.email,
                 displayName: body?.displayName,
                 role: body?.role,

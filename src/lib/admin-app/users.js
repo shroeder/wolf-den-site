@@ -42,6 +42,7 @@ async function getOverridesForUser(userId) {
 function mapUser(row, effectivePermissions, overrides = []) {
     return {
         id: row.id,
+        storeId: row.store_id,
         email: row.email,
         displayName: row.display_name,
         role: row.role,
@@ -65,8 +66,11 @@ async function hydrateUser(row) {
     return mapUser(row, effective, overrides);
 }
 
-export async function getAdminAppUserById(id) {
-    const row = await db.queryOne("SELECT * FROM admin_app_users WHERE id = $1", [id]);
+export async function getAdminAppUserById(storeId, id) {
+    const row = await db.queryOne(
+        "SELECT * FROM admin_app_users WHERE id = $1 AND store_id = $2",
+        [id, storeId]
+    );
 
     if (!row) {
         return null;
@@ -75,14 +79,21 @@ export async function getAdminAppUserById(id) {
     return hydrateUser(row);
 }
 
-export async function listAdminAppUsers() {
-    const rows = await db.query("SELECT * FROM admin_app_users ORDER BY created_at ASC");
+export async function listAdminAppUsers(storeId) {
+    const rows = await db.query(
+        "SELECT * FROM admin_app_users WHERE store_id = $1 ORDER BY created_at ASC",
+        [storeId]
+    );
 
     return Promise.all(rows.map(hydrateUser));
 }
 
-export async function createAdminAppUser({ email, displayName, role, password, mustChangePassword = true }) {
+export async function createAdminAppUser({ storeId, email, displayName, role, password, mustChangePassword = true }) {
     const normalizedEmail = normalizeEmail(email);
+
+    if (!storeId) {
+        return { error: "missing_store", status: 400 };
+    }
 
     if (!isValidEmail(normalizedEmail)) {
         return { error: "invalid_email", status: 400 };
@@ -112,10 +123,10 @@ export async function createAdminAppUser({ email, displayName, role, password, m
     const passwordHash = await hashPassword(password);
 
     const row = await db.queryOne(
-        `INSERT INTO admin_app_users (email, email_normalized, display_name, password_hash, role, must_change_password)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO admin_app_users (store_id, email, email_normalized, display_name, password_hash, role, must_change_password)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [String(email).trim(), normalizedEmail, displayName.trim(), passwordHash, role, Boolean(mustChangePassword)]
+        [storeId, String(email).trim(), normalizedEmail, displayName.trim(), passwordHash, role, Boolean(mustChangePassword)]
     );
 
     usersLogger.info("admin_app.users.created", { userId: row.id, role });
@@ -154,7 +165,7 @@ export async function touchAdminAppUserLogin(id) {
     );
 }
 
-export async function updateAdminAppUser(id, updates) {
+export async function updateAdminAppUser(storeId, id, updates) {
     const assignments = [];
     const values = [];
 
@@ -187,11 +198,12 @@ export async function updateAdminAppUser(id, updates) {
     }
 
     values.push(id);
+    values.push(storeId);
 
     const rows = await db.query(
         `UPDATE admin_app_users
          SET ${assignments.join(", ")}, updated_at = NOW()
-         WHERE id = $${values.length}
+         WHERE id = $${values.length - 1} AND store_id = $${values.length}
          RETURNING id`,
         values
     );
@@ -200,16 +212,16 @@ export async function updateAdminAppUser(id, updates) {
         return { error: "user_not_found", status: 404 };
     }
 
-    usersLogger.info("admin_app.users.updated", { userId: id, fields: Object.keys(updates) });
+    usersLogger.info("admin_app.users.updated", { storeId, userId: id, fields: Object.keys(updates) });
 
-    return { user: await getAdminAppUserById(id) };
+    return { user: await getAdminAppUserById(storeId, id) };
 }
 
 /**
  * Replace a user's permission overrides wholesale.
  * @param {Array<{key: string, granted: boolean}>} overrides
  */
-export async function setAdminAppUserPermissionOverrides(id, overrides) {
+export async function setAdminAppUserPermissionOverrides(storeId, id, overrides) {
     if (!Array.isArray(overrides)) {
         return { error: "invalid_overrides", status: 400 };
     }
@@ -220,7 +232,10 @@ export async function setAdminAppUserPermissionOverrides(id, overrides) {
         }
     }
 
-    const user = await db.queryOne("SELECT id FROM admin_app_users WHERE id = $1", [id]);
+    const user = await db.queryOne(
+        "SELECT id FROM admin_app_users WHERE id = $1 AND store_id = $2",
+        [id, storeId]
+    );
 
     if (!user) {
         return { error: "user_not_found", status: 404 };
@@ -236,12 +251,12 @@ export async function setAdminAppUserPermissionOverrides(id, overrides) {
         );
     }
 
-    usersLogger.info("admin_app.users.permissions_set", { userId: id, count: overrides.length });
+    usersLogger.info("admin_app.users.permissions_set", { storeId, userId: id, count: overrides.length });
 
-    return { user: await getAdminAppUserById(id) };
+    return { user: await getAdminAppUserById(storeId, id) };
 }
 
-export async function setAdminAppUserPassword(id, password, { mustChangePassword = false } = {}) {
+export async function setAdminAppUserPassword(storeId, id, password, { mustChangePassword = false } = {}) {
     if (!isValidPassword(password)) {
         return { error: "weak_password", status: 400 };
     }
@@ -251,16 +266,16 @@ export async function setAdminAppUserPassword(id, password, { mustChangePassword
     const rows = await db.query(
         `UPDATE admin_app_users
          SET password_hash = $1, must_change_password = $2, updated_at = NOW()
-         WHERE id = $3
+         WHERE id = $3 AND store_id = $4
          RETURNING id`,
-        [passwordHash, Boolean(mustChangePassword), id]
+        [passwordHash, Boolean(mustChangePassword), id, storeId]
     );
 
     if (!rows.length) {
         return { error: "user_not_found", status: 404 };
     }
 
-    usersLogger.info("admin_app.users.password_set", { userId: id });
+    usersLogger.info("admin_app.users.password_set", { storeId, userId: id });
 
-    return { user: await getAdminAppUserById(id) };
+    return { user: await getAdminAppUserById(storeId, id) };
 }
