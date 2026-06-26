@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminAppPermission } from "@/lib/admin-app/auth";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { backfillRecentArrivalsToDiscord } from "@/lib/product-alerts/webhook-discord";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -8,18 +8,21 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * Admin-triggered Discord catch-up. Hit from the admin app (a "catch up" button) to re-announce
+ * Admin-triggered Discord catch-up. Hit from the accounting app ("catch up" button) to re-announce
  * recent in-stock arrivals — e.g. anything missed while the old path was misbehaving. Posts to
  * Discord directly (same single-card $50 gate as the live webhook) and is idempotent via
  * last_posted_at, so it's safe to press more than once. Lookback defaults to 168h (7 days); override
- * with ?hours=N. Gated on the staff.manage permission (same as the integrations endpoints).
+ * with ?hours=N.
+ *
+ * Auth via requireAdminAccess (same as the other /api/admin/* routes the app calls): accepts a staff
+ * session with remediations.run, or the legacy shared ADMIN_API_KEY the app sends today.
  */
 export async function POST(request) {
-    return withRequestLogging(request, "POST /api/admin-app/product-alerts/backfill", async ({ logger, internalError }) => {
-        const gate = await requireAdminAppPermission(request, "staff.manage", logger);
+    return withRequestLogging(request, "POST /api/admin/product-alerts/backfill", async ({ logger, internalError }) => {
+        const authError = await requireAdminAccess(request, "remediations.run", logger);
 
-        if (gate.response) {
-            return gate.response;
+        if (authError) {
+            return authError;
         }
 
         try {
@@ -28,14 +31,11 @@ export async function POST(request) {
 
             const result = await backfillRecentArrivalsToDiscord({ lookbackHours });
 
-            logger.info("admin_app.product_alerts.backfill.done", {
-                userId: gate.session.user.id,
-                ...result,
-            });
+            logger.info("admin.product_alerts.backfill.done", { ...result });
 
             return NextResponse.json({ success: true, ...result }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
-            return internalError(error, { event: "admin_app.product_alerts.backfill.failure" });
+            return internalError(error, { event: "admin.product_alerts.backfill.failure" });
         }
     });
 }
