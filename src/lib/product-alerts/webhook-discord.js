@@ -82,9 +82,18 @@ function extractInStockCounts(payload, locationId) {
 function buildEmbed(details, isNew) {
     const verb = isNew ? "New arrival" : "Restocked";
     const priceLine = typeof details.price === "number" ? `\n${currency.format(details.price)}` : "";
+    // Each embed's url MUST be unique. Discord merges multiple embeds that share the same url into a
+    // single rendered "gallery" entry — so identical /shop links made 10 embeds per message collapse
+    // into one. The variation id keeps every link distinct (the shop page ignores the param).
+    const shopUrl = new URL("/shop", baseUrl());
+
+    if (details.id) {
+        shopUrl.searchParams.set("v", details.id);
+    }
+
     const embed = {
         title: details.name,
-        url: new URL("/shop", baseUrl()).toString(),
+        url: shopUrl.toString(),
         description: `${verb} at The Wolf Den${priceLine}`,
         color: EMBED_COLOR,
     };
