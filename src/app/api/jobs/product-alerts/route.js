@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { withRequestLogging } from "@/lib/server-logger";
 import { runProductAlertScan } from "@/lib/product-alerts/detection";
 import { runProductAlertDigest } from "@/lib/product-alerts/digest";
-import { postNewArrivalsToDiscord } from "@/lib/product-alerts/discord";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -29,11 +28,13 @@ export async function GET(request) {
                 return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             }
 
+            // Discord posting moved to the Square webhook (src/lib/product-alerts/webhook-discord.js)
+            // so arrivals broadcast immediately on a count increase. This cron now only drives the
+            // category opt-in email digest.
             const scan = await runProductAlertScan();
             const digest = await runProductAlertDigest();
-            const discord = await postNewArrivalsToDiscord();
 
-            return NextResponse.json({ success: true, scan, digest, discord });
+            return NextResponse.json({ success: true, scan, digest });
         } catch (error) {
             return internalError(error, { event: "product_alerts.job.run.failed" });
         }

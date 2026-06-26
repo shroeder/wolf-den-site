@@ -7,6 +7,7 @@ import {
     runMysteryWebhookProcessing,
 } from "@/lib/mystery-bags";
 import { INVENTORY_EVENT_TYPES, flagInventoryDirty } from "@/lib/product-alerts/state";
+import { postInventoryCountIncreaseToDiscord } from "@/lib/product-alerts/webhook-discord";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -85,9 +86,12 @@ export async function POST(request) {
 
         const eventType = getEventType(payload);
 
-        // Inventory/catalog changes drive new-arrival alerts, not mystery bags. Flag the
-        // product-alert state dirty (cheap) so the next cron tick scans, and return early — these
-        // events are unrelated to the mystery-bag order flow below.
+        // Inventory/catalog changes drive new-arrival alerts, not mystery bags. Two things happen
+        // here, then we return early — these events are unrelated to the mystery-bag order flow:
+        //   1. Flag the product-alert state dirty (cheap) so the email-digest cron scans next tick.
+        //   2. Post any count INCREASE straight to Discord (minimal logic, single-card price gate).
+        // Discord is best-effort: a failure there must not 500 the webhook, or Square would retry
+        // the whole event and the dirty flag would churn — so it's caught and logged, not rethrown.
         if (INVENTORY_EVENT_TYPES.has(eventType)) {
             try {
                 await flagInventoryDirty();
@@ -100,7 +104,20 @@ export async function POST(request) {
                 });
             }
 
-            return NextResponse.json({ success: true, eventType, flagged: true }, { status: 200 });
+            let discord = null;
+
+            try {
+                discord = await postInventoryCountIncreaseToDiscord({
+                    payload,
+                    eventId: getProviderEventId(payload),
+                });
+
+                logger.info("webhooks.square.product_alerts.discord", { eventType, ...discord });
+            } catch (error) {
+                logger.error("webhooks.square.product_alerts.discord_failure", error, { eventType });
+            }
+
+            return NextResponse.json({ success: true, eventType, flagged: true, discord }, { status: 200 });
         }
 
         try {

@@ -1186,6 +1186,52 @@ export async function getSquareCatalogObjectById(objectId) {
     return payload?.object || null;
 }
 
+/**
+ * Fetch just enough about a single variation to render a new-arrival message: display name, price,
+ * SKU (for the single-card gate), and image URL. One catalog call with include_related_objects=true
+ * pulls the parent ITEM (name/image_ids) and the IMAGE objects alongside the variation, so no second
+ * round-trip is needed. The lean per-variation counterpart to findShopItemByVariationId (which lists
+ * the entire catalog). Returns null if the id isn't an item variation.
+ */
+export async function getShopVariationDetails(variationId) {
+    const normalizedId = String(variationId || "").trim();
+
+    if (!normalizedId) {
+        return null;
+    }
+
+    const payload = await squareFetch(
+        `/v2/catalog/object/${normalizedId}?include_related_objects=true`
+    );
+    const object = payload?.object;
+
+    if (!object || object.type !== "ITEM_VARIATION") {
+        return null;
+    }
+
+    const related = payload?.related_objects || [];
+    const variationData = object.item_variation_data || {};
+    const parentItem =
+        related.find((o) => o.type === "ITEM" && o.id === variationData.item_id) ||
+        related.find((o) => o.type === "ITEM") ||
+        null;
+
+    const imageId = getCatalogImageId(parentItem || { item_data: {} }, object);
+    const imageUrl = imageId
+        ? related.find((o) => o.type === "IMAGE" && o.id === imageId)?.image_data?.url || null
+        : null;
+
+    const priceAmount = variationData.price_money?.amount;
+
+    return {
+        id: normalizedId,
+        name: toDisplayName(parentItem?.item_data?.name || "New Item", variationData.name),
+        price: typeof priceAmount === "number" ? normalizeMoney(priceAmount) : null,
+        sku: variationData.sku || null,
+        imageUrl,
+    };
+}
+
 export async function getSquareOrder(orderId) {
     const normalizedId = String(orderId || "").trim();
 
