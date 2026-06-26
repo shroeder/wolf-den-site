@@ -45,7 +45,7 @@ export default function EventsPage() {
                     )}
                     <p>{featured.description}</p>
                     <p>
-                        <strong>Seats are limited to {featured.signupLimit}.</strong> Reserve your spot online — pay at the door.
+                        <strong>Seats are limited to {featured.signupLimit}.</strong> Reserve your spot online — pay $5 in person when you arrive. Character creation starts promptly at 3:00 PM.
                     </p>
                     <a className="button primary" href={`/events/${featured.slug}`}>
                         Reserve Your Seat
