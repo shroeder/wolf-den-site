@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { events } from "@/lib/events";
-import { countRecentArrivals } from "@/lib/product-alerts/feed";
+import { countRecentChanges } from "@/lib/inventory-feed/feed";
 
 const categories = ["Pokemon", "Magic", "Singles", "Accessories", "Events"];
 const featuredEvents = events.slice(0, 3);
@@ -29,7 +29,7 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-    const justInCount = await countRecentArrivals({ windowHours: 24 });
+    const justInCount = await countRecentChanges({ windowHours: 24 });
     const justInCountLabel =
         justInCount > 0
             ? `${justInCount} fresh ${justInCount === 1 ? "item" : "items"} scanned in over the last 24 hours.`

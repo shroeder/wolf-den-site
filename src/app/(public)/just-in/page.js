@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { listRecentArrivals } from "@/lib/product-alerts/feed";
+import { listRecentChanges } from "@/lib/inventory-feed/feed";
 
 export const metadata = {
     title: "Just In — New Arrivals at The Wolf Den",
@@ -50,7 +50,7 @@ const relativeTime = (iso) => {
 };
 
 export default async function JustInPage() {
-    const items = await listRecentArrivals({ windowHours: FEED_WINDOW_HOURS }).catch(() => []);
+    const items = await listRecentChanges({ windowHours: FEED_WINDOW_HOURS }).catch(() => []);
 
     return (
         <div className="stack reveal">
@@ -75,16 +75,23 @@ export default async function JustInPage() {
                 <section className="card">
                     <div className="shop-grid just-in-grid" aria-label="Recently scanned-in items">
                         {items.map((item) => {
-                            const isRestock = item.kind === "restock";
+                            const badgeLabel =
+                                item.kind === "restock"
+                                    ? "Back in stock"
+                                    : item.kind === "price_drop"
+                                      ? "Price drop"
+                                      : "New";
+                            const badgeModifier =
+                                item.kind === "restock"
+                                    ? " just-in-badge-restock"
+                                    : item.kind === "price_drop"
+                                      ? " just-in-badge-price-drop"
+                                      : "";
 
                             return (
                                 <article key={item.id} className="shop-tile just-in-tile">
                                     <div className="shop-tile-image-wrap">
-                                        <span
-                                            className={`just-in-badge${isRestock ? " just-in-badge-restock" : ""}`}
-                                        >
-                                            {isRestock ? "Back in stock" : "New"}
-                                        </span>
+                                        <span className={`just-in-badge${badgeModifier}`}>{badgeLabel}</span>
                                         {item.imageUrl ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img

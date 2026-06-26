@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { syncStockIncreasesToDiscord } from "@/lib/product-alerts/webhook-discord";
+import { reconcileInventory } from "@/lib/inventory-feed/reconcile";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * Admin-triggered Discord catch-up. Hit from the accounting app ("Sync arrivals" button) to post any
- * in-stock item whose Square count is higher than our last-known value — the same quantity-increase
- * trigger as the live webhook, swept across the catalog. Recovers increases the live webhook missed.
- * Same single-card $50 gate; idempotent (records the new counts), so it's safe to press repeatedly.
+ * Admin-triggered reconcile, hit from the accounting app's New-Arrival Alerts screen. Runs the same
+ * unified reconcile as the cron/webhook: diffs current Square stock and posts new items / restocks /
+ * price drops to Discord (no gate). ?force=1 re-posts recent changes even if already broadcast (the
+ * "Re-post recent" button), for correcting a botched send.
  *
- * Auth via requireAdminAccess (same as the other /api/admin/* routes the app calls): accepts a staff
- * session with remediations.run, or the legacy shared ADMIN_API_KEY the app sends today.
+ * Auth via requireAdminAccess (same as the other /api/admin/* routes the app calls): a staff session
+ * with remediations.run, or the legacy shared ADMIN_API_KEY the app sends today.
+ *
+ * Response keeps the field names the app already parses: posted / gated / considered / skipped.
  */
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/admin/product-alerts/backfill", async ({ logger, internalError }) => {
@@ -25,18 +27,30 @@ export async function POST(request) {
         }
 
         try {
-            const url = new URL(request.url);
-            const daysParam = Number(url.searchParams.get("days"));
-            const lookbackDays = Number.isFinite(daysParam) && daysParam > 0 ? daysParam : 14;
-            const forceRepost = ["1", "true", "yes"].includes((url.searchParams.get("force") || "").toLowerCase());
+            const force = ["1", "true", "yes"].includes(
+                (new URL(request.url).searchParams.get("force") || "").toLowerCase()
+            );
 
-            const result = await syncStockIncreasesToDiscord({ lookbackDays, forceRepost });
+            const result = await reconcileInventory({ force });
 
-            logger.info("admin.product_alerts.sync.done", { ...result });
+            logger.info("admin.inventory_feed.reconcile.done", { force, ...result });
 
-            return NextResponse.json({ success: true, ...result }, { headers: { "Cache-Control": "no-store" } });
+            return NextResponse.json(
+                {
+                    success: true,
+                    posted: result.posted,
+                    gated: 0,
+                    considered: result.items,
+                    skipped: result.discordSkipped || result.seeding || false,
+                    new: result.new,
+                    restock: result.restock,
+                    priceDrop: result.priceDrop,
+                    seeding: result.seeding,
+                },
+                { headers: { "Cache-Control": "no-store" } }
+            );
         } catch (error) {
-            return internalError(error, { event: "admin.product_alerts.sync.failure" });
+            return internalError(error, { event: "admin.inventory_feed.reconcile.failure" });
         }
     });
 }
