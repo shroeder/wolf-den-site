@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
-import { getShopVariationDetails, listShopInventory } from "@/lib/consignment/square";
+import { getInStockIncreaseTimes, getShopVariationDetails, listShopInventory } from "@/lib/consignment/square";
 import { SITE_URL } from "@/lib/site";
 
 const logger = createServerLogger({ source: "webhook", subsystem: "product-alerts-discord" });
@@ -249,14 +249,14 @@ export async function postInventoryCountIncreaseToDiscord({ payload, eventId }) 
 }
 
 /**
- * Manual catch-up: sweep current Square stock and post any variation whose on-hand count is HIGHER
- * than our last-known value — the same "quantity went up" trigger as the live webhook, just run as a
- * batch. Use it to reconcile increases the live webhook missed (e.g. before the
- * inventory.count.updated subscription was active, or during an outage). The single-card $50 gate
- * still applies; sealed/supplies always post. Idempotent: it records the new counts as it goes, so a
- * second run finds nothing changed. Embeds batch 10 per message.
+ * Manual catch-up driven by SQUARE'S OWN inventory-change history (not any local snapshot, which is
+ * unreliable as a baseline). Asks Square which variations actually had an in-stock increase in the
+ * last `lookbackDays`, then posts the ones currently in stock whose increase is newer than the last
+ * time we announced that variation. Single-card $50 gate still applies; sealed/supplies always post.
+ * Idempotent: dedupes by comparing Square's increase timestamp to our last-announced time, so a
+ * second run (or an item the live webhook already posted) sends nothing. Embeds batch 10 per message.
  */
-export async function syncStockIncreasesToDiscord() {
+export async function syncStockIncreasesToDiscord({ lookbackDays = 14 } = {}) {
     const webhookUrl = process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
 
     if (!webhookUrl) {
@@ -265,10 +265,21 @@ export async function syncStockIncreasesToDiscord() {
         return { skipped: true, reason: "not_configured" };
     }
 
-    const inventory = await listShopInventory();
-    const minPrice = singleMinPrice();
+    const days = Number.isFinite(lookbackDays) && lookbackDays > 0 ? lookbackDays : 14;
+    const updatedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    // Current in-stock counts, one entry per variation (a variation can span categories).
+    // 1. Source of truth: variations Square recorded an in-stock increase for, with the latest time.
+    const increaseTimes = await getInStockIncreaseTimes(updatedAfter);
+
+    if (increaseTimes.size === 0) {
+        logger.info("product_alerts.sync.no_increases", { days });
+
+        return { posted: 0, gated: 0, considered: 0 };
+    }
+
+    // 2. Current in-stock details for just those variations (confirms still in stock; gives
+    //    name/price/sku/image). Sold-out-again variations are dropped here.
+    const inventory = await listShopInventory();
     const current = new Map();
 
     for (const category of inventory) {
@@ -277,30 +288,40 @@ export async function syncStockIncreasesToDiscord() {
         }
 
         for (const item of category.items || []) {
-            if (!(item.quantity > 0) || current.has(item.id)) {
-                continue;
+            if (item.quantity > 0 && increaseTimes.has(item.id) && !current.has(item.id)) {
+                current.set(item.id, item);
             }
-
-            current.set(item.id, item);
         }
     }
 
-    // Last-known counts (the same baseline the live webhook maintains).
-    const storedRows = await db.query(`SELECT variation_id, quantity FROM discord_alert_inventory`);
-    const stored = new Map(
-        storedRows.map((row) => [row.variation_id, row.quantity == null ? 0 : Number(row.quantity)])
+    if (current.size === 0) {
+        logger.info("product_alerts.sync.no_in_stock_increases", { days });
+
+        return { posted: 0, gated: 0, considered: 0 };
+    }
+
+    // 3. Last time we announced each of these, to skip increases we've already handled (whether by a
+    //    prior sync or the live webhook).
+    const variationIds = Array.from(current.keys());
+    const actedRows = await db.query(
+        `SELECT variation_id, last_posted_at FROM discord_alert_inventory WHERE variation_id = ANY($1::text[])`,
+        [variationIds]
+    );
+    const lastActed = new Map(
+        actedRows.map((row) => [row.variation_id, row.last_posted_at ? new Date(row.last_posted_at).getTime() : null])
     );
 
-    // Decide what to post: any current count strictly above last-known, minus gated singles. Gated
-    // singles still get their new count recorded so they aren't reconsidered on every run.
+    const minPrice = singleMinPrice();
     const toPost = [];
+    const handledGated = [];
     let gated = 0;
 
     for (const [variationId, item] of current) {
-        const cur = Number(item.quantity) || 0;
-        const prev = stored.get(variationId) ?? 0;
+        const increasedAt = increaseTimes.get(variationId);
+        const actedAt = lastActed.get(variationId) ?? null;
 
-        if (cur <= prev) {
+        // Already announced an increase at/after this one — nothing new to say.
+        if (actedAt != null && increasedAt <= actedAt) {
             continue;
         }
 
@@ -308,25 +329,31 @@ export async function syncStockIncreasesToDiscord() {
 
         if (isSingleSku(item.sku) && !(price !== null && price >= minPrice)) {
             gated += 1;
-            await db.query(
-                `INSERT INTO discord_alert_inventory (variation_id, quantity, updated_at)
-                 VALUES ($1, $2, NOW())
-                 ON CONFLICT (variation_id) DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW()`,
-                [variationId, cur]
-            );
+            handledGated.push({ variationId, quantity: Number(item.quantity) || 0 });
             continue;
         }
 
         toPost.push({
             variationId,
-            quantity: cur,
-            isNew: prev === 0,
+            quantity: Number(item.quantity) || 0,
+            isNew: actedAt == null,
             details: { id: variationId, name: item.name, price, imageUrl: item.imageUrl || null },
         });
     }
 
-    // Post in batches of 10. Record the new count + announce time only AFTER a chunk sends, so a
-    // failed send is retried on the next run rather than silently skipped.
+    // Record gated singles as handled (stamp last_posted_at) so this same increase isn't re-counted.
+    for (const entry of handledGated) {
+        await db.query(
+            `INSERT INTO discord_alert_inventory (variation_id, quantity, last_posted_at, updated_at)
+             VALUES ($1, $2, NOW(), NOW())
+             ON CONFLICT (variation_id) DO UPDATE SET
+                quantity = EXCLUDED.quantity, last_posted_at = NOW(), updated_at = NOW()`,
+            [entry.variationId, entry.quantity]
+        );
+    }
+
+    // Post in batches of 10. Stamp last_posted_at only AFTER a chunk sends, so a failed send retries
+    // on the next run rather than being silently marked handled.
     let posted = 0;
 
     for (let i = 0; i < toPost.length; i += MAX_EMBEDS_PER_MESSAGE) {
@@ -365,17 +392,7 @@ export async function syncStockIncreasesToDiscord() {
         }
     }
 
-    // Re-arm sold-out items: anything we knew as in-stock but that's no longer in the current set
-    // drops to 0, so a future restock reads as an increase again.
-    const currentIds = Array.from(current.keys());
-
-    await db.query(
-        `UPDATE discord_alert_inventory SET quantity = 0, updated_at = NOW()
-         WHERE quantity > 0 AND NOT (variation_id = ANY($1::text[]))`,
-        [currentIds]
-    );
-
-    logger.info("product_alerts.sync.completed", { considered: current.size, posted, gated });
+    logger.info("product_alerts.sync.completed", { days, considered: current.size, posted, gated });
 
     return { posted, gated, considered: current.size };
 }

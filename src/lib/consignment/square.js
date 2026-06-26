@@ -1232,6 +1232,78 @@ export async function getShopVariationDetails(variationId) {
     };
 }
 
+/**
+ * Per-variation IN-STOCK increase timestamps from Square's own inventory-change history (the source
+ * of truth for "what counts went up", rather than any local snapshot). Pulls ADJUSTMENT and
+ * PHYSICAL_COUNT changes at our location since `updatedAfter` (ISO string) and returns a Map of
+ * variationId -> latest occurred-at epoch ms for changes that ADDED in-stock quantity:
+ *   - ADJUSTMENT with to_state === "IN_STOCK" and quantity > 0 (stock received / returned), or
+ *   - PHYSICAL_COUNT setting state "IN_STOCK" (a manual recount that establishes on-hand).
+ * Sales (to_state SOLD) and other decreases are ignored. Paginates via cursor.
+ */
+export async function getInStockIncreaseTimes(updatedAfter) {
+    const locationId = getSquareLocationId();
+    const latestByVariation = new Map();
+    let cursor = null;
+
+    do {
+        const body = {
+            location_ids: [locationId],
+            types: ["ADJUSTMENT", "PHYSICAL_COUNT"],
+            updated_after: updatedAfter,
+        };
+
+        if (cursor) {
+            body.cursor = cursor;
+        }
+
+        const payload = await squareFetch("/v2/inventory/changes/batch-retrieve", {
+            method: "POST",
+            body: JSON.stringify(body),
+        });
+
+        for (const change of payload.changes || []) {
+            let variationId = null;
+            let occurredAt = null;
+            let isIncrease = false;
+
+            if (change.type === "ADJUSTMENT" && change.adjustment) {
+                const adjustment = change.adjustment;
+
+                variationId = adjustment.catalog_object_id;
+                occurredAt = adjustment.occurred_at;
+                isIncrease = adjustment.to_state === "IN_STOCK" && Number(adjustment.quantity) > 0;
+            } else if (change.type === "PHYSICAL_COUNT" && change.physical_count) {
+                const physicalCount = change.physical_count;
+
+                variationId = physicalCount.catalog_object_id;
+                occurredAt = physicalCount.occurred_at;
+                isIncrease = physicalCount.state === "IN_STOCK";
+            }
+
+            if (!isIncrease || !variationId || !occurredAt) {
+                continue;
+            }
+
+            const occurredMs = new Date(occurredAt).getTime();
+
+            if (Number.isNaN(occurredMs)) {
+                continue;
+            }
+
+            const prior = latestByVariation.get(variationId);
+
+            if (prior == null || occurredMs > prior) {
+                latestByVariation.set(variationId, occurredMs);
+            }
+        }
+
+        cursor = payload.cursor || null;
+    } while (cursor);
+
+    return latestByVariation;
+}
+
 export async function getSquareOrder(orderId) {
     const normalizedId = String(orderId || "").trim();
 
