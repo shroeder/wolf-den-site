@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 import { runProductAlertScan } from "@/lib/product-alerts/detection";
 import { runProductAlertDigest } from "@/lib/product-alerts/digest";
+import { backfillRecentArrivalsToDiscord } from "@/lib/product-alerts/webhook-discord";
+
+// Sentinel key in discord_alert_events marking that the one-time post-rewrite reconciliation has
+// run, so the bootstrap below fires exactly once across all cron ticks.
+const BACKFILL_SENTINEL = "backfill:bootstrap";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -34,7 +40,37 @@ export async function GET(request) {
             const scan = await runProductAlertScan();
             const digest = await runProductAlertDigest();
 
-            return NextResponse.json({ success: true, scan, digest });
+            // One-shot Discord reconciliation: on the first tick after the webhook-direct rewrite
+            // deployed, announce recent in-stock arrivals the old cron/category path silently
+            // dropped. Guarded by a sentinel so it runs exactly once, and the sentinel is only set
+            // when the backfill actually ran (not when it skipped for a missing webhook URL), so it
+            // retries until Discord is configured. Isolated in try/catch so it can never break the
+            // email digest. Safe to delete this block later — the sentinel keeps it inert regardless.
+            let backfill = null;
+
+            try {
+                const done = await db.query(
+                    `SELECT 1 FROM discord_alert_events WHERE event_id = $1`,
+                    [BACKFILL_SENTINEL]
+                );
+
+                if (!done.length) {
+                    backfill = await backfillRecentArrivalsToDiscord({ lookbackHours: 168 });
+
+                    if (!backfill.skipped) {
+                        await db.query(
+                            `INSERT INTO discord_alert_events (event_id) VALUES ($1) ON CONFLICT (event_id) DO NOTHING`,
+                            [BACKFILL_SENTINEL]
+                        );
+                    }
+                }
+            } catch (error) {
+                logger.warn("product_alerts.backfill.bootstrap_failed", {
+                    reason: error instanceof Error ? error.message : "unknown_error",
+                });
+            }
+
+            return NextResponse.json({ success: true, scan, digest, backfill });
         } catch (error) {
             return internalError(error, { event: "product_alerts.job.run.failed" });
         }
