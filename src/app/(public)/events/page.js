@@ -11,6 +11,8 @@ export const metadata = {
 };
 
 export default function EventsPage() {
+    const featured = events.find((event) => event.oneShot);
+
     return (
         <div className="stack reveal">
             <section className="card hero-accent">
@@ -23,6 +25,34 @@ export default function EventsPage() {
                 </p>
             </section>
 
+            {featured && (
+                <section className="card hero-accent">
+                    <p className="muted">Special Event</p>
+                    <h2>{featured.title}</h2>
+                    <p className="muted">
+                        {featured.day} • {featured.time} • {featured.entryFee}
+                    </p>
+                    {featured.image && (
+                        <Image
+                            src={featured.image.src}
+                            alt={featured.image.alt}
+                            width={featured.image.width}
+                            height={featured.image.height}
+                            sizes="(max-width: 900px) 100vw, 70vw"
+                            className="content-photo"
+                            priority
+                        />
+                    )}
+                    <p>{featured.description}</p>
+                    <p>
+                        <strong>Seats are limited to {featured.signupLimit}.</strong> Reserve your spot online — pay at the door.
+                    </p>
+                    <a className="button primary" href={`/events/${featured.slug}`}>
+                        Reserve Your Seat
+                    </a>
+                </section>
+            )}
+
             <section className="card">
                 <h2>Weekly Event Schedule</h2>
                 <p>
@@ -32,7 +62,7 @@ export default function EventsPage() {
             </section>
 
             <section className="grid two-col">
-                {events.map((event) => (
+                {events.filter((event) => !event.oneShot).map((event) => (
                     <article key={event.slug} className="card lift">
                         <h2>{event.title}</h2>
                         <p className="muted">

@@ -80,7 +80,7 @@ export default async function EventDetailPage({ params }) {
         },
         offers: {
             "@type": "Offer",
-            price: event.entryFee === "Free" ? "0" : undefined,
+            price: event.entryFee === "Free" ? "0" : event.priceUsd,
             priceCurrency: "USD",
             availability: "https://schema.org/InStock",
             url: `${SITE_URL}/events/${event.slug}`,
@@ -104,7 +104,7 @@ export default async function EventDetailPage({ params }) {
         }
     }
 
-    if (event.entryFee !== "Free") {
+    if (!eventSchema.offers.price) {
         delete eventSchema.offers.price;
     }
 

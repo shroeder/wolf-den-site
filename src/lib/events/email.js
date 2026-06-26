@@ -37,6 +37,10 @@ export async function sendEventSignupConfirmationEmail({
     const safeTitle = escapeHtml(event.title);
     const safeDay = escapeHtml(event.day || "See event page");
     const safeTime = escapeHtml(event.time || "See event page");
+    const hasEntryFee = event.entryFee && event.entryFee !== "Free";
+    const feeRow = hasEntryFee
+        ? `<p style="margin:8px 0 0;"><strong>Entry fee:</strong> ${escapeHtml(event.entryFee)}</p>`
+        : "";
 
     const result = await resend.emails.send({
         from: "The Wolf Den <portal@wolfdengamingmn.com>",
@@ -59,6 +63,7 @@ export async function sendEventSignupConfirmationEmail({
                             <p style="margin:0 0 8px;"><strong>Time:</strong> ${safeTime}</p>
                             <p style="margin:0 0 8px;"><strong>Your seat:</strong> #${slotNumber}</p>
                             <p style="margin:0;"><strong>Spots left:</strong> ${seatsRemaining} of ${capacity}</p>
+                            ${feeRow}
                         </div>
 
                         <p style="margin:16px 0 0;">
