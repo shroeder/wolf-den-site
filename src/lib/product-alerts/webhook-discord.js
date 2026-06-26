@@ -20,8 +20,6 @@ const TCG_SINGLE_SKU_PATTERN = /^TCG-\d+$/i;
 const MAX_EMBEDS_PER_MESSAGE = 10;
 // Synthetic pseudo-category appended by listShopInventory (duplicates of real categories).
 const SYNTHETIC_CATEGORY_ID = "new-just-in";
-// Default reconciliation window: the last 7 days of arrivals.
-const DEFAULT_BACKFILL_LOOKBACK_HOURS = 168;
 
 function singleMinPrice() {
     const parsed = Number(process.env.DISCORD_SINGLE_MIN_PRICE);
@@ -251,28 +249,27 @@ export async function postInventoryCountIncreaseToDiscord({ payload, eventId }) 
 }
 
 /**
- * One-time reconciliation: announce recent arrivals that the broken cron/category path silently
- * dropped. Scans current Square inventory and posts in-stock variations created within the lookback
- * window, applying the same single-card price gate. Idempotent — a variation already announced (by
- * the live webhook or a prior backfill run, i.e. last_posted_at IS NOT NULL) is skipped, and each
- * post stamps last_posted_at so re-running is safe. Embeds are batched 10 per message.
+ * Manual catch-up: sweep current Square stock and post any variation whose on-hand count is HIGHER
+ * than our last-known value — the same "quantity went up" trigger as the live webhook, just run as a
+ * batch. Use it to reconcile increases the live webhook missed (e.g. before the
+ * inventory.count.updated subscription was active, or during an outage). The single-card $50 gate
+ * still applies; sealed/supplies always post. Idempotent: it records the new counts as it goes, so a
+ * second run finds nothing changed. Embeds batch 10 per message.
  */
-export async function backfillRecentArrivalsToDiscord({ lookbackHours = DEFAULT_BACKFILL_LOOKBACK_HOURS } = {}) {
+export async function syncStockIncreasesToDiscord() {
     const webhookUrl = process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
 
     if (!webhookUrl) {
-        logger.info("product_alerts.backfill.skipped", { reason: "not_configured" });
+        logger.info("product_alerts.sync.skipped", { reason: "not_configured" });
 
         return { skipped: true, reason: "not_configured" };
     }
 
-    const hours = Number.isFinite(lookbackHours) && lookbackHours > 0 ? lookbackHours : DEFAULT_BACKFILL_LOOKBACK_HOURS;
     const inventory = await listShopInventory();
-    const cutoffMs = Date.now() - hours * 60 * 60 * 1000;
     const minPrice = singleMinPrice();
 
-    // Collapse to one entry per variation (a variation can appear under several categories).
-    const byVariation = new Map();
+    // Current in-stock counts, one entry per variation (a variation can span categories).
+    const current = new Map();
 
     for (const category of inventory) {
         if (category.id === SYNTHETIC_CATEGORY_ID) {
@@ -280,33 +277,30 @@ export async function backfillRecentArrivalsToDiscord({ lookbackHours = DEFAULT_
         }
 
         for (const item of category.items || []) {
-            if (!(item.quantity > 0) || byVariation.has(item.id)) {
+            if (!(item.quantity > 0) || current.has(item.id)) {
                 continue;
             }
 
-            const createdMs = Date.parse(item.createdAt || "");
-
-            if (Number.isNaN(createdMs) || createdMs < cutoffMs) {
-                continue;
-            }
-
-            byVariation.set(item.id, item);
+            current.set(item.id, item);
         }
     }
 
-    // Filter out already-announced and gated items, building the list of products to post.
+    // Last-known counts (the same baseline the live webhook maintains).
+    const storedRows = await db.query(`SELECT variation_id, quantity FROM discord_alert_inventory`);
+    const stored = new Map(
+        storedRows.map((row) => [row.variation_id, row.quantity == null ? 0 : Number(row.quantity)])
+    );
+
+    // Decide what to post: any current count strictly above last-known, minus gated singles. Gated
+    // singles still get their new count recorded so they aren't reconsidered on every run.
     const toPost = [];
     let gated = 0;
-    let alreadyPosted = 0;
 
-    for (const [variationId, item] of byVariation) {
-        const prior = await db.queryOne(
-            `SELECT last_posted_at FROM discord_alert_inventory WHERE variation_id = $1`,
-            [variationId]
-        );
+    for (const [variationId, item] of current) {
+        const cur = Number(item.quantity) || 0;
+        const prev = stored.get(variationId) ?? 0;
 
-        if (prior && prior.last_posted_at) {
-            alreadyPosted += 1;
+        if (cur <= prev) {
             continue;
         }
 
@@ -314,30 +308,39 @@ export async function backfillRecentArrivalsToDiscord({ lookbackHours = DEFAULT_
 
         if (isSingleSku(item.sku) && !(price !== null && price >= minPrice)) {
             gated += 1;
+            await db.query(
+                `INSERT INTO discord_alert_inventory (variation_id, quantity, updated_at)
+                 VALUES ($1, $2, NOW())
+                 ON CONFLICT (variation_id) DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW()`,
+                [variationId, cur]
+            );
             continue;
         }
 
         toPost.push({
             variationId,
-            quantity: Number(item.quantity) || 0,
+            quantity: cur,
+            isNew: prev === 0,
             details: { id: variationId, name: item.name, price, imageUrl: item.imageUrl || null },
         });
     }
 
+    // Post in batches of 10. Record the new count + announce time only AFTER a chunk sends, so a
+    // failed send is retried on the next run rather than silently skipped.
     let posted = 0;
 
     for (let i = 0; i < toPost.length; i += MAX_EMBEDS_PER_MESSAGE) {
         const chunk = toPost.slice(i, i + MAX_EMBEDS_PER_MESSAGE);
-        const message = { embeds: chunk.map((entry) => buildEmbed(entry.details, true)) };
+        const message = { embeds: chunk.map((entry) => buildEmbed(entry.details, entry.isNew)) };
 
         if (i === 0) {
-            message.content = "✨ Catching up on recent arrivals at The Wolf Den:";
+            message.content = "✨ Catching up on arrivals at The Wolf Den:";
         }
 
         try {
             await postMessage(webhookUrl, message);
         } catch (error) {
-            logger.warn("product_alerts.backfill.post_failed", {
+            logger.warn("product_alerts.sync.post_failed", {
                 postedSoFar: posted,
                 reason: error instanceof Error ? error.message : "unknown_error",
             });
@@ -345,13 +348,12 @@ export async function backfillRecentArrivalsToDiscord({ lookbackHours = DEFAULT_
             break;
         }
 
-        // Stamp each announced variation (and ensure a qty row exists) so future increases are
-        // measured from here and a re-run won't repost.
         for (const entry of chunk) {
             await db.query(
                 `INSERT INTO discord_alert_inventory (variation_id, quantity, last_posted_at, updated_at)
                  VALUES ($1, $2, NOW(), NOW())
-                 ON CONFLICT (variation_id) DO UPDATE SET last_posted_at = NOW(), updated_at = NOW()`,
+                 ON CONFLICT (variation_id) DO UPDATE SET
+                    quantity = EXCLUDED.quantity, last_posted_at = NOW(), updated_at = NOW()`,
                 [entry.variationId, entry.quantity]
             );
         }
@@ -363,13 +365,17 @@ export async function backfillRecentArrivalsToDiscord({ lookbackHours = DEFAULT_
         }
     }
 
-    logger.info("product_alerts.backfill.completed", {
-        considered: byVariation.size,
-        posted,
-        gated,
-        alreadyPosted,
-        lookbackHours: hours,
-    });
+    // Re-arm sold-out items: anything we knew as in-stock but that's no longer in the current set
+    // drops to 0, so a future restock reads as an increase again.
+    const currentIds = Array.from(current.keys());
 
-    return { posted, gated, alreadyPosted, considered: byVariation.size, lookbackHours: hours };
+    await db.query(
+        `UPDATE discord_alert_inventory SET quantity = 0, updated_at = NOW()
+         WHERE quantity > 0 AND NOT (variation_id = ANY($1::text[]))`,
+        [currentIds]
+    );
+
+    logger.info("product_alerts.sync.completed", { considered: current.size, posted, gated });
+
+    return { posted, gated, considered: current.size };
 }
