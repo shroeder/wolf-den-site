@@ -108,35 +108,71 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
 }
 
 /**
- * Authoritative "cards that went out the door" — every card the system has marked sold (across all
- * pack-price eras), with its market value. This is what the Mystery Pack Report uses for value-out,
- * replacing the phone app's local snapshot list. Sold status is set when a card is assigned to a sale
- * (see assignCardsToSoldEvent), so this is barcode-driven and device-independent.
+ * Authoritative "what sold in mystery packs" — driven off mystery_sold_events (the record of every
+ * pack sale Square reported), NOT off mystery_bag_cards.status. The old version only listed cards
+ * whose status flipped to 'sold', so any recorded pack sale that never got assigned to a card row
+ * was silently invisible. This version starts from the sale events and resolves each to its card:
+ *
+ *   Part A — exact match: events that were assigned to a specific card (mystery_sold_assignments).
+ *            This is the precise "which card sold," carrying the real sold_at from the event.
+ *   Part B — fallback: events with no assignment, resolved by sold_pack_variation_id against the
+ *            packed/source variation on mystery_bag_cards. If even that misses, the row still shows
+ *            using the event's own sold_pack_item_name (price/image just come back empty).
+ *
+ * Result: every recorded pack sale appears, with card image/price/name whenever we can resolve it.
  */
 export async function listMysterySoldCards() {
     const rows = await db.query(
-        `SELECT id,
-                card_id,
-                square_variation_id,
-                card_name,
-                set_name,
-                card_number,
-                market_value,
-                image_url,
-                sold_at,
-                created_at
-         FROM mystery_bag_cards
-         WHERE status = 'sold'
-         ORDER BY market_value DESC, sold_at DESC NULLS LAST`
+        `SELECT card_id, square_variation_id, card_name, set_name, card_number, market_value, image_url, sold_at, created_at
+         FROM (
+             -- Part A: events assigned to a specific card (one row per assigned card)
+             SELECT c.card_id,
+                    c.square_variation_id,
+                    c.card_name,
+                    c.set_name,
+                    c.card_number,
+                    c.market_value,
+                    c.image_url,
+                    e.sold_at,
+                    e.created_at
+             FROM mystery_sold_assignments a
+             JOIN mystery_sold_events e ON e.id = a.sold_event_id
+             JOIN mystery_bag_cards c ON c.id = a.mystery_card_id
+
+             UNION ALL
+
+             -- Part B: events with no assignment, resolved by variation (else event name only)
+             SELECT NULL::text AS card_id,
+                    e.sold_pack_variation_id AS square_variation_id,
+                    COALESCE(c.card_name, e.sold_pack_item_name, 'Mystery Pack') AS card_name,
+                    c.set_name,
+                    c.card_number,
+                    c.market_value,
+                    c.image_url,
+                    e.sold_at,
+                    e.created_at
+             FROM mystery_sold_events e
+             LEFT JOIN LATERAL (
+                 SELECT mbc.card_name, mbc.set_name, mbc.card_number, mbc.market_value, mbc.image_url
+                 FROM mystery_bag_cards mbc
+                 WHERE mbc.packed_variation_id = e.sold_pack_variation_id
+                    OR mbc.square_variation_id = e.sold_pack_variation_id
+                 ORDER BY mbc.market_value DESC NULLS LAST
+                 LIMIT 1
+             ) c ON TRUE
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM mystery_sold_assignments a WHERE a.sold_event_id = e.id
+             )
+         ) sold
+         ORDER BY sold_at DESC NULLS LAST, created_at DESC`
     );
 
     return rows.map((row) => ({
-        id: row.id,
-        cardId: row.card_id,
+        cardId: row.card_id || null,
         squareVariationId: row.square_variation_id || null,
         name: row.card_name,
-        set: row.set_name,
-        number: row.card_number,
+        set: row.set_name || null,
+        number: row.card_number || null,
         marketValue: toMoneyNumber(row.market_value),
         imageUrl: row.image_url || null,
         soldAt: toIso(row.sold_at),
