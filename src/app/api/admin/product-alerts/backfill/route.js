@@ -25,10 +25,12 @@ export async function POST(request) {
         }
 
         try {
-            const daysParam = Number(new URL(request.url).searchParams.get("days"));
+            const url = new URL(request.url);
+            const daysParam = Number(url.searchParams.get("days"));
             const lookbackDays = Number.isFinite(daysParam) && daysParam > 0 ? daysParam : 14;
+            const forceRepost = ["1", "true", "yes"].includes((url.searchParams.get("force") || "").toLowerCase());
 
-            const result = await syncStockIncreasesToDiscord({ lookbackDays });
+            const result = await syncStockIncreasesToDiscord({ lookbackDays, forceRepost });
 
             logger.info("admin.product_alerts.sync.done", { ...result });
 

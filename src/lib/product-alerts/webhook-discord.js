@@ -265,7 +265,7 @@ export async function postInventoryCountIncreaseToDiscord({ payload, eventId }) 
  * Idempotent: dedupes by comparing Square's increase timestamp to our last-announced time, so a
  * second run (or an item the live webhook already posted) sends nothing. Embeds batch 10 per message.
  */
-export async function syncStockIncreasesToDiscord({ lookbackDays = 14 } = {}) {
+export async function syncStockIncreasesToDiscord({ lookbackDays = 14, forceRepost = false } = {}) {
     const webhookUrl = process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
 
     if (!webhookUrl) {
@@ -329,8 +329,9 @@ export async function syncStockIncreasesToDiscord({ lookbackDays = 14 } = {}) {
         const increasedAt = increaseTimes.get(variationId);
         const actedAt = lastActed.get(variationId) ?? null;
 
-        // Already announced an increase at/after this one — nothing new to say.
-        if (actedAt != null && increasedAt <= actedAt) {
+        // Already announced an increase at/after this one — nothing new to say. forceRepost ignores
+        // this (one-time corrective re-post of everything currently in stock that increased in window).
+        if (!forceRepost && actedAt != null && increasedAt <= actedAt) {
             continue;
         }
 
