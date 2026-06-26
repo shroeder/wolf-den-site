@@ -22,7 +22,37 @@ function formatPrice(value) {
     return priceFormatter.format(Number(value));
 }
 
-function CardTile({ card, inList, busy, onAdd, onRemove }) {
+const MAX_QUANTITY = 99;
+
+function QtyStepper({ quantity, busy, onChange }) {
+    return (
+        <div className="lf-qty" role="group" aria-label="Quantity wanted">
+            <button
+                type="button"
+                className="lf-qty-btn"
+                disabled={busy || quantity <= 1}
+                onClick={() => onChange(quantity - 1)}
+                aria-label="Want one fewer"
+            >
+                −
+            </button>
+            <span className="lf-qty-value" aria-live="polite">
+                {quantity}
+            </span>
+            <button
+                type="button"
+                className="lf-qty-btn"
+                disabled={busy || quantity >= MAX_QUANTITY}
+                onClick={() => onChange(quantity + 1)}
+                aria-label="Want one more"
+            >
+                +
+            </button>
+        </div>
+    );
+}
+
+function CardTile({ card, inList, quantity, busy, onAdd, onRemove, onQuantityChange }) {
     const inStock = card.stockQuantity > 0;
 
     return (
@@ -55,9 +85,16 @@ function CardTile({ card, inList, busy, onAdd, onRemove }) {
                 <p className="lf-card-price">{formatPrice(card.marketPrice)}</p>
             </div>
             {inList ? (
-                <button type="button" className="pill" disabled={busy} onClick={() => onRemove(card.id)}>
-                    Remove
-                </button>
+                <div className="lf-card-actions">
+                    <QtyStepper
+                        quantity={quantity}
+                        busy={busy}
+                        onChange={(next) => onQuantityChange(card.id, next)}
+                    />
+                    <button type="button" className="pill" disabled={busy} onClick={() => onRemove(card.id)}>
+                        Remove
+                    </button>
+                </div>
             ) : (
                 <button type="button" className="button primary" disabled={busy} onClick={() => onAdd(card.id)}>
                     Add to list
@@ -144,6 +181,10 @@ export default function LookingForClient() {
     }, [searchParams]);
 
     const listIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+    const quantityById = useMemo(
+        () => new Map(items.map((item) => [item.id, item.quantity ?? 1])),
+        [items]
+    );
     const searchAbortRef = useRef(null);
     const autoOpenedRef = useRef(false);
 
@@ -291,6 +332,29 @@ export default function LookingForClient() {
                     setListOpen(true);
                     autoOpenedRef.current = true;
                 }
+            }
+        } finally {
+            setPendingCardId(null);
+        }
+    }, [applyListResponse]);
+
+    const updateQuantity = useCallback(async (cardId, quantity) => {
+        const next = Math.max(1, Math.min(MAX_QUANTITY, Math.trunc(quantity)));
+
+        // Optimistic: reflect the new count immediately, then reconcile with the server response.
+        setItems((prev) => prev.map((item) => (item.id === cardId ? { ...item, quantity: next } : item)));
+        setPendingCardId(cardId);
+
+        try {
+            const response = await fetch("/api/looking-for/list", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ cardId, quantity: next }),
+            });
+            const data = await response.json().catch(() => null);
+
+            if (response.ok && data) {
+                applyListResponse(data);
             }
         } finally {
             setPendingCardId(null);
@@ -456,9 +520,11 @@ export default function LookingForClient() {
                             key={card.id}
                             card={card}
                             inList={listIds.has(card.id)}
+                            quantity={quantityById.get(card.id) ?? 1}
                             busy={pendingCardId === card.id}
                             onAdd={addCard}
                             onRemove={removeCard}
+                            onQuantityChange={updateQuantity}
                         />
                     ))}
                 </div>
@@ -475,9 +541,11 @@ export default function LookingForClient() {
                                 key={card.id}
                                 card={card}
                                 inList
+                                quantity={card.quantity ?? 1}
                                 busy={pendingCardId === card.id}
                                 onAdd={addCard}
                                 onRemove={removeCard}
+                                onQuantityChange={updateQuantity}
                             />
                         ))}
                     </div>
@@ -566,14 +634,21 @@ export default function LookingForClient() {
                                                 ) : null}
                                             </span>
                                         </div>
-                                        <button
-                                            type="button"
-                                            className="pill"
-                                            disabled={pendingCardId === card.id}
-                                            onClick={() => removeCard(card.id)}
-                                        >
-                                            Remove
-                                        </button>
+                                        <div className="lf-drawer-actions">
+                                            <QtyStepper
+                                                quantity={card.quantity ?? 1}
+                                                busy={pendingCardId === card.id}
+                                                onChange={(next) => updateQuantity(card.id, next)}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="pill"
+                                                disabled={pendingCardId === card.id}
+                                                onClick={() => removeCard(card.id)}
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                                 </ul>

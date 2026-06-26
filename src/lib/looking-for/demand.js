@@ -20,6 +20,7 @@ export async function listLookingForDemand() {
             w.email AS email,
             w.email_verified AS email_verified,
             i.created_at AS added_at,
+            i.quantity AS quantity,
             c.id AS card_id,
             c.game AS game,
             c.name AS name,
@@ -60,6 +61,7 @@ export async function listLookingForDemand() {
             number: row.number,
             imageUrl: row.image_url,
             marketPrice: row.market_price === null ? null : Number(row.market_price),
+            quantity: row.quantity === null ? 1 : Number(row.quantity),
             inStock: stockQuantity !== null && stockQuantity > 0,
             stockQuantity,
             addedAt: row.added_at ? new Date(row.added_at).toISOString() : null,
@@ -81,6 +83,7 @@ export async function listLookingForDemand() {
         return {
             ...watcher,
             itemCount: watcher.items.length,
+            totalQuantity: watcher.items.reduce((sum, item) => sum + item.quantity, 0),
             inStockCount,
         };
     });
@@ -101,6 +104,7 @@ export async function listLookingForDemand() {
     const totals = {
         watchers: watchers.length,
         items: watchers.reduce((sum, watcher) => sum + watcher.itemCount, 0),
+        units: watchers.reduce((sum, watcher) => sum + watcher.totalQuantity, 0),
         inStockItems: watchers.reduce((sum, watcher) => sum + watcher.inStockCount, 0),
     };
 

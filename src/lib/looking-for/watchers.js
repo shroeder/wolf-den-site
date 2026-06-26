@@ -12,6 +12,20 @@ import {
     verifyWatcherToken,
 } from "@/lib/looking-for/session";
 
+// A single watcher can want at most this many copies of one card — a sane guard against runaway
+// input. Shared with the API route so client and server clamp to the same ceiling.
+export const MAX_WATCHLIST_QUANTITY = 99;
+
+function clampQuantity(value) {
+    const numeric = Math.trunc(Number(value));
+
+    if (!Number.isFinite(numeric)) {
+        return 1;
+    }
+
+    return Math.max(1, Math.min(MAX_WATCHLIST_QUANTITY, numeric));
+}
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -78,22 +92,25 @@ export async function getOrCreateWatcher(cookieStore) {
     return linkCustomerIfNeeded(created);
 }
 
-export async function listWatchlistCardIds(watcherId) {
+export async function listWatchlistItems(watcherId) {
     const rows = await db.query(
-        `SELECT card_id FROM card_watchlist_items WHERE watcher_id = $1 ORDER BY created_at DESC`,
+        `SELECT card_id, quantity FROM card_watchlist_items WHERE watcher_id = $1 ORDER BY created_at DESC`,
         [watcherId]
     );
 
-    return rows.map((row) => Number(row.card_id));
+    return rows.map((row) => ({ cardId: Number(row.card_id), quantity: Number(row.quantity) }));
 }
 
 /**
- * Return the watcher's wishlist hydrated with full card display rows (newest first).
+ * Return the watcher's wishlist hydrated with full card display rows (newest first), each carrying
+ * the wanted `quantity`.
  */
 export async function getWatchlist(watcherId) {
-    const cardIds = await listWatchlistCardIds(watcherId);
+    const items = await listWatchlistItems(watcherId);
+    const cards = await getCardsByIds(items.map((item) => item.cardId));
+    const quantityByCardId = new Map(items.map((item) => [item.cardId, item.quantity]));
 
-    return getCardsByIds(cardIds);
+    return cards.map((card) => ({ ...card, quantity: quantityByCardId.get(card.id) ?? 1 }));
 }
 
 export async function addWatchlistItem(watcherId, cardId) {
@@ -103,6 +120,8 @@ export async function addWatchlistItem(watcherId, cardId) {
         return { status: "not_found" };
     }
 
+    // Re-adding a card already on the list is a no-op: it must not reset a quantity the shopper
+    // already bumped up.
     await db.query(
         `INSERT INTO card_watchlist_items (watcher_id, card_id)
          VALUES ($1, $2)
@@ -111,6 +130,23 @@ export async function addWatchlistItem(watcherId, cardId) {
     );
 
     return { status: "ok" };
+}
+
+/**
+ * Set how many copies of a card the watcher wants. The card must already be on their list; the
+ * quantity is clamped to [1, MAX_WATCHLIST_QUANTITY].
+ */
+export async function setWatchlistItemQuantity(watcherId, cardId, quantity) {
+    const clamped = clampQuantity(quantity);
+
+    const updated = await db.queryOne(
+        `UPDATE card_watchlist_items SET quantity = $3
+         WHERE watcher_id = $1 AND card_id = $2
+         RETURNING card_id`,
+        [watcherId, cardId, clamped]
+    );
+
+    return updated ? { status: "ok", quantity: clamped } : { status: "not_found" };
 }
 
 export async function removeWatchlistItem(watcherId, cardId) {

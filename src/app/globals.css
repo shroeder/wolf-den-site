@@ -3625,6 +3625,59 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 0.9rem;
 }
 
+/* Quantity stepper — lets a shopper want more than one copy of the same card. */
+.lf-card-actions,
+.lf-drawer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lf-drawer-actions {
+    flex: 0 0 auto;
+}
+
+.lf-qty {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0.15rem 0.3rem;
+    background: var(--elevated);
+}
+
+.lf-qty-btn {
+    width: 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--accent-hover);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.lf-qty-btn:hover:not(:disabled) {
+    background: rgba(212, 175, 55, 0.15);
+}
+
+.lf-qty-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.lf-qty-value {
+    min-width: 1.4rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
 /* Persistent "My List" access — pinned so it's reachable while scrolling a long set */
 .lf-list-fab-wrap {
     position: fixed;
