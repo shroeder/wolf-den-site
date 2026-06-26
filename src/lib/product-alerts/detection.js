@@ -21,11 +21,11 @@ function isSingleSku(sku) {
 }
 
 /**
- * Scan current Square inventory and record new arrivals. An arrival is a variation that flipped
- * from absent/out-of-stock to in-stock: `new` if we've never seen it, `restock` if it was
- * previously out. The category list is synced in the same pass. Out-of-stock variations are
- * re-armed so a future restock alerts again. Idempotent: running twice with no inventory change
- * produces no arrivals.
+ * Scan current Square inventory and record new arrivals. An arrival is `new` if we've never seen
+ * the variation, or `restock` if it's an existing variation whose on-hand count went up since the
+ * last scan — whether that's a return from zero or a top-up that never hit zero. The category list
+ * is synced in the same pass. Out-of-stock variations are re-armed (count zeroed) so a future
+ * restock alerts again. Idempotent: running twice with no inventory change produces no arrivals.
  */
 export async function runProductAlertScan() {
     const inventory = await listShopInventory();
@@ -55,6 +55,9 @@ export async function runProductAlertScan() {
                     imageUrl: item.imageUrl || null,
                     price: typeof item.price === "number" ? item.price : null,
                     isSingle: isSingleSku(item.sku),
+                    // On-hand count is per-variation (identical across the categories a variation
+                    // belongs to), so capturing it once on first sight is enough.
+                    quantity: Number(item.quantity) || 0,
                     categoryIds: new Set(),
                 };
                 currentInStock.set(item.id, entry);
@@ -66,11 +69,17 @@ export async function runProductAlertScan() {
 
     await syncCategoriesFromSquare(categoryMap);
 
-    // 2. Prior per-variation state.
+    // 2. Prior per-variation state. `quantity` is NULL for rows written before the column existed
+    //    (re-baselined silently on the next scan — see the quantity-increase guard below).
     const priorRows = await db.query(
-        `SELECT variation_id, in_stock FROM product_alert_inventory_state`
+        `SELECT variation_id, in_stock, quantity FROM product_alert_inventory_state`
     );
-    const priorState = new Map(priorRows.map((row) => [row.variation_id, row.in_stock]));
+    const priorState = new Map(
+        priorRows.map((row) => [
+            row.variation_id,
+            { inStock: row.in_stock === true, quantity: row.quantity == null ? null : Number(row.quantity) },
+        ])
+    );
     const isSeedingRun = priorState.size === 0;
 
     // 3. Diff. On the very first scan we seed the baseline silently rather than flagging the entire
@@ -79,12 +88,28 @@ export async function runProductAlertScan() {
 
     for (const [variationId, entry] of currentInStock) {
         const prior = priorState.get(variationId);
-        const wasInStock = prior === true;
         const seenBefore = priorState.has(variationId);
+        const wasInStock = prior?.inStock === true;
+        const priorQuantity = prior && prior.quantity != null ? prior.quantity : null;
 
-        if (!isSeedingRun && !wasInStock) {
-            const kind = seenBefore ? "restock" : "new";
+        // Arrival rules:
+        //   - never seen before               -> "new"
+        //   - was out of stock, now in stock   -> "restock" (the original 0 -> positive flip)
+        //   - on-hand count went up vs last scan -> "restock" (a top-up that never hit zero)
+        // The quantity-increase signal is skipped when priorQuantity is NULL (row predates the
+        // quantity column) so the first post-migration scan re-baselines instead of flagging the
+        // whole catalog.
+        let kind = null;
 
+        if (!isSeedingRun) {
+            if (!seenBefore) {
+                kind = "new";
+            } else if (!wasInStock || (priorQuantity !== null && entry.quantity > priorQuantity)) {
+                kind = "restock";
+            }
+        }
+
+        if (kind) {
             for (const categoryId of entry.categoryIds) {
                 arrivals.push({
                     variationId,
@@ -99,13 +124,14 @@ export async function runProductAlertScan() {
         }
 
         await db.query(
-            `INSERT INTO product_alert_inventory_state (variation_id, item_name, in_stock, last_seen_at)
-             VALUES ($1, $2, TRUE, NOW())
+            `INSERT INTO product_alert_inventory_state (variation_id, item_name, in_stock, quantity, last_seen_at)
+             VALUES ($1, $2, TRUE, $3, NOW())
              ON CONFLICT (variation_id) DO UPDATE SET
                 item_name = EXCLUDED.item_name,
                 in_stock = TRUE,
+                quantity = EXCLUDED.quantity,
                 last_seen_at = NOW()`,
-            [variationId, entry.name]
+            [variationId, entry.name, entry.quantity]
         );
     }
 
@@ -114,7 +140,7 @@ export async function runProductAlertScan() {
 
     await db.query(
         `UPDATE product_alert_inventory_state
-         SET in_stock = FALSE
+         SET in_stock = FALSE, quantity = 0
          WHERE in_stock = TRUE AND NOT (variation_id = ANY($1::text[]))`,
         [inStockIds]
     );

@@ -49,7 +49,7 @@
         },
         {
             "path": "/api/jobs/product-alerts",
-            "schedule": "0 */4 * * *"
+            "schedule": "*/15 * * * *"
         }
     ]
 }
