@@ -4,7 +4,7 @@ export const events = [
         title: "AYOZA: A Custom D&D One-Shot at The Wolf Den",
         seoTitle: "AYOZA D&D One-Shot Campaign | The Wolf Den",
         metaDescription:
-            "Play AYOZA, a custom one-shot Dungeons & Dragons adventure built for The Wolf Den in Montgomery, MN. Saturday, July 5 from 3 to 6 PM, with character creation 3–4 PM. $5 at the door, only 6 seats — reserve yours online.",
+            "Play AYOZA, a custom one-shot Dungeons & Dragons adventure built for The Wolf Den in Montgomery, MN. Sunday, July 12 from 3 to 6 PM, with character creation 3–4 PM. $5 at the door, only 6 seats — reserve yours online.",
         keywords: [
             "DnD one-shot Montgomery MN",
             "Dungeons and Dragons Montgomery MN",
@@ -14,8 +14,8 @@ export const events = [
             "AYOZA Wolf Den",
         ],
         oneShot: true,
-        day: "Saturday, July 5",
-        date: "2026-07-05T15:00:00-05:00",
+        day: "Sunday, July 12",
+        date: "2026-07-12T15:00:00-05:00",
         time: "3:00 PM - 6:00 PM",
         image: {
             src: "/images/ayoza-dnd-one-shot-the-wolf-den-montgomery-mn.png",
@@ -33,7 +33,7 @@ export const events = [
         beginnerFriendly: true,
         audience: "Players new to or experienced with Dungeons & Dragons, ages welcome to roleplay",
         description:
-            "On Saturday, July 5 from 3:00 PM to 6:00 PM, AJ runs AYOZA — a custom one-shot Dungeons & Dragons adventure built exclusively for The Wolf Den in Montgomery, Minnesota. Original story, setting, characters, and enemies, all in a single self-contained session. The first hour, 3:00 to 4:00 PM, is for character creation, so please arrive promptly.",
+            "On Sunday, July 12 from 3:00 PM to 6:00 PM, AJ runs AYOZA — a custom one-shot Dungeons & Dragons adventure built exclusively for The Wolf Den in Montgomery, Minnesota. Original story, setting, characters, and enemies, all in a single self-contained session. The first hour, 3:00 to 4:00 PM, is for character creation, so please arrive promptly.",
         rules:
             "AYOZA is a self-contained one-shot, so no prior characters or experience are required. Everything you need to play is provided — custom character sheets, dice, and all materials. Just bring yourself and $5 for entry, paid in person when you arrive. Plan to show up promptly: character creation runs from 3:00 to 4:00 PM, and the adventure begins right after. Your journey starts at the Wolf Lodge: explore, discover, unravel, and belong. Seats are limited to 6 adventurers, so reserve early.",
         details: {
