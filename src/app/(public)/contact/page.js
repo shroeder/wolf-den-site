@@ -27,7 +27,7 @@ export default function ContactPage() {
                         <li>Email: luke@wolfdengamingmn.com</li>
                         <li>Phone: (701) 409-0782</li>
                         <li>Address: 300 1st St S, Montgomery, MN 56069</li>
-                        <li>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm</li>
+                        <li>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm, Sun 12–6pm</li>
                     </ul>
                     <p>
                         <strong>Best for:</strong> store questions, inventory checks, event timing, trade-in questions, vendor contact, and local pickup coordination.
