@@ -4259,6 +4259,7 @@ body.tv-mode .shop-mobile-cart-fab {
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .mkt-invite-link {
@@ -4367,6 +4368,36 @@ body.tv-mode .shop-mobile-cart-fab {
     font: inherit;
     background: var(--elevated);
     color: var(--ink);
+}
+
+/* Phones: stack each row's info above its actions so nothing overflows sideways. */
+@media (max-width: 560px) {
+    .mkt-admin-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .mkt-admin-actions {
+        width: 100%;
+    }
+
+    .mkt-listing-edit label {
+        flex: 1 1 80px;
+    }
+
+    .mkt-listing-edit input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .mkt-listing-edit .button,
+    .mkt-listing-edit .pill {
+        flex: 1 1 auto;
+    }
+
+    .mkt-add-row > div {
+        flex: 1 1 100%;
+    }
 }
 
 /* CSV import */
