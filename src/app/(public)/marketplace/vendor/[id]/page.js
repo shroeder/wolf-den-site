@@ -38,6 +38,7 @@ export async function generateMetadata({ params }) {
 
 function ListingTile({ listing }) {
     const price = formatPrice(listing.price);
+    const market = formatPrice(listing.marketPrice);
     const condition = listing.condition ? CONDITION_LABELS[listing.condition] || listing.condition : null;
 
     const inner = (
@@ -63,6 +64,7 @@ function ListingTile({ listing }) {
                     {condition ? ` · ${condition}` : ""}
                 </p>
                 {price ? <p className="mkt-card-price">{price}</p> : null}
+                {market ? <p className="mkt-card-market">Market {market}</p> : null}
                 <p className="mkt-card-sub">{listing.quantity} available</p>
             </div>
         </>

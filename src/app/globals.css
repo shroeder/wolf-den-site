@@ -4051,6 +4051,12 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 0.75rem;
 }
 
+.mkt-card-market {
+    margin: 0.1rem 0 0;
+    color: var(--muted);
+    font-size: 0.76rem;
+}
+
 /* Product page */
 .mkt-breadcrumb {
     margin: 0 0 1rem;

@@ -27,6 +27,7 @@ function formatPrice(value) {
 
 function ResultTile({ item }) {
     const from = formatPrice(item.minPrice);
+    const market = formatPrice(item.marketPrice);
 
     return (
         <Link href={`/marketplace/product/${item.catalogProductId}`} className="mkt-card">
@@ -51,6 +52,7 @@ function ResultTile({ item }) {
                     {item.number ? ` · #${item.number}` : ""}
                 </p>
                 {from ? <p className="mkt-card-price">from {from}</p> : null}
+                {market ? <p className="mkt-card-market">Market {market}</p> : null}
                 <p className="mkt-card-sub">
                     {item.vendorCount} vendor{item.vendorCount === 1 ? "" : "s"}
                 </p>
