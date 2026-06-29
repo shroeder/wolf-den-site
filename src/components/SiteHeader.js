@@ -13,6 +13,7 @@ const navItems = [
     { href: "/shop", label: "Shop" },
     { href: "/just-in", label: "Just In" },
     { href: "/looking-for", label: "Looking For" },
+    { href: "/marketplace", label: "Marketplace" },
     { href: "/alerts", label: "New-Arrival Alerts" },
     { href: "/mystery-bags", label: "Mystery Bags" },
     { href: "/events", label: "Events" },

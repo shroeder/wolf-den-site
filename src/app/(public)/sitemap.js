@@ -62,6 +62,24 @@ export default function sitemap() {
             priority: 0.8,
         },
         {
+            url: `${BASE_URL}/marketplace`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.8,
+        },
+        {
+            url: `${BASE_URL}/marketplace/vendors`,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 0.6,
+        },
+        {
+            url: `${BASE_URL}/marketplace/apply`,
+            lastModified: new Date(),
+            changeFrequency: "monthly",
+            priority: 0.6,
+        },
+        {
             url: `${BASE_URL}/mystery-bags`,
             lastModified: new Date(),
             changeFrequency: "daily",

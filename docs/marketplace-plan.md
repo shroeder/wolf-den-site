@@ -1,7 +1,9 @@
 # Vendor Marketplace — Plan & Rollout Tracker
 
-> **Status (2026-06-29): planning.** No code yet. This doc is the single source of truth for
-> scope, decisions, and phases. Keep it updated as phases land.
+> **Status (2026-06-29): LIVE & PUBLIC.** Phases 0–3 built, deployed, and verified on prod.
+> Linked from the main site nav ("Marketplace") + in the sitemap; buyer pages public, admin/
+> portal/onboard gated + noindex. Demo vendor (Capital City Cards) kept live as a placeholder
+> until real vendors are onboarded. This doc is the single source of truth — keep it updated.
 
 ## The concept
 
