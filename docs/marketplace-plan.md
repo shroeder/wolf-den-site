@@ -113,11 +113,14 @@ email+password as the phone app, one identity across phone + web.
 - Optional: set `MARKETPLACE_ADMIN_EMAIL` in Vercel env to get application-notification emails.
 - Note: the invite **accept page** (`/marketplace/onboard?token=`) the emails link to is Phase 3.
 
-### Phase 3 — Vendor self-onboard + inventory upload  — NOT STARTED
-- [ ] Emailed invite link → `acceptVendorInvite` (set password + address; geocode address → lat/lng via Nominatim)
-- [ ] Vendor portal (`mkt_vendor_session` login): add/edit/delete listings
-- [ ] Sealed: pick from controlled catalog list + qty + price
-- [ ] Singles: CSV import (TCGplayer export) → resolver match → review/confirm → create listings
+### Phase 3 — Vendor self-onboard + inventory upload  — CORE BUILT (CSV import remaining)
+- [x] `/marketplace/onboard?token=` + `MarketplaceOnboardClient` → `acceptVendorInvite` (set password +
+      address), geocode address → lat/lng via Nominatim (`geocode.js`), auto-login to portal
+- [x] Vendor web session (`vendor-session.js`): cookie over `mkt_vendor_session`; login/logout routes
+- [x] `/marketplace/portal` + `VendorLoginClient` + `VendorPortalClient`: add / edit price+qty / delete listings
+- [x] Sealed + singles: catalog typeahead picker (`searchCatalog` + `/vendor/catalog-search`); condition for singles
+- [x] Lint + `npm run build` pass (no new migration — reuses `mkt_vendor_session` from 034)
+- [ ] **Singles CSV import** (TCGplayer export) → resolver match → review/confirm → bulk create — NEXT
 
 ### Phase 4 — Connectors  — NOT STARTED
 - [ ] Store-search connector: wolf den store search also surfaces `mkt_` listings

@@ -4248,3 +4248,78 @@ body.tv-mode .shop-mobile-cart-fab {
     background: rgba(220, 80, 80, 0.18);
     color: #e88;
 }
+
+/* Vendor portal — add-listing picker + inline edit */
+.mkt-add-form input,
+.mkt-add-form select {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.6rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
+}
+
+.mkt-add-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.mkt-add-row > div {
+    flex: 1 1 120px;
+}
+
+.mkt-picker {
+    list-style: none;
+    margin: 0.3rem 0 0;
+    padding: 0.3rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--elevated);
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.mkt-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--ink);
+    padding: 0.4rem 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.mkt-picker-item:hover {
+    background: rgba(212, 175, 55, 0.12);
+}
+
+.mkt-picker-thumb {
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.mkt-listing-edit label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--ink-secondary);
+}
+
+.mkt-listing-edit input {
+    width: 80px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.4rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
+}

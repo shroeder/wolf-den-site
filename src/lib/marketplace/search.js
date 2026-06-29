@@ -204,6 +204,46 @@ export async function listVendorsForBrowse() {
     }));
 }
 
+// Catalog typeahead for a vendor adding a listing — searches the WHOLE catalog (not restricted to
+// in-stock), so a vendor can list anything that exists in tcg_cards.
+export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
+    const trimmed = String(query || "").trim();
+
+    if (trimmed.length < 2) {
+        return [];
+    }
+
+    const params = [`%${trimmed}%`];
+    let gameClause = "";
+
+    if (game) {
+        params.push(game);
+        gameClause = `AND c.game = $${params.length}`;
+    }
+
+    params.push(Math.min(Number(limit) || 12, 50));
+
+    const rows = await db.query(
+        `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, s.name AS set_name
+         FROM tcg_cards c
+         JOIN tcg_sets s ON s.id = c.set_id
+         WHERE c.name ILIKE $1 ${gameClause}
+         ORDER BY c.name ASC
+         LIMIT $${params.length}`,
+        params
+    );
+
+    return rows.map((row) => ({
+        catalogProductId: String(row.id),
+        game: row.game,
+        name: row.name,
+        setName: row.set_name,
+        number: row.number,
+        imageUrl: row.image_url,
+        marketPrice: toNumber(row.market_price),
+    }));
+}
+
 // A single vendor's public storefront: their info + active listings (cheapest first). Returns null
 // if the vendor isn't active.
 export async function getVendorStorefront(vendorId) {

@@ -277,3 +277,11 @@ export async function listVendorsForAdmin() {
 
     return rows.map((row) => ({ ...mapVendor(row), activeListings: Number(row.active_listings) || 0 }));
 }
+
+// Set a vendor's geocoded coordinates (best-effort, after onboarding address capture).
+export async function setVendorCoordinates(id, latitude, longitude) {
+    await db.query(
+        `UPDATE mkt_vendor SET latitude = $2, longitude = $3, updated_at = NOW() WHERE id = $1`,
+        [id, latitude, longitude]
+    );
+}
