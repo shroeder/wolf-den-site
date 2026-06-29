@@ -63,11 +63,13 @@ async function main() {
         const vendorResult = await pool.query(
             `INSERT INTO mkt_vendor
                 (email, email_normalized, display_name, status,
-                 city, region, postal_code, country, location_label, accepted_at)
-             VALUES ($1, $2, $3, 'active', 'Sacramento', 'CA', '95814', 'US', 'Sacramento, CA', NOW())
+                 city, region, postal_code, country, location_label, latitude, longitude, accepted_at)
+             VALUES ($1, $2, $3, 'active', 'Sacramento', 'CA', '95814', 'US', 'Sacramento, CA', 38.5816, -121.4944, NOW())
              ON CONFLICT (email_normalized) DO UPDATE
                 SET display_name = EXCLUDED.display_name,
                     status = 'active',
+                    latitude = EXCLUDED.latitude,
+                    longitude = EXCLUDED.longitude,
                     updated_at = NOW()
              RETURNING id`,
             [email, emailNormalized, displayName]

@@ -87,19 +87,37 @@ Backend (done):
 UI (lives under `(public)/marketplace/…` for now so it inherits site nav/footer; liftable later):
 - [x] `marketplace/page.js` + `MarketplaceSearchClient` — search mode (in-stock only, game/kind filters)
 - [x] `marketplace/product/[id]/page.js` + `MarketplaceOffers` — item + vendor offers (cheapest first) + inline contact form
-- [x] `mkt-*` CSS block in globals.css; `npm run build` passes
-- [ ] `marketplace/vendors` + `marketplace/vendor/[id]` — browse mode: **Leaflet + OpenStreetMap** map
-      (no API key) + vendor list + storefront. Needs Nominatim geocoding of vendor address → lat/lng.
-- [ ] Goal: full buyer experience working on hand-seeded data before any upload UX
+- [x] `marketplace/vendors` + `MarketplaceBrowseClient` — browse mode: **Leaflet + OpenStreetMap** map
+      (plain Leaflet, vector markers, no API key) + vendor list + "find near me" (browser geolocation)
+- [x] `marketplace/vendor/[id]` — vendor storefront (their active listings, linking to product pages)
+- [x] `leaflet` dependency added; `mkt-*` CSS in globals.css; `npm run build` passes
+- [x] **Verified live against prod data** (seed + queries): search, offers, contact, map marker all working
+- Note: real vendor geocoding (address → lat/lng) moves to Phase 2 onboarding; seed uses fixed coords.
 
-### Phase 2 — Vendor onboarding + inventory upload  — NOT STARTED
-- [ ] Emailed invite link → vendor self-sign-up (name, address, password)
-- [ ] Vendor portal: add/edit/delete listings
+### Phase 2 — Vendor applications + web admin portal  — NOT STARTED
+
+Decided 2026-06-29: vendors apply via a public form; Luke approves from a **hidden web admin
+portal** (so he can do vendor admin from the website when his phone app build is stale, not just
+from the Android app). **Admin login reuses the existing `admin_app_users` owner account** — same
+email+password as the phone app, one identity across phone + web.
+
+- [ ] Migration `035`: `mkt_vendor_application` (business/contact/email/phone/location, what they
+      sell, links e.g. Facebook, notes, status invited/approved/rejected)
+- [ ] Public `/marketplace/apply` form → insert application + email Luke (Resend)
+- [ ] Add `marketplace.manage` permission to the admin-app permission catalog (owner gets it free)
+- [ ] **Web session layer**: thin httpOnly-cookie wrapper over the existing (bearer) `admin_app_sessions`
+      so the same revocable token system works in a browser. Web login page → cookie.
+- [ ] `/marketplace/admin` (login-gated): review applications → **Approve** (creates `mkt_vendor` +
+      `createVendorInvite` → emails the accept-invite link already built) / **Reject**
+- [ ] Admin: list all vendors + their inventory; suspend/remove; resend invite
+
+### Phase 3 — Vendor self-onboard + inventory upload  — NOT STARTED
+- [ ] Emailed invite link → `acceptVendorInvite` (set password + address; geocode address → lat/lng via Nominatim)
+- [ ] Vendor portal (`mkt_vendor_session` login): add/edit/delete listings
 - [ ] Sealed: pick from controlled catalog list + qty + price
 - [ ] Singles: CSV import (TCGplayer export) → resolver match → review/confirm → create listings
-- [ ] Admin: list all vendors + their inventory, remove a vendor
 
-### Phase 3 — Connectors  — NOT STARTED
+### Phase 4 — Connectors  — NOT STARTED
 - [ ] Store-search connector: wolf den store search also surfaces `mkt_` listings
 - [ ] Email connector (TBD shape)
 

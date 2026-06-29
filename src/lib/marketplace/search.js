@@ -203,3 +203,53 @@ export async function listVendorsForBrowse() {
         listingCount: Number(row.listing_count) || 0,
     }));
 }
+
+// A single vendor's public storefront: their info + active listings (cheapest first). Returns null
+// if the vendor isn't active.
+export async function getVendorStorefront(vendorId) {
+    const vendor = await db.queryOne(
+        `SELECT id, display_name, location_label, region, city, latitude, longitude
+         FROM mkt_vendor
+         WHERE id = $1 AND status = 'active'`,
+        [vendorId]
+    );
+
+    if (!vendor) {
+        return null;
+    }
+
+    const listings = await db.query(
+        `SELECT l.id, l.kind, l.condition, l.price, l.quantity, l.catalog_product_id,
+                l.title, l.set_name, l.card_number,
+                COALESCE(l.image_url, c.image_url) AS image_url,
+                c.market_price
+         FROM mkt_listing l
+         LEFT JOIN tcg_cards c ON c.id = l.catalog_product_id
+         WHERE l.vendor_id = $1 AND l.status = 'active'
+         ORDER BY l.price ASC`,
+        [vendorId]
+    );
+
+    return {
+        id: vendor.id,
+        displayName: vendor.display_name,
+        locationLabel: vendor.location_label,
+        region: vendor.region,
+        city: vendor.city,
+        latitude: toNumber(vendor.latitude),
+        longitude: toNumber(vendor.longitude),
+        listings: listings.map((row) => ({
+            listingId: row.id,
+            kind: row.kind,
+            condition: row.condition,
+            price: toNumber(row.price),
+            quantity: row.quantity,
+            catalogProductId: row.catalog_product_id ? String(row.catalog_product_id) : null,
+            title: row.title,
+            setName: row.set_name,
+            cardNumber: row.card_number,
+            imageUrl: row.image_url,
+            marketPrice: toNumber(row.market_price),
+        })),
+    };
+}

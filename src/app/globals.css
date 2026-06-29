@@ -4099,3 +4099,64 @@ body.tv-mode .shop-mobile-cart-fab {
     color: var(--ink);
     resize: vertical;
 }
+
+/* Browse / map */
+.mkt-browse-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.mkt-map {
+    height: 440px;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--elevated);
+}
+
+/* Leaflet popups render on a white tile; keep their text dark for contrast. */
+.mkt-map .leaflet-popup-content {
+    color: #1a1a1a;
+}
+
+.mkt-map .leaflet-popup-content a {
+    color: #8a6d1a;
+    font-weight: 700;
+}
+
+.mkt-vendor-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.mkt-vendor-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.mkt-vendor-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.mkt-vendor-name {
+    font-weight: 700;
+    color: var(--accent);
+}
