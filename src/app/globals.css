@@ -3930,3 +3930,172 @@ body.tv-mode .shop-mobile-cart-fab {
     font-weight: 600;
     white-space: nowrap;
 }
+
+/* ── Vendor Marketplace ───────────────────────────────────────────────── */
+.mkt-toggle-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.6rem 0 1rem;
+}
+
+.mkt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.mkt-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.mkt-card:hover {
+    border-color: var(--brand-strong);
+    transform: translateY(-2px);
+}
+
+.mkt-card-art {
+    display: flex;
+    justify-content: center;
+}
+
+.mkt-card-image {
+    width: 100%;
+    height: auto;
+    max-width: 146px;
+    border-radius: 8px;
+}
+
+.mkt-card-image-empty {
+    aspect-ratio: 146 / 204;
+    width: 100%;
+    background: var(--elevated);
+    border-radius: 8px;
+}
+
+.mkt-card-body {
+    flex: 1;
+}
+
+.mkt-card-name {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.25;
+}
+
+.mkt-card-meta {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.mkt-card-price {
+    margin: 0.35rem 0 0;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.mkt-card-sub {
+    margin: 0.15rem 0 0;
+    color: var(--ink-secondary);
+    font-size: 0.75rem;
+}
+
+/* Product page */
+.mkt-breadcrumb {
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+}
+
+.mkt-product-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.mkt-product-image {
+    width: 100%;
+    height: auto;
+    max-width: 240px;
+    border-radius: 10px;
+}
+
+.mkt-product-info {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.mkt-market-price {
+    margin: 0.6rem 0;
+    color: var(--ink-secondary);
+}
+
+/* Offers */
+.mkt-offer-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.mkt-offer {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.mkt-offer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.mkt-offer-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.mkt-offer-price {
+    color: var(--accent);
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+
+.mkt-offer-meta {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.mkt-contact-form {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--line);
+}
+
+.mkt-contact-form textarea {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.6rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
+    resize: vertical;
+}

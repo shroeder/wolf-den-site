@@ -1,0 +1,205 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+
+// Buyer-facing reads. Search is CATALOG-CENTRIC: it queries tcg_cards (the daily tcgcsv source of
+// truth for what an item is + its market price), restricted to products at least one active vendor
+// has in stock — there's no point surfacing items nobody is selling. Selecting a product shows every
+// vendor's offer for it.
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+const AUTOCOMPLETE_LIMIT = 8;
+
+function toNumber(value) {
+    return value !== null && value !== undefined ? Number(value) : null;
+}
+
+function toIso(value) {
+    return value ? new Date(value).toISOString() : null;
+}
+
+// A catalog product that is in stock among vendors (search/autocomplete result).
+function mapCatalogResult(row) {
+    return {
+        catalogProductId: String(row.id),
+        game: row.game,
+        name: row.name,
+        setName: row.set_name,
+        number: row.number,
+        imageUrl: row.image_url,
+        marketPrice: toNumber(row.market_price),
+        vendorCount: Number(row.vendor_count) || 0,
+        minPrice: toNumber(row.min_price),
+    };
+}
+
+// Shared FROM/JOIN that restricts catalog rows to "in stock among active vendors".
+const IN_STOCK_FROM = `
+    FROM tcg_cards c
+    JOIN tcg_sets s ON s.id = c.set_id
+    JOIN mkt_listing l ON l.catalog_product_id = c.id AND l.status = 'active'
+    JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'`;
+
+const IN_STOCK_SELECT = `
+    SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price,
+           s.name AS set_name,
+           COUNT(DISTINCT l.vendor_id) AS vendor_count,
+           MIN(l.price) AS min_price`;
+
+const IN_STOCK_GROUP = `GROUP BY c.id, s.name`;
+
+// Lightweight typeahead for the search box.
+export async function autocompleteInStock({ query, game = null } = {}) {
+    const trimmed = String(query || "").trim();
+
+    if (trimmed.length < 2) {
+        return [];
+    }
+
+    const params = [`%${trimmed}%`];
+    let gameClause = "";
+
+    if (game) {
+        params.push(game);
+        gameClause = `AND c.game = $${params.length}`;
+    }
+
+    params.push(AUTOCOMPLETE_LIMIT);
+
+    const rows = await db.query(
+        `${IN_STOCK_SELECT}
+         ${IN_STOCK_FROM}
+         WHERE c.name ILIKE $1 ${gameClause}
+         ${IN_STOCK_GROUP}
+         ORDER BY c.name ASC
+         LIMIT $${params.length}`,
+        params
+    );
+
+    return rows.map(mapCatalogResult);
+}
+
+// Full search results grid. `kind` (sealed|single) filters by what vendors are offering.
+export async function searchCatalogInStock({
+    query = null,
+    game = null,
+    kind = null,
+    limit = DEFAULT_LIMIT,
+    offset = 0,
+} = {}) {
+    const params = [];
+    const filters = [];
+
+    if (query && String(query).trim().length >= 2) {
+        params.push(`%${String(query).trim()}%`);
+        filters.push(`c.name ILIKE $${params.length}`);
+    }
+
+    if (game) {
+        params.push(game);
+        filters.push(`c.game = $${params.length}`);
+    }
+
+    if (kind === "sealed" || kind === "single") {
+        params.push(kind);
+        filters.push(`l.kind = $${params.length}`);
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+    params.push(Math.min(Number(limit) || DEFAULT_LIMIT, MAX_LIMIT));
+    const limitParam = params.length;
+    params.push(Math.max(Number(offset) || 0, 0));
+    const offsetParam = params.length;
+
+    const rows = await db.query(
+        `${IN_STOCK_SELECT}
+         ${IN_STOCK_FROM}
+         ${whereClause}
+         ${IN_STOCK_GROUP}
+         ORDER BY vendor_count DESC, c.name ASC
+         LIMIT $${limitParam} OFFSET $${offsetParam}`,
+        params
+    );
+
+    return rows.map(mapCatalogResult);
+}
+
+// Product page: the canonical item (from the catalog) + every active vendor offer, cheapest first.
+export async function getProductWithOffers(catalogProductId) {
+    const product = await db.queryOne(
+        `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, c.rarity,
+                s.name AS set_name
+         FROM tcg_cards c
+         JOIN tcg_sets s ON s.id = c.set_id
+         WHERE c.id = $1`,
+        [catalogProductId]
+    );
+
+    if (!product) {
+        return null;
+    }
+
+    const offers = await db.query(
+        `SELECT l.id, l.kind, l.condition, l.price, l.quantity, l.created_at,
+                v.id AS vendor_id, v.display_name AS vendor_name,
+                v.location_label, v.region AS vendor_region
+         FROM mkt_listing l
+         JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
+         WHERE l.catalog_product_id = $1 AND l.status = 'active'
+         ORDER BY l.price ASC`,
+        [catalogProductId]
+    );
+
+    return {
+        catalogProductId: String(product.id),
+        game: product.game,
+        name: product.name,
+        setName: product.set_name,
+        number: product.number,
+        rarity: product.rarity,
+        imageUrl: product.image_url,
+        marketPrice: toNumber(product.market_price),
+        offers: offers.map((row) => ({
+            listingId: row.id,
+            kind: row.kind,
+            condition: row.condition,
+            price: toNumber(row.price),
+            quantity: row.quantity,
+            createdAt: toIso(row.created_at),
+            vendor: {
+                id: row.vendor_id,
+                displayName: row.vendor_name,
+                locationLabel: row.location_label,
+                region: row.vendor_region,
+            },
+        })),
+    };
+}
+
+// Browse mode: active vendors that actually have inventory, with location for the map + a list.
+export async function listVendorsForBrowse() {
+    const rows = await db.query(
+        `SELECT v.id, v.display_name, v.location_label, v.region, v.city,
+                v.latitude, v.longitude,
+                COUNT(l.id) FILTER (WHERE l.status = 'active') AS listing_count
+         FROM mkt_vendor v
+         LEFT JOIN mkt_listing l ON l.vendor_id = v.id
+         WHERE v.status = 'active'
+         GROUP BY v.id
+         HAVING COUNT(l.id) FILTER (WHERE l.status = 'active') > 0
+         ORDER BY v.display_name ASC`
+    );
+
+    return rows.map((row) => ({
+        id: row.id,
+        displayName: row.display_name,
+        locationLabel: row.location_label,
+        region: row.region,
+        city: row.city,
+        latitude: toNumber(row.latitude),
+        longitude: toNumber(row.longitude),
+        listingCount: Number(row.listing_count) || 0,
+    }));
+}
