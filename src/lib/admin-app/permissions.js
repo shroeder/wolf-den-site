@@ -31,6 +31,7 @@ export const ALL_PERMISSIONS = Object.freeze([
     "ai.use",
     "remediations.run",
     "staff.manage",
+    "marketplace.manage",
 ]);
 
 const PERMISSION_SET = new Set(ALL_PERMISSIONS);

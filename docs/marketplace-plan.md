@@ -94,22 +94,24 @@ UI (lives under `(public)/marketplace/…` for now so it inherits site nav/foote
 - [x] **Verified live against prod data** (seed + queries): search, offers, contact, map marker all working
 - Note: real vendor geocoding (address → lat/lng) moves to Phase 2 onboarding; seed uses fixed coords.
 
-### Phase 2 — Vendor applications + web admin portal  — NOT STARTED
+### Phase 2 — Vendor applications + web admin portal  — BUILT (untested on prod until deploy)
 
 Decided 2026-06-29: vendors apply via a public form; Luke approves from a **hidden web admin
 portal** (so he can do vendor admin from the website when his phone app build is stale, not just
 from the Android app). **Admin login reuses the existing `admin_app_users` owner account** — same
 email+password as the phone app, one identity across phone + web.
 
-- [ ] Migration `035`: `mkt_vendor_application` (business/contact/email/phone/location, what they
-      sell, links e.g. Facebook, notes, status invited/approved/rejected)
-- [ ] Public `/marketplace/apply` form → insert application + email Luke (Resend)
-- [ ] Add `marketplace.manage` permission to the admin-app permission catalog (owner gets it free)
-- [ ] **Web session layer**: thin httpOnly-cookie wrapper over the existing (bearer) `admin_app_sessions`
-      so the same revocable token system works in a browser. Web login page → cookie.
-- [ ] `/marketplace/admin` (login-gated): review applications → **Approve** (creates `mkt_vendor` +
-      `createVendorInvite` → emails the accept-invite link already built) / **Reject**
-- [ ] Admin: list all vendors + their inventory; suspend/remove; resend invite
+- [x] Migration `035`: `mkt_vendor_application` (business/contact/email/phone/location, sells, links, notes, status)
+- [x] Public `/marketplace/apply` form + `MarketplaceApplyClient` → insert application + best-effort email Luke
+- [x] Added `marketplace.manage` permission to the admin-app catalog (owner gets it free)
+- [x] **Web session layer** (`admin-app/web-session.js`): httpOnly-cookie wrapper over the existing
+      (bearer) `admin_app_sessions` — same revocable token system, browser-friendly. Login/logout routes.
+- [x] `/marketplace/admin` (cookie-gated by `marketplace.manage`): review applications → **Approve**
+      (creates `mkt_vendor` + `createVendorInvite` + emails the accept link, also shows it inline) / **Reject**
+- [x] Admin: list all vendors + status badges; suspend / reactivate / remove; link to inventory
+- [x] Lint + `npm run build` pass
+- Optional: set `MARKETPLACE_ADMIN_EMAIL` in Vercel env to get application-notification emails.
+- Note: the invite **accept page** (`/marketplace/onboard?token=`) the emails link to is Phase 3.
 
 ### Phase 3 — Vendor self-onboard + inventory upload  — NOT STARTED
 - [ ] Emailed invite link → `acceptVendorInvite` (set password + address; geocode address → lat/lng via Nominatim)

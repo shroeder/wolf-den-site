@@ -263,3 +263,17 @@ export async function setVendorStatus(id, status) {
 
     return mapVendor(row);
 }
+
+// Admin view: every vendor (any status) + their active listing count, newest first.
+export async function listVendorsForAdmin() {
+    const rows = await db.query(
+        `SELECT ${VENDOR_COLUMNS.split(",").map((c) => `v.${c.trim()}`).join(", ")},
+                COUNT(l.id) FILTER (WHERE l.status = 'active') AS active_listings
+         FROM mkt_vendor v
+         LEFT JOIN mkt_listing l ON l.vendor_id = v.id
+         GROUP BY v.id
+         ORDER BY v.created_at DESC`
+    );
+
+    return rows.map((row) => ({ ...mapVendor(row), activeListings: Number(row.active_listings) || 0 }));
+}

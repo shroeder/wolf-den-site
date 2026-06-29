@@ -4160,3 +4160,91 @@ body.tv-mode .shop-mobile-cart-fab {
     font-weight: 700;
     color: var(--accent);
 }
+
+/* Apply form + admin portal */
+.mkt-apply-form textarea {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.6rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
+    resize: vertical;
+}
+
+.mkt-admin-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.mkt-admin-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.mkt-admin-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.mkt-admin-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.mkt-admin-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.mkt-invite-link {
+    margin-top: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--accent);
+    word-break: break-all;
+}
+
+.mkt-status {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.mkt-status-active {
+    background: rgba(212, 175, 55, 0.18);
+    color: var(--accent);
+}
+
+.mkt-status-invited {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--ink-secondary);
+}
+
+.mkt-status-suspended,
+.mkt-status-removed {
+    background: rgba(220, 80, 80, 0.18);
+    color: #e88;
+}

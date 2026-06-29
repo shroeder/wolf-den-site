@@ -124,9 +124,12 @@ export default function MarketplaceSearchClient() {
                     Search sealed product and singles across every vetted vendor. You only see what someone actually
                     has in stock — pick an item to see each vendor&apos;s price and where they are.
                 </p>
-                <p>
+                <p className="mkt-hero-links">
                     <Link href="/marketplace/vendors" className="pill">
                         📍 Browse vendors near you
+                    </Link>
+                    <Link href="/marketplace/apply" className="pill">
+                        Sell on the marketplace →
                     </Link>
                 </p>
             </section>
