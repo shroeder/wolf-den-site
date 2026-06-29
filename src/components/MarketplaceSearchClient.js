@@ -153,34 +153,8 @@ export default function MarketplaceSearchClient() {
             </section>
 
             <section className="card">
-                <div className="lf-game-toggle" role="group" aria-label="Filter by game">
-                    {games.map((option) => (
-                        <button
-                            key={option.id || "all"}
-                            type="button"
-                            className={`pill${game === option.id ? " lf-game-active" : ""}`}
-                            onClick={() => setGame(option.id)}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="mkt-toggle-row" role="group" aria-label="Filter by type">
-                    {KINDS.map((option) => (
-                        <button
-                            key={option.id || "all"}
-                            type="button"
-                            className={`pill${kind === option.id ? " lf-game-active" : ""}`}
-                            onClick={() => setKind(option.id)}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="lf-search-row">
-                    <div className="lf-search-field">
+                <div className="mkt-filter-row">
+                    <div className="mkt-filter-search">
                         <label className="lf-search-label" htmlFor="mkt-search">
                             Search the marketplace
                         </label>
@@ -193,6 +167,40 @@ export default function MarketplaceSearchClient() {
                             onChange={(event) => setQuery(event.target.value)}
                             autoComplete="off"
                         />
+                    </div>
+                    <div className="mkt-filter-field">
+                        <label className="lf-search-label" htmlFor="mkt-game">
+                            Game
+                        </label>
+                        <select
+                            id="mkt-game"
+                            className="lf-set-select"
+                            value={game}
+                            onChange={(event) => setGame(event.target.value)}
+                        >
+                            {games.map((option) => (
+                                <option key={option.id || "all"} value={option.id}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="mkt-filter-field">
+                        <label className="lf-search-label" htmlFor="mkt-kind">
+                            Type
+                        </label>
+                        <select
+                            id="mkt-kind"
+                            className="lf-set-select"
+                            value={kind}
+                            onChange={(event) => setKind(event.target.value)}
+                        >
+                            {KINDS.map((option) => (
+                                <option key={option.id || "all"} value={option.id}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
