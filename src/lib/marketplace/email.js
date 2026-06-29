@@ -32,15 +32,15 @@ function formatPrice(value) {
     return value === null || value === undefined ? "" : currency.format(Number(value));
 }
 
-// Notify Luke that a new vendor applied. Best-effort: returns false (no throw) if no admin address
-// is configured, so a missing env var never blocks the public submission.
-export async function sendNewApplicationEmail(application) {
-    const adminEmail = process.env.MARKETPLACE_ADMIN_EMAIL;
-
-    if (!adminEmail) {
+// Notify the marketplace admin that a new vendor applied. Recipient is resolved by the caller
+// (MARKETPLACE_ADMIN_EMAIL env, else the store owner's email). Best-effort: returns false (no throw)
+// if there's no recipient, so it never blocks the public submission.
+export async function sendNewApplicationEmail(application, toEmail) {
+    if (!toEmail) {
         return false;
     }
 
+    const adminEmail = toEmail;
     const resend = getResendClient();
     const adminUrl = new URL("/marketplace/admin", baseUrl()).toString();
 

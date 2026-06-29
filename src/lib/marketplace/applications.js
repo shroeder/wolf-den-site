@@ -45,6 +45,22 @@ export function isValidEmail(value) {
     return EMAIL_PATTERN.test(String(value || "").trim().toLowerCase());
 }
 
+// Where application notifications go: MARKETPLACE_ADMIN_EMAIL if set, otherwise the store owner's
+// email (so it works with no env config). Returns null if neither is available.
+async function resolveAdminNotifyEmail() {
+    const configured = process.env.MARKETPLACE_ADMIN_EMAIL;
+
+    if (configured) {
+        return configured;
+    }
+
+    const owner = await db.queryOne(
+        "SELECT email FROM admin_app_users WHERE role = 'owner' AND active = TRUE ORDER BY created_at ASC LIMIT 1"
+    );
+
+    return owner?.email || null;
+}
+
 // Public submission. Saves the application (source of truth) and best-effort emails Luke.
 export async function createApplication(input = {}) {
     const businessName = String(input.businessName || "").trim();
@@ -81,7 +97,8 @@ export async function createApplication(input = {}) {
 
     // Best-effort notify — never let a failed email block the submission.
     try {
-        await sendNewApplicationEmail(application);
+        const to = await resolveAdminNotifyEmail();
+        await sendNewApplicationEmail(application, to);
     } catch (error) {
         applicationsLogger.warn("marketplace.application.notify_failed", { reason: error.message });
     }
