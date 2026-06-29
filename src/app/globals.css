@@ -4323,3 +4323,47 @@ body.tv-mode .shop-mobile-cart-fab {
     background: var(--elevated);
     color: var(--ink);
 }
+
+/* CSV import */
+.mkt-import-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0;
+}
+
+.mkt-import-paste {
+    margin: 0.5rem 0;
+}
+
+.mkt-import-paste textarea {
+    width: 100%;
+    margin-top: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.6rem;
+    font: inherit;
+    background: var(--elevated);
+    color: var(--ink);
+    resize: vertical;
+}
+
+.mkt-import-preview {
+    margin-top: 1rem;
+}
+
+.mkt-import-list {
+    max-height: 460px;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+}
+
+.mkt-import-skipped {
+    margin-top: 0.75rem;
+}
+
+.mkt-import-skipped summary {
+    cursor: pointer;
+    color: var(--ink-secondary);
+}

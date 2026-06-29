@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import VendorImportClient from "@/components/VendorImportClient";
+
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 const GAMES = [
     { id: "", label: "All" },
@@ -312,6 +314,11 @@ export default function VendorPortalClient({ vendor, listings }) {
             <section className="card">
                 <h2>Add a listing</h2>
                 <AddListingForm onAdded={refresh} />
+            </section>
+
+            <section className="card">
+                <h2>Bulk import from CSV</h2>
+                <VendorImportClient onImported={refresh} />
             </section>
 
             <section className="card">
