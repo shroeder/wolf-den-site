@@ -7,11 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import VendorImportClient from "@/components/VendorImportClient";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
-const GAMES = [
-    { id: "", label: "All" },
-    { id: "pokemon", label: "Pokemon" },
-    { id: "magic", label: "Magic" },
-];
+const DEFAULT_GAMES = [{ id: "", label: "All" }];
 
 const priceFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
@@ -20,6 +16,7 @@ function formatPrice(value) {
 }
 
 function AddListingForm({ onAdded }) {
+    const [games, setGames] = useState(DEFAULT_GAMES);
     const [game, setGame] = useState("");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
@@ -32,6 +29,26 @@ function AddListingForm({ onAdded }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const abortRef = useRef(null);
+
+    useEffect(() => {
+        let ignore = false;
+
+        (async () => {
+            try {
+                const response = await fetch("/api/marketplace/games");
+                const data = await response.json().catch(() => null);
+                if (!ignore && response.ok && Array.isArray(data?.games)) {
+                    setGames([{ id: "", label: "All" }, ...data.games.map((g) => ({ id: g.slug, label: g.label }))]);
+                }
+            } catch {
+                /* keep the default */
+            }
+        })();
+
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     useEffect(() => {
         const trimmed = query.trim();
@@ -127,7 +144,7 @@ function AddListingForm({ onAdded }) {
     return (
         <form className="contact-form mkt-add-form" onSubmit={submit}>
             <div className="lf-game-toggle" role="group" aria-label="Filter catalog by game">
-                {GAMES.map((g) => (
+                {games.map((g) => (
                     <button
                         key={g.id || "all"}
                         type="button"

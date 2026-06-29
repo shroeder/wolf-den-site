@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { TCG_GAMES } from "@/lib/tcg-games";
 
 // Buyer-facing reads. Search is CATALOG-CENTRIC: it queries tcg_cards (the daily tcgcsv source of
 // truth for what an item is + its market price), restricted to products at least one active vendor
@@ -202,6 +203,15 @@ export async function listVendorsForBrowse() {
         longitude: toNumber(row.longitude),
         listingCount: Number(row.listing_count) || 0,
     }));
+}
+
+// Games that actually have catalog data, in registry order (drives the dynamic game filters). Read
+// from tcg_sets (hundreds of rows) rather than tcg_cards (millions) for speed.
+export async function listAvailableGames() {
+    const rows = await db.query("SELECT DISTINCT game FROM tcg_sets");
+    const present = new Set(rows.map((r) => r.game));
+
+    return TCG_GAMES.filter((g) => present.has(g.slug)).map((g) => ({ slug: g.slug, label: g.label }));
 }
 
 // Catalog typeahead for a vendor adding a listing — searches the WHOLE catalog (not restricted to

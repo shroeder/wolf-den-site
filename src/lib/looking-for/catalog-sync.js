@@ -2,16 +2,10 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
+import { gameForCategoryId } from "@/lib/tcg-games";
 
 const TCGCSV_BASE = "https://tcgcsv.com";
 const USER_AGENT = "WolfDenSite/1.0 (+https://www.wolfdengamingmn.com)";
-
-// Categories whose tcgplayer display name matches one of these keywords are ingested. Scope is
-// intentionally Magic + Pokemon for launch (see plan); add keywords here to widen coverage.
-const GAME_BY_KEYWORD = [
-    { keyword: "pokemon", game: "pokemon" },
-    { keyword: "magic", game: "magic" },
-];
 
 // The cron runs once a day and aims to refresh the whole catalog in a single run. Groups are
 // ingested in small concurrent batches (each group = two tcgcsv fetches + batched upserts), and
@@ -68,18 +62,6 @@ async function fetchText(url) {
     return (await response.text()).trim();
 }
 
-function gameForCategoryName(name) {
-    const normalized = String(name || "").toLowerCase();
-
-    for (const { keyword, game } of GAME_BY_KEYWORD) {
-        if (normalized.includes(keyword)) {
-            return game;
-        }
-    }
-
-    return null;
-}
-
 function getExtendedValue(extendedData, fieldName) {
     if (!Array.isArray(extendedData)) {
         return null;
@@ -132,11 +114,10 @@ async function discoverGroups() {
     const selected = [];
 
     for (const category of categories) {
-        const name = category?.displayName || category?.name || "";
-        const game = gameForCategoryName(name);
+        const match = category?.categoryId ? gameForCategoryId(category.categoryId) : null;
 
-        if (game && category?.categoryId) {
-            selected.push({ categoryId: category.categoryId, game });
+        if (match) {
+            selected.push({ categoryId: category.categoryId, game: match.slug });
         }
     }
 

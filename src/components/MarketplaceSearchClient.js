@@ -4,11 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-const GAMES = [
-    { id: "", label: "All games" },
-    { id: "pokemon", label: "Pokemon" },
-    { id: "magic", label: "Magic" },
-];
+const DEFAULT_GAMES = [{ id: "", label: "All games" }];
 
 const KINDS = [
     { id: "", label: "Everything" },
@@ -70,7 +66,29 @@ export default function MarketplaceSearchClient() {
     const [results, setResults] = useState([]);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState("");
+    const [games, setGames] = useState(DEFAULT_GAMES);
     const abortRef = useRef(null);
+
+    // Load the games that actually have catalog data (dynamic — grows as the sync widens).
+    useEffect(() => {
+        let ignore = false;
+
+        (async () => {
+            try {
+                const response = await fetch("/api/marketplace/games");
+                const data = await response.json().catch(() => null);
+                if (!ignore && response.ok && Array.isArray(data?.games)) {
+                    setGames([{ id: "", label: "All games" }, ...data.games.map((g) => ({ id: g.slug, label: g.label }))]);
+                }
+            } catch {
+                /* keep the default */
+            }
+        })();
+
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     // Debounced search. Empty query returns the most-stocked items so the grid is never blank.
     useEffect(() => {
@@ -136,7 +154,7 @@ export default function MarketplaceSearchClient() {
 
             <section className="card">
                 <div className="lf-game-toggle" role="group" aria-label="Filter by game">
-                    {GAMES.map((option) => (
+                    {games.map((option) => (
                         <button
                             key={option.id || "all"}
                             type="button"

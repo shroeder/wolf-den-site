@@ -138,6 +138,21 @@ email+password as the phone app, one identity across phone + web.
       delete). Later, capturing what actually sells is the likely path to monetizing the app — design
       the sold-state + transaction record then, not now.
 
+## Catalog coverage (tcgcsv sync)
+
+The daily `tcg-catalog-sync` cron was Pokémon + Magic only. Widened 2026-06-29 to **~12 major
+games** via a curated registry: **`src/lib/tcg-games.js`** (`TCG_GAMES` = categoryId + slug + label).
+It's the single source of truth — the sync (`catalog-sync.js` `discoverGroups`) selects categories
+from it, and the game filters (marketplace search, vendor portal) render from it via
+`GET /api/marketplace/games` (`listAvailableGames` = distinct games present in `tcg_sets`). Add/remove
+a row in `TCG_GAMES` to change coverage. Current 12: magic, pokemon, yugioh, lorcana, one-piece,
+flesh-and-blood, digimon, star-wars-unlimited, dragon-ball-fusion, gundam, union-arena, riftbound.
+
+New games are discovered when the ingest queue rebuilds — either when tcgcsv publishes a new daily
+snapshot, or by resetting `tcg_ingest_state.source_last_updated`. Initial seed of the added games
+spans a few daily cron runs. Looking For (`LookingForClient`) still hardcodes pokemon/magic toggles —
+extend it to the registry later if desired.
+
 ## Open questions / risks
 
 - **Public wholesale pricing.** Buyers are open, so vendors' ~80%-of-market asks are publicly visible,
