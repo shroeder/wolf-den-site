@@ -4345,23 +4345,27 @@ body.tv-mode .shop-mobile-cart-fab {
     margin: 0.3rem 0 0;
     padding: 0.3rem;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--elevated);
-    max-height: 280px;
+    max-height: 380px;
     overflow-y: auto;
+}
+
+.mkt-picker li + li {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .mkt-picker-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     width: 100%;
     text-align: left;
     background: none;
     border: none;
     color: var(--ink);
-    padding: 0.4rem 0.5rem;
-    border-radius: 8px;
+    padding: 0.55rem 0.5rem;
+    border-radius: 10px;
     cursor: pointer;
     font: inherit;
 }
@@ -4371,8 +4375,34 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 .mkt-picker-thumb {
-    border-radius: 4px;
+    width: 64px;
+    height: 90px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
     flex-shrink: 0;
+}
+
+.mkt-picker-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.mkt-picker-name {
+    font-size: 0.92rem;
+    line-height: 1.25;
+    font-weight: 600;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.mkt-picker-meta {
+    font-size: 0.78rem;
+    color: var(--muted);
 }
 
 .mkt-listing-edit label {

@@ -174,11 +174,16 @@ function AddListingForm({ onAdded }) {
                         <li key={r.catalogProductId}>
                             <button type="button" className="mkt-picker-item" onClick={() => pick(r)}>
                                 {r.imageUrl ? (
-                                    <Image src={r.imageUrl} alt="" width={32} height={45} className="mkt-picker-thumb" />
-                                ) : null}
-                                <span>
-                                    {r.name}
-                                    <span className="mkt-offer-meta"> · {r.setName}{r.marketPrice != null ? ` · mkt ${formatPrice(r.marketPrice)}` : ""}</span>
+                                    <Image src={r.imageUrl} alt="" width={64} height={90} className="mkt-picker-thumb" />
+                                ) : (
+                                    <span className="mkt-picker-thumb mkt-picker-thumb-empty" aria-hidden="true" />
+                                )}
+                                <span className="mkt-picker-text">
+                                    <span className="mkt-picker-name">{r.name}</span>
+                                    <span className="mkt-picker-meta">
+                                        {r.setName}
+                                        {r.marketPrice != null ? ` · mkt ${formatPrice(r.marketPrice)}` : ""}
+                                    </span>
                                 </span>
                             </button>
                         </li>
