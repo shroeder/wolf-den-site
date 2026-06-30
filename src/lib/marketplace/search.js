@@ -298,7 +298,8 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
 // if the vendor isn't active.
 export async function getVendorStorefront(vendorId) {
     const vendor = await db.queryOne(
-        `SELECT id, display_name, location_label, region, city, latitude, longitude
+        `SELECT id, display_name, location_label, region, city, latitude, longitude,
+                created_at, accepted_at
          FROM mkt_vendor
          WHERE id = $1 AND status = 'active'`,
         [vendorId]
@@ -311,7 +312,7 @@ export async function getVendorStorefront(vendorId) {
     const listings = await db.query(
         `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade,
                 l.price, l.quantity, l.catalog_product_id,
-                l.title, l.set_name, l.card_number,
+                l.title, l.set_name, l.card_number, l.updated_at,
                 COALESCE(l.image_url, c.image_url) AS image_url,
                 c.market_price
          FROM mkt_listing l
@@ -321,6 +322,13 @@ export async function getVendorStorefront(vendorId) {
         [vendorId]
     );
 
+    // Objective reputation signals (no star ratings): vetted (active = hand-approved by The Wolf
+    // Den), tenure, catalog depth, and freshness.
+    const lastListedAt = listings.reduce((latest, row) => {
+        const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+        return t > latest ? t : latest;
+    }, 0);
+
     return {
         id: vendor.id,
         displayName: vendor.display_name,
@@ -329,6 +337,10 @@ export async function getVendorStorefront(vendorId) {
         city: vendor.city,
         latitude: toNumber(vendor.latitude),
         longitude: toNumber(vendor.longitude),
+        verified: true,
+        memberSince: toIso(vendor.accepted_at || vendor.created_at),
+        listingCount: listings.length,
+        lastListedAt: lastListedAt ? new Date(lastListedAt).toISOString() : null,
         listings: listings.map((row) => ({
             listingId: row.id,
             kind: row.kind,

@@ -4069,6 +4069,41 @@ body.tv-mode .shop-mobile-cart-fab {
     overflow-y: auto;
 }
 
+/* Vendor reputation trust strip (objective signals, no star ratings). */
+.mkt-trust {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.75rem;
+    margin-top: 0.6rem;
+}
+
+.mkt-trust-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(212, 175, 55, 0.16);
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.mkt-trust-item {
+    font-size: 0.8rem;
+    color: var(--ink-secondary);
+}
+
+.mkt-offer-vendor {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.mkt-offer-vendor:hover {
+    text-decoration: underline;
+}
+
 /* Compact one-line filter bar: search grows, game + type are dropdowns (not pill walls). */
 .mkt-filter-row {
     display: flex;

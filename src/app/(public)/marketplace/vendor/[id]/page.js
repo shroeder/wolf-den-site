@@ -21,6 +21,26 @@ function formatPrice(value) {
     return value === null || value === undefined ? null : priceFormatter.format(Number(value));
 }
 
+function monthYear(iso) {
+    const d = iso ? new Date(iso) : null;
+    return d && !Number.isNaN(d.getTime())
+        ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+        : null;
+}
+
+function sinceLabel(iso) {
+    const then = Date.parse(iso || "");
+    if (Number.isNaN(then)) return null;
+    const days = Math.round((Date.now() - then) / 86400000);
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 30) return `${days} days ago`;
+    const months = Math.round(days / 30);
+    if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+    const years = Math.round(months / 12);
+    return `${years} year${years === 1 ? "" : "s"} ago`;
+}
+
 export async function generateMetadata({ params }) {
     const { id } = await params;
     const vendor = await getVendorStorefront(id);
@@ -100,9 +120,18 @@ export default async function VendorStorefrontPage({ params }) {
                 </p>
                 <h1>{vendor.displayName}</h1>
                 <p className="muted">{vendor.locationLabel || vendor.region || "Location TBD"}</p>
-                <p className="muted">
-                    {vendor.listings.length} item{vendor.listings.length === 1 ? "" : "s"} in stock
-                </p>
+                <div className="mkt-trust">
+                    <span className="mkt-trust-badge">✓ Verified vendor</span>
+                    {monthYear(vendor.memberSince) ? (
+                        <span className="mkt-trust-item">Member since {monthYear(vendor.memberSince)}</span>
+                    ) : null}
+                    <span className="mkt-trust-item">
+                        {vendor.listingCount} active listing{vendor.listingCount === 1 ? "" : "s"}
+                    </span>
+                    {sinceLabel(vendor.lastListedAt) ? (
+                        <span className="mkt-trust-item">Updated {sinceLabel(vendor.lastListedAt)}</span>
+                    ) : null}
+                </div>
             </section>
 
             <section className="card">

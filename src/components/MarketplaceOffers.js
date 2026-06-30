@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
@@ -118,7 +119,9 @@ function OfferRow({ offer, productName }) {
                 <div className="mkt-offer-main">
                     <span className="mkt-offer-price">{formatPrice(offer.price)}</span>
                     <span className="mkt-offer-meta">
-                        {offer.vendor.displayName}
+                        <Link href={`/marketplace/vendor/${offer.vendor.id}`} className="mkt-offer-vendor">
+                            ✓ {offer.vendor.displayName}
+                        </Link>
                         {offer.vendor.locationLabel ? ` · ${offer.vendor.locationLabel}` : ""}
                     </span>
                     <span className="mkt-offer-meta">
