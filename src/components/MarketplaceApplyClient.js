@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const EMPTY = {
     businessName: "",
@@ -19,6 +19,28 @@ export default function MarketplaceApplyClient() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [done, setDone] = useState(false);
+    const [vendor, setVendor] = useState(null);
+
+    // If they're already a signed-in vendor, send them to their portal instead of the apply form.
+    useEffect(() => {
+        let ignore = false;
+
+        (async () => {
+            try {
+                const response = await fetch("/api/marketplace/vendor/me", { cache: "no-store" });
+                const data = await response.json().catch(() => null);
+                if (!ignore && response.ok && data?.vendor) {
+                    setVendor(data.vendor);
+                }
+            } catch {
+                /* not signed in — show the form */
+            }
+        })();
+
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     function update(field) {
         return (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -68,6 +90,25 @@ export default function MarketplaceApplyClient() {
         );
     }
 
+    if (vendor) {
+        return (
+            <div className="stack reveal">
+                <section className="card hero-accent">
+                    <h1>Welcome back</h1>
+                    <p>
+                        You&apos;re signed in as <strong>{vendor.displayName}</strong>. Head to your portal to manage
+                        your listings.
+                    </p>
+                    <p className="mkt-hero-links">
+                        <Link href="/marketplace/portal" className="button primary">
+                            Go to my portal →
+                        </Link>
+                    </p>
+                </section>
+            </div>
+        );
+    }
+
     return (
         <div className="stack reveal">
             <section className="card hero-accent">
@@ -75,6 +116,11 @@ export default function MarketplaceApplyClient() {
                 <p>
                     Sell your sealed product and singles to buyers across the marketplace. Vendors are hand-vetted —
                     tell us about your business and we&apos;ll reach out if it&apos;s a fit.
+                </p>
+                <p className="mkt-hero-links">
+                    <Link href="/marketplace/portal" className="pill">
+                        Already a vendor? Sign in
+                    </Link>
                 </p>
             </section>
 
