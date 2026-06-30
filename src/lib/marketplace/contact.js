@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendVendorContactEmail } from "@/lib/marketplace/email.js";
+import { notifyNewLead } from "@/lib/marketplace/notify.js";
 import { markListingSold } from "@/lib/marketplace/sales.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -44,6 +45,20 @@ export async function createContactRequest({ listingId, buyerName, buyerEmail, m
          RETURNING id`,
         [listing.id, listing.vendor_id, buyerName || null, String(buyerEmail).trim(), trimmedMessage]
     );
+
+    // Fast nudge to Discord (best-effort) — runs even if the vendor email below fails, so a lead is
+    // never silently missed. Awaited but self-contained: it swallows its own errors.
+    await notifyNewLead({
+        vendorName: listing.vendor_name,
+        buyerName,
+        buyerEmail: String(buyerEmail).trim(),
+        itemTitle: listing.title,
+        price: listing.price !== null && listing.price !== undefined ? Number(listing.price) : null,
+        message: trimmedMessage,
+        productUrl: listing.catalog_product_id
+            ? new URL(`/marketplace/product/${listing.catalog_product_id}`, process.env.NEXT_PUBLIC_BASE_URL || "https://www.wolfdengamingmn.com").toString()
+            : null,
+    });
 
     try {
         await sendVendorContactEmail({
