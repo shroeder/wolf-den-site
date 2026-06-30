@@ -374,8 +374,14 @@ export default function VendorPortalClient({ vendor, listings }) {
             </section>
 
             <section className="card">
-                <h2>Bulk import from CSV</h2>
-                <VendorImportClient onImported={refresh} />
+                <details className="mkt-collapse">
+                    <summary className="mkt-collapse-summary">
+                        <h2>Bulk import from CSV</h2>
+                    </summary>
+                    <div className="mkt-collapse-body">
+                        <VendorImportClient onImported={refresh} />
+                    </div>
+                </details>
             </section>
 
             <section className="card">
