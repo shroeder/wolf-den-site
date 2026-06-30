@@ -48,22 +48,45 @@ h3 {
     overflow-wrap: break-word;
 }
 
-/* Compact, correctly-sized headings on phones (browser defaults are too large here). */
+/* App-like density on phones, site-wide. Generic, low-specificity rules — bespoke pages with
+   class-scoped styling override these. The marketplace (.mkt-app) layers on slightly tighter values. */
 @media (max-width: 600px) {
-    h1 {
-        font-size: 1.7rem;
-    }
-
-    h2 {
-        font-size: 1.3rem;
-    }
-
     .content {
-        padding: 1rem 0 2rem;
+        padding: 0.7rem 0 1.5rem;
+    }
+
+    .stack {
+        gap: 0.6rem;
     }
 
     .card {
-        padding: 0.9rem 1rem;
+        padding: 0.8rem;
+        border-radius: 14px;
+    }
+
+    .hero-accent {
+        padding: 0.85rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    h2 {
+        font-size: 1.2rem;
+    }
+
+    .lead {
+        font-size: 1rem;
+    }
+
+    .contact-form {
+        gap: 0.45rem;
+    }
+
+    .pill {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
     }
 }
 
