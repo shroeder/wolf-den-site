@@ -4060,6 +4060,15 @@ body.tv-mode .shop-mobile-cart-fab {
     color: var(--muted);
 }
 
+.mkt-deadend {
+    margin-top: 0.5rem;
+}
+
+.mkt-wanted-list {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
 /* Compact one-line filter bar: search grows, game + type are dropdowns (not pill walls). */
 .mkt-filter-row {
     display: flex;

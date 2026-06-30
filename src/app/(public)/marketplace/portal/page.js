@@ -2,6 +2,7 @@ import VendorLoginClient from "@/components/VendorLoginClient";
 import VendorPortalClient from "@/components/VendorPortalClient";
 import { listVendorListings } from "@/lib/marketplace/listings.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
+import { listMostWanted } from "@/lib/marketplace/wants.js";
 
 export const metadata = {
     title: "Vendor Portal | Wolf Den Marketplace",
@@ -17,7 +18,10 @@ export default async function VendorPortalPage() {
         return <VendorLoginClient />;
     }
 
-    const listings = await listVendorListings(vendor.id);
+    const [listings, wanted] = await Promise.all([
+        listVendorListings(vendor.id),
+        listMostWanted(30).catch(() => []),
+    ]);
 
-    return <VendorPortalClient vendor={vendor} listings={listings} />;
+    return <VendorPortalClient vendor={vendor} listings={listings} wanted={wanted} />;
 }

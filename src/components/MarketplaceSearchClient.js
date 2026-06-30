@@ -69,6 +69,7 @@ export default function MarketplaceSearchClient() {
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState("");
     const [games, setGames] = useState(DEFAULT_GAMES);
+    const [catalogResults, setCatalogResults] = useState([]);
     const abortRef = useRef(null);
 
     // Load the games that actually have catalog data (dynamic — grows as the sync widens).
@@ -135,6 +136,39 @@ export default function MarketplaceSearchClient() {
 
         return () => clearTimeout(handle);
     }, [query, game, kind]);
+
+    // Dead-end capture: when nobody stocks the search, look it up in the full catalog so the buyer
+    // can ask to be notified when a vendor lists it.
+    useEffect(() => {
+        let ignore = false;
+
+        // All state updates happen inside the deferred callback (never synchronously in the effect body).
+        const handle = setTimeout(async () => {
+            if (searching || results.length > 0 || query.trim().length < 2) {
+                setCatalogResults([]);
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({ q: query.trim() });
+                if (game) params.set("game", game);
+                const response = await fetch(`/api/marketplace/catalog-search?${params.toString()}`, { cache: "no-store" });
+                const data = await response.json().catch(() => null);
+                if (!ignore && response.ok) {
+                    setCatalogResults(Array.isArray(data?.results) ? data.results : []);
+                }
+            } catch {
+                /* leave empty */
+            }
+        }, 150);
+
+        return () => {
+            ignore = true;
+            clearTimeout(handle);
+        };
+    }, [results, query, game, searching]);
+
+    const deadEnd = !searching && !error && results.length === 0 && query.trim().length >= 2;
 
     return (
         <div className="stack reveal">
@@ -208,12 +242,56 @@ export default function MarketplaceSearchClient() {
 
                 {searching ? <p className="muted">Searching...</p> : null}
                 {error ? <p className="muted">{error}</p> : null}
-                {!searching && !error && results.length === 0 ? (
-                    <p className="muted">
-                        {query.trim()
-                            ? "No vendor has that in stock right now. Try a different search."
-                            : "No marketplace inventory yet."}
-                    </p>
+                {!searching && !error && results.length === 0 && query.trim().length < 2 ? (
+                    <p className="muted">No marketplace inventory yet.</p>
+                ) : null}
+
+                {deadEnd && catalogResults.length > 0 ? (
+                    <div className="mkt-deadend">
+                        <p className="muted">
+                            No vendor has this in stock yet — tap a product and we&apos;ll email you the moment one
+                            lists it.
+                        </p>
+                        <div className="mkt-grid">
+                            {catalogResults.map((item) => (
+                                <Link
+                                    key={item.catalogProductId}
+                                    href={`/marketplace/product/${item.catalogProductId}`}
+                                    className="mkt-card"
+                                >
+                                    <div className="mkt-card-art">
+                                        {item.imageUrl ? (
+                                            <Image
+                                                src={item.imageUrl}
+                                                alt={item.name}
+                                                width={146}
+                                                height={204}
+                                                sizes="146px"
+                                                className="mkt-card-image"
+                                            />
+                                        ) : (
+                                            <div className="mkt-card-image mkt-card-image-empty" aria-hidden="true" />
+                                        )}
+                                    </div>
+                                    <div className="mkt-card-body">
+                                        <h3 className="mkt-card-name">{item.name}</h3>
+                                        <p className="mkt-card-meta">
+                                            {item.setName}
+                                            {item.number ? ` · #${item.number}` : ""}
+                                        </p>
+                                        {item.marketPrice != null ? (
+                                            <p className="mkt-card-market">Market {formatPrice(item.marketPrice)}</p>
+                                        ) : null}
+                                        <p className="mkt-card-sub">🔔 Notify me</p>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
+                {deadEnd && catalogResults.length === 0 ? (
+                    <p className="muted">No match found. Try a different spelling.</p>
                 ) : null}
 
                 <div className="mkt-grid">

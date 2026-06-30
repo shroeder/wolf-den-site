@@ -400,7 +400,7 @@ function ListingRow({ listing, onChanged }) {
     );
 }
 
-export default function VendorPortalClient({ vendor, listings }) {
+export default function VendorPortalClient({ vendor, listings, wanted = [] }) {
     const router = useRouter();
     const refresh = () => router.refresh();
 
@@ -422,6 +422,30 @@ export default function VendorPortalClient({ vendor, listings }) {
                     </button>
                 </div>
             </section>
+
+            {wanted.length > 0 ? (
+                <section className="card">
+                    <h2>Most wanted by buyers</h2>
+                    <p className="muted">What shoppers are asking for right now — a shopping list of what to stock.</p>
+                    <ul className="mkt-admin-list mkt-wanted-list">
+                        {wanted.map((w) => (
+                            <li key={w.catalogProductId} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{w.name}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {w.setName}
+                                        {w.number ? ` · #${w.number}` : ""}
+                                        {w.marketPrice != null ? ` · mkt ${formatPrice(w.marketPrice)}` : ""}
+                                    </span>
+                                </div>
+                                <span className="shop-qty-badge">
+                                    {w.wantCount} want{w.wantCount === 1 ? "" : "s"}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
 
             <section className="card">
                 <h2>Add a listing</h2>
