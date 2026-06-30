@@ -242,6 +242,7 @@ export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
          JOIN tcg_sets s ON s.id = c.set_id
          WHERE (c.name ILIKE $1 OR s.name ILIKE $1)
            AND c.name NOT ILIKE '%code card%'
+           AND c.name NOT ILIKE '%[set of%'
            ${gameClause}
          ORDER BY
            (CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
