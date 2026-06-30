@@ -1,6 +1,7 @@
 import { events } from "@/lib/events";
 import { listInStockForSitemap } from "@/lib/inventory-feed/feed";
 import { productHandle } from "@/lib/inventory-feed/product-url";
+import { listIndexableMarketplaceProductIds, listVendorsForBrowse } from "@/lib/marketplace/search.js";
 import { SITE_URL } from "@/lib/site";
 
 const BASE_URL = SITE_URL;
@@ -152,5 +153,30 @@ export default async function sitemap() {
         productRoutes = [];
     }
 
-    return [...staticRoutes, ...eventRoutes, ...productRoutes];
+    // Marketplace: index only products a vendor actually stocks, plus active vendor storefronts.
+    let marketplaceRoutes = [];
+    try {
+        const [productIds, vendors] = await Promise.all([
+            listIndexableMarketplaceProductIds(),
+            listVendorsForBrowse(),
+        ]);
+        marketplaceRoutes = [
+            ...productIds.map((id) => ({
+                url: `${BASE_URL}/marketplace/product/${id}`,
+                lastModified: new Date(),
+                changeFrequency: "daily",
+                priority: 0.5,
+            })),
+            ...vendors.map((vendor) => ({
+                url: `${BASE_URL}/marketplace/vendor/${vendor.id}`,
+                lastModified: new Date(),
+                changeFrequency: "weekly",
+                priority: 0.4,
+            })),
+        ];
+    } catch {
+        marketplaceRoutes = [];
+    }
+
+    return [...staticRoutes, ...eventRoutes, ...productRoutes, ...marketplaceRoutes];
 }

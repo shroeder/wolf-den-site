@@ -183,6 +183,19 @@ export async function getProductWithOffers(catalogProductId) {
     };
 }
 
+// Catalog product ids a vendor actually has in stock — the only marketplace product pages worth
+// indexing (the catalog has millions of rows; we index only what someone is selling).
+export async function listIndexableMarketplaceProductIds() {
+    const rows = await db.query(
+        `SELECT DISTINCT l.catalog_product_id AS id
+         FROM mkt_listing l
+         JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
+         WHERE l.status = 'active' AND l.catalog_product_id IS NOT NULL`
+    );
+
+    return rows.map((row) => String(row.id));
+}
+
 // Browse mode: active vendors that actually have inventory, with location for the map + a list.
 export async function listVendorsForBrowse() {
     const rows = await db.query(

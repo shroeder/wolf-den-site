@@ -4,6 +4,10 @@ import { notFound } from "next/navigation";
 
 import MarketplaceOffers from "@/components/MarketplaceOffers";
 import { getProductWithOffers } from "@/lib/marketplace/search.js";
+import { SITE_URL } from "@/lib/site";
+
+// Regenerate cached HTML every 30 min as vendor offers change.
+export const revalidate = 1800;
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -19,13 +23,25 @@ export async function generateMetadata({ params }) {
     const product = await getProductWithOffers(id);
 
     if (!product) {
-        return { title: "Marketplace", description: "The Wolf Den Vendor Marketplace." };
+        return { title: "Marketplace", description: "The Wolf Den Vendor Marketplace.", robots: { index: false, follow: true } };
     }
+
+    const canonical = `/marketplace/product/${product.catalogProductId}`;
+    const description = `See vendor prices for ${product.name}${product.setName ? ` (${product.setName})` : ""} on The Wolf Den Vendor Marketplace.`;
 
     return {
         title: `${product.name} | Wolf Den Marketplace`,
-        description: `See vendor prices for ${product.name}${product.setName ? ` (${product.setName})` : ""} on The Wolf Den Vendor Marketplace.`,
-        alternates: { canonical: `/marketplace/product/${product.catalogProductId}` },
+        description,
+        alternates: { canonical },
+        // Only index products a vendor actually has in stock — never the empty catalog pages.
+        robots: product.offers.length > 0 ? undefined : { index: false, follow: true },
+        openGraph: {
+            title: product.name,
+            description,
+            url: canonical,
+            type: "website",
+            images: product.imageUrl ? [product.imageUrl] : undefined,
+        },
     };
 }
 
@@ -38,6 +54,27 @@ export default async function MarketplaceProductPage({ params }) {
     }
 
     const marketPrice = formatPrice(product.marketPrice);
+
+    const offerPrices = product.offers.map((o) => o.price).filter((p) => p != null);
+    const jsonLd =
+        offerPrices.length > 0
+            ? {
+                  "@context": "https://schema.org",
+                  "@type": "Product",
+                  name: product.name,
+                  ...(product.imageUrl ? { image: [product.imageUrl] } : {}),
+                  ...(product.setName ? { category: product.setName } : {}),
+                  offers: {
+                      "@type": "AggregateOffer",
+                      priceCurrency: "USD",
+                      lowPrice: Math.min(...offerPrices).toFixed(2),
+                      highPrice: Math.max(...offerPrices).toFixed(2),
+                      offerCount: product.offers.length,
+                      availability: "https://schema.org/InStock",
+                      url: `${SITE_URL}/marketplace/product/${product.catalogProductId}`,
+                  },
+              }
+            : null;
 
     return (
         <div className="stack reveal">
@@ -83,6 +120,10 @@ export default async function MarketplaceProductPage({ params }) {
                 <h2>Vendor offers</h2>
                 <MarketplaceOffers offers={product.offers} productName={product.name} />
             </section>
+
+            {jsonLd ? (
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+            ) : null}
         </div>
     );
 }
