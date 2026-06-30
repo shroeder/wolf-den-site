@@ -16,6 +16,17 @@ function formatPrice(value) {
     return value === null || value === undefined ? "—" : priceFormatter.format(Number(value));
 }
 
+// Infer sealed vs single from a catalog product: sealed product names match these keywords; otherwise
+// a collector number or rarity means it's a single.
+const SEALED_NAME = /booster box|booster bundle|elite trainer|\betb\b|premium collection|collection box|\btin\b|blister|booster pack|build & battle|\bbundle\b|\bcase\b|display|sealed/i;
+
+function inferKind(product) {
+    if (SEALED_NAME.test(String(product?.name || ""))) {
+        return "sealed";
+    }
+    return product?.number || product?.rarity ? "single" : "sealed";
+}
+
 function AddListingForm({ onAdded }) {
     const [games, setGames] = useState(DEFAULT_GAMES);
     const [game, setGame] = useState("");
@@ -88,6 +99,7 @@ function AddListingForm({ onAdded }) {
     function pick(product) {
         setSelected(product);
         setTitle(product.name);
+        setKind(inferKind(product));
     }
 
     function startManual() {
