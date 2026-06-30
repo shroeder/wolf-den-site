@@ -50,10 +50,10 @@ export default function PokemonCardsPage() {
                 </div>
                 <div className="showcase-media">
                     <Image
-                        src="/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg"
-                        alt="Pokemon sealed products and accessories on store shelves at The Wolf Den in Montgomery, Minnesota"
-                        width={1200}
-                        height={900}
+                        src="/images/pokemon-store-display-cases-the-wolf-den-montgomery-mn.jpg"
+                        alt="Interior of The Wolf Den in Montgomery, Minnesota with Pokemon singles display cases and sealed product shelves"
+                        width={1600}
+                        height={2133}
                         sizes="(max-width: 900px) 100vw, 45vw"
                         className="hero-photo"
                     />
@@ -94,10 +94,10 @@ export default function PokemonCardsPage() {
                 <article className="card lift">
                     <h2>Pokemon Product Shelves</h2>
                     <Image
-                        src="/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg"
-                        alt="Pokemon ETBs, booster boxes, and sealed product on retail shelves at The Wolf Den in Montgomery, Minnesota"
-                        width={1200}
-                        height={900}
+                        src="/images/pokemon-sealed-product-display-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon ETBs, booster boxes, binder collections, and sealed product on the shelves at The Wolf Den in Montgomery, Minnesota"
+                        width={1600}
+                        height={2133}
                         sizes="(max-width: 900px) 100vw, 48vw"
                         className="content-photo"
                     />
@@ -105,10 +105,10 @@ export default function PokemonCardsPage() {
                 <article className="card lift">
                     <h2>Pokemon Singles</h2>
                     <Image
-                        src="/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg"
-                        alt="Pokemon singles display case inventory at The Wolf Den local game store in Montgomery, Minnesota"
-                        width={1200}
-                        height={900}
+                        src="/images/pokemon-singles-glass-case-the-wolf-den-montgomery-mn.jpg"
+                        alt="Pokemon singles in toploaders with price tags in the glass display case at The Wolf Den in Montgomery, Minnesota"
+                        width={1600}
+                        height={2133}
                         sizes="(max-width: 900px) 100vw, 48vw"
                         className="content-photo"
                     />
