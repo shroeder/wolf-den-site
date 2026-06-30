@@ -51,11 +51,12 @@ function buildEmbed(row) {
     }
 
     const priceLine = row.price != null ? `\n${currency.format(Number(row.price))}` : "";
+    const stockLine = Number(row.quantity) > 1 ? `\n${Number(row.quantity)} in stock` : "";
     const categoryLine = row.category_names ? `\n${row.category_names}` : "";
     const embed = {
         title: row.name || "New item",
         url: shopUrl.toString(),
-        description: `${changeVerb(row.last_change_kind)} at The Wolf Den${priceLine}${categoryLine}`,
+        description: `${changeVerb(row.last_change_kind)} at The Wolf Den${priceLine}${stockLine}${categoryLine}`,
         color: EMBED_COLOR,
     };
 
@@ -107,7 +108,7 @@ async function postPendingToDiscord({ force = false } = {}) {
     }
 
     const rows = await db.query(
-        `SELECT variation_id, name, image_url, price, category_names, last_change_kind
+        `SELECT variation_id, name, image_url, price, quantity, category_names, last_change_kind
          FROM inventory_feed
          WHERE in_stock = TRUE
            AND last_change_at IS NOT NULL
