@@ -244,6 +244,7 @@ export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
            AND c.name NOT ILIKE '%code card%'
            ${gameClause}
          ORDER BY
+           (CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
            (CASE WHEN c.name ILIKE $2 THEN 0 ELSE 1 END),
            c.market_price DESC NULLS LAST,
            c.name ASC
