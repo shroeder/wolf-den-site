@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import VendorImportClient from "@/components/VendorImportClient";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
+const GRADERS = ["PSA", "BGS", "CGC", "SGC", "TAG", "ACE", "Other"];
 const DEFAULT_GAMES = [{ id: "", label: "All" }];
 
 const priceFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -24,6 +25,9 @@ function AddListingForm({ onAdded }) {
     const [title, setTitle] = useState("");
     const [kind, setKind] = useState("sealed");
     const [condition, setCondition] = useState("NM");
+    const [graded, setGraded] = useState(false);
+    const [gradingCompany, setGradingCompany] = useState("PSA");
+    const [grade, setGrade] = useState("");
     const [price, setPrice] = useState("");
     const [quantity, setQuantity] = useState("1");
     const [busy, setBusy] = useState(false);
@@ -112,7 +116,10 @@ function AddListingForm({ onAdded }) {
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
                     kind,
-                    condition: kind === "single" ? condition : null,
+                    condition: kind === "single" && !graded ? condition : null,
+                    graded: kind === "single" ? graded : false,
+                    gradingCompany: kind === "single" && graded ? gradingCompany : null,
+                    grade: kind === "single" && graded ? grade.trim() : null,
                     price: Number(price),
                     quantity: Number(quantity) || 1,
                     title: title.trim(),
@@ -136,6 +143,8 @@ function AddListingForm({ onAdded }) {
             setPrice("");
             setQuantity("1");
             setKind("sealed");
+            setGraded(false);
+            setGrade("");
             onAdded();
         } catch (err) {
             setError(err?.message || "Could not add the listing.");
@@ -207,14 +216,39 @@ function AddListingForm({ onAdded }) {
 
                     {kind === "single" ? (
                         <>
-                            <label htmlFor="add-condition">Condition</label>
-                            <select id="add-condition" className="lf-set-select" value={condition} onChange={(e) => setCondition(e.target.value)}>
-                                {CONDITIONS.map((c) => (
-                                    <option key={c} value={c}>
-                                        {c}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="mkt-toggle-row" role="group" aria-label="Graded or raw">
+                                <button type="button" className={`pill${!graded ? " lf-game-active" : ""}`} onClick={() => setGraded(false)}>
+                                    Raw
+                                </button>
+                                <button type="button" className={`pill${graded ? " lf-game-active" : ""}`} onClick={() => setGraded(true)}>
+                                    Graded
+                                </button>
+                            </div>
+                            {graded ? (
+                                <>
+                                    <label htmlFor="add-grader">Grading company</label>
+                                    <select id="add-grader" className="lf-set-select" value={gradingCompany} onChange={(e) => setGradingCompany(e.target.value)}>
+                                        {GRADERS.map((g) => (
+                                            <option key={g} value={g}>
+                                                {g}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <label htmlFor="add-grade">Grade</label>
+                                    <input id="add-grade" type="text" value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="e.g. 10" />
+                                </>
+                            ) : (
+                                <>
+                                    <label htmlFor="add-condition">Condition</label>
+                                    <select id="add-condition" className="lf-set-select" value={condition} onChange={(e) => setCondition(e.target.value)}>
+                                        {CONDITIONS.map((c) => (
+                                            <option key={c} value={c}>
+                                                {c}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </>
+                            )}
                         </>
                     ) : null}
 
@@ -325,7 +359,11 @@ function ListingRow({ listing, onChanged }) {
                 <strong>{listing.title}</strong>
                 <span className="mkt-offer-meta">
                     {listing.kind}
-                    {listing.condition ? ` · ${listing.condition}` : ""}
+                    {listing.graded
+                        ? ` · ${[listing.gradingCompany, listing.grade].filter(Boolean).join(" ")}`
+                        : listing.condition
+                          ? ` · ${listing.condition}`
+                          : ""}
                     {listing.setName ? ` · ${listing.setName}` : ""}
                 </span>
                 {error ? <span className="muted">{error}</span> : null}

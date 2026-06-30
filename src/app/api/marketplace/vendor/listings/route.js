@@ -40,6 +40,9 @@ export async function POST(request) {
                     cardNumber: body.cardNumber || null,
                     imageUrl: body.imageUrl || null,
                     condition: body.condition || null,
+                    graded: Boolean(body.graded),
+                    gradingCompany: body.gradingCompany || null,
+                    grade: body.grade || null,
                     price,
                     quantity: Number.isFinite(quantity) && quantity >= 0 ? Math.trunc(quantity) : 1,
                 });

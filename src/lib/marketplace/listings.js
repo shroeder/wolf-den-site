@@ -15,7 +15,8 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 const LISTING_COLUMNS = `id, vendor_id, kind, catalog_product_id, game, title, set_name,
-    card_number, image_url, condition, price, quantity, status, created_at, updated_at`;
+    card_number, image_url, condition, graded, grading_company, grade, price, quantity, status,
+    created_at, updated_at`;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -51,6 +52,9 @@ function mapListing(row) {
         cardNumber: row.card_number,
         imageUrl: row.image_url,
         condition: row.condition,
+        graded: Boolean(row.graded),
+        gradingCompany: row.grading_company,
+        grade: row.grade,
         price: toNumber(row.price),
         quantity: row.quantity,
         status: row.status,
@@ -85,6 +89,9 @@ export async function createListing({
     cardNumber = null,
     imageUrl = null,
     condition = null,
+    graded = false,
+    gradingCompany = null,
+    grade = null,
     price,
     quantity = 1,
 }) {
@@ -92,15 +99,20 @@ export async function createListing({
         throw new Error(`Invalid listing kind: ${kind}`);
     }
 
-    if (!isValidCondition(condition)) {
+    // Grading only applies to singles. A graded single uses company + grade (no condition); a raw
+    // single uses condition; sealed uses none of these.
+    const isGraded = kind === "single" && Boolean(graded);
+    const rawCondition = kind === "single" && !isGraded ? condition : null;
+
+    if (!isValidCondition(rawCondition)) {
         throw new Error(`Invalid condition: ${condition}`);
     }
 
     const row = await db.queryOne(
         `INSERT INTO mkt_listing
             (vendor_id, kind, catalog_product_id, game, title, set_name, card_number,
-             image_url, condition, price, quantity)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             image_url, condition, graded, grading_company, grade, price, quantity)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING ${LISTING_COLUMNS}`,
         [
             vendorId,
@@ -111,7 +123,10 @@ export async function createListing({
             setName,
             cardNumber,
             imageUrl,
-            kind === "single" ? condition : null,
+            rawCondition,
+            isGraded,
+            isGraded ? (gradingCompany ? String(gradingCompany).trim() : null) : null,
+            isGraded ? (grade ? String(grade).trim() : null) : null,
             price,
             quantity,
         ]
@@ -135,6 +150,9 @@ export async function updateListing(id, vendorId, patch = {}) {
         cardNumber: "card_number",
         imageUrl: "image_url",
         condition: "condition",
+        graded: "graded",
+        gradingCompany: "grading_company",
+        grade: "grade",
         price: "price",
         quantity: "quantity",
         game: "game",

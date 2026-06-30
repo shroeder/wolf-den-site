@@ -39,7 +39,11 @@ export async function generateMetadata({ params }) {
 function ListingTile({ listing }) {
     const price = formatPrice(listing.price);
     const market = formatPrice(listing.marketPrice);
-    const condition = listing.condition ? CONDITION_LABELS[listing.condition] || listing.condition : null;
+    const condition = listing.graded
+        ? [listing.gradingCompany, listing.grade].filter(Boolean).join(" ") || "Graded"
+        : listing.condition
+          ? CONDITION_LABELS[listing.condition] || listing.condition
+          : null;
 
     const inner = (
         <>

@@ -19,6 +19,14 @@ function formatPrice(value) {
     return value === null || value === undefined ? "—" : priceFormatter.format(Number(value));
 }
 
+// Graded -> "PSA 10"; raw single -> condition label; sealed -> null.
+function qualityLabel(offer) {
+    if (offer.graded) {
+        return [offer.gradingCompany, offer.grade].filter(Boolean).join(" ") || "Graded";
+    }
+    return offer.condition ? CONDITION_LABELS[offer.condition] || offer.condition : null;
+}
+
 function ContactForm({ offer, productName, onDone }) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -102,7 +110,7 @@ function ContactForm({ offer, productName, onDone }) {
 
 function OfferRow({ offer, productName }) {
     const [open, setOpen] = useState(false);
-    const conditionLabel = offer.condition ? CONDITION_LABELS[offer.condition] || offer.condition : null;
+    const conditionLabel = qualityLabel(offer);
 
     return (
         <li className="mkt-offer">
