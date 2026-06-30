@@ -4035,6 +4035,12 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 0.5rem;
 }
 
+.mkt-search-hint {
+    margin: 0.1rem 0 0;
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
 /* Compact one-line filter bar: search grows, game + type are dropdowns (not pill walls). */
 .mkt-filter-row {
     display: flex;

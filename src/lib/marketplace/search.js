@@ -216,40 +216,52 @@ export async function listAvailableGames() {
 
 // Catalog typeahead for a vendor adding a listing — searches the WHOLE catalog (not restricted to
 // in-stock), so a vendor can list anything that exists in tcg_cards.
-export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
+export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
     const trimmed = String(query || "").trim();
 
     if (trimmed.length < 2) {
         return [];
     }
 
-    // $1 = contains match (name or set), $2 = prefix match (for ranking).
-    const params = [`%${trimmed}%`, `${trimmed}%`];
-    let gameClause = "";
+    // Multi-term AND search: every word must match somewhere (name, set, collector number, rarity, or
+    // set code). So "pikachu surging 58" or "charizard obsidian 125" narrows to the exact card.
+    const terms = trimmed.split(/\s+/).filter(Boolean).slice(0, 6);
+    const params = [];
+    const termClauses = terms.map((term) => {
+        params.push(`%${term}%`);
+        const p = `$${params.length}`;
+        return `(c.name ILIKE ${p} OR s.name ILIKE ${p} OR c.number ILIKE ${p} OR c.rarity ILIKE ${p} OR s.abbreviation ILIKE ${p})`;
+    });
 
+    // Whole-query prefix on name, for ranking exact-ish name matches first.
+    params.push(`${trimmed}%`);
+    const prefixParam = `$${params.length}`;
+
+    let gameClause = "";
     if (game) {
         params.push(game);
         gameClause = `AND c.game = $${params.length}`;
     }
 
-    params.push(Math.min(Number(limit) || 12, 50));
+    params.push(Math.min(Number(limit) || 24, 50));
+    const limitParam = `$${params.length}`;
 
-    // Match name OR set name; drop worthless digital "Code Card" entries; rank by relevance —
-    // name-prefix matches first, then by market value (so real product beats $0.05 filler).
+    // Drop worthless "Code Card" / "[Set of N]" entries; rank name-prefix matches first, then by
+    // market value (so real product beats filler), with bulk case/display/carton units demoted.
     const rows = await db.query(
-        `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, s.name AS set_name
+        `SELECT c.id, c.game, c.name, c.number, c.rarity, c.image_url, c.market_price, s.name AS set_name
          FROM tcg_cards c
          JOIN tcg_sets s ON s.id = c.set_id
-         WHERE (c.name ILIKE $1 OR s.name ILIKE $1)
+         WHERE ${termClauses.join(" AND ")}
            AND c.name NOT ILIKE '%code card%'
            AND c.name NOT ILIKE '%[set of%'
            ${gameClause}
          ORDER BY
            (CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
-           (CASE WHEN c.name ILIKE $2 THEN 0 ELSE 1 END),
+           (CASE WHEN c.name ILIKE ${prefixParam} THEN 0 ELSE 1 END),
            c.market_price DESC NULLS LAST,
            c.name ASC
-         LIMIT $${params.length}`,
+         LIMIT ${limitParam}`,
         params
     );
 
@@ -259,6 +271,7 @@ export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
         name: row.name,
         setName: row.set_name,
         number: row.number,
+        rarity: row.rarity,
         imageUrl: row.image_url,
         marketPrice: toNumber(row.market_price),
     }));

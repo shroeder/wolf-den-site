@@ -159,7 +159,7 @@ function AddListingForm({ onAdded }) {
                 ))}
             </div>
 
-            <label htmlFor="add-search">Search products</label>
+            <label htmlFor="add-search">Search by name, set, or card number</label>
             <input
                 id="add-search"
                 type="text"
@@ -168,9 +168,10 @@ function AddListingForm({ onAdded }) {
                     setQuery(e.target.value);
                     setSelected(null);
                 }}
-                placeholder="e.g. Prismatic Evolutions, Charizard…"
+                placeholder="e.g. Charizard Obsidian 125"
                 autoComplete="off"
             />
+            <p className="mkt-search-hint">Tip: combine words to narrow — name + set + collector number.</p>
 
             {selected ? (
                 <div className="mkt-selected">
@@ -248,7 +249,11 @@ function AddListingForm({ onAdded }) {
                                     </div>
                                     <div className="mkt-card-body">
                                         <h3 className="mkt-card-name">{r.name}</h3>
-                                        <p className="mkt-card-meta">{r.setName}</p>
+                                        <p className="mkt-card-meta">
+                                            {r.setName}
+                                            {r.number ? ` · #${r.number}` : ""}
+                                            {r.rarity ? ` · ${r.rarity}` : ""}
+                                        </p>
                                         {r.marketPrice != null ? <p className="mkt-card-price">mkt {formatPrice(r.marketPrice)}</p> : null}
                                     </div>
                                 </button>
