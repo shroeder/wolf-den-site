@@ -4405,6 +4405,54 @@ body.tv-mode .shop-mobile-cart-fab {
     color: var(--muted);
 }
 
+/* Tile-based product picker (results render as image-forward tiles; tap to select). */
+.mkt-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.4rem;
+}
+
+.mkt-pick-card {
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mkt-link-btn {
+    margin-top: 0.6rem;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    padding: 0.4rem 0;
+    text-align: left;
+}
+
+/* Selected product + its listing fields flow as grid items in the form. */
+.mkt-selected {
+    display: contents;
+}
+
+.mkt-selected-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--brand-strong);
+    border-radius: 12px;
+    background: rgba(212, 175, 55, 0.08);
+}
+
+.mkt-selected-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    flex: 1;
+}
+
 .mkt-listing-edit label {
     display: inline-flex;
     align-items: center;

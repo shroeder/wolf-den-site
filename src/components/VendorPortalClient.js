@@ -84,8 +84,11 @@ function AddListingForm({ onAdded }) {
     function pick(product) {
         setSelected(product);
         setTitle(product.name);
-        setQuery(product.name);
-        setResults([]);
+    }
+
+    function startManual() {
+        setSelected({ catalogProductId: null, name: "", setName: null, number: null, imageUrl: null, game: null, marketPrice: null, manual: true });
+        setTitle("");
     }
 
     async function submit(event) {
@@ -156,7 +159,7 @@ function AddListingForm({ onAdded }) {
                 ))}
             </div>
 
-            <label htmlFor="add-search">Find the product</label>
+            <label htmlFor="add-search">Search products</label>
             <input
                 id="add-search"
                 type="text"
@@ -165,72 +168,104 @@ function AddListingForm({ onAdded }) {
                     setQuery(e.target.value);
                     setSelected(null);
                 }}
-                placeholder="Search the TCG catalog…"
+                placeholder="e.g. Prismatic Evolutions, Charizard…"
                 autoComplete="off"
             />
-            {results.length > 0 ? (
-                <ul className="mkt-picker">
-                    {results.map((r) => (
-                        <li key={r.catalogProductId}>
-                            <button type="button" className="mkt-picker-item" onClick={() => pick(r)}>
-                                {r.imageUrl ? (
-                                    <Image src={r.imageUrl} alt="" width={64} height={90} className="mkt-picker-thumb" />
-                                ) : (
-                                    <span className="mkt-picker-thumb mkt-picker-thumb-empty" aria-hidden="true" />
-                                )}
-                                <span className="mkt-picker-text">
-                                    <span className="mkt-picker-name">{r.name}</span>
-                                    <span className="mkt-picker-meta">
-                                        {r.setName}
-                                        {r.marketPrice != null ? ` · mkt ${formatPrice(r.marketPrice)}` : ""}
-                                    </span>
-                                </span>
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
 
-            <label htmlFor="add-title">Listing title</label>
-            <input id="add-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
+            {selected ? (
+                <div className="mkt-selected">
+                    <div className="mkt-selected-head">
+                        {selected.imageUrl ? (
+                            <Image src={selected.imageUrl} alt="" width={56} height={78} className="mkt-picker-thumb" />
+                        ) : (
+                            <span className="mkt-picker-thumb mkt-picker-thumb-empty" aria-hidden="true" />
+                        )}
+                        <span className="mkt-selected-info">
+                            <strong>{selected.name || "Custom item"}</strong>
+                            <span className="mkt-picker-meta">
+                                {selected.setName || "Not in catalog"}
+                                {selected.marketPrice != null ? ` · mkt ${formatPrice(selected.marketPrice)}` : ""}
+                            </span>
+                        </span>
+                        <button type="button" className="pill" onClick={() => setSelected(null)}>
+                            Change
+                        </button>
+                    </div>
 
-            <div className="mkt-toggle-row" role="group" aria-label="Listing type">
-                <button type="button" className={`pill${kind === "sealed" ? " lf-game-active" : ""}`} onClick={() => setKind("sealed")}>
-                    Sealed
-                </button>
-                <button type="button" className={`pill${kind === "single" ? " lf-game-active" : ""}`} onClick={() => setKind("single")}>
-                    Single
-                </button>
-            </div>
+                    <label htmlFor="add-title">Listing title</label>
+                    <input id="add-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} required />
 
-            {kind === "single" ? (
-                <>
-                    <label htmlFor="add-condition">Condition</label>
-                    <select id="add-condition" className="lf-set-select" value={condition} onChange={(e) => setCondition(e.target.value)}>
-                        {CONDITIONS.map((c) => (
-                            <option key={c} value={c}>
-                                {c}
-                            </option>
-                        ))}
-                    </select>
-                </>
-            ) : null}
+                    <div className="mkt-toggle-row" role="group" aria-label="Listing type">
+                        <button type="button" className={`pill${kind === "sealed" ? " lf-game-active" : ""}`} onClick={() => setKind("sealed")}>
+                            Sealed
+                        </button>
+                        <button type="button" className={`pill${kind === "single" ? " lf-game-active" : ""}`} onClick={() => setKind("single")}>
+                            Single
+                        </button>
+                    </div>
 
-            <div className="mkt-add-row">
-                <div>
-                    <label htmlFor="add-price">Your price ($)</label>
-                    <input id="add-price" type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+                    {kind === "single" ? (
+                        <>
+                            <label htmlFor="add-condition">Condition</label>
+                            <select id="add-condition" className="lf-set-select" value={condition} onChange={(e) => setCondition(e.target.value)}>
+                                {CONDITIONS.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    ) : null}
+
+                    <div className="mkt-add-row">
+                        <div>
+                            <label htmlFor="add-price">Your price ($)</label>
+                            <input id="add-price" type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label htmlFor="add-qty">Quantity</label>
+                            <input id="add-qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <button className="button primary" type="submit" disabled={busy}>
+                        {busy ? "Adding..." : "Add listing"}
+                    </button>
+                    {error ? <p className="muted">{error}</p> : null}
                 </div>
-                <div>
-                    <label htmlFor="add-qty">Quantity</label>
-                    <input id="add-qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            ) : (
+                <div className="mkt-pick-results">
+                    {results.length > 0 ? (
+                        <div className="mkt-pick-grid">
+                            {results.map((r) => (
+                                <button key={r.catalogProductId} type="button" className="mkt-card mkt-pick-card" onClick={() => pick(r)}>
+                                    <div className="mkt-card-art">
+                                        {r.imageUrl ? (
+                                            <Image src={r.imageUrl} alt="" width={146} height={204} className="mkt-card-image" />
+                                        ) : (
+                                            <div className="mkt-card-image mkt-card-image-empty" aria-hidden="true" />
+                                        )}
+                                    </div>
+                                    <div className="mkt-card-body">
+                                        <h3 className="mkt-card-name">{r.name}</h3>
+                                        <p className="mkt-card-meta">{r.setName}</p>
+                                        {r.marketPrice != null ? <p className="mkt-card-price">mkt {formatPrice(r.marketPrice)}</p> : null}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="muted">
+                            {query.trim().length >= 2
+                                ? "No matches — try a different search."
+                                : "Search above to find a product to list."}
+                        </p>
+                    )}
+                    <button type="button" className="mkt-link-btn" onClick={startManual}>
+                        Can&apos;t find it? Add a custom listing →
+                    </button>
                 </div>
-            </div>
-
-            <button className="button primary" type="submit" disabled={busy}>
-                {busy ? "Adding..." : "Add listing"}
-            </button>
-            {error ? <p className="muted">{error}</p> : null}
+            )}
         </form>
     );
 }
