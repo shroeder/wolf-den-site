@@ -60,6 +60,12 @@ a:visited {
     margin: 0 auto;
 }
 
+/* Safety net: never let a stray too-wide child (e.g. a file input) push the page wider than the
+   screen and break the full-width header. Only clips main content; header/banner are outside it. */
+main.content {
+    overflow-x: clip;
+}
+
 .opening-banner {
     background: linear-gradient(90deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.08));
     border-bottom: 2px solid var(--accent);
@@ -4392,6 +4398,12 @@ body.tv-mode .shop-mobile-cart-fab {
     gap: 0.75rem;
     flex-wrap: wrap;
     margin: 0.5rem 0;
+}
+
+/* File inputs don't shrink on their own — keep it inside the screen on mobile. */
+.mkt-import-controls input[type="file"] {
+    max-width: 100%;
+    min-width: 0;
 }
 
 .mkt-import-paste {
