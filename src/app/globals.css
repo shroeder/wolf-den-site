@@ -3992,6 +3992,26 @@ body.tv-mode .shop-mobile-cart-fab {
     white-space: nowrap;
 }
 
+.just-in-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.just-in-filters .lf-game-toggle {
+    margin-bottom: 0;
+}
+
+.just-in-category {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.just-in-category .lf-set-select {
+    width: 100%;
+}
+
 /* ── Vendor Marketplace ───────────────────────────────────────────────── */
 .mkt-toggle-row {
     display: flex;
