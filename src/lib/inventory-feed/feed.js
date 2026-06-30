@@ -12,7 +12,7 @@ const CATEGORY_SEPARATOR = " · ";
  */
 export async function listRecentChanges({ windowHours = DEFAULT_WINDOW_HOURS, limit = 120 } = {}) {
     const rows = await db.query(
-        `SELECT variation_id, name, image_url, price, category_names, last_change_kind, last_change_at
+        `SELECT variation_id, name, image_url, price, quantity, category_names, last_change_kind, last_change_at
          FROM inventory_feed
          WHERE in_stock = TRUE
            AND last_change_at IS NOT NULL
@@ -27,6 +27,7 @@ export async function listRecentChanges({ windowHours = DEFAULT_WINDOW_HOURS, li
         name: row.name,
         imageUrl: row.image_url || null,
         price: row.price == null ? null : Number(row.price),
+        quantity: row.quantity == null ? null : Number(row.quantity),
         kind: row.last_change_kind, // 'new' | 'restock' | 'price_drop'
         categoryNames: row.category_names ? row.category_names.split(CATEGORY_SEPARATOR) : [],
         createdAt: row.last_change_at instanceof Date ? row.last_change_at.toISOString() : row.last_change_at,

@@ -130,6 +130,9 @@ export default function JustInClient({ items }) {
                                         {item.categoryNames.length > 0 && (
                                             <p className="shop-item-category">{item.categoryNames.join(" · ")}</p>
                                         )}
+                                        {item.quantity > 1 && (
+                                            <p className="just-in-qty">{item.quantity} in stock</p>
+                                        )}
                                         <div className="shop-tile-meta-row">
                                             <p className="shop-tile-price">
                                                 {formatPrice(item.price) ?? <span className="muted">See in store</span>}

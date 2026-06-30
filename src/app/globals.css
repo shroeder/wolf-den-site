@@ -3992,6 +3992,13 @@ body.tv-mode .shop-mobile-cart-fab {
     white-space: nowrap;
 }
 
+.just-in-qty {
+    margin: 0.15rem 0 0;
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 .just-in-filters {
     display: flex;
     flex-wrap: wrap;
