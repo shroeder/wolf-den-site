@@ -335,6 +335,22 @@ export async function getVendorStorefront(vendorId) {
     );
     const salesCount = salesRow ? salesRow.count : 0;
 
+    // Funnel-derived signals (close rate, typical response time). Computed here but only meaningful —
+    // and only rendered — once a vendor has a few leads, so we never show "0%" on a brand-new vendor.
+    const reqRow = await db.queryOne(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE status = 'sold')::int AS sold,
+                AVG(EXTRACT(EPOCH FROM (responded_at - created_at)))
+                    FILTER (WHERE responded_at IS NOT NULL) AS avg_response_seconds
+         FROM mkt_contact_request
+         WHERE vendor_id = $1`,
+        [vendorId]
+    );
+    const requestTotal = reqRow ? reqRow.total : 0;
+    const closeRate = requestTotal > 0 ? reqRow.sold / requestTotal : null;
+    const avgResponseHours =
+        reqRow && reqRow.avg_response_seconds != null ? Number(reqRow.avg_response_seconds) / 3600 : null;
+
     return {
         id: vendor.id,
         displayName: vendor.display_name,
@@ -348,6 +364,9 @@ export async function getVendorStorefront(vendorId) {
         listingCount: listings.length,
         lastListedAt: lastListedAt ? new Date(lastListedAt).toISOString() : null,
         salesCount,
+        requestTotal,
+        closeRate,
+        avgResponseHours,
         listings: listings.map((row) => ({
             listingId: row.id,
             kind: row.kind,

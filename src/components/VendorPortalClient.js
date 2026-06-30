@@ -16,6 +16,25 @@ function formatPrice(value) {
     return value === null || value === undefined ? "—" : priceFormatter.format(Number(value));
 }
 
+function timeAgo(iso) {
+    const then = Date.parse(iso || "");
+    if (Number.isNaN(then)) return "";
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+}
+
+const REQUEST_STATUS_LABELS = {
+    new: "New",
+    responded: "Replied",
+    sold: "Sold",
+    closed: "Closed",
+};
+
 // Infer sealed vs single from a catalog product: sealed product names match these keywords; otherwise
 // a collector number or rarity means it's a single.
 const SEALED_NAME = /booster box|booster bundle|elite trainer|\betb\b|premium collection|collection box|\btin\b|blister|booster pack|build & battle|\bbundle\b|\bcase\b|display|sealed/i;
@@ -422,7 +441,83 @@ function ListingRow({ listing, onChanged }) {
     );
 }
 
-export default function VendorPortalClient({ vendor, listings, wanted = [], salesCount = 0 }) {
+function RequestRow({ request, onChanged }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+
+    async function setStatus(status) {
+        if (
+            status === "sold" &&
+            typeof window !== "undefined" &&
+            !window.confirm("Mark this lead as sold? If the item is still listed, it'll be closed out and recorded as a completed sale.")
+        ) {
+            return;
+        }
+        setBusy(true);
+        setError("");
+        try {
+            const response = await fetch(`/api/marketplace/vendor/requests/${request.id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ status }),
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => null);
+                throw new Error(data?.error || "Could not update.");
+            }
+            onChanged();
+        } catch (err) {
+            setError(err?.message || "Could not update.");
+            setBusy(false);
+        }
+    }
+
+    const terminal = request.status === "sold" || request.status === "closed";
+
+    return (
+        <li className={`mkt-admin-row mkt-request-row mkt-request-${request.status}`}>
+            <div className="mkt-admin-info">
+                <strong>
+                    {request.itemTitle || "Listing"}
+                    <span className={`mkt-request-badge mkt-request-badge-${request.status}`}>
+                        {REQUEST_STATUS_LABELS[request.status] || request.status}
+                    </span>
+                </strong>
+                <span className="mkt-offer-meta">
+                    {request.buyerName ? `${request.buyerName} · ` : ""}
+                    <a href={`mailto:${request.buyerEmail}`}>{request.buyerEmail}</a>
+                    {request.createdAt ? ` · ${timeAgo(request.createdAt)}` : ""}
+                </span>
+                {request.message ? <span className="mkt-request-message">“{request.message}”</span> : null}
+                {error ? <span className="muted">{error}</span> : null}
+            </div>
+            {!terminal ? (
+                <div className="mkt-admin-actions">
+                    {request.status !== "responded" ? (
+                        <button type="button" className="pill" disabled={busy} onClick={() => setStatus("responded")}>
+                            Mark replied
+                        </button>
+                    ) : null}
+                    <button type="button" className="pill mkt-sold-btn" disabled={busy} onClick={() => setStatus("sold")}>
+                        Mark sold
+                    </button>
+                    <button type="button" className="pill" disabled={busy} onClick={() => setStatus("closed")}>
+                        Close
+                    </button>
+                </div>
+            ) : null}
+        </li>
+    );
+}
+
+export default function VendorPortalClient({
+    vendor,
+    listings,
+    wanted = [],
+    salesCount = 0,
+    requests = [],
+    requestStats = null,
+}) {
     const router = useRouter();
     const refresh = () => router.refresh();
 
@@ -430,6 +525,10 @@ export default function VendorPortalClient({ vendor, listings, wanted = [], sale
         await fetch("/api/marketplace/vendor/logout", { method: "POST" });
         router.refresh();
     }
+
+    // Open leads need action; sold/closed go into a collapsible history.
+    const openRequests = requests.filter((r) => r.status === "new" || r.status === "responded");
+    const closedRequests = requests.filter((r) => r.status === "sold" || r.status === "closed");
 
     return (
         <div className="stack reveal">
@@ -440,6 +539,9 @@ export default function VendorPortalClient({ vendor, listings, wanted = [], sale
                         <p className="muted">
                             {vendor.displayName}{vendor.locationLabel ? ` · ${vendor.locationLabel}` : ""}
                             {salesCount > 0 ? ` · ${salesCount} completed sale${salesCount === 1 ? "" : "s"}` : ""}
+                            {requestStats?.total > 0
+                                ? ` · ${requestStats.total} lead${requestStats.total === 1 ? "" : "s"} (${requestStats.sold} sold)`
+                                : ""}
                         </p>
                     </div>
                     <button type="button" className="pill" onClick={logout}>
@@ -447,6 +549,33 @@ export default function VendorPortalClient({ vendor, listings, wanted = [], sale
                     </button>
                 </div>
             </section>
+
+            {openRequests.length > 0 ? (
+                <section className="card">
+                    <h2>Inbound requests</h2>
+                    <p className="muted">
+                        Buyers who messaged you. Reply from your email, then mark what happened so it counts toward
+                        your track record.
+                    </p>
+                    <ul className="mkt-admin-list">
+                        {openRequests.map((request) => (
+                            <RequestRow key={request.id} request={request} onChanged={refresh} />
+                        ))}
+                    </ul>
+                    {closedRequests.length > 0 ? (
+                        <details className="mkt-collapse mkt-request-history">
+                            <summary className="mkt-collapse-summary">
+                                <span>History ({closedRequests.length})</span>
+                            </summary>
+                            <ul className="mkt-admin-list mkt-collapse-body">
+                                {closedRequests.map((request) => (
+                                    <RequestRow key={request.id} request={request} onChanged={refresh} />
+                                ))}
+                            </ul>
+                        </details>
+                    ) : null}
+                </section>
+            ) : null}
 
             {wanted.length > 0 ? (
                 <section className="card">

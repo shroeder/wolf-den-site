@@ -170,6 +170,20 @@ vendors. Supply is the real bottleneck — features help, but Luke seeds real ve
 - [x] Completed-sales count added to storefront trust strip (`getVendorStorefront.salesCount`).
 - First real transaction data captured → seeds the sales-data monetization idea (revisit for pricing).
 
+### Vendor lead funnel (contact → sale) — DONE
+- Closes the loop on buyer contact: a request now moves new → responded → sold/closed.
+- [x] Migration 039: `mkt_contact_request` gains status/responded_at/updated_at; `mkt_sale` gains
+      `contact_request_id` (attributes a sale back to the lead).
+- [x] `contact.js`: `listVendorContactRequests`, `getVendorRequestStats`, `setContactRequestStatus`
+      (marking 'sold' runs `markListingSold` with attribution). `GET /requests`, `PATCH /requests/[id]`.
+- [x] Portal "Inbound requests" panel (Mark replied / sold / closed; sold/closed collapse to history);
+      hero shows "N leads (M sold)".
+- [x] Storefront trust strip gains close-rate + typical-response-time — COMPUTED always, RENDERED only
+      at ≥3 leads so a brand-new vendor never shows "0%". Unlocks the Phase 6 deferred signals.
+- Comms decision (deliberate): NO in-app messaging at this stage — email relay stays the channel; the
+  physical "meet at The Wolf Den" close is the moat. Revisit messaging only at real deal-flow volume.
+- Follow-up (not built): mirror new leads to a channel Luke watches (Discord/phone) for fast response.
+
 ### Local positioning (ongoing, copy/SEO)
 - Lean on the in-person angle ("search local vendors, inspect in person, meet at The Wolf Den");
   target local product searches; builds on the shop SEO work (product pages + sitemap + feed).

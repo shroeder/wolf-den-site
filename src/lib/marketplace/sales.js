@@ -11,8 +11,9 @@ import { createServerLogger } from "@/lib/server-logger";
 const salesLogger = createServerLogger({ source: "api", subsystem: "marketplace-sales" });
 
 // Mark a vendor's own active listing as sold. Vendor-scoped so one vendor can't close another's
-// listing. Returns the recorded sale, or null if the listing wasn't found / already gone.
-export async function markListingSold(listingId, vendorId) {
+// listing. `contactRequestId` attributes the sale to the inbound lead that produced it (optional).
+// Returns the recorded sale, or null if the listing wasn't found / already gone.
+export async function markListingSold(listingId, vendorId, { contactRequestId = null } = {}) {
     return db.tx(async (client) => {
         const { rows: listingRows } = await client.query(
             `UPDATE mkt_listing
@@ -29,8 +30,8 @@ export async function markListingSold(listingId, vendorId) {
 
         const { rows: saleRows } = await client.query(
             `INSERT INTO mkt_sale
-                (vendor_id, listing_id, catalog_product_id, title, kind, price, quantity)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+                (vendor_id, listing_id, catalog_product_id, title, kind, price, quantity, contact_request_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id, sold_at`,
             [
                 listing.vendor_id,
@@ -40,6 +41,7 @@ export async function markListingSold(listingId, vendorId) {
                 listing.kind,
                 listing.price,
                 listing.quantity,
+                contactRequestId,
             ]
         );
 

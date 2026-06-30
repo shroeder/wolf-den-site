@@ -4131,6 +4131,38 @@ body.tv-mode .shop-mobile-cart-fab {
     color: var(--accent);
 }
 
+/* Inbound contact requests (the lead funnel). */
+.mkt-request-message {
+    font-style: italic;
+    color: var(--ink-secondary);
+}
+
+.mkt-request-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    vertical-align: middle;
+    border: 1px solid var(--line);
+    color: var(--ink-secondary);
+}
+
+.mkt-request-badge-new {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    color: var(--accent);
+}
+
+.mkt-request-badge-sold {
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent);
+}
+
+.mkt-request-history {
+    margin-top: 1rem;
+}
+
 /* Compact one-line filter bar: search grows, game + type are dropdowns (not pill walls). */
 .mkt-filter-row {
     display: flex;

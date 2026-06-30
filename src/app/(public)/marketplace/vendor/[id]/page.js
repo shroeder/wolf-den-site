@@ -41,6 +41,13 @@ function sinceLabel(iso) {
     return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
+function responseLabel(hours) {
+    if (hours == null || Number.isNaN(hours)) return null;
+    if (hours < 1) return "Replies within an hour";
+    if (hours < 24) return `Replies in ~${Math.round(hours)}h`;
+    return `Replies in ~${Math.round(hours / 24)}d`;
+}
+
 export async function generateMetadata({ params }) {
     const { id } = await params;
     const vendor = await getVendorStorefront(id);
@@ -132,6 +139,12 @@ export default async function VendorStorefrontPage({ params }) {
                         <span className="mkt-trust-item">
                             {vendor.salesCount} completed sale{vendor.salesCount === 1 ? "" : "s"}
                         </span>
+                    ) : null}
+                    {vendor.requestTotal >= 3 && vendor.closeRate != null ? (
+                        <span className="mkt-trust-item">{Math.round(vendor.closeRate * 100)}% close rate</span>
+                    ) : null}
+                    {vendor.requestTotal >= 3 && responseLabel(vendor.avgResponseHours) ? (
+                        <span className="mkt-trust-item">{responseLabel(vendor.avgResponseHours)}</span>
                     ) : null}
                     {sinceLabel(vendor.lastListedAt) ? (
                         <span className="mkt-trust-item">Updated {sinceLabel(vendor.lastListedAt)}</span>
