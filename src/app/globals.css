@@ -3999,6 +3999,12 @@ body.tv-mode .shop-mobile-cart-fab {
     font-weight: 700;
 }
 
+.just-in-tile-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
 .just-in-filters {
     display: flex;
     flex-wrap: wrap;

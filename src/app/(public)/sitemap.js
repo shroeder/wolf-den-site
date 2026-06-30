@@ -1,9 +1,14 @@
 import { events } from "@/lib/events";
+import { listInStockForSitemap } from "@/lib/inventory-feed/feed";
+import { productHandle } from "@/lib/inventory-feed/product-url";
 import { SITE_URL } from "@/lib/site";
 
 const BASE_URL = SITE_URL;
 
-export default function sitemap() {
+// Regenerate the sitemap hourly so new/sold inventory is reflected without a redeploy.
+export const revalidate = 3600;
+
+export default async function sitemap() {
     const staticRoutes = [
         {
             url: BASE_URL,
@@ -132,5 +137,20 @@ export default function sitemap() {
                 : [`${BASE_URL}/images/tcg-play-tables-the-wolf-den-montgomery-mn.jpg`],
     }));
 
-    return [...staticRoutes, ...eventRoutes];
+    // Every in-stock shop product gets a crawlable, indexable URL.
+    let productRoutes = [];
+    try {
+        const items = await listInStockForSitemap();
+        productRoutes = items.map((item) => ({
+            url: `${BASE_URL}/shop/${productHandle(item.name, item.variationId)}`,
+            lastModified: item.updatedAt,
+            changeFrequency: "daily",
+            priority: 0.6,
+        }));
+    } catch {
+        // A DB hiccup should never break the whole sitemap.
+        productRoutes = [];
+    }
+
+    return [...staticRoutes, ...eventRoutes, ...productRoutes];
 }

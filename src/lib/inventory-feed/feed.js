@@ -35,6 +35,52 @@ export async function listRecentChanges({ windowHours = DEFAULT_WINDOW_HOURS, li
 }
 
 /**
+ * A single inventory item by Square variation id (any stock state — the product page shows
+ * out-of-stock items as OutOfStock + noindex rather than 404ing a URL Google already knows).
+ */
+export async function getInventoryItem(variationId) {
+    if (!variationId) {
+        return null;
+    }
+
+    const row = await db.queryOne(
+        `SELECT variation_id, name, image_url, price, quantity, category_names, in_stock,
+                last_change_at, updated_at
+         FROM inventory_feed
+         WHERE variation_id = $1`,
+        [variationId]
+    );
+
+    if (!row) {
+        return null;
+    }
+
+    return {
+        variationId: row.variation_id,
+        name: row.name,
+        imageUrl: row.image_url || null,
+        price: row.price == null ? null : Number(row.price),
+        quantity: row.quantity == null ? null : Number(row.quantity),
+        categoryNames: row.category_names ? row.category_names.split(CATEGORY_SEPARATOR) : [],
+        inStock: Boolean(row.in_stock),
+        updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+    };
+}
+
+/** Every in-stock item (variation id + name + updated_at) for the sitemap's product URLs. */
+export async function listInStockForSitemap() {
+    const rows = await db.query(
+        `SELECT variation_id, name, updated_at FROM inventory_feed WHERE in_stock = TRUE`
+    );
+
+    return rows.map((row) => ({
+        variationId: row.variation_id,
+        name: row.name,
+        updatedAt: row.updated_at instanceof Date ? row.updated_at : new Date(row.updated_at),
+    }));
+}
+
+/**
  * Count of recent changes — used for the homepage call-to-action. Returns 0 on any error so the
  * homepage never breaks on a transient DB hiccup.
  */

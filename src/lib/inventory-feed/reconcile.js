@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { productHandle } from "@/lib/inventory-feed/product-url";
 import { createServerLogger } from "@/lib/server-logger";
 import { listShopInventory } from "@/lib/consignment/square";
 import { SITE_URL } from "@/lib/site";
@@ -42,13 +43,11 @@ function changeVerb(kind) {
 }
 
 function buildEmbed(row) {
-    // Each embed's url MUST be unique — Discord merges same-url embeds in one message into a single
-    // gallery entry. The variation id keeps every link distinct (the shop page ignores the param).
-    const shopUrl = new URL("/shop", baseUrl());
-
-    if (row.variation_id) {
-        shopUrl.searchParams.set("v", row.variation_id);
-    }
+    // Link straight to the item's own (indexable) product page. Each url is unique because the
+    // handle ends in the variation id, which also keeps Discord from merging embeds into a gallery.
+    const shopUrl = row.variation_id
+        ? new URL(`/shop/${productHandle(row.name, row.variation_id)}`, baseUrl())
+        : new URL("/shop", baseUrl());
 
     const priceLine = row.price != null ? `\n${currency.format(Number(row.price))}` : "";
     const stockLine = Number(row.quantity) > 1 ? `\n${Number(row.quantity)} in stock` : "";

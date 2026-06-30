@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
+
+import { productHandle } from "@/lib/inventory-feed/product-url";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
@@ -106,7 +109,12 @@ export default function JustInClient({ items }) {
                                       : "";
 
                             return (
-                                <article key={item.id} className="shop-tile just-in-tile">
+                                <Link
+                                    key={item.id}
+                                    href={`/shop/${productHandle(item.name, item.id)}`}
+                                    className="just-in-tile-link"
+                                >
+                                    <article className="shop-tile just-in-tile">
                                     <div className="shop-tile-image-wrap">
                                         <span className={`just-in-badge${badgeModifier}`}>{badgeLabel}</span>
                                         {item.imageUrl ? (
@@ -142,7 +150,8 @@ export default function JustInClient({ items }) {
                                             )}
                                         </div>
                                     </div>
-                                </article>
+                                    </article>
+                                </Link>
                             );
                         })}
                     </div>
