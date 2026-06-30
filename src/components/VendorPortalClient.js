@@ -8,6 +8,22 @@ import VendorImportClient from "@/components/VendorImportClient";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 const GRADERS = ["PSA", "BGS", "CGC", "SGC", "TAG", "ACE", "Other"];
+// Keep in sync with LISTING_LANGUAGES in lib/marketplace/listings.js (server-only, can't import here).
+const LANGUAGES = [
+    "English",
+    "Japanese",
+    "Chinese (Simplified)",
+    "Chinese (Traditional)",
+    "Korean",
+    "German",
+    "French",
+    "Italian",
+    "Spanish",
+    "Portuguese",
+    "Russian",
+    "Thai",
+    "Indonesian",
+];
 const DEFAULT_GAMES = [{ id: "", label: "All" }];
 
 const priceFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -58,6 +74,7 @@ function AddListingForm({ onAdded }) {
     const [graded, setGraded] = useState(false);
     const [gradingCompany, setGradingCompany] = useState("PSA");
     const [grade, setGrade] = useState("");
+    const [language, setLanguage] = useState("English");
     const [price, setPrice] = useState("");
     const [quantity, setQuantity] = useState("1");
     const [busy, setBusy] = useState(false);
@@ -151,6 +168,7 @@ function AddListingForm({ onAdded }) {
                     graded: kind === "single" ? graded : false,
                     gradingCompany: kind === "single" && graded ? gradingCompany : null,
                     grade: kind === "single" && graded ? grade.trim() : null,
+                    language,
                     price: Number(price),
                     quantity: Number(quantity) || 1,
                     title: title.trim(),
@@ -283,6 +301,15 @@ function AddListingForm({ onAdded }) {
                         </>
                     ) : null}
 
+                    <label htmlFor="add-language">Language</label>
+                    <select id="add-language" className="lf-set-select" value={language} onChange={(e) => setLanguage(e.target.value)}>
+                        {LANGUAGES.map((l) => (
+                            <option key={l} value={l}>
+                                {l}
+                            </option>
+                        ))}
+                    </select>
+
                     <div className="mkt-add-row">
                         <div>
                             <label htmlFor="add-price">Your price ($)</label>
@@ -414,6 +441,7 @@ function ListingRow({ listing, onChanged }) {
                         : listing.condition
                           ? ` · ${listing.condition}`
                           : ""}
+                    {listing.language && listing.language !== "English" ? ` · ${listing.language}` : ""}
                     {listing.setName ? ` · ${listing.setName}` : ""}
                 </span>
                 {error ? <span className="muted">{error}</span> : null}

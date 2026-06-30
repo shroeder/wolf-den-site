@@ -43,6 +43,7 @@ export async function POST(request) {
                     graded: Boolean(body.graded),
                     gradingCompany: body.gradingCompany || null,
                     grade: body.grade || null,
+                    language: body.language || "English",
                     price,
                     quantity: Number.isFinite(quantity) && quantity >= 0 ? Math.trunc(quantity) : 1,
                 });

@@ -93,6 +93,7 @@ function ListingTile({ listing }) {
                 <p className="mkt-card-meta">
                     {listing.setName || (listing.kind === "sealed" ? "Sealed" : "Single")}
                     {condition ? ` · ${condition}` : ""}
+                    {listing.language && listing.language !== "English" ? ` · ${listing.language}` : ""}
                 </p>
                 {price ? <p className="mkt-card-price">{price}</p> : null}
                 {market ? <p className="mkt-card-market">Market {market}</p> : null}

@@ -125,6 +125,9 @@ function OfferRow({ offer, productName }) {
                         {offer.vendor.locationLabel ? ` · ${offer.vendor.locationLabel}` : ""}
                     </span>
                     <span className="mkt-offer-meta">
+                        {offer.language && offer.language !== "English" ? (
+                            <span className="mkt-lang-badge">{offer.language}</span>
+                        ) : null}
                         {conditionLabel ? `${conditionLabel} · ` : ""}
                         {offer.quantity} available
                     </span>

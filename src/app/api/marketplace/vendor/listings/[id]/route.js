@@ -40,6 +40,10 @@ export async function PATCH(request, { params }) {
                 patch.condition = body.condition;
             }
 
+            if (body.language !== undefined) {
+                patch.language = body.language;
+            }
+
             const listing = await updateListing(id, vendor.id, patch);
 
             if (!listing) {

@@ -143,7 +143,7 @@ export async function getProductWithOffers(catalogProductId) {
     }
 
     const offers = await db.query(
-        `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade,
+        `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
                 l.price, l.quantity, l.created_at,
                 v.id AS vendor_id, v.display_name AS vendor_name,
                 v.location_label, v.region AS vendor_region
@@ -170,6 +170,7 @@ export async function getProductWithOffers(catalogProductId) {
             graded: Boolean(row.graded),
             gradingCompany: row.grading_company,
             grade: row.grade,
+            language: row.language || "English",
             price: toNumber(row.price),
             quantity: row.quantity,
             createdAt: toIso(row.created_at),
@@ -310,7 +311,7 @@ export async function getVendorStorefront(vendorId) {
     }
 
     const listings = await db.query(
-        `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade,
+        `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
                 l.price, l.quantity, l.catalog_product_id,
                 l.title, l.set_name, l.card_number, l.updated_at,
                 COALESCE(l.image_url, c.image_url) AS image_url,
@@ -374,6 +375,7 @@ export async function getVendorStorefront(vendorId) {
             graded: Boolean(row.graded),
             gradingCompany: row.grading_company,
             grade: row.grade,
+            language: row.language || "English",
             price: toNumber(row.price),
             quantity: row.quantity,
             catalogProductId: row.catalog_product_id ? String(row.catalog_product_id) : null,

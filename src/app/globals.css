@@ -4125,6 +4125,18 @@ body.tv-mode .shop-mobile-cart-fab {
     text-decoration: underline;
 }
 
+/* Non-English language flag on an offer — drawn so a Japanese/etc. card reads at a glance. */
+.mkt-lang-badge {
+    display: inline-block;
+    margin-right: 0.4rem;
+    padding: 0.02rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent);
+}
+
 /* "Mark sold" sits between Save and Delete; tint it so it reads as a positive close-out, not a destroy. */
 .mkt-sold-btn {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);

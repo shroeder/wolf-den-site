@@ -12,12 +12,29 @@ const listingsLogger = createServerLogger({ source: "api", subsystem: "marketpla
 
 const VALID_KINDS = new Set(["sealed", "single"]);
 const VALID_CONDITIONS = new Set(["NM", "LP", "MP", "HP", "DMG"]);
+// Common TCG print languages. Anything else falls back to English.
+export const LISTING_LANGUAGES = [
+    "English",
+    "Japanese",
+    "Chinese (Simplified)",
+    "Chinese (Traditional)",
+    "Korean",
+    "German",
+    "French",
+    "Italian",
+    "Spanish",
+    "Portuguese",
+    "Russian",
+    "Thai",
+    "Indonesian",
+];
+const VALID_LANGUAGES = new Set(LISTING_LANGUAGES);
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 const LISTING_COLUMNS = `id, vendor_id, kind, catalog_product_id, game, title, set_name,
-    card_number, image_url, condition, graded, grading_company, grade, price, quantity, status,
-    created_at, updated_at`;
+    card_number, image_url, condition, graded, grading_company, grade, language, price, quantity,
+    status, created_at, updated_at`;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -33,6 +50,12 @@ export function isValidKind(kind) {
 
 export function isValidCondition(condition) {
     return condition === null || condition === undefined || VALID_CONDITIONS.has(condition);
+}
+
+// Normalize a free-form language to a supported one, defaulting to English.
+export function normalizeLanguage(language) {
+    const value = String(language || "").trim();
+    return VALID_LANGUAGES.has(value) ? value : "English";
 }
 
 function mapListing(row) {
@@ -56,6 +79,7 @@ function mapListing(row) {
         graded: Boolean(row.graded),
         gradingCompany: row.grading_company,
         grade: row.grade,
+        language: row.language || "English",
         price: toNumber(row.price),
         quantity: row.quantity,
         status: row.status,
@@ -93,6 +117,7 @@ export async function createListing({
     graded = false,
     gradingCompany = null,
     grade = null,
+    language = "English",
     price,
     quantity = 1,
 }) {
@@ -112,8 +137,8 @@ export async function createListing({
     const row = await db.queryOne(
         `INSERT INTO mkt_listing
             (vendor_id, kind, catalog_product_id, game, title, set_name, card_number,
-             image_url, condition, graded, grading_company, grade, price, quantity)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+             image_url, condition, graded, grading_company, grade, language, price, quantity)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          RETURNING ${LISTING_COLUMNS}`,
         [
             vendorId,
@@ -128,6 +153,7 @@ export async function createListing({
             isGraded,
             isGraded ? (gradingCompany ? String(gradingCompany).trim() : null) : null,
             isGraded ? (grade ? String(grade).trim() : null) : null,
+            normalizeLanguage(language),
             price,
             quantity,
         ]
@@ -163,6 +189,7 @@ export async function updateListing(id, vendorId, patch = {}) {
         graded: "graded",
         gradingCompany: "grading_company",
         grade: "grade",
+        language: "language",
         price: "price",
         quantity: "quantity",
         game: "game",
