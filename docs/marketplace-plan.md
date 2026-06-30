@@ -154,8 +154,10 @@ vendors. Supply is the real bottleneck — features help, but Luke seeds real ve
       single-add + CSV import). `sendWantAvailableEmail`.
 - [x] Vendor **"most wanted" board** in the portal (`listMostWanted` — demand counts = shopping list).
 
-### Phase 6 — Vendor reputation (objective only)
-- [ ] Storefront/offer trust strip: member since · # active listings · identity verified · last listed.
+### Phase 6 — Vendor reputation (objective only) — DONE
+- [x] Storefront trust strip: ✓ Verified vendor · member since · # active listings · updated X ago
+      (`getVendorStorefront` returns verified/memberSince/listingCount/lastListedAt). Offers link the
+      checkmarked vendor name to their storefront.
 - Deferred (need data we don't capture): completed sales, avg response time — unlock with Phase 7.
 
 ### Phase 7 — Sold tracking (later)
