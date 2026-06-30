@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 
+import { productHandle } from "@/lib/inventory-feed/product-url";
 import { useTvMode } from "@/lib/tv-mode-client";
 
 const PAYMENT_TOGGLE_STORAGE_KEY = "wolfden-payments-test-enabled";
@@ -728,6 +729,14 @@ export default function ShopInventoryClient({
                                                 <span className="shop-qty-badge">{item.quantity} in stock</span>
                                             </div>
                                         </div>
+                                        <Link
+                                            href={`/shop/${productHandle(item.name, item.id)}`}
+                                            className="shop-tile-permalink"
+                                            onClick={(event) => event.stopPropagation()}
+                                            aria-label={`View the ${item.name} page`}
+                                        >
+                                            View page →
+                                        </Link>
                                     </div>
                                 </article>
                             ))}

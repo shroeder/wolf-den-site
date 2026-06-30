@@ -1687,6 +1687,19 @@ textarea {
     white-space: nowrap;
 }
 
+.shop-tile-permalink {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.shop-tile-permalink:hover {
+    text-decoration: underline;
+}
+
 .shop-in-cart-badge {
     display: inline-flex;
     align-items: center;
