@@ -142,8 +142,9 @@ email+password as the phone app, one identity across phone + web.
 
 ## Catalog coverage (tcgcsv sync)
 
-The daily `tcg-catalog-sync` cron was Pokémon + Magic only. Widened 2026-06-29 to **~12 major
-games** via a curated registry: **`src/lib/tcg-games.js`** (`TCG_GAMES` = categoryId + slug + label).
+The daily `tcg-catalog-sync` cron was Pokémon + Magic only. Widened 2026-06-29 to **all ~56 TCG/CCG
+categories** tcgcsv carries (non-card categories — supplies, Funko, miniatures, Warhammer, comics —
+excluded) via the registry: **`src/lib/tcg-games.js`** (`TCG_GAMES` = categoryId + slug + label).
 It's the single source of truth — the sync (`catalog-sync.js` `discoverGroups`) selects categories
 from it, and the game filters (marketplace search, vendor portal) render from it via
 `GET /api/marketplace/games` (`listAvailableGames` = distinct games present in `tcg_sets`). Add/remove
