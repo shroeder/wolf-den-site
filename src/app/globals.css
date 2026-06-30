@@ -4453,6 +4453,74 @@ body.tv-mode .shop-mobile-cart-fab {
     flex: 1;
 }
 
+/* App-like density for the marketplace on phones (scoped to .mkt-app; desktop unaffected). */
+@media (max-width: 600px) {
+    .content:has(> .mkt-app) {
+        padding-top: 0.6rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .mkt-app .stack {
+        gap: 0.55rem;
+    }
+
+    .mkt-app .card {
+        padding: 0.8rem;
+        border-radius: 14px;
+    }
+
+    .mkt-app .hero-accent {
+        padding: 0.8rem;
+    }
+
+    .mkt-app h1 {
+        font-size: 1.3rem;
+        margin: 0;
+    }
+
+    .mkt-app h2 {
+        font-size: 1.05rem;
+        margin: 0 0 0.15rem;
+    }
+
+    .mkt-app .muted {
+        font-size: 0.85rem;
+    }
+
+    .mkt-app .contact-form {
+        gap: 0.45rem;
+    }
+
+    .mkt-app label,
+    .mkt-app .lf-search-label {
+        font-size: 0.8rem;
+        margin-bottom: 0.15rem;
+    }
+
+    .mkt-app input,
+    .mkt-app select,
+    .mkt-app textarea {
+        padding: 0.5rem 0.6rem;
+    }
+
+    .mkt-app .pill {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .mkt-app .mkt-admin-list {
+        gap: 0.5rem;
+    }
+
+    .mkt-app .mkt-admin-row {
+        padding: 0.65rem 0.75rem;
+    }
+
+    .mkt-app .mkt-pick-grid {
+        gap: 0.55rem;
+    }
+}
+
 .mkt-listing-edit label {
     display: inline-flex;
     align-items: center;
