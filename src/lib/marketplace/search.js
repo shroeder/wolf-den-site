@@ -223,7 +223,8 @@ export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
         return [];
     }
 
-    const params = [`%${trimmed}%`];
+    // $1 = contains match (name or set), $2 = prefix match (for ranking).
+    const params = [`%${trimmed}%`, `${trimmed}%`];
     let gameClause = "";
 
     if (game) {
@@ -233,12 +234,19 @@ export async function searchCatalog({ query, game = null, limit = 12 } = {}) {
 
     params.push(Math.min(Number(limit) || 12, 50));
 
+    // Match name OR set name; drop worthless digital "Code Card" entries; rank by relevance —
+    // name-prefix matches first, then by market value (so real product beats $0.05 filler).
     const rows = await db.query(
         `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, s.name AS set_name
          FROM tcg_cards c
          JOIN tcg_sets s ON s.id = c.set_id
-         WHERE c.name ILIKE $1 ${gameClause}
-         ORDER BY c.name ASC
+         WHERE (c.name ILIKE $1 OR s.name ILIKE $1)
+           AND c.name NOT ILIKE '%code card%'
+           ${gameClause}
+         ORDER BY
+           (CASE WHEN c.name ILIKE $2 THEN 0 ELSE 1 END),
+           c.market_price DESC NULLS LAST,
+           c.name ASC
          LIMIT $${params.length}`,
         params
     );
