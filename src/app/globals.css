@@ -41,6 +41,32 @@ h3,
     font-family: var(--font-display);
 }
 
+/* A long word (e.g. "Storefront") must never push a card wider than the screen. */
+h1,
+h2,
+h3 {
+    overflow-wrap: break-word;
+}
+
+/* Compact, correctly-sized headings on phones (browser defaults are too large here). */
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.7rem;
+    }
+
+    h2 {
+        font-size: 1.3rem;
+    }
+
+    .content {
+        padding: 1rem 0 2rem;
+    }
+
+    .card {
+        padding: 0.9rem 1rem;
+    }
+}
+
 .brand {
     font-family: var(--font-body);
 }
@@ -774,7 +800,12 @@ textarea {
     }
 
     .brand {
-        flex: 1;
+        flex: 0 0 auto;
+    }
+
+    /* Mobile: logo only — drop the wordmark so it never wraps or crowds the bar. */
+    .brand span {
+        display: none;
     }
 }
 
@@ -4366,6 +4397,12 @@ body.tv-mode .shop-mobile-cart-fab {
     .mkt-admin-row {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .mkt-admin-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
     }
 
     .mkt-admin-actions {
