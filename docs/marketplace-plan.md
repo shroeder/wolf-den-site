@@ -146,11 +146,13 @@ Reframe: this is a **local inventory search engine for collectibles**, not just 
 flywheel: more vendors → more inventory → more Google traffic → more buyers → more sales → more
 vendors. Supply is the real bottleneck — features help, but Luke seeds real vendors (his FB contacts).
 
-### Phase 5 — Demand engine (BUILD FIRST)
-- [ ] `mkt_want` (migration 037): buyer "notify me when an approved vendor lists this product".
-- [ ] Buyer capture: "Notify me" on zero-offer product pages + on search dead-ends.
-- [ ] Edge-triggered email when a vendor lists a wanted product (hook in `createListing`).
-- [ ] Vendor **"most wanted" board** in the portal (demand counts per product = a shopping list).
+### Phase 5 — Demand engine — DONE
+- [x] `mkt_want` (migration 037): buyer "notify me when an approved vendor lists this product".
+- [x] Buyer capture: "Notify me" on zero-offer product pages + on search dead-ends (public
+      `/api/marketplace/catalog-search` finds the product even when nobody stocks it).
+- [x] Edge-triggered email when a vendor lists a wanted product (hook in `createListing`; covers
+      single-add + CSV import). `sendWantAvailableEmail`.
+- [x] Vendor **"most wanted" board** in the portal (`listMostWanted` — demand counts = shopping list).
 
 ### Phase 6 — Vendor reputation (objective only)
 - [ ] Storefront/offer trust strip: member since · # active listings · identity verified · last listed.
