@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { productHandle } from "@/lib/inventory-feed/product-url";
+import { refreshStockSnapshot } from "@/lib/looking-for/stock";
 import { createServerLogger } from "@/lib/server-logger";
 import { listShopInventory } from "@/lib/consignment/square";
 import { SITE_URL } from "@/lib/site";
@@ -302,6 +303,17 @@ export async function reconcileInventory({ force = false } = {}) {
 
     // 6. Broadcast (never on the seeding run — that's just establishing the baseline).
     const discord = seeding ? { posted: 0, seeded: true } : await postPendingToDiscord({ force });
+
+    // 7. Keep the "Looking For" in-stock snapshot (tcg_stock) as fresh as the feed, so a just-scanned
+    //    card matches wishlists within a reconcile cycle instead of waiting for the daily catalog job.
+    //    Best-effort: a stock-refresh failure must not fail the reconcile.
+    try {
+        await refreshStockSnapshot();
+    } catch (stockError) {
+        logger.warn("inventory_feed.stock_refresh.failed", {
+            reason: stockError instanceof Error ? stockError.message : "unknown_error",
+        });
+    }
 
     const summary = {
         seeding,
