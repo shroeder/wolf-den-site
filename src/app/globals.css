@@ -4104,6 +4104,12 @@ body.tv-mode .shop-mobile-cart-fab {
     text-decoration: underline;
 }
 
+/* "Mark sold" sits between Save and Delete; tint it so it reads as a positive close-out, not a destroy. */
+.mkt-sold-btn {
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent);
+}
+
 /* Compact one-line filter bar: search grows, game + type are dropdowns (not pill walls). */
 .mkt-filter-row {
     display: flex;

@@ -323,11 +323,17 @@ export async function getVendorStorefront(vendorId) {
     );
 
     // Objective reputation signals (no star ratings): vetted (active = hand-approved by The Wolf
-    // Den), tenure, catalog depth, and freshness.
+    // Den), tenure, catalog depth, freshness, and completed sales.
     const lastListedAt = listings.reduce((latest, row) => {
         const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
         return t > latest ? t : latest;
     }, 0);
+
+    const salesRow = await db.queryOne(
+        `SELECT COUNT(*)::int AS count FROM mkt_sale WHERE vendor_id = $1`,
+        [vendorId]
+    );
+    const salesCount = salesRow ? salesRow.count : 0;
 
     return {
         id: vendor.id,
@@ -341,6 +347,7 @@ export async function getVendorStorefront(vendorId) {
         memberSince: toIso(vendor.accepted_at || vendor.created_at),
         listingCount: listings.length,
         lastListedAt: lastListedAt ? new Date(lastListedAt).toISOString() : null,
+        salesCount,
         listings: listings.map((row) => ({
             listingId: row.id,
             kind: row.kind,

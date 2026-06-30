@@ -1,6 +1,7 @@
 import VendorLoginClient from "@/components/VendorLoginClient";
 import VendorPortalClient from "@/components/VendorPortalClient";
 import { listVendorListings } from "@/lib/marketplace/listings.js";
+import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { listMostWanted } from "@/lib/marketplace/wants.js";
 
@@ -18,10 +19,11 @@ export default async function VendorPortalPage() {
         return <VendorLoginClient />;
     }
 
-    const [listings, wanted] = await Promise.all([
+    const [listings, wanted, salesCount] = await Promise.all([
         listVendorListings(vendor.id),
         listMostWanted(30).catch(() => []),
+        getVendorSalesCount(vendor.id).catch(() => 0),
     ]);
 
-    return <VendorPortalClient vendor={vendor} listings={listings} wanted={wanted} />;
+    return <VendorPortalClient vendor={vendor} listings={listings} wanted={wanted} salesCount={salesCount} />;
 }

@@ -128,6 +128,11 @@ export default async function VendorStorefrontPage({ params }) {
                     <span className="mkt-trust-item">
                         {vendor.listingCount} active listing{vendor.listingCount === 1 ? "" : "s"}
                     </span>
+                    {vendor.salesCount > 0 ? (
+                        <span className="mkt-trust-item">
+                            {vendor.salesCount} completed sale{vendor.salesCount === 1 ? "" : "s"}
+                        </span>
+                    ) : null}
                     {sinceLabel(vendor.lastListedAt) ? (
                         <span className="mkt-trust-item">Updated {sinceLabel(vendor.lastListedAt)}</span>
                     ) : null}

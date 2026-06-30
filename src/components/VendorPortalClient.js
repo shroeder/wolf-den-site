@@ -365,6 +365,25 @@ function ListingRow({ listing, onChanged }) {
         }
     }
 
+    async function markSold() {
+        if (typeof window !== "undefined" && !window.confirm(`Mark "${listing.title}" as sold? This removes it from your storefront and adds to your completed-sales record.`)) {
+            return;
+        }
+        setBusy(true);
+        setError("");
+        try {
+            const response = await fetch(`/api/marketplace/vendor/listings/${listing.id}/sold`, { method: "POST" });
+            if (!response.ok) {
+                const data = await response.json().catch(() => null);
+                throw new Error(data?.error || "Could not mark sold.");
+            }
+            onChanged();
+        } catch (err) {
+            setError(err?.message || "Could not mark sold.");
+            setBusy(false);
+        }
+    }
+
     return (
         <li className="mkt-admin-row">
             <div className="mkt-admin-info">
@@ -392,6 +411,9 @@ function ListingRow({ listing, onChanged }) {
                 <button type="button" className="button primary" disabled={busy || !dirty} onClick={save}>
                     Save
                 </button>
+                <button type="button" className="pill mkt-sold-btn" disabled={busy} onClick={markSold}>
+                    Mark sold
+                </button>
                 <button type="button" className="pill" disabled={busy} onClick={remove}>
                     Delete
                 </button>
@@ -400,7 +422,7 @@ function ListingRow({ listing, onChanged }) {
     );
 }
 
-export default function VendorPortalClient({ vendor, listings, wanted = [] }) {
+export default function VendorPortalClient({ vendor, listings, wanted = [], salesCount = 0 }) {
     const router = useRouter();
     const refresh = () => router.refresh();
 
@@ -415,7 +437,10 @@ export default function VendorPortalClient({ vendor, listings, wanted = [] }) {
                 <div className="mkt-admin-head">
                     <div>
                         <h1>Your Storefront</h1>
-                        <p className="muted">{vendor.displayName}{vendor.locationLabel ? ` · ${vendor.locationLabel}` : ""}</p>
+                        <p className="muted">
+                            {vendor.displayName}{vendor.locationLabel ? ` · ${vendor.locationLabel}` : ""}
+                            {salesCount > 0 ? ` · ${salesCount} completed sale${salesCount === 1 ? "" : "s"}` : ""}
+                        </p>
                     </div>
                     <button type="button" className="pill" onClick={logout}>
                         Sign out

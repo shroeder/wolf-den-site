@@ -160,8 +160,12 @@ vendors. Supply is the real bottleneck — features help, but Luke seeds real ve
       checkmarked vendor name to their storefront.
 - Deferred (need data we don't capture): completed sales, avg response time — unlock with Phase 7.
 
-### Phase 7 — Sold tracking (later)
-- [ ] Vendor "mark as sold" → enables completed-sales reputation + the sales-data monetization idea.
+### Phase 7 — Sold tracking — DONE
+- [x] `mkt_sale` snapshot table (migration 038); `markListingSold` (tx: listing → status='sold' +
+      mkt_sale row); `POST /api/marketplace/vendor/listings/[id]/sold`.
+- [x] Vendor portal "Mark sold" button per listing; vendor sees own completed-sales tally in hero.
+- [x] Completed-sales count added to storefront trust strip (`getVendorStorefront.salesCount`).
+- First real transaction data captured → seeds the sales-data monetization idea (revisit for pricing).
 
 ### Local positioning (ongoing, copy/SEO)
 - Lean on the in-person angle ("search local vendors, inspect in person, meet at The Wolf Den");
