@@ -126,8 +126,11 @@ email+password as the phone app, one identity across phone + web.
       `/vendor/import/preview` + `/vendor/import/commit`. Verified against prod data.
 - [x] Lint + `npm run build` pass (no new migration — reuses existing tables)
 
-### Phase 4 — Connectors  — NOT STARTED
-- [ ] Store-search connector: wolf den store search also surfaces `mkt_` listings
+### Phase 4 — Connectors  — IN PROGRESS
+- [x] Store-search connector: shop search (`ShopInventoryClient`) debounce-fetches
+      `/api/marketplace/search`; renders an "Also available from local vendors" outlet section
+      BELOW our own results. Our stock is always primary; the outlet hides any product we already
+      stock (dedup by scanned-single `TCG-<id>` SKU vs catalog id), so it only fills gaps.
 - [ ] Email connector (TBD shape)
 
 ### Later / Parked

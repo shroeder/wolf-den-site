@@ -167,6 +167,7 @@ export default function ShopInventoryClient({
     const [cartItemQuantities, setCartItemQuantities] = useState({});
     const [cartMutatingItemId, setCartMutatingItemId] = useState("");
     const [cartSyncing, setCartSyncing] = useState(false);
+    const [vendorMatches, setVendorMatches] = useState([]);
     const [cartError, setCartError] = useState("");
     const swipeStartRef = useRef(null);
     const panelRef = useRef(null);
@@ -193,6 +194,19 @@ export default function ShopInventoryClient({
         : (active?.items || []).map((item) => ({ ...item, categoryName: active.name }));
 
     const visibleItems = sortVisibleItems(matchedItems, sortMode);
+
+    // Catalog ids we already stock (scanned singles carry a "TCG-<id>" SKU). The vendor outlet hides
+    // anything in this set, so it only ever surfaces products we DON'T have — your stock stays primary.
+    const ownCatalogIds = new Set();
+    for (const item of matchedItems) {
+        const match = /^TCG-(\d+)$/i.exec(item.sku || "");
+        if (match) {
+            ownCatalogIds.add(match[1]);
+        }
+    }
+    const vendorOnlyMatches = isSearching
+        ? vendorMatches.filter((r) => r && !ownCatalogIds.has(String(r.catalogProductId)))
+        : [];
 
     const detailIndex = detailItemKey === null
         ? -1
@@ -318,6 +332,38 @@ export default function ShopInventoryClient({
             window.removeEventListener("wolfden-shop-cart-updated", onCartUpdated);
         };
     }, [canShowPaymentUi, refreshCartCount]);
+
+    // Marketplace outlet: when a shopper searches, fetch what local vendors have for the same query.
+    // Our own inventory always renders first; these only show as a fallback for products we lack.
+    useEffect(() => {
+        let cancelled = false;
+        const term = normalizedSearch;
+
+        const timeoutId = window.setTimeout(async () => {
+            if (term.length < 2) {
+                if (!cancelled) setVendorMatches([]);
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/marketplace/search?q=${encodeURIComponent(term)}&limit=12`,
+                    { cache: "no-store" }
+                ).catch(() => null);
+                const payload = response?.ok ? await response.json().catch(() => null) : null;
+                if (!cancelled) {
+                    setVendorMatches(Array.isArray(payload?.results) ? payload.results : []);
+                }
+            } catch {
+                if (!cancelled) setVendorMatches([]);
+            }
+        }, 250);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [normalizedSearch]);
 
     const closeDetail = () => {
         setDetailItemKey(null);
@@ -742,10 +788,68 @@ export default function ShopInventoryClient({
                             ))}
 
                             {visibleItems.length === 0 && (
-                                <p className="consignment-empty shop-empty">No products matched &quot;{searchTerm}&quot;.</p>
+                                <p className="consignment-empty shop-empty">
+                                    {vendorOnlyMatches.length > 0
+                                        ? `We don't carry "${searchTerm}" in store right now — but local vendors do, below ↓`
+                                        : `No products matched "${searchTerm}".`}
+                                </p>
                             )}
                         </div>
                     </div>
+                )}
+
+                {isSearching && vendorOnlyMatches.length > 0 && (
+                    <section className="shop-vendor-outlet" aria-label="Available from local vendors">
+                        <div className="shop-vendor-outlet-head">
+                            <h2>Also available from local vendors</h2>
+                            <p className="secondary">
+                                Not on our shelves right now — these are listed by vetted local vendors on the
+                                Wolf Den Marketplace. Inspect and pick them up in person.
+                            </p>
+                        </div>
+                        <div className="shop-grid">
+                            {vendorOnlyMatches.map((result) => (
+                                <Link
+                                    key={result.catalogProductId}
+                                    href={`/marketplace/product/${result.catalogProductId}`}
+                                    className="shop-tile shop-tile-action"
+                                >
+                                    <div className="shop-tile-image-wrap">
+                                        {result.imageUrl ? (
+                                            <img
+                                                src={result.imageUrl}
+                                                alt={result.name}
+                                                className="shop-tile-image"
+                                                loading="lazy"
+                                                decoding="async"
+                                            />
+                                        ) : (
+                                            <div className="shop-tile-image-placeholder" aria-hidden="true">
+                                                No image
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="shop-tile-body">
+                                        <h3 className="shop-tile-name">{result.name}</h3>
+                                        {result.setName || result.game ? (
+                                            <p className="shop-item-category">{result.setName || result.game}</p>
+                                        ) : null}
+                                        <div className="shop-tile-meta-row">
+                                            <p className="shop-tile-price">
+                                                {result.minPrice != null
+                                                    ? `From ${formatPrice(result.minPrice)}`
+                                                    : <span className="muted">See offers</span>}
+                                            </p>
+                                            <span className="shop-qty-badge">
+                                                {result.vendorCount} vendor{result.vendorCount === 1 ? "" : "s"}
+                                            </span>
+                                        </div>
+                                        <span className="shop-tile-permalink">View offers →</span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
                 )}
 
                 {canShowPaymentUi && (cartCountLoading || resolvedCartCount > 0) && (
