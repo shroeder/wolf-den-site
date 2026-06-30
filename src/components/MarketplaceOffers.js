@@ -135,9 +135,68 @@ function OfferRow({ offer, productName }) {
     );
 }
 
-export default function MarketplaceOffers({ offers, productName }) {
+function NotifyMe({ catalogProductId, productName }) {
+    const [email, setEmail] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [done, setDone] = useState(false);
+    const [error, setError] = useState("");
+
+    if (done) {
+        return (
+            <p className="statement-copy">
+                Done — we&apos;ll email you the moment an approved vendor lists {productName}.
+            </p>
+        );
+    }
+
+    async function submit(event) {
+        event.preventDefault();
+        setSubmitting(true);
+        setError("");
+
+        try {
+            const response = await fetch("/api/marketplace/want", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ catalogProductId, email }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(data?.error || "Could not save that.");
+            }
+            setDone(true);
+        } catch (err) {
+            setError(err?.message || "Could not save that.");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div className="mkt-notify">
+            <p className="muted">No vendor has this in stock yet.</p>
+            <form className="contact-form" onSubmit={submit}>
+                <label htmlFor="mkt-notify-email">Notify me when a vendor lists it</label>
+                <input
+                    id="mkt-notify-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                />
+                <button className="button primary" type="submit" disabled={submitting}>
+                    {submitting ? "Saving..." : "Notify me"}
+                </button>
+                {error ? <p className="muted">{error}</p> : null}
+            </form>
+        </div>
+    );
+}
+
+export default function MarketplaceOffers({ offers, productName, catalogProductId }) {
     if (!offers || offers.length === 0) {
-        return <p className="muted">No vendor currently has this in stock.</p>;
+        return <NotifyMe catalogProductId={catalogProductId} productName={productName} />;
     }
 
     return (

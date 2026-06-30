@@ -118,7 +118,11 @@ export default async function MarketplaceProductPage({ params }) {
 
             <section className="card">
                 <h2>Vendor offers</h2>
-                <MarketplaceOffers offers={product.offers} productName={product.name} />
+                <MarketplaceOffers
+                    offers={product.offers}
+                    productName={product.name}
+                    catalogProductId={product.catalogProductId}
+                />
             </section>
 
             {jsonLd ? (

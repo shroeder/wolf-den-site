@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { notifyWantsForProduct } from "@/lib/marketplace/wants.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 // Marketplace listings: one row per item a vendor has for sale. The vendor sets the price (the
@@ -138,6 +139,15 @@ export async function createListing({
         vendorId,
         kind,
     });
+
+    // Demand alert: email anyone who asked to be notified when this product gets listed.
+    if (catalogProductId) {
+        try {
+            await notifyWantsForProduct(catalogProductId);
+        } catch (error) {
+            listingsLogger.warn("marketplace.listing.want_notify_failed", { listingId: row.id, reason: error.message });
+        }
+    }
 
     return mapListing(row);
 }

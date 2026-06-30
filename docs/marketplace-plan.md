@@ -140,6 +140,29 @@ email+password as the phone app, one identity across phone + web.
       delete). Later, capturing what actually sells is the likely path to monetizing the app — design
       the sold-state + transaction record then, not now.
 
+## Phase 5+ — "Local inventory search engine" (planned 2026-06-30)
+
+Reframe: this is a **local inventory search engine for collectibles**, not just a vendor list. The
+flywheel: more vendors → more inventory → more Google traffic → more buyers → more sales → more
+vendors. Supply is the real bottleneck — features help, but Luke seeds real vendors (his FB contacts).
+
+### Phase 5 — Demand engine (BUILD FIRST)
+- [ ] `mkt_want` (migration 037): buyer "notify me when an approved vendor lists this product".
+- [ ] Buyer capture: "Notify me" on zero-offer product pages + on search dead-ends.
+- [ ] Edge-triggered email when a vendor lists a wanted product (hook in `createListing`).
+- [ ] Vendor **"most wanted" board** in the portal (demand counts per product = a shopping list).
+
+### Phase 6 — Vendor reputation (objective only)
+- [ ] Storefront/offer trust strip: member since · # active listings · identity verified · last listed.
+- Deferred (need data we don't capture): completed sales, avg response time — unlock with Phase 7.
+
+### Phase 7 — Sold tracking (later)
+- [ ] Vendor "mark as sold" → enables completed-sales reputation + the sales-data monetization idea.
+
+### Local positioning (ongoing, copy/SEO)
+- Lean on the in-person angle ("search local vendors, inspect in person, meet at The Wolf Den");
+  target local product searches; builds on the shop SEO work (product pages + sitemap + feed).
+
 ## Catalog coverage (tcgcsv sync)
 
 The daily `tcg-catalog-sync` cron was Pokémon + Magic only. Widened 2026-06-29 to **all ~56 TCG/CCG

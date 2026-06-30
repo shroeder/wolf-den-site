@@ -97,6 +97,34 @@ export async function sendVendorInviteEmail({ vendor, businessName, inviteToken 
     return result;
 }
 
+// Tell a buyer that a product on their "notify me" list was just listed by a vendor.
+export async function sendWantAvailableEmail(email, product) {
+    const resend = getResendClient();
+    const url = new URL(`/marketplace/product/${product.catalogProductId}`, baseUrl()).toString();
+    const goldButton =
+        "display:inline-block;padding:12px 24px;background:#D4AF37;color:#0E0E0E;text-decoration:none;border-radius:6px;font-weight:bold;";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: email,
+        subject: `Now available: ${product.name}`,
+        html: `
+            <h1>A vendor just listed what you were looking for</h1>
+            <p><strong>${escapeHtml(product.name)}</strong>${product.setName ? ` — ${escapeHtml(product.setName)}` : ""}${product.number ? ` (#${escapeHtml(product.number)})` : ""} is now on the Wolf Den Marketplace.</p>
+            <p><a href="${url}" style="${goldButton}">See vendor offers</a></p>
+            <p>Get in early — vendor stock moves fast.</p>
+            <hr />
+            <p><small>The Wolf Den Marketplace</small></p>
+        `,
+    });
+
+    if (result?.error) {
+        throw new Error(result.error.message || "Failed to send want-available email.");
+    }
+
+    return result;
+}
+
 export async function sendVendorContactEmail({ vendor, listing, buyerName, buyerEmail, message }) {
     const resend = getResendClient();
 
