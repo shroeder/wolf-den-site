@@ -67,6 +67,27 @@ export async function getInventoryItem(variationId) {
     };
 }
 
+/**
+ * In-stock items eligible for the Google Merchant Center product feed. Merchant Center requires an
+ * image and a price, so items missing either are excluded.
+ */
+export async function listShopFeedItems() {
+    const rows = await db.query(
+        `SELECT variation_id, name, image_url, price, quantity, category_names
+         FROM inventory_feed
+         WHERE in_stock = TRUE AND image_url IS NOT NULL AND price IS NOT NULL`
+    );
+
+    return rows.map((row) => ({
+        variationId: row.variation_id,
+        name: row.name,
+        imageUrl: row.image_url,
+        price: Number(row.price),
+        quantity: row.quantity == null ? null : Number(row.quantity),
+        categoryNames: row.category_names ? row.category_names.split(CATEGORY_SEPARATOR) : [],
+    }));
+}
+
 /** Every in-stock item (variation id + name + updated_at) for the sitemap's product URLs. */
 export async function listInStockForSitemap() {
     const rows = await db.query(
