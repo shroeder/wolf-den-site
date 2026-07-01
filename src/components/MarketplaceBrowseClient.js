@@ -8,6 +8,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const US_CENTER = [39.8, -98.6];
 const BRAND = "#D4AF37";
 
+function monthYear(iso) {
+    const d = iso ? new Date(iso) : null;
+    return d && !Number.isNaN(d.getTime())
+        ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+        : null;
+}
+
 // Great-circle distance in miles (for "near me" sorting).
 function distanceMiles(a, b) {
     const toRad = (d) => (d * Math.PI) / 180;
@@ -159,19 +166,35 @@ export default function MarketplaceBrowseClient({ vendors }) {
                 {vendors.length === 0 ? (
                     <p className="muted">No vendors with inventory yet.</p>
                 ) : (
-                    <ul className="mkt-vendor-list">
+                    <ul className="mkt-vendor-grid">
                         {sortedVendors.map((v) => (
-                            <li key={v.id} className="mkt-vendor-row">
-                                <Link href={`/marketplace/vendor/${v.id}`} className="mkt-vendor-link">
-                                    <span className="mkt-vendor-name">{v.displayName}</span>
-                                    <span className="mkt-offer-meta">
-                                        {v.locationLabel || v.region || "Location TBD"}
-                                        {v.distance != null ? ` · ${v.distance.toFixed(0)} mi away` : ""}
-                                    </span>
+                            <li key={v.id}>
+                                <Link href={`/marketplace/vendor/${v.id}`} className="mkt-vendor-card">
+                                    <div className="mkt-vendor-card-top">
+                                        <span className="mkt-vendor-name">✓ {v.displayName}</span>
+                                        <span className="mkt-offer-meta">
+                                            {v.locationLabel || v.region || "Location TBD"}
+                                            {v.distance != null ? ` · ${v.distance.toFixed(0)} mi away` : ""}
+                                        </span>
+                                    </div>
+                                    {v.previewImages && v.previewImages.length > 0 ? (
+                                        <div className="mkt-vendor-previews">
+                                            {v.previewImages.slice(0, 4).map((img, i) => (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img key={i} src={img} alt="" className="mkt-vendor-preview" loading="lazy" />
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                    <div className="mkt-vendor-card-foot">
+                                        <span className="mkt-trust-badge">✓ Verified</span>
+                                        <span className="mkt-trust-item">
+                                            {v.listingCount} listing{v.listingCount === 1 ? "" : "s"}
+                                        </span>
+                                        {monthYear(v.memberSince) ? (
+                                            <span className="mkt-trust-item">Since {monthYear(v.memberSince)}</span>
+                                        ) : null}
+                                    </div>
                                 </Link>
-                                <span className="mkt-offer-meta">
-                                    {v.listingCount} listing{v.listingCount === 1 ? "" : "s"}
-                                </span>
                             </li>
                         ))}
                     </ul>

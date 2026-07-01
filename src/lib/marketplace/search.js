@@ -233,8 +233,17 @@ export async function listIndexableMarketplaceProductIds() {
 export async function listVendorsForBrowse() {
     const rows = await db.query(
         `SELECT v.id, v.display_name, v.location_label, v.region, v.city,
-                v.latitude, v.longitude,
-                COUNT(l.id) FILTER (WHERE l.status = 'active') AS listing_count
+                v.latitude, v.longitude, v.accepted_at, v.created_at,
+                COUNT(l.id) FILTER (WHERE l.status = 'active') AS listing_count,
+                (SELECT array_agg(img) FROM (
+                     SELECT COALESCE(l2.image_url, c2.image_url) AS img
+                     FROM mkt_listing l2
+                     LEFT JOIN tcg_cards c2 ON c2.id = l2.catalog_product_id
+                     WHERE l2.vendor_id = v.id AND l2.status = 'active'
+                       AND COALESCE(l2.image_url, c2.image_url) IS NOT NULL
+                     ORDER BY l2.price DESC
+                     LIMIT 4
+                 ) t) AS preview_images
          FROM mkt_vendor v
          LEFT JOIN mkt_listing l ON l.vendor_id = v.id
          WHERE v.status = 'active'
@@ -252,6 +261,9 @@ export async function listVendorsForBrowse() {
         latitude: toNumber(row.latitude),
         longitude: toNumber(row.longitude),
         listingCount: Number(row.listing_count) || 0,
+        verified: true,
+        memberSince: toIso(row.accepted_at || row.created_at),
+        previewImages: Array.isArray(row.preview_images) ? row.preview_images.filter(Boolean) : [],
     }));
 }
 
