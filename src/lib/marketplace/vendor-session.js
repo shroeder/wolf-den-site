@@ -45,7 +45,8 @@ export async function resolveVendorSession(token) {
 
     const row = await db.queryOne(
         `SELECT s.id AS session_id, s.expires_at, s.revoked_at,
-                v.id, v.display_name, v.email, v.status, v.location_label
+                v.id, v.display_name, v.email, v.status, v.location_label,
+                v.default_pricing_mode, v.default_pricing_value
          FROM mkt_vendor_session s
          JOIN mkt_vendor v ON v.id = s.vendor_id
          WHERE s.token_hash = $1`,
@@ -70,6 +71,8 @@ export async function resolveVendorSession(token) {
             email: row.email,
             status: row.status,
             locationLabel: row.location_label,
+            defaultPricingMode: row.default_pricing_mode || "manual",
+            defaultPricingValue: row.default_pricing_value != null ? Number(row.default_pricing_value) : null,
         },
     };
 }

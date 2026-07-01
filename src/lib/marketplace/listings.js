@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { computeListingPriceNow, PRICING_MODES } from "@/lib/marketplace/reprice.js";
 import { notifyWantsForProduct } from "@/lib/marketplace/wants.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -34,7 +35,7 @@ const MAX_LIMIT = 200;
 
 const LISTING_COLUMNS = `id, vendor_id, kind, catalog_product_id, game, title, set_name,
     card_number, image_url, condition, graded, grading_company, grade, language, price, quantity,
-    status, created_at, updated_at`;
+    pricing_mode, pricing_value, status, created_at, updated_at`;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -82,6 +83,8 @@ function mapListing(row) {
         language: row.language || "English",
         price: toNumber(row.price),
         quantity: row.quantity,
+        pricingMode: row.pricing_mode || "manual",
+        pricingValue: toNumber(row.pricing_value),
         status: row.status,
         createdAt: toIso(row.created_at),
         updatedAt: toIso(row.updated_at),
@@ -120,9 +123,22 @@ export async function createListing({
     language = "English",
     price,
     quantity = 1,
+    pricingMode = "manual",
+    pricingValue = null,
 }) {
     if (!isValidKind(kind)) {
         throw new Error(`Invalid listing kind: ${kind}`);
+    }
+
+    // Auto-pricing: compute the price from the rule now so it's correct immediately (the nightly job
+    // keeps it current afterward). Falls back to the passed price if we can't compute one.
+    const mode = PRICING_MODES.has(pricingMode) ? pricingMode : "manual";
+    let effectivePrice = price;
+    if (mode !== "manual") {
+        const computed = await computeListingPriceNow({ catalogProductId, vendorId, mode, value: pricingValue });
+        if (computed != null) {
+            effectivePrice = computed;
+        }
     }
 
     // Grading only applies to singles. A graded single uses company + grade (no condition); a raw
@@ -137,8 +153,9 @@ export async function createListing({
     const row = await db.queryOne(
         `INSERT INTO mkt_listing
             (vendor_id, kind, catalog_product_id, game, title, set_name, card_number,
-             image_url, condition, graded, grading_company, grade, language, price, quantity)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+             image_url, condition, graded, grading_company, grade, language, price, quantity,
+             pricing_mode, pricing_value)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          RETURNING ${LISTING_COLUMNS}`,
         [
             vendorId,
@@ -154,8 +171,10 @@ export async function createListing({
             isGraded ? (gradingCompany ? String(gradingCompany).trim() : null) : null,
             isGraded ? (grade ? String(grade).trim() : null) : null,
             normalizeLanguage(language),
-            price,
+            effectivePrice,
             quantity,
+            mode,
+            mode === "manual" ? null : pricingValue,
         ]
     );
 
@@ -180,6 +199,27 @@ export async function createListing({
 
 // Patch a vendor's own listing. Vendor-scoped so one vendor can't edit another's row.
 export async function updateListing(id, vendorId, patch = {}) {
+    // Switching to / adjusting an auto-pricing rule recomputes the price now (then the nightly job maintains it).
+    if (patch.pricingMode !== undefined || patch.pricingValue !== undefined) {
+        const existing = await getListingById(id);
+        if (existing && existing.vendorId === vendorId) {
+            const mode = patch.pricingMode !== undefined ? patch.pricingMode : existing.pricingMode;
+            const value = patch.pricingValue !== undefined ? patch.pricingValue : existing.pricingValue;
+            const normMode = PRICING_MODES.has(mode) ? mode : "manual";
+            patch.pricingMode = normMode;
+            patch.pricingValue = normMode === "manual" ? null : value;
+            if (normMode !== "manual") {
+                const computed = await computeListingPriceNow({
+                    catalogProductId: existing.catalogProductId,
+                    vendorId,
+                    mode: normMode,
+                    value,
+                });
+                if (computed != null) patch.price = computed;
+            }
+        }
+    }
+
     const allowed = {
         title: "title",
         setName: "set_name",
@@ -194,6 +234,8 @@ export async function updateListing(id, vendorId, patch = {}) {
         quantity: "quantity",
         game: "game",
         catalogProductId: "catalog_product_id",
+        pricingMode: "pricing_mode",
+        pricingValue: "pricing_value",
     };
 
     const sets = [];

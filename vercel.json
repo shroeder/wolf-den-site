@@ -44,6 +44,10 @@
             "schedule": "0 6 * * *"
         },
         {
+            "path": "/api/jobs/marketplace-reprice",
+            "schedule": "45 6 * * *"
+        },
+        {
             "path": "/api/jobs/looking-for-alerts",
             "schedule": "0 8 * * *"
         },

@@ -44,6 +44,14 @@ export async function PATCH(request, { params }) {
                 patch.language = body.language;
             }
 
+            if (body.pricingMode !== undefined) {
+                patch.pricingMode = body.pricingMode;
+            }
+
+            if (body.pricingValue !== undefined) {
+                patch.pricingValue = body.pricingValue === null ? null : Number(body.pricingValue);
+            }
+
             const listing = await updateListing(id, vendor.id, patch);
 
             if (!listing) {

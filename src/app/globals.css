@@ -4146,6 +4146,29 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-right: 0.25rem;
 }
 
+.mkt-pricing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0.5rem;
+}
+
+.mkt-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+}
+
+.mkt-checkbox input {
+    width: auto;
+}
+
+.mkt-mode-select {
+    max-width: 8.5rem;
+}
+
 /* Non-English language flag on an offer — drawn so a Japanese/etc. card reads at a glance. */
 .mkt-lang-badge {
     display: inline-block;

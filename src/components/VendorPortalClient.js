@@ -62,7 +62,7 @@ function inferKind(product) {
     return product?.number || product?.rarity ? "single" : "sealed";
 }
 
-function AddListingForm({ onAdded }) {
+function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricingValue = null }) {
     const [games, setGames] = useState(DEFAULT_GAMES);
     const [game, setGame] = useState("");
     const [query, setQuery] = useState("");
@@ -78,6 +78,14 @@ function AddListingForm({ onAdded }) {
     const [price, setPrice] = useState("");
     const [quantity, setQuantity] = useState("1");
     const [pricing, setPricing] = useState(null);
+    const [autoMode, setAutoMode] = useState(defaultPricingMode || "manual");
+    const [pctInput, setPctInput] = useState(
+        defaultPricingMode === "market_pct" && defaultPricingValue ? String(Math.round(defaultPricingValue * 100)) : "90"
+    );
+    const [undercutInput, setUndercutInput] = useState(
+        defaultPricingMode === "match_lowest" && defaultPricingValue != null ? String(defaultPricingValue) : "0"
+    );
+    const [saveDefault, setSaveDefault] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const abortRef = useRef(null);
@@ -176,9 +184,33 @@ function AddListingForm({ onAdded }) {
             setError("Pick a product or enter a title.");
             return;
         }
-        if (price === "" || Number(price) < 0) {
-            setError("Enter a valid price.");
-            return;
+        const market = pricing?.marketPrice ?? selected?.marketPrice ?? null;
+        const lowest = pricing?.lowestPrice ?? null;
+        const round2 = (n) => Math.round(n * 100) / 100;
+
+        let pricingValue = null;
+        let submitPrice;
+        if (autoMode === "market_pct") {
+            pricingValue = Number(pctInput) / 100;
+            if (!(pricingValue > 0) || market == null) {
+                setError("Auto % pricing needs a catalog-matched product. Pick one, or use Manual.");
+                return;
+            }
+            submitPrice = round2(market * pricingValue);
+        } else if (autoMode === "match_lowest") {
+            pricingValue = Number(undercutInput) || 0;
+            const base = lowest ?? market;
+            if (base == null) {
+                setError("Match-lowest needs a catalog-matched product. Pick one, or use Manual.");
+                return;
+            }
+            submitPrice = Math.max(0, round2(base - pricingValue));
+        } else {
+            if (price === "" || Number(price) < 0) {
+                setError("Enter a valid price.");
+                return;
+            }
+            submitPrice = Number(price);
         }
 
         setBusy(true);
@@ -194,7 +226,9 @@ function AddListingForm({ onAdded }) {
                     gradingCompany: kind === "single" && graded ? gradingCompany : null,
                     grade: kind === "single" && graded ? grade.trim() : null,
                     language,
-                    price: Number(price),
+                    price: submitPrice,
+                    pricingMode: autoMode,
+                    pricingValue,
                     quantity: Number(quantity) || 1,
                     title: title.trim(),
                     catalogProductId: selected?.catalogProductId || null,
@@ -208,6 +242,14 @@ function AddListingForm({ onAdded }) {
 
             if (!response.ok) {
                 throw new Error(data?.error || "Could not add the listing.");
+            }
+
+            if (saveDefault && autoMode !== "manual") {
+                fetch("/api/marketplace/vendor/pricing-default", {
+                    method: "PATCH",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ mode: autoMode, value: pricingValue }),
+                }).catch(() => {});
             }
 
             // Reset.
@@ -338,52 +380,97 @@ function AddListingForm({ onAdded }) {
                     {(() => {
                         const market = pricing?.marketPrice ?? selected?.marketPrice ?? null;
                         const lowest = pricing?.lowestPrice ?? null;
-                        if (market == null && lowest == null) return null;
+                        const round2 = (n) => Math.round(n * 100) / 100;
+                        const preview =
+                            autoMode === "market_pct" && market != null
+                                ? Math.max(0, round2(market * (Number(pctInput) / 100)))
+                                : autoMode === "match_lowest" && (lowest ?? market) != null
+                                  ? Math.max(0, round2((lowest ?? market) - (Number(undercutInput) || 0)))
+                                  : null;
                         return (
-                            <div className="mkt-price-helpers">
-                                {market != null ? (
-                                    <div className="mkt-price-helper-row">
-                                        <span className="mkt-price-helper-label">Market {formatPrice(market)}</span>
-                                        {[0.85, 0.9, 0.95, 1].map((pct) => (
-                                            <button
-                                                key={pct}
-                                                type="button"
-                                                className="pill"
-                                                onClick={() => setPrice((market * pct).toFixed(2))}
-                                            >
-                                                {Math.round(pct * 100)}%
-                                            </button>
-                                        ))}
-                                    </div>
-                                ) : null}
-                                {lowest != null ? (
-                                    <div className="mkt-price-helper-row">
-                                        <span className="mkt-price-helper-label">
-                                            Lowest {formatPrice(lowest)}
-                                            {pricing?.vendorCount ? ` · ${pricing.vendorCount} vendor${pricing.vendorCount === 1 ? "" : "s"}` : ""}
-                                        </span>
-                                        <button type="button" className="pill" onClick={() => setPrice(lowest.toFixed(2))}>
-                                            Match
+                            <div className="mkt-pricing">
+                                <div className="mkt-toggle-row" role="group" aria-label="Pricing mode">
+                                    {[["manual", "Manual"], ["market_pct", "% of market"], ["match_lowest", "Match lowest"]].map(([m, lbl]) => (
+                                        <button
+                                            key={m}
+                                            type="button"
+                                            className={`pill${autoMode === m ? " lf-game-active" : ""}`}
+                                            onClick={() => setAutoMode(m)}
+                                        >
+                                            {lbl}
                                         </button>
-                                        <button type="button" className="pill" onClick={() => setPrice(Math.max(0, lowest - 0.25).toFixed(2))}>
-                                            Undercut
-                                        </button>
-                                    </div>
+                                    ))}
+                                </div>
+
+                                {market != null || lowest != null ? (
+                                    <p className="mkt-price-helper-label">
+                                        {market != null ? `Market ${formatPrice(market)}` : ""}
+                                        {lowest != null ? `${market != null ? " · " : ""}Lowest ${formatPrice(lowest)}${pricing?.vendorCount ? ` (${pricing.vendorCount})` : ""}` : ""}
+                                    </p>
                                 ) : null}
+
+                                {autoMode === "manual" ? (
+                                    <>
+                                        {market != null ? (
+                                            <div className="mkt-price-helper-row">
+                                                {[0.85, 0.9, 0.95, 1].map((pct) => (
+                                                    <button key={pct} type="button" className="pill" onClick={() => setPrice((market * pct).toFixed(2))}>
+                                                        {Math.round(pct * 100)}%
+                                                    </button>
+                                                ))}
+                                                {lowest != null ? (
+                                                    <>
+                                                        <button type="button" className="pill" onClick={() => setPrice(lowest.toFixed(2))}>Match</button>
+                                                        <button type="button" className="pill" onClick={() => setPrice(Math.max(0, lowest - 0.25).toFixed(2))}>Undercut</button>
+                                                    </>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        <div className="mkt-add-row">
+                                            <div>
+                                                <label htmlFor="add-price">Your price ($)</label>
+                                                <input id="add-price" type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="add-qty">Quantity</label>
+                                                <input id="add-qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="mkt-add-row">
+                                            <div>
+                                                {autoMode === "market_pct" ? (
+                                                    <>
+                                                        <label htmlFor="add-pct">% of market</label>
+                                                        <input id="add-pct" type="number" min="1" step="1" value={pctInput} onChange={(e) => setPctInput(e.target.value)} />
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <label htmlFor="add-undercut">Undercut lowest by ($)</label>
+                                                        <input id="add-undercut" type="number" min="0" step="0.25" value={undercutInput} onChange={(e) => setUndercutInput(e.target.value)} />
+                                                    </>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label htmlFor="add-qty">Quantity</label>
+                                                <input id="add-qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <p className="mkt-price-helper-label">
+                                            Auto price → {preview != null ? formatPrice(preview) : "needs a catalog-matched product"}
+                                            {autoMode === "match_lowest" && lowest == null && market != null ? " (no other vendors yet — uses market)" : ""}
+                                        </p>
+                                        <label className="mkt-checkbox">
+                                            <input type="checkbox" checked={saveDefault} onChange={(e) => setSaveDefault(e.target.checked)} />
+                                            Save as my default for new listings
+                                        </label>
+                                    </>
+                                )}
                             </div>
                         );
                     })()}
-
-                    <div className="mkt-add-row">
-                        <div>
-                            <label htmlFor="add-price">Your price ($)</label>
-                            <input id="add-price" type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
-                        </div>
-                        <div>
-                            <label htmlFor="add-qty">Quantity</label>
-                            <input id="add-qty" type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-                        </div>
-                    </div>
 
                     <button className="button primary" type="submit" disabled={busy}>
                         {busy ? "Adding..." : "Add listing"}
@@ -434,10 +521,26 @@ function AddListingForm({ onAdded }) {
 function ListingRow({ listing, onChanged }) {
     const [price, setPrice] = useState(String(listing.price ?? ""));
     const [quantity, setQuantity] = useState(String(listing.quantity ?? 1));
+    const [mode, setMode] = useState(listing.pricingMode || "manual");
+    const [pctVal, setPctVal] = useState(
+        listing.pricingMode === "market_pct" && listing.pricingValue != null ? String(Math.round(listing.pricingValue * 100)) : "90"
+    );
+    const [undercutVal, setUndercutVal] = useState(
+        listing.pricingMode === "match_lowest" && listing.pricingValue != null ? String(listing.pricingValue) : "0"
+    );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
-    const dirty = price !== String(listing.price ?? "") || quantity !== String(listing.quantity ?? 1);
+    const storedValInput =
+        listing.pricingMode === "market_pct" && listing.pricingValue != null
+            ? String(Math.round(listing.pricingValue * 100))
+            : listing.pricingMode === "match_lowest" && listing.pricingValue != null
+              ? String(listing.pricingValue)
+              : "";
+    const currentValInput = mode === "market_pct" ? pctVal : mode === "match_lowest" ? undercutVal : "";
+    const pricingDirty = mode !== (listing.pricingMode || "manual") || (mode !== "manual" && currentValInput !== storedValInput);
+    const dirty =
+        price !== String(listing.price ?? "") || quantity !== String(listing.quantity ?? 1) || pricingDirty;
 
     async function save() {
         setBusy(true);
@@ -446,7 +549,15 @@ function ListingRow({ listing, onChanged }) {
             const response = await fetch(`/api/marketplace/vendor/listings/${listing.id}`, {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ price: Number(price), quantity: Number(quantity) }),
+                body: JSON.stringify(
+                    mode === "manual"
+                        ? { price: Number(price), quantity: Number(quantity), pricingMode: "manual", pricingValue: null }
+                        : {
+                              quantity: Number(quantity),
+                              pricingMode: mode,
+                              pricingValue: mode === "market_pct" ? Number(pctVal) / 100 : Number(undercutVal) || 0,
+                          }
+                ),
             });
             if (!response.ok) {
                 const data = await response.json().catch(() => null);
@@ -507,14 +618,34 @@ function ListingRow({ listing, onChanged }) {
                           : ""}
                     {listing.language && listing.language !== "English" ? ` · ${listing.language}` : ""}
                     {listing.setName ? ` · ${listing.setName}` : ""}
+                    {listing.pricingMode && listing.pricingMode !== "manual"
+                        ? ` · auto ${listing.pricingMode === "market_pct" ? `${Math.round((listing.pricingValue || 0) * 100)}% mkt` : "match low"}`
+                        : ""}
                 </span>
                 {error ? <span className="muted">{error}</span> : null}
             </div>
             <div className="mkt-admin-actions mkt-listing-edit">
-                <label>
-                    $
-                    <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
-                </label>
+                <select className="lf-set-select mkt-mode-select" value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Pricing mode">
+                    <option value="manual">Manual</option>
+                    <option value="market_pct">% market</option>
+                    <option value="match_lowest">Match low</option>
+                </select>
+                {mode === "manual" ? (
+                    <label>
+                        $
+                        <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+                    </label>
+                ) : mode === "market_pct" ? (
+                    <label>
+                        %
+                        <input type="number" min="1" step="1" value={pctVal} onChange={(e) => setPctVal(e.target.value)} />
+                    </label>
+                ) : (
+                    <label>
+                        −$
+                        <input type="number" min="0" step="0.25" value={undercutVal} onChange={(e) => setUndercutVal(e.target.value)} />
+                    </label>
+                )}
                 <label>
                     Qty
                     <input type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
@@ -695,7 +826,11 @@ export default function VendorPortalClient({
 
             <section className="card">
                 <h2>Add a listing</h2>
-                <AddListingForm onAdded={refresh} />
+                <AddListingForm
+                    onAdded={refresh}
+                    defaultPricingMode={vendor.defaultPricingMode}
+                    defaultPricingValue={vendor.defaultPricingValue}
+                />
             </section>
 
             <section className="card">

@@ -46,6 +46,8 @@ export async function POST(request) {
                     language: body.language || "English",
                     price,
                     quantity: Number.isFinite(quantity) && quantity >= 0 ? Math.trunc(quantity) : 1,
+                    pricingMode: body.pricingMode || "manual",
+                    pricingValue: body.pricingValue != null ? Number(body.pricingValue) : null,
                 });
 
                 logger.info("marketplace.vendor.listing_created", { vendorId: vendor.id, listingId: listing.id });
