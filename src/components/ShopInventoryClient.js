@@ -804,6 +804,7 @@ export default function ShopInventoryClient({
 
                                     <div className="shop-tile-body">
                                         <h3 className="shop-tile-name">{item.name}</h3>
+                                        {item.setName ? <p className="shop-tile-set">{item.setName}</p> : null}
                                         {isFiltering && <p className="shop-item-category">{item.categoryName}</p>}
                                         <div className="shop-tile-meta-row">
                                             <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
