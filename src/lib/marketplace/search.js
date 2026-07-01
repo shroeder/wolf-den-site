@@ -128,6 +128,38 @@ export async function searchCatalogInStock({
 }
 
 // Product page: the canonical item (from the catalog) + every active vendor offer, cheapest first.
+// Pricing context for a vendor setting a price: the catalog market price plus the lowest active price
+// among OTHER vendors (excludeVendorId) and how many are competing. Powers the add-listing helpers.
+export async function getProductPricingContext(catalogProductId, excludeVendorId = null) {
+    const row = await db.queryOne(
+        `SELECT c.market_price,
+                MIN(l.price) FILTER (
+                    WHERE l.status = 'active' AND v.status = 'active'
+                      AND ($2::uuid IS NULL OR l.vendor_id <> $2)
+                ) AS lowest_price,
+                COUNT(DISTINCT l.vendor_id) FILTER (
+                    WHERE l.status = 'active' AND v.status = 'active'
+                      AND ($2::uuid IS NULL OR l.vendor_id <> $2)
+                ) AS vendor_count
+         FROM tcg_cards c
+         LEFT JOIN mkt_listing l ON l.catalog_product_id = c.id
+         LEFT JOIN mkt_vendor v ON v.id = l.vendor_id
+         WHERE c.id = $1
+         GROUP BY c.market_price`,
+        [catalogProductId, excludeVendorId]
+    );
+
+    if (!row) {
+        return null;
+    }
+
+    return {
+        marketPrice: toNumber(row.market_price),
+        lowestPrice: toNumber(row.lowest_price),
+        vendorCount: Number(row.vendor_count) || 0,
+    };
+}
+
 export async function getProductWithOffers(catalogProductId) {
     const product = await db.queryOne(
         `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, c.rarity,

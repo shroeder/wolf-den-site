@@ -4125,6 +4125,27 @@ body.tv-mode .shop-mobile-cart-fab {
     text-decoration: underline;
 }
 
+/* One-tap pricing helpers in the add-listing form (% of market, match/undercut lowest vendor). */
+.mkt-price-helpers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.25rem 0 0.5rem;
+}
+
+.mkt-price-helper-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.mkt-price-helper-label {
+    font-size: 0.8rem;
+    color: var(--ink-secondary);
+    margin-right: 0.25rem;
+}
+
 /* Non-English language flag on an offer — drawn so a Japanese/etc. card reads at a glance. */
 .mkt-lang-badge {
     display: inline-block;

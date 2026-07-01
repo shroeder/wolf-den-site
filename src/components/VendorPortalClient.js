@@ -77,6 +77,7 @@ function AddListingForm({ onAdded }) {
     const [language, setLanguage] = useState("English");
     const [price, setPrice] = useState("");
     const [quantity, setQuantity] = useState("1");
+    const [pricing, setPricing] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const abortRef = useRef(null);
@@ -131,6 +132,30 @@ function AddListingForm({ onAdded }) {
 
         return () => clearTimeout(handle);
     }, [query, game, selected]);
+
+    // Pull pricing context (market + lowest competing vendor) whenever a matched product is selected.
+    useEffect(() => {
+        let ignore = false;
+        const id = selected?.catalogProductId;
+
+        (async () => {
+            if (!id) {
+                if (!ignore) setPricing(null);
+                return;
+            }
+            try {
+                const response = await fetch(`/api/marketplace/vendor/product-pricing?catalogProductId=${id}`, { cache: "no-store" });
+                const data = await response.json().catch(() => null);
+                if (!ignore) setPricing(response.ok ? data : null);
+            } catch {
+                if (!ignore) setPricing(null);
+            }
+        })();
+
+        return () => {
+            ignore = true;
+        };
+    }, [selected?.catalogProductId]);
 
     function pick(product) {
         setSelected(product);
@@ -309,6 +334,45 @@ function AddListingForm({ onAdded }) {
                             </option>
                         ))}
                     </select>
+
+                    {(() => {
+                        const market = pricing?.marketPrice ?? selected?.marketPrice ?? null;
+                        const lowest = pricing?.lowestPrice ?? null;
+                        if (market == null && lowest == null) return null;
+                        return (
+                            <div className="mkt-price-helpers">
+                                {market != null ? (
+                                    <div className="mkt-price-helper-row">
+                                        <span className="mkt-price-helper-label">Market {formatPrice(market)}</span>
+                                        {[0.85, 0.9, 0.95, 1].map((pct) => (
+                                            <button
+                                                key={pct}
+                                                type="button"
+                                                className="pill"
+                                                onClick={() => setPrice((market * pct).toFixed(2))}
+                                            >
+                                                {Math.round(pct * 100)}%
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : null}
+                                {lowest != null ? (
+                                    <div className="mkt-price-helper-row">
+                                        <span className="mkt-price-helper-label">
+                                            Lowest {formatPrice(lowest)}
+                                            {pricing?.vendorCount ? ` · ${pricing.vendorCount} vendor${pricing.vendorCount === 1 ? "" : "s"}` : ""}
+                                        </span>
+                                        <button type="button" className="pill" onClick={() => setPrice(lowest.toFixed(2))}>
+                                            Match
+                                        </button>
+                                        <button type="button" className="pill" onClick={() => setPrice(Math.max(0, lowest - 0.25).toFixed(2))}>
+                                            Undercut
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })()}
 
                     <div className="mkt-add-row">
                         <div>
