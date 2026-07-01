@@ -2,12 +2,26 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
 import { requireAdminAppAuth } from "@/lib/admin-app/auth";
 import { hasPermission } from "@/lib/admin-app/permissions";
 import { getDecryptedCredential, resolveOpenAiKey, resolveSquareAccessToken } from "@/lib/admin-app/integrations";
+import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
+
+// The single flagship store (The Wolf Den) whose credentials come from Vercel env. Cached per process.
+let flagshipStoreIdCache;
+async function flagshipStoreId() {
+    if (flagshipStoreIdCache === undefined) {
+        const row = await db.queryOne(
+            "SELECT id FROM stores WHERE uses_env_credentials = TRUE ORDER BY created_at ASC LIMIT 1"
+        );
+        flagshipStoreIdCache = row?.id || null;
+    }
+    return flagshipStoreIdCache;
+}
 
 const P = {
     LEDGER_VIEW: "ledger.view",
@@ -140,10 +154,21 @@ export async function handleProxy(request, upstreamKey, context) {
         return NextResponse.json({ error: "unknown_upstream" }, { status: 404 });
     }
 
-    const auth = await requireAdminAppAuth(request, proxyLogger);
+    // Two ways in: the single-store flagship app authenticates with the shared admin key (no login) and
+    // acts as owner; or a per-user staff session (if login is ever added) with checked permissions.
+    const usingSharedKey = request.headers.get("x-admin-key")
+        ? verifyAdminApiKey(request, proxyLogger) === null
+        : false;
 
-    if (auth.response) {
-        return auth.response;
+    let session;
+    if (usingSharedKey) {
+        session = { user: { id: "flagship-app", storeId: await flagshipStoreId() }, effectivePermissions: [] };
+    } else {
+        const auth = await requireAdminAppAuth(request, proxyLogger);
+        if (auth.response) {
+            return auth.response;
+        }
+        session = auth.session;
     }
 
     const { path: pathSegments = [] } = (await context.params) || {};
@@ -156,13 +181,13 @@ export async function handleProxy(request, upstreamKey, context) {
         return NextResponse.json({ error: "path_not_allowed" }, { status: 403 });
     }
 
-    const permitted = rule.anyOf.some((perm) => hasPermission(auth.session.effectivePermissions, perm));
+    const permitted = usingSharedKey || rule.anyOf.some((perm) => hasPermission(session.effectivePermissions, perm));
 
     if (!permitted) {
         proxyLogger.warn("admin_app.proxy.permission_denied", {
             upstreamKey,
             path,
-            userId: auth.session.user.id,
+            userId: session.user.id,
             anyOf: rule.anyOf,
         });
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -182,7 +207,7 @@ export async function handleProxy(request, upstreamKey, context) {
         ({ headers, bodyText } = await upstream.applyAuth({
             headers,
             bodyText,
-            storeId: auth.session.user.storeId,
+            storeId: session.user.storeId,
             path,
         }));
     } catch (error) {
@@ -215,7 +240,7 @@ export async function handleProxy(request, upstreamKey, context) {
         path,
         method,
         status: upstreamResponse.status,
-        userId: auth.session.user.id,
+        userId: session.user.id,
     });
 
     return new NextResponse(responseBody, {
