@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import SellInquiryForm from "@/components/SellInquiryForm";
+import SellCardsClient from "@/components/SellCardsClient";
 
 export const metadata = {
     title: "Sell Pokemon & Magic Cards",
@@ -21,11 +21,13 @@ export default function SellCardsPage() {
                     The Wolf Den buys Pokemon cards, Magic: The Gathering cards, and select collectibles in Montgomery, Minnesota.
                 </p>
                 <p>
-                    If you have singles, decks, sealed product, or a larger collection, we offer local evaluation with payout options in cash or higher-value store credit.
+                    Pick your exact cards below and choose how you want to move them: <strong>sell to us</strong>,{" "}
+                    <strong>consign</strong>, or <strong>get offers from local vendors</strong> — like shopping a card
+                    show without leaving home.
                 </p>
                 <div className="cta-row">
                     <a className="button primary" href="#sell-form">
-                        Sell or Consign to Us
+                        Start Selling
                     </a>
                     <a className="button" href="tel:+17014090782">
                         Call Store
@@ -36,10 +38,10 @@ export default function SellCardsPage() {
             <section className="card" id="sell-form">
                 <h2>Tell us what you have</h2>
                 <p className="muted">
-                    Send us the cards or collection you&apos;d like to sell or consign and we&apos;ll email you back. No
-                    obligation — even if we can&apos;t buy it outright, we can often help you move it.
+                    Search the catalog and add your cards, pick where they should go, and we&apos;ll take it from there.
+                    Free and no obligation — even if we can&apos;t buy it outright, local vendors often will.
                 </p>
-                <SellInquiryForm />
+                <SellCardsClient defaultDestination="sell" />
             </section>
 
             <section className="grid two-col">

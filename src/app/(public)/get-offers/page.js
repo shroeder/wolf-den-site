@@ -1,4 +1,4 @@
-import SellOfferForm from "@/components/SellOfferForm";
+import SellCardsClient from "@/components/SellCardsClient";
 
 export const metadata = {
     title: "Get Offers From Local Vendors | The Wolf Den",
@@ -21,7 +21,7 @@ export default function GetOffersPage() {
 
             <section className="card">
                 <h2>What are you looking to sell?</h2>
-                <SellOfferForm />
+                <SellCardsClient defaultDestination="vendors" lockDestination />
             </section>
 
             <section className="card">

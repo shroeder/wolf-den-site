@@ -4169,6 +4169,96 @@ body.tv-mode .shop-mobile-cart-fab {
     max-width: 8.5rem;
 }
 
+/* Unified "sell your cards" form: intent picker + catalog picker + selected list. */
+.sell-form .sell-step-label {
+    display: block;
+    font-weight: 600;
+    margin-top: 0.6rem;
+}
+
+.sell-dest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem;
+    margin: 0.25rem 0 0.5rem;
+}
+
+.sell-dest {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.sell-dest strong {
+    font-size: 0.95rem;
+}
+
+.sell-dest span {
+    font-size: 0.8rem;
+    color: var(--ink-secondary);
+}
+
+.sell-dest-active {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.sell-pick-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+.sell-selected {
+    list-style: none;
+    margin: 0.25rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.sell-selected-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+
+.sell-selected-thumb {
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.sell-selected-thumb-empty {
+    width: 40px;
+    height: 56px;
+    background: rgba(0, 0, 0, 0.15);
+    display: inline-block;
+}
+
+.sell-selected-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.sell-selected-info strong {
+    font-size: 0.9rem;
+}
+
+.sell-selected-info .muted {
+    font-size: 0.78rem;
+}
+
 /* Non-English language flag on an offer — drawn so a Japanese/etc. card reads at a glance. */
 .mkt-lang-badge {
     display: inline-block;

@@ -38,7 +38,7 @@ function baseUrl() {
     return process.env.NEXT_PUBLIC_BASE_URL || SITE_URL;
 }
 
-export async function createSellOffer({ name, email, phone, items, askingPrice }) {
+export async function createSellOffer({ name, email, phone, items, askingPrice, itemsJson = null }) {
     if (!isValidEmail(email)) {
         throw new Error("A valid email address is required.");
     }
@@ -49,10 +49,17 @@ export async function createSellOffer({ name, email, phone, items, askingPrice }
     const clean = (v) => (v ? String(v).slice(0, MAX_LEN).trim() : null);
 
     const row = await db.queryOne(
-        `INSERT INTO sell_offer (name, email, phone, items, asking_price)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO sell_offer (name, email, phone, items, asking_price, items_json)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [clean(name), String(email).trim(), clean(phone), String(items).slice(0, MAX_LEN).trim(), clean(askingPrice)]
+        [
+            clean(name),
+            String(email).trim(),
+            clean(phone),
+            String(items).slice(0, MAX_LEN).trim(),
+            clean(askingPrice),
+            itemsJson ? JSON.stringify(itemsJson) : null,
+        ]
     );
 
     // Discord ping (best-effort) so the owner sees seller supply come in.
