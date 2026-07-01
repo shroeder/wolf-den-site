@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import SellInquiryForm from "@/components/SellInquiryForm";
+
 export const metadata = {
     title: "Sell Pokemon & Magic Cards",
     description:
@@ -22,13 +24,22 @@ export default function SellCardsPage() {
                     If you have singles, decks, sealed product, or a larger collection, we offer local evaluation with payout options in cash or higher-value store credit.
                 </p>
                 <div className="cta-row">
-                    <Link className="button primary" href="/contact">
-                        Start a Buylist Request
-                    </Link>
+                    <a className="button primary" href="#sell-form">
+                        Sell or Consign to Us
+                    </a>
                     <a className="button" href="tel:+17014090782">
                         Call Store
                     </a>
                 </div>
+            </section>
+
+            <section className="card" id="sell-form">
+                <h2>Tell us what you have</h2>
+                <p className="muted">
+                    Send us the cards or collection you&apos;d like to sell or consign and we&apos;ll email you back. No
+                    obligation — even if we can&apos;t buy it outright, we can often help you move it.
+                </p>
+                <SellInquiryForm />
             </section>
 
             <section className="grid two-col">
