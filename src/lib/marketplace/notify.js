@@ -56,3 +56,43 @@ export async function notifyNewLead({ vendorName, buyerName, buyerEmail, itemTit
         notifyLogger.warn("marketplace.lead_notify_failed", { reason: error.message });
     }
 }
+
+// A walk-in seller posted cards looking for vendor offers. Best-effort Discord ping.
+export async function notifyNewSellOffer({ name, email, items, askingPrice }) {
+    const webhookUrl =
+        process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+
+    if (!webhookUrl) {
+        return;
+    }
+
+    const fields = [
+        { name: "Selling", value: String(items).slice(0, 1000), inline: false },
+        { name: "Seller", value: `${name ? `${name} · ` : ""}${email}`, inline: false },
+    ];
+    if (askingPrice) {
+        fields.push({ name: "Asking", value: String(askingPrice).slice(0, 200), inline: true });
+    }
+
+    const embed = {
+        title: "New seller looking for offers",
+        description: "A local seller posted cards for vendors to make offers on.",
+        url: new URL("/marketplace/portal", baseUrl()).toString(),
+        color: 0x8b5cf6,
+        fields,
+    };
+
+    try {
+        const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ embeds: [embed] }),
+        });
+        if (!response.ok) {
+            const text = await response.text().catch(() => "");
+            throw new Error(`Discord ${response.status}: ${text.slice(0, 150)}`);
+        }
+    } catch (error) {
+        notifyLogger.warn("marketplace.sell_offer_notify_failed", { reason: error.message });
+    }
+}

@@ -740,6 +740,7 @@ export default function VendorPortalClient({
     salesCount = 0,
     requests = [],
     requestStats = null,
+    sellOffers = [],
 }) {
     const router = useRouter();
     const refresh = () => router.refresh();
@@ -818,6 +819,35 @@ export default function VendorPortalClient({
                                 <span className="shop-qty-badge">
                                     {w.wantCount} want{w.wantCount === 1 ? "" : "s"}
                                 </span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
+
+            {sellOffers.length > 0 ? (
+                <section className="card">
+                    <h2>Sellers looking for offers</h2>
+                    <p className="muted">
+                        Local sellers posted these to get offers. Email them directly to make an offer — they&apos;re
+                        expecting to hear from vendors.
+                    </p>
+                    <ul className="mkt-admin-list">
+                        {sellOffers.map((offer) => (
+                            <li key={offer.id} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{offer.items}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {offer.name ? `${offer.name} · ` : ""}
+                                        <a href={`mailto:${offer.email}`}>{offer.email}</a>
+                                        {offer.phone ? ` · ${offer.phone}` : ""}
+                                        {offer.askingPrice ? ` · asking ${offer.askingPrice}` : ""}
+                                        {offer.createdAt ? ` · ${timeAgo(offer.createdAt)}` : ""}
+                                    </span>
+                                </div>
+                                <a className="button primary" href={`mailto:${offer.email}?subject=${encodeURIComponent("Offer on your cards — The Wolf Den Marketplace")}`}>
+                                    Make offer
+                                </a>
                             </li>
                         ))}
                     </ul>
