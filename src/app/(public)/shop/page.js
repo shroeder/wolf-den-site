@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import ShopInventoryClient from "@/components/ShopInventoryClient";
 import { listShopInventory } from "@/lib/consignment/square";
+import { attachSetNames } from "@/lib/shop-set-tags";
 
 export const metadata = {
     title: "Pokemon, MTG & Accessories",
@@ -13,7 +14,10 @@ export const metadata = {
 };
 
 export default async function ShopPage() {
-    const categories = await listShopInventory().catch(() => null);
+    let categories = await listShopInventory().catch(() => null);
+    if (categories) {
+        categories = await attachSetNames(categories).catch(() => categories);
+    }
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
     return (

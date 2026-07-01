@@ -151,7 +151,19 @@ export default function ShopInventoryClient({
     const [activeId, setActiveId] = useState(orderedCategories[0]?.id ?? null);
     const [detailItemKey, setDetailItemKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [setFilter, setSetFilter] = useState("");
     const [sortMode, setSortMode] = useState("featured");
+
+    // Sets present among in-stock singles (tagged server-side from the TCG SKU) — drives the Set filter.
+    const availableSets = useMemo(() => {
+        const seen = new Set();
+        for (const category of orderedCategories) {
+            for (const item of category.items || []) {
+                if (item.setName) seen.add(item.setName);
+            }
+        }
+        return Array.from(seen).sort();
+    }, [orderedCategories]);
     const [isLocalPaymentsEnabled, setIsLocalPaymentsEnabled] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -182,12 +194,17 @@ export default function ShopInventoryClient({
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const isSearching = normalizedSearch.length > 0;
+    const isFiltering = isSearching || Boolean(setFilter);
 
-    const matchedItems = isSearching
+    const matchedItems = isFiltering
         ? dedupeSearchItems(
             orderedCategories.flatMap((category) =>
                 category.items
-                    .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+                    .filter(
+                        (item) =>
+                            (!normalizedSearch || item.name.toLowerCase().includes(normalizedSearch)) &&
+                            (!setFilter || item.setName === setFilter)
+                    )
                     .map((item) => ({ ...item, categoryName: category.name }))
             )
         )
@@ -652,10 +669,32 @@ export default function ShopInventoryClient({
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
                     />
-                    {isSearching && (
+                    {isFiltering && (
                         <p className="secondary shop-search-meta">
-                            {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"} across all categories
+                            {visibleItems.length} result{visibleItems.length === 1 ? "" : "s"}
+                            {setFilter ? ` in ${setFilter}` : " across all categories"}
                         </p>
+                    )}
+
+                    {availableSets.length > 0 && (
+                        <div className="shop-sort-control">
+                            <label htmlFor="shop-set-select" className="shop-sort-label">
+                                Set
+                            </label>
+                            <select
+                                id="shop-set-select"
+                                className="shop-sort-select"
+                                value={setFilter}
+                                onChange={(event) => setSetFilter(event.target.value)}
+                            >
+                                <option value="">All sets</option>
+                                {availableSets.map((name) => (
+                                    <option key={name} value={name}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     )}
 
                     <div className="shop-sort-control">
@@ -693,7 +732,7 @@ export default function ShopInventoryClient({
                     </p>
                 )}
 
-                <div className="shop-category-mobile" aria-hidden={isSearching ? "true" : "false"}>
+                <div className="shop-category-mobile" aria-hidden={isFiltering ? "true" : "false"}>
                     <label htmlFor="shop-category-select" className="shop-category-mobile-label">
                         Category
                     </label>
@@ -702,7 +741,7 @@ export default function ShopInventoryClient({
                         className="shop-category-mobile-select"
                         value={selectedCategoryId ?? ""}
                         onChange={(event) => setActiveId(event.target.value)}
-                        disabled={isSearching}
+                        disabled={isFiltering}
                     >
                         {orderedCategories.map((category) => (
                             <option key={category.id} value={category.id}>
@@ -765,7 +804,7 @@ export default function ShopInventoryClient({
 
                                     <div className="shop-tile-body">
                                         <h3 className="shop-tile-name">{item.name}</h3>
-                                        {isSearching && <p className="shop-item-category">{item.categoryName}</p>}
+                                        {isFiltering && <p className="shop-item-category">{item.categoryName}</p>}
                                         <div className="shop-tile-meta-row">
                                             <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
                                             <div className="shop-tile-badges">
@@ -791,7 +830,9 @@ export default function ShopInventoryClient({
                                 <p className="consignment-empty shop-empty">
                                     {vendorOnlyMatches.length > 0
                                         ? `We don't carry "${searchTerm}" in store right now — but local vendors do, below ↓`
-                                        : `No products matched "${searchTerm}".`}
+                                        : setFilter && !isSearching
+                                          ? `No in-stock singles from ${setFilter} right now.`
+                                          : `No products matched "${searchTerm}".`}
                                 </p>
                             )}
                         </div>
