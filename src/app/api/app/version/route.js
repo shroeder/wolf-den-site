@@ -19,11 +19,17 @@ export async function GET(request) {
         }
 
         try {
+            // Default to 'full' so the already-installed app (which sends no channel) keeps working.
+            const { searchParams } = new URL(request.url);
+            const channel = (searchParams.get("channel") || "full").trim();
+
             const row = await db.queryOne(
                 `SELECT version_code, version_name, apk_url, notes, size_bytes, created_at
                  FROM app_release
+                 WHERE channel = $1
                  ORDER BY version_code DESC
-                 LIMIT 1`
+                 LIMIT 1`,
+                [channel]
             );
 
             if (!row) {

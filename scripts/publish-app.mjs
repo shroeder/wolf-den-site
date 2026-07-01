@@ -26,6 +26,7 @@ function parseArgs(argv) {
         const a = argv[i];
         if (a === "--apk") args.apk = argv[++i];
         else if (a === "--variant") args.variant = argv[++i];
+        else if (a === "--flavor") args.flavor = argv[++i];
         else if (a === "--notes") args.notes = argv[++i];
     }
     return args;
@@ -47,7 +48,10 @@ function readSecret(name) {
 async function main() {
     const args = parseArgs(process.argv.slice(2));
 
-    const apkDir = path.resolve(`../accounting_app/app/build/outputs/apk/${args.variant}`);
+    // Product flavors put the APK under apk/<flavor>/<buildType>/ (e.g. apk/full/debug, apk/employee/debug).
+    // The flavor doubles as the release channel the app checks against.
+    const flavor = args.flavor || "full";
+    const apkDir = path.resolve(`../accounting_app/app/build/outputs/apk/${flavor}/${args.variant}`);
     const metaPath = path.join(apkDir, "output-metadata.json");
 
     let versionCode;
@@ -90,9 +94,11 @@ async function main() {
 
     console.log(`Publishing ${path.basename(apkPath)}  v${versionName} (code ${versionCode}, ${(sizeBytes / 1e6).toFixed(1)} MB)`);
 
+    console.log(`Channel: ${flavor}`);
+
     // Upload to Blob. addRandomSuffix keeps the URL unguessable for an internal build.
     const fileBuffer = readFileSync(apkPath);
-    const blob = await put(`app/wolfdenledger-${versionCode}.apk`, fileBuffer, {
+    const blob = await put(`app/wolfdenledger-${flavor}-${versionCode}.apk`, fileBuffer, {
         access: "public",
         addRandomSuffix: true,
         contentType: "application/vnd.android.package-archive",
@@ -104,11 +110,11 @@ async function main() {
     const pool = new Pool({ connectionString: dbUrl });
     try {
         await pool.query(
-            `INSERT INTO app_release (version_code, version_name, apk_url, notes, size_bytes)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [versionCode, versionName, blob.url, args.notes || null, sizeBytes]
+            `INSERT INTO app_release (version_code, version_name, apk_url, notes, size_bytes, channel)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [versionCode, versionName, blob.url, args.notes || null, sizeBytes, flavor]
         );
-        console.log(`Recorded release v${versionName} (code ${versionCode}). The app will offer it on next launch.`);
+        console.log(`Recorded ${flavor} release v${versionName} (code ${versionCode}). The app will offer it on next launch.`);
     } finally {
         await pool.end();
     }
