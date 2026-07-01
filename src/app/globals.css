@@ -4259,6 +4259,58 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 0.78rem;
 }
 
+/* Marketplace landing polish: value chips, idle prompt, how-it-works. */
+.mkt-hero-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.5rem 0;
+}
+
+.mkt-chip {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--ink-secondary);
+}
+
+.mkt-idle {
+    padding: 1rem 0;
+    text-align: center;
+}
+
+.mkt-how-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.mkt-how-step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.mkt-how-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.mkt-how-step p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--ink-secondary);
+}
+
 /* Non-English language flag on an offer — drawn so a Japanese/etc. card reads at a glance. */
 .mkt-lang-badge {
     display: inline-block;

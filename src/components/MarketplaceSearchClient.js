@@ -173,17 +173,25 @@ export default function MarketplaceSearchClient() {
     return (
         <div className="stack reveal">
             <section className="card hero-accent">
-                <h1>Vendor Marketplace</h1>
+                <h1>Find cards for sale near you</h1>
                 <p>
-                    Search sealed product and singles across every vetted vendor. You only see what someone actually
-                    has in stock — pick an item to see each vendor&apos;s price and where they are.
+                    Search sealed product and singles across every vetted local vendor — you only see what someone
+                    actually has in stock. Pick an item to compare each vendor&apos;s price, then meet up in person.
                 </p>
+                <div className="mkt-hero-chips">
+                    <span className="mkt-chip">✓ Hand-vetted vendors</span>
+                    <span className="mkt-chip">📍 Local — meet in person</span>
+                    <span className="mkt-chip">💬 Contact direct, no fees</span>
+                </div>
                 <p className="mkt-hero-links">
                     <Link href="/marketplace/vendors" className="pill">
-                        📍 Browse vendors near you
+                        📍 Browse vendors
+                    </Link>
+                    <Link href="/sell-cards" className="pill">
+                        Got cards to sell? →
                     </Link>
                     <Link href="/marketplace/apply" className="pill">
-                        Sell on the marketplace →
+                        Become a vendor →
                     </Link>
                 </p>
             </section>
@@ -294,10 +302,38 @@ export default function MarketplaceSearchClient() {
                     <p className="muted">No match found. Try a different spelling.</p>
                 ) : null}
 
+                {results.length === 0 && !query.trim() ? (
+                    <p className="muted mkt-idle">
+                        Start typing a card, set, or product name above — or{" "}
+                        <Link href="/marketplace/vendors">browse all vendors</Link>.
+                    </p>
+                ) : null}
+
                 <div className="mkt-grid">
                     {results.map((item) => (
                         <ResultTile key={item.catalogProductId} item={item} />
                     ))}
+                </div>
+            </section>
+
+            <section className="card">
+                <h2>How it works</h2>
+                <div className="mkt-how-grid">
+                    <div className="mkt-how-step">
+                        <span className="mkt-how-num">1</span>
+                        <strong>Search</strong>
+                        <p>Find the card or sealed product you want across every local vendor at once.</p>
+                    </div>
+                    <div className="mkt-how-step">
+                        <span className="mkt-how-num">2</span>
+                        <strong>Compare</strong>
+                        <p>See who has it in stock, each vendor&apos;s price and condition, and where they are.</p>
+                    </div>
+                    <div className="mkt-how-step">
+                        <span className="mkt-how-num">3</span>
+                        <strong>Meet up</strong>
+                        <p>Message the vendor and arrange to meet in person — often right at The Wolf Den.</p>
+                    </div>
                 </div>
             </section>
         </div>
