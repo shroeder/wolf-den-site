@@ -19,7 +19,7 @@ const INVITE_EXPIRY_DAYS = 14;
 
 const VENDOR_COLUMNS = `id, email, display_name, status, password_hash,
     address_line1, address_line2, city, region, postal_code, country,
-    location_label, latitude, longitude, logo_url,
+    location_label, latitude, longitude, logo_url, ships, local_pickup,
     invited_at, accepted_at, last_login_at, created_at, updated_at`;
 
 function normalizeEmail(value) {
@@ -60,6 +60,8 @@ function mapVendor(row) {
         email: row.email,
         displayName: row.display_name,
         logoUrl: row.logo_url || null,
+        ships: row.ships === true,
+        localPickup: row.local_pickup == null ? true : row.local_pickup === true,
         status: row.status,
         hasPassword: Boolean(row.password_hash),
         address: {
@@ -137,6 +139,16 @@ export async function createVendor({ email, displayName, address = {}, logoUrl =
     );
 
     vendorsLogger.info("marketplace.vendor.created", { step: "vendor_created", vendorId: row.id });
+
+    return mapVendor(row);
+}
+
+// Set a vendor's fulfillment options (ships / local pickup). Used by the vendor portal.
+export async function setVendorFulfillment(id, { ships, localPickup }) {
+    const row = await db.queryOne(
+        `UPDATE mkt_vendor SET ships = $2, local_pickup = $3, updated_at = NOW() WHERE id = $1 RETURNING ${VENDOR_COLUMNS}`,
+        [id, Boolean(ships), Boolean(localPickup)]
+    );
 
     return mapVendor(row);
 }

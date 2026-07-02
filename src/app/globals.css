@@ -1701,6 +1701,20 @@ textarea {
 .mkt-logo-upload {
     cursor: pointer;
 }
+.mkt-fulfillment {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+.mkt-fulfillment label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {

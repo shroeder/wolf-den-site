@@ -458,7 +458,7 @@ export async function searchCatalog({ query, game = null, type = "all", setId = 
 export async function getVendorStorefront(vendorId, { includeInactive = false } = {}) {
     const vendor = await db.queryOne(
         `SELECT id, display_name, logo_url, location_label, region, city, latitude, longitude,
-                created_at, accepted_at, status
+                created_at, accepted_at, status, ships, local_pickup, last_login_at
          FROM mkt_vendor
          WHERE id = $1 ${includeInactive ? "" : "AND status = 'active'"}`,
         [vendorId]
@@ -487,6 +487,11 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
         const t = row.updated_at ? new Date(row.updated_at).getTime() : 0;
         return t > latest ? t : latest;
     }, 0);
+
+    // "Active this week" — logged in OR listed something in the last 7 days.
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const lastLoginMs = vendor.last_login_at ? new Date(vendor.last_login_at).getTime() : 0;
+    const activeThisWeek = lastLoginMs >= weekAgo || lastListedAt >= weekAgo;
 
     const salesRow = await db.queryOne(
         `SELECT COUNT(*)::int AS count FROM mkt_sale WHERE vendor_id = $1`,
@@ -520,6 +525,9 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
         city: vendor.city,
         ...spreadCoords(vendor.id, vendor.latitude, vendor.longitude),
         verified: true,
+        activeThisWeek,
+        ships: vendor.ships === true,
+        localPickup: vendor.local_pickup == null ? true : vendor.local_pickup === true,
         memberSince: toIso(vendor.accepted_at || vendor.created_at),
         listingCount: listings.length,
         lastListedAt: lastListedAt ? new Date(lastListedAt).toISOString() : null,

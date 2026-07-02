@@ -155,6 +155,9 @@ export default async function VendorStorefrontPage({ params }) {
                 </div>
                 <div className="mkt-trust">
                     <span className="mkt-trust-badge">✓ Verified vendor</span>
+                    {vendor.activeThisWeek ? <span className="mkt-trust-badge">🟢 Active this week</span> : null}
+                    {vendor.localPickup ? <span className="mkt-trust-item">Local pickup</span> : null}
+                    {vendor.ships ? <span className="mkt-trust-item">Ships</span> : null}
                     {monthYear(vendor.memberSince) ? (
                         <span className="mkt-trust-item">Member since {monthYear(vendor.memberSince)}</span>
                     ) : null}

@@ -855,6 +855,58 @@ function VendorLogoEditor({ vendor, onChanged }) {
     );
 }
 
+function VendorFulfillmentEditor({ vendor, onChanged }) {
+    const [ships, setShips] = useState(Boolean(vendor.ships));
+    const [localPickup, setLocalPickup] = useState(vendor.localPickup !== false);
+    const [saving, setSaving] = useState(false);
+
+    async function save(next) {
+        setSaving(true);
+        try {
+            await fetch("/api/marketplace/vendor/fulfillment", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(next),
+            });
+            onChanged();
+        } catch {
+            /* ignore */
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="mkt-fulfillment">
+            <span className="muted">Buyers can:</span>
+            <label>
+                <input
+                    type="checkbox"
+                    checked={localPickup}
+                    disabled={saving}
+                    onChange={(e) => {
+                        setLocalPickup(e.target.checked);
+                        save({ ships, localPickup: e.target.checked });
+                    }}
+                />{" "}
+                Local pickup
+            </label>
+            <label>
+                <input
+                    type="checkbox"
+                    checked={ships}
+                    disabled={saving}
+                    onChange={(e) => {
+                        setShips(e.target.checked);
+                        save({ ships: e.target.checked, localPickup });
+                    }}
+                />{" "}
+                Ship
+            </label>
+        </div>
+    );
+}
+
 export default function VendorPortalClient({
     vendor,
     listings,
@@ -891,6 +943,7 @@ export default function VendorPortalClient({
                                 : ""}
                         </p>
                         <VendorLogoEditor vendor={vendor} onChanged={refresh} />
+                        <VendorFulfillmentEditor vendor={vendor} onChanged={refresh} />
                     </div>
                     <button type="button" className="pill" onClick={logout}>
                         Sign out
