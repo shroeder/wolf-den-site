@@ -1808,6 +1808,17 @@ textarea {
     font-size: 0.8rem;
     color: #d4af37;
 }
+.mkt-mission-source {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #35c759;
+    text-decoration: none;
+}
+.mkt-mission-source:hover {
+    text-decoration: underline;
+}
 
 /* "Live Local Inventory" stats strip. */
 .mkt-live-stats {

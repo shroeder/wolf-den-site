@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -955,6 +956,10 @@ export default function VendorPortalClient({
                 <h2>Vendor Missions</h2>
                 <p className="muted">
                     Opportunities from the network — what to stock next, and where you&apos;re the only seller.
+                    Have dead stock?{" "}
+                    <Link href="/marketplace" className="mkt-mission-source">
+                        Source &amp; sell to other vendors →
+                    </Link>
                 </p>
                 {missions.demandGaps.length === 0 && missions.uniques.length === 0 ? (
                     <p className="muted">
@@ -981,6 +986,14 @@ export default function VendorPortalClient({
                                                 ? "nobody in the network stocks it yet"
                                                 : `${m.sellerCount} seller${m.sellerCount === 1 ? "" : "s"} carry it`}
                                         </p>
+                                        {m.sellerCount > 0 ? (
+                                            <Link
+                                                href={`/marketplace/product/${m.catalogProductId}`}
+                                                className="mkt-mission-source"
+                                            >
+                                                🔁 Source it from {m.sellerCount} vendor{m.sellerCount === 1 ? "" : "s"} →
+                                            </Link>
+                                        ) : null}
                                     </div>
                                 </li>
                             ))}
