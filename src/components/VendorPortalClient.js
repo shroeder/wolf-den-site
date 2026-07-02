@@ -988,7 +988,7 @@ function DealerResult({ l, onOffered }) {
     );
 }
 
-function DealerNetwork({ onChanged }) {
+function DealerNetwork({ onChanged, demand = [] }) {
     const [q, setQ] = useState("");
     const [results, setResults] = useState([]);
 
@@ -1015,6 +1015,24 @@ function DealerNetwork({ onChanged }) {
     return (
         <section className="card">
             <h2>Dealer Network — source inventory</h2>
+            {demand.length > 0 ? (
+                <div className="mkt-dealer-demand">
+                    <h3 className="mkt-mission-head">🔥 Your dealer stock buyers want</h3>
+                    <ul className="mkt-admin-list">
+                        {demand.map((d) => (
+                            <li key={d.listingId} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{d.title}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {d.setName ? `${d.setName} · ` : ""}
+                                        {d.quantity} in stock · {d.wantCount} buyer{d.wantCount === 1 ? "" : "s"} want it
+                                    </span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
             <p className="muted">
                 Search stock other vendors have opened to dealers, and make an offer to buy or swap. (Mark your
                 own listings &quot;offer to other dealers&quot; to appear here for others.)
@@ -1181,6 +1199,7 @@ export default function VendorPortalClient({
     sellOffers = [],
     missions = { demandGaps: [], uniques: [] },
     dealerOffers = { incoming: [], outgoing: [] },
+    dealerDemand = [],
 }) {
     const router = useRouter();
     const refresh = () => router.refresh();
@@ -1290,7 +1309,7 @@ export default function VendorPortalClient({
 
             <DealerOffers dealerOffers={dealerOffers} onChanged={refresh} />
 
-            <DealerNetwork onChanged={refresh} />
+            <DealerNetwork onChanged={refresh} demand={dealerDemand} />
 
             {openRequests.length > 0 ? (
                 <section className="card">

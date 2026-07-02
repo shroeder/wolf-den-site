@@ -72,6 +72,34 @@ export async function listVendorMissions(vendorId, { limit = 10 } = {}) {
     };
 }
 
+// D2D matching: a vendor's own dealer-available stock that buyers in the network want — so dead
+// inventory they've opened to dealers is surfaced against real demand.
+export async function listDealerStockInDemand(vendorId) {
+    if (!vendorId) {
+        return [];
+    }
+    const rows = await db.query(
+        `SELECT l.id, l.title, l.set_name, l.wholesale_price, l.price, l.quantity,
+                (SELECT COUNT(DISTINCT w.email_normalized) FROM mkt_want w
+                   WHERE w.catalog_product_id = l.catalog_product_id)::int AS want_count
+         FROM mkt_listing l
+         WHERE l.vendor_id = $1 AND l.status = 'active' AND l.dealer_available = TRUE
+           AND l.catalog_product_id IS NOT NULL
+           AND EXISTS (SELECT 1 FROM mkt_want w WHERE w.catalog_product_id = l.catalog_product_id)
+         ORDER BY want_count DESC
+         LIMIT 12`,
+        [vendorId]
+    );
+    return rows.map((r) => ({
+        listingId: r.id,
+        title: r.title,
+        setName: r.set_name,
+        price: r.wholesale_price != null ? Number(r.wholesale_price) : r.price != null ? Number(r.price) : null,
+        quantity: r.quantity,
+        wantCount: Number(r.want_count) || 0,
+    }));
+}
+
 // Weekly cron: email each active vendor their own missions. Vendor-only (never buyers); skips vendors
 // with no opportunities so we don't send empty digests.
 export async function sendMissionDigests() {

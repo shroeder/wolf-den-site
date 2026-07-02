@@ -2,7 +2,7 @@ import VendorLoginClient from "@/components/VendorLoginClient";
 import VendorPortalClient from "@/components/VendorPortalClient";
 import { getVendorRequestStats, listVendorContactRequests } from "@/lib/marketplace/contact.js";
 import { listVendorListings } from "@/lib/marketplace/listings.js";
-import { listVendorMissions } from "@/lib/marketplace/missions.js";
+import { listDealerStockInDemand, listVendorMissions } from "@/lib/marketplace/missions.js";
 import { listDealerOffers } from "@/lib/marketplace/offers.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
 import { listOpenSellOffers } from "@/lib/marketplace/sell-offers.js";
@@ -32,7 +32,10 @@ export default async function VendorPortalPage() {
         listOpenSellOffers(40).catch(() => []),
         listVendorMissions(vendor.id).catch(() => ({ demandGaps: [], uniques: [] })),
     ]);
-    const dealerOffers = await listDealerOffers(vendor.id).catch(() => ({ incoming: [], outgoing: [] }));
+    const [dealerOffers, dealerDemand] = await Promise.all([
+        listDealerOffers(vendor.id).catch(() => ({ incoming: [], outgoing: [] })),
+        listDealerStockInDemand(vendor.id).catch(() => []),
+    ]);
 
     return (
         <VendorPortalClient
@@ -45,6 +48,7 @@ export default async function VendorPortalPage() {
             sellOffers={sellOffers}
             missions={missions}
             dealerOffers={dealerOffers}
+            dealerDemand={dealerDemand}
         />
     );
 }
