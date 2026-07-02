@@ -1693,6 +1693,40 @@ textarea {
     cursor: pointer;
 }
 
+/* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
+.mkt-vendor-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #fff;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    vertical-align: middle;
+    flex: 0 0 auto;
+}
+.mkt-vendor-logo-sm {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    margin-right: 6px;
+}
+.mkt-vendor-logo-lg {
+    width: 84px;
+    height: 84px;
+    border-radius: 12px;
+}
+.mkt-vendor-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.mkt-offer-vendor-line {
+    display: inline-flex;
+    align-items: center;
+}
+
 .shop-tile-meta-row {
     margin-top: auto;
     display: flex;

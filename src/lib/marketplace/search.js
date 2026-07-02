@@ -177,7 +177,7 @@ export async function getProductWithOffers(catalogProductId) {
     const offers = await db.query(
         `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
                 l.price, l.quantity, l.created_at,
-                v.id AS vendor_id, v.display_name AS vendor_name,
+                v.id AS vendor_id, v.display_name AS vendor_name, v.logo_url AS vendor_logo,
                 v.location_label, v.region AS vendor_region
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
@@ -209,6 +209,7 @@ export async function getProductWithOffers(catalogProductId) {
             vendor: {
                 id: row.vendor_id,
                 displayName: row.vendor_name,
+                logoUrl: row.vendor_logo || null,
                 locationLabel: row.location_label,
                 region: row.vendor_region,
             },
@@ -232,7 +233,7 @@ export async function listIndexableMarketplaceProductIds() {
 // Browse mode: active vendors that actually have inventory, with location for the map + a list.
 export async function listVendorsForBrowse() {
     const rows = await db.query(
-        `SELECT v.id, v.display_name, v.location_label, v.region, v.city,
+        `SELECT v.id, v.display_name, v.logo_url, v.location_label, v.region, v.city,
                 v.latitude, v.longitude, v.accepted_at, v.created_at,
                 COUNT(l.id) FILTER (WHERE l.status = 'active') AS listing_count,
                 (SELECT array_agg(img) FROM (
@@ -255,6 +256,7 @@ export async function listVendorsForBrowse() {
     return rows.map((row) => ({
         id: row.id,
         displayName: row.display_name,
+        logoUrl: row.logo_url || null,
         locationLabel: row.location_label,
         region: row.region,
         city: row.city,
@@ -343,7 +345,7 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
 // if the vendor isn't active.
 export async function getVendorStorefront(vendorId) {
     const vendor = await db.queryOne(
-        `SELECT id, display_name, location_label, region, city, latitude, longitude,
+        `SELECT id, display_name, logo_url, location_label, region, city, latitude, longitude,
                 created_at, accepted_at
          FROM mkt_vendor
          WHERE id = $1 AND status = 'active'`,
@@ -399,6 +401,7 @@ export async function getVendorStorefront(vendorId) {
     return {
         id: vendor.id,
         displayName: vendor.display_name,
+        logoUrl: vendor.logo_url || null,
         locationLabel: vendor.location_label,
         region: vendor.region,
         city: vendor.city,

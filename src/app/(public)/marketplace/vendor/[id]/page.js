@@ -126,8 +126,16 @@ export default async function VendorStorefrontPage({ params }) {
                 <p className="mkt-breadcrumb">
                     <Link href="/marketplace/vendors">← All vendors</Link>
                 </p>
-                <h1>{vendor.displayName}</h1>
-                <p className="muted">{vendor.locationLabel || vendor.region || "Location TBD"}</p>
+                <div className="mkt-vendor-head">
+                    {vendor.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={vendor.logoUrl} alt={`${vendor.displayName} logo`} className="mkt-vendor-logo mkt-vendor-logo-lg" />
+                    ) : null}
+                    <div>
+                        <h1>{vendor.displayName}</h1>
+                        <p className="muted">{vendor.locationLabel || vendor.region || "Location TBD"}</p>
+                    </div>
+                </div>
                 <div className="mkt-trust">
                     <span className="mkt-trust-badge">✓ Verified vendor</span>
                     {monthYear(vendor.memberSince) ? (

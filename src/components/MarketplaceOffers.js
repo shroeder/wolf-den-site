@@ -118,7 +118,11 @@ function OfferRow({ offer, productName }) {
             <div className="mkt-offer-row">
                 <div className="mkt-offer-main">
                     <span className="mkt-offer-price">{formatPrice(offer.price)}</span>
-                    <span className="mkt-offer-meta">
+                    <span className="mkt-offer-meta mkt-offer-vendor-line">
+                        {offer.vendor.logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={offer.vendor.logoUrl} alt="" className="mkt-vendor-logo mkt-vendor-logo-sm" />
+                        ) : null}
                         <Link href={`/marketplace/vendor/${offer.vendor.id}`} className="mkt-offer-vendor">
                             ✓ {offer.vendor.displayName}
                         </Link>

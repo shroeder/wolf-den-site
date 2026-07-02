@@ -88,6 +88,10 @@ export default function MarketplaceAdminClient({ admin, applications, vendors })
                         {pending.map((a) => (
                             <li key={a.id} className="mkt-admin-row">
                                 <div className="mkt-admin-info">
+                                    {a.logoUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={a.logoUrl} alt={`${a.businessName} logo`} className="mkt-vendor-logo" />
+                                    ) : null}
                                     <strong>{a.businessName}</strong>
                                     <span className="mkt-offer-meta">
                                         {a.contactName ? `${a.contactName} · ` : ""}

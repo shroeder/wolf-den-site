@@ -171,7 +171,13 @@ export default function MarketplaceBrowseClient({ vendors }) {
                             <li key={v.id}>
                                 <Link href={`/marketplace/vendor/${v.id}`} className="mkt-vendor-card">
                                     <div className="mkt-vendor-card-top">
-                                        <span className="mkt-vendor-name">✓ {v.displayName}</span>
+                                        <span className="mkt-vendor-name">
+                                            {v.logoUrl ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={v.logoUrl} alt="" className="mkt-vendor-logo mkt-vendor-logo-sm" />
+                                            ) : null}
+                                            ✓ {v.displayName}
+                                        </span>
                                         <span className="mkt-offer-meta">
                                             {v.locationLabel || v.region || "Location TBD"}
                                             {v.distance != null ? ` · ${v.distance.toFixed(0)} mi away` : ""}
