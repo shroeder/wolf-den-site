@@ -293,6 +293,24 @@ export async function listVendorsForBrowse() {
     }));
 }
 
+// "Live Local Inventory" vitality stats for the marketplace — active vendors, searchable items, and
+// freshness — so the marketplace feels alive rather than static.
+export async function getMarketplaceLiveStats() {
+    const row = await db.queryOne(
+        `SELECT
+            (SELECT COUNT(DISTINCT v.id) FROM mkt_vendor v
+               JOIN mkt_listing l ON l.vendor_id = v.id AND l.status = 'active'
+               WHERE v.status = 'active')::int AS vendors,
+            (SELECT COUNT(*) FROM mkt_listing WHERE status = 'active')::int AS items,
+            (SELECT MAX(updated_at) FROM mkt_listing WHERE status = 'active') AS last_updated`
+    );
+    return {
+        vendors: row?.vendors || 0,
+        items: row?.items || 0,
+        lastUpdatedAt: toIso(row?.last_updated),
+    };
+}
+
 // Games that actually have catalog data, in registry order (drives the dynamic game filters). Read
 // from tcg_sets (hundreds of rows) rather than tcg_cards (millions) for speed.
 export async function listAvailableGames() {

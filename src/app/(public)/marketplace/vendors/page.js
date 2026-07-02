@@ -1,5 +1,5 @@
 import MarketplaceBrowseClient from "@/components/MarketplaceBrowseClient";
-import { listVendorsForBrowse } from "@/lib/marketplace/search.js";
+import { getMarketplaceLiveStats, listVendorsForBrowse } from "@/lib/marketplace/search.js";
 
 export const metadata = {
     title: "Browse Vendors | Wolf Den Marketplace",
@@ -13,7 +13,10 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MarketplaceVendorsPage() {
-    const vendors = await listVendorsForBrowse();
+    const [vendors, stats] = await Promise.all([
+        listVendorsForBrowse(),
+        getMarketplaceLiveStats().catch(() => null),
+    ]);
 
-    return <MarketplaceBrowseClient vendors={vendors} />;
+    return <MarketplaceBrowseClient vendors={vendors} stats={stats} />;
 }

@@ -5,6 +5,8 @@ import "leaflet/dist/leaflet.css";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import MarketplaceLiveStats from "@/components/MarketplaceLiveStats";
+
 // Default view: south metro of the Twin Cities / Montgomery area — the Wolf Den's recruiting turf.
 const MN_SOUTH_METRO = [44.66, -93.42];
 const DEFAULT_ZOOM = 10;
@@ -29,7 +31,9 @@ function distanceMiles(a, b) {
     return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export default function MarketplaceBrowseClient({ vendors }) {
+const NEARBY_RADIUS_MI = 25;
+
+export default function MarketplaceBrowseClient({ vendors, stats = null }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef({});
@@ -58,6 +62,18 @@ export default function MarketplaceBrowseClient({ vendors }) {
                 if (b.distance == null) return -1;
                 return a.distance - b.distance;
             });
+    }, [vendors, myLoc]);
+
+    // Items within range once the buyer shares location (drives the "N near you" live stat).
+    const nearbyItems = useMemo(() => {
+        if (!myLoc) {
+            return null;
+        }
+        return vendors.reduce((sum, v) => {
+            if (v.latitude == null || v.longitude == null) return sum;
+            const d = distanceMiles(myLoc, { lat: v.latitude, lng: v.longitude });
+            return d <= NEARBY_RADIUS_MI ? sum + (v.listingCount || 0) : sum;
+        }, 0);
     }, [vendors, myLoc]);
 
     // Initialise the Leaflet map once (client-only; dynamic import keeps it out of SSR).
@@ -173,6 +189,7 @@ export default function MarketplaceBrowseClient({ vendors }) {
         <div className="stack reveal">
             <section className="card hero-accent">
                 <h1>Browse Vendors</h1>
+                {stats ? <MarketplaceLiveStats {...stats} nearby={nearbyItems} /> : null}
                 <p>
                     See which vendors are near you and browse their full online catalog. Pick a vendor to view
                     everything they have in stock.
