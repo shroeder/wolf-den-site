@@ -3,6 +3,7 @@ import VendorPortalClient from "@/components/VendorPortalClient";
 import { getVendorRequestStats, listVendorContactRequests } from "@/lib/marketplace/contact.js";
 import { listVendorListings } from "@/lib/marketplace/listings.js";
 import { listVendorMissions } from "@/lib/marketplace/missions.js";
+import { listDealerOffers } from "@/lib/marketplace/offers.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
 import { listOpenSellOffers } from "@/lib/marketplace/sell-offers.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
@@ -31,6 +32,7 @@ export default async function VendorPortalPage() {
         listOpenSellOffers(40).catch(() => []),
         listVendorMissions(vendor.id).catch(() => ({ demandGaps: [], uniques: [] })),
     ]);
+    const dealerOffers = await listDealerOffers(vendor.id).catch(() => ({ incoming: [], outgoing: [] }));
 
     return (
         <VendorPortalClient
@@ -42,6 +44,7 @@ export default async function VendorPortalPage() {
             requestStats={requestStats}
             sellOffers={sellOffers}
             missions={missions}
+            dealerOffers={dealerOffers}
         />
     );
 }

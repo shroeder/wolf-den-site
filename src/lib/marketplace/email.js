@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 
+import { db } from "@/lib/db";
 import { SITE_URL } from "@/lib/site";
 
 // Buyer -> vendor contact email. Reply-To is the buyer, so the vendor just hits reply and the two
@@ -217,4 +218,80 @@ function escapeHtml(value) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+}
+
+// --- Dealer-to-dealer offer emails (identified relay: recipient can reply straight to the other dealer) ---
+
+async function loadOfferContext(offerId) {
+    return db.queryOne(
+        `SELECT o.kind, o.amount, o.quantity, o.note,
+                l.title AS listing_title,
+                vf.id AS from_id, vf.display_name AS from_name, vf.email AS from_email,
+                vt.id AS to_id, vt.display_name AS to_name, vt.email AS to_email
+         FROM mkt_dealer_offer o
+         JOIN mkt_listing l ON l.id = o.listing_id
+         JOIN mkt_vendor vf ON vf.id = o.from_vendor_id
+         JOIN mkt_vendor vt ON vt.id = o.to_vendor_id
+         WHERE o.id = $1`,
+        [offerId]
+    );
+}
+
+export async function sendDealerOfferEmail(offerId) {
+    const o = await loadOfferContext(offerId);
+    if (!o) return null;
+    const resend = getResendClient();
+    const portalUrl = new URL("/marketplace/portal", baseUrl()).toString();
+    const storefrontUrl = new URL(`/marketplace/vendor/${o.from_id}`, baseUrl()).toString();
+    const terms = o.kind === "trade" ? "proposes a trade for" : "wants to buy";
+    const amountLine = o.amount != null ? ` — ${currency.format(Number(o.amount))}` : "";
+    const qtyLine = o.quantity > 1 ? ` (qty ${o.quantity})` : "";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: o.to_email,
+        replyTo: o.from_email,
+        subject: `Dealer offer on ${o.listing_title}`,
+        html: `
+            <h1>Another dealer made you an offer</h1>
+            <p><strong>${escapeHtml(o.from_name)}</strong> ${terms} your <strong>${escapeHtml(o.listing_title)}</strong>${amountLine}${qtyLine}.</p>
+            ${o.note ? `<p>They said: &ldquo;${escapeHtml(o.note)}&rdquo;</p>` : ""}
+            <p><strong>Just reply to this email</strong> to talk to ${escapeHtml(o.from_name)} directly, or accept/decline in your <a href="${portalUrl}">portal</a>.</p>
+            <p><a href="${storefrontUrl}">See ${escapeHtml(o.from_name)}'s storefront</a></p>
+            <hr /><p><small>The Wolf Den Marketplace · dealer network</small></p>
+        `,
+    });
+    if (result?.error) throw new Error(result.error.message || "Failed to send offer email.");
+    return result;
+}
+
+export async function sendDealerOfferResponseEmail(offerId, status) {
+    const o = await loadOfferContext(offerId);
+    if (!o) return null;
+    const resend = getResendClient();
+    const portalUrl = new URL("/marketplace/portal", baseUrl()).toString();
+
+    // accepted/declined -> tell the offerer (reply-to owner); withdrawn -> tell the owner (reply-to offerer).
+    const toOfferer = status === "accepted" || status === "declined";
+    const to = toOfferer ? o.from_email : o.to_email;
+    const replyTo = toOfferer ? o.to_email : o.from_email;
+    const actorName = toOfferer ? o.to_name : o.from_name;
+    const verb =
+        status === "accepted" ? "accepted your offer on" : status === "declined" ? "declined your offer on" : "withdrew their offer on";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to,
+        replyTo,
+        subject: `Dealer offer ${status}: ${o.listing_title}`,
+        html: `
+            <h1>Dealer offer ${escapeHtml(status)}</h1>
+            <p><strong>${escapeHtml(actorName)}</strong> ${verb} <strong>${escapeHtml(o.listing_title)}</strong>.</p>
+            ${status === "accepted" ? `<p><strong>Reply to this email</strong> to arrange the handoff.</p>` : ""}
+            <p><a href="${portalUrl}">Open your portal</a></p>
+            <hr /><p><small>The Wolf Den Marketplace · dealer network</small></p>
+        `,
+    });
+    if (result?.error) throw new Error(result.error.message || "Failed to send offer response email.");
+    return result;
 }

@@ -913,7 +913,82 @@ function VendorLogoEditor({ vendor, onChanged }) {
     );
 }
 
-function DealerNetwork() {
+function DealerResult({ l, onOffered }) {
+    const [open, setOpen] = useState(false);
+    const [amount, setAmount] = useState(l.wholesalePrice != null ? String(l.wholesalePrice) : "");
+    const [note, setNote] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [msg, setMsg] = useState("");
+
+    async function makeOffer() {
+        setBusy(true);
+        setMsg("");
+        try {
+            const res = await fetch("/api/marketplace/vendor/offers", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ listingId: l.id, kind: "buy", amount: amount || null, note: note || null }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || "Could not send offer.");
+            setMsg("Offer sent — they'll get an email.");
+            setOpen(false);
+            onOffered();
+        } catch (e) {
+            setMsg(e?.message || "Could not send offer.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <li className="mkt-admin-row">
+            <div className="mkt-admin-info">
+                <strong>{l.title}</strong>
+                <span className="mkt-offer-meta">
+                    {l.setName ? `${l.setName} · ` : ""}
+                    {l.condition || (l.graded ? `${l.gradingCompany || ""} ${l.grade || ""}`.trim() : "")}
+                    {` · ${l.quantity} available`}
+                    {` · ${formatPrice(l.wholesalePrice ?? l.price)}${l.wholesalePrice != null ? " wholesale" : ""}`}
+                    {` · ${l.vendor.displayName}`}
+                    {l.vendor.locationLabel ? ` (${l.vendor.locationLabel})` : ""}
+                </span>
+                {open ? (
+                    <div className="mkt-want-add">
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="your $ offer"
+                        />
+                        <input
+                            type="text"
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="note (optional)"
+                        />
+                        <button type="button" className="pill" disabled={busy} onClick={makeOffer}>
+                            Send offer
+                        </button>
+                    </div>
+                ) : null}
+                {msg ? <span className="muted">{msg}</span> : null}
+            </div>
+            <div className="mkt-dealer-actions">
+                <button type="button" className="pill" onClick={() => setOpen((o) => !o)}>
+                    {open ? "Cancel" : "Make offer"}
+                </button>
+                <Link href={`/marketplace/vendor/${l.vendor.id}`} className="pill">
+                    Contact →
+                </Link>
+            </div>
+        </li>
+    );
+}
+
+function DealerNetwork({ onChanged }) {
     const [q, setQ] = useState("");
     const [results, setResults] = useState([]);
 
@@ -941,8 +1016,8 @@ function DealerNetwork() {
         <section className="card">
             <h2>Dealer Network — source inventory</h2>
             <p className="muted">
-                Search stock other vendors have opened to dealers. Contact them to buy or swap, then list it
-                yourself. (Mark your own listings &quot;offer to other dealers&quot; to appear here for others.)
+                Search stock other vendors have opened to dealers, and make an offer to buy or swap. (Mark your
+                own listings &quot;offer to other dealers&quot; to appear here for others.)
             </p>
             <input
                 type="text"
@@ -954,26 +1029,91 @@ function DealerNetwork() {
             {results.length > 0 ? (
                 <ul className="mkt-admin-list">
                     {results.map((l) => (
-                        <li key={l.id} className="mkt-admin-row">
-                            <div className="mkt-admin-info">
-                                <strong>{l.title}</strong>
-                                <span className="mkt-offer-meta">
-                                    {l.setName ? `${l.setName} · ` : ""}
-                                    {l.condition || (l.graded ? `${l.gradingCompany || ""} ${l.grade || ""}`.trim() : "")}
-                                    {` · ${l.quantity} available`}
-                                    {` · ${formatPrice(l.wholesalePrice ?? l.price)}${l.wholesalePrice != null ? " wholesale" : ""}`}
-                                    {` · ${l.vendor.displayName}`}
-                                    {l.vendor.locationLabel ? ` (${l.vendor.locationLabel})` : ""}
-                                </span>
-                            </div>
-                            <Link href={`/marketplace/vendor/${l.vendor.id}`} className="pill">
-                                View / contact →
-                            </Link>
-                        </li>
+                        <DealerResult key={l.id} l={l} onOffered={onChanged} />
                     ))}
                 </ul>
             ) : q.trim().length >= 2 ? (
                 <p className="muted">No dealer stock matches — try another search.</p>
+            ) : null}
+        </section>
+    );
+}
+
+function DealerOffers({ dealerOffers, onChanged }) {
+    const incoming = dealerOffers?.incoming || [];
+    const outgoing = dealerOffers?.outgoing || [];
+    if (incoming.length === 0 && outgoing.length === 0) {
+        return null;
+    }
+
+    async function respond(id, action) {
+        try {
+            await fetch(`/api/marketplace/vendor/offers/${id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            onChanged();
+        } catch {
+            /* ignore */
+        }
+    }
+
+    const terms = (o) => (o.kind === "trade" ? "trade" : o.amount != null ? formatPrice(o.amount) : "offer");
+
+    return (
+        <section className="card">
+            <h2>Dealer offers</h2>
+            {incoming.length > 0 ? (
+                <>
+                    <h3 className="mkt-mission-head">On your listings</h3>
+                    <ul className="mkt-admin-list">
+                        {incoming.map((o) => (
+                            <li key={o.id} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{o.listingTitle}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {o.counterpartyName} · {terms(o)}
+                                        {o.quantity > 1 ? ` · qty ${o.quantity}` : ""}
+                                        {o.note ? ` · "${o.note}"` : ""} · {o.status}
+                                    </span>
+                                </div>
+                                {o.status === "pending" ? (
+                                    <div className="mkt-dealer-actions">
+                                        <button type="button" className="button primary" onClick={() => respond(o.id, "accept")}>
+                                            Accept
+                                        </button>
+                                        <button type="button" className="pill" onClick={() => respond(o.id, "decline")}>
+                                            Decline
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ) : null}
+            {outgoing.length > 0 ? (
+                <>
+                    <h3 className="mkt-mission-head">You made</h3>
+                    <ul className="mkt-admin-list">
+                        {outgoing.map((o) => (
+                            <li key={o.id} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{o.listingTitle}</strong>
+                                    <span className="mkt-offer-meta">
+                                        to {o.counterpartyName} · {terms(o)} · {o.status}
+                                    </span>
+                                </div>
+                                {o.status === "pending" ? (
+                                    <button type="button" className="pill" onClick={() => respond(o.id, "withdraw")}>
+                                        Withdraw
+                                    </button>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </>
             ) : null}
         </section>
     );
@@ -1040,6 +1180,7 @@ export default function VendorPortalClient({
     requestStats = null,
     sellOffers = [],
     missions = { demandGaps: [], uniques: [] },
+    dealerOffers = { incoming: [], outgoing: [] },
 }) {
     const router = useRouter();
     const refresh = () => router.refresh();
@@ -1147,7 +1288,9 @@ export default function VendorPortalClient({
                 ) : null}
             </section>
 
-            <DealerNetwork />
+            <DealerOffers dealerOffers={dealerOffers} onChanged={refresh} />
+
+            <DealerNetwork onChanged={refresh} />
 
             {openRequests.length > 0 ? (
                 <section className="card">

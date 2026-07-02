@@ -1738,6 +1738,12 @@ textarea {
     margin: 8px 0;
     font-size: 0.9rem;
 }
+.mkt-dealer-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {
