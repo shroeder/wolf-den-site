@@ -2,7 +2,7 @@ import VendorLoginClient from "@/components/VendorLoginClient";
 import VendorPortalClient from "@/components/VendorPortalClient";
 import { getVendorRequestStats, listVendorContactRequests } from "@/lib/marketplace/contact.js";
 import { listSearchDemand } from "@/lib/marketplace/demand.js";
-import { listVendorListings } from "@/lib/marketplace/listings.js";
+import { listAgingInventory, listVendorListings } from "@/lib/marketplace/listings.js";
 import { listDealerStockInDemand, listVendorMissions } from "@/lib/marketplace/missions.js";
 import { listDealerOffers } from "@/lib/marketplace/offers.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
@@ -33,11 +33,12 @@ export default async function VendorPortalPage() {
         listOpenSellOffers(40).catch(() => []),
         listVendorMissions(vendor.id).catch(() => ({ demandGaps: [], uniques: [] })),
     ]);
-    const [dealerOffers, dealerDemand, sellBids, searchDemand] = await Promise.all([
+    const [dealerOffers, dealerDemand, sellBids, searchDemand, agingInventory] = await Promise.all([
         listDealerOffers(vendor.id).catch(() => ({ incoming: [], outgoing: [] })),
         listDealerStockInDemand(vendor.id).catch(() => []),
         listVendorSellBids(vendor.id).catch(() => []),
         listSearchDemand({ vendorId: vendor.id }).catch(() => []),
+        listAgingInventory(vendor.id).catch(() => []),
     ]);
 
     return (
@@ -54,6 +55,7 @@ export default async function VendorPortalPage() {
             dealerDemand={dealerDemand}
             sellBids={sellBids}
             searchDemand={searchDemand}
+            agingInventory={agingInventory}
         />
     );
 }

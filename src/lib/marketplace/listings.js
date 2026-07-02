@@ -317,6 +317,33 @@ export async function listVendorListings(vendorId, { includeDeleted = false } = 
     return rows.map(mapListing);
 }
 
+// Inventory aging: a vendor's active listings sitting 30+ days, with demand context (network wants)
+// and dealer-availability, so stale stock surfaces with a suggested action.
+export async function listAgingInventory(vendorId) {
+    const rows = await db.query(
+        `SELECT l.id, l.title, l.set_name, l.price, l.quantity, l.dealer_available,
+                (CURRENT_DATE - l.created_at::date) AS age_days,
+                (SELECT COUNT(DISTINCT w.email_normalized) FROM mkt_want w
+                   WHERE w.catalog_product_id = l.catalog_product_id) AS want_count
+         FROM mkt_listing l
+         WHERE l.vendor_id = $1 AND l.status = 'active'
+           AND l.created_at <= NOW() - INTERVAL '30 days'
+         ORDER BY l.created_at ASC
+         LIMIT 60`,
+        [vendorId]
+    );
+    return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        setName: r.set_name,
+        price: r.price != null ? Number(r.price) : null,
+        quantity: r.quantity,
+        ageDays: Number(r.age_days) || 0,
+        dealerAvailable: r.dealer_available === true,
+        wantCount: Number(r.want_count) || 0,
+    }));
+}
+
 // Dealer-to-dealer sourcing: OTHER vendors' listings flagged available to dealers, with wholesale
 // price + who's selling. Excludes the requesting vendor's own stock.
 export async function listDealerInventory({ excludeVendorId = null, query = "", game = null, limit = 60 } = {}) {

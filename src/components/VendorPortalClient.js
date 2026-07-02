@@ -914,6 +914,99 @@ function VendorLogoEditor({ vendor, onChanged }) {
     );
 }
 
+function AgingRow({ item, onChanged }) {
+    const [busy, setBusy] = useState(false);
+    const suggestion =
+        item.wantCount > 0
+            ? `${item.wantCount} buyer${item.wantCount === 1 ? "" : "s"} want it — a small cut should move it`
+            : item.ageDays >= 90 && !item.dealerAvailable
+              ? "slow mover — discount or open to dealers"
+              : "consider a discount to refresh it";
+    const discounted = item.price != null ? Math.round(item.price * 0.9 * 100) / 100 : null;
+
+    async function patch(body) {
+        setBusy(true);
+        try {
+            await fetch(`/api/marketplace/vendor/listings/${item.id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            onChanged();
+        } catch {
+            /* ignore */
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <li className="mkt-admin-row">
+            <div className="mkt-admin-info">
+                <strong>{item.title}</strong>
+                <span className="mkt-offer-meta">
+                    {item.setName ? `${item.setName} · ` : ""}
+                    {item.ageDays} days · {formatPrice(item.price)}
+                    {item.dealerAvailable ? " · dealer ✓" : ""} · {suggestion}
+                </span>
+            </div>
+            <div className="mkt-dealer-actions">
+                {discounted != null ? (
+                    <button
+                        type="button"
+                        className="button primary"
+                        disabled={busy}
+                        onClick={() => patch({ price: discounted, pricingMode: "manual", pricingValue: null })}
+                    >
+                        Discount 10% → {formatPrice(discounted)}
+                    </button>
+                ) : null}
+                {!item.dealerAvailable ? (
+                    <button type="button" className="pill" disabled={busy} onClick={() => patch({ dealerAvailable: true })}>
+                        Open to dealers
+                    </button>
+                ) : null}
+            </div>
+        </li>
+    );
+}
+
+function AgingInventory({ items = [], onChanged }) {
+    if (items.length === 0) {
+        return null;
+    }
+    const buckets = [
+        { key: "180", label: "Sitting 180+ days", test: (d) => d >= 180 },
+        { key: "90", label: "Sitting 90+ days", test: (d) => d >= 90 && d < 180 },
+        { key: "30", label: "Sitting 30+ days", test: (d) => d >= 30 && d < 90 },
+    ];
+    return (
+        <section className="card">
+            <h2>Inventory aging</h2>
+            <p className="muted">
+                Stock that&apos;s been sitting. Move it before it ties up cash — discount it, or open it to the dealer
+                network to trade it away.
+            </p>
+            {buckets.map((b) => {
+                const rows = items.filter((it) => b.test(it.ageDays));
+                if (rows.length === 0) return null;
+                return (
+                    <div key={b.key} className="mkt-aging-bucket">
+                        <h3 className="mkt-mission-head">
+                            {b.label} ({rows.length})
+                        </h3>
+                        <ul className="mkt-admin-list">
+                            {rows.map((it) => (
+                                <AgingRow key={it.id} item={it} onChanged={onChanged} />
+                            ))}
+                        </ul>
+                    </div>
+                );
+            })}
+        </section>
+    );
+}
+
 function EventAttendance() {
     const [events, setEvents] = useState(null);
     const [name, setName] = useState("");
@@ -1420,6 +1513,7 @@ export default function VendorPortalClient({
     dealerDemand = [],
     sellBids = [],
     searchDemand = [],
+    agingInventory = [],
 }) {
     const router = useRouter();
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
@@ -1503,6 +1597,8 @@ export default function VendorPortalClient({
                     ) : null}
                 </div>
             </section>
+
+            <AgingInventory items={agingInventory} onChanged={refresh} />
 
             {searchDemand.length > 0 ? (
                 <section className="card">
