@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { getMarketplaceAdmin } from "@/lib/admin-app/web-session";
 import { getVendorStorefront } from "@/lib/marketplace/search.js";
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
@@ -114,7 +115,18 @@ function ListingTile({ listing }) {
 
 export default async function VendorStorefrontPage({ params }) {
     const { id } = await params;
-    const vendor = await getVendorStorefront(id);
+    let vendor = await getVendorStorefront(id);
+    let adminPreview = false;
+
+    // Inactive vendors (invited / suspended / removed) aren't public — but a marketplace admin should
+    // still be able to inspect their inventory from the admin portal instead of hitting a 404.
+    if (!vendor) {
+        const admin = await getMarketplaceAdmin();
+        if (admin) {
+            vendor = await getVendorStorefront(id, { includeInactive: true });
+            adminPreview = Boolean(vendor);
+        }
+    }
 
     if (!vendor) {
         notFound();
@@ -126,6 +138,11 @@ export default async function VendorStorefrontPage({ params }) {
                 <p className="mkt-breadcrumb">
                     <Link href="/marketplace/vendors">← All vendors</Link>
                 </p>
+                {adminPreview ? (
+                    <p className="mkt-admin-preview-banner">
+                        Admin preview — this vendor is <strong>{vendor.status}</strong> and not publicly listed.
+                    </p>
+                ) : null}
                 <div className="mkt-vendor-head">
                     {vendor.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element

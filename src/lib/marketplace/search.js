@@ -343,12 +343,12 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
 
 // A single vendor's public storefront: their info + active listings (cheapest first). Returns null
 // if the vendor isn't active.
-export async function getVendorStorefront(vendorId) {
+export async function getVendorStorefront(vendorId, { includeInactive = false } = {}) {
     const vendor = await db.queryOne(
         `SELECT id, display_name, logo_url, location_label, region, city, latitude, longitude,
-                created_at, accepted_at
+                created_at, accepted_at, status
          FROM mkt_vendor
-         WHERE id = $1 AND status = 'active'`,
+         WHERE id = $1 ${includeInactive ? "" : "AND status = 'active'"}`,
         [vendorId]
     );
 
@@ -402,6 +402,7 @@ export async function getVendorStorefront(vendorId) {
         id: vendor.id,
         displayName: vendor.display_name,
         logoUrl: vendor.logo_url || null,
+        status: vendor.status,
         locationLabel: vendor.location_label,
         region: vendor.region,
         city: vendor.city,

@@ -1726,6 +1726,14 @@ textarea {
     display: inline-flex;
     align-items: center;
 }
+.mkt-admin-preview-banner {
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    font-size: 0.85rem;
+}
 
 .shop-tile-meta-row {
     margin-top: auto;
