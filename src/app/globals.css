@@ -1798,6 +1798,9 @@ textarea {
     font-size: 0.75rem;
     color: var(--muted);
 }
+.mkt-event-add {
+    margin-top: 12px;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {

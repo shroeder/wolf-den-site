@@ -914,6 +914,118 @@ function VendorLogoEditor({ vendor, onChanged }) {
     );
 }
 
+function EventAttendance() {
+    const [events, setEvents] = useState(null);
+    const [name, setName] = useState("");
+    const [loc, setLoc] = useState("");
+    const [date, setDate] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    async function load() {
+        try {
+            const res = await fetch("/api/marketplace/vendor/events", { cache: "no-store" });
+            const data = await res.json().catch(() => null);
+            setEvents(res.ok ? data?.events || [] : []);
+        } catch {
+            setEvents([]);
+        }
+    }
+
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/vendor/events", { cache: "no-store" });
+                const data = await res.json().catch(() => null);
+                if (!ignore) setEvents(res.ok ? data?.events || [] : []);
+            } catch {
+                if (!ignore) setEvents([]);
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
+    async function toggle(id, attending) {
+        try {
+            await fetch(`/api/marketplace/vendor/events/${id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ attending }),
+            });
+            load();
+        } catch {
+            /* ignore */
+        }
+    }
+
+    async function create(e) {
+        e.preventDefault();
+        if (!name.trim()) return;
+        setBusy(true);
+        try {
+            await fetch("/api/marketplace/vendor/events", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ name, locationLabel: loc || null, eventDate: date || null }),
+            });
+            setName("");
+            setLoc("");
+            setDate("");
+            load();
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <section className="card">
+            <h2>I&apos;ll be there — events</h2>
+            <p className="muted">
+                Mark the shows and game nights you&apos;re bringing inventory to. Buyers see who&apos;s attending and
+                can browse your stock for that event.
+            </p>
+            {events === null ? (
+                <p className="muted">Loading…</p>
+            ) : events.length === 0 ? (
+                <p className="muted">No upcoming events yet — add one below.</p>
+            ) : (
+                <ul className="mkt-admin-list">
+                    {events.map((ev) => (
+                        <li key={ev.id} className="mkt-admin-row">
+                            <div className="mkt-admin-info">
+                                <strong>{ev.name}</strong>
+                                <span className="mkt-offer-meta">
+                                    {ev.eventDate || "date TBD"}
+                                    {ev.locationLabel ? ` · ${ev.locationLabel}` : ""}
+                                </span>
+                            </div>
+                            <label className="mkt-dealer-actions">
+                                <input
+                                    type="checkbox"
+                                    checked={ev.attending}
+                                    onChange={(e) => toggle(ev.id, e.target.checked)}
+                                />{" "}
+                                I&apos;ll be there
+                            </label>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <form className="contact-form mkt-event-add" onSubmit={create}>
+                <label htmlFor="ev-name">Add an event</label>
+                <input id="ev-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rochester Trade Night" />
+                <input type="text" value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="Location (optional)" />
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <button className="button primary" type="submit" disabled={busy || !name.trim()}>
+                    Add event
+                </button>
+            </form>
+        </section>
+    );
+}
+
 function SellOfferBid({ offer, existingAmount, onChanged }) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState(existingAmount != null ? String(existingAmount) : "");
@@ -1499,6 +1611,8 @@ export default function VendorPortalClient({
             <DealerOffers dealerOffers={dealerOffers} onChanged={refresh} />
 
             <DealerNetwork onChanged={refresh} demand={dealerDemand} />
+
+            <EventAttendance />
 
             {openRequests.length > 0 ? (
                 <section className="card">
