@@ -317,89 +317,117 @@ function mapCatalogRow(row) {
 
 // Catalog typeahead for a vendor adding a listing — searches the WHOLE catalog (not restricted to
 // in-stock), so a vendor can list anything that exists in tcg_cards.
-export async function searchCatalog({ query, game = null, type = "all", limit = 24 } = {}) {
-    const trimmed = String(query || "").trim();
+// Product-type facet -> SQL. Sealed = no collector number; subtypes add a name pattern.
+const SEALED_SQL = "(c.number IS NULL OR c.number = '')";
+const TYPE_SQL = {
+    single: "c.number IS NOT NULL AND c.number <> ''",
+    sealed: SEALED_SQL,
+    tin: `${SEALED_SQL} AND c.name ILIKE '%tin%'`,
+    "mini-tin": `${SEALED_SQL} AND c.name ILIKE '%mini tin%'`,
+    etb: `${SEALED_SQL} AND c.name ILIKE '%elite trainer box%'`,
+    box: `${SEALED_SQL} AND c.name ILIKE '%booster box%'`,
+    blister: `${SEALED_SQL} AND c.name ILIKE '%blister%'`,
+    bundle: `${SEALED_SQL} AND c.name ILIKE '%bundle%'`,
+    pack: `${SEALED_SQL} AND c.name ILIKE '%booster pack%'`,
+};
 
-    if (trimmed.length < 2) {
+// Sets for the set-selector dropdown (recent first). Requires a game so the list stays manageable.
+export async function listCatalogSets({ game = null } = {}) {
+    if (!game) {
+        return [];
+    }
+    const rows = await db.query(
+        `SELECT id, name FROM tcg_sets WHERE game = $1 ORDER BY published_on DESC NULLS LAST, name ASC`,
+        [game]
+    );
+    return rows.map((row) => ({ id: String(row.id), name: row.name }));
+}
+
+// Catalog typeahead / browse for a vendor adding a listing — searches the WHOLE catalog (not restricted
+// to in-stock). Works two ways: type text to search, OR pick a set (setId) to browse it with no text.
+// Optional type facet narrows to singles / sealed / a sealed subtype (tin, etb, box, ...).
+export async function searchCatalog({ query, game = null, type = "all", setId = null, limit = 60 } = {}) {
+    const trimmed = String(query || "").trim();
+    const hasSet = setId !== null && setId !== undefined && String(setId).trim() !== "";
+    const hasText = trimmed.length >= 2;
+
+    // Need a search term or a set to browse — otherwise we'd be scanning the entire catalog.
+    if (!hasText && !hasSet) {
         return [];
     }
 
-    // Sealed vs singles: in the catalog, singles carry a collector number and sealed product doesn't.
-    let typeClause = "";
-    if (type === "sealed") {
-        typeClause = "AND (c.number IS NULL OR c.number = '')";
-    } else if (type === "single") {
-        typeClause = "AND c.number IS NOT NULL AND c.number <> ''";
-    }
-
-    // SKU / TCGplayer-id lookup: "TCG-12345" (our scan-app SKU) or a bare product id jumps straight to
-    // that exact card. Bare numbers fall through to text search too, since a short one may be a
-    // collector number rather than an id.
-    const skuMatch = trimmed.match(/^(?:tcg-)?(\d{4,})$/i);
-    if (skuMatch) {
-        const idRows = await db.query(
-            `SELECT c.id, c.game, c.name, c.number, c.rarity, c.image_url, c.market_price, s.name AS set_name
-             FROM tcg_cards c
-             JOIN tcg_sets s ON s.id = c.set_id
-             WHERE c.id = $1`,
-            [Number(skuMatch[1])]
-        );
-        if (idRows.length) {
-            return idRows.map(mapCatalogRow);
-        }
-        if (/^tcg-/i.test(trimmed)) {
-            return []; // explicit SKU with no match — nothing else to try
+    // SKU / TCGplayer-id lookup (text only): "TCG-12345" or a bare product id jumps to the exact card.
+    if (hasText) {
+        const skuMatch = trimmed.match(/^(?:tcg-)?(\d{4,})$/i);
+        if (skuMatch) {
+            const idRows = await db.query(
+                `SELECT c.id, c.game, c.name, c.number, c.rarity, c.image_url, c.market_price, s.name AS set_name
+                 FROM tcg_cards c JOIN tcg_sets s ON s.id = c.set_id WHERE c.id = $1`,
+                [Number(skuMatch[1])]
+            );
+            if (idRows.length) {
+                return idRows.map(mapCatalogRow);
+            }
+            if (/^tcg-/i.test(trimmed)) {
+                return [];
+            }
         }
     }
 
-    // Multi-term AND search: every word must match somewhere (name, set, collector number, rarity, or
-    // set code). So "pikachu surging 58" or "charizard obsidian 125" narrows to the exact card.
-    const terms = trimmed.split(/\s+/).filter(Boolean).slice(0, 6);
     const params = [];
-    // Match each term at a WORD BOUNDARY in name/set (start of the field or after a space), not as a
-    // raw substring — otherwise "tin" matches "Vic-tin-i" / "Gira-tin-a" and buries real "Tin"
-    // products. Collector number / rarity / set code stay substring (they're short codes).
-    const termClauses = terms.map((term) => {
-        const escaped = term.replace(/([%_\\])/g, "\\$1");
-        params.push(escaped);
-        const p = `$${params.length}`;
-        return (
-            `(c.name ILIKE (${p} || '%') OR c.name ILIKE ('% ' || ${p} || '%') OR ` +
-            `s.name ILIKE (${p} || '%') OR s.name ILIKE ('% ' || ${p} || '%') OR ` +
-            `c.number ILIKE ('%' || ${p} || '%') OR c.rarity ILIKE (${p} || '%') OR ` +
-            `s.abbreviation ILIKE (${p} || '%'))`
-        );
-    });
+    const whereClauses = ["c.name NOT ILIKE '%code card%'", "c.name NOT ILIKE '%[set of%'"];
+    let prefixParam = null;
 
-    // Whole-query prefix on name, for ranking exact-ish name matches first.
-    params.push(`${trimmed}%`);
-    const prefixParam = `$${params.length}`;
+    if (hasText) {
+        // Word-boundary term match in name/set (avoids "tin" hitting "Vic-tin-i"); number/rarity/code
+        // stay substring. Every term must match somewhere (AND).
+        const terms = trimmed.split(/\s+/).filter(Boolean).slice(0, 6);
+        terms.forEach((term) => {
+            const escaped = term.replace(/([%_\\])/g, "\\$1");
+            params.push(escaped);
+            const p = `$${params.length}`;
+            whereClauses.push(
+                `(c.name ILIKE (${p} || '%') OR c.name ILIKE ('% ' || ${p} || '%') OR ` +
+                    `s.name ILIKE (${p} || '%') OR s.name ILIKE ('% ' || ${p} || '%') OR ` +
+                    `c.number ILIKE ('%' || ${p} || '%') OR c.rarity ILIKE (${p} || '%') OR ` +
+                    `s.abbreviation ILIKE (${p} || '%'))`
+            );
+        });
+        params.push(`${trimmed}%`);
+        prefixParam = `$${params.length}`;
+    }
 
-    let gameClause = "";
     if (game) {
         params.push(game);
-        gameClause = `AND c.game = $${params.length}`;
+        whereClauses.push(`c.game = $${params.length}`);
+    }
+    if (hasSet) {
+        params.push(Number(setId));
+        whereClauses.push(`c.set_id = $${params.length}`);
+    }
+    if (TYPE_SQL[type]) {
+        whereClauses.push(`(${TYPE_SQL[type]})`);
     }
 
-    params.push(Math.min(Number(limit) || 24, 50));
+    params.push(Math.min(Number(limit) || 60, 100));
     const limitParam = `$${params.length}`;
 
-    // Drop worthless "Code Card" / "[Set of N]" entries; rank name-prefix matches first, then by
-    // market value (so real product beats filler), with bulk case/display/carton units demoted.
+    // With text: rank name-prefix then market value. Browsing a set (no text): alphabetical. Bulk
+    // case/display/carton units always sink to the bottom.
+    const orderBy = prefixParam
+        ? `(CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
+           (CASE WHEN c.name ILIKE ${prefixParam} THEN 0 ELSE 1 END),
+           c.market_price DESC NULLS LAST,
+           c.name ASC`
+        : `(CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
+           c.name ASC`;
+
     const rows = await db.query(
         `SELECT c.id, c.game, c.name, c.number, c.rarity, c.image_url, c.market_price, s.name AS set_name
          FROM tcg_cards c
          JOIN tcg_sets s ON s.id = c.set_id
-         WHERE ${termClauses.join(" AND ")}
-           AND c.name NOT ILIKE '%code card%'
-           AND c.name NOT ILIKE '%[set of%'
-           ${gameClause}
-           ${typeClause}
-         ORDER BY
-           (CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
-           (CASE WHEN c.name ILIKE ${prefixParam} THEN 0 ELSE 1 END),
-           c.market_price DESC NULLS LAST,
-           c.name ASC
+         WHERE ${whereClauses.join(" AND ")}
+         ORDER BY ${orderBy}
          LIMIT ${limitParam}`,
         params
     );

@@ -20,6 +20,7 @@ export async function GET(request) {
                 query: searchParams.get("q") || "",
                 game: searchParams.get("game") || null,
                 type: searchParams.get("type") || "all",
+                setId: searchParams.get("setId") || null,
             });
 
             logger.info("marketplace.vendor.catalog_search.success", { resultCount: results.length });

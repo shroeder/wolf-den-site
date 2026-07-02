@@ -66,6 +66,8 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
     const [games, setGames] = useState(DEFAULT_GAMES);
     const [game, setGame] = useState("");
     const [catalogType, setCatalogType] = useState("sealed");
+    const [sets, setSets] = useState([]);
+    const [setId, setSetId] = useState("");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [selected, setSelected] = useState(null);
@@ -111,12 +113,37 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
         };
     }, []);
 
+    // Load the set list whenever the game changes (for the optional set-browse dropdown). Reset of
+    // sets/setId on game change happens in the game <select> handler to avoid sync setState here.
+    useEffect(() => {
+        if (!game) {
+            return undefined;
+        }
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/marketplace/vendor/catalog-sets?game=${encodeURIComponent(game)}`, {
+                    cache: "no-store",
+                });
+                const data = await res.json().catch(() => null);
+                if (!ignore && res.ok) setSets(Array.isArray(data?.sets) ? data.sets : []);
+            } catch {
+                /* ignore */
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, [game]);
+
     useEffect(() => {
         const trimmed = query.trim();
+        // Search needs text OR a chosen set to browse.
+        const canSearch = trimmed.length >= 2 || Boolean(setId);
 
         // All state updates happen inside the deferred callback (never synchronously in the effect body).
         const handle = setTimeout(async () => {
-            if (trimmed.length < 2 || (selected && selected.name === trimmed)) {
+            if (!canSearch || (selected && selected.name === trimmed)) {
                 setResults([]);
                 return;
             }
@@ -126,9 +153,11 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
             abortRef.current = controller;
 
             try {
-                const params = new URLSearchParams({ q: trimmed });
+                const params = new URLSearchParams();
+                if (trimmed.length >= 2) params.set("q", trimmed);
                 if (game) params.set("game", game);
                 if (catalogType && catalogType !== "all") params.set("type", catalogType);
+                if (setId) params.set("setId", setId);
                 const response = await fetch(`/api/marketplace/vendor/catalog-search?${params.toString()}`, {
                     cache: "no-store",
                     signal: controller.signal,
@@ -141,7 +170,7 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
         }, trimmed.length < 2 ? 0 : 250);
 
         return () => clearTimeout(handle);
-    }, [query, game, catalogType, selected]);
+    }, [query, game, catalogType, setId, selected]);
 
     // Pull pricing context (market + lowest competing vendor) whenever a matched product is selected.
     useEffect(() => {
@@ -273,29 +302,35 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
 
     return (
         <form className="contact-form mkt-add-form" onSubmit={submit}>
-            <div className="lf-game-toggle" role="group" aria-label="Sealed or singles">
-                {[
-                    { v: "sealed", l: "Sealed" },
-                    { v: "single", l: "Singles" },
-                    { v: "all", l: "All" },
-                ].map((t) => (
-                    <button
-                        key={t.v}
-                        type="button"
-                        className={`pill${catalogType === t.v ? " lf-game-active" : ""}`}
-                        onClick={() => setCatalogType(t.v)}
-                    >
-                        {t.l}
-                    </button>
-                ))}
-            </div>
+            <label htmlFor="add-type">Type</label>
+            <select
+                id="add-type"
+                className="mkt-game-select"
+                value={catalogType}
+                onChange={(event) => setCatalogType(event.target.value)}
+            >
+                <option value="sealed">Sealed (all)</option>
+                <option value="single">Singles</option>
+                <option value="tin">Tins</option>
+                <option value="mini-tin">Mini Tins</option>
+                <option value="etb">Elite Trainer Boxes</option>
+                <option value="box">Booster Boxes</option>
+                <option value="blister">Blisters</option>
+                <option value="bundle">Bundles</option>
+                <option value="pack">Booster Packs</option>
+                <option value="all">All types</option>
+            </select>
 
             <label htmlFor="add-game">Game (optional — narrows the search)</label>
             <select
                 id="add-game"
                 className="mkt-game-select"
                 value={game}
-                onChange={(event) => setGame(event.target.value)}
+                onChange={(event) => {
+                    setGame(event.target.value);
+                    setSetId("");
+                    setSets([]);
+                }}
             >
                 {games.map((g) => (
                     <option key={g.id || "all"} value={g.id}>
@@ -304,7 +339,26 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                 ))}
             </select>
 
-            <label htmlFor="add-search">Search by name, set, or card number</label>
+            {game && sets.length > 0 ? (
+                <>
+                    <label htmlFor="add-set">Set (optional — pick one to browse it without typing)</label>
+                    <select
+                        id="add-set"
+                        className="mkt-game-select"
+                        value={setId}
+                        onChange={(event) => setSetId(event.target.value)}
+                    >
+                        <option value="">All sets</option>
+                        {sets.map((s) => (
+                            <option key={s.id} value={s.id}>
+                                {s.name}
+                            </option>
+                        ))}
+                    </select>
+                </>
+            ) : null}
+
+            <label htmlFor="add-search">Search by name, set, or card number (optional if a set is chosen)</label>
             <input
                 id="add-search"
                 type="text"
