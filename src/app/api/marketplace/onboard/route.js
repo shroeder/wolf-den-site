@@ -38,9 +38,15 @@ export async function POST(request) {
                 );
             }
 
-            // Best-effort geocode so the vendor shows up on the browse map.
+            // Best-effort geocode so the vendor shows up on the browse map. Geocode the TOWN (city +
+            // state), not the street address, so the pin sits on the town center and never reveals a
+            // vendor's exact (usually home) address.
             try {
-                const coords = await geocodeAddress(address);
+                const coords = await geocodeAddress({
+                    city: address.city,
+                    region: address.region,
+                    country: address.country,
+                });
                 if (coords) {
                     await setVendorCoordinates(vendor.id, coords.latitude, coords.longitude);
                 }
