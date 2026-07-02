@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { db } from "@/lib/db";
 
@@ -111,7 +111,26 @@ export async function clearVendorSessionCookie() {
     cookieStore.delete(MKT_VENDOR_COOKIE);
 }
 
+// Bearer token from the Authorization header — how the native app authenticates (same session
+// tokens as the web cookie, just delivered in a header).
+async function getBearerToken() {
+    try {
+        const h = await headers();
+        const auth = h.get("authorization");
+        if (auth && auth.toLowerCase().startsWith("bearer ")) {
+            return auth.slice(7).trim() || null;
+        }
+    } catch {
+        /* not in a request scope */
+    }
+    return null;
+}
+
 export async function getVendorSessionToken() {
+    const bearer = await getBearerToken();
+    if (bearer) {
+        return bearer;
+    }
     const cookieStore = await cookies();
 
     return cookieStore.get(MKT_VENDOR_COOKIE)?.value || null;
