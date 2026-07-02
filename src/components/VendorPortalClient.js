@@ -81,6 +81,8 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
     const [language, setLanguage] = useState("English");
     const [price, setPrice] = useState("");
     const [quantity, setQuantity] = useState("1");
+    const [dealerAvailable, setDealerAvailable] = useState(false);
+    const [wholesalePrice, setWholesalePrice] = useState("");
     const [pricing, setPricing] = useState(null);
     const [autoMode, setAutoMode] = useState(defaultPricingMode || "manual");
     const [pctInput, setPctInput] = useState(
@@ -268,6 +270,8 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                     setName: selected?.setName || null,
                     cardNumber: selected?.number || null,
                     imageUrl: selected?.imageUrl || null,
+                    dealerAvailable,
+                    wholesalePrice: dealerAvailable && wholesalePrice ? wholesalePrice : null,
                 }),
             });
             const data = await response.json().catch(() => null);
@@ -547,6 +551,27 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                         );
                     })()}
 
+                    <div className="mkt-dealer-toggle">
+                        <label>
+                            <input
+                                type="checkbox"
+                                checked={dealerAvailable}
+                                onChange={(e) => setDealerAvailable(e.target.checked)}
+                            />{" "}
+                            Also offer to other dealers (wholesale)
+                        </label>
+                        {dealerAvailable ? (
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={wholesalePrice}
+                                onChange={(e) => setWholesalePrice(e.target.value)}
+                                placeholder="wholesale $ (opt)"
+                            />
+                        ) : null}
+                    </div>
+
                     <button className="button primary" type="submit" disabled={busy}>
                         {busy ? "Adding..." : "Add listing"}
                     </button>
@@ -603,6 +628,10 @@ function ListingRow({ listing, onChanged }) {
     const [undercutVal, setUndercutVal] = useState(
         listing.pricingMode === "match_lowest" && listing.pricingValue != null ? String(listing.pricingValue) : "0"
     );
+    const [dealerAvailable, setDealerAvailable] = useState(Boolean(listing.dealerAvailable));
+    const [wholesalePrice, setWholesalePrice] = useState(
+        listing.wholesalePrice != null ? String(listing.wholesalePrice) : ""
+    );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -614,8 +643,14 @@ function ListingRow({ listing, onChanged }) {
               : "";
     const currentValInput = mode === "market_pct" ? pctVal : mode === "match_lowest" ? undercutVal : "";
     const pricingDirty = mode !== (listing.pricingMode || "manual") || (mode !== "manual" && currentValInput !== storedValInput);
+    const dealerDirty =
+        dealerAvailable !== Boolean(listing.dealerAvailable) ||
+        wholesalePrice !== (listing.wholesalePrice != null ? String(listing.wholesalePrice) : "");
     const dirty =
-        price !== String(listing.price ?? "") || quantity !== String(listing.quantity ?? 1) || pricingDirty;
+        price !== String(listing.price ?? "") ||
+        quantity !== String(listing.quantity ?? 1) ||
+        pricingDirty ||
+        dealerDirty;
 
     async function save() {
         setBusy(true);
@@ -624,15 +659,17 @@ function ListingRow({ listing, onChanged }) {
             const response = await fetch(`/api/marketplace/vendor/listings/${listing.id}`, {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify(
-                    mode === "manual"
-                        ? { price: Number(price), quantity: Number(quantity), pricingMode: "manual", pricingValue: null }
+                body: JSON.stringify({
+                    quantity: Number(quantity),
+                    dealerAvailable,
+                    wholesalePrice: dealerAvailable && wholesalePrice ? wholesalePrice : null,
+                    ...(mode === "manual"
+                        ? { price: Number(price), pricingMode: "manual", pricingValue: null }
                         : {
-                              quantity: Number(quantity),
                               pricingMode: mode,
                               pricingValue: mode === "market_pct" ? Number(pctVal) / 100 : Number(undercutVal) || 0,
-                          }
-                ),
+                          }),
+                }),
             });
             if (!response.ok) {
                 const data = await response.json().catch(() => null);
@@ -725,6 +762,26 @@ function ListingRow({ listing, onChanged }) {
                     Qty
                     <input type="number" min="0" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                 </label>
+                <label title="Offer this to other dealers (wholesale)">
+                    <input
+                        type="checkbox"
+                        checked={dealerAvailable}
+                        onChange={(e) => setDealerAvailable(e.target.checked)}
+                    />{" "}
+                    Dealers
+                </label>
+                {dealerAvailable ? (
+                    <label>
+                        WS $
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={wholesalePrice}
+                            onChange={(e) => setWholesalePrice(e.target.value)}
+                        />
+                    </label>
+                ) : null}
                 <button type="button" className="button primary" disabled={busy || !dirty} onClick={save}>
                     Save
                 </button>
@@ -853,6 +910,72 @@ function VendorLogoEditor({ vendor, onChanged }) {
             </label>
             {error ? <span className="muted">{error}</span> : null}
         </div>
+    );
+}
+
+function DealerNetwork() {
+    const [q, setQ] = useState("");
+    const [results, setResults] = useState([]);
+
+    useEffect(() => {
+        const t = setTimeout(async () => {
+            const query = q.trim();
+            if (query.length < 2) {
+                setResults([]);
+                return;
+            }
+            try {
+                const res = await fetch(`/api/marketplace/vendor/dealer-inventory?q=${encodeURIComponent(query)}`, {
+                    cache: "no-store",
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok) setResults(Array.isArray(data?.listings) ? data.listings : []);
+            } catch {
+                /* ignore */
+            }
+        }, 250);
+        return () => clearTimeout(t);
+    }, [q]);
+
+    return (
+        <section className="card">
+            <h2>Dealer Network — source inventory</h2>
+            <p className="muted">
+                Search stock other vendors have opened to dealers. Contact them to buy or swap, then list it
+                yourself. (Mark your own listings &quot;offer to other dealers&quot; to appear here for others.)
+            </p>
+            <input
+                type="text"
+                className="shop-search-input"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search dealer inventory (e.g. Surging Sparks ETB)"
+            />
+            {results.length > 0 ? (
+                <ul className="mkt-admin-list">
+                    {results.map((l) => (
+                        <li key={l.id} className="mkt-admin-row">
+                            <div className="mkt-admin-info">
+                                <strong>{l.title}</strong>
+                                <span className="mkt-offer-meta">
+                                    {l.setName ? `${l.setName} · ` : ""}
+                                    {l.condition || (l.graded ? `${l.gradingCompany || ""} ${l.grade || ""}`.trim() : "")}
+                                    {` · ${l.quantity} available`}
+                                    {` · ${formatPrice(l.wholesalePrice ?? l.price)}${l.wholesalePrice != null ? " wholesale" : ""}`}
+                                    {` · ${l.vendor.displayName}`}
+                                    {l.vendor.locationLabel ? ` (${l.vendor.locationLabel})` : ""}
+                                </span>
+                            </div>
+                            <Link href={`/marketplace/vendor/${l.vendor.id}`} className="pill">
+                                View / contact →
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            ) : q.trim().length >= 2 ? (
+                <p className="muted">No dealer stock matches — try another search.</p>
+            ) : null}
+        </section>
     );
 }
 
@@ -1023,6 +1146,8 @@ export default function VendorPortalClient({
                     </>
                 ) : null}
             </section>
+
+            <DealerNetwork />
 
             {openRequests.length > 0 ? (
                 <section className="card">

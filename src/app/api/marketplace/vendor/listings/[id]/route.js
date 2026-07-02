@@ -52,6 +52,15 @@ export async function PATCH(request, { params }) {
                 patch.pricingValue = body.pricingValue === null ? null : Number(body.pricingValue);
             }
 
+            if (body.dealerAvailable !== undefined) {
+                patch.dealerAvailable = Boolean(body.dealerAvailable);
+            }
+
+            if (body.wholesalePrice !== undefined) {
+                const wp = body.wholesalePrice === null || body.wholesalePrice === "" ? null : Number(body.wholesalePrice);
+                patch.wholesalePrice = wp != null && Number.isFinite(wp) && wp > 0 ? wp : null;
+            }
+
             const listing = await updateListing(id, vendor.id, patch);
 
             if (!listing) {

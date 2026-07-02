@@ -35,7 +35,7 @@ const MAX_LIMIT = 200;
 
 const LISTING_COLUMNS = `id, vendor_id, kind, catalog_product_id, game, title, set_name,
     card_number, image_url, condition, graded, grading_company, grade, language, price, quantity,
-    pricing_mode, pricing_value, status, created_at, updated_at`;
+    pricing_mode, pricing_value, dealer_available, wholesale_price, status, created_at, updated_at`;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -85,6 +85,8 @@ function mapListing(row) {
         quantity: row.quantity,
         pricingMode: row.pricing_mode || "manual",
         pricingValue: toNumber(row.pricing_value),
+        dealerAvailable: row.dealer_available === true,
+        wholesalePrice: toNumber(row.wholesale_price),
         status: row.status,
         createdAt: toIso(row.created_at),
         updatedAt: toIso(row.updated_at),
@@ -125,10 +127,17 @@ export async function createListing({
     quantity = 1,
     pricingMode = "manual",
     pricingValue = null,
+    dealerAvailable = false,
+    wholesalePrice = null,
 }) {
     if (!isValidKind(kind)) {
         throw new Error(`Invalid listing kind: ${kind}`);
     }
+
+    const normalizedWholesale =
+        wholesalePrice != null && wholesalePrice !== "" && Number.isFinite(Number(wholesalePrice)) && Number(wholesalePrice) > 0
+            ? Number(wholesalePrice)
+            : null;
 
     // Auto-pricing: compute the price from the rule now so it's correct immediately (the nightly job
     // keeps it current afterward). Falls back to the passed price if we can't compute one.
@@ -154,8 +163,8 @@ export async function createListing({
         `INSERT INTO mkt_listing
             (vendor_id, kind, catalog_product_id, game, title, set_name, card_number,
              image_url, condition, graded, grading_company, grade, language, price, quantity,
-             pricing_mode, pricing_value)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+             pricing_mode, pricing_value, dealer_available, wholesale_price)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          RETURNING ${LISTING_COLUMNS}`,
         [
             vendorId,
@@ -175,6 +184,8 @@ export async function createListing({
             quantity,
             mode,
             mode === "manual" ? null : pricingValue,
+            Boolean(dealerAvailable),
+            normalizedWholesale,
         ]
     );
 
@@ -237,6 +248,8 @@ export async function updateListing(id, vendorId, patch = {}) {
         catalogProductId: "catalog_product_id",
         pricingMode: "pricing_mode",
         pricingValue: "pricing_value",
+        dealerAvailable: "dealer_available",
+        wholesalePrice: "wholesale_price",
     };
 
     const sets = [];
@@ -302,6 +315,61 @@ export async function listVendorListings(vendorId, { includeDeleted = false } = 
     );
 
     return rows.map(mapListing);
+}
+
+// Dealer-to-dealer sourcing: OTHER vendors' listings flagged available to dealers, with wholesale
+// price + who's selling. Excludes the requesting vendor's own stock.
+export async function listDealerInventory({ excludeVendorId = null, query = "", game = null, limit = 60 } = {}) {
+    const params = [];
+    const where = ["l.status = 'active'", "l.dealer_available = TRUE", "v.status = 'active'"];
+
+    if (excludeVendorId) {
+        params.push(excludeVendorId);
+        where.push(`l.vendor_id <> $${params.length}`);
+    }
+    if (game) {
+        params.push(game);
+        where.push(`l.game = $${params.length}`);
+    }
+    const q = String(query || "").trim();
+    if (q.length >= 2) {
+        params.push(`%${q}%`);
+        where.push(`(l.title ILIKE $${params.length} OR l.set_name ILIKE $${params.length})`);
+    }
+
+    params.push(Math.min(Number(limit) || 60, 100));
+    const rows = await db.query(
+        `SELECT l.id, l.kind, l.title, l.set_name, l.card_number, l.game, l.condition, l.graded,
+                l.grading_company, l.grade, l.language, l.price, l.wholesale_price, l.quantity,
+                COALESCE(l.image_url, c.image_url) AS image_url,
+                v.id AS vendor_id, v.display_name AS vendor_name, v.location_label
+         FROM mkt_listing l
+         JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
+         LEFT JOIN tcg_cards c ON c.id = l.catalog_product_id
+         WHERE ${where.join(" AND ")}
+         ORDER BY l.updated_at DESC
+         LIMIT $${params.length}`,
+        params
+    );
+
+    return rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        title: r.title,
+        setName: r.set_name,
+        cardNumber: r.card_number,
+        game: r.game,
+        condition: r.condition,
+        graded: Boolean(r.graded),
+        gradingCompany: r.grading_company,
+        grade: r.grade,
+        language: r.language,
+        price: toNumber(r.price),
+        wholesalePrice: toNumber(r.wholesale_price),
+        quantity: r.quantity,
+        imageUrl: r.image_url,
+        vendor: { id: r.vendor_id, displayName: r.vendor_name, locationLabel: r.location_label },
+    }));
 }
 
 // Public buyer-facing search. Only active listings from active vendors. Optional filters: free-text

@@ -48,6 +48,8 @@ export async function POST(request) {
                     quantity: Number.isFinite(quantity) && quantity >= 0 ? Math.trunc(quantity) : 1,
                     pricingMode: body.pricingMode || "manual",
                     pricingValue: body.pricingValue != null ? Number(body.pricingValue) : null,
+                    dealerAvailable: Boolean(body.dealerAvailable),
+                    wholesalePrice: body.wholesalePrice != null ? body.wholesalePrice : null,
                 });
 
                 logger.info("marketplace.vendor.listing_created", { vendorId: vendor.id, listingId: listing.id });

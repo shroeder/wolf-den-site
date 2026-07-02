@@ -1730,6 +1730,14 @@ textarea {
     border: 1px solid rgba(255, 255, 255, 0.15);
     font-size: 0.8rem;
 }
+.mkt-dealer-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {
