@@ -5,7 +5,9 @@ import "leaflet/dist/leaflet.css";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const US_CENTER = [39.8, -98.6];
+// Default view: south metro of the Twin Cities / Montgomery area — the Wolf Den's recruiting turf.
+const MN_SOUTH_METRO = [44.66, -93.42];
+const DEFAULT_ZOOM = 10;
 const BRAND = "#D4AF37";
 
 function monthYear(iso) {
@@ -30,6 +32,7 @@ function distanceMiles(a, b) {
 export default function MarketplaceBrowseClient({ vendors }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
+    const markersRef = useRef({});
     const [myLoc, setMyLoc] = useState(null);
     const [locating, setLocating] = useState(false);
     const [locError, setLocError] = useState("");
@@ -69,8 +72,9 @@ export default function MarketplaceBrowseClient({ vendors }) {
                 return;
             }
 
-            map = L.map(containerRef.current).setView(US_CENTER, 4);
+            map = L.map(containerRef.current).setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
             mapRef.current = map;
+            markersRef.current = {};
 
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution: "&copy; OpenStreetMap contributors",
@@ -94,14 +98,23 @@ export default function MarketplaceBrowseClient({ vendors }) {
                         `<a href="/marketplace/vendor/${v.id}">View inventory →</a>`
                 );
 
+                markersRef.current[v.id] = marker;
                 points.push([v.latitude, v.longitude]);
             });
 
+            // Frame actual vendors when present, but never zoom out past the south-metro default so the
+            // map stays anchored on Luke's area.
             if (points.length === 1) {
-                map.setView(points[0], 9);
+                map.setView(points[0], Math.max(DEFAULT_ZOOM, 11));
             } else if (points.length > 1) {
-                map.fitBounds(points, { padding: [40, 40], maxZoom: 10 });
+                map.fitBounds(points, { padding: [40, 40], maxZoom: 11 });
+                if (map.getZoom() < 8) {
+                    map.setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
+                }
             }
+
+            // The map lives in a grid column now; recalc its size after layout so tiles fill correctly.
+            setTimeout(() => map.invalidateSize(), 0);
         })();
 
         return () => {
@@ -138,6 +151,22 @@ export default function MarketplaceBrowseClient({ vendors }) {
         );
     }
 
+    // Hovering a vendor card highlights its map pin (and vice versa), so the list and map correlate.
+    function highlightVendor(id) {
+        const marker = markersRef.current[id];
+        if (!marker) return;
+        marker.setStyle({ radius: 14, fillOpacity: 1, weight: 3 });
+        marker.bringToFront?.();
+        marker.openPopup();
+    }
+
+    function resetVendor(id) {
+        const marker = markersRef.current[id];
+        if (!marker) return;
+        marker.setStyle({ radius: 9, fillOpacity: 0.85, weight: 2 });
+        marker.closePopup();
+    }
+
     return (
         <div className="stack reveal">
             <section className="card hero-accent">
@@ -157,19 +186,25 @@ export default function MarketplaceBrowseClient({ vendors }) {
                 {locError ? <p className="muted">{locError}</p> : null}
             </section>
 
-            <section className="card">
-                <div ref={containerRef} className="mkt-map" />
-            </section>
+            <div className="mkt-browse-split">
+                <section className="card mkt-browse-map-card">
+                    <div ref={containerRef} className="mkt-map" />
+                </section>
 
-            <section className="card">
-                <h2>Vendors{vendors.length ? ` (${vendors.length})` : ""}</h2>
+                <section className="card mkt-browse-list-card">
+                    <h2>Vendors{vendors.length ? ` (${vendors.length})` : ""}</h2>
                 {vendors.length === 0 ? (
                     <p className="muted">No vendors with inventory yet.</p>
                 ) : (
                     <ul className="mkt-vendor-grid">
                         {sortedVendors.map((v) => (
                             <li key={v.id}>
-                                <Link href={`/marketplace/vendor/${v.id}`} className="mkt-vendor-card">
+                                <Link
+                                    href={`/marketplace/vendor/${v.id}`}
+                                    className="mkt-vendor-card"
+                                    onMouseEnter={() => highlightVendor(v.id)}
+                                    onMouseLeave={() => resetVendor(v.id)}
+                                >
                                     <div className="mkt-vendor-card-top">
                                         <span className="mkt-vendor-name">
                                             {v.logoUrl ? (
@@ -205,7 +240,8 @@ export default function MarketplaceBrowseClient({ vendors }) {
                         ))}
                     </ul>
                 )}
-            </section>
+                </section>
+            </div>
         </div>
     );
 }
