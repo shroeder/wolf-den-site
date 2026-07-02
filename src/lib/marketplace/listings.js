@@ -185,10 +185,11 @@ export async function createListing({
         kind,
     });
 
-    // Demand alert: email anyone who asked to be notified when this product gets listed.
+    // Demand alert: email anyone who asked to be notified when this product gets listed (respecting
+    // their price threshold).
     if (catalogProductId) {
         try {
-            await notifyWantsForProduct(catalogProductId);
+            await notifyWantsForProduct(catalogProductId, effectivePrice);
         } catch (error) {
             listingsLogger.warn("marketplace.listing.want_notify_failed", { listingId: row.id, reason: error.message });
         }

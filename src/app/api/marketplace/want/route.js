@@ -15,7 +15,11 @@ export async function POST(request) {
             }
 
             try {
-                await createWant({ catalogProductId: body.catalogProductId, email: body.email });
+                await createWant({
+                    catalogProductId: body.catalogProductId,
+                    email: body.email,
+                    maxPrice: body.maxPrice ?? null,
+                });
                 logger.info("marketplace.want.success", { catalogProductId: body.catalogProductId });
 
                 return NextResponse.json({ ok: true });

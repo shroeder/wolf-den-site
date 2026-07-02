@@ -19,8 +19,9 @@ export function isValidEmail(value) {
     return EMAIL_PATTERN.test(normalizeEmail(value));
 }
 
-// Record a buyer's want for a catalog product (idempotent per person+product).
-export async function createWant({ catalogProductId, email }) {
+// Record a buyer's want for a catalog product (idempotent per person+product). An optional maxPrice
+// only alerts them when a listing appears at or under that price.
+export async function createWant({ catalogProductId, email, maxPrice = null }) {
     if (!catalogProductId) {
         throw new Error("A product is required.");
     }
@@ -34,31 +35,41 @@ export async function createWant({ catalogProductId, email }) {
         throw new Error("That product isn't in the catalog.");
     }
 
+    const parsed = maxPrice != null && maxPrice !== "" ? Number(maxPrice) : null;
+    const normalizedMax = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+
+    // Re-registering updates the threshold and re-arms the alert (so a matching listing re-notifies).
     await db.query(
-        `INSERT INTO mkt_want (catalog_product_id, email, email_normalized)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (catalog_product_id, email_normalized) DO NOTHING`,
-        [catalogProductId, String(email).trim(), normalizeEmail(email)]
+        `INSERT INTO mkt_want (catalog_product_id, email, email_normalized, max_price)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (catalog_product_id, email_normalized)
+         DO UPDATE SET max_price = EXCLUDED.max_price, notified_at = NULL, updated_at = NOW()`,
+        [catalogProductId, String(email).trim(), normalizeEmail(email), normalizedMax]
     );
 
-    wantsLogger.info("marketplace.want.created", { catalogProductId });
+    wantsLogger.info("marketplace.want.created", { catalogProductId, hasMaxPrice: normalizedMax != null });
 }
 
 // Called when a vendor lists a product: email everyone waiting on it (once), mark them notified.
 // Best-effort — never let an alert failure break listing creation.
-export async function notifyWantsForProduct(catalogProductId) {
+export async function notifyWantsForProduct(catalogProductId, listingPrice = null) {
     if (!catalogProductId) {
         return;
     }
 
+    const price = listingPrice != null && Number.isFinite(Number(listingPrice)) ? Number(listingPrice) : null;
+
+    // Only alert wants whose threshold is met: no max_price, unknown listing price, or price <= max.
+    // Wants with a higher threshold stay pending for a future cheaper listing.
     const pending = await db.query(
         `SELECT w.id, w.email,
                 c.name, c.number, c.image_url, s.name AS set_name
          FROM mkt_want w
          JOIN tcg_cards c ON c.id = w.catalog_product_id
          JOIN tcg_sets s ON s.id = c.set_id
-         WHERE w.catalog_product_id = $1 AND w.notified_at IS NULL`,
-        [catalogProductId]
+         WHERE w.catalog_product_id = $1 AND w.notified_at IS NULL
+           AND (w.max_price IS NULL OR $2::numeric IS NULL OR w.max_price >= $2::numeric)`,
+        [catalogProductId, price]
     );
 
     for (const want of pending) {

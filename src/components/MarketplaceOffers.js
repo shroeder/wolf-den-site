@@ -147,6 +147,7 @@ function OfferRow({ offer, productName }) {
 
 function NotifyMe({ catalogProductId, productName }) {
     const [email, setEmail] = useState("");
+    const [maxPrice, setMaxPrice] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [done, setDone] = useState(false);
     const [error, setError] = useState("");
@@ -154,7 +155,8 @@ function NotifyMe({ catalogProductId, productName }) {
     if (done) {
         return (
             <p className="statement-copy">
-                Done — we&apos;ll email you the moment an approved vendor lists {productName}.
+                Done — we&apos;ll email you the moment an approved vendor lists {productName}
+                {maxPrice ? ` at or under $${Number(maxPrice).toFixed(2)}` : ""}.
             </p>
         );
     }
@@ -168,7 +170,7 @@ function NotifyMe({ catalogProductId, productName }) {
             const response = await fetch("/api/marketplace/want", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ catalogProductId, email }),
+                body: JSON.stringify({ catalogProductId, email, maxPrice: maxPrice || null }),
             });
             const data = await response.json().catch(() => null);
             if (!response.ok) {
@@ -194,6 +196,16 @@ function NotifyMe({ catalogProductId, productName }) {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     required
+                />
+                <label htmlFor="mkt-notify-price">Only if it&apos;s under (optional)</label>
+                <input
+                    id="mkt-notify-price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    placeholder="e.g. 90"
                 />
                 <button className="button primary" type="submit" disabled={submitting}>
                     {submitting ? "Saving..." : "Notify me"}
