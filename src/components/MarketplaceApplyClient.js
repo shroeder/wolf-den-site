@@ -164,7 +164,7 @@ export default function MarketplaceApplyClient() {
                         onChange={uploadLogo}
                         disabled={logoUploading}
                     />
-                    <p className="muted">{logoUploading ? "Uploading logo…" : "PNG, JPG, or WEBP, under 2 MB."}</p>
+                    <p className="muted">{logoUploading ? "Uploading logo…" : "PNG, JPG, or WEBP, under 8 MB."}</p>
 
                     <label htmlFor="ap-contact">Your name</label>
                     <input id="ap-contact" type="text" value={form.contactName} onChange={update("contactName")} />

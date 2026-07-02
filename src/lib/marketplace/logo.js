@@ -5,7 +5,7 @@ import { put } from "@vercel/blob";
 // Vendor logos are uploaded during the public application and editable from the portal. Kept small
 // and raster-only (no SVG — it can carry scripts and we display these inline).
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 const ALLOWED_TYPES = new Map([
     ["image/png", "png"],
     ["image/jpeg", "jpg"],
@@ -23,7 +23,7 @@ export async function uploadVendorLogo(file) {
         throw new Error("Logo must be a PNG, JPG, or WEBP image.");
     }
     if (file.size > MAX_BYTES) {
-        throw new Error("Logo must be under 2 MB.");
+        throw new Error("Logo must be under 8 MB.");
     }
 
     const blob = await put(`marketplace/logos/logo.${ext}`, file, {

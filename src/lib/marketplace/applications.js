@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendNewApplicationEmail, sendVendorInviteEmail } from "@/lib/marketplace/email.js";
-import { createVendor, createVendorInvite, getVendorByEmail } from "@/lib/marketplace/vendors.js";
+import { createVendor, createVendorInvite, getVendorByEmail, setVendorLogo } from "@/lib/marketplace/vendors.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const applicationsLogger = createServerLogger({ source: "api", subsystem: "marketplace-applications" });
@@ -148,6 +148,9 @@ export async function approveApplication(id) {
                 locationLabel: application.locationLabel,
             },
         });
+    } else if (application.logoUrl && !vendor.logoUrl) {
+        // Reusing an existing vendor — carry over the application's logo if they don't have one yet.
+        vendor = await setVendorLogo(vendor.id, application.logoUrl);
     }
 
     const inviteToken = await createVendorInvite(vendor.id);
