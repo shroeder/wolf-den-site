@@ -187,6 +187,9 @@ export default function MarketplaceSearchClient() {
                     <Link href="/marketplace/vendors" className="pill">
                         📍 Browse vendors
                     </Link>
+                    <Link href="/marketplace/wants" className="pill">
+                        📋 Build a want list →
+                    </Link>
                     <Link href="/sell-cards" className="pill">
                         Got cards to sell? →
                     </Link>

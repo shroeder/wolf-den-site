@@ -1715,6 +1715,21 @@ textarea {
     gap: 5px;
     cursor: pointer;
 }
+.mkt-want-add {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+.mkt-want-add input {
+    width: 96px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--elevated, #16161a);
+    color: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 0.8rem;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {

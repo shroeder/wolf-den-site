@@ -123,3 +123,44 @@ export async function getWantCount(catalogProductId) {
     const row = await db.queryOne("SELECT COUNT(*) AS n FROM mkt_want WHERE catalog_product_id = $1", [catalogProductId]);
     return Number(row?.n) || 0;
 }
+
+// A buyer's want list, by email (accountless). Low-sensitivity (just cards they want).
+export async function listWantsByEmail(email) {
+    if (!isValidEmail(email)) {
+        return [];
+    }
+    const rows = await db.query(
+        `SELECT w.id, w.catalog_product_id, w.max_price, w.notified_at, w.created_at,
+                c.name, c.number, c.image_url, c.game, c.market_price, s.name AS set_name
+         FROM mkt_want w
+         JOIN tcg_cards c ON c.id = w.catalog_product_id
+         JOIN tcg_sets s ON s.id = c.set_id
+         WHERE w.email_normalized = $1
+         ORDER BY w.created_at DESC`,
+        [normalizeEmail(email)]
+    );
+    return rows.map((r) => ({
+        id: r.id,
+        catalogProductId: String(r.catalog_product_id),
+        name: r.name,
+        setName: r.set_name,
+        number: r.number,
+        game: r.game,
+        imageUrl: r.image_url,
+        marketPrice: r.market_price != null ? Number(r.market_price) : null,
+        maxPrice: r.max_price != null ? Number(r.max_price) : null,
+        notified: Boolean(r.notified_at),
+    }));
+}
+
+// Remove a want from a buyer's list (authorized by matching the email it was created under).
+export async function deleteWant(id, email) {
+    if (!id || !isValidEmail(email)) {
+        return false;
+    }
+    const rows = await db.query(
+        `DELETE FROM mkt_want WHERE id = $1 AND email_normalized = $2 RETURNING id`,
+        [id, normalizeEmail(email)]
+    );
+    return rows.length > 0;
+}
