@@ -302,6 +302,19 @@ export async function listAvailableGames() {
     return TCG_GAMES.filter((g) => present.has(g.slug)).map((g) => ({ slug: g.slug, label: g.label }));
 }
 
+function mapCatalogRow(row) {
+    return {
+        catalogProductId: String(row.id),
+        game: row.game,
+        name: row.name,
+        setName: row.set_name,
+        number: row.number,
+        rarity: row.rarity,
+        imageUrl: row.image_url,
+        marketPrice: toNumber(row.market_price),
+    };
+}
+
 // Catalog typeahead for a vendor adding a listing — searches the WHOLE catalog (not restricted to
 // in-stock), so a vendor can list anything that exists in tcg_cards.
 export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
@@ -309,6 +322,26 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
 
     if (trimmed.length < 2) {
         return [];
+    }
+
+    // SKU / TCGplayer-id lookup: "TCG-12345" (our scan-app SKU) or a bare product id jumps straight to
+    // that exact card. Bare numbers fall through to text search too, since a short one may be a
+    // collector number rather than an id.
+    const skuMatch = trimmed.match(/^(?:tcg-)?(\d{4,})$/i);
+    if (skuMatch) {
+        const idRows = await db.query(
+            `SELECT c.id, c.game, c.name, c.number, c.rarity, c.image_url, c.market_price, s.name AS set_name
+             FROM tcg_cards c
+             JOIN tcg_sets s ON s.id = c.set_id
+             WHERE c.id = $1`,
+            [Number(skuMatch[1])]
+        );
+        if (idRows.length) {
+            return idRows.map(mapCatalogRow);
+        }
+        if (/^tcg-/i.test(trimmed)) {
+            return []; // explicit SKU with no match — nothing else to try
+        }
     }
 
     // Multi-term AND search: every word must match somewhere (name, set, collector number, rarity, or
@@ -353,16 +386,7 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
         params
     );
 
-    return rows.map((row) => ({
-        catalogProductId: String(row.id),
-        game: row.game,
-        name: row.name,
-        setName: row.set_name,
-        number: row.number,
-        rarity: row.rarity,
-        imageUrl: row.image_url,
-        marketPrice: toNumber(row.market_price),
-    }));
+    return rows.map(mapCatalogRow);
 }
 
 // A single vendor's public storefront: their info + active listings (cheapest first). Returns null
