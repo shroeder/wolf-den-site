@@ -65,6 +65,7 @@ function inferKind(product) {
 function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricingValue = null }) {
     const [games, setGames] = useState(DEFAULT_GAMES);
     const [game, setGame] = useState("");
+    const [catalogType, setCatalogType] = useState("sealed");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [selected, setSelected] = useState(null);
@@ -127,6 +128,7 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
             try {
                 const params = new URLSearchParams({ q: trimmed });
                 if (game) params.set("game", game);
+                if (catalogType && catalogType !== "all") params.set("type", catalogType);
                 const response = await fetch(`/api/marketplace/vendor/catalog-search?${params.toString()}`, {
                     cache: "no-store",
                     signal: controller.signal,
@@ -139,7 +141,7 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
         }, trimmed.length < 2 ? 0 : 250);
 
         return () => clearTimeout(handle);
-    }, [query, game, selected]);
+    }, [query, game, catalogType, selected]);
 
     // Pull pricing context (market + lowest competing vendor) whenever a matched product is selected.
     useEffect(() => {
@@ -271,6 +273,23 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
 
     return (
         <form className="contact-form mkt-add-form" onSubmit={submit}>
+            <div className="lf-game-toggle" role="group" aria-label="Sealed or singles">
+                {[
+                    { v: "sealed", l: "Sealed" },
+                    { v: "single", l: "Singles" },
+                    { v: "all", l: "All" },
+                ].map((t) => (
+                    <button
+                        key={t.v}
+                        type="button"
+                        className={`pill${catalogType === t.v ? " lf-game-active" : ""}`}
+                        onClick={() => setCatalogType(t.v)}
+                    >
+                        {t.l}
+                    </button>
+                ))}
+            </div>
+
             <label htmlFor="add-game">Game (optional — narrows the search)</label>
             <select
                 id="add-game"

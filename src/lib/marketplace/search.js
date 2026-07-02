@@ -317,11 +317,19 @@ function mapCatalogRow(row) {
 
 // Catalog typeahead for a vendor adding a listing — searches the WHOLE catalog (not restricted to
 // in-stock), so a vendor can list anything that exists in tcg_cards.
-export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
+export async function searchCatalog({ query, game = null, type = "all", limit = 24 } = {}) {
     const trimmed = String(query || "").trim();
 
     if (trimmed.length < 2) {
         return [];
+    }
+
+    // Sealed vs singles: in the catalog, singles carry a collector number and sealed product doesn't.
+    let typeClause = "";
+    if (type === "sealed") {
+        typeClause = "AND (c.number IS NULL OR c.number = '')";
+    } else if (type === "single") {
+        typeClause = "AND c.number IS NOT NULL AND c.number <> ''";
     }
 
     // SKU / TCGplayer-id lookup: "TCG-12345" (our scan-app SKU) or a bare product id jumps straight to
@@ -386,6 +394,7 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
            AND c.name NOT ILIKE '%code card%'
            AND c.name NOT ILIKE '%[set of%'
            ${gameClause}
+           ${typeClause}
          ORDER BY
            (CASE WHEN c.name ILIKE '% case%' OR c.name ILIKE '% display%' OR c.name ILIKE '% carton%' THEN 1 ELSE 0 END),
            (CASE WHEN c.name ILIKE ${prefixParam} THEN 0 ELSE 1 END),

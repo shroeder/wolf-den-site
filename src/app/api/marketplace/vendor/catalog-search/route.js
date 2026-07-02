@@ -19,6 +19,7 @@ export async function GET(request) {
             const results = await searchCatalog({
                 query: searchParams.get("q") || "",
                 game: searchParams.get("game") || null,
+                type: searchParams.get("type") || "all",
             });
 
             logger.info("marketplace.vendor.catalog_search.success", { resultCount: results.length });
