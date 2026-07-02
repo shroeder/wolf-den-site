@@ -211,6 +211,28 @@ export async function getProductWithOffers(catalogProductId) {
         [catalogProductId]
     );
 
+    // Community Price History — network-internal market intelligence from active listings.
+    const prices = offers.map((o) => Number(o.price)).filter((p) => Number.isFinite(p) && p > 0);
+    const copies = offers.reduce((sum, o) => sum + (Number(o.quantity) || 0), 0);
+    const vendorCount = new Set(offers.map((o) => o.vendor_id)).size;
+    const avgPrice = prices.length ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100 : null;
+    const lowestPrice = prices.length ? Math.min(...prices) : null;
+
+    // Trend vs the closest snapshot from ~7+ days ago (null until snapshots accumulate).
+    const prior = await db.queryOne(
+        `SELECT copies, low_price FROM mkt_price_snapshot
+         WHERE catalog_product_id = $1 AND snapshot_date <= CURRENT_DATE - 7
+         ORDER BY snapshot_date DESC LIMIT 1`,
+        [catalogProductId]
+    );
+    const trend = prior
+        ? {
+              copiesDelta: copies - Number(prior.copies),
+              lowPriceDelta:
+                  lowestPrice != null && prior.low_price != null ? lowestPrice - Number(prior.low_price) : null,
+          }
+        : null;
+
     return {
         catalogProductId: String(product.id),
         game: product.game,
@@ -220,6 +242,7 @@ export async function getProductWithOffers(catalogProductId) {
         rarity: product.rarity,
         imageUrl: product.image_url,
         marketPrice: toNumber(product.market_price),
+        networkStats: { vendorCount, copies, avgPrice, lowestPrice, trend },
         offers: offers.map((row) => ({
             listingId: row.id,
             kind: row.kind,
@@ -310,6 +333,26 @@ export async function getMarketplaceLiveStats() {
         items: row?.items || 0,
         lastUpdatedAt: toIso(row?.last_updated),
     };
+}
+
+// Daily: snapshot per-product network supply/pricing for the Community Price History trend. One
+// aggregate upsert over all catalog-linked active listings.
+export async function snapshotNetworkPrices() {
+    const rows = await db.query(
+        `INSERT INTO mkt_price_snapshot (catalog_product_id, snapshot_date, vendor_count, copies, avg_price, low_price)
+         SELECT l.catalog_product_id, CURRENT_DATE,
+                COUNT(DISTINCT l.vendor_id), COALESCE(SUM(l.quantity), 0),
+                ROUND(AVG(l.price)::numeric, 2), MIN(l.price)
+         FROM mkt_listing l
+         JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
+         WHERE l.status = 'active' AND l.catalog_product_id IS NOT NULL
+         GROUP BY l.catalog_product_id
+         ON CONFLICT (catalog_product_id, snapshot_date)
+         DO UPDATE SET vendor_count = EXCLUDED.vendor_count, copies = EXCLUDED.copies,
+                       avg_price = EXCLUDED.avg_price, low_price = EXCLUDED.low_price
+         RETURNING catalog_product_id`
+    );
+    return { products: rows.length };
 }
 
 // Games that actually have catalog data, in registry order (drives the dynamic game filters). Read
