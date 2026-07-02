@@ -125,6 +125,57 @@ export async function sendWantAvailableEmail(email, product) {
     return result;
 }
 
+// Weekly vendor-only digest of Vendor Missions (network opportunities). Private per-vendor — never
+// sent to buyers.
+export async function sendVendorMissionsEmail({ vendor, demandGaps = [], uniques = [] }) {
+    const resend = getResendClient();
+    const portalUrl = new URL("/marketplace/portal", baseUrl()).toString();
+    const goldButton =
+        "display:inline-block;padding:12px 24px;background:#D4AF37;color:#0E0E0E;text-decoration:none;border-radius:6px;font-weight:bold;";
+
+    const gapItems = demandGaps
+        .slice(0, 8)
+        .map(
+            (m) =>
+                `<li><strong>${escapeHtml(m.name)}</strong>${m.setName ? ` — ${escapeHtml(m.setName)}` : ""} · ` +
+                `${m.wantCount} buyer${m.wantCount === 1 ? "" : "s"} want it · ` +
+                `${m.sellerCount === 0 ? "nobody stocks it yet" : `${m.sellerCount} seller${m.sellerCount === 1 ? "" : "s"} carry it`}</li>`
+        )
+        .join("");
+    const uniqueItems = uniques
+        .slice(0, 5)
+        .map(
+            (m) =>
+                `<li><strong>${escapeHtml(m.name)}</strong>${m.setName ? ` — ${escapeHtml(m.setName)}` : ""}` +
+                `${m.wantCount > 0 ? ` · ${m.wantCount} want it` : ""}</li>`
+        )
+        .join("");
+
+    const sections = [];
+    if (gapItems) sections.push(`<h2>Buyers want these — you don't list them</h2><ul>${gapItems}</ul>`);
+    if (uniqueItems) sections.push(`<h2>You're the only seller in the network</h2><ul>${uniqueItems}</ul>`);
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: vendor.email,
+        subject: "Your Wolf Den Marketplace missions",
+        html: `
+            <h1>Opportunities from the network</h1>
+            <p>Hi ${escapeHtml(vendor.displayName)} — here's what buyers are after and where you stand out this week.</p>
+            ${sections.join("")}
+            <p><a href="${portalUrl}" style="${goldButton}">Open your portal</a></p>
+            <hr />
+            <p><small>The Wolf Den Marketplace · sent to you as an active vendor.</small></p>
+        `,
+    });
+
+    if (result?.error) {
+        throw new Error(result.error.message || "Failed to send missions email.");
+    }
+
+    return result;
+}
+
 export async function sendVendorContactEmail({ vendor, listing, buyerName, buyerEmail, message }) {
     const resend = getResendClient();
 

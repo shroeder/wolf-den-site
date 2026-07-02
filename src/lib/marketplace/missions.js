@@ -1,6 +1,11 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { sendVendorMissionsEmail } from "@/lib/marketplace/email.js";
+import { createServerLogger } from "@/lib/server-logger";
+import { listVendors } from "@/lib/marketplace/vendors.js";
+
+const missionsLogger = createServerLogger({ source: "api", subsystem: "marketplace-missions" });
 
 // "Vendor Missions" — turn the marketplace from a passive catalog into an intelligence signal by
 // crossing network DEMAND (mkt_want "notify me") with SUPPLY (mkt_listing). Tells a vendor what to
@@ -65,4 +70,35 @@ export async function listVendorMissions(vendorId, { limit = 10 } = {}) {
         demandGaps: demandGaps.map(mapMission),
         uniques: uniques.map(mapMission),
     };
+}
+
+// Weekly cron: email each active vendor their own missions. Vendor-only (never buyers); skips vendors
+// with no opportunities so we don't send empty digests.
+export async function sendMissionDigests() {
+    const vendors = await listVendors({ status: "active" }).catch(() => []);
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const vendor of vendors) {
+        if (!vendor.email) {
+            skipped += 1;
+            continue;
+        }
+        const missions = await listVendorMissions(vendor.id).catch(() => ({ demandGaps: [], uniques: [] }));
+        if (missions.demandGaps.length === 0 && missions.uniques.length === 0) {
+            skipped += 1;
+            continue;
+        }
+        try {
+            await sendVendorMissionsEmail({ vendor, demandGaps: missions.demandGaps, uniques: missions.uniques });
+            sent += 1;
+        } catch (error) {
+            failed += 1;
+            missionsLogger.warn("marketplace.missions.email_failed", { vendorId: vendor.id, reason: error.message });
+        }
+    }
+
+    missionsLogger.info("marketplace.missions.digest_run", { vendors: vendors.length, sent, skipped, failed });
+    return { vendors: vendors.length, sent, skipped, failed };
 }

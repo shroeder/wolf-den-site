@@ -54,6 +54,10 @@
         {
             "path": "/api/jobs/inventory-feed",
             "schedule": "*/15 * * * *"
+        },
+        {
+            "path": "/api/jobs/marketplace-missions",
+            "schedule": "0 14 * * 1"
         }
     ]
 }
