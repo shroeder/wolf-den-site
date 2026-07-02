@@ -120,25 +120,25 @@ export default async function MarketplaceProductPage({ params }) {
 
             {product.networkStats && product.networkStats.vendorCount > 0 ? (
                 <section className="card">
-                    <h2>In this network</h2>
+                    <h2>Local price index</h2>
                     <div className="mkt-live-stats">
-                        <span className="mkt-live-stat">
-                            <strong>{product.networkStats.copies}</strong> cop{product.networkStats.copies === 1 ? "y" : "ies"} available
-                        </span>
-                        <span className="mkt-live-stat">
-                            across <strong>{product.networkStats.vendorCount}</strong> vendor
-                            {product.networkStats.vendorCount === 1 ? "" : "s"}
-                        </span>
                         {product.networkStats.lowestPrice != null ? (
                             <span className="mkt-live-stat">
                                 lowest local <strong>{formatPrice(product.networkStats.lowestPrice)}</strong>
                             </span>
                         ) : null}
-                        {product.networkStats.avgPrice != null ? (
+                        {product.networkStats.medianPrice != null ? (
                             <span className="mkt-live-stat">
-                                avg asking <strong>{formatPrice(product.networkStats.avgPrice)}</strong>
+                                median <strong>{formatPrice(product.networkStats.medianPrice)}</strong>
                             </span>
                         ) : null}
+                        <span className="mkt-live-stat">
+                            <strong>{product.networkStats.copies}</strong> available nearby
+                        </span>
+                        <span className="mkt-live-stat">
+                            across <strong>{product.networkStats.vendorCount}</strong> vendor
+                            {product.networkStats.vendorCount === 1 ? "" : "s"}
+                        </span>
                         {product.networkStats.trend && product.networkStats.trend.copiesDelta !== 0 ? (
                             <span className="mkt-live-stat">
                                 copies {product.networkStats.trend.copiesDelta > 0 ? "▲" : "▼"}
@@ -154,7 +154,9 @@ export default async function MarketplaceProductPage({ params }) {
                             </span>
                         ) : null}
                     </div>
-                    <p className="muted">Prices seen inside The Wolf Den network — not a global price guide.</p>
+                    <p className="muted">
+                        A local market index from real listings near you — not a &ldquo;should cost&rdquo; price guide.
+                    </p>
                 </section>
             ) : null}
 

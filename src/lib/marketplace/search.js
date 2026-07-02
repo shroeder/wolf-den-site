@@ -217,6 +217,14 @@ export async function getProductWithOffers(catalogProductId) {
     const vendorCount = new Set(offers.map((o) => o.vendor_id)).size;
     const avgPrice = prices.length ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100 : null;
     const lowestPrice = prices.length ? Math.min(...prices) : null;
+    // Median — the local market index anchor; robust to a single over/under-priced listing.
+    const sortedPrices = [...prices].sort((a, b) => a - b);
+    const medianPrice = sortedPrices.length
+        ? sortedPrices.length % 2
+            ? sortedPrices[(sortedPrices.length - 1) / 2]
+            : Math.round(((sortedPrices[sortedPrices.length / 2 - 1] + sortedPrices[sortedPrices.length / 2]) / 2) * 100) /
+              100
+        : null;
 
     // Trend vs the closest snapshot from ~7+ days ago (null until snapshots accumulate).
     const prior = await db.queryOne(
@@ -242,7 +250,7 @@ export async function getProductWithOffers(catalogProductId) {
         rarity: product.rarity,
         imageUrl: product.image_url,
         marketPrice: toNumber(product.market_price),
-        networkStats: { vendorCount, copies, avgPrice, lowestPrice, trend },
+        networkStats: { vendorCount, copies, avgPrice, medianPrice, lowestPrice, trend },
         offers: offers.map((row) => ({
             listingId: row.id,
             kind: row.kind,
