@@ -72,7 +72,9 @@ export default function MarketplaceBrowseClient({ vendors }) {
                 return;
             }
 
-            map = L.map(containerRef.current).setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
+            // scrollWheelZoom off so mousing over the map doesn't hijack the page scroll (+/- buttons
+            // and pinch still zoom).
+            map = L.map(containerRef.current, { scrollWheelZoom: false }).setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
             mapRef.current = map;
             markersRef.current = {};
 
