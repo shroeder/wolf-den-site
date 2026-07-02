@@ -12,6 +12,7 @@ const EMPTY = {
     sells: "",
     links: "",
     notes: "",
+    logoUrl: "",
 };
 
 export default function MarketplaceApplyClient() {
@@ -20,6 +21,28 @@ export default function MarketplaceApplyClient() {
     const [error, setError] = useState("");
     const [done, setDone] = useState(false);
     const [vendor, setVendor] = useState(null);
+    const [logoUploading, setLogoUploading] = useState(false);
+
+    async function uploadLogo(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setLogoUploading(true);
+        setError("");
+        try {
+            const body = new FormData();
+            body.append("file", file);
+            const response = await fetch("/api/marketplace/apply/logo", { method: "POST", body });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(data?.error || "Logo upload failed.");
+            }
+            setForm((prev) => ({ ...prev, logoUrl: data.url }));
+        } catch (err) {
+            setError(err?.message || "Logo upload failed.");
+        } finally {
+            setLogoUploading(false);
+        }
+    }
 
     // If they're already a signed-in vendor, send them to their portal instead of the apply form.
     useEffect(() => {
@@ -128,6 +151,20 @@ export default function MarketplaceApplyClient() {
                 <form className="contact-form mkt-apply-form" onSubmit={submit}>
                     <label htmlFor="ap-business">Business name *</label>
                     <input id="ap-business" type="text" value={form.businessName} onChange={update("businessName")} required />
+
+                    <label htmlFor="ap-logo">Logo (optional)</label>
+                    {form.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={form.logoUrl} alt="Logo preview" className="mkt-logo-preview" />
+                    ) : null}
+                    <input
+                        id="ap-logo"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={uploadLogo}
+                        disabled={logoUploading}
+                    />
+                    <p className="muted">{logoUploading ? "Uploading logo…" : "PNG, JPG, or WEBP, under 2 MB."}</p>
 
                     <label htmlFor="ap-contact">Your name</label>
                     <input id="ap-contact" type="text" value={form.contactName} onChange={update("contactName")} />

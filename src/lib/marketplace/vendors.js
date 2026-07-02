@@ -19,7 +19,7 @@ const INVITE_EXPIRY_DAYS = 14;
 
 const VENDOR_COLUMNS = `id, email, display_name, status, password_hash,
     address_line1, address_line2, city, region, postal_code, country,
-    location_label, latitude, longitude,
+    location_label, latitude, longitude, logo_url,
     invited_at, accepted_at, last_login_at, created_at, updated_at`;
 
 function normalizeEmail(value) {
@@ -59,6 +59,7 @@ function mapVendor(row) {
         id: row.id,
         email: row.email,
         displayName: row.display_name,
+        logoUrl: row.logo_url || null,
         status: row.status,
         hasPassword: Boolean(row.password_hash),
         address: {
@@ -111,14 +112,14 @@ export async function listVendors({ status } = {}) {
 
 // Luke creates the vendor record (status 'invited'). Address is optional here — the vendor usually
 // fills it in when they accept the invite.
-export async function createVendor({ email, displayName, address = {} }) {
+export async function createVendor({ email, displayName, address = {}, logoUrl = null }) {
     const normalized = normalizeEmail(email);
 
     const row = await db.queryOne(
         `INSERT INTO mkt_vendor
             (email, email_normalized, display_name,
-             address_line1, address_line2, city, region, postal_code, country, location_label)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'US'), $10)
+             address_line1, address_line2, city, region, postal_code, country, location_label, logo_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'US'), $10, $11)
          RETURNING ${VENDOR_COLUMNS}`,
         [
             String(email || "").trim(),
@@ -131,10 +132,21 @@ export async function createVendor({ email, displayName, address = {} }) {
             address.postalCode || null,
             address.country || null,
             address.locationLabel || null,
+            logoUrl || null,
         ]
     );
 
     vendorsLogger.info("marketplace.vendor.created", { step: "vendor_created", vendorId: row.id });
+
+    return mapVendor(row);
+}
+
+// Set (or clear) a vendor's logo URL. Used by the vendor portal.
+export async function setVendorLogo(id, logoUrl) {
+    const row = await db.queryOne(
+        `UPDATE mkt_vendor SET logo_url = $2, updated_at = NOW() WHERE id = $1 RETURNING ${VENDOR_COLUMNS}`,
+        [id, logoUrl || null]
+    );
 
     return mapVendor(row);
 }

@@ -1659,6 +1659,40 @@ textarea {
     font-size: 0.78rem;
 }
 
+/* Vendor logo upload/preview (marketplace apply form + portal). */
+.mkt-logo-editor {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+.mkt-logo-preview {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #fff;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.mkt-logo-placeholder {
+    width: 72px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px dashed rgba(255, 255, 255, 0.25);
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-align: center;
+    padding: 4px;
+}
+.mkt-logo-upload {
+    cursor: pointer;
+}
+
 .shop-tile-meta-row {
     margin-top: auto;
     display: flex;

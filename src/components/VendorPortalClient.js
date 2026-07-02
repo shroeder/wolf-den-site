@@ -733,6 +733,54 @@ function RequestRow({ request, onChanged }) {
     );
 }
 
+function VendorLogoEditor({ vendor, onChanged }) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+
+    async function upload(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        setBusy(true);
+        setError("");
+        try {
+            const body = new FormData();
+            body.append("file", file);
+            const response = await fetch("/api/marketplace/vendor/logo", { method: "POST", body });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(data?.error || "Upload failed.");
+            }
+            onChanged();
+        } catch (err) {
+            setError(err?.message || "Upload failed.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div className="mkt-logo-editor">
+            {vendor.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={vendor.logoUrl} alt={`${vendor.displayName} logo`} className="mkt-logo-preview" />
+            ) : (
+                <div className="mkt-logo-placeholder" aria-hidden="true">No logo yet</div>
+            )}
+            <label className="pill mkt-logo-upload">
+                {busy ? "Uploading…" : vendor.logoUrl ? "Replace logo" : "Add logo"}
+                <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={upload}
+                    disabled={busy}
+                    hidden
+                />
+            </label>
+            {error ? <span className="muted">{error}</span> : null}
+        </div>
+    );
+}
+
 export default function VendorPortalClient({
     vendor,
     listings,
@@ -767,6 +815,7 @@ export default function VendorPortalClient({
                                 ? ` · ${requestStats.total} lead${requestStats.total === 1 ? "" : "s"} (${requestStats.sold} sold)`
                                 : ""}
                         </p>
+                        <VendorLogoEditor vendor={vendor} onChanged={refresh} />
                     </div>
                     <button type="button" className="pill" onClick={logout}>
                         Sign out

@@ -10,7 +10,7 @@ const applicationsLogger = createServerLogger({ source: "api", subsystem: "marke
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const APPLICATION_COLUMNS = `id, business_name, contact_name, email, phone, city, region,
-    location_label, sells, links, notes, status, reviewed_at, vendor_id, created_at, updated_at`;
+    location_label, sells, links, notes, logo_url, status, reviewed_at, vendor_id, created_at, updated_at`;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -33,6 +33,7 @@ function mapApplication(row) {
         sells: row.sells,
         links: row.links,
         notes: row.notes,
+        logoUrl: row.logo_url || null,
         status: row.status,
         reviewedAt: toIso(row.reviewed_at),
         vendorId: row.vendor_id,
@@ -68,8 +69,8 @@ export async function createApplication(input = {}) {
 
     const row = await db.queryOne(
         `INSERT INTO mkt_vendor_application
-            (business_name, contact_name, email, phone, city, region, location_label, sells, links, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            (business_name, contact_name, email, phone, city, region, location_label, sells, links, notes, logo_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING ${APPLICATION_COLUMNS}`,
         [
             businessName,
@@ -82,6 +83,7 @@ export async function createApplication(input = {}) {
             input.sells ? String(input.sells).slice(0, 2000) : null,
             input.links ? String(input.links).slice(0, 1000) : null,
             input.notes ? String(input.notes).slice(0, 2000) : null,
+            input.logoUrl ? String(input.logoUrl).trim().slice(0, 2000) : null,
         ]
     );
 
@@ -139,6 +141,7 @@ export async function approveApplication(id) {
         vendor = await createVendor({
             email: application.email,
             displayName: application.businessName,
+            logoUrl: application.logoUrl,
             address: {
                 city: application.city,
                 region: application.region,
