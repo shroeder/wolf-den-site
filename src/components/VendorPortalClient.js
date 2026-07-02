@@ -271,18 +271,19 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
 
     return (
         <form className="contact-form mkt-add-form" onSubmit={submit}>
-            <div className="lf-game-toggle" role="group" aria-label="Filter catalog by game">
+            <label htmlFor="add-game">Game (optional — narrows the search)</label>
+            <select
+                id="add-game"
+                className="mkt-game-select"
+                value={game}
+                onChange={(event) => setGame(event.target.value)}
+            >
                 {games.map((g) => (
-                    <button
-                        key={g.id || "all"}
-                        type="button"
-                        className={`pill${game === g.id ? " lf-game-active" : ""}`}
-                        onClick={() => setGame(g.id)}
-                    >
+                    <option key={g.id || "all"} value={g.id}>
                         {g.label}
-                    </button>
+                    </option>
                 ))}
-            </div>
+            </select>
 
             <label htmlFor="add-search">Search by name, set, or card number</label>
             <input
