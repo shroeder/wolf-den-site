@@ -5,6 +5,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 
 import { db } from "@/lib/db";
+import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { getVendorById } from "@/lib/marketplace/vendors.js";
 
 // Vendor web sessions on the mkt_vendor_session table — same shape as admin_app_sessions
 // (revocable, only the token hash stored), surfaced to the browser via an httpOnly cookie.
@@ -140,11 +142,22 @@ export async function getVendorSessionToken() {
 export async function getAuthenticatedVendor() {
     const token = await getVendorSessionToken();
 
-    if (!token) {
-        return null;
+    if (token) {
+        const session = await resolveVendorSession(token);
+        if (session) {
+            return session.vendor;
+        }
     }
 
-    const session = await resolveVendorSession(token);
+    // Unified account model: an account session whose account has a linked (active) vendor profile
+    // IS a seller. One token grants both buyer and seller access.
+    const account = await getAuthenticatedBuyer();
+    if (account) {
+        const vendorId = await getAccountLinkedVendorId(account.id);
+        if (vendorId) {
+            return await getVendorById(vendorId);
+        }
+    }
 
-    return session ? session.vendor : null;
+    return null;
 }

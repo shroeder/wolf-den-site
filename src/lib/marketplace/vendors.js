@@ -122,8 +122,10 @@ export async function createVendor({ email, displayName, address = {}, logoUrl =
     const row = await db.queryOne(
         `INSERT INTO mkt_vendor
             (email, email_normalized, display_name,
-             address_line1, address_line2, city, region, postal_code, country, location_label, logo_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'US'), $10, $11)
+             address_line1, address_line2, city, region, postal_code, country, location_label, logo_url,
+             account_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'US'), $10, $11,
+             (SELECT id FROM mkt_buyer WHERE email_normalized = $2 LIMIT 1))
          RETURNING ${VENDOR_COLUMNS}`,
         [
             String(email || "").trim(),

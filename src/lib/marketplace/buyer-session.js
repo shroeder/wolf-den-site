@@ -138,3 +138,14 @@ export async function getAuthenticatedBuyer() {
     const session = await resolveBuyerSession(token);
     return session ? session.buyer : null;
 }
+
+// The active vendor (seller) profile linked to an account, or null. Drives the derived role: an
+// account with a linked active vendor is a seller, otherwise a buyer.
+export async function getAccountLinkedVendorId(accountId) {
+    if (!accountId) return null;
+    const row = await db.queryOne(
+        `SELECT id FROM mkt_vendor WHERE account_id = $1 AND status = 'active' ORDER BY created_at ASC LIMIT 1`,
+        [accountId]
+    );
+    return row?.id || null;
+}
