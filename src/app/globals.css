@@ -1744,6 +1744,34 @@ textarea {
     align-items: center;
     flex-wrap: wrap;
 }
+.mkt-specialties-editor {
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+.mkt-specialties-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.mkt-specialty-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+.mkt-specialty-tag {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(212, 175, 55, 0.14);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    color: #e7cf86;
+}
+.mkt-specialty-select {
+    width: auto;
+    min-width: 160px;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {

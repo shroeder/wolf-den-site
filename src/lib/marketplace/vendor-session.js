@@ -46,7 +46,7 @@ export async function resolveVendorSession(token) {
     const row = await db.queryOne(
         `SELECT s.id AS session_id, s.expires_at, s.revoked_at,
                 v.id, v.display_name, v.email, v.status, v.location_label, v.logo_url,
-                v.ships, v.local_pickup,
+                v.ships, v.local_pickup, v.specialties,
                 v.default_pricing_mode, v.default_pricing_value
          FROM mkt_vendor_session s
          JOIN mkt_vendor v ON v.id = s.vendor_id
@@ -75,6 +75,7 @@ export async function resolveVendorSession(token) {
             logoUrl: row.logo_url || null,
             ships: row.ships === true,
             localPickup: row.local_pickup == null ? true : row.local_pickup === true,
+            specialties: Array.isArray(row.specialties) ? row.specialties : [],
             defaultPricingMode: row.default_pricing_mode || "manual",
             defaultPricingValue: row.default_pricing_value != null ? Number(row.default_pricing_value) : null,
         },

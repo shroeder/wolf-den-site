@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import VendorImportClient from "@/components/VendorImportClient";
+import { VENDOR_SPECIALTIES } from "@/lib/marketplace/specialties.js";
 
 const CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
 const GRADERS = ["PSA", "BGS", "CGC", "SGC", "TAG", "ACE", "Other"];
@@ -1137,6 +1138,50 @@ function DealerOffers({ dealerOffers, onChanged }) {
     );
 }
 
+function VendorSpecialtiesEditor({ vendor, onChanged }) {
+    const [selected, setSelected] = useState(new Set(vendor.specialties || []));
+    const [saving, setSaving] = useState(false);
+
+    async function toggle(tag) {
+        const next = new Set(selected);
+        if (next.has(tag)) next.delete(tag);
+        else next.add(tag);
+        setSelected(next);
+        setSaving(true);
+        try {
+            await fetch("/api/marketplace/vendor/specialties", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ specialties: Array.from(next) }),
+            });
+            onChanged();
+        } catch {
+            /* ignore */
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="mkt-specialties-editor">
+            <span className="muted">Specialties (what you&apos;re known for):</span>
+            <div className="mkt-specialties-tags">
+                {VENDOR_SPECIALTIES.map((tag) => (
+                    <button
+                        key={tag}
+                        type="button"
+                        className={`pill${selected.has(tag) ? " lf-game-active" : ""}`}
+                        disabled={saving}
+                        onClick={() => toggle(tag)}
+                    >
+                        {tag}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function VendorFulfillmentEditor({ vendor, onChanged }) {
     const [ships, setShips] = useState(Boolean(vendor.ships));
     const [localPickup, setLocalPickup] = useState(vendor.localPickup !== false);
@@ -1228,6 +1273,7 @@ export default function VendorPortalClient({
                         </p>
                         <VendorLogoEditor vendor={vendor} onChanged={refresh} />
                         <VendorFulfillmentEditor vendor={vendor} onChanged={refresh} />
+                        <VendorSpecialtiesEditor vendor={vendor} onChanged={refresh} />
                     </div>
                     <button type="button" className="pill" onClick={logout}>
                         Sign out

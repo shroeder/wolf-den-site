@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import MarketplaceLiveStats from "@/components/MarketplaceLiveStats";
+import { VENDOR_SPECIALTIES } from "@/lib/marketplace/specialties.js";
 
 // Default view: south metro of the Twin Cities / Montgomery area — the Wolf Den's recruiting turf.
 const MN_SOUTH_METRO = [44.66, -93.42];
@@ -40,6 +41,14 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
     const [myLoc, setMyLoc] = useState(null);
     const [locating, setLocating] = useState(false);
     const [locError, setLocError] = useState("");
+    const [specialty, setSpecialty] = useState("");
+
+    // Specialties present across vendors (canonical order) — drives the directory filter.
+    const availableSpecialties = useMemo(() => {
+        const present = new Set();
+        vendors.forEach((v) => (v.specialties || []).forEach((s) => present.add(s)));
+        return VENDOR_SPECIALTIES.filter((s) => present.has(s));
+    }, [vendors]);
 
     const located = vendors.filter((v) => v.latitude != null && v.longitude != null);
 
@@ -198,6 +207,21 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                     <button type="button" className="button primary" onClick={locateMe} disabled={locating}>
                         {locating ? "Locating..." : "📍 Find vendors near me"}
                     </button>
+                    {availableSpecialties.length > 0 ? (
+                        <select
+                            className="mkt-game-select mkt-specialty-select"
+                            value={specialty}
+                            onChange={(e) => setSpecialty(e.target.value)}
+                            aria-label="Filter vendors by specialty"
+                        >
+                            <option value="">All specialties</option>
+                            {availableSpecialties.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
+                            ))}
+                        </select>
+                    ) : null}
                     <Link href="/marketplace" className="pill">
                         Search by item instead
                     </Link>
@@ -211,12 +235,20 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                 </section>
 
                 <section className="card mkt-browse-list-card">
-                    <h2>Vendors{vendors.length ? ` (${vendors.length})` : ""}</h2>
+                    {(() => {
+                        const shown = specialty
+                            ? sortedVendors.filter((v) => (v.specialties || []).includes(specialty))
+                            : sortedVendors;
+                        return (
+                <>
+                    <h2>Vendors{shown.length ? ` (${shown.length})` : ""}</h2>
                 {vendors.length === 0 ? (
                     <p className="muted">No vendors with inventory yet.</p>
+                ) : shown.length === 0 ? (
+                    <p className="muted">No vendors specialize in {specialty} yet.</p>
                 ) : (
                     <ul className="mkt-vendor-grid">
-                        {sortedVendors.map((v) => (
+                        {shown.map((v) => (
                             <li key={v.id}>
                                 <Link
                                     href={`/marketplace/vendor/${v.id}`}
@@ -254,11 +286,23 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                                             <span className="mkt-trust-item">Since {monthYear(v.memberSince)}</span>
                                         ) : null}
                                     </div>
+                                    {v.specialties && v.specialties.length > 0 ? (
+                                        <div className="mkt-specialty-tags">
+                                            {v.specialties.slice(0, 3).map((s) => (
+                                                <span key={s} className="mkt-specialty-tag">
+                                                    {s}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null}
                                 </Link>
                             </li>
                         ))}
                     </ul>
                 )}
+                </>
+                        );
+                    })()}
                 </section>
             </div>
         </div>

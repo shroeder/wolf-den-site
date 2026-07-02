@@ -259,7 +259,7 @@ export async function listIndexableMarketplaceProductIds() {
 export async function listVendorsForBrowse() {
     const rows = await db.query(
         `SELECT v.id, v.display_name, v.logo_url, v.location_label, v.region, v.city,
-                v.latitude, v.longitude, v.accepted_at, v.created_at,
+                v.latitude, v.longitude, v.accepted_at, v.created_at, v.specialties,
                 COUNT(l.id) FILTER (WHERE l.status = 'active') AS listing_count,
                 (SELECT array_agg(img) FROM (
                      SELECT COALESCE(l2.image_url, c2.image_url) AS img
@@ -282,6 +282,7 @@ export async function listVendorsForBrowse() {
         id: row.id,
         displayName: row.display_name,
         logoUrl: row.logo_url || null,
+        specialties: Array.isArray(row.specialties) ? row.specialties : [],
         locationLabel: row.location_label,
         region: row.region,
         city: row.city,
@@ -458,7 +459,7 @@ export async function searchCatalog({ query, game = null, type = "all", setId = 
 export async function getVendorStorefront(vendorId, { includeInactive = false } = {}) {
     const vendor = await db.queryOne(
         `SELECT id, display_name, logo_url, location_label, region, city, latitude, longitude,
-                created_at, accepted_at, status, ships, local_pickup, last_login_at
+                created_at, accepted_at, status, ships, local_pickup, specialties, last_login_at
          FROM mkt_vendor
          WHERE id = $1 ${includeInactive ? "" : "AND status = 'active'"}`,
         [vendorId]
@@ -528,6 +529,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
         activeThisWeek,
         ships: vendor.ships === true,
         localPickup: vendor.local_pickup == null ? true : vendor.local_pickup === true,
+        specialties: Array.isArray(vendor.specialties) ? vendor.specialties : [],
         memberSince: toIso(vendor.accepted_at || vendor.created_at),
         listingCount: listings.length,
         lastListedAt: lastListedAt ? new Date(lastListedAt).toISOString() : null,

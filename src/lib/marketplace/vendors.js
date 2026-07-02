@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 import { db } from "@/lib/db";
+import { sanitizeSpecialties } from "@/lib/marketplace/specialties.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 // Marketplace vendors: hand-vetted by Luke, invited by email, self-onboard (set password + address),
@@ -19,7 +20,7 @@ const INVITE_EXPIRY_DAYS = 14;
 
 const VENDOR_COLUMNS = `id, email, display_name, status, password_hash,
     address_line1, address_line2, city, region, postal_code, country,
-    location_label, latitude, longitude, logo_url, ships, local_pickup,
+    location_label, latitude, longitude, logo_url, ships, local_pickup, specialties,
     invited_at, accepted_at, last_login_at, created_at, updated_at`;
 
 function normalizeEmail(value) {
@@ -62,6 +63,7 @@ function mapVendor(row) {
         logoUrl: row.logo_url || null,
         ships: row.ships === true,
         localPickup: row.local_pickup == null ? true : row.local_pickup === true,
+        specialties: Array.isArray(row.specialties) ? row.specialties : [],
         status: row.status,
         hasPassword: Boolean(row.password_hash),
         address: {
@@ -139,6 +141,17 @@ export async function createVendor({ email, displayName, address = {}, logoUrl =
     );
 
     vendorsLogger.info("marketplace.vendor.created", { step: "vendor_created", vendorId: row.id });
+
+    return mapVendor(row);
+}
+
+// Set a vendor's specialty tags (validated against the curated vocabulary). Used by the vendor portal.
+export async function setVendorSpecialties(id, specialties) {
+    const clean = sanitizeSpecialties(specialties);
+    const row = await db.queryOne(
+        `UPDATE mkt_vendor SET specialties = $2::text[], updated_at = NOW() WHERE id = $1 RETURNING ${VENDOR_COLUMNS}`,
+        [id, clean]
+    );
 
     return mapVendor(row);
 }

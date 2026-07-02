@@ -179,6 +179,15 @@ export default async function VendorStorefrontPage({ params }) {
                         <span className="mkt-trust-item">Updated {sinceLabel(vendor.lastListedAt)}</span>
                     ) : null}
                 </div>
+                {vendor.specialties && vendor.specialties.length > 0 ? (
+                    <div className="mkt-specialty-tags">
+                        {vendor.specialties.map((s) => (
+                            <span key={s} className="mkt-specialty-tag">
+                                {s}
+                            </span>
+                        ))}
+                    </div>
+                ) : null}
             </section>
 
             <section className="card">
