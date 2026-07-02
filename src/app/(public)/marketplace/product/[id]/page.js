@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import MarketplaceOffers from "@/components/MarketplaceOffers";
+import ProductViewBeacon from "@/components/ProductViewBeacon";
 import { getProductWithOffers } from "@/lib/marketplace/search.js";
 import { SITE_URL } from "@/lib/site";
 
@@ -78,6 +79,7 @@ export default async function MarketplaceProductPage({ params }) {
 
     return (
         <div className="stack reveal">
+            <ProductViewBeacon catalogProductId={product.catalogProductId} />
             <section className="card">
                 <p className="mkt-breadcrumb">
                     <Link href="/marketplace">← Back to marketplace</Link>

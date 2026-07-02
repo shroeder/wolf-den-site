@@ -1307,6 +1307,7 @@ export default function VendorPortalClient({
     dealerOffers = { incoming: [], outgoing: [] },
     dealerDemand = [],
     sellBids = [],
+    searchDemand = [],
 }) {
     const router = useRouter();
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
@@ -1390,6 +1391,38 @@ export default function VendorPortalClient({
                     ) : null}
                 </div>
             </section>
+
+            {searchDemand.length > 0 ? (
+                <section className="card">
+                    <h2>🔥 Buyer search demand (this week)</h2>
+                    <p className="muted">
+                        What buyers are viewing across the network, and whether anyone stocks it. Gaps are
+                        opportunities.
+                    </p>
+                    <ul className="mkt-admin-list">
+                        {searchDemand.map((d) => (
+                            <li key={d.catalogProductId} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{d.name}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {d.setName ? `${d.setName} · ` : ""}
+                                        {d.views} view{d.views === 1 ? "" : "s"} ·{" "}
+                                        {d.vendorCount === 0
+                                            ? "nobody carries it"
+                                            : `${d.vendorCount} vendor${d.vendorCount === 1 ? "" : "s"} carry it`}
+                                        {d.youCarry ? " · you stock it ✓" : ""}
+                                    </span>
+                                </div>
+                                {!d.youCarry ? (
+                                    <Link href={`/marketplace/product/${d.catalogProductId}`} className="pill">
+                                        {d.vendorCount === 0 ? "Fill the gap →" : "Source →"}
+                                    </Link>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
 
             <section className="card">
                 <h2>Vendor Missions</h2>
