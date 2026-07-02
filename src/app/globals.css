@@ -1818,6 +1818,11 @@ textarea {
 .mkt-swap-list .mkt-admin-info {
     cursor: pointer;
 }
+.mkt-hidden-badge {
+    color: #d4af37;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
 
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {

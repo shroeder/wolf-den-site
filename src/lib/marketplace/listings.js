@@ -35,7 +35,7 @@ const MAX_LIMIT = 200;
 
 const LISTING_COLUMNS = `id, vendor_id, kind, catalog_product_id, game, title, set_name,
     card_number, image_url, condition, graded, grading_company, grade, language, price, quantity,
-    pricing_mode, pricing_value, dealer_available, wholesale_price, status, created_at, updated_at`;
+    pricing_mode, pricing_value, dealer_available, wholesale_price, vendor_only, status, created_at, updated_at`;
 
 function toIso(value) {
     return value ? new Date(value).toISOString() : null;
@@ -87,6 +87,7 @@ function mapListing(row) {
         pricingValue: toNumber(row.pricing_value),
         dealerAvailable: row.dealer_available === true,
         wholesalePrice: toNumber(row.wholesale_price),
+        vendorOnly: row.vendor_only === true,
         status: row.status,
         createdAt: toIso(row.created_at),
         updatedAt: toIso(row.updated_at),
@@ -129,6 +130,7 @@ export async function createListing({
     pricingValue = null,
     dealerAvailable = false,
     wholesalePrice = null,
+    vendorOnly = false,
 }) {
     if (!isValidKind(kind)) {
         throw new Error(`Invalid listing kind: ${kind}`);
@@ -163,8 +165,8 @@ export async function createListing({
         `INSERT INTO mkt_listing
             (vendor_id, kind, catalog_product_id, game, title, set_name, card_number,
              image_url, condition, graded, grading_company, grade, language, price, quantity,
-             pricing_mode, pricing_value, dealer_available, wholesale_price)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+             pricing_mode, pricing_value, dealer_available, wholesale_price, vendor_only)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
          RETURNING ${LISTING_COLUMNS}`,
         [
             vendorId,
@@ -186,6 +188,7 @@ export async function createListing({
             mode === "manual" ? null : pricingValue,
             Boolean(dealerAvailable),
             normalizedWholesale,
+            Boolean(vendorOnly),
         ]
     );
 
@@ -197,8 +200,8 @@ export async function createListing({
     });
 
     // Demand alert: email anyone who asked to be notified when this product gets listed (respecting
-    // their price threshold).
-    if (catalogProductId) {
+    // their price threshold). Skipped for vendor-only (hidden) stock — buyers never see it.
+    if (catalogProductId && !vendorOnly) {
         try {
             await notifyWantsForProduct(catalogProductId, effectivePrice);
         } catch (error) {
@@ -250,6 +253,7 @@ export async function updateListing(id, vendorId, patch = {}) {
         pricingValue: "pricing_value",
         dealerAvailable: "dealer_available",
         wholesalePrice: "wholesale_price",
+        vendorOnly: "vendor_only",
     };
 
     const sets = [];
@@ -348,7 +352,8 @@ export async function listAgingInventory(vendorId) {
 // price + who's selling. Excludes the requesting vendor's own stock.
 export async function listDealerInventory({ excludeVendorId = null, query = "", game = null, limit = 60 } = {}) {
     const params = [];
-    const where = ["l.status = 'active'", "l.dealer_available = TRUE", "v.status = 'active'"];
+    // Dealer-facing: both listings opened to dealers and hidden vendor-only (wholesale/overstock) stock.
+    const where = ["l.status = 'active'", "(l.dealer_available = TRUE OR l.vendor_only = TRUE)", "v.status = 'active'"];
 
     if (excludeVendorId) {
         params.push(excludeVendorId);
@@ -409,7 +414,7 @@ export async function searchListings({
     limit = DEFAULT_LIMIT,
     offset = 0,
 } = {}) {
-    const where = ["l.status = 'active'", "v.status = 'active'"];
+    const where = ["l.status = 'active'", "v.status = 'active'", "NOT l.vendor_only"];
     const params = [];
 
     if (query) {

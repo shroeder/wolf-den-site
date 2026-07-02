@@ -35,7 +35,7 @@ export async function createSwap({
         throw new Error("Some of your items are no longer available.");
     }
     const requestRows = await db.query(
-        `SELECT id FROM mkt_listing WHERE id = ANY($1::uuid[]) AND vendor_id = $2 AND status = 'active' AND dealer_available = TRUE`,
+        `SELECT id FROM mkt_listing WHERE id = ANY($1::uuid[]) AND vendor_id = $2 AND status = 'active' AND (dealer_available = TRUE OR vendor_only = TRUE)`,
         [requestIds, toVendorId]
     );
     if (requestRows.length !== requestIds.length) {

@@ -55,6 +55,7 @@ export async function repriceActiveListings() {
                    JOIN mkt_vendor v2 ON v2.id = l2.vendor_id AND v2.status = 'active'
                   WHERE l2.catalog_product_id = l.catalog_product_id
                     AND l2.status = 'active'
+                    AND NOT l2.vendor_only
                     AND l2.vendor_id <> l.vendor_id) AS lowest_price
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
@@ -94,6 +95,7 @@ export async function computeListingPriceNow({ catalogProductId, vendorId, mode,
                    JOIN mkt_vendor v2 ON v2.id = l2.vendor_id AND v2.status = 'active'
                   WHERE l2.catalog_product_id = $1
                     AND l2.status = 'active'
+                    AND NOT l2.vendor_only
                     AND ($2::uuid IS NULL OR l2.vendor_id <> $2)) AS lowest_price
          FROM tcg_cards c
          WHERE c.id = $1`,

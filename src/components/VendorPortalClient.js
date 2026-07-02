@@ -83,6 +83,7 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
     const [price, setPrice] = useState("");
     const [quantity, setQuantity] = useState("1");
     const [dealerAvailable, setDealerAvailable] = useState(false);
+    const [vendorOnly, setVendorOnly] = useState(false);
     const [wholesalePrice, setWholesalePrice] = useState("");
     const [pricing, setPricing] = useState(null);
     const [autoMode, setAutoMode] = useState(defaultPricingMode || "manual");
@@ -273,6 +274,7 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                     imageUrl: selected?.imageUrl || null,
                     dealerAvailable,
                     wholesalePrice: dealerAvailable && wholesalePrice ? wholesalePrice : null,
+                    vendorOnly,
                 }),
             });
             const data = await response.json().catch(() => null);
@@ -571,6 +573,14 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                                 placeholder="wholesale $ (opt)"
                             />
                         ) : null}
+                        <label title="Hide from the public marketplace — visible only to other vendors">
+                            <input
+                                type="checkbox"
+                                checked={vendorOnly}
+                                onChange={(e) => setVendorOnly(e.target.checked)}
+                            />{" "}
+                            Vendor-only (hidden from public)
+                        </label>
                     </div>
 
                     <button className="button primary" type="submit" disabled={busy}>
@@ -630,6 +640,7 @@ function ListingRow({ listing, onChanged }) {
         listing.pricingMode === "match_lowest" && listing.pricingValue != null ? String(listing.pricingValue) : "0"
     );
     const [dealerAvailable, setDealerAvailable] = useState(Boolean(listing.dealerAvailable));
+    const [vendorOnly, setVendorOnly] = useState(Boolean(listing.vendorOnly));
     const [wholesalePrice, setWholesalePrice] = useState(
         listing.wholesalePrice != null ? String(listing.wholesalePrice) : ""
     );
@@ -646,6 +657,7 @@ function ListingRow({ listing, onChanged }) {
     const pricingDirty = mode !== (listing.pricingMode || "manual") || (mode !== "manual" && currentValInput !== storedValInput);
     const dealerDirty =
         dealerAvailable !== Boolean(listing.dealerAvailable) ||
+        vendorOnly !== Boolean(listing.vendorOnly) ||
         wholesalePrice !== (listing.wholesalePrice != null ? String(listing.wholesalePrice) : "");
     const dirty =
         price !== String(listing.price ?? "") ||
@@ -663,6 +675,7 @@ function ListingRow({ listing, onChanged }) {
                 body: JSON.stringify({
                     quantity: Number(quantity),
                     dealerAvailable,
+                    vendorOnly,
                     wholesalePrice: dealerAvailable && wholesalePrice ? wholesalePrice : null,
                     ...(mode === "manual"
                         ? { price: Number(price), pricingMode: "manual", pricingValue: null }
@@ -721,7 +734,10 @@ function ListingRow({ listing, onChanged }) {
     return (
         <li className="mkt-admin-row">
             <div className="mkt-admin-info">
-                <strong>{listing.title}</strong>
+                <strong>
+                    {listing.title}
+                    {listing.vendorOnly ? <span className="mkt-hidden-badge"> · hidden</span> : null}
+                </strong>
                 <span className="mkt-offer-meta">
                     {listing.kind}
                     {listing.graded
@@ -783,6 +799,9 @@ function ListingRow({ listing, onChanged }) {
                         />
                     </label>
                 ) : null}
+                <label title="Hide from the public marketplace — visible only to other vendors">
+                    <input type="checkbox" checked={vendorOnly} onChange={(e) => setVendorOnly(e.target.checked)} /> Hidden
+                </label>
                 <button type="button" className="button primary" disabled={busy || !dirty} onClick={save}>
                     Save
                 </button>

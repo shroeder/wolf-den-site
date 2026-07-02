@@ -56,6 +56,10 @@ export async function PATCH(request, { params }) {
                 patch.dealerAvailable = Boolean(body.dealerAvailable);
             }
 
+            if (body.vendorOnly !== undefined) {
+                patch.vendorOnly = Boolean(body.vendorOnly);
+            }
+
             if (body.wholesalePrice !== undefined) {
                 const wp = body.wholesalePrice === null || body.wholesalePrice === "" ? null : Number(body.wholesalePrice);
                 patch.wholesalePrice = wp != null && Number.isFinite(wp) && wp > 0 ? wp : null;

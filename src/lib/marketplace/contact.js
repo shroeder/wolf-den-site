@@ -28,7 +28,7 @@ export async function createContactRequest({ listingId, buyerName, buyerEmail, m
                 v.id AS vendor_id, v.email AS vendor_email, v.display_name AS vendor_name, v.status AS vendor_status
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id
-         WHERE l.id = $1 AND l.status = 'active'`,
+         WHERE l.id = $1 AND l.status = 'active' AND NOT l.vendor_only`,
         [listingId]
     );
 

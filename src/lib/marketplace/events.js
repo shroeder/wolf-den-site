@@ -88,7 +88,7 @@ export async function getEventWithVendors(eventId) {
     }
     const vendors = await db.query(
         `SELECT v.id, v.display_name, v.logo_url, v.location_label, v.specialties,
-                (SELECT COUNT(*) FROM mkt_listing l WHERE l.vendor_id = v.id AND l.status = 'active')::int AS listing_count
+                (SELECT COUNT(*) FROM mkt_listing l WHERE l.vendor_id = v.id AND l.status = 'active' AND NOT l.vendor_only)::int AS listing_count
          FROM mkt_event_vendor ev
          JOIN mkt_vendor v ON v.id = ev.vendor_id AND v.status = 'active'
          WHERE ev.event_id = $1
@@ -123,7 +123,7 @@ export async function listEventInventory(eventId, { query = "", limit = 60 } = {
                 COALESCE(l.image_url, c.image_url) AS image_url,
                 v.id AS vendor_id, v.display_name AS vendor_name
          FROM mkt_event_vendor ev
-         JOIN mkt_listing l ON l.vendor_id = ev.vendor_id AND l.status = 'active'
+         JOIN mkt_listing l ON l.vendor_id = ev.vendor_id AND l.status = 'active' AND NOT l.vendor_only
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
          LEFT JOIN tcg_cards c ON c.id = l.catalog_product_id
          WHERE ev.event_id = $1 ${textClause}

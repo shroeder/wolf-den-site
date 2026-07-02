@@ -50,6 +50,7 @@ export async function POST(request) {
                     pricingValue: body.pricingValue != null ? Number(body.pricingValue) : null,
                     dealerAvailable: Boolean(body.dealerAvailable),
                     wholesalePrice: body.wholesalePrice != null ? body.wholesalePrice : null,
+                    vendorOnly: Boolean(body.vendorOnly),
                 });
 
                 logger.info("marketplace.vendor.listing_created", { vendorId: vendor.id, listingId: listing.id });

@@ -64,7 +64,7 @@ function mapCatalogResult(row) {
 const IN_STOCK_FROM = `
     FROM tcg_cards c
     JOIN tcg_sets s ON s.id = c.set_id
-    JOIN mkt_listing l ON l.catalog_product_id = c.id AND l.status = 'active'
+    JOIN mkt_listing l ON l.catalog_product_id = c.id AND l.status = 'active' AND NOT l.vendor_only
     JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'`;
 
 const IN_STOCK_SELECT = `
@@ -159,11 +159,11 @@ export async function getProductPricingContext(catalogProductId, excludeVendorId
     const row = await db.queryOne(
         `SELECT c.market_price,
                 MIN(l.price) FILTER (
-                    WHERE l.status = 'active' AND v.status = 'active'
+                    WHERE l.status = 'active' AND v.status = 'active' AND NOT l.vendor_only
                       AND ($2::uuid IS NULL OR l.vendor_id <> $2)
                 ) AS lowest_price,
                 COUNT(DISTINCT l.vendor_id) FILTER (
-                    WHERE l.status = 'active' AND v.status = 'active'
+                    WHERE l.status = 'active' AND v.status = 'active' AND NOT l.vendor_only
                       AND ($2::uuid IS NULL OR l.vendor_id <> $2)
                 ) AS vendor_count
          FROM tcg_cards c
@@ -206,7 +206,7 @@ export async function getProductWithOffers(catalogProductId) {
                 v.location_label, v.region AS vendor_region
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
-         WHERE l.catalog_product_id = $1 AND l.status = 'active'
+         WHERE l.catalog_product_id = $1 AND l.status = 'active' AND NOT l.vendor_only
          ORDER BY l.price ASC`,
         [catalogProductId]
     );
@@ -280,7 +280,7 @@ export async function listIndexableMarketplaceProductIds() {
         `SELECT DISTINCT l.catalog_product_id AS id
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
-         WHERE l.status = 'active' AND l.catalog_product_id IS NOT NULL`
+         WHERE l.status = 'active' AND l.catalog_product_id IS NOT NULL AND NOT l.vendor_only`
     );
 
     return rows.map((row) => String(row.id));
@@ -291,12 +291,12 @@ export async function listVendorsForBrowse() {
     const rows = await db.query(
         `SELECT v.id, v.display_name, v.logo_url, v.location_label, v.region, v.city,
                 v.latitude, v.longitude, v.accepted_at, v.created_at, v.specialties,
-                COUNT(l.id) FILTER (WHERE l.status = 'active') AS listing_count,
+                COUNT(l.id) FILTER (WHERE l.status = 'active' AND NOT l.vendor_only) AS listing_count,
                 (SELECT array_agg(img) FROM (
                      SELECT COALESCE(l2.image_url, c2.image_url) AS img
                      FROM mkt_listing l2
                      LEFT JOIN tcg_cards c2 ON c2.id = l2.catalog_product_id
-                     WHERE l2.vendor_id = v.id AND l2.status = 'active'
+                     WHERE l2.vendor_id = v.id AND l2.status = 'active' AND NOT l2.vendor_only
                        AND COALESCE(l2.image_url, c2.image_url) IS NOT NULL
                      ORDER BY l2.price DESC
                      LIMIT 4
@@ -305,7 +305,7 @@ export async function listVendorsForBrowse() {
          LEFT JOIN mkt_listing l ON l.vendor_id = v.id
          WHERE v.status = 'active'
          GROUP BY v.id
-         HAVING COUNT(l.id) FILTER (WHERE l.status = 'active') > 0
+         HAVING COUNT(l.id) FILTER (WHERE l.status = 'active' AND NOT l.vendor_only) > 0
          ORDER BY v.display_name ASC`
     );
 
@@ -331,10 +331,10 @@ export async function getMarketplaceLiveStats() {
     const row = await db.queryOne(
         `SELECT
             (SELECT COUNT(DISTINCT v.id) FROM mkt_vendor v
-               JOIN mkt_listing l ON l.vendor_id = v.id AND l.status = 'active'
+               JOIN mkt_listing l ON l.vendor_id = v.id AND l.status = 'active' AND NOT l.vendor_only
                WHERE v.status = 'active')::int AS vendors,
-            (SELECT COUNT(*) FROM mkt_listing WHERE status = 'active')::int AS items,
-            (SELECT MAX(updated_at) FROM mkt_listing WHERE status = 'active') AS last_updated`
+            (SELECT COUNT(*) FROM mkt_listing WHERE status = 'active' AND NOT vendor_only)::int AS items,
+            (SELECT MAX(updated_at) FROM mkt_listing WHERE status = 'active' AND NOT vendor_only) AS last_updated`
     );
     return {
         vendors: row?.vendors || 0,
@@ -353,7 +353,7 @@ export async function snapshotNetworkPrices() {
                 ROUND(AVG(l.price)::numeric, 2), MIN(l.price)
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
-         WHERE l.status = 'active' AND l.catalog_product_id IS NOT NULL
+         WHERE l.status = 'active' AND l.catalog_product_id IS NOT NULL AND NOT l.vendor_only
          GROUP BY l.catalog_product_id
          ON CONFLICT (catalog_product_id, snapshot_date)
          DO UPDATE SET vendor_count = EXCLUDED.vendor_count, copies = EXCLUDED.copies,
@@ -528,7 +528,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
                 c.market_price
          FROM mkt_listing l
          LEFT JOIN tcg_cards c ON c.id = l.catalog_product_id
-         WHERE l.vendor_id = $1 AND l.status = 'active'
+         WHERE l.vendor_id = $1 AND l.status = 'active' AND NOT l.vendor_only
          ORDER BY l.price ASC`,
         [vendorId]
     );

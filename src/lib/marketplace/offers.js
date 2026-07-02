@@ -31,7 +31,8 @@ function mapOffer(row) {
 
 export async function createDealerOffer({ fromVendorId, listingId, kind = "buy", amount = null, quantity = 1, note = null }) {
     const listing = await db.queryOne(
-        `SELECT id, vendor_id, dealer_available FROM mkt_listing WHERE id = $1 AND status = 'active'`,
+        `SELECT id, vendor_id, (dealer_available OR vendor_only) AS dealer_available
+         FROM mkt_listing WHERE id = $1 AND status = 'active'`,
         [listingId]
     );
     if (!listing || listing.dealer_available !== true) {
