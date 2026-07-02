@@ -348,10 +348,19 @@ export async function searchCatalog({ query, game = null, limit = 24 } = {}) {
     // set code). So "pikachu surging 58" or "charizard obsidian 125" narrows to the exact card.
     const terms = trimmed.split(/\s+/).filter(Boolean).slice(0, 6);
     const params = [];
+    // Match each term at a WORD BOUNDARY in name/set (start of the field or after a space), not as a
+    // raw substring — otherwise "tin" matches "Vic-tin-i" / "Gira-tin-a" and buries real "Tin"
+    // products. Collector number / rarity / set code stay substring (they're short codes).
     const termClauses = terms.map((term) => {
-        params.push(`%${term}%`);
+        const escaped = term.replace(/([%_\\])/g, "\\$1");
+        params.push(escaped);
         const p = `$${params.length}`;
-        return `(c.name ILIKE ${p} OR s.name ILIKE ${p} OR c.number ILIKE ${p} OR c.rarity ILIKE ${p} OR s.abbreviation ILIKE ${p})`;
+        return (
+            `(c.name ILIKE (${p} || '%') OR c.name ILIKE ('% ' || ${p} || '%') OR ` +
+            `s.name ILIKE (${p} || '%') OR s.name ILIKE ('% ' || ${p} || '%') OR ` +
+            `c.number ILIKE ('%' || ${p} || '%') OR c.rarity ILIKE (${p} || '%') OR ` +
+            `s.abbreviation ILIKE (${p} || '%'))`
+        );
     });
 
     // Whole-query prefix on name, for ranking exact-ish name matches first.
