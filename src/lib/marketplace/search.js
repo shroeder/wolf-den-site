@@ -20,6 +20,32 @@ function toIso(value) {
     return value ? new Date(value).toISOString() : null;
 }
 
+// Public map coordinates are FUZZED (~<=1 mile) from the exact geocoded point so a vendor's likely
+// home address is never revealed — buyers see the right neighborhood, not the house. The offset is
+// deterministic per vendor id, so the pin stays put across loads. Exact coords are never sent to
+// buyers (only used internally / in the admin view).
+function fuzzedCoords(id, latRaw, lngRaw) {
+    const lat = toNumber(latRaw);
+    const lng = toNumber(lngRaw);
+    if (lat == null || lng == null) {
+        return { latitude: null, longitude: null };
+    }
+    let hash = 0;
+    const seed = String(id);
+    for (let i = 0; i < seed.length; i += 1) {
+        hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    const r1 = (hash & 0xffff) / 0xffff;
+    const r2 = ((hash >>> 16) & 0xffff) / 0xffff;
+    const range = 0.03; // ±0.015° ≈ ±1 mile of latitude
+    const dLat = (r1 - 0.5) * range;
+    const dLng = ((r2 - 0.5) * range) / Math.max(Math.cos((lat * Math.PI) / 180), 0.2);
+    return {
+        latitude: Number((lat + dLat).toFixed(4)),
+        longitude: Number((lng + dLng).toFixed(4)),
+    };
+}
+
 // A catalog product that is in stock among vendors (search/autocomplete result).
 function mapCatalogResult(row) {
     return {
@@ -260,8 +286,7 @@ export async function listVendorsForBrowse() {
         locationLabel: row.location_label,
         region: row.region,
         city: row.city,
-        latitude: toNumber(row.latitude),
-        longitude: toNumber(row.longitude),
+        ...fuzzedCoords(row.id, row.latitude, row.longitude),
         listingCount: Number(row.listing_count) || 0,
         verified: true,
         memberSince: toIso(row.accepted_at || row.created_at),
@@ -406,8 +431,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
         locationLabel: vendor.location_label,
         region: vendor.region,
         city: vendor.city,
-        latitude: toNumber(vendor.latitude),
-        longitude: toNumber(vendor.longitude),
+        ...fuzzedCoords(vendor.id, vendor.latitude, vendor.longitude),
         verified: true,
         memberSince: toIso(vendor.accepted_at || vendor.created_at),
         listingCount: listings.length,

@@ -79,6 +79,10 @@ export default function MarketplaceOnboardClient({ token, vendor }) {
 
                     <label htmlFor="ob-line1">Street address</label>
                     <input id="ob-line1" type="text" value={address.line1} onChange={updateAddress("line1")} />
+                    <p className="muted">
+                        Kept private — used only to place an approximate (~1 mile) pin on the map. Buyers never see
+                        your exact address; they only see your display location below.
+                    </p>
 
                     <label htmlFor="ob-city">City</label>
                     <input id="ob-city" type="text" value={address.city} onChange={updateAddress("city")} />
