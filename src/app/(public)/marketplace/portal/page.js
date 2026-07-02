@@ -2,6 +2,7 @@ import VendorLoginClient from "@/components/VendorLoginClient";
 import VendorPortalClient from "@/components/VendorPortalClient";
 import { getVendorRequestStats, listVendorContactRequests } from "@/lib/marketplace/contact.js";
 import { listVendorListings } from "@/lib/marketplace/listings.js";
+import { listVendorMissions } from "@/lib/marketplace/missions.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
 import { listOpenSellOffers } from "@/lib/marketplace/sell-offers.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
@@ -21,13 +22,14 @@ export default async function VendorPortalPage() {
         return <VendorLoginClient />;
     }
 
-    const [listings, wanted, salesCount, requests, requestStats, sellOffers] = await Promise.all([
+    const [listings, wanted, salesCount, requests, requestStats, sellOffers, missions] = await Promise.all([
         listVendorListings(vendor.id),
         listMostWanted(30).catch(() => []),
         getVendorSalesCount(vendor.id).catch(() => 0),
         listVendorContactRequests(vendor.id).catch(() => []),
         getVendorRequestStats(vendor.id).catch(() => null),
         listOpenSellOffers(40).catch(() => []),
+        listVendorMissions(vendor.id).catch(() => ({ demandGaps: [], uniques: [] })),
     ]);
 
     return (
@@ -39,6 +41,7 @@ export default async function VendorPortalPage() {
             requests={requests}
             requestStats={requestStats}
             sellOffers={sellOffers}
+            missions={missions}
         />
     );
 }

@@ -863,6 +863,7 @@ export default function VendorPortalClient({
     requests = [],
     requestStats = null,
     sellOffers = [],
+    missions = { demandGaps: [], uniques: [] },
 }) {
     const router = useRouter();
     const refresh = () => router.refresh();
@@ -895,6 +896,66 @@ export default function VendorPortalClient({
                         Sign out
                     </button>
                 </div>
+            </section>
+
+            <section className="card">
+                <h2>Vendor Missions</h2>
+                <p className="muted">
+                    Opportunities from the network — what to stock next, and where you&apos;re the only seller.
+                </p>
+                {missions.demandGaps.length === 0 && missions.uniques.length === 0 ? (
+                    <p className="muted">
+                        No opportunities yet. As buyers hit &quot;notify me&quot; on cards and vendors list
+                        inventory, this panel surfaces what to buy/list next and where you&apos;re the only seller.
+                    </p>
+                ) : null}
+                {missions.demandGaps.length > 0 ? (
+                    <>
+                        <h3 className="mkt-mission-head">📈 Buyers want these — you don&apos;t list them</h3>
+                        <ul className="mkt-mission-grid">
+                            {missions.demandGaps.map((m) => (
+                                <li key={m.catalogProductId} className="mkt-mission-card">
+                                    {m.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={m.imageUrl} alt="" className="mkt-mission-img" />
+                                    ) : null}
+                                    <div>
+                                        <strong>{m.name}</strong>
+                                        <p className="mkt-offer-meta">{m.setName}</p>
+                                        <p className="mkt-mission-signal">
+                                            {m.wantCount} buyer{m.wantCount === 1 ? "" : "s"} want this ·{" "}
+                                            {m.sellerCount === 0
+                                                ? "nobody in the network stocks it yet"
+                                                : `${m.sellerCount} seller${m.sellerCount === 1 ? "" : "s"} carry it`}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                ) : null}
+                {missions.uniques.length > 0 ? (
+                    <>
+                        <h3 className="mkt-mission-head">⭐ You&apos;re the only seller</h3>
+                        <ul className="mkt-mission-grid">
+                            {missions.uniques.map((m) => (
+                                <li key={m.catalogProductId} className="mkt-mission-card">
+                                    {m.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={m.imageUrl} alt="" className="mkt-mission-img" />
+                                    ) : null}
+                                    <div>
+                                        <strong>{m.name}</strong>
+                                        <p className="mkt-offer-meta">{m.setName}</p>
+                                        <p className="mkt-mission-signal">
+                                            Only copy in the network{m.wantCount > 0 ? ` · ${m.wantCount} want it` : ""}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                ) : null}
             </section>
 
             {openRequests.length > 0 ? (

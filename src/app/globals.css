@@ -1744,6 +1744,42 @@ textarea {
     font-size: 0.85rem;
 }
 
+/* Vendor Missions panel. */
+.mkt-mission-head {
+    margin: 16px 0 8px;
+    font-size: 0.95rem;
+}
+.mkt-mission-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+}
+.mkt-mission-card {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+}
+.mkt-mission-img {
+    width: 44px;
+    height: 62px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #000;
+    flex: 0 0 auto;
+}
+.mkt-mission-signal {
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+    color: #d4af37;
+}
+
 .shop-tile-meta-row {
     margin-top: auto;
     display: flex;
