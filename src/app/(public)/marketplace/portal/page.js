@@ -5,7 +5,7 @@ import { listVendorListings } from "@/lib/marketplace/listings.js";
 import { listDealerStockInDemand, listVendorMissions } from "@/lib/marketplace/missions.js";
 import { listDealerOffers } from "@/lib/marketplace/offers.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
-import { listOpenSellOffers } from "@/lib/marketplace/sell-offers.js";
+import { listOpenSellOffers, listVendorSellBids } from "@/lib/marketplace/sell-offers.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { listMostWanted } from "@/lib/marketplace/wants.js";
 
@@ -32,9 +32,10 @@ export default async function VendorPortalPage() {
         listOpenSellOffers(40).catch(() => []),
         listVendorMissions(vendor.id).catch(() => ({ demandGaps: [], uniques: [] })),
     ]);
-    const [dealerOffers, dealerDemand] = await Promise.all([
+    const [dealerOffers, dealerDemand, sellBids] = await Promise.all([
         listDealerOffers(vendor.id).catch(() => ({ incoming: [], outgoing: [] })),
         listDealerStockInDemand(vendor.id).catch(() => []),
+        listVendorSellBids(vendor.id).catch(() => []),
     ]);
 
     return (
@@ -49,6 +50,7 @@ export default async function VendorPortalPage() {
             missions={missions}
             dealerOffers={dealerOffers}
             dealerDemand={dealerDemand}
+            sellBids={sellBids}
         />
     );
 }

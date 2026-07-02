@@ -914,6 +914,67 @@ function VendorLogoEditor({ vendor, onChanged }) {
     );
 }
 
+function SellOfferBid({ offer, existingAmount, onChanged }) {
+    const [open, setOpen] = useState(false);
+    const [amount, setAmount] = useState(existingAmount != null ? String(existingAmount) : "");
+    const [note, setNote] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [msg, setMsg] = useState("");
+
+    async function submit() {
+        setBusy(true);
+        setMsg("");
+        try {
+            const res = await fetch(`/api/marketplace/vendor/sell-offers/${offer.id}/bid`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ amount: amount || null, note: note || null }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || "Could not send offer.");
+            setMsg("Offer sent — the seller got an email.");
+            setOpen(false);
+            onChanged();
+        } catch (e) {
+            setMsg(e?.message || "Could not send offer.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <div className="mkt-dealer-actions">
+            {existingAmount != null && !open ? (
+                <span className="mkt-offer-meta">You offered ${existingAmount.toFixed(2)}</span>
+            ) : null}
+            {open ? (
+                <>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="$ offer"
+                    />
+                    <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="note (optional)" />
+                    <button type="button" className="pill" disabled={busy} onClick={submit}>
+                        Send
+                    </button>
+                    <button type="button" className="pill" onClick={() => setOpen(false)}>
+                        Cancel
+                    </button>
+                </>
+            ) : (
+                <button type="button" className="button primary" onClick={() => setOpen(true)}>
+                    {existingAmount != null ? "Update offer" : "Make offer"}
+                </button>
+            )}
+            {msg ? <span className="muted">{msg}</span> : null}
+        </div>
+    );
+}
+
 function DealerResult({ l, onOffered }) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState(l.wholesalePrice != null ? String(l.wholesalePrice) : "");
@@ -1245,8 +1306,10 @@ export default function VendorPortalClient({
     missions = { demandGaps: [], uniques: [] },
     dealerOffers = { incoming: [], outgoing: [] },
     dealerDemand = [],
+    sellBids = [],
 }) {
     const router = useRouter();
+    const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
     const refresh = () => router.refresh();
 
     async function logout() {
@@ -1412,8 +1475,8 @@ export default function VendorPortalClient({
                 <section className="card">
                     <h2>Sellers looking for offers</h2>
                     <p className="muted">
-                        Local sellers posted these to get offers. Email them directly to make an offer — they&apos;re
-                        expecting to hear from vendors.
+                        Local sellers posted these to get offers. Make an offer (they get an email and can reply to
+                        you) — or email them directly. They compare offers and choose.
                     </p>
                     <ul className="mkt-admin-list">
                         {sellOffers.map((offer) => (
@@ -1428,9 +1491,11 @@ export default function VendorPortalClient({
                                         {offer.createdAt ? ` · ${timeAgo(offer.createdAt)}` : ""}
                                     </span>
                                 </div>
-                                <a className="button primary" href={`mailto:${offer.email}?subject=${encodeURIComponent("Offer on your cards — The Wolf Den Marketplace")}`}>
-                                    Make offer
-                                </a>
+                                <SellOfferBid
+                                    offer={offer}
+                                    existingAmount={sellBidMap.get(offer.id) ?? null}
+                                    onChanged={refresh}
+                                />
                             </li>
                         ))}
                     </ul>
