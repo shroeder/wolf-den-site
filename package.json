@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "db:migrate": "node scripts/migrate.js",
     "db:migrate:status": "node scripts/migrate.js --status",
-    "app:publish": "node scripts/publish-app.mjs"
+    "app:publish": "node scripts/publish-app.mjs",
+    "app:publish:market": "node scripts/publish-app.mjs --app market"
   },
   "keywords": [],
   "author": "",

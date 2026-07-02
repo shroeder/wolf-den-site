@@ -27,6 +27,7 @@ function parseArgs(argv) {
         if (a === "--apk") args.apk = argv[++i];
         else if (a === "--variant") args.variant = argv[++i];
         else if (a === "--flavor") args.flavor = argv[++i];
+        else if (a === "--app") args.app = argv[++i];
         else if (a === "--notes") args.notes = argv[++i];
     }
     return args;
@@ -48,10 +49,16 @@ function readSecret(name) {
 async function main() {
     const args = parseArgs(process.argv.slice(2));
 
-    // Product flavors put the APK under apk/<flavor>/<buildType>/ (e.g. apk/full/debug, apk/employee/debug).
-    // The flavor doubles as the release channel the app checks against.
-    const flavor = args.flavor || "full";
-    const apkDir = path.resolve(`../accounting_app/app/build/outputs/apk/${flavor}/${args.variant}`);
+    // Two apps share this publisher + the app_release table (keyed by channel):
+    //  - ledger (accounting_app): product flavors under apk/<flavor>/<variant>, channel = flavor.
+    //  - market (marketplace_app): no flavors, apk/<variant>, channel = "marketplace".
+    const isMarket = args.app === "market" || args.app === "marketplace";
+    const flavor = args.flavor || (isMarket ? "" : "full");
+    const channel = isMarket ? "marketplace" : flavor;
+    const blobPrefix = isMarket ? "wolfdenmarket" : `wolfdenledger-${flavor}`;
+    const apkDir = isMarket
+        ? path.resolve(`../marketplace_app/app/build/outputs/apk/${args.variant}`)
+        : path.resolve(`../accounting_app/app/build/outputs/apk/${flavor}/${args.variant}`);
     const metaPath = path.join(apkDir, "output-metadata.json");
 
     let versionCode;
@@ -94,11 +101,11 @@ async function main() {
 
     console.log(`Publishing ${path.basename(apkPath)}  v${versionName} (code ${versionCode}, ${(sizeBytes / 1e6).toFixed(1)} MB)`);
 
-    console.log(`Channel: ${flavor}`);
+    console.log(`Channel: ${channel}`);
 
     // Upload to Blob. addRandomSuffix keeps the URL unguessable for an internal build.
     const fileBuffer = readFileSync(apkPath);
-    const blob = await put(`app/wolfdenledger-${flavor}-${versionCode}.apk`, fileBuffer, {
+    const blob = await put(`app/${blobPrefix}-${versionCode}.apk`, fileBuffer, {
         access: "public",
         addRandomSuffix: true,
         contentType: "application/vnd.android.package-archive",
@@ -112,9 +119,9 @@ async function main() {
         await pool.query(
             `INSERT INTO app_release (version_code, version_name, apk_url, notes, size_bytes, channel)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [versionCode, versionName, blob.url, args.notes || null, sizeBytes, flavor]
+            [versionCode, versionName, blob.url, args.notes || null, sizeBytes, channel]
         );
-        console.log(`Recorded ${flavor} release v${versionName} (code ${versionCode}). The app will offer it on next launch.`);
+        console.log(`Recorded ${channel} release v${versionName} (code ${versionCode}). The app will offer it on next launch.`);
     } finally {
         await pool.end();
     }
