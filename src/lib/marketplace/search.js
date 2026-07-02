@@ -20,8 +20,30 @@ function toIso(value) {
     return value ? new Date(value).toISOString() : null;
 }
 
-// Vendor coordinates are the TOWN center (geocoded from city/state, not the street address), so they
-// carry no home-location info and are safe to expose on the public map as-is.
+// Coordinates are the TOWN center (geocoded from city/state, not the street address), so they carry
+// no home-location info. We add a small deterministic spread (~<=0.4 mi, stable per vendor) purely so
+// multiple vendors in the same town don't stack on a single map pin.
+function spreadCoords(id, latRaw, lngRaw) {
+    const lat = toNumber(latRaw);
+    const lng = toNumber(lngRaw);
+    if (lat == null || lng == null) {
+        return { latitude: null, longitude: null };
+    }
+    let hash = 0;
+    const seed = String(id);
+    for (let i = 0; i < seed.length; i += 1) {
+        hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    const r1 = (hash & 0xffff) / 0xffff;
+    const r2 = ((hash >>> 16) & 0xffff) / 0xffff;
+    const range = 0.012; // ±0.006° ≈ ±0.4 mi
+    const dLat = (r1 - 0.5) * range;
+    const dLng = ((r2 - 0.5) * range) / Math.max(Math.cos((lat * Math.PI) / 180), 0.2);
+    return {
+        latitude: Number((lat + dLat).toFixed(4)),
+        longitude: Number((lng + dLng).toFixed(4)),
+    };
+}
 
 // A catalog product that is in stock among vendors (search/autocomplete result).
 function mapCatalogResult(row) {
@@ -263,8 +285,7 @@ export async function listVendorsForBrowse() {
         locationLabel: row.location_label,
         region: row.region,
         city: row.city,
-        latitude: toNumber(row.latitude),
-        longitude: toNumber(row.longitude),
+        ...spreadCoords(row.id, row.latitude, row.longitude),
         listingCount: Number(row.listing_count) || 0,
         verified: true,
         memberSince: toIso(row.accepted_at || row.created_at),
@@ -409,8 +430,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
         locationLabel: vendor.location_label,
         region: vendor.region,
         city: vendor.city,
-        latitude: toNumber(vendor.latitude),
-        longitude: toNumber(vendor.longitude),
+        ...spreadCoords(vendor.id, vendor.latitude, vendor.longitude),
         verified: true,
         memberSince: toIso(vendor.accepted_at || vendor.created_at),
         listingCount: listings.length,
