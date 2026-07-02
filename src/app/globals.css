@@ -1773,6 +1773,32 @@ textarea {
     min-width: 160px;
 }
 
+/* Vendor dashboard metric tiles. */
+.mkt-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+.mkt-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+}
+.mkt-metric-num {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #d4af37;
+    line-height: 1.1;
+}
+.mkt-metric-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
 /* Buyer-facing vendor logo (listing offers, vendor cards, vendor page, admin review). */
 .mkt-vendor-logo {
     width: 40px;

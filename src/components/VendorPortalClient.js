@@ -1321,6 +1321,13 @@ export default function VendorPortalClient({
     const openRequests = requests.filter((r) => r.status === "new" || r.status === "responded");
     const closedRequests = requests.filter((r) => r.status === "sold" || r.status === "closed");
 
+    // Dashboard metrics (derived from data already loaded — the "vendor operating system" summary).
+    const inventoryValue = listings.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.quantity) || 0), 0);
+    const pendingIncomingOffers = (dealerOffers.incoming || []).filter((o) => o.status === "pending").length;
+    const demandToFill = (missions.demandGaps || []).length;
+    const closeRatePct =
+        requestStats && requestStats.total >= 3 ? Math.round((requestStats.sold / requestStats.total) * 100) : null;
+
     return (
         <div className="stack reveal">
             <section className="card hero-accent">
@@ -1341,6 +1348,46 @@ export default function VendorPortalClient({
                     <button type="button" className="pill" onClick={logout}>
                         Sign out
                     </button>
+                </div>
+            </section>
+
+            <section className="card">
+                <h2>Your dashboard</h2>
+                <div className="mkt-metrics">
+                    <div className="mkt-metric">
+                        <span className="mkt-metric-num">{listings.length}</span>
+                        <span className="mkt-metric-label">active listings</span>
+                    </div>
+                    <div className="mkt-metric">
+                        <span className="mkt-metric-num">${inventoryValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        <span className="mkt-metric-label">inventory value</span>
+                    </div>
+                    <div className="mkt-metric">
+                        <span className="mkt-metric-num">{salesCount}</span>
+                        <span className="mkt-metric-label">completed sales</span>
+                    </div>
+                    <div className="mkt-metric">
+                        <span className="mkt-metric-num">{openRequests.length}</span>
+                        <span className="mkt-metric-label">open leads</span>
+                    </div>
+                    {closeRatePct != null ? (
+                        <div className="mkt-metric">
+                            <span className="mkt-metric-num">{closeRatePct}%</span>
+                            <span className="mkt-metric-label">close rate</span>
+                        </div>
+                    ) : null}
+                    {demandToFill > 0 ? (
+                        <div className="mkt-metric">
+                            <span className="mkt-metric-num">{demandToFill}</span>
+                            <span className="mkt-metric-label">to stock (demand)</span>
+                        </div>
+                    ) : null}
+                    {pendingIncomingOffers > 0 ? (
+                        <div className="mkt-metric">
+                            <span className="mkt-metric-num">{pendingIncomingOffers}</span>
+                            <span className="mkt-metric-label">offers to review</span>
+                        </div>
+                    ) : null}
                 </div>
             </section>
 
