@@ -295,3 +295,89 @@ export async function sendDealerOfferResponseEmail(offerId, status) {
     if (result?.error) throw new Error(result.error.message || "Failed to send offer response email.");
     return result;
 }
+
+// --- Inventory swap emails (identified relay: recipient can reply straight to the proposer) ---
+
+async function loadSwapContext(swapId) {
+    const swap = await db.queryOne(
+        `SELECT s.cash, s.note,
+                vf.id AS from_id, vf.display_name AS from_name, vf.email AS from_email,
+                vt.id AS to_id, vt.display_name AS to_name, vt.email AS to_email
+         FROM mkt_swap s
+         JOIN mkt_vendor vf ON vf.id = s.from_vendor_id
+         JOIN mkt_vendor vt ON vt.id = s.to_vendor_id
+         WHERE s.id = $1`,
+        [swapId]
+    );
+    if (!swap) return null;
+    const items = await db.query(
+        `SELECT si.side, l.title FROM mkt_swap_item si JOIN mkt_listing l ON l.id = si.listing_id WHERE si.swap_id = $1`,
+        [swapId]
+    );
+    swap.offer = items.filter((i) => i.side === "offer").map((i) => i.title);
+    swap.request = items.filter((i) => i.side === "request").map((i) => i.title);
+    return swap;
+}
+
+function swapList(titles) {
+    return titles.length ? `<ul>${titles.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>` : "<p>—</p>";
+}
+
+export async function sendSwapEmail(swapId) {
+    const s = await loadSwapContext(swapId);
+    if (!s) return null;
+    const resend = getResendClient();
+    const portalUrl = new URL("/marketplace/portal", baseUrl()).toString();
+    const storefrontUrl = new URL(`/marketplace/vendor/${s.from_id}`, baseUrl()).toString();
+    const cashLine = s.cash != null ? `<p><strong>Plus ${currency.format(Number(s.cash))} cash</strong> on their side.</p>` : "";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: s.to_email,
+        replyTo: s.from_email,
+        subject: `Swap proposal from ${s.from_name}`,
+        html: `
+            <h1>${escapeHtml(s.from_name)} wants to swap</h1>
+            <p><strong>They give you:</strong></p>
+            ${swapList(s.offer)}
+            <p><strong>For your:</strong></p>
+            ${swapList(s.request)}
+            ${cashLine}
+            ${s.note ? `<p>They said: &ldquo;${escapeHtml(s.note)}&rdquo;</p>` : ""}
+            <p><strong>Reply to this email</strong> to talk to ${escapeHtml(s.from_name)}, or accept/decline in your <a href="${portalUrl}">portal</a>.</p>
+            <p><a href="${storefrontUrl}">See their storefront</a></p>
+            <hr /><p><small>The Wolf Den Marketplace · dealer swaps</small></p>
+        `,
+    });
+    if (result?.error) throw new Error(result.error.message || "Failed to send swap email.");
+    return result;
+}
+
+export async function sendSwapResponseEmail(swapId, status) {
+    const s = await loadSwapContext(swapId);
+    if (!s) return null;
+    const resend = getResendClient();
+    const portalUrl = new URL("/marketplace/portal", baseUrl()).toString();
+    const toProposer = status === "accepted" || status === "declined";
+    const to = toProposer ? s.from_email : s.to_email;
+    const replyTo = toProposer ? s.to_email : s.from_email;
+    const actorName = toProposer ? s.to_name : s.from_name;
+    const verb =
+        status === "accepted" ? "accepted your swap" : status === "declined" ? "declined your swap" : "withdrew their swap";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to,
+        replyTo,
+        subject: `Swap ${status}`,
+        html: `
+            <h1>Swap ${escapeHtml(status)}</h1>
+            <p><strong>${escapeHtml(actorName)}</strong> ${verb}.</p>
+            ${status === "accepted" ? `<p><strong>Reply to this email</strong> to arrange the trade.</p>` : ""}
+            <p><a href="${portalUrl}">Open your portal</a></p>
+            <hr /><p><small>The Wolf Den Marketplace · dealer swaps</small></p>
+        `,
+    });
+    if (result?.error) throw new Error(result.error.message || "Failed to send swap response email.");
+    return result;
+}

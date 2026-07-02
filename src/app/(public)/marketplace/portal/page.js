@@ -6,6 +6,7 @@ import { listAgingInventory, listVendorListings } from "@/lib/marketplace/listin
 import { listDealerStockInDemand, listVendorMissions } from "@/lib/marketplace/missions.js";
 import { listDealerOffers } from "@/lib/marketplace/offers.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
+import { listSwaps } from "@/lib/marketplace/swaps.js";
 import { listOpenSellOffers, listVendorSellBids } from "@/lib/marketplace/sell-offers.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { listMostWanted } from "@/lib/marketplace/wants.js";
@@ -40,6 +41,7 @@ export default async function VendorPortalPage() {
         listSearchDemand({ vendorId: vendor.id }).catch(() => []),
         listAgingInventory(vendor.id).catch(() => []),
     ]);
+    const swaps = await listSwaps(vendor.id).catch(() => ({ incoming: [], outgoing: [] }));
 
     return (
         <VendorPortalClient
@@ -56,6 +58,7 @@ export default async function VendorPortalPage() {
             sellBids={sellBids}
             searchDemand={searchDemand}
             agingInventory={agingInventory}
+            swaps={swaps}
         />
     );
 }

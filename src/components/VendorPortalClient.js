@@ -914,6 +914,247 @@ function VendorLogoEditor({ vendor, onChanged }) {
     );
 }
 
+function SwapBuilder({ myListings = [], onChanged }) {
+    const [q, setQ] = useState("");
+    const [results, setResults] = useState([]);
+    const [target, setTarget] = useState(null); // { id, name } — swaps are with one vendor at a time
+    const [request, setRequest] = useState(new Map()); // their listingId -> { title }
+    const [offer, setOffer] = useState(new Set()); // your listing ids
+    const [cash, setCash] = useState("");
+    const [note, setNote] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [msg, setMsg] = useState("");
+
+    useEffect(() => {
+        const t = setTimeout(async () => {
+            const query = q.trim();
+            if (query.length < 2) {
+                setResults([]);
+                return;
+            }
+            try {
+                const res = await fetch(`/api/marketplace/vendor/dealer-inventory?q=${encodeURIComponent(query)}`, {
+                    cache: "no-store",
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok) setResults(Array.isArray(data?.listings) ? data.listings : []);
+            } catch {
+                /* ignore */
+            }
+        }, 250);
+        return () => clearTimeout(t);
+    }, [q]);
+
+    function toggleRequest(l) {
+        setMsg("");
+        setRequest((prev) => {
+            const next = new Map(prev);
+            if (next.has(l.id)) {
+                next.delete(l.id);
+                if (next.size === 0) setTarget(null);
+                return next;
+            }
+            // A swap targets one vendor — switching vendors resets the "want" basket.
+            if (target && target.id !== l.vendor.id) {
+                setTarget({ id: l.vendor.id, name: l.vendor.displayName });
+                return new Map([[l.id, { title: l.title }]]);
+            }
+            setTarget({ id: l.vendor.id, name: l.vendor.displayName });
+            next.set(l.id, { title: l.title });
+            return next;
+        });
+    }
+
+    function toggleOffer(id) {
+        setOffer((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }
+
+    async function send() {
+        setBusy(true);
+        setMsg("");
+        try {
+            const res = await fetch("/api/marketplace/vendor/swaps", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    toVendorId: target?.id,
+                    requestListingIds: Array.from(request.keys()),
+                    offerListingIds: Array.from(offer),
+                    cash: cash || null,
+                    note: note || null,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || "Could not send swap.");
+            setMsg("Swap sent — they'll get an email.");
+            setRequest(new Map());
+            setOffer(new Set());
+            setTarget(null);
+            setCash("");
+            setNote("");
+            setQ("");
+            setResults([]);
+            onChanged();
+        } catch (e) {
+            setMsg(e?.message || "Could not send swap.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    const canSend = target && request.size > 0 && offer.size > 0 && !busy;
+    const sellable = myListings.filter((l) => (l.quantity ?? 0) > 0);
+
+    return (
+        <section className="card">
+            <h2>Propose a swap</h2>
+            <p className="muted">
+                Trade your inventory for another dealer&apos;s — &ldquo;my sealed for your singles.&rdquo; They approve
+                in one click.
+            </p>
+            <div className="mkt-swap-grid">
+                <div>
+                    <h3 className="mkt-mission-head">What you want{target ? ` — from ${target.name}` : ""}</h3>
+                    <input
+                        type="text"
+                        className="shop-search-input"
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Search dealer inventory"
+                    />
+                    <ul className="mkt-admin-list mkt-swap-list">
+                        {results.map((l) => (
+                            <li key={l.id} className="mkt-admin-row">
+                                <label className="mkt-admin-info">
+                                    <input type="checkbox" checked={request.has(l.id)} onChange={() => toggleRequest(l)} />{" "}
+                                    <strong>{l.title}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {l.setName ? `${l.setName} · ` : ""}
+                                        {formatPrice(l.wholesalePrice ?? l.price)} · {l.vendor.displayName}
+                                    </span>
+                                </label>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+                <div>
+                    <h3 className="mkt-mission-head">What you&apos;ll give</h3>
+                    <ul className="mkt-admin-list mkt-swap-list">
+                        {sellable.map((l) => (
+                            <li key={l.id} className="mkt-admin-row">
+                                <label className="mkt-admin-info">
+                                    <input type="checkbox" checked={offer.has(l.id)} onChange={() => toggleOffer(l.id)} />{" "}
+                                    <strong>{l.title}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {l.setName ? `${l.setName} · ` : ""}
+                                        {formatPrice(l.price)}
+                                    </span>
+                                </label>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+            <div className="mkt-dealer-toggle">
+                <label>
+                    + cash $
+                    <input type="number" min="0" step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} />
+                </label>
+                <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="note (optional)" />
+                <button type="button" className="button primary" disabled={!canSend} onClick={send}>
+                    Send swap proposal
+                </button>
+            </div>
+            {msg ? <p className="muted">{msg}</p> : null}
+        </section>
+    );
+}
+
+function SwapsPanel({ swaps, onChanged }) {
+    const incoming = swaps?.incoming || [];
+    const outgoing = swaps?.outgoing || [];
+    if (incoming.length === 0 && outgoing.length === 0) {
+        return null;
+    }
+    async function respond(id, action) {
+        try {
+            await fetch(`/api/marketplace/vendor/swaps/${id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            onChanged();
+        } catch {
+            /* ignore */
+        }
+    }
+    const titles = (arr) => (arr.length ? arr.map((i) => i.title).join(", ") : "—");
+
+    return (
+        <section className="card">
+            <h2>Swaps</h2>
+            {incoming.length > 0 ? (
+                <>
+                    <h3 className="mkt-mission-head">Proposed to you</h3>
+                    <ul className="mkt-admin-list">
+                        {incoming.map((s) => (
+                            <li key={s.id} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{s.fromName} wants to swap</strong>
+                                    <span className="mkt-offer-meta">
+                                        You give: {titles(s.requestItems)} · You get: {titles(s.offerItems)}
+                                        {s.cash ? ` + ${formatPrice(s.cash)}` : ""}
+                                        {s.note ? ` · "${s.note}"` : ""} · {s.status}
+                                    </span>
+                                </div>
+                                {s.status === "pending" ? (
+                                    <div className="mkt-dealer-actions">
+                                        <button type="button" className="button primary" onClick={() => respond(s.id, "accept")}>
+                                            Accept
+                                        </button>
+                                        <button type="button" className="pill" onClick={() => respond(s.id, "decline")}>
+                                            Decline
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ) : null}
+            {outgoing.length > 0 ? (
+                <>
+                    <h3 className="mkt-mission-head">You proposed</h3>
+                    <ul className="mkt-admin-list">
+                        {outgoing.map((s) => (
+                            <li key={s.id} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>Swap with {s.toName}</strong>
+                                    <span className="mkt-offer-meta">
+                                        You give: {titles(s.offerItems)}
+                                        {s.cash ? ` + ${formatPrice(s.cash)}` : ""} · You get: {titles(s.requestItems)} ·{" "}
+                                        {s.status}
+                                    </span>
+                                </div>
+                                {s.status === "pending" ? (
+                                    <button type="button" className="pill" onClick={() => respond(s.id, "withdraw")}>
+                                        Withdraw
+                                    </button>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ) : null}
+        </section>
+    );
+}
+
 function AgingRow({ item, onChanged }) {
     const [busy, setBusy] = useState(false);
     const suggestion =
@@ -1514,6 +1755,7 @@ export default function VendorPortalClient({
     sellBids = [],
     searchDemand = [],
     agingInventory = [],
+    swaps = { incoming: [], outgoing: [] },
 }) {
     const router = useRouter();
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
@@ -1707,6 +1949,10 @@ export default function VendorPortalClient({
             <DealerOffers dealerOffers={dealerOffers} onChanged={refresh} />
 
             <DealerNetwork onChanged={refresh} demand={dealerDemand} />
+
+            <SwapsPanel swaps={swaps} onChanged={refresh} />
+
+            <SwapBuilder myListings={listings} onChanged={refresh} />
 
             <EventAttendance />
 
