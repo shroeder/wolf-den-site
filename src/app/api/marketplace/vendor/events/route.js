@@ -36,6 +36,9 @@ export async function POST(request) {
                 locationLabel: body.locationLabel ?? null,
                 eventDate: body.eventDate || null,
                 createdBy: vendor.id,
+                imageUrl: body.imageUrl ?? null,
+                latitude: body.latitude ?? null,
+                longitude: body.longitude ?? null,
             });
             logger.info("marketplace.event.created", { vendorId: vendor.id, eventId: id });
             return NextResponse.json({ ok: true, id });

@@ -12,14 +12,24 @@ function mapEvent(row) {
         name: row.name,
         locationLabel: row.location_label || null,
         eventDate: toDateStr(row.event_date),
+        imageUrl: row.image_url || null,
+        latitude: row.latitude != null ? Number(row.latitude) : null,
+        longitude: row.longitude != null ? Number(row.longitude) : null,
+        createdBy: row.created_by || null,
+        createdByName: row.created_by_name || null,
         vendorCount: row.vendor_count != null ? Number(row.vendor_count) : undefined,
     };
 }
 
+// Common event columns + creator name, for the list/detail queries (aliased "e").
+const EVENT_COLS =
+    "e.id, e.name, e.location_label, e.event_date, e.image_url, e.created_by, e.latitude, e.longitude, " +
+    "(SELECT display_name FROM mkt_vendor WHERE id = e.created_by) AS created_by_name";
+
 // Upcoming events (dated in the future, or undated), with attending active-vendor count.
 export async function listUpcomingEvents({ limit = 50 } = {}) {
     const rows = await db.query(
-        `SELECT e.id, e.name, e.location_label, e.event_date,
+        `SELECT ${EVENT_COLS},
                 (SELECT COUNT(*) FROM mkt_event_vendor ev JOIN mkt_vendor v ON v.id = ev.vendor_id AND v.status = 'active'
                    WHERE ev.event_id = e.id)::int AS vendor_count
          FROM mkt_event e
@@ -34,7 +44,7 @@ export async function listUpcomingEvents({ limit = 50 } = {}) {
 // For the vendor portal: upcoming events + whether THIS vendor is attending.
 export async function listEventsForVendor(vendorId) {
     const rows = await db.query(
-        `SELECT e.id, e.name, e.location_label, e.event_date,
+        `SELECT ${EVENT_COLS},
                 EXISTS (SELECT 1 FROM mkt_event_vendor ev WHERE ev.event_id = e.id AND ev.vendor_id = $1) AS attending
          FROM mkt_event e
          WHERE e.event_date IS NULL OR e.event_date >= CURRENT_DATE
@@ -46,12 +56,14 @@ export async function listEventsForVendor(vendorId) {
 }
 
 // Create (or reuse a duplicate of) an event. Returns the event id.
-export async function createEvent({ name, locationLabel = null, eventDate = null, createdBy = null }) {
+export async function createEvent({ name, locationLabel = null, eventDate = null, createdBy = null, imageUrl = null, latitude = null, longitude = null }) {
     const trimmed = String(name || "").trim();
     if (!trimmed) {
         throw new Error("Event name is required.");
     }
     const date = eventDate || null;
+    const lat = latitude != null && latitude !== "" && Number.isFinite(Number(latitude)) ? Number(latitude) : null;
+    const lng = longitude != null && longitude !== "" && Number.isFinite(Number(longitude)) ? Number(longitude) : null;
     const existing = await db.queryOne(
         `SELECT id FROM mkt_event WHERE LOWER(name) = LOWER($1) AND event_date IS NOT DISTINCT FROM $2`,
         [trimmed, date]
@@ -60,8 +72,17 @@ export async function createEvent({ name, locationLabel = null, eventDate = null
         return existing.id;
     }
     const row = await db.queryOne(
-        `INSERT INTO mkt_event (name, location_label, event_date, created_by) VALUES ($1, $2, $3, $4) RETURNING id`,
-        [trimmed.slice(0, 200), locationLabel ? String(locationLabel).slice(0, 200) : null, date, createdBy]
+        `INSERT INTO mkt_event (name, location_label, event_date, created_by, image_url, latitude, longitude)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [
+            trimmed.slice(0, 200),
+            locationLabel ? String(locationLabel).slice(0, 200) : null,
+            date,
+            createdBy,
+            imageUrl ? String(imageUrl).slice(0, 500) : null,
+            lat,
+            lng,
+        ]
     );
     return row.id;
 }
@@ -80,7 +101,9 @@ export async function setEventAttendance(eventId, vendorId, attending) {
 // Buyer event page: the event + attending vendors.
 export async function getEventWithVendors(eventId) {
     const event = await db.queryOne(
-        `SELECT id, name, location_label, event_date FROM mkt_event WHERE id = $1`,
+        `SELECT id, name, location_label, event_date, image_url, created_by, latitude, longitude,
+                (SELECT display_name FROM mkt_vendor WHERE id = mkt_event.created_by) AS created_by_name
+         FROM mkt_event WHERE id = $1`,
         [eventId]
     );
     if (!event) {
