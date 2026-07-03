@@ -117,6 +117,63 @@ export async function revokeBuyerSession(token) {
     );
 }
 
+// --- Password reset ---
+
+const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// Start a reset: if an account exists for the email, store a hashed reset token + expiry and return
+// the raw token + email to send. Returns null if no account (caller still responds "ok" to avoid
+// leaking which emails are registered).
+export async function createPasswordReset(email) {
+    const normalized = normalizeEmail(email);
+    const account = await db.queryOne(`SELECT id, email FROM mkt_buyer WHERE email_normalized = $1`, [normalized]);
+    if (!account) {
+        return null;
+    }
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+    await db.query(
+        `UPDATE mkt_buyer SET reset_token_hash = $2, reset_expires_at = $3, updated_at = NOW() WHERE id = $1`,
+        [account.id, hashToken(token), expiresAt]
+    );
+    return { token, email: account.email };
+}
+
+// Complete a reset: set the new password on the account, keep any linked vendor's (web-portal)
+// password in sync, revoke existing app sessions, and clear the token.
+export async function resetPassword(token, newPassword) {
+    if (!token || typeof token !== "string") {
+        throw new Error("This reset link is invalid or has expired.");
+    }
+    if (!isValidBuyerPassword(newPassword)) {
+        throw new Error("Password must be at least 8 characters.");
+    }
+    const account = await db.queryOne(
+        `SELECT id, email_normalized, reset_expires_at FROM mkt_buyer WHERE reset_token_hash = $1`,
+        [hashToken(token)]
+    );
+    if (!account || !account.reset_expires_at || new Date(account.reset_expires_at) <= new Date()) {
+        throw new Error("This reset link is invalid or has expired.");
+    }
+    const passwordHash = await hashPassword(newPassword);
+    await db.query(
+        `UPDATE mkt_buyer SET password_hash = $2, reset_token_hash = NULL, reset_expires_at = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [account.id, passwordHash]
+    );
+    // Keep the linked vendor's web-portal password matching the account password.
+    await db.query(
+        `UPDATE mkt_vendor SET password_hash = $2, updated_at = NOW()
+         WHERE account_id = $1 OR email_normalized = $3`,
+        [account.id, passwordHash, account.email_normalized]
+    );
+    // Invalidate existing app sessions after a password change.
+    await db.query(`UPDATE mkt_buyer_session SET revoked_at = NOW() WHERE buyer_id = $1 AND revoked_at IS NULL`, [
+        account.id,
+    ]);
+    return true;
+}
+
 // Bearer token from the Authorization header (the app's only auth transport).
 export async function getBearerToken() {
     try {

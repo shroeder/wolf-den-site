@@ -1,0 +1,79 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+
+export default function MarketplaceResetClient() {
+    const token = useSearchParams().get("token") || "";
+    const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
+    const [status, setStatus] = useState("idle"); // idle | submitting | done
+    const [error, setError] = useState("");
+
+    async function submit(e) {
+        e.preventDefault();
+        setError("");
+        if (password.length < 8) {
+            setError("Password must be at least 8 characters.");
+            return;
+        }
+        if (password !== confirm) {
+            setError("Passwords don't match.");
+            return;
+        }
+        setStatus("submitting");
+        try {
+            const res = await fetch("/api/marketplace/auth/reset", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ token, password }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(data?.error || "Could not reset password.");
+            setStatus("done");
+        } catch (err) {
+            setError(err?.message || "Could not reset password.");
+            setStatus("idle");
+        }
+    }
+
+    if (!token) {
+        return (
+            <section className="card">
+                <h1>Reset password</h1>
+                <p className="muted">This reset link is missing its token. Request a new one from the app.</p>
+            </section>
+        );
+    }
+
+    if (status === "done") {
+        return (
+            <section className="card">
+                <h1>Password updated</h1>
+                <p>You can now sign in with your new password.</p>
+                <p>
+                    <Link href="/marketplace" className="pill">
+                        Go to the marketplace
+                    </Link>
+                </p>
+            </section>
+        );
+    }
+
+    return (
+        <section className="card">
+            <h1>Set a new password</h1>
+            <form onSubmit={submit} className="contact-form">
+                <label htmlFor="pw">New password</label>
+                <input id="pw" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <label htmlFor="pw2">Confirm password</label>
+                <input id="pw2" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                {error ? <p className="muted">{error}</p> : null}
+                <button type="submit" className="button primary" disabled={status === "submitting" || !password || !confirm}>
+                    {status === "submitting" ? "Saving…" : "Update password"}
+                </button>
+            </form>
+        </section>
+    );
+}

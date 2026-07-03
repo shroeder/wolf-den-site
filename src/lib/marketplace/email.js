@@ -381,3 +381,28 @@ export async function sendSwapResponseEmail(swapId, status) {
     if (result?.error) throw new Error(result.error.message || "Failed to send swap response email.");
     return result;
 }
+
+// --- Password reset ---
+
+export async function sendPasswordResetEmail(email, token) {
+    const resend = getResendClient();
+    const url = new URL("/marketplace/reset", baseUrl());
+    url.searchParams.set("token", token);
+    const goldButton =
+        "display:inline-block;padding:12px 24px;background:#D4AF37;color:#0E0E0E;text-decoration:none;border-radius:6px;font-weight:bold;";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: email,
+        subject: "Reset your Wolf Den Marketplace password",
+        html: `
+            <h1>Reset your password</h1>
+            <p>Tap below to set a new password. This link expires in 1 hour.</p>
+            <p><a href="${url.toString()}" style="${goldButton}">Reset password</a></p>
+            <p>If you didn't request this, you can safely ignore this email — your password won't change.</p>
+            <hr /><p><small>The Wolf Den Marketplace</small></p>
+        `,
+    });
+    if (result?.error) throw new Error(result.error.message || "Failed to send reset email.");
+    return result;
+}
