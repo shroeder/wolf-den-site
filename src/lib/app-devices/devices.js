@@ -15,10 +15,58 @@ function mapDevice(row) {
         channel: row.channel,
         label: row.label || null,
         revoked: Boolean(row.revoked),
+        authorized: Boolean(row.authorized),
         appVersion: row.app_version || null,
         firstSeenAt: toIso(row.first_seen_at),
         lastSeenAt: toIso(row.last_seen_at),
     };
+}
+
+// Runtime secret hydration. Registers/updates the device (like heartbeat), then returns the server-held
+// secrets ONLY if the device is explicitly authorized and not revoked. Unauthorized devices register
+// as pending (authorized=false) and get NOTHING — the owner authorizes them out-of-band. This is how
+// the apps carry no baked secrets: the APK is clean, secrets are delivered to confirmed devices only.
+export async function hydrateDeviceSecrets({ deviceId, channel = "full", label = null, appVersion = null }) {
+    if (!deviceId) {
+        throw new Error("deviceId is required.");
+    }
+    const row = await db.queryOne(
+        `INSERT INTO app_device (id, channel, label, app_version)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET
+            last_seen_at = NOW(),
+            app_version = EXCLUDED.app_version,
+            channel = EXCLUDED.channel,
+            label = COALESCE(app_device.label, EXCLUDED.label)
+         RETURNING revoked, authorized`,
+        [deviceId, channel, label, appVersion]
+    );
+
+    const authorized = Boolean(row?.authorized) && !row?.revoked;
+    if (!authorized) {
+        return { authorized: false };
+    }
+
+    return {
+        authorized: true,
+        secrets: {
+            openAiApiKey: process.env.OPENAI_API_KEY || "",
+            adminApiKey: process.env.ADMIN_API_KEY || "",
+            plaidClientId: process.env.PLAID_CLIENT_ID || "",
+            plaidSecret: process.env.PLAID_SECRET || "",
+            plaidEnv: process.env.PLAID_ENV || "production",
+            plaidInstitutionId: process.env.PLAID_INSTITUTION_ID || "",
+        },
+    };
+}
+
+// Owner action: authorize / de-authorize a device for secret hydration (by device id).
+export async function setDeviceAuthorized(id, authorized) {
+    const row = await db.queryOne(
+        `UPDATE app_device SET authorized = $2 WHERE id = $1 RETURNING *`,
+        [id, Boolean(authorized)]
+    );
+    return row ? mapDevice(row) : null;
 }
 
 // Upsert a device on check-in and report whether it's revoked. Keeps an owner-set label (COALESCE on
@@ -54,13 +102,17 @@ export async function listDevices(channel = null) {
 }
 
 // Owner actions: revoke/allow and rename. Returns the updated device, or null if not found.
-export async function updateDevice(id, { revoked, label } = {}) {
+export async function updateDevice(id, { revoked, label, authorized } = {}) {
     const sets = [];
     const params = [id];
 
     if (revoked !== undefined) {
         params.push(Boolean(revoked));
         sets.push(`revoked = $${params.length}`);
+    }
+    if (authorized !== undefined) {
+        params.push(Boolean(authorized));
+        sets.push(`authorized = $${params.length}`);
     }
     if (label !== undefined) {
         params.push(label ? String(label).slice(0, 120) : null);

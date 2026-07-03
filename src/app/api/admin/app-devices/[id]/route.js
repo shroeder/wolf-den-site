@@ -20,6 +20,7 @@ export async function PATCH(request, { params }) {
 
             const patch = {};
             if (body.revoked !== undefined) patch.revoked = Boolean(body.revoked);
+            if (body.authorized !== undefined) patch.authorized = Boolean(body.authorized);
             if (body.label !== undefined) patch.label = body.label;
 
             const device = await updateDevice(id, patch);
@@ -27,7 +28,7 @@ export async function PATCH(request, { params }) {
                 return NextResponse.json({ error: "Device not found." }, { status: 404 });
             }
 
-            logger.info("admin.app_devices.updated", { deviceId: id, revoked: device.revoked });
+            logger.info("admin.app_devices.updated", { deviceId: id, revoked: device.revoked, authorized: device.authorized });
             return NextResponse.json({ ok: true, device });
         } catch (error) {
             return internalError(error, { event: "admin.app_devices.update.failure" });
