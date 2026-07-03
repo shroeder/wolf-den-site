@@ -110,6 +110,29 @@ export async function getMarketplaceInsights() {
     };
 }
 
+// Engagement analytics: unique reach, geography, and inferred demand over a rolling window.
+export async function getEngagementInsights({ days = 30 } = {}) {
+    const win = `NOW() - ($1 || ' days')::interval`;
+    const [totals, byKind, topRegions, topCities, topSearches, uniqueByDay] = await Promise.all([
+        db.queryOne(`SELECT count(*)::int AS events, count(DISTINCT visitor_id)::int AS uniques FROM mkt_engagement WHERE created_at >= ${win}`, [days]),
+        db.query(`SELECT kind, count(*)::int AS n, count(DISTINCT visitor_id)::int AS uniques FROM mkt_engagement WHERE created_at >= ${win} GROUP BY kind ORDER BY n DESC`, [days]),
+        db.query(`SELECT region, country, count(DISTINCT visitor_id)::int AS visitors, count(*)::int AS events FROM mkt_engagement WHERE created_at >= ${win} AND region IS NOT NULL GROUP BY region, country ORDER BY visitors DESC, events DESC LIMIT 15`, [days]),
+        db.query(`SELECT city, region, count(DISTINCT visitor_id)::int AS visitors FROM mkt_engagement WHERE created_at >= ${win} AND city IS NOT NULL GROUP BY city, region ORDER BY visitors DESC LIMIT 15`, [days]),
+        db.query(`SELECT lower(search_term) AS term, count(*)::int AS n FROM mkt_engagement WHERE created_at >= ${win} AND kind = 'search' AND search_term IS NOT NULL AND search_term <> '' GROUP BY lower(search_term) ORDER BY n DESC LIMIT 20`, [days]),
+        db.query(`SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, count(DISTINCT visitor_id)::int AS visitors FROM mkt_engagement WHERE created_at >= ${win} GROUP BY 1 ORDER BY 1`, [days]),
+    ]);
+    return {
+        days,
+        events: totals?.events || 0,
+        uniqueVisitors: totals?.uniques || 0,
+        byKind: byKind.map((r) => ({ kind: r.kind, events: r.n, uniques: r.uniques })),
+        topRegions: topRegions.map((r) => ({ region: r.region, country: r.country, visitors: r.visitors, events: r.events })),
+        topCities: topCities.map((r) => ({ city: r.city, region: r.region, visitors: r.visitors })),
+        topSearches: topSearches.map((r) => ({ term: r.term, count: r.n })),
+        uniqueByDay: uniqueByDay.map((r) => ({ day: r.day, visitors: r.visitors })),
+    };
+}
+
 // Owner removal of any listing (soft delete). Returns true if a live listing was removed.
 export async function adminRemoveListing(id) {
     const row = await db.queryOne(
