@@ -15,8 +15,17 @@ export async function GET(request) {
             const kind = searchParams.get("kind") || null;
             const limit = searchParams.get("limit") || undefined;
             const offset = searchParams.get("offset") || undefined;
+            const sort = searchParams.get("sort") || "relevance";
 
-            const results = await searchCatalogInStock({ query, game, kind, limit, offset });
+            // Buyer location for distance/nearest: explicit lat/lng from the app, else Vercel edge geo.
+            let lat = Number(searchParams.get("lat")) || null;
+            let lng = Number(searchParams.get("lng")) || null;
+            if (lat == null || lng == null) {
+                lat = Number(request.headers.get("x-vercel-ip-latitude")) || null;
+                lng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
+            }
+
+            const results = await searchCatalogInStock({ query, game, kind, lat, lng, sort, limit, offset });
 
             logger.info("marketplace.search.success", { resultCount: results.length });
             if (query && query.trim().length >= 2) {

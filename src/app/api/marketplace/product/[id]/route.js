@@ -11,7 +11,15 @@ export async function GET(request, { params }) {
     return withRequestLogging(request, "GET /api/marketplace/product/[id]", async ({ internalError }) => {
         try {
             const { id } = await params;
-            const product = await getProductWithOffers(id);
+            const sp = new URL(request.url).searchParams;
+            const sort = sp.get("sort") || "price";
+            let lat = Number(sp.get("lat")) || null;
+            let lng = Number(sp.get("lng")) || null;
+            if (lat == null || lng == null) {
+                lat = Number(request.headers.get("x-vercel-ip-latitude")) || null;
+                lng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
+            }
+            const product = await getProductWithOffers(id, { lat, lng, sort });
             if (!product) {
                 return NextResponse.json({ error: "not_found" }, { status: 404 });
             }

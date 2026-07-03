@@ -57,6 +57,7 @@ function mapCatalogResult(row) {
         marketPrice: toNumber(row.market_price),
         vendorCount: Number(row.vendor_count) || 0,
         minPrice: toNumber(row.min_price),
+        nearestKm: row.nearest_km != null ? Number(row.nearest_km) : null,
     };
 }
 
@@ -111,6 +112,9 @@ export async function searchCatalogInStock({
     query = null,
     game = null,
     kind = null,
+    lat = null,
+    lng = null,
+    sort = "relevance",
     limit = DEFAULT_LIMIT,
     offset = 0,
 } = {}) {
@@ -132,7 +136,26 @@ export async function searchCatalogInStock({
         filters.push(`l.kind = $${params.length}`);
     }
 
+    // Nearest-vendor distance per product (km), when we know where the buyer is.
+    const hasLoc = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    let distanceSelect = "NULL::numeric AS nearest_km";
+    if (hasLoc) {
+        params.push(Number(lat));
+        const latP = `$${params.length}`;
+        params.push(Number(lng));
+        const lngP = `$${params.length}`;
+        distanceSelect =
+            `MIN(CASE WHEN v.latitude IS NULL OR v.longitude IS NULL THEN NULL ELSE ` +
+            `6371 * acos(LEAST(1, cos(radians(${latP})) * cos(radians(v.latitude)) * ` +
+            `cos(radians(v.longitude) - radians(${lngP})) + sin(radians(${latP})) * sin(radians(v.latitude)))) END) AS nearest_km`;
+    }
+
     const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+    let orderBy;
+    if (sort === "price") orderBy = "min_price ASC NULLS LAST, c.name ASC";
+    else if (sort === "nearest" && hasLoc) orderBy = "nearest_km ASC NULLS LAST, min_price ASC NULLS LAST";
+    else orderBy = "vendor_count DESC, c.name ASC";
 
     params.push(Math.min(Number(limit) || DEFAULT_LIMIT, MAX_LIMIT));
     const limitParam = params.length;
@@ -140,11 +163,12 @@ export async function searchCatalogInStock({
     const offsetParam = params.length;
 
     const rows = await db.query(
-        `${IN_STOCK_SELECT}
+        `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, s.name AS set_name,
+                COUNT(DISTINCT l.vendor_id) AS vendor_count, MIN(l.price) AS min_price, ${distanceSelect}
          ${IN_STOCK_FROM}
          ${whereClause}
          ${IN_STOCK_GROUP}
-         ORDER BY vendor_count DESC, c.name ASC
+         ORDER BY ${orderBy}
          LIMIT $${limitParam} OFFSET $${offsetParam}`,
         params
     );
@@ -185,7 +209,18 @@ export async function getProductPricingContext(catalogProductId, excludeVendorId
     };
 }
 
-export async function getProductWithOffers(catalogProductId) {
+function haversineKm(lat1, lng1, lat2, lng2) {
+    if (![lat1, lng1, lat2, lng2].every((n) => Number.isFinite(Number(n)))) return null;
+    const R = 6371;
+    const toRad = (d) => (Number(d) * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export async function getProductWithOffers(catalogProductId, { lat = null, lng = null, sort = "price" } = {}) {
+    const hasLoc = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     const product = await db.queryOne(
         `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, c.rarity,
                 s.name AS set_name
@@ -203,7 +238,7 @@ export async function getProductWithOffers(catalogProductId) {
         `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
                 l.price, l.quantity, l.created_at,
                 v.id AS vendor_id, v.display_name AS vendor_name, v.logo_url AS vendor_logo,
-                v.location_label, v.region AS vendor_region
+                v.location_label, v.region AS vendor_region, v.latitude AS vendor_lat, v.longitude AS vendor_lng
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
          WHERE l.catalog_product_id = $1 AND l.status = 'active' AND NOT l.vendor_only
@@ -241,6 +276,34 @@ export async function getProductWithOffers(catalogProductId) {
           }
         : null;
 
+    let mappedOffers = offers.map((row) => ({
+        listingId: row.id,
+        kind: row.kind,
+        condition: row.condition,
+        graded: Boolean(row.graded),
+        gradingCompany: row.grading_company,
+        grade: row.grade,
+        language: row.language || "English",
+        price: toNumber(row.price),
+        quantity: row.quantity,
+        createdAt: toIso(row.created_at),
+        distanceKm: hasLoc ? haversineKm(Number(lat), Number(lng), row.vendor_lat, row.vendor_lng) : null,
+        vendor: {
+            id: row.vendor_id,
+            displayName: row.vendor_name,
+            logoUrl: row.vendor_logo || null,
+            locationLabel: row.location_label,
+            region: row.vendor_region,
+        },
+    }));
+    if (sort === "nearest" && hasLoc) {
+        mappedOffers = [...mappedOffers].sort((a, b) => {
+            if (a.distanceKm == null) return 1;
+            if (b.distanceKm == null) return -1;
+            return a.distanceKm - b.distanceKm;
+        });
+    }
+
     return {
         catalogProductId: String(product.id),
         game: product.game,
@@ -251,25 +314,7 @@ export async function getProductWithOffers(catalogProductId) {
         imageUrl: product.image_url,
         marketPrice: toNumber(product.market_price),
         networkStats: { vendorCount, copies, avgPrice, medianPrice, lowestPrice, trend },
-        offers: offers.map((row) => ({
-            listingId: row.id,
-            kind: row.kind,
-            condition: row.condition,
-            graded: Boolean(row.graded),
-            gradingCompany: row.grading_company,
-            grade: row.grade,
-            language: row.language || "English",
-            price: toNumber(row.price),
-            quantity: row.quantity,
-            createdAt: toIso(row.created_at),
-            vendor: {
-                id: row.vendor_id,
-                displayName: row.vendor_name,
-                logoUrl: row.vendor_logo || null,
-                locationLabel: row.location_label,
-                region: row.vendor_region,
-            },
-        })),
+        offers: mappedOffers,
     };
 }
 
