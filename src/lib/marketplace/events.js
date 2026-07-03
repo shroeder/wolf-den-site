@@ -26,19 +26,56 @@ const EVENT_COLS =
     "e.id, e.name, e.location_label, e.event_date, e.image_url, e.created_by, e.latitude, e.longitude, " +
     "(SELECT display_name FROM mkt_vendor WHERE id = e.created_by) AS created_by_name";
 
-// Upcoming events (dated in the future, or undated), with attending active-vendor count.
-export async function listUpcomingEvents({ limit = 50 } = {}) {
+// Upcoming events with optional filters: text (name / location / attending-vendor name — covers
+// "who's going"), a specific date, and vicinity (nearLat/nearLng → distance sort). Undated/no-coord
+// events sort last.
+export async function listUpcomingEvents({ q = null, date = null, nearLat = null, nearLng = null, limit = 50 } = {}) {
+    const params = [];
+    const where = ["(e.event_date IS NULL OR e.event_date >= CURRENT_DATE)"];
+
+    if (date) {
+        params.push(date);
+        where.push(`e.event_date = $${params.length}`);
+    }
+    const text = q ? String(q).trim() : "";
+    if (text.length >= 2) {
+        params.push(`%${text}%`);
+        const p = `$${params.length}`;
+        where.push(
+            `(e.name ILIKE ${p} OR e.location_label ILIKE ${p} OR EXISTS (
+                SELECT 1 FROM mkt_event_vendor ev JOIN mkt_vendor v ON v.id = ev.vendor_id
+                WHERE ev.event_id = e.id AND v.display_name ILIKE ${p}))`
+        );
+    }
+
+    const hasNear = Number.isFinite(Number(nearLat)) && Number.isFinite(Number(nearLng));
+    let distanceSelect = "NULL::numeric AS distance_km";
+    let orderBy = "e.event_date ASC NULLS LAST, e.name ASC";
+    if (hasNear) {
+        params.push(Number(nearLat));
+        const latP = `$${params.length}`;
+        params.push(Number(nearLng));
+        const lngP = `$${params.length}`;
+        distanceSelect =
+            `CASE WHEN e.latitude IS NULL OR e.longitude IS NULL THEN NULL ELSE ` +
+            `6371 * acos(LEAST(1, cos(radians(${latP})) * cos(radians(e.latitude)) * ` +
+            `cos(radians(e.longitude) - radians(${lngP})) + sin(radians(${latP})) * sin(radians(e.latitude)))) END AS distance_km`;
+        orderBy = "distance_km ASC NULLS LAST, e.event_date ASC NULLS LAST";
+    }
+
+    params.push(limit);
+    const limitP = `$${params.length}`;
     const rows = await db.query(
-        `SELECT ${EVENT_COLS},
+        `SELECT ${EVENT_COLS}, ${distanceSelect},
                 (SELECT COUNT(*) FROM mkt_event_vendor ev JOIN mkt_vendor v ON v.id = ev.vendor_id AND v.status = 'active'
                    WHERE ev.event_id = e.id)::int AS vendor_count
          FROM mkt_event e
-         WHERE e.event_date IS NULL OR e.event_date >= CURRENT_DATE
-         ORDER BY e.event_date ASC NULLS LAST, e.name ASC
-         LIMIT $1`,
-        [limit]
+         WHERE ${where.join(" AND ")}
+         ORDER BY ${orderBy}
+         LIMIT ${limitP}`,
+        params
     );
-    return rows.map(mapEvent);
+    return rows.map((r) => ({ ...mapEvent(r), distanceKm: r.distance_km != null ? Number(r.distance_km) : null }));
 }
 
 // For the vendor portal: upcoming events + whether THIS vendor is attending.
