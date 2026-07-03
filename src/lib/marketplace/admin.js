@@ -1,6 +1,9 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { listSearchDemand } from "@/lib/marketplace/demand.js";
+import { getMarketplaceLiveStats } from "@/lib/marketplace/search.js";
+import { listMostWanted } from "@/lib/marketplace/wants.js";
 
 // Admin-only marketplace queries for the owner console (Android admin app). The per-vendor and
 // per-listing helpers already exist elsewhere; this fills the cross-cutting gaps: all buyers, a
@@ -65,6 +68,46 @@ export async function listMarketplaceActivity({ limit = 120 } = {}) {
         title: r.title || "",
         detail: r.detail || null,
     }));
+}
+
+// Insights: demand intelligence (#1) + conversion/responsiveness (#2) for the admin console.
+export async function getMarketplaceInsights() {
+    const [stats, mostWanted, searchDemand, funnelRows, responsiveness] = await Promise.all([
+        getMarketplaceLiveStats(),
+        listMostWanted(20),
+        listSearchDemand({ limit: 20, days: 30 }),
+        db.query(`SELECT status, count(*)::int AS n FROM mkt_contact_request GROUP BY status`),
+        db.query(
+            `SELECT v.id, v.display_name,
+                    count(c.*)::int AS contacts,
+                    count(c.*) FILTER (WHERE c.status IN ('responded', 'sold', 'closed'))::int AS responded,
+                    count(c.*) FILTER (WHERE c.status = 'sold')::int AS sold,
+                    round(avg(EXTRACT(EPOCH FROM (c.responded_at - COALESCE(c.sent_at, c.created_at))) / 3600.0)
+                          FILTER (WHERE c.responded_at IS NOT NULL)::numeric, 1) AS avg_response_hours
+             FROM mkt_vendor v JOIN mkt_contact_request c ON c.vendor_id = v.id
+             GROUP BY v.id, v.display_name
+             HAVING count(c.*) > 0
+             ORDER BY contacts DESC
+             LIMIT 50`
+        ),
+    ]);
+    const contactFunnel = {};
+    funnelRows.forEach((r) => { contactFunnel[r.status] = r.n; });
+    return {
+        stats,
+        mostWanted,
+        searchDemand,
+        contactFunnel,
+        responsiveness: responsiveness.map((r) => ({
+            vendorId: r.id,
+            displayName: r.display_name,
+            contacts: r.contacts,
+            responded: r.responded,
+            sold: r.sold,
+            responseRate: r.contacts ? Math.round((100 * r.responded) / r.contacts) : 0,
+            avgResponseHours: r.avg_response_hours != null ? Number(r.avg_response_hours) : null,
+        })),
+    };
 }
 
 // Owner removal of any listing (soft delete). Returns true if a live listing was removed.
