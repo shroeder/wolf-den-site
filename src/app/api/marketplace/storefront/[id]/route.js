@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
+import { recordEngagement } from "@/lib/marketplace/engagement.js";
 import { getVendorStorefront } from "@/lib/marketplace/search.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -14,6 +15,7 @@ export async function GET(request, { params }) {
             if (!storefront) {
                 return NextResponse.json({ error: "not_found" }, { status: 404 });
             }
+            after(() => recordEngagement("storefront"));
             return NextResponse.json({ storefront }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.storefront.failure" });

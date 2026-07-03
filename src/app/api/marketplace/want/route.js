@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
+import { recordEngagement } from "@/lib/marketplace/engagement.js";
 import { createWant } from "@/lib/marketplace/wants.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -21,6 +22,7 @@ export async function POST(request) {
                     maxPrice: body.maxPrice ?? null,
                 });
                 logger.info("marketplace.want.success", { catalogProductId: body.catalogProductId });
+                after(() => recordEngagement("want", { catalogProductId: body.catalogProductId }));
 
                 return NextResponse.json({ ok: true });
             } catch (validationError) {

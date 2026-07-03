@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { createContactRequest } from "@/lib/marketplace/contact.js";
+import { recordEngagement } from "@/lib/marketplace/engagement.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ export async function POST(request) {
                 });
 
                 logger.info("marketplace.contact.success", { requestId: result.id });
+                after(() => recordEngagement("contact"));
 
                 return NextResponse.json({ ok: true, id: result.id });
             } catch (validationError) {
