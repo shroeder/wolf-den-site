@@ -124,6 +124,32 @@ export async function createEvent({ name, locationLabel = null, eventDate = null
     return row.id;
 }
 
+// Edit an event — only the vendor who created it. Returns the id, or null if not found / not owner.
+export async function updateEvent({ eventId, vendorId, name, locationLabel, eventDate, imageUrl, latitude, longitude }) {
+    const sets = [];
+    const params = [eventId, vendorId];
+    const add = (col, val) => {
+        params.push(val);
+        sets.push(`${col} = $${params.length}`);
+    };
+    if (name !== undefined) {
+        const t = String(name || "").trim();
+        if (!t) throw new Error("Event name is required.");
+        add("name", t.slice(0, 200));
+    }
+    if (locationLabel !== undefined) add("location_label", locationLabel ? String(locationLabel).slice(0, 200) : null);
+    if (eventDate !== undefined) add("event_date", eventDate || null);
+    if (imageUrl !== undefined) add("image_url", imageUrl ? String(imageUrl).slice(0, 500) : null);
+    if (latitude !== undefined) add("latitude", latitude != null && latitude !== "" && Number.isFinite(Number(latitude)) ? Number(latitude) : null);
+    if (longitude !== undefined) add("longitude", longitude != null && longitude !== "" && Number.isFinite(Number(longitude)) ? Number(longitude) : null);
+    if (sets.length === 0) return null;
+    const row = await db.queryOne(
+        `UPDATE mkt_event SET ${sets.join(", ")} WHERE id = $1 AND created_by = $2 RETURNING id`,
+        params
+    );
+    return row ? row.id : null;
+}
+
 export async function setEventAttendance(eventId, vendorId, attending) {
     if (attending) {
         await db.query(
