@@ -8,20 +8,24 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Latest published Android build. The app calls this on launch and compares versionCode against its
-// own BuildConfig.VERSION_CODE to decide whether to self-update. Gated by the same shared admin key
-// the app already sends to other admin endpoints, so the (public-CDN) APK URL is only ever handed to
-// the app itself — random callers get 401. The APK download itself is a direct, unguessable CDN URL.
+// own BuildConfig.VERSION_CODE to decide whether to self-update.
+//
+// The 'marketplace' channel is a PUBLIC (Play Store) app that carries NO admin key, so its version
+// lookup is open. The 'full'/'employee' channels are the owner/staff apps that DO carry the shared
+// admin key (they use the proxy), so those stay gated — their key-carrying APK URLs never go public.
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/app/version", async ({ logger, internalError }) => {
-        const authError = verifyAdminApiKey(request, logger);
-        if (authError) {
-            return authError;
+        const { searchParams } = new URL(request.url);
+        const channel = (searchParams.get("channel") || "full").trim();
+
+        if (channel !== "marketplace") {
+            const authError = verifyAdminApiKey(request, logger);
+            if (authError) {
+                return authError;
+            }
         }
 
         try {
-            // Default to 'full' so the already-installed app (which sends no channel) keeps working.
-            const { searchParams } = new URL(request.url);
-            const channel = (searchParams.get("channel") || "full").trim();
 
             const row = await db.queryOne(
                 `SELECT version_code, version_name, apk_url, notes, size_bytes, created_at

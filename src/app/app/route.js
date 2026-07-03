@@ -5,18 +5,20 @@ import { db } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Stable, human-typeable download link for the Android apps: wolfdengamingmn.com/app always 302s to
-// the latest published APK for a channel (default full; ?channel=marketplace / employee for the
-// others). Lets the phone's browser handle the big download (resumable/retried) instead of the
-// in-app one-shot updater, which is the reliable way to (re)install. The APK URL is already public.
+// Public download link for the MARKETPLACE app only (wolfdengamingmn.com/app). Marketplace is the
+// public buyer/seller app and carries no secrets, so a public download is fine. The owner/staff
+// (full/employee) apps carry the shared admin key, so they are NOT downloadable here — they install
+// via their in-app self-update / adb, never a public URL.
 export async function GET(request) {
-    const channel = (new URL(request.url).searchParams.get("channel") || "full").trim();
+    const requested = (new URL(request.url).searchParams.get("channel") || "marketplace").trim();
+    if (requested !== "marketplace") {
+        return new NextResponse("Not available.", { status: 404 });
+    }
     const row = await db.queryOne(
-        `SELECT apk_url FROM app_release WHERE channel = $1 ORDER BY version_code DESC LIMIT 1`,
-        [channel]
+        `SELECT apk_url FROM app_release WHERE channel = 'marketplace' ORDER BY version_code DESC LIMIT 1`
     );
     if (!row?.apk_url) {
-        return new NextResponse(`No build available for channel "${channel}".`, { status: 404 });
+        return new NextResponse("No build available.", { status: 404 });
     }
     return NextResponse.redirect(row.apk_url, { status: 302, headers: { "Cache-Control": "no-store" } });
 }
