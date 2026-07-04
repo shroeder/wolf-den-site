@@ -17,7 +17,9 @@ export async function GET(request) {
             if (sp.get("lat") && sp.get("lng")) {
                 nearLat = Number(sp.get("lat"));
                 nearLng = Number(sp.get("lng"));
-            } else if (sp.get("near") === "auto") {
+            } else if (sp.get("near") === "auto" && sp.get("src") !== "app") {
+                // Web-only edge-geo fallback; the app (src=app) supplies real GPS or gets no vicinity
+                // filter — carrier-IP geo on cellular is hundreds of miles off.
                 nearLat = Number(request.headers.get("x-vercel-ip-latitude")) || null;
                 nearLng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
             }

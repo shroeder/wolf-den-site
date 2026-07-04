@@ -18,9 +18,12 @@ export async function GET(request) {
             const sort = searchParams.get("sort") || "relevance";
 
             // Buyer location for distance/nearest: explicit lat/lng from the app, else Vercel edge geo.
+            // Fall back to edge geo ONLY for web. The mobile app sends src=app: on cellular, carrier-IP
+            // geolocation lands hundreds of miles away, so the app gets NO distance rather than a wrong
+            // one (it supplies real GPS when the user shares location).
             let lat = Number(searchParams.get("lat")) || null;
             let lng = Number(searchParams.get("lng")) || null;
-            if (lat == null || lng == null) {
+            if ((lat == null || lng == null) && searchParams.get("src") !== "app") {
                 lat = Number(request.headers.get("x-vercel-ip-latitude")) || null;
                 lng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
             }

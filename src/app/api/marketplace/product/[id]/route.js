@@ -15,7 +15,9 @@ export async function GET(request, { params }) {
             const sort = sp.get("sort") || "price";
             let lat = Number(sp.get("lat")) || null;
             let lng = Number(sp.get("lng")) || null;
-            if (lat == null || lng == null) {
+            // Web falls back to Vercel edge geo; the app (src=app) does not — carrier-IP geo on cellular
+            // is hundreds of miles off, so show no distance rather than a wrong one.
+            if ((lat == null || lng == null) && sp.get("src") !== "app") {
                 lat = Number(request.headers.get("x-vercel-ip-latitude")) || null;
                 lng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
             }
