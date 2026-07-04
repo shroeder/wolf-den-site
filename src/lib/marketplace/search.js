@@ -137,7 +137,9 @@ export async function searchCatalogInStock({
     }
 
     // Nearest-vendor distance per product (km), when we know where the buyer is.
-    const hasLoc = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    // Guard null/undefined explicitly: Number(null) === 0 is finite, which would treat "no location"
+    // as the point (0,0) and report a ~10,000 km distance instead of no distance.
+    const hasLoc = lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     let distanceSelect = "NULL::numeric AS nearest_km";
     if (hasLoc) {
         params.push(Number(lat));
@@ -220,7 +222,9 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 export async function getProductWithOffers(catalogProductId, { lat = null, lng = null, sort = "price" } = {}) {
-    const hasLoc = Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+    // Guard null explicitly — Number(null) === 0 is finite, so a missing location would otherwise be
+    // treated as the point (0,0) and report a bogus ~10,000 km distance.
+    const hasLoc = lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
     const product = await db.queryOne(
         `SELECT c.id, c.game, c.name, c.number, c.image_url, c.market_price, c.rarity,
                 s.name AS set_name

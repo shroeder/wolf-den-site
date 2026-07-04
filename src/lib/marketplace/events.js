@@ -48,7 +48,8 @@ export async function listUpcomingEvents({ q = null, date = null, nearLat = null
         );
     }
 
-    const hasNear = Number.isFinite(Number(nearLat)) && Number.isFinite(Number(nearLng));
+    // Guard null explicitly — Number(null) === 0 is finite, which would treat "no location" as (0,0).
+    const hasNear = nearLat != null && nearLng != null && Number.isFinite(Number(nearLat)) && Number.isFinite(Number(nearLng));
     let distanceSelect = "NULL::numeric AS distance_km";
     let orderBy = "e.event_date ASC NULLS LAST, e.name ASC";
     if (hasNear) {
