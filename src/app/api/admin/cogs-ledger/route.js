@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { listCogs, insertCogs, deleteCogsByEntryId, deleteCogsRow } from "@/lib/cogs/cogs-ledger.js";
+import { listCogs, insertCogs, updateCogs, deleteCogsByEntryId, deleteCogsRow } from "@/lib/cogs/cogs-ledger.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -38,6 +38,26 @@ export async function POST(request) {
             }
         } catch (error) {
             return internalError(error, { event: "admin.cogs.insert.failure" });
+        }
+    });
+}
+
+// Edit an intake row by id.
+export async function PATCH(request) {
+    return withRequestLogging(request, "PATCH /api/admin/cogs-ledger", async ({ logger, internalError }) => {
+        const authError = verifyAdminApiKey(request, logger);
+        if (authError) return authError;
+        try {
+            const body = await request.json().catch(() => null);
+            if (!body?.id) return NextResponse.json({ error: "id required." }, { status: 400 });
+            try {
+                const row = await updateCogs(body.id, body);
+                return NextResponse.json({ ok: true, row });
+            } catch (validationError) {
+                return NextResponse.json({ error: validationError.message }, { status: 400 });
+            }
+        } catch (error) {
+            return internalError(error, { event: "admin.cogs.update.failure" });
         }
     });
 }

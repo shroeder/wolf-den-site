@@ -77,6 +77,21 @@ export async function insertCogs(input) {
     return mapRow(rows[0]);
 }
 
+// Edit an existing intake row by its own id (COGS-Entry rows have no entry_id, so we key on id).
+export async function updateCogs(id, input) {
+    const rid = id ? String(id).trim() : "";
+    if (!rid) throw new Error("id is required.");
+    const e = normalize({ ...input, occurredOn: input?.occurredOn ?? "1970-01-01" });
+    const rows = await db.query(
+        `UPDATE cogs_ledger SET occurred_on=$2, product=$3, quantity=$4, paid_each=$5, paid_total=$6,
+             market_each=$7, market_total=$8, list_each_110=$9, list_total_110=$10
+         WHERE id=$1 RETURNING *`,
+        [rid, e.occurredOn, e.product, e.quantity, e.paidEach, e.paidTotal, e.marketEach, e.marketTotal, e.listEach110, e.listTotal110],
+    );
+    if (!rows.length) throw new Error("Row not found.");
+    return mapRow(rows[0]);
+}
+
 export async function deleteCogsByEntryId(entryId) {
     const id = entryId ? String(entryId).trim() : "";
     if (!id) return 0;
