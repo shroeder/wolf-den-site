@@ -113,13 +113,19 @@ export async function getMarketplaceInsights() {
 // Engagement analytics: unique reach, geography, and inferred demand over a rolling window.
 export async function getEngagementInsights({ days = 30 } = {}) {
     const win = `NOW() - ($1 || ' days')::interval`;
-    const [totals, byKind, topRegions, topCities, topSearches, uniqueByDay] = await Promise.all([
+    const [totals, byKind, topRegions, topCities, topSearches, uniqueByDay, topPages, topProducts, recent] = await Promise.all([
         db.queryOne(`SELECT count(*)::int AS events, count(DISTINCT visitor_id)::int AS uniques FROM mkt_engagement WHERE created_at >= ${win}`, [days]),
         db.query(`SELECT kind, count(*)::int AS n, count(DISTINCT visitor_id)::int AS uniques FROM mkt_engagement WHERE created_at >= ${win} GROUP BY kind ORDER BY n DESC`, [days]),
         db.query(`SELECT region, country, count(DISTINCT visitor_id)::int AS visitors, count(*)::int AS events FROM mkt_engagement WHERE created_at >= ${win} AND region IS NOT NULL GROUP BY region, country ORDER BY visitors DESC, events DESC LIMIT 15`, [days]),
         db.query(`SELECT city, region, count(DISTINCT visitor_id)::int AS visitors FROM mkt_engagement WHERE created_at >= ${win} AND city IS NOT NULL GROUP BY city, region ORDER BY visitors DESC LIMIT 15`, [days]),
         db.query(`SELECT lower(search_term) AS term, count(*)::int AS n FROM mkt_engagement WHERE created_at >= ${win} AND kind = 'search' AND search_term IS NOT NULL AND search_term <> '' GROUP BY lower(search_term) ORDER BY n DESC LIMIT 20`, [days]),
         db.query(`SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, count(DISTINCT visitor_id)::int AS visitors FROM mkt_engagement WHERE created_at >= ${win} GROUP BY 1 ORDER BY 1`, [days]),
+        // Feature usage — which pages get visited (site-wide page views).
+        db.query(`SELECT path, count(*)::int AS n, count(DISTINCT visitor_id)::int AS uniques FROM mkt_engagement WHERE created_at >= ${win} AND kind = 'pageview' AND path IS NOT NULL GROUP BY path ORDER BY n DESC LIMIT 25`, [days]),
+        // Most-viewed products (join the catalog for a readable name).
+        db.query(`SELECT e.catalog_product_id AS id, c.name, count(*)::int AS n, count(DISTINCT e.visitor_id)::int AS uniques FROM mkt_engagement e LEFT JOIN tcg_cards c ON c.id = e.catalog_product_id WHERE e.created_at >= ${win} AND e.kind = 'view' AND e.catalog_product_id IS NOT NULL GROUP BY e.catalog_product_id, c.name ORDER BY n DESC LIMIT 25`, [days]),
+        // Low-level recent-activity feed.
+        db.query(`SELECT to_char(created_at, 'MM-DD HH24:MI') AS at, kind, path, search_term, catalog_product_id, city, region FROM mkt_engagement WHERE created_at >= ${win} ORDER BY created_at DESC LIMIT 60`, [days]),
     ]);
     return {
         days,
@@ -130,6 +136,9 @@ export async function getEngagementInsights({ days = 30 } = {}) {
         topCities: topCities.map((r) => ({ city: r.city, region: r.region, visitors: r.visitors })),
         topSearches: topSearches.map((r) => ({ term: r.term, count: r.n })),
         uniqueByDay: uniqueByDay.map((r) => ({ day: r.day, visitors: r.visitors })),
+        topPages: topPages.map((r) => ({ path: r.path, views: r.n, uniques: r.uniques })),
+        topProducts: topProducts.map((r) => ({ id: r.id, name: r.name || `#${r.id}`, views: r.n, uniques: r.uniques })),
+        recent: recent.map((r) => ({ at: r.at, kind: r.kind, path: r.path, term: r.search_term, productId: r.catalog_product_id, city: r.city, region: r.region })),
     };
 }
 

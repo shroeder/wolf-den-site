@@ -7,20 +7,21 @@ import { db } from "@/lib/db";
 // Record one passive engagement event, tagged with the anonymous visitor id (cookie for web, an
 // x-mkt-vid header for the native app) and coarse Vercel edge geo. Never throws — analytics must not
 // break a request. Call it from route handlers, ideally via `after()` so it runs post-response.
-export async function recordEngagement(kind, { catalogProductId = null, searchTerm = null } = {}) {
+export async function recordEngagement(kind, { catalogProductId = null, searchTerm = null, path = null, vid: vidOverride = null } = {}) {
     try {
         const h = await headers();
         const c = await cookies();
-        const vid = h.get("x-mkt-vid") || c.get("mkt_vid")?.value || null;
+        const vid = vidOverride || h.get("x-mkt-vid") || c.get("mkt_vid")?.value || null;
         const cityRaw = h.get("x-vercel-ip-city");
         await db.query(
-            `INSERT INTO mkt_engagement (visitor_id, kind, catalog_product_id, search_term, country, region, city)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            `INSERT INTO mkt_engagement (visitor_id, kind, catalog_product_id, search_term, path, country, region, city)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
                 vid ? String(vid).slice(0, 80) : null,
                 String(kind).slice(0, 24),
                 catalogProductId ? Number(catalogProductId) || null : null,
                 searchTerm ? String(searchTerm).slice(0, 120) : null,
+                path ? String(path).slice(0, 200) : null,
                 h.get("x-vercel-ip-country") || null,
                 h.get("x-vercel-ip-country-region") || null,
                 cityRaw ? decodeURIComponent(cityRaw) : null,

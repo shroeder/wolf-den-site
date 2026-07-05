@@ -2,6 +2,7 @@ import "./globals.css";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { SITE_URL } from "@/lib/site";
+import Telemetry from "@/components/Telemetry";
 
 const manrope = Manrope({
     subsets: ["latin"],
@@ -151,6 +152,7 @@ export default function RootLayout({ children }) {
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
                 />
+                <Telemetry />
                 {children}
             </body>
         </html>
