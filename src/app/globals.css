@@ -1464,8 +1464,22 @@ textarea {
 
 .shop-grid {
     display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.6rem;
+    /* Mobile: two compact tiles per row so you can actually browse. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 560px) {
+    .shop-grid {
+        gap: 1rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 900px) {
+    .shop-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 /* Loading skeleton — mirrors the real shop layout while Square inventory loads. */
@@ -1495,8 +1509,21 @@ textarea {
 
 .shop-skeleton-grid {
     display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.6rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 560px) {
+    .shop-skeleton-grid {
+        gap: 1rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 900px) {
+    .shop-skeleton-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 .shop-skeleton-tile {
@@ -1661,6 +1688,33 @@ textarea {
     margin: 0;
     color: var(--ink-secondary);
     font-size: 0.78rem;
+}
+
+/* Compact the tiles at the 2-up mobile size so more fits on screen and text stays readable. */
+@media (max-width: 559px) {
+    .shop-tile-body {
+        padding: 0.55rem;
+        gap: 0.28rem;
+    }
+    .shop-tile-name {
+        font-size: 0.82rem;
+        line-height: 1.25;
+        min-height: 2.05em;
+    }
+    .shop-tile-set,
+    .shop-item-category {
+        font-size: 0.7rem;
+    }
+    .shop-tile-image {
+        padding: 0.2rem;
+    }
+    /* The whole tile is tappable, so the redundant "View page →" link just wastes height on mobile. */
+    .shop-tile-permalink {
+        display: none;
+    }
+    .shop-tile-price {
+        font-size: 0.9rem;
+    }
 }
 
 /* Vendor logo upload/preview (marketplace apply form + portal). */
