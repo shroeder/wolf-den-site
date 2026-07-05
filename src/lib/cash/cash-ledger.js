@@ -95,10 +95,15 @@ export async function replaceAllFromImport(rows) {
             if (Number.isNaN(amount)) continue;
             const occurredOn = r.occurredOn || r.date || null;
             if (!occurredOn) continue;
+            const eid = r.entryId ? String(r.entryId).trim() : null;
+            // Collapse the sheet's duplicate entry-id rows to one (last wins); null-id float rows all insert.
             await client.query(
                 `INSERT INTO cash_ledger (occurred_on, description, amount, payment_method, entry_id, source)
-                 VALUES ($1, $2, $3, $4, $5, 'sheets-import')`,
-                [occurredOn, r.description || "", amount, r.paymentMethod || null, r.entryId ? String(r.entryId).trim() : null],
+                 VALUES ($1, $2, $3, $4, $5, 'sheets-import')
+                 ON CONFLICT (entry_id) WHERE entry_id IS NOT NULL
+                 DO UPDATE SET occurred_on = EXCLUDED.occurred_on, description = EXCLUDED.description,
+                               amount = EXCLUDED.amount, payment_method = EXCLUDED.payment_method`,
+                [occurredOn, r.description || "", amount, r.paymentMethod || null, eid],
             );
             inserted += 1;
         }
