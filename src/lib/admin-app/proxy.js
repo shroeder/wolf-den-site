@@ -195,7 +195,18 @@ export async function handleProxy(request, upstreamKey, context) {
 
     const method = request.method.toUpperCase();
     const hasBody = method !== "GET" && method !== "HEAD" && method !== "DELETE";
-    let bodyText = hasBody ? await request.text() : null;
+    // Binary bodies (e.g. Square catalog image multipart uploads) must be forwarded as RAW BYTES.
+    // Reading them with request.text() corrupts the image, which silently dropped every uploaded
+    // card image once Square moved behind this proxy. JSON/text bodies still go through as text so
+    // per-service applyAuth (e.g. Plaid) can inspect/modify them.
+    const reqContentType = request.headers.get("content-type") || "";
+    const isBinaryBody = hasBody && (
+        reqContentType.startsWith("multipart/") ||
+        reqContentType.startsWith("image/") ||
+        reqContentType.includes("application/octet-stream")
+    );
+    let bodyText = hasBody && !isBinaryBody ? await request.text() : null;
+    const bodyBytes = isBinaryBody ? Buffer.from(await request.arrayBuffer()) : null;
 
     let headers = new Headers();
     for (const name of FORWARD_HEADERS) {
@@ -226,7 +237,7 @@ export async function handleProxy(request, upstreamKey, context) {
         upstreamResponse = await fetch(targetUrl, {
             method,
             headers,
-            body: bodyText,
+            body: isBinaryBody ? bodyBytes : bodyText,
         });
     } catch (error) {
         proxyLogger.error("admin_app.proxy.upstream_unreachable", error, { upstreamKey, path });
