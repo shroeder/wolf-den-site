@@ -240,7 +240,7 @@ export async function getProductWithOffers(catalogProductId, { lat = null, lng =
 
     const offers = await db.query(
         `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
-                l.price, l.quantity, l.created_at,
+                l.price, l.quantity, l.created_at, l.dealer_available,
                 v.id AS vendor_id, v.display_name AS vendor_name, v.logo_url AS vendor_logo,
                 v.location_label, v.region AS vendor_region, v.latitude AS vendor_lat, v.longitude AS vendor_lng
          FROM mkt_listing l
@@ -291,6 +291,7 @@ export async function getProductWithOffers(catalogProductId, { lat = null, lng =
         price: toNumber(row.price),
         quantity: row.quantity,
         createdAt: toIso(row.created_at),
+        dealerAvailable: row.dealer_available === true,
         distanceKm: hasLoc ? haversineKm(Number(lat), Number(lng), row.vendor_lat, row.vendor_lng) : null,
         vendor: {
             id: row.vendor_id,
