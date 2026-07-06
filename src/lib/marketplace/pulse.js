@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 // "Activity pulse" for the browse home: what people are hunting (trending searches), what just hit
 // the marketplace (recent listings), and headline counts for social proof. Public, anonymous.
 export async function getMarketplacePulse() {
-    const [trending, justListed, mostWanted, stats] = await Promise.all([
+    const [trending, justListed, mostWanted, deals, stats] = await Promise.all([
         db.query(
             `SELECT lower(search_term) AS term, count(*)::int AS n
              FROM mkt_engagement
@@ -49,6 +49,19 @@ export async function getMarketplacePulse() {
              ORDER BY wants DESC, c.name ASC
              LIMIT 12`,
         ),
+        // Deals: active listings priced below the catalog market price, biggest discount first.
+        db.query(
+            `SELECT l.catalog_product_id AS id, c.name, c.image_url, s.name AS set_name,
+                    MIN(l.price) AS price, c.market_price,
+                    round((1 - MIN(l.price) / NULLIF(c.market_price, 0)) * 100)::int AS pct_under
+             FROM mkt_listing l
+             JOIN tcg_cards c ON c.id = l.catalog_product_id
+             JOIN tcg_sets s ON s.id = c.set_id
+             WHERE l.status = 'active' AND NOT l.vendor_only AND c.market_price > 0 AND l.price < c.market_price
+             GROUP BY l.catalog_product_id, c.name, c.image_url, s.name, c.market_price
+             ORDER BY pct_under DESC
+             LIMIT 12`,
+        ),
         db.queryOne(
             `SELECT
                  (SELECT count(*)::int FROM mkt_listing WHERE status = 'active' AND NOT vendor_only) AS listings,
@@ -66,6 +79,15 @@ export async function getMarketplacePulse() {
             setName: r.set_name || null,
             price: r.price == null ? null : Number(r.price),
             vendor: r.vendor || null,
+        })),
+        deals: deals.map((r) => ({
+            id: r.id,
+            name: r.name,
+            imageUrl: r.image_url || null,
+            setName: r.set_name || null,
+            price: r.price == null ? null : Number(r.price),
+            marketPrice: r.market_price == null ? null : Number(r.market_price),
+            pctUnder: r.pct_under,
         })),
         mostWanted: mostWanted.map((r) => ({
             id: r.id,
