@@ -156,6 +156,7 @@ export async function searchCatalogInStock({
 
     let orderBy;
     if (sort === "price") orderBy = "min_price ASC NULLS LAST, c.name ASC";
+    else if (sort === "price_desc") orderBy = "min_price DESC NULLS LAST, c.name ASC";
     else if (sort === "nearest" && hasLoc) orderBy = "nearest_km ASC NULLS LAST, min_price ASC NULLS LAST";
     else orderBy = "vendor_count DESC, c.name ASC";
 
