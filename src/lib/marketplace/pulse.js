@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 // "Activity pulse" for the browse home: what people are hunting (trending searches), what just hit
 // the marketplace (recent listings), and headline counts for social proof. Public, anonymous.
 export async function getMarketplacePulse() {
-    const [trending, justListed, stats] = await Promise.all([
+    const [trending, justListed, mostWanted, stats] = await Promise.all([
         db.query(
             `SELECT lower(search_term) AS term, count(*)::int AS n
              FROM mkt_engagement
@@ -32,6 +32,23 @@ export async function getMarketplacePulse() {
              ORDER BY t.created_at DESC
              LIMIT 12`,
         ),
+        // Wanted board: aggregate wishlists into demand. in_stock flags whether it's currently
+        // listed (so it doubles as a "what to stock" signal for vendors).
+        db.query(
+            `SELECT w.catalog_product_id AS id, c.name, c.image_url, s.name AS set_name,
+                    count(DISTINCT w.email_normalized)::int AS wants,
+                    EXISTS(
+                        SELECT 1 FROM mkt_listing l
+                        WHERE l.catalog_product_id = w.catalog_product_id
+                          AND l.status = 'active' AND NOT l.vendor_only
+                    ) AS in_stock
+             FROM mkt_want w
+             JOIN tcg_cards c ON c.id = w.catalog_product_id
+             JOIN tcg_sets s ON s.id = c.set_id
+             GROUP BY w.catalog_product_id, c.name, c.image_url, s.name
+             ORDER BY wants DESC, c.name ASC
+             LIMIT 12`,
+        ),
         db.queryOne(
             `SELECT
                  (SELECT count(*)::int FROM mkt_listing WHERE status = 'active' AND NOT vendor_only) AS listings,
@@ -49,6 +66,14 @@ export async function getMarketplacePulse() {
             setName: r.set_name || null,
             price: r.price == null ? null : Number(r.price),
             vendor: r.vendor || null,
+        })),
+        mostWanted: mostWanted.map((r) => ({
+            id: r.id,
+            name: r.name,
+            imageUrl: r.image_url || null,
+            setName: r.set_name || null,
+            wants: r.wants,
+            inStock: r.in_stock === true,
         })),
         stats: {
             listings: stats?.listings || 0,
