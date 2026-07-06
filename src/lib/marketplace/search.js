@@ -256,7 +256,7 @@ export async function getProductWithOffers(catalogProductId, { lat = null, lng =
     const offers = await db.query(
         `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
                 l.price, l.quantity, l.created_at, l.dealer_available,
-                v.id AS vendor_id, v.display_name AS vendor_name, v.logo_url AS vendor_logo,
+                v.id AS vendor_id, v.display_name AS vendor_name, v.logo_url AS vendor_logo, v.verified AS vendor_verified,
                 v.location_label, v.region AS vendor_region, v.latitude AS vendor_lat, v.longitude AS vendor_lng
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
@@ -315,6 +315,7 @@ export async function getProductWithOffers(catalogProductId, { lat = null, lng =
             logoUrl: row.vendor_logo || null,
             locationLabel: row.location_label,
             region: row.vendor_region,
+            verified: row.vendor_verified === true,
         },
     }));
     if (sort === "nearest" && hasLoc) {
@@ -355,7 +356,7 @@ export async function listIndexableMarketplaceProductIds() {
 // Browse mode: active vendors that actually have inventory, with location for the map + a list.
 export async function listVendorsForBrowse() {
     const rows = await db.query(
-        `SELECT v.id, v.display_name, v.logo_url, v.location_label, v.region, v.city,
+        `SELECT v.id, v.display_name, v.logo_url, v.location_label, v.region, v.city, v.verified,
                 v.latitude, v.longitude, v.accepted_at, v.created_at, v.specialties,
                 COUNT(l.id) FILTER (WHERE l.status = 'active' AND NOT l.vendor_only) AS listing_count,
                 (SELECT array_agg(img) FROM (
@@ -385,7 +386,7 @@ export async function listVendorsForBrowse() {
         city: row.city,
         ...spreadCoords(row.id, row.latitude, row.longitude),
         listingCount: Number(row.listing_count) || 0,
-        verified: true,
+        verified: row.verified === true,
         memberSince: toIso(row.accepted_at || row.created_at),
         previewImages: Array.isArray(row.preview_images) ? row.preview_images.filter(Boolean) : [],
     }));
@@ -575,7 +576,7 @@ export async function searchCatalog({ query, game = null, type = "all", setId = 
 // if the vendor isn't active.
 export async function getVendorStorefront(vendorId, { includeInactive = false } = {}) {
     const vendor = await db.queryOne(
-        `SELECT id, display_name, logo_url, location_label, region, city, latitude, longitude,
+        `SELECT id, display_name, logo_url, location_label, region, city, latitude, longitude, verified,
                 created_at, accepted_at, status, ships, local_pickup, specialties, last_login_at
          FROM mkt_vendor
          WHERE id = $1 ${includeInactive ? "" : "AND status = 'active'"}`,
@@ -642,7 +643,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
         region: vendor.region,
         city: vendor.city,
         ...spreadCoords(vendor.id, vendor.latitude, vendor.longitude),
-        verified: true,
+        verified: vendor.verified === true,
         activeThisWeek,
         ships: vendor.ships === true,
         localPickup: vendor.local_pickup == null ? true : vendor.local_pickup === true,
