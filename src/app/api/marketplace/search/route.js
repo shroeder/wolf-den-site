@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { recordEngagement } from "@/lib/marketplace/engagement.js";
 import { searchCatalogInStock } from "@/lib/marketplace/search.js";
+import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -28,7 +29,10 @@ export async function GET(request) {
                 lng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
             }
 
-            const results = await searchCatalogInStock({ query, game, kind, lat, lng, sort, limit, offset });
+            // If a vendor is browsing (logged in), hide their own listings — they can't buy from themselves.
+            const viewer = await getAuthenticatedVendor().catch(() => null);
+
+            const results = await searchCatalogInStock({ query, game, kind, lat, lng, sort, limit, offset, excludeVendorId: viewer?.id || null });
 
             logger.info("marketplace.search.success", { resultCount: results.length });
             if (query && query.trim().length >= 2) {

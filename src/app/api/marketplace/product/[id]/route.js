@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getProductWithOffers } from "@/lib/marketplace/search.js";
+import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -21,7 +22,9 @@ export async function GET(request, { params }) {
                 lat = Number(request.headers.get("x-vercel-ip-latitude")) || null;
                 lng = Number(request.headers.get("x-vercel-ip-longitude")) || null;
             }
-            const product = await getProductWithOffers(id, { lat, lng, sort });
+            // A vendor viewing a product shouldn't see their own offer among the vendor list.
+            const viewer = await getAuthenticatedVendor().catch(() => null);
+            const product = await getProductWithOffers(id, { lat, lng, sort, excludeVendorId: viewer?.id || null });
             if (!product) {
                 return NextResponse.json({ error: "not_found" }, { status: 404 });
             }

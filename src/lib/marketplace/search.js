@@ -117,9 +117,17 @@ export async function searchCatalogInStock({
     sort = "relevance",
     limit = DEFAULT_LIMIT,
     offset = 0,
+    excludeVendorId = null,
 } = {}) {
     const params = [];
     const filters = [];
+
+    // A vendor browsing shouldn't see their own listings (they can't buy from themselves). Filtering
+    // here (pre-aggregation) also drops products where they are the ONLY seller.
+    if (excludeVendorId) {
+        params.push(excludeVendorId);
+        filters.push(`l.vendor_id <> $${params.length}`);
+    }
 
     if (query && String(query).trim().length >= 2) {
         params.push(`%${String(query).trim()}%`);
@@ -222,7 +230,7 @@ function haversineKm(lat1, lng1, lat2, lng2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export async function getProductWithOffers(catalogProductId, { lat = null, lng = null, sort = "price" } = {}) {
+export async function getProductWithOffers(catalogProductId, { lat = null, lng = null, sort = "price", excludeVendorId = null } = {}) {
     // Guard null explicitly — Number(null) === 0 is finite, so a missing location would otherwise be
     // treated as the point (0,0) and report a bogus ~10,000 km distance.
     const hasLoc = lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
@@ -239,6 +247,12 @@ export async function getProductWithOffers(catalogProductId, { lat = null, lng =
         return null;
     }
 
+    const offerParams = [catalogProductId];
+    let excludeClause = "";
+    if (excludeVendorId) {
+        offerParams.push(excludeVendorId);
+        excludeClause = `AND l.vendor_id <> $${offerParams.length}`;
+    }
     const offers = await db.query(
         `SELECT l.id, l.kind, l.condition, l.graded, l.grading_company, l.grade, l.language,
                 l.price, l.quantity, l.created_at, l.dealer_available,
@@ -247,8 +261,9 @@ export async function getProductWithOffers(catalogProductId, { lat = null, lng =
          FROM mkt_listing l
          JOIN mkt_vendor v ON v.id = l.vendor_id AND v.status = 'active'
          WHERE l.catalog_product_id = $1 AND l.status = 'active' AND NOT l.vendor_only
+           ${excludeClause}
          ORDER BY l.price ASC`,
-        [catalogProductId]
+        offerParams
     );
 
     // Community Price History — network-internal market intelligence from active listings.
