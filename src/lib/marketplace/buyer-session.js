@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 
 import { headers } from "next/headers";
 
@@ -66,18 +66,70 @@ export async function createBuyer({ email, password, displayName = null }) {
     return mapBuyer(row);
 }
 
-// Verify email + password, returning the buyer or null.
+// Verify email + password, returning the buyer (with emailVerified) or null.
 export async function authenticateBuyer(email, password) {
     const normalized = normalizeEmail(email);
     const row = await db.queryOne(
-        `SELECT id, email, display_name, password_hash FROM mkt_buyer WHERE email_normalized = $1`,
+        `SELECT id, email, display_name, password_hash, email_verified FROM mkt_buyer WHERE email_normalized = $1`,
         [normalized]
     );
     if (!row || !row.password_hash) {
         return null;
     }
     const ok = await verifyPassword(password, row.password_hash);
-    return ok ? mapBuyer(row) : null;
+    return ok ? { ...mapBuyer(row), emailVerified: !!row.email_verified } : null;
+}
+
+// --- Email verification (6-digit code) ---
+
+const VERIFY_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_VERIFY_ATTEMPTS = 6;
+
+// Generate + store a hashed 6-digit code for the account, returning the raw code + email to send.
+// Returns null if no account exists for the email.
+export async function createEmailVerification(email) {
+    const normalized = normalizeEmail(email);
+    const account = await db.queryOne(`SELECT id, email FROM mkt_buyer WHERE email_normalized = $1`, [normalized]);
+    if (!account) return null;
+    const code = String(randomInt(100000, 1000000));
+    const expiresAt = new Date(Date.now() + VERIFY_TTL_MS);
+    await db.query(
+        `UPDATE mkt_buyer
+            SET email_verify_code_hash = $2, email_verify_expires = $3, email_verify_attempts = 0, updated_at = NOW()
+          WHERE id = $1`,
+        [account.id, hashToken(code), expiresAt]
+    );
+    return { email: account.email, code };
+}
+
+// Check a code. On success marks the account verified and returns { ok: true, buyer }. Otherwise
+// { ok: false, reason }. Increments an attempt counter to throttle brute force.
+export async function verifyEmailCode(email, code) {
+    const normalized = normalizeEmail(email);
+    const row = await db.queryOne(
+        `SELECT id, email, display_name, email_verified, email_verify_code_hash, email_verify_expires, email_verify_attempts
+           FROM mkt_buyer WHERE email_normalized = $1`,
+        [normalized]
+    );
+    if (!row) return { ok: false, reason: "not_found" };
+    if (row.email_verified) return { ok: true, buyer: mapBuyer(row) };
+    if (!row.email_verify_code_hash || !row.email_verify_expires) return { ok: false, reason: "no_code" };
+    if (new Date(row.email_verify_expires) <= new Date()) return { ok: false, reason: "expired" };
+    if (row.email_verify_attempts >= MAX_VERIFY_ATTEMPTS) return { ok: false, reason: "too_many_attempts" };
+
+    const matches = hashToken(String(code || "").trim()) === row.email_verify_code_hash;
+    if (!matches) {
+        await db.query(`UPDATE mkt_buyer SET email_verify_attempts = email_verify_attempts + 1 WHERE id = $1`, [row.id]);
+        return { ok: false, reason: "invalid_code" };
+    }
+    await db.query(
+        `UPDATE mkt_buyer
+            SET email_verified = TRUE, email_verify_code_hash = NULL, email_verify_expires = NULL,
+                email_verify_attempts = 0, updated_at = NOW()
+          WHERE id = $1`,
+        [row.id]
+    );
+    return { ok: true, buyer: mapBuyer(row) };
 }
 
 export async function createBuyerSession(buyerId, { deviceLabel = "app" } = {}) {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { authenticateBuyer, createBuyerSession, getAccountLinkedVendorId } from "@/lib/marketplace/buyer-session.js";
+import { authenticateBuyer, createBuyerSession, createEmailVerification, getAccountLinkedVendorId } from "@/lib/marketplace/buyer-session.js";
 import { createVendorSession } from "@/lib/marketplace/vendor-session.js";
+import { sendVerificationEmail } from "@/lib/marketplace/email.js";
 import { authenticateVendor, getVendorById } from "@/lib/marketplace/vendors.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -19,6 +20,19 @@ export async function POST(request) {
 
             const account = await authenticateBuyer(email, password);
             if (account) {
+                if (!account.emailVerified) {
+                    // Block unverified accounts; re-send a fresh code so they can finish verifying.
+                    const verification = await createEmailVerification(account.email);
+                    if (verification) {
+                        try {
+                            await sendVerificationEmail(verification.email, verification.code);
+                        } catch (emailError) {
+                            logger.warn("marketplace.auth.login_verify_email_failed", { reason: emailError.message });
+                        }
+                    }
+                    logger.info("marketplace.auth.login_needs_verification", { accountId: account.id });
+                    return NextResponse.json({ ok: true, needsVerification: true, email: account.email });
+                }
                 const { token, expiresAt } = await createBuyerSession(account.id, { deviceLabel: "app" });
                 const vendorId = await getAccountLinkedVendorId(account.id);
                 if (vendorId) {

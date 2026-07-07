@@ -36,6 +36,21 @@ function formatPrice(value) {
 // Notify the marketplace admin that a new vendor applied. Recipient is resolved by the caller
 // (MARKETPLACE_ADMIN_EMAIL env, else the store owner's email). Best-effort: returns false (no throw)
 // if there's no recipient, so it never blocks the public submission.
+export async function sendVerificationEmail(email, code) {
+    const resend = getResendClient();
+    await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: email,
+        subject: `Your Wolf Den Marketplace code: ${code}`,
+        html: `
+            <p>Welcome to the Wolf Den Marketplace!</p>
+            <p>Enter this code in the app to verify your email:</p>
+            <p style="font-size:28px;font-weight:bold;letter-spacing:4px;">${code}</p>
+            <p>This code expires in 30 minutes. If you didn't create an account, you can ignore this email.</p>
+        `,
+    });
+}
+
 export async function sendNewApplicationEmail(application, toEmail) {
     if (!toEmail) {
         return false;
