@@ -173,7 +173,7 @@ async function upsertCardBatch(cards) {
         return;
     }
 
-    const columns = 11;
+    const columns = 12;
     const values = [];
     const placeholders = cards.map((card, index) => {
         const base = index * columns;
@@ -188,7 +188,8 @@ async function upsertCardBatch(cards) {
             card.imageUrl,
             card.url,
             card.marketPrice,
-            card.marketSubType
+            card.marketSubType,
+            card.upc || null
         );
 
         const tokens = Array.from({ length: columns }, (_unused, columnIndex) => `$${base + columnIndex + 1}`);
@@ -198,7 +199,7 @@ async function upsertCardBatch(cards) {
 
     await db.query(
         `INSERT INTO tcg_cards (
-            id, set_id, game, name, clean_name, number, rarity, image_url, url, market_price, market_price_subtype
+            id, set_id, game, name, clean_name, number, rarity, image_url, url, market_price, market_price_subtype, upc
          ) VALUES ${placeholders.join(", ")}
          ON CONFLICT (id) DO UPDATE SET
             set_id = EXCLUDED.set_id,
@@ -211,6 +212,7 @@ async function upsertCardBatch(cards) {
             url = EXCLUDED.url,
             market_price = EXCLUDED.market_price,
             market_price_subtype = EXCLUDED.market_price_subtype,
+            upc = COALESCE(EXCLUDED.upc, tcg_cards.upc),
             price_updated_at = NOW(),
             updated_at = NOW()`,
         values
@@ -255,6 +257,7 @@ async function ingestGroup(group) {
                 cleanName: product.cleanName || null,
                 number: getExtendedValue(product.extendedData, "Number"),
                 rarity: getExtendedValue(product.extendedData, "Rarity"),
+                upc: getExtendedValue(product.extendedData, "UPC"),
                 imageUrl: product.imageUrl || null,
                 url: product.url || null,
                 marketPrice,
