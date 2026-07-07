@@ -67,6 +67,20 @@ export async function createWant({
     wantsLogger.info("marketplace.want.created", { catalogProductId, hasMaxPrice: normalizedMax != null, qty });
 }
 
+// One open buy order with its buyer email + product, for a vendor's "I can fill this" response.
+export async function getBuyOrderById(id) {
+    if (!id) return null;
+    return db.queryOne(
+        `SELECT w.id, w.email, w.max_price, w.quantity, w.catalog_product_id,
+                c.name, s.name AS set_name
+         FROM mkt_want w
+         JOIN tcg_cards c ON c.id = w.catalog_product_id
+         JOIN tcg_sets s ON s.id = c.set_id
+         WHERE w.id = $1 AND w.status = 'open'`,
+        [id]
+    );
+}
+
 // Open buy orders (demand) for vendors + the map. Filter by `near` {lat,lng,radiusKm} for a map tap,
 // by `productId` for one product, or by `buyerId` for a buyer's own orders. Each row carries the
 // product, the buyer's max price + quantity, and a coarse location.

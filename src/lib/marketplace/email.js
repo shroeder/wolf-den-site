@@ -141,6 +141,38 @@ export async function sendWantAvailableEmail(email, product) {
     return result;
 }
 
+// A vendor responds to a buyer's buy order ("I can fill this"). Emails the buyer; replies route
+// straight back to the vendor so they can arrange the deal.
+export async function sendBuyOrderResponseEmail(buyerEmail, { vendor, product, message = null, price = null }) {
+    const resend = getResendClient();
+    const priceLine = price != null ? `<p><strong>Their price:</strong> $${Number(price).toFixed(2)}</p>` : "";
+    const msgLine = message
+        ? `<p><strong>${escapeHtml(vendor.displayName)} says:</strong><br/>${escapeHtml(message)}</p>`
+        : "";
+
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: buyerEmail,
+        replyTo: vendor.email || undefined,
+        subject: `A vendor can fill your buy order: ${product.name}`,
+        html: `
+            <h1>Good news — a vendor has what you're looking for</h1>
+            <p><strong>${escapeHtml(vendor.displayName)}</strong> can fill your buy order for <strong>${escapeHtml(product.name)}</strong>${product.setName ? ` — ${escapeHtml(product.setName)}` : ""}.</p>
+            ${priceLine}
+            ${msgLine}
+            <p>Just reply to this email to reach ${escapeHtml(vendor.displayName)} directly and arrange the deal.</p>
+            <hr />
+            <p><small>The Wolf Den Marketplace</small></p>
+        `,
+    });
+
+    if (result?.error) {
+        throw new Error(result.error.message || "Failed to send buy-order response email.");
+    }
+
+    return result;
+}
+
 // Weekly vendor-only digest of Vendor Missions (network opportunities). Private per-vendor — never
 // sent to buyers.
 export async function sendVendorMissionsEmail({ vendor, demandGaps = [], uniques = [] }) {

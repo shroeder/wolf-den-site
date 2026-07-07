@@ -1760,6 +1760,115 @@ function VendorFulfillmentEditor({ vendor, onChanged }) {
     );
 }
 
+function BuyOrdersBoard() {
+    const [orders, setOrders] = useState(null);
+    const [respondingId, setRespondingId] = useState(null);
+    const [message, setMessage] = useState("");
+    const [price, setPrice] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [done, setDone] = useState({});
+
+    useEffect(() => {
+        let active = true;
+        fetch("/api/marketplace/buy-orders?limit=100", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => { if (active) setOrders(Array.isArray(d.orders) ? d.orders : []); })
+            .catch(() => { if (active) setOrders([]); });
+        return () => { active = false; };
+    }, []);
+
+    async function respond(id) {
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/marketplace/buy-orders/${id}/respond`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: message.trim() || null, price: price ? Number(price) : null }),
+            });
+            if (res.ok) {
+                setDone((d) => ({ ...d, [id]: true }));
+                setRespondingId(null);
+                setMessage("");
+                setPrice("");
+            }
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    if (orders != null && orders.length === 0) {
+        return null;
+    }
+
+    return (
+        <section className="card">
+            <h2>🛒 Buy orders — buyers want these</h2>
+            <p className="muted">Open requests from buyers, with what they&apos;ll pay. Fill one and they&apos;ll hear from you by email.</p>
+            {orders == null ? (
+                <p className="muted">Loading…</p>
+            ) : (
+                <ul className="mkt-admin-list">
+                    {orders.map((o) => (
+                        <li key={o.id} className="mkt-admin-row">
+                            <div className="mkt-admin-info">
+                                <strong>{o.name}</strong>
+                                <span className="mkt-offer-meta">
+                                    {o.setName ? `${o.setName} · ` : ""}
+                                    {o.maxPrice != null ? `up to $${Number(o.maxPrice).toFixed(2)}` : "any price"}
+                                    {o.quantity > 1 ? ` · qty ${o.quantity}` : ""}
+                                    {o.marketPrice != null ? ` · market $${Number(o.marketPrice).toFixed(2)}` : ""}
+                                </span>
+                                {o.note ? <span className="mkt-offer-meta">&ldquo;{o.note}&rdquo;</span> : null}
+                                {respondingId === o.id ? (
+                                    <div className="stack" style={{ marginTop: 8, gap: 6, maxWidth: 340 }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="Your price (optional)"
+                                            value={price}
+                                            onChange={(e) => setPrice(e.target.value)}
+                                        />
+                                        <textarea
+                                            rows={2}
+                                            placeholder="Message to the buyer (optional)"
+                                            value={message}
+                                            onChange={(e) => setMessage(e.target.value)}
+                                        />
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button type="button" className="pill" disabled={busy} onClick={() => respond(o.id)}>
+                                                {busy ? "Sending…" : "Send to buyer"}
+                                            </button>
+                                            <button type="button" className="pill" onClick={() => setRespondingId(null)}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                            {done[o.id] ? (
+                                <span className="pill" style={{ opacity: 0.7 }}>Sent ✓</span>
+                            ) : respondingId === o.id ? null : (
+                                <button
+                                    type="button"
+                                    className="pill"
+                                    onClick={() => {
+                                        setRespondingId(o.id);
+                                        setMessage("");
+                                        setPrice(o.maxPrice != null ? String(o.maxPrice) : "");
+                                    }}
+                                >
+                                    I can fill this →
+                                </button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </section>
+    );
+}
+
 export default function VendorPortalClient({
     vendor,
     listings,
@@ -1858,6 +1967,8 @@ export default function VendorPortalClient({
                     ) : null}
                 </div>
             </section>
+
+            <BuyOrdersBoard />
 
             <AgingInventory items={agingInventory} onChanged={refresh} />
 
