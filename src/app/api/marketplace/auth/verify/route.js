@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { verifyEmailCode, createBuyerSession } from "@/lib/marketplace/buyer-session.js";
+import { verifyEmailCode, createBuyerSession, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -25,6 +25,7 @@ export async function POST(request) {
                 return NextResponse.json({ error: message, reason: result.reason }, { status: 400 });
             }
             const { token, expiresAt } = await createBuyerSession(result.buyer.id, { deviceLabel: "app" });
+            await setBuyerSessionCookie(token);
             logger.info("marketplace.buyer.verified", { buyerId: result.buyer.id });
             return NextResponse.json({ ok: true, token, expiresAt, role: "buyer", buyer: result.buyer });
         } catch (error) {

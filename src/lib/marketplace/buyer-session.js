@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes, randomInt } from "node:crypto";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 import { db } from "@/lib/db";
@@ -226,7 +226,7 @@ export async function resetPassword(token, newPassword) {
     return true;
 }
 
-// Bearer token from the Authorization header (the app's only auth transport).
+// Bearer token from the Authorization header (the app's auth transport).
 export async function getBearerToken() {
     try {
         const h = await headers();
@@ -240,9 +240,42 @@ export async function getBearerToken() {
     return null;
 }
 
-// The authenticated buyer for the current request (bearer token), or null.
+// Web buyer session cookie (mirrors the vendor cookie) so buyers can sign in on the website with the
+// SAME account the app uses. Separate from the flag-gated /shop account system.
+export const MKT_BUYER_COOKIE = "wolfden-mkt-buyer-session";
+const BUYER_COOKIE_MAX_AGE = 90 * 24 * 60 * 60;
+
+export async function setBuyerSessionCookie(token) {
+    const cookieStore = await cookies();
+    cookieStore.set(MKT_BUYER_COOKIE, token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: BUYER_COOKIE_MAX_AGE,
+    });
+}
+
+export async function clearBuyerSessionCookie() {
+    const cookieStore = await cookies();
+    cookieStore.delete(MKT_BUYER_COOKIE);
+}
+
+// Token from the Authorization header (app) OR the buyer cookie (web).
+export async function getBuyerSessionToken() {
+    const bearer = await getBearerToken();
+    if (bearer) return bearer;
+    try {
+        const cookieStore = await cookies();
+        return cookieStore.get(MKT_BUYER_COOKIE)?.value || null;
+    } catch {
+        return null;
+    }
+}
+
+// The authenticated buyer for the current request (bearer token or web cookie), or null.
 export async function getAuthenticatedBuyer() {
-    const token = await getBearerToken();
+    const token = await getBuyerSessionToken();
     if (!token) return null;
     const session = await resolveBuyerSession(token);
     return session ? session.buyer : null;

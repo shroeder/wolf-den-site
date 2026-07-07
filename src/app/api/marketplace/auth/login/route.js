@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { authenticateBuyer, createBuyerSession, createEmailVerification, getAccountLinkedVendorId } from "@/lib/marketplace/buyer-session.js";
+import { authenticateBuyer, createBuyerSession, createEmailVerification, getAccountLinkedVendorId, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
 import { createVendorSession } from "@/lib/marketplace/vendor-session.js";
 import { sendVerificationEmail } from "@/lib/marketplace/email.js";
 import { authenticateVendor, getVendorById } from "@/lib/marketplace/vendors.js";
@@ -34,6 +34,10 @@ export async function POST(request) {
                     return NextResponse.json({ ok: true, needsVerification: true, email: account.email });
                 }
                 const { token, expiresAt } = await createBuyerSession(account.id, { deviceLabel: "app" });
+                // Also set a web cookie so the SAME account works on the website (app ignores it and
+                // uses the returned token). getAuthenticatedVendor falls back to the linked account,
+                // so this one cookie covers both buyer and seller web sessions.
+                await setBuyerSessionCookie(token);
                 const vendorId = await getAccountLinkedVendorId(account.id);
                 if (vendorId) {
                     const vendor = await getVendorById(vendorId);
