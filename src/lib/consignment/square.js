@@ -818,6 +818,81 @@ export async function listInStockTcgSkus() {
     return quantityByProductId;
 }
 
+const LISTING_SEALED_KEYWORDS = ["sealed", "box", "booster", "elite trainer", "blister", "pack", "bundle", "case", "tin", "collection"];
+const LISTING_CONDITION_RE = /\s+(NM|LP|MP|HP|DMG)\s*$/i;
+
+// Server-side equivalent of the admin app's fetchListingSyncRows: in-stock items with a TCG-<id>
+// SKU, shaped as marketplace listing rows (catalog id from the SKU, condition parsed from the title,
+// kind inferred from the Square category). Used by the hourly auto-sync cron.
+export async function listTcgListingRows() {
+    const categories = new Map();
+    let cursor = null;
+    do {
+        const params = new URLSearchParams({ types: "CATEGORY" });
+        if (cursor) params.set("cursor", cursor);
+        const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+        for (const o of payload.objects || []) {
+            if (o.type === "CATEGORY" && o.id && o.category_data?.name) {
+                categories.set(o.id, String(o.category_data.name).toLowerCase());
+            }
+        }
+        cursor = payload.cursor || null;
+    } while (cursor);
+
+    const items = [];
+    const variationIds = [];
+    cursor = null;
+    do {
+        const params = new URLSearchParams({ types: "ITEM" });
+        if (cursor) params.set("cursor", cursor);
+        const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+        for (const item of payload.objects || []) {
+            if (item.type !== "ITEM" || isMysteryCatalogItem(item)) continue;
+            if (item.item_data?.is_archived) continue;
+            const variation = item.item_data?.variations?.[0];
+            if (!variation) continue;
+            const sku = (variation.item_variation_data?.sku || "").trim();
+            const match = TCG_SKU_PATTERN.exec(sku);
+            if (!match) continue;
+            const categoryId =
+                item.item_data?.category_id ||
+                item.item_data?.categories?.[0]?.id ||
+                item.item_data?.reporting_category?.id ||
+                null;
+            items.push({
+                variationId: variation.id,
+                productId: Number(match[1]),
+                title: item.item_data?.name || "",
+                price: Number(variation.item_variation_data?.price_money?.amount || 0) / 100,
+                categoryId,
+            });
+            variationIds.push(variation.id);
+        }
+        cursor = payload.cursor || null;
+    } while (cursor);
+
+    const counts = await getInventoryCounts(variationIds);
+
+    const rows = [];
+    for (const it of items) {
+        const qty = counts.get(it.variationId) || 0;
+        if (qty <= 0) continue;
+        const categoryName = it.categoryId ? categories.get(it.categoryId) || "" : "";
+        const kind = LISTING_SEALED_KEYWORDS.some((k) => categoryName.includes(k)) ? "sealed" : "single";
+        const conditionMatch = LISTING_CONDITION_RE.exec(it.title.trim());
+        const condition = kind === "single" ? (conditionMatch ? conditionMatch[1].toUpperCase() : "NM") : null;
+        rows.push({
+            catalogProductId: String(it.productId),
+            kind,
+            condition,
+            title: it.title,
+            price: it.price,
+            quantity: qty,
+        });
+    }
+    return rows;
+}
+
 function normalizeName(value) {
     return String(value || "")
         .trim()

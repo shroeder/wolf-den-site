@@ -62,6 +62,10 @@
         {
             "path": "/api/jobs/marketplace-price-snapshot",
             "schedule": "0 7 * * *"
+        },
+        {
+            "path": "/api/jobs/marketplace-square-sync",
+            "schedule": "15 * * * *"
         }
     ]
 }
