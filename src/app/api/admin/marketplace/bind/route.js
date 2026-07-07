@@ -7,6 +7,21 @@ import { withRequestLogging } from "@/lib/server-logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// The set of already-bound Square item ids, so the admin app can show only items that still need
+// binding (regardless of whether they have an image).
+export async function GET(request) {
+    return withRequestLogging(request, "GET /api/admin/marketplace/bind", async ({ logger, internalError }) => {
+        const authError = await requireAdminAccess(request, "marketplace.manage", logger);
+        if (authError) return authError;
+        try {
+            const rows = await db.query(`SELECT square_item_id FROM mkt_square_binding`);
+            return NextResponse.json({ squareItemIds: rows.map((r) => r.square_item_id) });
+        } catch (error) {
+            return internalError(error, { event: "admin.marketplace.bind.list.failure" });
+        }
+    });
+}
+
 // Bind a Square item to a TCGplayer catalog product (from an approved AI match in the admin app), so
 // the marketplace sync can list it even though its SKU isn't a TCG- id. Body: { squareItemId,
 // catalogProductId }. Pass catalogProductId=null to remove a binding.

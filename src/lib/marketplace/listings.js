@@ -311,13 +311,15 @@ export async function getListingById(id) {
 
 export async function listVendorListings(vendorId, { includeDeleted = false } = {}) {
     const rows = await db.query(
-        `SELECT l.id, l.vendor_id, l.kind, l.catalog_product_id, l.game, l.title, l.set_name,
+        `SELECT l.id, l.vendor_id, l.kind, l.catalog_product_id, COALESCE(l.game, c.game) AS game,
+                l.title, COALESCE(l.set_name, s.name) AS set_name,
                 l.card_number, COALESCE(l.image_url, c.image_url) AS image_url, l.condition, l.graded,
                 l.grading_company, l.grade, l.language, l.price, l.quantity, l.pricing_mode,
                 l.pricing_value, l.dealer_available, l.wholesale_price, l.vendor_only, l.status,
                 l.created_at, l.updated_at, c.market_price AS catalog_market_price
          FROM mkt_listing l
          LEFT JOIN tcg_cards c ON c.id = l.catalog_product_id
+         LEFT JOIN tcg_sets s ON s.id = c.set_id
          WHERE l.vendor_id = $1 ${includeDeleted ? "" : "AND l.status = 'active'"}
          ORDER BY l.created_at DESC`,
         [vendorId]
