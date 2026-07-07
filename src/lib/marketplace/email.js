@@ -173,6 +173,30 @@ export async function sendBuyOrderResponseEmail(buyerEmail, { vendor, product, m
     return result;
 }
 
+// "You have a new message" nudge back into the app/portal. The conversation lives in-platform — this
+// is only a ping, so it never contains reply-to routing to the other party's raw email.
+export async function sendNewMessageEmail(toEmail, { fromName, preview, openUrl }) {
+    const resend = getResendClient();
+    const goldButton = "display:inline-block;padding:12px 24px;background:#D4AF37;color:#0E0E0E;text-decoration:none;border-radius:6px;font-weight:bold;";
+    const result = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: toEmail,
+        subject: `New message from ${fromName}`,
+        html: `
+            <h1>You have a new message</h1>
+            <p><strong>${escapeHtml(fromName)}</strong> messaged you on the Wolf Den Marketplace:</p>
+            <blockquote style="border-left:3px solid #D4AF37;padding-left:12px;color:#555;">${escapeHtml(preview || "")}</blockquote>
+            <p><a href="${openUrl}" style="${goldButton}">Open your messages</a></p>
+            <hr />
+            <p><small>Reply in the app to keep the conversation in one place.</small></p>
+        `,
+    });
+    if (result?.error) {
+        throw new Error(result.error.message || "Failed to send new-message email.");
+    }
+    return result;
+}
+
 // Weekly vendor-only digest of Vendor Missions (network opportunities). Private per-vendor — never
 // sent to buyers.
 export async function sendVendorMissionsEmail({ vendor, demandGaps = [], uniques = [] }) {

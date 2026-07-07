@@ -71,7 +71,7 @@ export async function createWant({
 export async function getBuyOrderById(id) {
     if (!id) return null;
     return db.queryOne(
-        `SELECT w.id, w.email, w.max_price, w.quantity, w.catalog_product_id,
+        `SELECT w.id, w.email, w.buyer_id, w.max_price, w.quantity, w.catalog_product_id,
                 c.name, s.name AS set_name
          FROM mkt_want w
          JOIN tcg_cards c ON c.id = w.catalog_product_id
