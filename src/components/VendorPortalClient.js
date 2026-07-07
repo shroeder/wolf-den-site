@@ -73,6 +73,8 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [selected, setSelected] = useState(null);
+    const [barcode, setBarcode] = useState("");
+    const [scanMsg, setScanMsg] = useState("");
     const [title, setTitle] = useState("");
     const [kind, setKind] = useState("sealed");
     const [condition, setCondition] = useState("NM");
@@ -205,6 +207,62 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
         setSelected(product);
         setTitle(product.name);
         setKind(inferKind(product));
+    }
+
+    async function lookupBarcode(raw) {
+        const upc = String(raw || "").replace(/\D/g, "");
+        if (upc.length < 6) {
+            setScanMsg("Enter or scan a barcode.");
+            return;
+        }
+        setScanMsg("Looking up…");
+        try {
+            const res = await fetch(`/api/marketplace/catalog/by-upc?upc=${upc}`, { cache: "no-store" });
+            const data = await res.json().catch(() => ({}));
+            const list = Array.isArray(data.results) ? data.results : [];
+            if (list.length === 0) {
+                setScanMsg(`No catalog match for ${upc} — it may be a single or unlisted product. Search by name instead.`);
+            } else if (list.length === 1) {
+                pick(list[0]);
+                setScanMsg("");
+            } else {
+                pick(list[0]);
+                setScanMsg(`Multiple matches — verify it's “${list[0].name}”.`);
+            }
+        } catch {
+            setScanMsg("Lookup failed — try again.");
+        }
+    }
+
+    async function scanWithCamera() {
+        if (typeof window === "undefined" || !("BarcodeDetector" in window)) {
+            setScanMsg("Camera scanning isn't supported in this browser — use a USB scanner or type the barcode.");
+            return;
+        }
+        try {
+            const detector = new window.BarcodeDetector({ formats: ["upc_a", "upc_e", "ean_13", "ean_8"] });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            const video = document.createElement("video");
+            video.srcObject = stream;
+            await video.play();
+            setScanMsg("Point the camera at the barcode…");
+            const deadline = Date.now() + 15000;
+            let found = null;
+            while (!found && Date.now() < deadline) {
+                const codes = await detector.detect(video).catch(() => []);
+                if (codes && codes.length) found = codes[0].rawValue;
+                else await new Promise((r) => setTimeout(r, 250));
+            }
+            stream.getTracks().forEach((t) => t.stop());
+            if (found) {
+                setBarcode(found);
+                await lookupBarcode(found);
+            } else {
+                setScanMsg("No barcode detected — try again or type it.");
+            }
+        } catch {
+            setScanMsg("Couldn't access the camera.");
+        }
     }
 
     function startManual() {
@@ -365,6 +423,23 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                     </select>
                 </>
             ) : null}
+
+            <label htmlFor="add-barcode">Scan or enter a barcode (sealed products)</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input
+                    id="add-barcode"
+                    type="text"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookupBarcode(barcode); } }}
+                    placeholder="Scan with a USB scanner, or type the UPC"
+                    autoComplete="off"
+                    style={{ flex: 1, minWidth: 180 }}
+                />
+                <button type="button" className="pill" onClick={() => lookupBarcode(barcode)}>Find</button>
+                <button type="button" className="pill" onClick={scanWithCamera}>📷 Camera</button>
+            </div>
+            {scanMsg ? <p className="mkt-search-hint">{scanMsg}</p> : null}
 
             <label htmlFor="add-search">Search by name, set, or card number (optional if a set is chosen)</label>
             <input
