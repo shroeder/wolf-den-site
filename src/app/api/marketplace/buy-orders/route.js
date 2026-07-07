@@ -28,9 +28,12 @@ export async function GET(request) {
                 buyerId = session.buyer.id;
             }
 
-            const lat = Number(searchParams.get("lat"));
-            const lng = Number(searchParams.get("lng"));
-            const near = Number.isFinite(lat) && Number.isFinite(lng)
+            const latRaw = searchParams.get("lat");
+            const lngRaw = searchParams.get("lng");
+            const lat = Number(latRaw);
+            const lng = Number(lngRaw);
+            // Guard against absent params: Number(null) is 0 (finite), which would wrongly filter to (0,0).
+            const near = latRaw != null && lngRaw != null && Number.isFinite(lat) && Number.isFinite(lng)
                 ? { lat, lng, radiusKm: Number(searchParams.get("radiusKm")) || 60 }
                 : null;
 
