@@ -14,8 +14,11 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            const rows = await db.query(`SELECT square_item_id FROM mkt_square_binding`);
-            return NextResponse.json({ squareItemIds: rows.map((r) => r.square_item_id) });
+            const rows = await db.query(`SELECT square_item_id, catalog_product_id FROM mkt_square_binding`);
+            return NextResponse.json({
+                squareItemIds: rows.map((r) => r.square_item_id),
+                bindings: rows.map((r) => ({ squareItemId: r.square_item_id, catalogProductId: String(r.catalog_product_id) })),
+            });
         } catch (error) {
             return internalError(error, { event: "admin.marketplace.bind.list.failure" });
         }
