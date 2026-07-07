@@ -46,3 +46,49 @@ export async function getMarketplaceMap({ days = 90 } = {}) {
         demand: demand.map((d) => ({ lat: Number(d.glat), lng: Number(d.glng), weight: d.weight })),
     };
 }
+
+// What's driving the heat near a point: the products people searched/viewed/wanted, and raw search
+// terms. Powers the map's "tap heat" sheet alongside buy orders.
+export async function getDemandNear({ lat, lng, radiusKm = 60, days = 90 } = {}) {
+    const dist = `(6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(e.lat)) * cos(radians(e.lng) - radians($2)) + sin(radians($1)) * sin(radians(e.lat)))))`;
+
+    const [products, searches] = await Promise.all([
+        db.query(
+            `SELECT e.catalog_product_id, c.name, c.image_url, c.market_price, s.name AS set_name,
+                    count(*)::int AS weight
+             FROM mkt_engagement e
+             JOIN tcg_cards c ON c.id = e.catalog_product_id
+             JOIN tcg_sets s ON s.id = c.set_id
+             WHERE e.lat IS NOT NULL AND e.catalog_product_id IS NOT NULL
+               AND e.created_at >= NOW() - ($4 || ' days')::interval
+               AND ${dist} <= $3
+             GROUP BY e.catalog_product_id, c.name, c.image_url, c.market_price, s.name
+             ORDER BY weight DESC
+             LIMIT 20`,
+            [lat, lng, radiusKm, days]
+        ),
+        db.query(
+            `SELECT lower(e.search_term) AS term, count(*)::int AS weight
+             FROM mkt_engagement e
+             WHERE e.lat IS NOT NULL AND e.search_term IS NOT NULL AND btrim(e.search_term) <> ''
+               AND e.created_at >= NOW() - ($4 || ' days')::interval
+               AND ${dist} <= $3
+             GROUP BY lower(e.search_term)
+             ORDER BY weight DESC
+             LIMIT 10`,
+            [lat, lng, radiusKm, days]
+        ),
+    ]);
+
+    return {
+        products: products.map((p) => ({
+            catalogProductId: String(p.catalog_product_id),
+            name: p.name,
+            setName: p.set_name,
+            imageUrl: p.image_url,
+            marketPrice: p.market_price === null ? null : Number(p.market_price),
+            weight: Number(p.weight) || 0,
+        })),
+        searches: searches.map((r) => ({ term: r.term, weight: Number(r.weight) || 0 })),
+    };
+}
