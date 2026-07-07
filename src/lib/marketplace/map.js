@@ -89,6 +89,20 @@ export async function getDemandNear({ lat, lng, radiusKm = 60, days = 90 } = {})
             marketPrice: p.market_price === null ? null : Number(p.market_price),
             weight: Number(p.weight) || 0,
         })),
-        searches: searches.map((r) => ({ term: r.term, weight: Number(r.weight) || 0 })),
+        searches: cleanSearchTerms(searches),
     };
+}
+
+// Typeahead logs a 'search' on every keystroke, so raw terms are noisy prefixes ("lu", "lumo",
+// "lumin…"). Drop <3 chars and collapse a term that's just a prefix of a longer kept one.
+function cleanSearchTerms(rows) {
+    const terms = rows
+        .map((r) => ({ term: String(r.term || "").trim(), weight: Number(r.weight) || 0 }))
+        .filter((r) => r.term.length >= 3);
+    const byLongest = [...terms].sort((a, b) => b.term.length - a.term.length);
+    const kept = [];
+    for (const t of byLongest) {
+        if (!kept.some((k) => k.term.startsWith(t.term))) kept.push(t);
+    }
+    return kept.sort((a, b) => b.weight - a.weight).slice(0, 8);
 }
