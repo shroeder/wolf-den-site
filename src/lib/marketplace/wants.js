@@ -21,7 +21,16 @@ export function isValidEmail(value) {
 
 // Record a buyer's want for a catalog product (idempotent per person+product). An optional maxPrice
 // only alerts them when a listing appears at or under that price.
-export async function createWant({ catalogProductId, email, maxPrice = null }) {
+export async function createWant({
+    catalogProductId,
+    email,
+    maxPrice = null,
+    quantity = 1,
+    note = null,
+    lat = null,
+    lng = null,
+    buyerId = null,
+}) {
     if (!catalogProductId) {
         throw new Error("A product is required.");
     }
@@ -37,17 +46,89 @@ export async function createWant({ catalogProductId, email, maxPrice = null }) {
 
     const parsed = maxPrice != null && maxPrice !== "" ? Number(maxPrice) : null;
     const normalizedMax = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    const qty = Math.min(Math.max(Math.round(Number(quantity) || 1), 1), 999);
+    const cleanNote = note != null && String(note).trim() !== "" ? String(note).trim().slice(0, 500) : null;
+    const glat = Number.isFinite(Number(lat)) ? Number(lat) : null;
+    const glng = Number.isFinite(Number(lng)) ? Number(lng) : null;
 
-    // Re-registering updates the threshold and re-arms the alert (so a matching listing re-notifies).
+    // Re-registering updates the buy order and re-arms the alert (so a matching listing re-notifies).
+    // COALESCE keeps a prior location/buyer if this call didn't supply one.
     await db.query(
-        `INSERT INTO mkt_want (catalog_product_id, email, email_normalized, max_price)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO mkt_want (catalog_product_id, email, email_normalized, max_price, quantity, note, lat, lng, buyer_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'open')
          ON CONFLICT (catalog_product_id, email_normalized)
-         DO UPDATE SET max_price = EXCLUDED.max_price, notified_at = NULL, updated_at = NOW()`,
-        [catalogProductId, String(email).trim(), normalizeEmail(email), normalizedMax]
+         DO UPDATE SET max_price = EXCLUDED.max_price, quantity = EXCLUDED.quantity, note = EXCLUDED.note,
+                       lat = COALESCE(EXCLUDED.lat, mkt_want.lat), lng = COALESCE(EXCLUDED.lng, mkt_want.lng),
+                       buyer_id = COALESCE(EXCLUDED.buyer_id, mkt_want.buyer_id),
+                       status = 'open', notified_at = NULL, updated_at = NOW()`,
+        [catalogProductId, String(email).trim(), normalizeEmail(email), normalizedMax, qty, cleanNote, glat, glng, buyerId]
     );
 
-    wantsLogger.info("marketplace.want.created", { catalogProductId, hasMaxPrice: normalizedMax != null });
+    wantsLogger.info("marketplace.want.created", { catalogProductId, hasMaxPrice: normalizedMax != null, qty });
+}
+
+// Open buy orders (demand) for vendors + the map. Filter by `near` {lat,lng,radiusKm} for a map tap,
+// by `productId` for one product, or by `buyerId` for a buyer's own orders. Each row carries the
+// product, the buyer's max price + quantity, and a coarse location.
+export async function listBuyOrders({ productId = null, buyerId = null, near = null, limit = 100 } = {}) {
+    const params = [];
+    const where = ["w.status = 'open'"];
+
+    if (productId) {
+        params.push(productId);
+        where.push(`w.catalog_product_id = $${params.length}`);
+    }
+    if (buyerId) {
+        params.push(buyerId);
+        where.push(`w.buyer_id = $${params.length}`);
+    }
+
+    let distanceSelect = "NULL::numeric AS distance_km";
+    let orderBy = "w.created_at DESC";
+    if (near && Number.isFinite(Number(near.lat)) && Number.isFinite(Number(near.lng))) {
+        const radiusKm = Math.min(Math.max(Number(near.radiusKm) || 60, 1), 500);
+        params.push(Number(near.lat), Number(near.lng));
+        const latP = `$${params.length - 1}`;
+        const lngP = `$${params.length}`;
+        // Haversine (km). Only orders with a location can match a location filter.
+        const dist = `(6371 * acos(LEAST(1, cos(radians(${latP})) * cos(radians(w.lat)) * cos(radians(w.lng) - radians(${lngP})) + sin(radians(${latP})) * sin(radians(w.lat)))))`;
+        distanceSelect = `${dist} AS distance_km`;
+        where.push(`w.lat IS NOT NULL AND w.lng IS NOT NULL AND ${dist} <= ${radiusKm}`);
+        orderBy = "distance_km ASC, w.created_at DESC";
+    }
+
+    params.push(Math.min(Number(limit) || 100, 300));
+
+    const rows = await db.query(
+        `SELECT w.id, w.catalog_product_id, w.max_price, w.quantity, w.note, w.lat, w.lng, w.created_at,
+                c.name, c.number, c.image_url, c.market_price, c.game, s.name AS set_name,
+                ${distanceSelect}
+         FROM mkt_want w
+         JOIN tcg_cards c ON c.id = w.catalog_product_id
+         JOIN tcg_sets s ON s.id = c.set_id
+         WHERE ${where.join(" AND ")}
+         ORDER BY ${orderBy}
+         LIMIT $${params.length}`,
+        params
+    );
+
+    return rows.map((row) => ({
+        id: row.id,
+        catalogProductId: String(row.catalog_product_id),
+        name: row.name,
+        setName: row.set_name,
+        number: row.number,
+        game: row.game,
+        imageUrl: row.image_url,
+        marketPrice: row.market_price === null ? null : Number(row.market_price),
+        maxPrice: row.max_price === null ? null : Number(row.max_price),
+        quantity: Number(row.quantity) || 1,
+        note: row.note || null,
+        lat: row.lat === null ? null : Number(row.lat),
+        lng: row.lng === null ? null : Number(row.lng),
+        distanceKm: row.distance_km === null ? null : Number(row.distance_km),
+        createdAt: row.created_at,
+    }));
 }
 
 // Called when a vendor lists a product: email everyone waiting on it (once), mark them notified.
