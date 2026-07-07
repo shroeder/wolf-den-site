@@ -35,7 +35,9 @@ export async function GET(request) {
                 return NextResponse.json({ error: "no sync vendor configured" }, { status: 400 });
             }
 
-            const rows = await listTcgListingRows();
+            const bindingRows = await db.query(`SELECT square_item_id, catalog_product_id FROM mkt_square_binding`);
+            const bindings = new Map(bindingRows.map((r) => [r.square_item_id, r.catalog_product_id]));
+            const rows = await listTcgListingRows(bindings);
             const result = await syncListingsFromSquare(vendorId, rows);
 
             logger.info("marketplace.square_sync.done", { vendorId, rowCount: rows.length, ...result });

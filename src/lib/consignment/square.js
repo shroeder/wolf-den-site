@@ -821,10 +821,11 @@ export async function listInStockTcgSkus() {
 const LISTING_SEALED_KEYWORDS = ["sealed", "box", "booster", "elite trainer", "blister", "pack", "bundle", "case", "tin", "collection"];
 const LISTING_CONDITION_RE = /\s+(NM|LP|MP|HP|DMG)\s*$/i;
 
-// Server-side equivalent of the admin app's fetchListingSyncRows: in-stock items with a TCG-<id>
-// SKU, shaped as marketplace listing rows (catalog id from the SKU, condition parsed from the title,
-// kind inferred from the Square category). Used by the hourly auto-sync cron.
-export async function listTcgListingRows() {
+// Server-side equivalent of the admin app's fetchListingSyncRows: in-stock items shaped as
+// marketplace listing rows (catalog id from the TCG- SKU, condition from the title, kind from the
+// Square category). `bindings` (Map of Square item id -> catalog product id) also pulls in
+// sealed/accessories that have no TCG- SKU but were bound via an approved AI match. Used by the cron.
+export async function listTcgListingRows(bindings = new Map()) {
     const categories = new Map();
     let cursor = null;
     do {
@@ -853,7 +854,12 @@ export async function listTcgListingRows() {
             if (!variation) continue;
             const sku = (variation.item_variation_data?.sku || "").trim();
             const match = TCG_SKU_PATTERN.exec(sku);
-            if (!match) continue;
+            let productId = match ? Number(match[1]) : null;
+            if (!productId) {
+                const bound = bindings.get(item.id);
+                if (bound) productId = Number(bound);
+            }
+            if (!productId) continue;
             const categoryId =
                 item.item_data?.category_id ||
                 item.item_data?.categories?.[0]?.id ||
@@ -861,7 +867,7 @@ export async function listTcgListingRows() {
                 null;
             items.push({
                 variationId: variation.id,
-                productId: Number(match[1]),
+                productId,
                 title: item.item_data?.name || "",
                 price: Number(variation.item_variation_data?.price_money?.amount || 0) / 100,
                 categoryId,
