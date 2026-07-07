@@ -1760,6 +1760,126 @@ function VendorFulfillmentEditor({ vendor, onChanged }) {
     );
 }
 
+function MessagesPanel() {
+    const [threads, setThreads] = useState(null);
+    const [openId, setOpenId] = useState(null);
+    const [convo, setConvo] = useState(null);
+    const [reply, setReply] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    async function loadThreads() {
+        try {
+            const res = await fetch("/api/marketplace/threads?role=vendor", { cache: "no-store" });
+            const d = await res.json();
+            setThreads(Array.isArray(d.threads) ? d.threads : []);
+        } catch {
+            setThreads([]);
+        }
+    }
+    useEffect(() => {
+        let active = true;
+        fetch("/api/marketplace/threads?role=vendor", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => { if (active) setThreads(Array.isArray(d.threads) ? d.threads : []); })
+            .catch(() => { if (active) setThreads([]); });
+        return () => { active = false; };
+    }, []);
+
+    async function openThread(id) {
+        setOpenId(id);
+        setConvo(null);
+        try {
+            const res = await fetch(`/api/marketplace/threads/${id}`, { cache: "no-store" });
+            setConvo(await res.json());
+        } catch {
+            setConvo({ messages: [] });
+        }
+        loadThreads();
+    }
+
+    async function send() {
+        if (!reply.trim()) return;
+        setBusy(true);
+        try {
+            await fetch(`/api/marketplace/threads/${openId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: reply.trim() }),
+            });
+            setReply("");
+            await openThread(openId);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    if (threads != null && threads.length === 0) return null;
+
+    return (
+        <section className="card">
+            <h2>💬 Messages</h2>
+            {threads == null ? (
+                <p className="muted">Loading…</p>
+            ) : openId == null ? (
+                <ul className="mkt-admin-list">
+                    {threads.map((t) => (
+                        <li key={t.id} className="mkt-admin-row">
+                            <div className="mkt-admin-info">
+                                <strong>{t.counterpartName}{t.unread ? " ●" : ""}</strong>
+                                <span className="mkt-offer-meta">
+                                    {t.subject ? `Re: ${t.subject} · ` : ""}
+                                    {t.lastPreview || ""}
+                                </span>
+                            </div>
+                            <button type="button" className="pill" onClick={() => openThread(t.id)}>Open</button>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <div className="stack" style={{ gap: 10 }}>
+                    <button type="button" className="pill" style={{ alignSelf: "flex-start" }} onClick={() => { setOpenId(null); setConvo(null); }}>
+                        ← All messages
+                    </button>
+                    {convo == null ? (
+                        <p className="muted">Loading…</p>
+                    ) : (
+                        <>
+                            <strong>{convo.thread?.counterpartName || "Conversation"}</strong>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto", padding: "4px 0" }}>
+                                {(convo.messages || []).map((m) => (
+                                    <div
+                                        key={m.id}
+                                        style={{
+                                            alignSelf: m.mine ? "flex-end" : "flex-start",
+                                            background: m.mine ? "#D4AF37" : "#2a2a2a",
+                                            color: m.mine ? "#111" : "#eee",
+                                            padding: "8px 12px",
+                                            borderRadius: 12,
+                                            maxWidth: "80%",
+                                        }}
+                                    >
+                                        {m.body}
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                                <input
+                                    value={reply}
+                                    onChange={(e) => setReply(e.target.value)}
+                                    placeholder="Reply…"
+                                    style={{ flex: 1 }}
+                                    onKeyDown={(e) => { if (e.key === "Enter" && !busy) send(); }}
+                                />
+                                <button type="button" className="pill" disabled={busy} onClick={send}>{busy ? "…" : "Send"}</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+        </section>
+    );
+}
+
 function BuyOrdersBoard() {
     const [orders, setOrders] = useState(null);
     const [respondingId, setRespondingId] = useState(null);
@@ -1967,6 +2087,8 @@ export default function VendorPortalClient({
                     ) : null}
                 </div>
             </section>
+
+            <MessagesPanel />
 
             <BuyOrdersBoard />
 
