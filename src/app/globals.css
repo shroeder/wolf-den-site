@@ -5915,3 +5915,13 @@ body.tv-mode .shop-mobile-cart-fab {
     border-color: rgba(255, 255, 255, 0.18);
     background: rgba(255, 255, 255, 0.04);
 }
+
+/* `.hero-accent a` forces every hero link gold, overriding the button text colors above (higher
+   specificity). Scope the vendor-button colors so they win: dark text on the gold primary, light
+   text on the neutral secondary — kills the gold-on-gold "Vendor sign in". */
+.mkt-vendor-cta .mkt-vendor-btn {
+    color: var(--ink);
+}
+.mkt-vendor-cta .mkt-vendor-btn-primary {
+    color: #141414;
+}
