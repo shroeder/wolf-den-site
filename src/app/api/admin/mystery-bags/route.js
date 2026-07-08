@@ -28,11 +28,14 @@ function normalizePayload(body) {
         number: typeof body?.number === "string" ? body.number.trim() : "",
         marketValue: body?.marketValue,
         imageUrl: typeof body?.imageUrl === "string" ? body.imageUrl.trim() : "",
+        itemType: body?.itemType === "sealed_pack" ? "sealed_pack" : "card",
     };
 }
 
 function validatePayload(payload) {
-    if (!payload.name || !payload.set || !payload.number || payload.marketValue === undefined) {
+    // Sealed packs have no card number; singles still require one.
+    const needsNumber = payload.itemType !== "sealed_pack";
+    if (!payload.name || !payload.set || (needsNumber && !payload.number) || payload.marketValue === undefined) {
         return "missing_required_fields";
     }
 

@@ -33,6 +33,7 @@ function toMysteryBagCard(row) {
         number: row.card_number,
         marketValue: toMoneyNumber(row.market_value),
         imageUrl: row.image_url || null,
+        itemType: row.item_type || "card",
         status: row.status || "active",
         createdAt: toIso(row.created_at),
         updatedAt: toIso(row.updated_at),
@@ -65,6 +66,7 @@ export async function listMysteryBagCards() {
                 card_number,
                 market_value,
                 image_url,
+                item_type,
                 status,
                 created_at,
                 updated_at
@@ -94,6 +96,7 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
                 card_number,
                 market_value,
                 image_url,
+                item_type,
                 status,
                 created_at,
                 updated_at
@@ -267,6 +270,7 @@ export async function upsertMysteryBagCard(payload) {
 
     const variationId = payload.squareVariationId || null;
     const packedVariationId = payload.packedVariationId || null;
+    const itemType = payload.itemType === "sealed_pack" ? "sealed_pack" : "card";
     let variationSku = typeof payload.variationSku === "string" ? payload.variationSku.trim() : "";
 
     // The SKU belongs to the packed variation (the one printed/scanned/sold),
@@ -314,6 +318,7 @@ export async function upsertMysteryBagCard(payload) {
             card_number,
             market_value,
             image_url,
+            item_type,
             status,
             reservation_key,
             reserved_at,
@@ -321,7 +326,7 @@ export async function upsertMysteryBagCard(payload) {
             removed_at,
             updated_at
         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', NULL, NULL, NULL, NULL, NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', NULL, NULL, NULL, NULL, NOW())
          ON CONFLICT (card_id)
          DO UPDATE
          SET square_variation_id = EXCLUDED.square_variation_id,
@@ -332,6 +337,7 @@ export async function upsertMysteryBagCard(payload) {
              card_number = EXCLUDED.card_number,
              market_value = EXCLUDED.market_value,
              image_url = EXCLUDED.image_url,
+             item_type = EXCLUDED.item_type,
              status = 'active',
              reservation_key = NULL,
              reserved_at = NULL,
@@ -348,6 +354,7 @@ export async function upsertMysteryBagCard(payload) {
                    card_number,
                    market_value,
                    image_url,
+                   item_type,
                    status,
                    created_at,
                    updated_at`,
@@ -358,9 +365,10 @@ export async function upsertMysteryBagCard(payload) {
             variationSku,
             payload.name,
             payload.set,
-            payload.number,
+            payload.number || null,
             payload.marketValue,
             payload.imageUrl,
+            itemType,
         ]
     );
 
