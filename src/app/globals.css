@@ -2131,12 +2131,26 @@ textarea {
     }
 
     .shop-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.5rem;
     }
 
+    /* Selects size to their widest OPTION (long set names) and can push the whole page wider than the
+       screen. Force them to fill the row and shrink instead. */
+    .shop-sort-control {
+        display: flex;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .shop-sort-select {
+        flex: 1;
+        min-width: 0;
+        max-width: 100%;
+    }
+
     .shop-tile-image {
-        padding: 0.25rem;
+        padding: 0.3rem;
     }
 
     .shop-tile-body {
@@ -2193,8 +2207,8 @@ textarea {
 
 @media (max-width: 420px) {
     .shop-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.4rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
     }
 }
 
