@@ -10,22 +10,30 @@ export default function MarketplaceMessagesClient({ buyerName = null }) {
     const [reply, setReply] = useState("");
     const [busy, setBusy] = useState(false);
 
-    async function loadThreads() {
-        try {
-            const res = await fetch("/api/marketplace/threads?role=buyer", { cache: "no-store" });
-            const d = await res.json();
-            setThreads(Array.isArray(d.threads) ? d.threads : []);
-        } catch {
-            setThreads([]);
+    // Pull both buyer- and vendor-side conversations and merge them, so a vendor account sees its
+    // seller threads here too (mirrors the app's Messages tab).
+    async function fetchBothRoles() {
+        const byId = new Map();
+        for (const role of ["buyer", "vendor"]) {
+            try {
+                const res = await fetch(`/api/marketplace/threads?role=${role}`, { cache: "no-store" });
+                if (!res.ok) continue;
+                const d = await res.json();
+                (Array.isArray(d.threads) ? d.threads : []).forEach((t) => byId.set(t.id, t));
+            } catch {
+                /* skip this role */
+            }
         }
+        return [...byId.values()].sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+    }
+    async function loadThreads() {
+        setThreads(await fetchBothRoles());
     }
     useEffect(() => {
         let active = true;
-        fetch("/api/marketplace/threads?role=buyer", { cache: "no-store" })
-            .then((r) => r.json())
-            .then((d) => { if (active) setThreads(Array.isArray(d.threads) ? d.threads : []); })
-            .catch(() => { if (active) setThreads([]); });
+        fetchBothRoles().then((list) => { if (active) setThreads(list); });
         return () => { active = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Deep link from the new-message email (?thread=…) opens that conversation straight away.
