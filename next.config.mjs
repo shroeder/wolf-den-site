@@ -9,6 +9,12 @@ const nextConfig = {
             { protocol: "https", hostname: "product-images.tcgplayer.com" },
         ],
     },
+    async rewrites() {
+        return [
+            // Serve the Android App Links verification file (public/ dot-folders aren't served).
+            { source: "/.well-known/assetlinks.json", destination: "/api/assetlinks" },
+        ];
+    },
     async redirects() {
         return [
             {
