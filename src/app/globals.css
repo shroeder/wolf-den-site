@@ -2131,8 +2131,8 @@ textarea {
     }
 
     .shop-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.5rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.45rem;
     }
 
     /* Selects size to their widest OPTION (long set names) and can push the whole page wider than the
@@ -2207,8 +2207,8 @@ textarea {
 
 @media (max-width: 420px) {
     .shop-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.5rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.45rem;
     }
 }
 
