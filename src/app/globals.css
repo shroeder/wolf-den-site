@@ -5699,3 +5699,155 @@ body.tv-mode .shop-mobile-cart-fab {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ============================================================================
+   Mobile refinement pass 2 — audit-driven, app-like density across every page.
+   ============================================================================ */
+@media (max-width: 600px) {
+    /* Buttons were never shrunk for mobile (only .pill was) — they read oversized. */
+    .button {
+        padding: 0.42rem 0.9rem;
+        font-size: 0.9rem;
+    }
+    /* CTA rows fill the width like an app's primary actions instead of floating small. */
+    .cta-row > * {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    /* Form submit buttons go full-width (app form pattern). */
+    .contact-form .button,
+    .contact-form button[type="submit"] {
+        width: 100%;
+    }
+    .statement-copy {
+        padding: 0.6rem 0.8rem;
+    }
+    /* Portrait hero photos were dominating the first screen. */
+    .hero-photo {
+        max-height: 260px;
+        object-fit: cover;
+    }
+
+    /* Marketplace: lift the primary action (search) up; tidy forms. */
+    .mkt-app .mkt-hero-chips {
+        display: none;
+    }
+    .mkt-app .mkt-hero-links {
+        gap: 0.35rem;
+    }
+    .mkt-app .hero-accent {
+        padding: 0.6rem;
+    }
+    .mkt-app .hero-accent p {
+        margin: 0 0 0.3rem;
+    }
+    .mkt-app .contact-form {
+        gap: 0.55rem;
+    }
+    .mkt-app label {
+        margin-bottom: 0.25rem;
+    }
+    .contact-form .muted {
+        margin: 0.15rem 0 0;
+        font-size: 0.75rem;
+    }
+
+    /* Product page: image + spacing were px-based (ignored the root scale). */
+    .mkt-product-head {
+        gap: 0.9rem;
+    }
+    .mkt-product-image {
+        max-width: 150px;
+    }
+    /* Shorter map so the vendor list is reachable without a long scroll. */
+    .mkt-map,
+    .mkt-browse-map-card .mkt-map {
+        height: 240px;
+    }
+
+    /* Mystery bags: a "scan to connect" QR on the phone you're holding is pointless. */
+    .mb2-qr-rail {
+        display: none;
+    }
+    .mb2-head h1,
+    .mb-head h1 {
+        font-size: 1.5rem;
+    }
+
+    .just-in-filters {
+        gap: 0.5rem;
+    }
+}
+
+/* Header/nav + misc mobile refinements (audit pass 2). */
+@media (max-width: 700px) {
+    .top-row {
+        padding: 0.55rem 0;
+        gap: 0.5rem;
+    }
+    /* App-style 2-column menu instead of a ~660px-tall single column. */
+    .nav-inner {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .nav-link {
+        padding: 0.62rem 0.85rem;
+        font-size: 0.92rem;
+    }
+}
+@media (max-width: 600px) {
+    .contact-form {
+        gap: 0.6rem;
+    }
+    .site-footer {
+        margin-top: 1.2rem;
+        padding: 1rem 0;
+    }
+    /* Was min(390px,90vw) = 351px inside a ~337px card → ~14px clip. */
+    .giveaway-wheel-zone {
+        width: min(320px, 85vw);
+    }
+}
+
+/* Home hero: keep SEO copy in the DOM (still crawlable) but hide the redundant restatements on mobile. */
+@media (max-width: 600px) {
+    .home-seo-extra {
+        display: none;
+    }
+}
+
+/* Event details as a compact key/value panel instead of stacked "Label: value" paragraphs. */
+.event-facts {
+    display: grid;
+    gap: 0;
+    margin: 0.4rem 0 0;
+}
+.event-facts > div {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 0.5rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--line);
+}
+.event-facts > div:last-child {
+    border-bottom: none;
+}
+.event-facts dt {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+.event-facts dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .event-facts > div {
+        grid-template-columns: 6.5rem 1fr;
+    }
+    /* Looking-for: the inline "My List" duplicates the floating FAB + drawer on mobile. */
+    .lf-inline-mylist {
+        display: none;
+    }
+}

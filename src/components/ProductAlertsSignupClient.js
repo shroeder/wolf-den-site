@@ -155,12 +155,10 @@ export default function ProductAlertsSignupClient() {
                 )}
             </section>
 
-            <section className="card">
-                <p className="muted">
-                    Changed your mind? Every alert email has a one-click unsubscribe link. You can re-subscribe here
-                    anytime to update the categories you follow.
-                </p>
-            </section>
+            <p className="muted pa-fineprint">
+                Changed your mind? Every alert email has a one-click unsubscribe link. You can re-subscribe here
+                anytime to update the categories you follow.
+            </p>
         </div>
     );
 }

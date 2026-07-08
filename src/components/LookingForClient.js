@@ -530,7 +530,7 @@ export default function LookingForClient() {
                 </div>
             </section>
 
-            <section className="card">
+            <section className="card lf-inline-mylist">
                 <h2>My List{items.length ? ` (${items.length})` : ""}</h2>
                 {items.length === 0 ? (
                     <p className="muted">Nothing here yet. Search above and add the cards you&apos;re hunting for.</p>

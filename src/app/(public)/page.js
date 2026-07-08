@@ -69,10 +69,10 @@ export default async function HomePage() {
                     <p className="lead">
                         Trading card game store in Montgomery, Minnesota for Pokemon cards, Magic: The Gathering, sealed product, singles, accessories, and local community play.
                     </p>
-                    <p className="statement-copy">
+                    <p className="statement-copy home-seo-extra">
                         The Wolf Den is a locally owned trading card game store in Montgomery, Minnesota specializing in Pokemon cards, Magic: The Gathering, sealed product, accessories, and community events.
                     </p>
-                    <p>
+                    <p className="home-seo-extra">
                         Serving players and collectors across Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and surrounding southern Minnesota communities.
                     </p>
                     <p>

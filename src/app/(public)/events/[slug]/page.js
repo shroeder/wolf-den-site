@@ -135,33 +135,42 @@ export default async function EventDetailPage({ params }) {
             <section className="grid two-col">
                 <article className="card">
                     <h2>Event Details</h2>
-                    <p>
-                        <strong>Day:</strong> {event.day}
-                    </p>
-                    <p>
-                        <strong>Time:</strong> {event.time}
-                    </p>
-                    <p>
-                        <strong>Location:</strong> The Wolf Den, Montgomery, Minnesota
-                    </p>
-                    <p>
-                        <strong>Entry Fee:</strong> {event.entryFee}
-                    </p>
-                    {event.audience && (
-                        <p>
-                            <strong>Best For:</strong> {event.audience}
-                        </p>
-                    )}
-                    {typeof event.familyFriendly === "boolean" && (
-                        <p>
-                            <strong>Family Friendly:</strong> {event.familyFriendly ? "Yes" : "No"}
-                        </p>
-                    )}
-                    {event.capacity && (
-                        <p>
-                            <strong>Capacity:</strong> {event.capacity}
-                        </p>
-                    )}
+                    <dl className="event-facts">
+                        <div>
+                            <dt>Day</dt>
+                            <dd>{event.day}</dd>
+                        </div>
+                        <div>
+                            <dt>Time</dt>
+                            <dd>{event.time}</dd>
+                        </div>
+                        <div>
+                            <dt>Location</dt>
+                            <dd>The Wolf Den, Montgomery, Minnesota</dd>
+                        </div>
+                        <div>
+                            <dt>Entry</dt>
+                            <dd>{event.entryFee}</dd>
+                        </div>
+                        {event.audience && (
+                            <div>
+                                <dt>Best For</dt>
+                                <dd>{event.audience}</dd>
+                            </div>
+                        )}
+                        {typeof event.familyFriendly === "boolean" && (
+                            <div>
+                                <dt>Family</dt>
+                                <dd>{event.familyFriendly ? "Yes" : "No"}</dd>
+                            </div>
+                        )}
+                        {event.capacity && (
+                            <div>
+                                <dt>Capacity</dt>
+                                <dd>{event.capacity}</dd>
+                            </div>
+                        )}
+                    </dl>
                 </article>
                 <article className="card">
                     <h2>What to Expect</h2>

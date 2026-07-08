@@ -54,7 +54,7 @@ export default function ContactPage() {
                         <label htmlFor="email">Email</label>
                         <input id="email" name="email" type="email" required />
                         <label htmlFor="message">Message</label>
-                        <textarea id="message" name="message" rows={5} required />
+                        <textarea id="message" name="message" rows={3} required />
                         <button className="button primary" type="submit">
                             Send Message
                         </button>

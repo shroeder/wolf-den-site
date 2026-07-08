@@ -666,7 +666,7 @@ export default function ShopInventoryClient({
                         id="shop-product-search"
                         type="search"
                         className="shop-search-input"
-                        placeholder="Search products across all categories"
+                        placeholder="Search products"
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
                     />

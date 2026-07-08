@@ -82,7 +82,7 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
                     )}
                     {error ? <p style={{ color: "#e66" }}>{error}</p> : null}
                     {info ? <p className="muted">{info}</p> : null}
-                    <button type="submit" className="pill" disabled={busy}>
+                    <button type="submit" className="button primary" style={{ width: "100%" }} disabled={busy}>
                         {busy ? "…" : mode === "register" ? "Create account" : mode === "verify" ? "Verify" : "Sign in"}
                     </button>
                 </form>
