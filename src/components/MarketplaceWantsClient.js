@@ -51,6 +51,7 @@ export default function MarketplaceWantsClient() {
     const [results, setResults] = useState([]);
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState("");
+    const [account, setAccount] = useState(null); // signed-in buyer — auto-loads their list, no email needed
 
     async function loadWants(mail = email) {
         if (!mail) return;
@@ -62,6 +63,30 @@ export default function MarketplaceWantsClient() {
             setWants([]);
         }
     }
+
+    // If a buyer is signed in, resolve their email from the session and load their list automatically —
+    // no need to type an email. Falls back to the accountless email flow when signed out.
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (!res.ok) return;
+                const data = await res.json().catch(() => null);
+                const mail = data?.buyer?.email || data?.account?.email || data?.vendor?.email || "";
+                if (!ignore && mail) {
+                    setAccount({ email: mail });
+                    setEmail(mail);
+                    loadWants(mail);
+                }
+            } catch {
+                /* signed out — keep the email flow */
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     // Debounced catalog search.
     useEffect(() => {
@@ -127,20 +152,26 @@ export default function MarketplaceWantsClient() {
                     Instead of hunting, tell the marketplace what you&apos;re after. Vendors see the demand, and the
                     moment one lists a card on your list (at or under your price), you get an email.
                 </p>
-                <div className="contact-form" style={{ maxWidth: "420px" }}>
-                    <label htmlFor="wl-email">Your email</label>
-                    <input
-                        id="wl-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onBlur={() => loadWants()}
-                        placeholder="you@example.com"
-                    />
-                    <button type="button" className="button primary" onClick={() => loadWants()} disabled={!email}>
-                        Load my list
-                    </button>
-                </div>
+                {account ? (
+                    <p className="muted">
+                        Signed in as <strong>{account.email}</strong> — your want list is loaded below.
+                    </p>
+                ) : (
+                    <div className="contact-form" style={{ maxWidth: "420px" }}>
+                        <label htmlFor="wl-email">Your email</label>
+                        <input
+                            id="wl-email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            onBlur={() => loadWants()}
+                            placeholder="you@example.com"
+                        />
+                        <button type="button" className="button primary" onClick={() => loadWants()} disabled={!email}>
+                            Load my list
+                        </button>
+                    </div>
+                )}
                 <p className="mkt-hero-links">
                     <Link href="/marketplace" className="pill">
                         Search inventory instead
@@ -174,7 +205,7 @@ export default function MarketplaceWantsClient() {
             <section className="card">
                 <h2>My want list{Array.isArray(wants) ? ` (${wants.length})` : ""}</h2>
                 {wants === null ? (
-                    <p className="muted">Enter your email above to load your list.</p>
+                    <p className="muted">{account ? "Loading your list…" : "Enter your email above to load your list."}</p>
                 ) : wants.length === 0 ? (
                     <p className="muted">Nothing yet. Search above and add the cards you&apos;re looking for.</p>
                 ) : (
