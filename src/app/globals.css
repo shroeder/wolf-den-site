@@ -2135,6 +2135,17 @@ textarea {
         gap: 0.5rem;
     }
 
+    /* Fixed small image height so a tile image can NEVER blow up, regardless of aspect-ratio /
+       grid quirks or stale cache. Keeps thumbnails tidy and images fully visible (contain). */
+    .shop-tile-image-wrap {
+        aspect-ratio: auto;
+        height: 116px;
+    }
+
+    .shop-tile-image {
+        padding: 0.25rem;
+    }
+
     .shop-tile-body {
         padding: 0.5rem;
     }
