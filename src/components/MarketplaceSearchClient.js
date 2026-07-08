@@ -188,16 +188,22 @@ export default function MarketplaceSearchClient() {
                     <Link href="/marketplace/wants" className="pill">📋 Want list</Link>
                     <Link href="/marketplace/events" className="pill">📅 Events</Link>
                 </div>
-                <div className="mkt-hero-vendor">
-                    <span className="mkt-hero-vendor-label">Are you a vendor?</span>
-                    <Link href="/marketplace/portal" className="button primary mkt-hero-vendor-cta">
-                        Vendor sign in →
-                    </Link>
-                    <span className="mkt-hero-vendor-links">
-                        <Link href="/marketplace/apply">Become a vendor</Link>
-                        <span aria-hidden="true"> · </span>
-                        <Link href="/sell-cards">Sell your cards</Link>
-                    </span>
+                <div className="mkt-vendor-cta">
+                    <div className="mkt-vendor-cta-copy">
+                        <strong>For vendors</strong>
+                        <span>
+                            Manage your storefront, or apply to sell.{" "}
+                            <Link href="/sell-cards" className="mkt-vendor-cta-inline">Got cards to sell?</Link>
+                        </span>
+                    </div>
+                    <div className="mkt-vendor-cta-actions">
+                        <Link href="/marketplace/portal" className="mkt-vendor-btn mkt-vendor-btn-primary">
+                            Vendor sign in
+                        </Link>
+                        <Link href="/marketplace/apply" className="mkt-vendor-btn">
+                            Become a vendor
+                        </Link>
+                    </div>
                 </div>
             </section>
 

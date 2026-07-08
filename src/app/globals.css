@@ -4429,33 +4429,81 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 0.5rem;
 }
 
-/* Vendor access — a distinct, first-class block set apart from the buyer links. */
-.mkt-hero-vendor {
+/* Vendor access — a distinct gold-accented panel with SQUARED buttons, deliberately unlike the round
+   buyer pills so vendor sign-in / apply stand apart. */
+.mkt-vendor-cta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.75rem;
-    margin-top: 0.9rem;
-    padding-top: 0.9rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    justify-content: space-between;
+    gap: 0.85rem;
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--brand-strong, #d4af37);
+    border-radius: 14px;
+    background: rgba(212, 175, 55, 0.07);
 }
 
-.mkt-hero-vendor-label {
-    font-weight: 700;
+.mkt-vendor-cta-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
 }
 
-.mkt-hero-vendor-cta {
-    white-space: nowrap;
+.mkt-vendor-cta-copy strong {
+    font-size: 1rem;
 }
 
-.mkt-hero-vendor-links {
+.mkt-vendor-cta-copy span {
     font-size: 0.85rem;
     color: var(--muted);
 }
 
-.mkt-hero-vendor-links a {
-    color: var(--brand-strong);
+.mkt-vendor-cta-inline {
+    color: var(--brand-strong, #d4af37);
     font-weight: 600;
+    white-space: nowrap;
+}
+
+.mkt-vendor-cta-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.mkt-vendor-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    padding: 0.55rem 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid var(--brand-strong, #d4af37);
+    color: var(--brand-strong, #d4af37);
+    background: transparent;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.mkt-vendor-btn-primary {
+    background: var(--brand-strong, #d4af37);
+    color: #1a1508;
+}
+
+.mkt-vendor-btn:hover,
+.mkt-vendor-btn:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.25);
+}
+
+@media (max-width: 560px) {
+    .mkt-vendor-cta-actions {
+        width: 100%;
+    }
+
+    .mkt-vendor-btn {
+        flex: 1;
+    }
 }
 
 .mkt-search-hint {
