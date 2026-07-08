@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import ThemedSelect from "@/components/ThemedSelect";
 import { productHandle } from "@/lib/inventory-feed/product-url";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -75,19 +76,13 @@ export default function JustInClient({ items }) {
                     <label className="lf-search-label" htmlFor="just-in-cat">
                         Category
                     </label>
-                    <select
-                        id="just-in-cat"
-                        className="lf-set-select"
+                    <ThemedSelect
+                        block
+                        ariaLabel="Category"
                         value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                    >
-                        <option value="all">All categories</option>
-                        {categories.map((c) => (
-                            <option key={c} value={c}>
-                                {c}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={setCategory}
+                        options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]}
+                    />
                 </div>
             </section>
 

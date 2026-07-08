@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 
+import ThemedSelect from "@/components/ThemedSelect";
 import { productHandle } from "@/lib/inventory-feed/product-url";
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -681,19 +682,13 @@ export default function ShopInventoryClient({
                             <label htmlFor="shop-set-select" className="shop-sort-label">
                                 Set
                             </label>
-                            <select
-                                id="shop-set-select"
-                                className="shop-sort-select"
+                            <ThemedSelect
+                                block
+                                ariaLabel="Filter by set"
                                 value={setFilter}
-                                onChange={(event) => setSetFilter(event.target.value)}
-                            >
-                                <option value="">All sets</option>
-                                {availableSets.map((name) => (
-                                    <option key={name} value={name}>
-                                        {name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setSetFilter}
+                                options={[{ value: "", label: "All sets" }, ...availableSets.map((name) => ({ value: name, label: name }))]}
+                            />
                         </div>
                     )}
 
@@ -701,18 +696,13 @@ export default function ShopInventoryClient({
                         <label htmlFor="shop-sort-select" className="shop-sort-label">
                             Sort by
                         </label>
-                        <select
-                            id="shop-sort-select"
-                            className="shop-sort-select"
+                        <ThemedSelect
+                            block
+                            ariaLabel="Sort by"
                             value={sortMode}
-                            onChange={(event) => setSortMode(event.target.value)}
-                        >
-                            {SORT_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={setSortMode}
+                            options={SORT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                        />
                     </div>
 
                     {canShowPaymentUi && (
@@ -736,19 +726,16 @@ export default function ShopInventoryClient({
                     <label htmlFor="shop-category-select" className="shop-category-mobile-label">
                         Category
                     </label>
-                    <select
-                        id="shop-category-select"
-                        className="shop-category-mobile-select"
+                    <ThemedSelect
+                        block
+                        ariaLabel="Category"
                         value={selectedCategoryId ?? ""}
-                        onChange={(event) => setActiveId(event.target.value)}
-                        disabled={isFiltering}
-                    >
-                        {orderedCategories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                                {category.name} ({category.items.length})
-                            </option>
-                        ))}
-                    </select>
+                        onChange={setActiveId}
+                        options={orderedCategories.map((category) => ({
+                            value: category.id,
+                            label: `${category.name} (${category.items.length})`,
+                        }))}
+                    />
                 </div>
 
                 <div className="shop-category-tabs" role="tablist" aria-label="Inventory categories">
@@ -810,19 +797,17 @@ export default function ShopInventoryClient({
                                             <p className="shop-tile-price">{formatPrice(item.price) ?? <span className="muted">Price unavailable</span>}</p>
                                             <div className="shop-tile-badges">
                                                 {canShowPaymentUi && cartQuantityForItem(item.id) > 0 && (
-                                                    <span className="shop-in-cart-badge">In cart: {cartQuantityForItem(item.id)}</span>
+                                                    <span className="shop-in-cart-badge" title="In cart">🛒 {cartQuantityForItem(item.id)}</span>
                                                 )}
-                                                <span className="shop-qty-badge">{item.quantity} in stock</span>
+                                                <span className="shop-qty-badge" title={`${item.quantity} in stock`} aria-label={`${item.quantity} in stock`}>
+                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                                                        <path d="M3 7l9-4 9 4v10l-9 4-9-4V7z" />
+                                                        <path d="M3 7l9 4 9-4M12 11v10" />
+                                                    </svg>
+                                                    {item.quantity}
+                                                </span>
                                             </div>
                                         </div>
-                                        <Link
-                                            href={`/shop/${productHandle(item.name, item.id)}`}
-                                            className="shop-tile-permalink"
-                                            onClick={(event) => event.stopPropagation()}
-                                            aria-label={`View the ${item.name} page`}
-                                        >
-                                            View page →
-                                        </Link>
                                     </div>
                                 </article>
                             ))}
