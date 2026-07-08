@@ -72,7 +72,28 @@ export default function MarketplaceSearchClient() {
     const [error, setError] = useState("");
     const [games, setGames] = useState(DEFAULT_GAMES);
     const [catalogResults, setCatalogResults] = useState([]);
+    const [account, setAccount] = useState(null); // { role, name } from the session, or null when signed out
     const abortRef = useRef(null);
+
+    // Know who's signed in so the vendor CTA adapts (portal link vs sign-in/apply).
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const response = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (!response.ok) return;
+                const data = await response.json().catch(() => null);
+                if (!ignore && data?.role) {
+                    setAccount({ role: data.role, name: data.vendor?.displayName || data.buyer?.displayName || null });
+                }
+            } catch {
+                /* signed out — leave the default CTA */
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     // Load the games that actually have catalog data (dynamic — grows as the sync widens).
     useEffect(() => {
@@ -192,19 +213,40 @@ export default function MarketplaceSearchClient() {
                 </div>
                 <div className="mkt-vendor-cta">
                     <div className="mkt-vendor-cta-copy">
-                        <strong>For vendors</strong>
-                        <span>
-                            Manage your storefront, or apply to sell.{" "}
-                            <Link href="/sell-cards" className="mkt-vendor-cta-inline">Got cards to sell?</Link>
-                        </span>
+                        {account?.role === "vendor" ? (
+                            <>
+                                <strong>Welcome back{account.name ? `, ${account.name}` : ""}</strong>
+                                <span>Your storefront, leads, and messages are ready.</span>
+                            </>
+                        ) : (
+                            <>
+                                <strong>For vendors</strong>
+                                <span>
+                                    Manage your storefront, or apply to sell.{" "}
+                                    <Link href="/sell-cards" className="mkt-vendor-cta-inline">Got cards to sell?</Link>
+                                </span>
+                            </>
+                        )}
                     </div>
                     <div className="mkt-vendor-cta-actions">
-                        <Link href="/marketplace/portal" className="mkt-vendor-btn mkt-vendor-btn-primary">
-                            Vendor sign in
-                        </Link>
-                        <Link href="/marketplace/apply" className="mkt-vendor-btn">
-                            Become a vendor
-                        </Link>
+                        {account?.role === "vendor" ? (
+                            <Link href="/marketplace/portal" className="mkt-vendor-btn mkt-vendor-btn-primary">
+                                Go to your portal →
+                            </Link>
+                        ) : account?.role === "buyer" ? (
+                            <Link href="/marketplace/apply" className="mkt-vendor-btn mkt-vendor-btn-primary">
+                                Become a vendor
+                            </Link>
+                        ) : (
+                            <>
+                                <Link href="/marketplace/portal" className="mkt-vendor-btn mkt-vendor-btn-primary">
+                                    Vendor sign in
+                                </Link>
+                                <Link href="/marketplace/apply" className="mkt-vendor-btn">
+                                    Become a vendor
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
             </section>
