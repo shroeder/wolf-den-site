@@ -5885,3 +5885,11 @@ body.tv-mode .shop-mobile-cart-fab {
     background: var(--accent);
     color: #1a1a1a;
 }
+
+/* A card holding an OPEN ThemedSelect must rise above following cards, or the dropdown paints
+   behind them (separate-card stacking — e.g. Just In filters sitting above the grid card). The
+   `.ts-menu` only exists in the DOM while open, so this only elevates during interaction. */
+.card:has(.ts-menu) {
+    position: relative;
+    z-index: 40;
+}
