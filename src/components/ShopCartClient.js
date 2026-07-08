@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import ThemedSelect from "@/components/ThemedSelect";
+
 const PAYMENT_TOGGLE_STORAGE_KEY = "wolfden-payments-test-enabled";
 const SHOP_CART_UPDATED_EVENT = "wolfden-shop-cart-updated";
 
@@ -793,17 +795,13 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                     </label>
                                     <label className="cart-field">
                                         <span>State</span>
-                                        <select
+                                        <ThemedSelect
+                                            block
+                                            ariaLabel="State"
                                             value={shippingForm.state}
-                                            onChange={(event) => setShippingForm((current) => ({ ...current, state: event.target.value }))}
-                                            aria-invalid={fieldErrors.shippingState ? "true" : "false"}
-                                            autoComplete="address-level1"
-                                        >
-                                            <option value="">Select state</option>
-                                            {US_STATE_OPTIONS.map((stateCode) => (
-                                                <option key={stateCode} value={stateCode}>{stateCode}</option>
-                                            ))}
-                                        </select>
+                                            onChange={(v) => setShippingForm((current) => ({ ...current, state: v }))}
+                                            options={[{ value: "", label: "Select state" }, ...US_STATE_OPTIONS.map((stateCode) => ({ value: stateCode, label: stateCode }))]}
+                                        />
                                         {fieldErrors.shippingState ? <small className="shop-payment-error">{fieldErrors.shippingState}</small> : null}
                                     </label>
                                     <label className="cart-field">

@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import ThemedSelect from "@/components/ThemedSelect";
+
 const DEFAULT_GAMES = [{ id: "", label: "All games" }];
 
 const KINDS = [
@@ -227,35 +229,25 @@ export default function MarketplaceSearchClient() {
                         <label className="lf-search-label" htmlFor="mkt-game">
                             Game
                         </label>
-                        <select
-                            id="mkt-game"
-                            className="lf-set-select"
+                        <ThemedSelect
+                            block
+                            ariaLabel="Game"
                             value={game}
-                            onChange={(event) => setGame(event.target.value)}
-                        >
-                            {games.map((option) => (
-                                <option key={option.id || "all"} value={option.id}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={setGame}
+                            options={games.map((option) => ({ value: option.id, label: option.label }))}
+                        />
                     </div>
                     <div className="mkt-filter-field">
                         <label className="lf-search-label" htmlFor="mkt-kind">
                             Type
                         </label>
-                        <select
-                            id="mkt-kind"
-                            className="lf-set-select"
+                        <ThemedSelect
+                            block
+                            ariaLabel="Type"
                             value={kind}
-                            onChange={(event) => setKind(event.target.value)}
-                        >
-                            {KINDS.map((option) => (
-                                <option key={option.id || "all"} value={option.id}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={setKind}
+                            options={KINDS.map((option) => ({ value: option.id, label: option.label }))}
+                        />
                     </div>
                 </div>
 

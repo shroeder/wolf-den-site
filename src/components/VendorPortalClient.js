@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import ThemedSelect from "@/components/ThemedSelect";
 import VendorImportClient from "@/components/VendorImportClient";
 import { VENDOR_SPECIALTIES } from "@/lib/marketplace/specialties.js";
 
@@ -369,58 +370,48 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
     return (
         <form className="contact-form mkt-add-form" onSubmit={submit}>
             <label htmlFor="add-type">Type</label>
-            <select
-                id="add-type"
-                className="mkt-game-select"
+            <ThemedSelect
+                block
+                ariaLabel="Type"
                 value={catalogType}
-                onChange={(event) => setCatalogType(event.target.value)}
-            >
-                <option value="sealed">Sealed (all)</option>
-                <option value="single">Singles</option>
-                <option value="tin">Tins</option>
-                <option value="mini-tin">Mini Tins</option>
-                <option value="etb">Elite Trainer Boxes</option>
-                <option value="box">Booster Boxes</option>
-                <option value="blister">Blisters</option>
-                <option value="bundle">Bundles</option>
-                <option value="pack">Booster Packs</option>
-                <option value="all">All types</option>
-            </select>
+                onChange={setCatalogType}
+                options={[
+                    { value: "sealed", label: "Sealed (all)" },
+                    { value: "single", label: "Singles" },
+                    { value: "tin", label: "Tins" },
+                    { value: "mini-tin", label: "Mini Tins" },
+                    { value: "etb", label: "Elite Trainer Boxes" },
+                    { value: "box", label: "Booster Boxes" },
+                    { value: "blister", label: "Blisters" },
+                    { value: "bundle", label: "Bundles" },
+                    { value: "pack", label: "Booster Packs" },
+                    { value: "all", label: "All types" },
+                ]}
+            />
 
             <label htmlFor="add-game">Game (optional — narrows the search)</label>
-            <select
-                id="add-game"
-                className="mkt-game-select"
+            <ThemedSelect
+                block
+                ariaLabel="Game (optional — narrows the search)"
                 value={game}
-                onChange={(event) => {
-                    setGame(event.target.value);
+                onChange={(v) => {
+                    setGame(v);
                     setSetId("");
                     setSets([]);
                 }}
-            >
-                {games.map((g) => (
-                    <option key={g.id || "all"} value={g.id}>
-                        {g.label}
-                    </option>
-                ))}
-            </select>
+                options={games.map((g) => ({ value: g.id, label: g.label }))}
+            />
 
             {game && sets.length > 0 ? (
                 <>
                     <label htmlFor="add-set">Set (optional — pick one to browse it without typing)</label>
-                    <select
-                        id="add-set"
-                        className="mkt-game-select"
+                    <ThemedSelect
+                        block
+                        ariaLabel="Set (optional — pick one to browse it without typing)"
                         value={setId}
-                        onChange={(event) => setSetId(event.target.value)}
-                    >
-                        <option value="">All sets</option>
-                        {sets.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.name}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={setSetId}
+                        options={[{ value: "", label: "All sets" }, ...sets.map((s) => ({ value: s.id, label: s.name }))]}
+                    />
                 </>
             ) : null}
 
@@ -500,39 +491,39 @@ function AddListingForm({ onAdded, defaultPricingMode = "manual", defaultPricing
                             {graded ? (
                                 <>
                                     <label htmlFor="add-grader">Grading company</label>
-                                    <select id="add-grader" className="lf-set-select" value={gradingCompany} onChange={(e) => setGradingCompany(e.target.value)}>
-                                        {GRADERS.map((g) => (
-                                            <option key={g} value={g}>
-                                                {g}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <ThemedSelect
+                                        block
+                                        ariaLabel="Grading company"
+                                        value={gradingCompany}
+                                        onChange={setGradingCompany}
+                                        options={GRADERS.map((g) => ({ value: g, label: g }))}
+                                    />
                                     <label htmlFor="add-grade">Grade</label>
                                     <input id="add-grade" type="text" value={grade} onChange={(e) => setGrade(e.target.value)} placeholder="e.g. 10" />
                                 </>
                             ) : (
                                 <>
                                     <label htmlFor="add-condition">Condition</label>
-                                    <select id="add-condition" className="lf-set-select" value={condition} onChange={(e) => setCondition(e.target.value)}>
-                                        {CONDITIONS.map((c) => (
-                                            <option key={c} value={c}>
-                                                {c}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <ThemedSelect
+                                        block
+                                        ariaLabel="Condition"
+                                        value={condition}
+                                        onChange={setCondition}
+                                        options={CONDITIONS.map((c) => ({ value: c, label: c }))}
+                                    />
                                 </>
                             )}
                         </>
                     ) : null}
 
                     <label htmlFor="add-language">Language</label>
-                    <select id="add-language" className="lf-set-select" value={language} onChange={(e) => setLanguage(e.target.value)}>
-                        {LANGUAGES.map((l) => (
-                            <option key={l} value={l}>
-                                {l}
-                            </option>
-                        ))}
-                    </select>
+                    <ThemedSelect
+                        block
+                        ariaLabel="Language"
+                        value={language}
+                        onChange={setLanguage}
+                        options={LANGUAGES.map((l) => ({ value: l, label: l }))}
+                    />
 
                     {(() => {
                         const market = pricing?.marketPrice ?? selected?.marketPrice ?? null;
@@ -829,11 +820,17 @@ function ListingRow({ listing, onChanged }) {
                 {error ? <span className="muted">{error}</span> : null}
             </div>
             <div className="mkt-admin-actions mkt-listing-edit">
-                <select className="lf-set-select mkt-mode-select" value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Pricing mode">
-                    <option value="manual">Manual</option>
-                    <option value="market_pct">% market</option>
-                    <option value="match_lowest">Match low</option>
-                </select>
+                <ThemedSelect
+                    block
+                    ariaLabel="Pricing mode"
+                    value={mode}
+                    onChange={setMode}
+                    options={[
+                        { value: "manual", label: "Manual" },
+                        { value: "market_pct", label: "% market" },
+                        { value: "match_lowest", label: "Match low" },
+                    ]}
+                />
                 {mode === "manual" ? (
                     <label>
                         $

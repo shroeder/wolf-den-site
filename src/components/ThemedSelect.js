@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 // A dark, compact, on-brand dropdown to replace native <select> (whose mobile OS picker is a huge
 // white full-screen list that clashes with the theme). Keyboard + click-outside + scroll supported.
-export default function ThemedSelect({ value, onChange, options, ariaLabel, className = "", block = false }) {
+export default function ThemedSelect({ value, onChange, options, ariaLabel, className = "", block = false, disabled = false }) {
     const [open, setOpen] = useState(false);
     const wrapRef = useRef(null);
 
@@ -34,7 +34,8 @@ export default function ThemedSelect({ value, onChange, options, ariaLabel, clas
                 aria-haspopup="listbox"
                 aria-expanded={open}
                 aria-label={ariaLabel}
-                onClick={() => setOpen((v) => !v)}
+                disabled={disabled}
+                onClick={() => !disabled && setOpen((v) => !v)}
             >
                 <span className="ts-value">{selected?.label ?? "Select"}</span>
                 <svg className={`ts-caret${open ? " ts-caret-open" : ""}`} width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">

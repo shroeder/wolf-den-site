@@ -5694,3 +5694,8 @@ body.tv-mode .shop-mobile-cart-fab {
     color: var(--brand-strong, #d4af37);
     font-weight: 700;
 }
+
+.ts-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

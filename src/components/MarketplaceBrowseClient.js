@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import MarketplaceLiveStats from "@/components/MarketplaceLiveStats";
+import ThemedSelect from "@/components/ThemedSelect";
 import { VENDOR_SPECIALTIES } from "@/lib/marketplace/specialties.js";
 
 // Default view: south metro of the Twin Cities / Montgomery area — the Wolf Den's recruiting turf.
@@ -208,19 +209,16 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                         {locating ? "Locating..." : "📍 Find vendors near me"}
                     </button>
                     {availableSpecialties.length > 0 ? (
-                        <select
-                            className="mkt-game-select mkt-specialty-select"
+                        <ThemedSelect
+                            block
+                            ariaLabel="Filter vendors by specialty"
                             value={specialty}
-                            onChange={(e) => setSpecialty(e.target.value)}
-                            aria-label="Filter vendors by specialty"
-                        >
-                            <option value="">All specialties</option>
-                            {availableSpecialties.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={setSpecialty}
+                            options={[
+                                { value: "", label: "All specialties" },
+                                ...availableSpecialties.map((s) => ({ value: s, label: s })),
+                            ]}
+                        />
                     ) : null}
                     <Link href="/marketplace" className="pill">
                         Search by item instead
