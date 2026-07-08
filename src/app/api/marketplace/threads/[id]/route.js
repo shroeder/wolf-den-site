@@ -23,7 +23,9 @@ async function nudge(threadId, senderSide, preview) {
         const buyerIsRecipient = senderSide === "vendor";
         const to = buyerIsRecipient ? p.buyer_email : p.vendor_email;
         const fromName = senderSide === "vendor" ? p.vendor_name : p.buyer_name;
-        const openUrl = `${SITE}${buyerIsRecipient ? "/marketplace" : "/marketplace/portal"}`;
+        const openUrl = buyerIsRecipient
+            ? `${SITE}/marketplace/messages?thread=${threadId}`
+            : `${SITE}/marketplace/portal?tab=messages`;
         if (to) await sendNewMessageEmail(to, { fromName: fromName || "A member", preview, openUrl });
     } catch {
         // best-effort

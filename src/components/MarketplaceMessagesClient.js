@@ -28,6 +28,13 @@ export default function MarketplaceMessagesClient({ buyerName = null }) {
         return () => { active = false; };
     }, []);
 
+    // Deep link from the new-message email (?thread=…) opens that conversation straight away.
+    useEffect(() => {
+        const t = new URLSearchParams(window.location.search).get("thread");
+        if (t) openThread(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     async function openThread(id) {
         setOpenId(id);
         setConvo(null);
