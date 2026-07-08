@@ -2102,13 +2102,12 @@ export default function VendorPortalClient({
     swaps = { incoming: [], outgoing: [] },
 }) {
     const router = useRouter();
-    const [tab, setTab] = useState("store");
-
-    // Deep link: the new-message email links here with ?tab=messages so vendors land on their Inbox.
-    useEffect(() => {
+    // Initial tab honors a ?tab= deep link (the new-message email sends vendors to ?tab=messages).
+    const [tab, setTab] = useState(() => {
+        if (typeof window === "undefined") return "store";
         const t = new URLSearchParams(window.location.search).get("tab");
-        if (t && PORTAL_TABS.some((x) => x.id === t)) setTab(t);
-    }, []);
+        return t && PORTAL_TABS.some((x) => x.id === t) ? t : "store";
+    });
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
     const refresh = () => router.refresh();
 
