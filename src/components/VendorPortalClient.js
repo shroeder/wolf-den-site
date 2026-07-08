@@ -1987,11 +1987,23 @@ function BuyOrdersBoard() {
     async function respond(id) {
         setBusy(true);
         try {
-            const res = await fetch(`/api/marketplace/buy-orders/${id}/respond`, {
+            const order = orders?.find((o) => o.id === id);
+            const note = message.trim();
+            const fullMessage = `I can fill your ${order?.name || "request"}${price ? ` for $${Number(price).toFixed(2)}` : ""}${note ? `. ${note}` : ""}`;
+            // Prefer a persistent thread (shows in Messages, app + web). Only if the buyer has no
+            // account (thread not possible) fall back to the legacy one-off email response.
+            let res = await fetch("/api/marketplace/threads", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: message.trim() || null, price: price ? Number(price) : null }),
+                body: JSON.stringify({ as: "vendor", buyOrderId: id, message: fullMessage }),
             });
+            if (!res.ok) {
+                res = await fetch(`/api/marketplace/buy-orders/${id}/respond`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: note || null, price: price ? Number(price) : null }),
+                });
+            }
             if (res.ok) {
                 setDone((d) => ({ ...d, [id]: true }));
                 setRespondingId(null);
