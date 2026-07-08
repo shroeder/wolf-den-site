@@ -4429,6 +4429,35 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 0.5rem;
 }
 
+/* Vendor access — a distinct, first-class block set apart from the buyer links. */
+.mkt-hero-vendor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.mkt-hero-vendor-label {
+    font-weight: 700;
+}
+
+.mkt-hero-vendor-cta {
+    white-space: nowrap;
+}
+
+.mkt-hero-vendor-links {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.mkt-hero-vendor-links a {
+    color: var(--brand-strong);
+    font-weight: 600;
+}
+
 .mkt-search-hint {
     margin: 0.1rem 0 0;
     font-size: 0.76rem;

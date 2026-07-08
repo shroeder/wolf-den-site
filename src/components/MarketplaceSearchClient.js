@@ -183,23 +183,22 @@ export default function MarketplaceSearchClient() {
                     <span className="mkt-chip">📍 Local — meet in person</span>
                     <span className="mkt-chip">💬 Contact direct, no fees</span>
                 </div>
-                <p className="mkt-hero-links">
-                    <Link href="/marketplace/vendors" className="pill">
-                        📍 Browse vendors
+                <div className="mkt-hero-links">
+                    <Link href="/marketplace/vendors" className="pill">📍 Browse vendors</Link>
+                    <Link href="/marketplace/wants" className="pill">📋 Want list</Link>
+                    <Link href="/marketplace/events" className="pill">📅 Events</Link>
+                </div>
+                <div className="mkt-hero-vendor">
+                    <span className="mkt-hero-vendor-label">Are you a vendor?</span>
+                    <Link href="/marketplace/portal" className="button primary mkt-hero-vendor-cta">
+                        Vendor sign in →
                     </Link>
-                    <Link href="/marketplace/wants" className="pill">
-                        📋 Build a want list →
-                    </Link>
-                    <Link href="/marketplace/events" className="pill">
-                        📅 Events near you →
-                    </Link>
-                    <Link href="/sell-cards" className="pill">
-                        Got cards to sell? →
-                    </Link>
-                    <Link href="/marketplace/apply" className="pill">
-                        Become a vendor →
-                    </Link>
-                </p>
+                    <span className="mkt-hero-vendor-links">
+                        <Link href="/marketplace/apply">Become a vendor</Link>
+                        <span aria-hidden="true"> · </span>
+                        <Link href="/sell-cards">Sell your cards</Link>
+                    </span>
+                </div>
             </section>
 
             <section className="card">
