@@ -5925,3 +5925,22 @@ body.tv-mode .shop-mobile-cart-fab {
 .mkt-vendor-cta .mkt-vendor-btn-primary {
     color: #141414;
 }
+
+/* Vendor listing rows: show the card/product image next to the title. */
+.mkt-listing-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    min-width: 0;
+}
+.mkt-listing-head .mkt-admin-info {
+    min-width: 0;
+}
+.mkt-listing-thumb {
+    width: 40px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--elevated);
+}

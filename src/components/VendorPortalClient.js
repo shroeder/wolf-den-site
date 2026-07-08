@@ -799,7 +799,11 @@ function ListingRow({ listing, onChanged }) {
 
     return (
         <li className="mkt-admin-row">
-            <div className="mkt-admin-info">
+            <div className="mkt-listing-head">
+                {listing.imageUrl ? (
+                    <Image src={listing.imageUrl} alt="" width={40} height={56} className="mkt-listing-thumb" />
+                ) : null}
+                <div className="mkt-admin-info">
                 <strong>
                     {listing.title}
                     {listing.vendorOnly ? <span className="mkt-hidden-badge"> · hidden</span> : null}
@@ -818,6 +822,7 @@ function ListingRow({ listing, onChanged }) {
                         : ""}
                 </span>
                 {error ? <span className="muted">{error}</span> : null}
+                </div>
             </div>
             <div className="mkt-admin-actions mkt-listing-edit">
                 <ThemedSelect
@@ -2064,6 +2069,7 @@ function BuyOrdersBoard() {
 const PORTAL_TABS = [
     { id: "store", label: "🏪 Store" },
     { id: "listings", label: "📦 Listings" },
+    { id: "add", label: "➕ Add" },
     { id: "messages", label: "💬 Inbox" },
     { id: "leads", label: "🔥 Leads" },
     { id: "dealer", label: "🤝 Dealer" },
@@ -2401,7 +2407,7 @@ export default function VendorPortalClient({
                 </section>
             ) : null}
 
-            {tab === "listings" && (
+            {tab === "add" && (
               <>
             <section className="card">
                 <h2>Add a listing</h2>
@@ -2422,20 +2428,22 @@ export default function VendorPortalClient({
                     </div>
                 </details>
             </section>
-
-            <section className="card">
-                <h2>Your listings{listings.length ? ` (${listings.length})` : ""}</h2>
-                {listings.length === 0 ? (
-                    <p className="muted">No listings yet. Add your first one above.</p>
-                ) : (
-                    <ul className="mkt-admin-list">
-                        {listings.map((listing) => (
-                            <ListingRow key={listing.id} listing={listing} onChanged={refresh} />
-                        ))}
-                    </ul>
-                )}
-            </section>
               </>
+            )}
+
+            {tab === "listings" && (
+                <section className="card">
+                    <h2>Your listings{listings.length ? ` (${listings.length})` : ""}</h2>
+                    {listings.length === 0 ? (
+                        <p className="muted">No listings yet. Add your first one in the ➕ Add tab.</p>
+                    ) : (
+                        <ul className="mkt-admin-list">
+                            {listings.map((listing) => (
+                                <ListingRow key={listing.id} listing={listing} onChanged={refresh} />
+                            ))}
+                        </ul>
+                    )}
+                </section>
             )}
         </div>
     );
