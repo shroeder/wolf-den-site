@@ -1890,7 +1890,17 @@ function MessagesPanel() {
         }
     }
 
-    if (threads != null && threads.length === 0) return null;
+    if (threads != null && threads.length === 0) {
+        return (
+            <section className="card">
+                <h2>💬 Messages</h2>
+                <p className="muted">
+                    No messages yet. When a buyer contacts you — from a listing, a buy order, or your storefront —
+                    the conversation shows up here.
+                </p>
+            </section>
+        );
+    }
 
     return (
         <section className="card">
