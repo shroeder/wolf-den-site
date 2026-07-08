@@ -52,7 +52,15 @@ export async function getMarketplaceMap({ days = 90 } = {}) {
 export async function getDemandNear({ lat, lng, radiusKm = 60, days = 90 } = {}) {
     const dist = `(6371 * acos(LEAST(1, cos(radians($1)) * cos(radians(e.lat)) * cos(radians(e.lng) - radians($2)) + sin(radians($1)) * sin(radians(e.lat)))))`;
 
-    const [products, searches] = await Promise.all([
+    const [activityRow, products, searches] = await Promise.all([
+        db.query(
+            `SELECT count(*)::int AS n
+             FROM mkt_engagement e
+             WHERE e.lat IS NOT NULL
+               AND e.created_at >= NOW() - ($4 || ' days')::interval
+               AND ${dist} <= $3`,
+            [lat, lng, radiusKm, days]
+        ),
         db.query(
             `SELECT e.catalog_product_id, c.name, c.image_url, c.market_price, s.name AS set_name,
                     count(*)::int AS weight
@@ -81,6 +89,7 @@ export async function getDemandNear({ lat, lng, radiusKm = 60, days = 90 } = {})
     ]);
 
     return {
+        activity: Number(activityRow[0]?.n) || 0,
         products: products.map((p) => ({
             catalogProductId: String(p.catalog_product_id),
             name: p.name,
