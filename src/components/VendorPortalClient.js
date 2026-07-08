@@ -2061,6 +2061,14 @@ function BuyOrdersBoard() {
     );
 }
 
+const PORTAL_TABS = [
+    { id: "store", label: "🏪 Store" },
+    { id: "listings", label: "📦 Listings" },
+    { id: "messages", label: "💬 Inbox" },
+    { id: "leads", label: "🔥 Leads" },
+    { id: "dealer", label: "🤝 Dealer" },
+];
+
 export default function VendorPortalClient({
     vendor,
     listings,
@@ -2078,6 +2086,7 @@ export default function VendorPortalClient({
     swaps = { incoming: [], outgoing: [] },
 }) {
     const router = useRouter();
+    const [tab, setTab] = useState("store");
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
     const refresh = () => router.refresh();
 
@@ -2110,9 +2119,6 @@ export default function VendorPortalClient({
                                 ? ` · ${requestStats.total} lead${requestStats.total === 1 ? "" : "s"} (${requestStats.sold} sold)`
                                 : ""}
                         </p>
-                        <VendorLogoEditor vendor={vendor} onChanged={refresh} />
-                        <VendorFulfillmentEditor vendor={vendor} onChanged={refresh} />
-                        <VendorSpecialtiesEditor vendor={vendor} onChanged={refresh} />
                     </div>
                     <button type="button" className="pill" onClick={logout}>
                         Sign out
@@ -2120,6 +2126,22 @@ export default function VendorPortalClient({
                 </div>
             </section>
 
+            <nav className="mkt-portal-tabs" role="tablist" aria-label="Portal sections">
+                {PORTAL_TABS.map((t) => (
+                    <button
+                        key={t.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === t.id}
+                        className={`mkt-portal-tab${tab === t.id ? " is-active" : ""}`}
+                        onClick={() => setTab(t.id)}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </nav>
+
+            {tab === "store" && (
             <section className="card">
                 <h2>Your dashboard</h2>
                 <div className="mkt-metrics">
@@ -2159,14 +2181,24 @@ export default function VendorPortalClient({
                     ) : null}
                 </div>
             </section>
+            )}
 
-            <MessagesPanel />
+            {tab === "store" && (
+            <section className="card">
+                <h2>Storefront profile</h2>
+                <VendorLogoEditor vendor={vendor} onChanged={refresh} />
+                <VendorFulfillmentEditor vendor={vendor} onChanged={refresh} />
+                <VendorSpecialtiesEditor vendor={vendor} onChanged={refresh} />
+            </section>
+            )}
 
-            <BuyOrdersBoard />
+            {tab === "messages" && <MessagesPanel />}
 
-            <AgingInventory items={agingInventory} onChanged={refresh} />
+            {tab === "messages" && <BuyOrdersBoard />}
 
-            {searchDemand.length > 0 ? (
+            {tab === "listings" && <AgingInventory items={agingInventory} onChanged={refresh} />}
+
+            {tab === "leads" && searchDemand.length > 0 ? (
                 <section className="card">
                     <h2>🔥 Buyer search demand (this week)</h2>
                     <p className="muted">
@@ -2198,6 +2230,7 @@ export default function VendorPortalClient({
                 </section>
             ) : null}
 
+            {tab === "leads" && (
             <section className="card">
                 <h2>Vendor Missions</h2>
                 <p className="muted">
@@ -2269,18 +2302,19 @@ export default function VendorPortalClient({
                     </>
                 ) : null}
             </section>
+            )}
 
-            <DealerOffers dealerOffers={dealerOffers} onChanged={refresh} />
+            {tab === "dealer" && <DealerOffers dealerOffers={dealerOffers} onChanged={refresh} />}
 
-            <DealerNetwork onChanged={refresh} demand={dealerDemand} />
+            {tab === "dealer" && <DealerNetwork onChanged={refresh} demand={dealerDemand} />}
 
-            <SwapsPanel swaps={swaps} onChanged={refresh} />
+            {tab === "dealer" && <SwapsPanel swaps={swaps} onChanged={refresh} />}
 
-            <SwapBuilder myListings={listings} onChanged={refresh} />
+            {tab === "dealer" && <SwapBuilder myListings={listings} onChanged={refresh} />}
 
-            <EventAttendance />
+            {tab === "dealer" && <EventAttendance />}
 
-            {openRequests.length > 0 ? (
+            {tab === "messages" && openRequests.length > 0 ? (
                 <section className="card">
                     <h2>Inbound requests</h2>
                     <p className="muted">
@@ -2307,7 +2341,7 @@ export default function VendorPortalClient({
                 </section>
             ) : null}
 
-            {wanted.length > 0 ? (
+            {tab === "leads" && wanted.length > 0 ? (
                 <section className="card">
                     <h2>Most wanted by buyers</h2>
                     <p className="muted">What shoppers are asking for right now — a shopping list of what to stock.</p>
@@ -2331,7 +2365,7 @@ export default function VendorPortalClient({
                 </section>
             ) : null}
 
-            {sellOffers.length > 0 ? (
+            {tab === "leads" && sellOffers.length > 0 ? (
                 <section className="card">
                     <h2>Sellers looking for offers</h2>
                     <p className="muted">
@@ -2362,6 +2396,8 @@ export default function VendorPortalClient({
                 </section>
             ) : null}
 
+            {tab === "listings" && (
+              <>
             <section className="card">
                 <h2>Add a listing</h2>
                 <AddListingForm
@@ -2394,6 +2430,8 @@ export default function VendorPortalClient({
                     </ul>
                 )}
             </section>
+              </>
+            )}
         </div>
     );
 }
