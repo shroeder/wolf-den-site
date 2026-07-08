@@ -186,9 +186,10 @@ export async function sendNewMessageEmail(toEmail, { fromName, preview, openUrl 
             <h1>You have a new message</h1>
             <p><strong>${escapeHtml(fromName)}</strong> messaged you on the Wolf Den Marketplace:</p>
             <blockquote style="border-left:3px solid #D4AF37;padding-left:12px;color:#555;">${escapeHtml(preview || "")}</blockquote>
-            <p><a href="${openUrl}" style="${goldButton}">Open your messages</a></p>
+            <p><a href="${openUrl}" style="${goldButton}">Open the conversation</a></p>
+            <p style="color:#777;font-size:13px;margin-top:6px;">📱 Opens right in the <strong>Wolf Den Market</strong> app if you have it installed — otherwise on the web.</p>
             <hr />
-            <p><small>Reply in the app to keep the conversation in one place.</small></p>
+            <p><small>Reply from the app or web (not by replying to this email) so the conversation stays in one place.</small></p>
         `,
     });
     if (result?.error) {
