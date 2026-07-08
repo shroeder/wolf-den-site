@@ -2194,7 +2194,35 @@ export default function VendorPortalClient({
 
             {tab === "messages" && <MessagesPanel />}
 
-            {tab === "messages" && <BuyOrdersBoard />}
+            {/* Contactable leads first — real buyers you can respond to, above the anonymous signal. */}
+            {tab === "leads" && <BuyOrdersBoard />}
+
+            {tab === "leads" && wanted.length > 0 ? (
+                <section className="card">
+                    <h2>🎯 Most wanted by buyers</h2>
+                    <p className="muted">
+                        On buyers&apos; want lists right now. List one at or under their price and they get emailed
+                        automatically — the fastest lead to close.
+                    </p>
+                    <ul className="mkt-admin-list mkt-wanted-list">
+                        {wanted.map((w) => (
+                            <li key={w.catalogProductId} className="mkt-admin-row">
+                                <div className="mkt-admin-info">
+                                    <strong>{w.name}</strong>
+                                    <span className="mkt-offer-meta">
+                                        {w.setName}
+                                        {w.number ? ` · #${w.number}` : ""}
+                                        {w.marketPrice != null ? ` · mkt ${formatPrice(w.marketPrice)}` : ""}
+                                    </span>
+                                </div>
+                                <span className="shop-qty-badge">
+                                    {w.wantCount} want{w.wantCount === 1 ? "" : "s"}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
 
             {tab === "listings" && <AgingInventory items={agingInventory} onChanged={refresh} />}
 
@@ -2202,8 +2230,9 @@ export default function VendorPortalClient({
                 <section className="card">
                     <h2>🔥 Buyer search demand (this week)</h2>
                     <p className="muted">
-                        What buyers are viewing across the network, and whether anyone stocks it. Gaps are
-                        opportunities.
+                        Anonymous browsing demand — no names attached. List the gaps (nobody stocks it yet) and any
+                        buyer with it on their want list is auto-notified. To reach a real person, use Buy orders &amp;
+                        Most wanted above.
                     </p>
                     <ul className="mkt-admin-list">
                         {searchDemand.map((d) => (
@@ -2338,30 +2367,6 @@ export default function VendorPortalClient({
                             </ul>
                         </details>
                     ) : null}
-                </section>
-            ) : null}
-
-            {tab === "leads" && wanted.length > 0 ? (
-                <section className="card">
-                    <h2>Most wanted by buyers</h2>
-                    <p className="muted">What shoppers are asking for right now — a shopping list of what to stock.</p>
-                    <ul className="mkt-admin-list mkt-wanted-list">
-                        {wanted.map((w) => (
-                            <li key={w.catalogProductId} className="mkt-admin-row">
-                                <div className="mkt-admin-info">
-                                    <strong>{w.name}</strong>
-                                    <span className="mkt-offer-meta">
-                                        {w.setName}
-                                        {w.number ? ` · #${w.number}` : ""}
-                                        {w.marketPrice != null ? ` · mkt ${formatPrice(w.marketPrice)}` : ""}
-                                    </span>
-                                </div>
-                                <span className="shop-qty-badge">
-                                    {w.wantCount} want{w.wantCount === 1 ? "" : "s"}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
                 </section>
             ) : null}
 
