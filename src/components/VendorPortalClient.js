@@ -821,6 +821,11 @@ function ListingRow({ listing, onChanged }) {
                         ? ` · auto ${listing.pricingMode === "market_pct" ? `${Math.round((listing.pricingValue || 0) * 100)}% mkt` : "match low"}`
                         : ""}
                 </span>
+                {listing.catalogMarketPrice != null ? (
+                    <span className="mkt-offer-meta" style={{ color: "var(--gold, #D4AF37)" }}>
+                        market ${listing.catalogMarketPrice.toFixed(2)}
+                    </span>
+                ) : null}
                 {error ? <span className="muted">{error}</span> : null}
                 </div>
             </div>
