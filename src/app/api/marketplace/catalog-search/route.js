@@ -15,7 +15,7 @@ export async function GET(request) {
                 query: searchParams.get("q") || "",
                 game: searchParams.get("game") || null,
                 type: searchParams.get("type") || "all",
-                limit: 12,
+                limit: Number(searchParams.get("limit")) || 12,
             });
 
             logger.info("marketplace.catalog_search.success", { resultCount: results.length });
