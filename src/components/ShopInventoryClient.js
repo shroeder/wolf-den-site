@@ -149,7 +149,12 @@ export default function ShopInventoryClient({
     paymentsEnabled,
 }) {
     const orderedCategories = useMemo(() => sortShopCategories(categories), [categories]);
-    const [activeId, setActiveId] = useState(orderedCategories[0]?.id ?? null);
+    // Default the shop to the Pokémon Sealed category (falls back to the first tab if it's absent).
+    const defaultCategoryId = useMemo(
+        () => orderedCategories.find((c) => /pok[eé]mon\s+sealed/i.test(c.name || ""))?.id ?? orderedCategories[0]?.id ?? null,
+        [orderedCategories],
+    );
+    const [activeId, setActiveId] = useState(defaultCategoryId);
     const [detailItemKey, setDetailItemKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [setFilter, setSetFilter] = useState("");
@@ -190,7 +195,7 @@ export default function ShopInventoryClient({
 
     const selectedCategoryId = orderedCategories.some((category) => category.id === activeId)
         ? activeId
-        : orderedCategories[0]?.id ?? null;
+        : defaultCategoryId;
     const active = orderedCategories.find((c) => c.id === selectedCategoryId) ?? orderedCategories[0];
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
