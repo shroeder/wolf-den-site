@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import MarketplaceDemandMap from "@/components/MarketplaceDemandMap";
 import ThemedSelect from "@/components/ThemedSelect";
 import VendorImportClient from "@/components/VendorImportClient";
 import { VENDOR_SPECIALTIES } from "@/lib/marketplace/specialties.js";
@@ -2099,6 +2100,7 @@ const PORTAL_TABS = [
     { id: "add", label: "➕ Add" },
     { id: "messages", label: "💬 Inbox" },
     { id: "leads", label: "🔥 Leads" },
+    { id: "map", label: "🗺️ Demand" },
     { id: "dealer", label: "🤝 Dealer" },
 ];
 
@@ -2244,6 +2246,8 @@ export default function VendorPortalClient({
             )}
 
             {tab === "messages" && <MessagesPanel />}
+
+            {tab === "map" && <MarketplaceDemandMap />}
 
             {/* Contactable leads first — real buyers you can respond to, above the anonymous signal. */}
             {tab === "leads" && <BuyOrdersBoard />}
