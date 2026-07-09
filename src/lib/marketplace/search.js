@@ -139,9 +139,16 @@ export async function searchCatalogInStock({
         filters.push(`c.game = $${params.length}`);
     }
 
-    if (kind === "sealed" || kind === "single") {
-        params.push(kind);
-        filters.push(`l.kind = $${params.length}`);
+    // Product-type facets buyers filter by. Sealed excludes individual packs (they get their own
+    // facet); Singles are raw cards; Graded singles are slabbed. Pack detection is by product name.
+    if (kind === "sealed") {
+        filters.push(`(l.kind = 'sealed' AND c.name NOT ILIKE '%pack%')`);
+    } else if (kind === "pack") {
+        filters.push(`(l.kind = 'sealed' AND c.name ILIKE '%pack%')`);
+    } else if (kind === "single") {
+        filters.push(`(l.kind = 'single' AND NOT COALESCE(l.graded, false))`);
+    } else if (kind === "graded") {
+        filters.push(`(COALESCE(l.graded, false) = true)`);
     }
 
     // Nearest-vendor distance per product (km), when we know where the buyer is.

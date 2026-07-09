@@ -11,7 +11,9 @@ const DEFAULT_GAMES = [{ id: "", label: "All games" }];
 const KINDS = [
     { id: "", label: "Everything" },
     { id: "sealed", label: "Sealed" },
+    { id: "pack", label: "Packs" },
     { id: "single", label: "Singles" },
+    { id: "graded", label: "Graded singles" },
 ];
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
