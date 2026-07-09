@@ -517,18 +517,27 @@ export async function searchCatalog({ query, game = null, type = "all", setId = 
 
     if (hasText) {
         // Word-boundary term match in name/set (avoids "tin" hitting "Vic-tin-i"); number/rarity/code
-        // stay substring. Every term must match somewhere (AND).
+        // stay substring. Every term must match somewhere (AND). Each term also matches its singular
+        // (drop a trailing "s") so natural plurals — "origins", "boosters", "bundles" — still hit the
+        // singular product/set names ("Lost Origin", "Booster Bundle").
         const terms = trimmed.split(/\s+/).filter(Boolean).slice(0, 6);
         terms.forEach((term) => {
-            const escaped = term.replace(/([%_\\])/g, "\\$1");
-            params.push(escaped);
-            const p = `$${params.length}`;
-            whereClauses.push(
-                `(c.name ILIKE (${p} || '%') OR c.name ILIKE ('% ' || ${p} || '%') OR ` +
+            const forms = [term];
+            if (term.length > 3 && /s$/i.test(term)) {
+                forms.push(term.slice(0, -1));
+            }
+            const ors = forms.map((form) => {
+                const escaped = form.replace(/([%_\\])/g, "\\$1");
+                params.push(escaped);
+                const p = `$${params.length}`;
+                return (
+                    `c.name ILIKE (${p} || '%') OR c.name ILIKE ('% ' || ${p} || '%') OR ` +
                     `s.name ILIKE (${p} || '%') OR s.name ILIKE ('% ' || ${p} || '%') OR ` +
                     `c.number ILIKE ('%' || ${p} || '%') OR c.rarity ILIKE (${p} || '%') OR ` +
-                    `s.abbreviation ILIKE (${p} || '%'))`
-            );
+                    `s.abbreviation ILIKE (${p} || '%')`
+                );
+            });
+            whereClauses.push(`(${ors.join(" OR ")})`);
         });
         params.push(`${trimmed}%`);
         prefixParam = `$${params.length}`;
