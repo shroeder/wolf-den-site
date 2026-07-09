@@ -2121,6 +2121,19 @@ export default function VendorPortalClient({
         return t && PORTAL_TABS.some((x) => x.id === t) ? t : "store";
     });
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
+    // Category filter for the Listings tab (client-side over the already-loaded listings).
+    const [listingCategory, setListingCategory] = useState("all");
+    const listingIsPack = (l) => l.kind === "sealed" && /pack/i.test(l.title || "");
+    const filteredListings =
+        listingCategory === "all"
+            ? listings
+            : listings.filter((l) => {
+                  if (listingCategory === "sealed") return l.kind === "sealed" && !listingIsPack(l);
+                  if (listingCategory === "pack") return listingIsPack(l);
+                  if (listingCategory === "single") return l.kind === "single" && !l.graded;
+                  if (listingCategory === "graded") return Boolean(l.graded);
+                  return true;
+              });
     const refresh = () => router.refresh();
 
     async function logout() {
@@ -2460,12 +2473,39 @@ export default function VendorPortalClient({
 
             {tab === "listings" && (
                 <section className="card">
-                    <h2>Your listings{listings.length ? ` (${listings.length})` : ""}</h2>
+                    <h2>
+                        Your listings
+                        {listings.length
+                            ? ` (${filteredListings.length}${listingCategory !== "all" ? ` of ${listings.length}` : ""})`
+                            : ""}
+                    </h2>
+                    {listings.length > 0 && (
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", margin: "6px 0 12px" }}>
+                            {[
+                                { id: "all", label: "All" },
+                                { id: "sealed", label: "Sealed" },
+                                { id: "pack", label: "Packs" },
+                                { id: "single", label: "Singles" },
+                                { id: "graded", label: "Graded" },
+                            ].map((c) => (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    className={`pill${listingCategory === c.id ? " lf-game-active" : ""}`}
+                                    onClick={() => setListingCategory(c.id)}
+                                >
+                                    {c.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     {listings.length === 0 ? (
                         <p className="muted">No listings yet. Add your first one in the ➕ Add tab.</p>
+                    ) : filteredListings.length === 0 ? (
+                        <p className="muted">No listings in this category.</p>
                     ) : (
                         <ul className="mkt-admin-list">
-                            {listings.map((listing) => (
+                            {filteredListings.map((listing) => (
                                 <ListingRow key={listing.id} listing={listing} onChanged={refresh} />
                             ))}
                         </ul>
