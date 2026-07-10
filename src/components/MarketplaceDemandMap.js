@@ -16,7 +16,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     const [showDemand, setShowDemand] = useState(true);
     const [mapReady, setMapReady] = useState(false);
     const [loaded, setLoaded] = useState(false);
-    const [dbg, setDbg] = useState("b9 …");
+    const [dbg, setDbg] = useState("b10 …");
 
     useEffect(() => {
         let cancelled = false;
@@ -104,7 +104,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
                 if (el) {
                     const cs = window.getComputedStyle(el);
                     setDbg(
-                        `b9 cont ${el.clientWidth} card ${el.parentElement?.clientWidth} ` +
+                        `b10 cont ${el.clientWidth} card ${el.parentElement?.clientWidth} ` +
                         `css ${cs.width} inline "${el.style.width || "-"}" off ${el.offsetLeft}`
                     );
                 }
@@ -203,7 +203,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     }, [demand, showDemand, mapReady]);
 
     return (
-        <section className="card">
+        <section className="card" style={{ animation: "none", transform: "none" }}>
             <h2>Demand map</h2>
             <p className="muted" style={{ fontSize: "0.7rem", opacity: 0.6 }}>{dbg}</p>
             <p className="muted" style={{ fontSize: "0.85rem" }}>
