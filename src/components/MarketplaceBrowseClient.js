@@ -38,29 +38,10 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef({});
-    const demandLayerRef = useRef(null);
     const [myLoc, setMyLoc] = useState(null);
     const [locating, setLocating] = useState(false);
     const [locError, setLocError] = useState("");
     const [specialty, setSpecialty] = useState("");
-    // Buyer-demand heatmap (what people are searching/wanting by area) — same data the app's map uses.
-    const [demand, setDemand] = useState([]);
-    const [showDemand, setShowDemand] = useState(true);
-    const [mapReady, setMapReady] = useState(false);
-
-    // Pull the demand grid once (vendor pins come from props; demand comes from the map endpoint).
-    useEffect(() => {
-        let cancelled = false;
-        fetch("/api/marketplace/map")
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => {
-                if (!cancelled && d && Array.isArray(d.demand)) setDemand(d.demand);
-            })
-            .catch(() => {});
-        return () => {
-            cancelled = true;
-        };
-    }, []);
 
     // Specialties present across vendors (canonical order) — drives the directory filter.
     const availableSpecialties = useMemo(() => {
@@ -163,73 +144,16 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
 
             // The map lives in a grid column now; recalc its size after layout so tiles fill correctly.
             setTimeout(() => map.invalidateSize(), 0);
-            if (!cancelled) setMapReady(true);
         })();
 
         return () => {
             cancelled = true;
-            setMapReady(false);
             if (map) {
                 map.remove();
                 mapRef.current = null;
             }
         };
     }, [located]);
-
-    // Demand heatmap layer: orange circles weighted by buyer activity; click one to see what's being
-    // searched/wanted in that area. Managed separately so toggling it doesn't rebuild the whole map.
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || !mapReady) return undefined;
-        let cancelled = false;
-        (async () => {
-            const L = (await import("leaflet")).default;
-            if (cancelled) return;
-            if (demandLayerRef.current) {
-                map.removeLayer(demandLayerRef.current);
-                demandLayerRef.current = null;
-            }
-            if (!showDemand || demand.length === 0) return;
-            const maxW = Math.max(...demand.map((d) => d.weight), 1);
-            const group = L.layerGroup();
-            demand.forEach((d) => {
-                const t = d.weight / maxW;
-                const circle = L.circle([d.lat, d.lng], {
-                    radius: 1200 + 4500 * t, // meters
-                    color: "#EA580C",
-                    weight: 1,
-                    fillColor: "#F97316",
-                    fillOpacity: 0.3 + 0.4 * t,
-                });
-                circle.on("click", async () => {
-                    L.popup().setLatLng([d.lat, d.lng]).setContent("Loading demand…").openOn(map);
-                    try {
-                        const res = await fetch(`/api/marketplace/map/demand?lat=${d.lat}&lng=${d.lng}&radiusKm=15`);
-                        const data = res.ok ? await res.json() : {};
-                        const searches = (data.searches || []).slice(0, 6);
-                        const products = (data.products || []).slice(0, 6);
-                        const html =
-                            `<strong>What buyers want near here</strong><br/>` +
-                            (searches.length ? `<em>Searches:</em> ${searches.join(", ")}<br/>` : "") +
-                            (products.length
-                                ? `<em>Most-wanted:</em><br/>${products.map((p) => `• ${p.name}`).join("<br/>")}`
-                                : searches.length
-                                  ? ""
-                                  : "No recent activity.");
-                        if (!cancelled) L.popup().setLatLng([d.lat, d.lng]).setContent(html).openOn(map);
-                    } catch {
-                        if (!cancelled) L.popup().setLatLng([d.lat, d.lng]).setContent("Couldn't load demand.").openOn(map);
-                    }
-                });
-                group.addLayer(circle);
-            });
-            group.addTo(map);
-            demandLayerRef.current = group;
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [demand, showDemand, mapReady]);
 
     function locateMe() {
         if (!navigator.geolocation) {
@@ -285,11 +209,6 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                     <button type="button" className="button primary" onClick={locateMe} disabled={locating}>
                         {locating ? "Locating..." : "📍 Find vendors near me"}
                     </button>
-                    {demand.length > 0 ? (
-                        <button type="button" className="pill" onClick={() => setShowDemand((s) => !s)}>
-                            {showDemand ? "🔥 Hide buyer demand" : "🔥 Show buyer demand"}
-                        </button>
-                    ) : null}
                     {availableSpecialties.length > 0 ? (
                         <ThemedSelect
                             block
@@ -311,11 +230,6 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
 
             <div className="mkt-browse-split">
                 <section className="card mkt-browse-map-card">
-                    {showDemand && demand.length > 0 ? (
-                        <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.85rem" }}>
-                            🔵 Vendors &nbsp;·&nbsp; 🟠 Buyer demand — tap an orange area to see what&rsquo;s being searched &amp; wanted there.
-                        </p>
-                    ) : null}
                     <div ref={containerRef} className="mkt-map" />
                 </section>
 
