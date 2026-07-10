@@ -19,28 +19,31 @@ const US_STATE_OPTIONS = [
 ];
 
 function buildSquareCardStyles() {
+    // Square's Web Payments SDK accepts a LIMITED style schema with camelCase property names (not CSS
+    // kebab-case), and only specific properties per selector: .input-container -> borderColor/
+    // borderRadius/borderWidth; input -> color/backgroundColor/fontSize/fontFamily/fontWeight;
+    // .message-text/.message-icon -> color. Anything else throws "Invalid style property".
     return {
         ".input-container": {
-            "border-color": "rgba(255, 255, 255, 0.18)",
-            "border-radius": "10px",
-            "background-color": "rgba(16, 16, 16, 0.96)",
+            borderColor: "rgba(255, 255, 255, 0.18)",
+            borderRadius: "10px",
         },
         ".input-container.is-focus": {
-            "border-color": "rgba(212, 175, 55, 0.65)",
+            borderColor: "rgba(212, 175, 55, 0.65)",
         },
         ".input-container.is-error": {
-            "border-color": "rgba(246, 147, 147, 0.92)",
+            borderColor: "rgba(246, 147, 147, 0.92)",
         },
         input: {
+            backgroundColor: "rgba(16, 16, 16, 0.96)",
             color: "#f4f2eb",
-            "font-size": "15px",
+            fontSize: "15px",
         },
         "input::placeholder": {
             color: "rgba(228, 228, 228, 0.62)",
         },
         ".message-text": {
             color: "rgba(236, 230, 214, 0.86)",
-            "font-size": "12px",
         },
         ".message-icon": {
             color: "rgba(236, 230, 214, 0.86)",
