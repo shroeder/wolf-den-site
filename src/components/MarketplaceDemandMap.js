@@ -16,6 +16,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     const [showDemand, setShowDemand] = useState(true);
     const [mapReady, setMapReady] = useState(false);
     const [loaded, setLoaded] = useState(false);
+    const [dbg, setDbg] = useState("b8 …");
 
     useEffect(() => {
         let cancelled = false;
@@ -97,7 +98,11 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
             // Re-measure ONLY (never re-center) so tiles fill the real container size once the tabbed
             // card has finished laying out. Retried across frames + on any later container resize.
             const remeasure = () => {
-                if (!cancelled && mapRef.current) mapRef.current.invalidateSize();
+                if (cancelled || !mapRef.current) return;
+                mapRef.current.invalidateSize();
+                const el = containerRef.current;
+                const size = mapRef.current.getSize?.() || { x: 0, y: 0 };
+                if (el) setDbg(`b8 cont ${el.clientWidth}×${el.clientHeight} · map ${Math.round(size.x)}×${Math.round(size.y)}`);
             };
             requestAnimationFrame(remeasure);
             setTimeout(remeasure, 200);
@@ -195,6 +200,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     return (
         <section className="card">
             <h2>Demand map</h2>
+            <p className="muted" style={{ fontSize: "0.7rem", opacity: 0.6 }}>{dbg}</p>
             <p className="muted" style={{ fontSize: "0.85rem" }}>
                 🔵 Vendors &nbsp;·&nbsp; 🟠 Buyer demand — tap an orange area to see what&rsquo;s being searched &amp; wanted
                 there. Spot the gaps you could fill.
