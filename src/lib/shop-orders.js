@@ -116,3 +116,37 @@ export async function getShopOrderById(orderId) {
         [orderId]
     );
 }
+
+// Admin: recent orders for the order-management view. Defaults to paid orders (the actionable ones).
+export async function listShopOrders({ limit = 100, paymentStatus = "completed", fulfillmentStatus = null } = {}) {
+    const params = [];
+    const filters = [];
+    if (paymentStatus && paymentStatus !== "all") {
+        params.push(paymentStatus);
+        filters.push(`status = $${params.length}`);
+    }
+    if (fulfillmentStatus && fulfillmentStatus !== "all") {
+        params.push(fulfillmentStatus);
+        filters.push(`fulfillment_status = $${params.length}`);
+    }
+    const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    params.push(Math.min(Number(limit) || 100, 500));
+    return db.query(
+        `SELECT * FROM shop_orders ${where} ORDER BY created_at DESC LIMIT $${params.length}`,
+        params
+    );
+}
+
+// Admin: update fulfillment (mark ready/shipped/picked up/cancelled) + optional tracking number.
+export async function setShopOrderFulfillment(orderId, { fulfillmentStatus, trackingNumber }) {
+    return db.queryOne(
+        `UPDATE shop_orders
+         SET fulfillment_status = COALESCE($2, fulfillment_status),
+             tracking_number = COALESCE($3, tracking_number),
+             fulfilled_at = CASE WHEN $2 IN ('shipped', 'picked_up') THEN NOW() ELSE fulfilled_at END,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [orderId, toNullableText(fulfillmentStatus), toNullableText(trackingNumber)]
+    );
+}
