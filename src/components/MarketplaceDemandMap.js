@@ -40,6 +40,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
         if (!loaded) return undefined;
         let cancelled = false;
         let map;
+        let resizeObs;
         (async () => {
             const L = (await import("leaflet")).default;
             if (cancelled || !containerRef.current || mapRef.current) return;
@@ -66,14 +67,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
                 );
                 points.push([v.lat, v.lng]);
             });
-            if (points.length === 1) {
-                map.setView(points[0], Math.max(DEFAULT_ZOOM, 11));
-            } else if (points.length > 1) {
-                map.fitBounds(points, { padding: [40, 40], maxZoom: 11 });
-                if (map.getZoom() < 8) map.setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
-            }
-
-            // "You are here" — a distinct green marker + center on the vendor when we know their location.
+            // "You are here" — a distinct green marker when we know the vendor's location.
             if (vendorLat != null && vendorLng != null) {
                 L.circleMarker([vendorLat, vendorLng], {
                     radius: 11,
@@ -82,15 +76,47 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
                     fillColor: "#16A34A",
                     fillOpacity: 1,
                 }).addTo(map).bindPopup("<strong>You are here</strong>");
-                map.setView([vendorLat, vendorLng], 10);
             }
 
-            setTimeout(() => map.invalidateSize(), 0);
+            // Apply the intended view INSIDE settle() — i.e. only after invalidateSize — so tiles never
+            // lay out against a stale container size (the cause of the "two offset map halves" glitch on
+            // mobile, where the card height isn't final at init).
+            const applyView = () => {
+                if (vendorLat != null && vendorLng != null) {
+                    map.setView([vendorLat, vendorLng], 10);
+                } else if (points.length === 1) {
+                    map.setView(points[0], Math.max(DEFAULT_ZOOM, 11));
+                } else if (points.length > 1) {
+                    map.fitBounds(points, { padding: [40, 40], maxZoom: 11 });
+                    if (map.getZoom() < 8) map.setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
+                }
+            };
+            const settle = () => {
+                if (cancelled || !mapRef.current) return;
+                map.invalidateSize();
+                applyView();
+            };
+            settle();
+            setTimeout(settle, 150);
+            setTimeout(settle, 450);
+
+            // Re-fit tiles whenever the container actually changes size (mobile layout settling).
+            if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+                resizeObs = new ResizeObserver(() => {
+                    if (mapRef.current) mapRef.current.invalidateSize();
+                });
+                resizeObs.observe(containerRef.current);
+            }
+
             if (!cancelled) setMapReady(true);
         })();
         return () => {
             cancelled = true;
             setMapReady(false);
+            if (resizeObs) {
+                resizeObs.disconnect();
+                resizeObs = undefined;
+            }
             if (map) {
                 map.remove();
                 mapRef.current = null;
