@@ -38,6 +38,10 @@ export default async function ShopOrdersAdminPage() {
         taxCents: o.tax_cents ?? null,
         shippingCents: o.shipping_cents ?? null,
         onlineFeeCents: o.online_fee_cents,
+        shippingCarrier: o.shipping_carrier || null,
+        shippingService: o.shipping_service || null,
+        shippingLabelUrl: o.shipping_label_url || null,
+        hasShipment: Boolean(o.easypost_shipment_id && o.easypost_rate_id),
         items: parseItems(o.items_json),
         shipping: {
             name: o.shipping_name,

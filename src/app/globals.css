@@ -2394,6 +2394,43 @@ textarea {
     background: rgba(0, 0, 0, 0.2);
 }
 
+.cart-shipping-rates {
+    margin-top: 0.6rem;
+}
+
+.cart-rate-list {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.5rem 0.7rem;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.cart-rate-list legend {
+    font-size: 0.7rem;
+    color: var(--ink-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 0.3rem;
+}
+
+.cart-rate-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.25rem 0.15rem;
+}
+
+.cart-rate-option .cart-rate-name {
+    flex: 1;
+}
+
+.cart-rate-option strong {
+    color: var(--accent);
+}
+
 .shop-payment-breakdown {
     display: grid;
     gap: 0.22rem;

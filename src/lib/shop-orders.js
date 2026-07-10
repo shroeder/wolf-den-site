@@ -27,6 +27,10 @@ export async function createPendingShopOrder({
     fulfillmentMode,
     shipping,
     shippingValidationStatus,
+    easyPostShipmentId = null,
+    easyPostRateId = null,
+    shippingCarrier = null,
+    shippingService = null,
 }) {
     return db.queryOne(
         `INSERT INTO shop_orders (
@@ -52,8 +56,12 @@ export async function createPendingShopOrder({
             shipping_validation_status,
             tax_cents,
             shipping_cents,
+            easypost_shipment_id,
+            easypost_rate_id,
+            shipping_carrier,
+            shipping_service,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -78,6 +86,33 @@ export async function createPendingShopOrder({
             toNullableText(shippingValidationStatus) || "pending",
             Math.max(0, Math.round(Number(taxCents) || 0)),
             Math.max(0, Math.round(Number(shippingCents) || 0)),
+            toNullableText(easyPostShipmentId),
+            toNullableText(easyPostRateId),
+            toNullableText(shippingCarrier),
+            toNullableText(shippingService),
+        ]
+    );
+}
+
+// Store the bought EasyPost label + tracking on the order and mark it shipped.
+export async function setShopOrderShippingLabel(orderId, { labelUrl, trackingNumber, carrier, service }) {
+    return db.queryOne(
+        `UPDATE shop_orders
+         SET shipping_label_url = COALESCE($2, shipping_label_url),
+             tracking_number = COALESCE($3, tracking_number),
+             shipping_carrier = COALESCE($4, shipping_carrier),
+             shipping_service = COALESCE($5, shipping_service),
+             fulfillment_status = 'shipped',
+             fulfilled_at = COALESCE(fulfilled_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [
+            orderId,
+            toNullableText(labelUrl),
+            toNullableText(trackingNumber),
+            toNullableText(carrier),
+            toNullableText(service),
         ]
     );
 }

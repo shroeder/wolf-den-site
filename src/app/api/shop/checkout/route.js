@@ -8,6 +8,7 @@ import {
     createSquareCardPayment,
     upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
+import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
@@ -262,6 +263,48 @@ export async function POST(request) {
                 }, { status: 409 });
             }
 
+            // Shipping cost: with EasyPost configured + a rate chosen at checkout, charge the
+            // authoritative EasyPost price (re-read server-side so a tampered client amount can't win);
+            // otherwise fall back to the cart's flat shipping.
+            let effectiveShippingCents = cart.shippingCents;
+            let easyPostShipmentId = null;
+            let easyPostRateId = null;
+            let shippingCarrier = null;
+            let shippingService = null;
+
+            if (fulfillment.fulfillmentMode === "shipping" && isEasyPostEnabled()) {
+                const shipmentId = String(body?.easyPostShipmentId || "").trim();
+                const rateId = String(body?.shippingRateId || "").trim();
+
+                if (!shipmentId || !rateId) {
+                    return jsonNoStore(
+                        { error: "Please select a shipping option.", code: "shipping_rate_required" },
+                        { status: 400 }
+                    );
+                }
+
+                const rate = await getShipmentRate(shipmentId, rateId);
+
+                if (!rate) {
+                    return jsonNoStore(
+                        {
+                            error: "Your selected shipping rate has expired. Please review shipping and try again.",
+                            code: "shipping_rate_expired",
+                        },
+                        { status: 409 }
+                    );
+                }
+
+                effectiveShippingCents = rate.amountCents;
+                easyPostShipmentId = shipmentId;
+                easyPostRateId = rateId;
+                shippingCarrier = rate.carrier;
+                shippingService = rate.service;
+            }
+
+            const effectiveTotalCents =
+                cart.subtotalCents + cart.onlineFeeCents + cart.taxCents + effectiveShippingCents;
+
             const idempotencyKey = randomUUID();
 
             const pendingOrder = await createPendingShopOrder({
@@ -271,14 +314,18 @@ export async function POST(request) {
                 subtotalCents: cart.subtotalCents,
                 onlineFeeCents: cart.onlineFeeCents,
                 taxCents: cart.taxCents,
-                shippingCents: cart.shippingCents,
-                totalCents: cart.totalCents,
+                shippingCents: effectiveShippingCents,
+                totalCents: effectiveTotalCents,
                 idempotencyKey,
                 cartId,
                 items: cart.items,
                 fulfillmentMode: fulfillment.fulfillmentMode,
                 shipping: fulfillment.shipping,
                 shippingValidationStatus: fulfillment.shippingValidationStatus,
+                easyPostShipmentId,
+                easyPostRateId,
+                shippingCarrier,
+                shippingService,
             });
 
             let payment;
@@ -286,7 +333,7 @@ export async function POST(request) {
             try {
                 payment = await createSquareCardPayment({
                     sourceId,
-                    amountCents: cart.totalCents,
+                    amountCents: effectiveTotalCents,
                     idempotencyKey,
                     note: `Shop order ${pendingOrder.id}`,
                     referenceId: pendingOrder.id,

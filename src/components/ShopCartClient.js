@@ -234,6 +234,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         totalCents: 0,
         hasUnavailableItems: false,
     });
+    // Live USPS rates (EasyPost). enabled:false => fall back to the flat shipping in cartData.
+    const [shipRates, setShipRates] = useState({ enabled: false, options: [], shipmentId: null });
+    const [selectedRateId, setSelectedRateId] = useState("");
+    const [ratesLoading, setRatesLoading] = useState(false);
+    const [ratesError, setRatesError] = useState("");
 
     const cardRef = useRef(null);
     const mountId = "square-cart-page-card";
@@ -247,6 +252,21 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const hasFulfillmentChoice = fulfillmentMode === "shipping" || fulfillmentMode === "pickup";
     const isShippingReady = fulfillmentMode === "shipping" && Object.keys(shippingFieldErrors).length === 0;
     const isFulfillmentReady = fulfillmentMode === "pickup" || isShippingReady;
+
+    // When EasyPost returns live rates, the buyer must pick one and the totals use that rate;
+    // otherwise the flat shipping from the server cart applies.
+    const selectedRate = shipRates.options.find((rate) => rate.id === selectedRateId) || null;
+    const usingCalculatedShipping = shipRates.enabled && fulfillmentMode === "shipping";
+    const baseCents = cartData.subtotalCents + cartData.onlineFeeCents + cartData.taxCents;
+    const displayShippingCents = fulfillmentMode !== "shipping"
+        ? 0
+        : usingCalculatedShipping
+            ? (selectedRate ? selectedRate.amountCents : null)
+            : cartData.shippingCents;
+    const displayTotalCents = usingCalculatedShipping
+        ? baseCents + (selectedRate ? selectedRate.amountCents : 0)
+        : cartData.totalCents;
+
     const canSubmitCheckout = Boolean(
         checkoutCardState === "ready"
         && !checkoutBusy
@@ -254,6 +274,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         && !cartData.hasUnavailableItems
         && hasFulfillmentChoice
         && isFulfillmentReady
+        && (!usingCalculatedShipping || Boolean(selectedRate))
     );
 
     const refreshCart = useCallback(async () => {
@@ -325,6 +346,78 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
         return () => window.clearTimeout(timeoutId);
     }, [canShowCart, refreshCart]);
+
+    // Fetch live shipping rates once the buyer has a valid shipping address + a non-empty cart.
+    // Debounced so typing the address doesn't hammer the endpoint. No-op / clears for pickup or
+    // when EasyPost isn't configured (endpoint returns enabled:false -> flat fallback).
+    useEffect(() => {
+        let cancelled = false;
+        const ready =
+            canShowCart && fulfillmentMode === "shipping" && isShippingReady && cartData.items.length > 0;
+
+        const disable = () => {
+            setShipRates({ enabled: false, options: [], shipmentId: null });
+            setSelectedRateId("");
+        };
+
+        // All state changes live inside the timeout callback (not the effect body) so we don't trigger
+        // cascading synchronous renders. Not-ready clears immediately (0ms); ready is debounced.
+        const timeoutId = window.setTimeout(async () => {
+            if (cancelled) {
+                return;
+            }
+
+            if (!ready) {
+                disable();
+                setRatesError("");
+                setRatesLoading(false);
+                return;
+            }
+
+            setRatesLoading(true);
+            setRatesError("");
+
+            try {
+                const response = await fetch("/api/shop/shipping/rates", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ shipping: normalizedShipping }),
+                });
+                const payload = await response.json().catch(() => null);
+
+                if (cancelled) {
+                    return;
+                }
+
+                if (!response.ok) {
+                    setRatesError(payload?.error || "Could not load shipping rates.");
+                    disable();
+                } else if (payload?.enabled && Array.isArray(payload.rates) && payload.rates.length) {
+                    setShipRates({ enabled: true, options: payload.rates, shipmentId: payload.shipmentId });
+                    setSelectedRateId((prev) =>
+                        payload.rates.some((rate) => rate.id === prev) ? prev : payload.rates[0].id
+                    );
+                } else {
+                    // EasyPost off or couldn't rate this address — use flat shipping.
+                    disable();
+                }
+            } catch {
+                if (!cancelled) {
+                    setRatesError("Could not load shipping rates.");
+                    disable();
+                }
+            } finally {
+                if (!cancelled) {
+                    setRatesLoading(false);
+                }
+            }
+        }, ready ? 600 : 0);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [canShowCart, fulfillmentMode, isShippingReady, cartData.items.length, normalizedShipping]);
 
     const refreshAuthSession = useCallback(async () => {
         if (!canShowCart) {
@@ -482,6 +575,16 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             }
 
             checkoutPayload.shipping = normalizedShipping;
+
+            if (usingCalculatedShipping) {
+                if (!selectedRate) {
+                    setError("Please select a shipping option.");
+                    setCheckoutBusy(false);
+                    return;
+                }
+                checkoutPayload.shippingRateId = selectedRate.id;
+                checkoutPayload.easyPostShipmentId = shipRates.shipmentId;
+            }
         }
 
         try {
@@ -804,6 +907,39 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 {fulfillmentMode === "pickup" ? (
                                     <p className="secondary">Local pickup selected. Shipping address is not required.</p>
                                 ) : null}
+
+                                {fulfillmentMode === "shipping" && isShippingReady ? (
+                                    <div className="cart-shipping-rates">
+                                        {ratesLoading ? (
+                                            <p className="secondary">Getting live shipping rates…</p>
+                                        ) : null}
+                                        {!ratesLoading && usingCalculatedShipping ? (
+                                            <fieldset className="cart-rate-list">
+                                                <legend>Choose a shipping option</legend>
+                                                {shipRates.options.map((rate) => (
+                                                    <label key={rate.id} className="cart-rate-option">
+                                                        <input
+                                                            type="radio"
+                                                            name="shipping-rate"
+                                                            value={rate.id}
+                                                            checked={selectedRateId === rate.id}
+                                                            onChange={() => setSelectedRateId(rate.id)}
+                                                            disabled={checkoutBusy}
+                                                        />
+                                                        <span className="cart-rate-name">
+                                                            {rate.carrier} {rate.service}
+                                                            {rate.deliveryDays ? ` · ${rate.deliveryDays} day${rate.deliveryDays > 1 ? "s" : ""}` : ""}
+                                                        </span>
+                                                        <strong>{formatMoney(rate.amountCents)}</strong>
+                                                    </label>
+                                                ))}
+                                            </fieldset>
+                                        ) : null}
+                                        {!ratesLoading && ratesError ? (
+                                            <p className="secondary">{ratesError} A flat rate will be used.</p>
+                                        ) : null}
+                                    </div>
+                                ) : null}
                             </section>
                         </div>
 
@@ -815,11 +951,17 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             {fulfillmentMode === "shipping" ? (
                                 <p>
                                     <span>Shipping</span>
-                                    <strong>{cartData.shippingCents ? formatMoney(cartData.shippingCents) : "FREE"}</strong>
+                                    <strong>
+                                        {displayShippingCents === null
+                                            ? "Select an option"
+                                            : displayShippingCents
+                                                ? formatMoney(displayShippingCents)
+                                                : "FREE"}
+                                    </strong>
                                 </p>
                             ) : null}
                             <p><span>Online fee (3.5%)</span><strong>{formatMoney(cartData.onlineFeeCents)}</strong></p>
-                            <p className="shop-payment-total"><span>Total</span><strong>{formatMoney(cartData.totalCents)}</strong></p>
+                            <p className="shop-payment-total"><span>Total</span><strong>{formatMoney(displayTotalCents)}</strong></p>
                         </div>
 
                         {!missingSquareConfig && checkoutCardState !== "error" && (

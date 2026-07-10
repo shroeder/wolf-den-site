@@ -73,12 +73,39 @@ export default function ShopOrdersAdminClient({ orders: initial }) {
 function OrderCard({ order: o, onUpdate }) {
     const [tracking, setTracking] = useState(o.trackingNumber || "");
     const [busy, setBusy] = useState(false);
+    const [labelUrl, setLabelUrl] = useState(o.shippingLabelUrl || "");
+    const [labelBusy, setLabelBusy] = useState(false);
+    const [labelError, setLabelError] = useState("");
     const isPickup = o.fulfillmentMode === "pickup";
 
     async function act(patch) {
         setBusy(true);
         await onUpdate(o.id, patch);
         setBusy(false);
+    }
+
+    async function buyLabel() {
+        setLabelBusy(true);
+        setLabelError("");
+        try {
+            const res = await fetch(`/api/admin/shop/orders/${o.id}/label`, { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setLabelError(data?.error || "Could not buy label.");
+                return;
+            }
+            setLabelUrl(data.labelUrl || "");
+            const newTracking = data.trackingCode || tracking;
+            if (data.trackingCode) {
+                setTracking(data.trackingCode);
+            }
+            // The label endpoint already marked the order shipped server-side; sync the list row.
+            await onUpdate(o.id, { fulfillmentStatus: "shipped", trackingNumber: newTracking });
+        } catch {
+            setLabelError("Could not buy label.");
+        } finally {
+            setLabelBusy(false);
+        }
     }
 
     return (
@@ -115,9 +142,26 @@ function OrderCard({ order: o, onUpdate }) {
                     </a>
                 </p>
             ) : null}
+            {!isPickup && (o.shippingService || o.shippingCarrier) ? (
+                <p className="muted">
+                    Shipping: {o.shippingCarrier || ""} {o.shippingService || ""} · {money(o.shippingCents)}
+                </p>
+            ) : null}
+            {labelError ? <p style={{ color: "#f7a6a6" }}>{labelError}</p> : null}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 {!isPickup ? (
                     <>
+                        {o.hasShipment ? (
+                            labelUrl ? (
+                                <a className="button primary" href={labelUrl} target="_blank" rel="noreferrer">
+                                    Print label →
+                                </a>
+                            ) : (
+                                <button type="button" className="button primary" disabled={labelBusy} onClick={buyLabel}>
+                                    {labelBusy ? "Buying…" : "Buy label"}
+                                </button>
+                            )
+                        ) : null}
                         <input
                             type="text"
                             placeholder="Tracking #"
@@ -126,7 +170,7 @@ function OrderCard({ order: o, onUpdate }) {
                         />
                         <button
                             type="button"
-                            className="button primary"
+                            className={o.hasShipment ? "pill" : "button primary"}
                             disabled={busy}
                             onClick={() => act({ fulfillmentStatus: "shipped", trackingNumber: tracking })}
                         >
