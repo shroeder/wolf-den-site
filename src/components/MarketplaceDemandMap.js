@@ -16,7 +16,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     const [showDemand, setShowDemand] = useState(true);
     const [mapReady, setMapReady] = useState(false);
     const [loaded, setLoaded] = useState(false);
-    const [dbg, setDbg] = useState("b8 …");
+    const [dbg, setDbg] = useState("b9 …");
 
     useEffect(() => {
         let cancelled = false;
@@ -101,8 +101,13 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
                 if (cancelled || !mapRef.current) return;
                 mapRef.current.invalidateSize();
                 const el = containerRef.current;
-                const size = mapRef.current.getSize?.() || { x: 0, y: 0 };
-                if (el) setDbg(`b8 cont ${el.clientWidth}×${el.clientHeight} · map ${Math.round(size.x)}×${Math.round(size.y)}`);
+                if (el) {
+                    const cs = window.getComputedStyle(el);
+                    setDbg(
+                        `b9 cont ${el.clientWidth} card ${el.parentElement?.clientWidth} ` +
+                        `css ${cs.width} inline "${el.style.width || "-"}" off ${el.offsetLeft}`
+                    );
+                }
             };
             requestAnimationFrame(remeasure);
             setTimeout(remeasure, 200);
