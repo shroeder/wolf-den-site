@@ -46,7 +46,7 @@ export default function SiteFooter() {
                 <div>
                     <h3>Visit</h3>
                     <p>300 1st St S, Montgomery, MN 56069</p>
-                    <p>Thu 4–7pm, Fri 4–7pm, Sat 12–6pm</p>
+                    <p>Open daily 12–6pm · Thu &amp; Fri 12–7pm</p>
                     <p><strong>Grand opening: May 21, 2026</strong></p>
                     <p>Serving Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, and Belle Plaine.</p>
                     <p className="footer-secret-wrap">

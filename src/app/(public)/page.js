@@ -152,10 +152,13 @@ export default async function HomePage() {
                     <h2>Hours & Location</h2>
                     <p>300 1st St S, Montgomery, MN 56069</p>
                     <ul>
-                        <li>Thursday: 4:00 PM – 7:00 PM</li>
-                        <li>Friday: 4:00 PM – 7:00 PM</li>
-                        <li>Saturday: 12:00 PM – 6:00 PM</li>
                         <li>Sunday: 12:00 PM – 6:00 PM</li>
+                        <li>Monday: 12:00 PM – 6:00 PM</li>
+                        <li>Tuesday: 12:00 PM – 6:00 PM</li>
+                        <li>Wednesday: 12:00 PM – 6:00 PM</li>
+                        <li>Thursday: 12:00 PM – 7:00 PM</li>
+                        <li>Friday: 12:00 PM – 7:00 PM</li>
+                        <li>Saturday: 12:00 PM – 6:00 PM</li>
                     </ul>
                     <a className="text-link" href="https://www.google.com/maps/search/?api=1&query=300+1st+St+S,+Montgomery,+MN+56069" target="_blank" rel="noreferrer">
                         Open Map

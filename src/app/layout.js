@@ -112,8 +112,11 @@ const localBusinessSchema = {
     ],
     knowsAbout: ["Pokemon cards", "Magic: The Gathering", "trading card singles", "sealed product", "Commander", "local play"],
     openingHoursSpecification: [
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "16:00", closes: "19:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "16:00", closes: "19:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Monday", opens: "12:00", closes: "18:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Tuesday", opens: "12:00", closes: "18:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Wednesday", opens: "12:00", closes: "18:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "12:00", closes: "19:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "12:00", closes: "19:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "12:00", closes: "18:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "12:00", closes: "18:00" },
     ],
