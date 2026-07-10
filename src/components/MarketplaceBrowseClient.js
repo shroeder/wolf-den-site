@@ -69,7 +69,9 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
         return VENDOR_SPECIALTIES.filter((s) => present.has(s));
     }, [vendors]);
 
-    const located = vendors.filter((v) => v.latitude != null && v.longitude != null);
+    // Memoized so its reference is stable — otherwise the map-init effect (keyed on `located`) re-runs
+    // every render, tearing down/rebuilding the map and preventing the demand heat layer from attaching.
+    const located = useMemo(() => vendors.filter((v) => v.latitude != null && v.longitude != null), [vendors]);
 
     // Vendor list, sorted by distance once we know where the buyer is.
     const sortedVendors = useMemo(() => {
