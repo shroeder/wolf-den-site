@@ -499,6 +499,71 @@ export async function adjustInventoryForSale(items, { idempotencyKey } = {}) {
     return { applied: changes.length, counts: results };
 }
 
+// Read the shop's sales-tax rate straight from Square so online orders are taxed at the exact same
+// rate as the counter — no hardcoded number to keep in sync. Sums the enabled additive tax objects
+// (a single-location shop normally has just one, e.g. "Sales Tax 7.375%"). Returns a decimal
+// (0.07375). Env SHOP_TAX_RATE overrides this entirely if the owner ever wants to force a rate.
+// Cached in-memory for an hour so we don't hit the catalog on every cart render.
+const DEFAULT_SHOP_TAX_RATE = 0.06875; // MN state base — only used if Square + env both give nothing
+let shopTaxRateCache = { rate: null, fetchedAt: 0 };
+const SHOP_TAX_RATE_TTL_MS = 60 * 60 * 1000;
+
+export async function getShopSalesTaxRate() {
+    const override = Number(process.env.SHOP_TAX_RATE);
+    if (Number.isFinite(override) && override >= 0 && override < 0.2) {
+        return override;
+    }
+
+    const now = Date.now();
+    if (shopTaxRateCache.rate !== null && now - shopTaxRateCache.fetchedAt < SHOP_TAX_RATE_TTL_MS) {
+        return shopTaxRateCache.rate;
+    }
+
+    try {
+        let cursor = null;
+        let summed = 0;
+        let found = false;
+
+        do {
+            const params = new URLSearchParams({ types: "TAX" });
+            if (cursor) {
+                params.set("cursor", cursor);
+            }
+
+            const payload = await squareFetch(`/v2/catalog/list?${params.toString()}`);
+
+            for (const obj of payload?.objects || []) {
+                const tax = obj?.tax_data;
+                if (!tax || tax.enabled === false) {
+                    continue;
+                }
+                // Only "additive" taxes get added on top of the price (what a customer pays extra).
+                if (tax.inclusion_type && tax.inclusion_type !== "ADDITIVE") {
+                    continue;
+                }
+
+                const pct = Number(tax.percentage);
+                if (Number.isFinite(pct) && pct > 0) {
+                    summed += pct / 100;
+                    found = true;
+                }
+            }
+
+            cursor = payload?.cursor || null;
+        } while (cursor);
+
+        // Sanity clamp so a misconfigured Square (e.g. many stacked taxes) can't wildly overcharge.
+        const rate = found && summed > 0 && summed < 0.15 ? summed : DEFAULT_SHOP_TAX_RATE;
+        shopTaxRateCache = { rate, fetchedAt: now };
+        return rate;
+    } catch (error) {
+        squareLogger.warn("square.tax_rate.fetch_failed", {
+            errorMessage: error instanceof Error ? error.message : "unknown_error",
+        });
+        return shopTaxRateCache.rate !== null ? shopTaxRateCache.rate : DEFAULT_SHOP_TAX_RATE;
+    }
+}
+
 export async function searchSalesForVariations(variationLookup, options = {}) {
     const locationId = getSquareLocationId();
 

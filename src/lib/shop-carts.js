@@ -1,6 +1,6 @@
 import "server-only";
 
-import { calculateOnlineFeeCents, listShopInventory, toPriceCents } from "@/lib/consignment/square";
+import { calculateOnlineFeeCents, getShopSalesTaxRate, listShopInventory, toPriceCents } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
 import {
@@ -273,7 +273,8 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
     }
 
     const onlineFeeCents = calculateOnlineFeeCents(subtotalCents / 100);
-    const taxCents = shopTaxCents(subtotalCents);
+    const taxRate = await getShopSalesTaxRate();
+    const taxCents = shopTaxCents(subtotalCents, taxRate);
     const shippingCents = shopShippingCents(subtotalCents, fulfillmentMode);
 
     return {
