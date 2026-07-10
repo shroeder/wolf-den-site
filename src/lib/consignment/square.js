@@ -1357,6 +1357,76 @@ export async function getSquarePaymentById(paymentId) {
     return payload.payment || null;
 }
 
+// Refund a completed Square payment (full or partial). Returns the refund object.
+export async function refundSquarePayment({ paymentId, amountCents, reason, idempotencyKey }) {
+    const normalizedPaymentId = String(paymentId || "").trim();
+    const normalizedAmountCents = Math.round(Number(amountCents || 0));
+
+    if (!normalizedPaymentId) {
+        throw new Error("Missing payment id to refund.");
+    }
+    if (!Number.isFinite(normalizedAmountCents) || normalizedAmountCents <= 0) {
+        throw new Error("Invalid refund amount.");
+    }
+
+    const payload = await squareFetch("/v2/refunds", {
+        method: "POST",
+        body: JSON.stringify({
+            idempotency_key: String(idempotencyKey || "").trim() || randomUUID(),
+            payment_id: normalizedPaymentId,
+            amount_money: { amount: normalizedAmountCents, currency: "USD" },
+            reason: reason ? String(reason).slice(0, 192) : undefined,
+        }),
+    });
+
+    return payload.refund || null;
+}
+
+// Put sold quantities back into IN_STOCK (the reverse of adjustInventoryForSale) — used when an order
+// is cancelled/refunded so the item is sellable again. Best-effort; mirrors the sale adjustment.
+export async function restockInventoryForCancel(items, { idempotencyKey } = {}) {
+    const locationId = getSquareLocationId();
+    const occurredAt = new Date().toISOString();
+
+    const changes = [];
+    for (const item of items || []) {
+        const catalogObjectId = String(item?.catalogObjectId || "").trim();
+        const quantity = Math.floor(Number(item?.quantity || 0));
+        if (!catalogObjectId || catalogObjectId === "cart" || quantity < 1) {
+            continue;
+        }
+        changes.push({
+            type: "ADJUSTMENT",
+            adjustment: {
+                catalog_object_id: catalogObjectId,
+                location_id: locationId,
+                from_state: "SOLD",
+                to_state: "IN_STOCK",
+                quantity: String(quantity),
+                occurred_at: occurredAt,
+            },
+        });
+    }
+
+    if (!changes.length) {
+        return { applied: 0 };
+    }
+
+    const results = [];
+    for (const batch of chunk(changes, 100)) {
+        const payload = await squareFetch("/v2/inventory/changes/batch-create", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: `${idempotencyKey || randomUUID()}-restock-${results.length}`,
+                changes: batch,
+            }),
+        });
+        results.push(...(payload?.counts || []));
+    }
+
+    return { applied: changes.length, counts: results };
+}
+
 export function calculateOnlineFeeCents(subtotalAmountDollars) {
     const subtotalCents = toAmountCents(subtotalAmountDollars);
 

@@ -103,6 +103,34 @@ export async function sendOrderConfirmationEmail(order) {
     return !result?.error;
 }
 
+/** Customer cancellation + refund notice with the owner's reason. Skips if no email on the order. */
+export async function sendOrderCancelledEmail(order, { reason, refundAmountCents } = {}) {
+    const resend = getResendClient();
+    if (!resend || !order?.shipping_email) {
+        return false;
+    }
+    const refunded = Number(refundAmountCents || 0) > 0;
+    const html = `
+        <h1>Your order was cancelled</h1>
+        <p>Order <strong>#${shortId(order.id)}</strong> has been cancelled.</p>
+        ${reason ? `<p><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : ""}
+        <ul>${itemsHtml(order.items_json)}</ul>
+        ${
+            refunded
+                ? `<p>We&rsquo;ve refunded <strong>${money(refundAmountCents)}</strong> to your original payment method. It may take a few business days to appear.</p>`
+                : `<p>No charge was captured, so there&rsquo;s nothing to refund.</p>`
+        }
+        <p style="color:#777;font-size:13px;">Sorry for the inconvenience — questions? Just reply to this email.</p>
+    `;
+    const result = await resend.emails.send({
+        from: FROM,
+        to: order.shipping_email,
+        subject: `Your Wolf Den order #${shortId(order.id)} was cancelled`,
+        html,
+    });
+    return !result?.error;
+}
+
 /** New-order alert to the store owner so an order is never missed. */
 export async function sendNewOrderAlertEmail(order) {
     const resend = getResendClient();

@@ -220,6 +220,28 @@ export async function listShopOrders({ limit = 100, paymentStatus = "completed",
     );
 }
 
+// Admin: record a cancellation + refund on an order. Sets fulfillment_status=cancelled and stores
+// the reason (shown to the customer) + Square refund details.
+export async function setShopOrderCancelled(orderId, { reason, refundId = null, refundAmountCents = null }) {
+    return db.queryOne(
+        `UPDATE shop_orders
+         SET fulfillment_status = 'cancelled',
+             cancellation_reason = $2,
+             refund_id = COALESCE($3, refund_id),
+             refund_amount_cents = COALESCE($4, refund_amount_cents),
+             refunded_at = CASE WHEN $3 IS NOT NULL THEN NOW() ELSE refunded_at END,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [
+            orderId,
+            toNullableText(reason),
+            toNullableText(refundId),
+            refundAmountCents == null ? null : Math.max(0, Math.round(Number(refundAmountCents) || 0)),
+        ]
+    );
+}
+
 // Admin: update fulfillment (mark ready/shipped/picked up/cancelled) + optional tracking number.
 export async function setShopOrderFulfillment(orderId, { fulfillmentStatus, trackingNumber }) {
     return db.queryOne(
