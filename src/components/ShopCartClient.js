@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ThemedSelect from "@/components/ThemedSelect";
 
-const PAYMENT_TOGGLE_STORAGE_KEY = "wolfden-payments-test-enabled";
 const SHOP_CART_UPDATED_EVENT = "wolfden-shop-cart-updated";
 
 const formatMoney = (cents) =>
@@ -140,14 +139,6 @@ function loadSquarePaymentsScript() {
     });
 }
 
-function isLocalPaymentsEnabled() {
-    try {
-        return window.localStorage.getItem(PAYMENT_TOGGLE_STORAGE_KEY) === "1";
-    } catch {
-        return false;
-    }
-}
-
 function emitCartUpdated() {
     window.dispatchEvent(new CustomEvent(SHOP_CART_UPDATED_EVENT));
 }
@@ -209,13 +200,6 @@ function normalizeShippingForm(shipping) {
 }
 
 export default function ShopCartClient({ paymentsEnabled, squareApplicationId, squareLocationId }) {
-    const [localToggleEnabled, setLocalToggleEnabled] = useState(() => {
-        if (typeof window === "undefined") {
-            return false;
-        }
-
-        return isLocalPaymentsEnabled();
-    });
     const [cartLoading, setCartLoading] = useState(false);
     const [cartMutating, setCartMutating] = useState(false);
     const [lineItemMutatingId, setLineItemMutatingId] = useState("");
@@ -254,7 +238,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const cardRef = useRef(null);
     const mountId = "square-cart-page-card";
 
-    const canShowCart = Boolean(paymentsEnabled && localToggleEnabled);
+    // Env flag is the single source of truth for exposing checkout — no local-storage gate (that was a
+    // launch footgun: customers hit a dead-end "cart hidden" screen). Off env = the guard above hides it.
+    const canShowCart = Boolean(paymentsEnabled);
     const missingSquareConfig = canShowCart && (!squareApplicationId || !squareLocationId);
     const normalizedShipping = useMemo(() => normalizeShippingForm(shippingForm), [shippingForm]);
     const shippingFieldErrors = useMemo(() => validateShippingForm(normalizedShipping), [normalizedShipping]);
@@ -326,16 +312,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             setCartMutating(false);
             setLineItemMutatingId("");
         }
-    }, []);
-
-    useEffect(() => {
-        const onStorage = () => {
-            setLocalToggleEnabled(isLocalPaymentsEnabled());
-        };
-
-        window.addEventListener("storage", onStorage);
-
-        return () => window.removeEventListener("storage", onStorage);
     }, []);
 
     useEffect(() => {
@@ -589,17 +565,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             <section className="card cart-page-shell">
                 <h1>Cart</h1>
                 <p className="secondary">Online checkout is currently unavailable.</p>
-            </section>
-        );
-    }
-
-    if (!localToggleEnabled) {
-        return (
-            <section className="card cart-page-shell">
-                <h1>Cart</h1>
-                <p className="secondary">
-                    Cart is hidden by your local test flag. Set <strong>{PAYMENT_TOGGLE_STORAGE_KEY}</strong> to <strong>1</strong> to enable.
-                </p>
             </section>
         );
     }

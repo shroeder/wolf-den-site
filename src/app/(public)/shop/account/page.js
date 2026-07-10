@@ -3,24 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const PAYMENT_TOGGLE_STORAGE_KEY = "wolfden-payments-test-enabled";
-
-function isLocalPaymentsEnabled() {
-    try {
-        return window.localStorage.getItem(PAYMENT_TOGGLE_STORAGE_KEY) === "1";
-    } catch {
-        return false;
-    }
-}
-
 export default function ShopAccountPage() {
-    const [localToggleEnabled, setLocalToggleEnabled] = useState(() => {
-        if (typeof window === "undefined") {
-            return false;
-        }
-
-        return isLocalPaymentsEnabled();
-    });
     const [busy, setBusy] = useState(false);
     const [customer, setCustomer] = useState(null);
     const [mode, setMode] = useState("login");
@@ -35,17 +18,7 @@ export default function ShopAccountPage() {
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
     useEffect(() => {
-        const onStorage = () => {
-            setLocalToggleEnabled(isLocalPaymentsEnabled());
-        };
-
-        window.addEventListener("storage", onStorage);
-
-        return () => window.removeEventListener("storage", onStorage);
-    }, []);
-
-    useEffect(() => {
-        if (!paymentsEnabled || !localToggleEnabled) {
+        if (!paymentsEnabled) {
             return;
         }
 
@@ -73,7 +46,7 @@ export default function ShopAccountPage() {
         };
 
         loadSession();
-    }, [paymentsEnabled, localToggleEnabled]);
+    }, [paymentsEnabled]);
 
     const handleAuthSubmit = async () => {
         if (!String(email || "").trim() || !String(password || "").trim()) {
@@ -195,15 +168,6 @@ export default function ShopAccountPage() {
             <section className="card cart-page-shell">
                 <h1>Account</h1>
                 <p className="secondary">Online shop account tools are currently unavailable.</p>
-            </section>
-        );
-    }
-
-    if (!localToggleEnabled) {
-        return (
-            <section className="card cart-page-shell">
-                <h1>Account</h1>
-                <p className="secondary">Shop account features are hidden by local test flag.</p>
             </section>
         );
     }

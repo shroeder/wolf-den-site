@@ -448,6 +448,57 @@ export async function getInventoryCounts(variationIds) {
     return totals;
 }
 
+// Move sold quantities out of IN_STOCK so an online-purchased card can't be double-sold in-store.
+// Records an ADJUSTMENT (IN_STOCK -> SOLD) per line. `items` is [{ catalogObjectId, quantity }].
+// Best-effort: callers should not fail a completed order if this throws (payment already captured).
+export async function adjustInventoryForSale(items, { idempotencyKey } = {}) {
+    const locationId = getSquareLocationId();
+    const occurredAt = new Date().toISOString();
+
+    const changes = [];
+    for (const item of items || []) {
+        const catalogObjectId = String(item?.catalogObjectId || "").trim();
+        const quantity = Math.floor(Number(item?.quantity || 0));
+
+        // Skip the synthetic "cart" placeholder row and anything without a real variation id.
+        if (!catalogObjectId || catalogObjectId === "cart" || quantity < 1) {
+            continue;
+        }
+
+        changes.push({
+            type: "ADJUSTMENT",
+            adjustment: {
+                catalog_object_id: catalogObjectId,
+                location_id: locationId,
+                from_state: "IN_STOCK",
+                to_state: "SOLD",
+                quantity: String(quantity),
+                occurred_at: occurredAt,
+            },
+        });
+    }
+
+    if (!changes.length) {
+        return { applied: 0 };
+    }
+
+    const results = [];
+    // Square caps this endpoint at 100 changes per request.
+    for (const batch of chunk(changes, 100)) {
+        const payload = await squareFetch("/v2/inventory/changes/batch-create", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: `${idempotencyKey || randomUUID()}-${results.length}`,
+                changes: batch,
+            }),
+        });
+
+        results.push(...(payload?.counts || []));
+    }
+
+    return { applied: changes.length, counts: results };
+}
+
 export async function searchSalesForVariations(variationLookup, options = {}) {
     const locationId = getSquareLocationId();
 

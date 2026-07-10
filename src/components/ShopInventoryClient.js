@@ -8,8 +8,6 @@ import ThemedSelect from "@/components/ThemedSelect";
 import { productHandle } from "@/lib/inventory-feed/product-url";
 import { useTvMode } from "@/lib/tv-mode-client";
 
-const PAYMENT_TOGGLE_STORAGE_KEY = "wolfden-payments-test-enabled";
-
 const formatPrice = (price) => {
     if (!price) return null;
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
@@ -170,17 +168,6 @@ export default function ShopInventoryClient({
         }
         return Array.from(seen).sort();
     }, [orderedCategories]);
-    const [isLocalPaymentsEnabled, setIsLocalPaymentsEnabled] = useState(() => {
-        if (typeof window === "undefined") {
-            return false;
-        }
-
-        try {
-            return window.localStorage.getItem(PAYMENT_TOGGLE_STORAGE_KEY) === "1";
-        } catch {
-            return false;
-        }
-    });
     const [cartCount, setCartCount] = useState(null);
     const [cartItemQuantities, setCartItemQuantities] = useState({});
     const [cartMutatingItemId, setCartMutatingItemId] = useState("");
@@ -235,7 +222,9 @@ export default function ShopInventoryClient({
         ? -1
         : visibleItems.findIndex((item) => getDetailKey(item) === detailItemKey);
     const detailItem = detailIndex >= 0 ? visibleItems[detailIndex] : null;
-    const canShowPaymentUi = Boolean(paymentsEnabled && isLocalPaymentsEnabled);
+    // The PAYMENTS_ENABLED env flag is the single source of truth for exposing checkout.
+    // (A prior localStorage test-toggle was a launch footgun — cart hidden with env on.)
+    const canShowPaymentUi = Boolean(paymentsEnabled);
 
     const cartQuantityForItem = useCallback((itemId) => {
         if (!canShowPaymentUi) {
@@ -318,22 +307,6 @@ export default function ShopInventoryClient({
             setCartMutatingItemId("");
         }
     }, [applyCartSnapshot, canShowPaymentUi]);
-
-    useEffect(() => {
-        const onStorage = () => {
-            try {
-                setIsLocalPaymentsEnabled(window.localStorage.getItem(PAYMENT_TOGGLE_STORAGE_KEY) === "1");
-            } catch {
-                setIsLocalPaymentsEnabled(false);
-            }
-        };
-
-        window.addEventListener("storage", onStorage);
-
-        return () => {
-            window.removeEventListener("storage", onStorage);
-        };
-    }, []);
 
     useEffect(() => {
         if (!canShowPaymentUi) {
@@ -627,12 +600,6 @@ export default function ShopInventoryClient({
                     <p className="shop-detail-category secondary">{detailItem.categoryName}</p>
                     {canShowPaymentUi && cartQuantityForItem(detailItem.id) > 0 && (
                         <p className="shop-in-cart-note">In your cart: {cartQuantityForItem(detailItem.id)}</p>
-                    )}
-
-                    {paymentsEnabled && !isLocalPaymentsEnabled && (
-                        <p className="shop-payment-note secondary">
-                            Test checkout is off. Set local storage key <strong>{PAYMENT_TOGGLE_STORAGE_KEY}</strong> to <strong>1</strong>.
-                        </p>
                     )}
 
                     {cartError && <p className="shop-payment-error">{cartError}</p>}

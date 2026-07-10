@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import {
+    adjustInventoryForSale,
     createSquareCardPayment,
     upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
@@ -324,6 +325,18 @@ export async function POST(request) {
 
             if (updatedOrder.status === "completed") {
                 await clearCartItems(cartId);
+
+                // Decrement Square inventory (IN_STOCK -> SOLD) so an online-purchased card can't be
+                // sold again at the counter. Best-effort: payment is already captured, so a failure here
+                // must not fail the order — we log it for manual reconciliation instead.
+                try {
+                    await adjustInventoryForSale(cart.items, { idempotencyKey });
+                } catch (inventoryError) {
+                    logger.warn("shop.checkout.inventory_adjust_failed", {
+                        orderId: updatedOrder.id,
+                        errorMessage: inventoryError instanceof Error ? inventoryError.message : "unknown_error",
+                    });
+                }
 
                 // Order emails: customer confirmation + owner alert. Awaited (so the serverless function
                 // doesn't terminate first) but never allowed to fail the order — allSettled never rejects.

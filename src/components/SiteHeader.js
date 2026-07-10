@@ -43,23 +43,9 @@ export default function SiteHeader() {
         const syncCartState = async () => {
             setCartLoading(true);
             setAuthLoading(true);
-            let localToggleEnabled = false;
 
-            try {
-                localToggleEnabled = window.localStorage.getItem("wolfden-payments-test-enabled") === "1";
-            } catch {
-                localToggleEnabled = false;
-            }
-
-            setCartEnabled(localToggleEnabled);
-
-            if (!localToggleEnabled) {
-                setCartCount(0);
-                setCartLoading(false);
-                setAuthCustomer(null);
-                setAuthLoading(false);
-                return;
-            }
+            // The PAYMENTS_ENABLED env flag is the single source of truth for exposing checkout.
+            setCartEnabled(true);
 
             try {
                 const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
