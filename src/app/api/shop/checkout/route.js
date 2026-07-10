@@ -248,7 +248,7 @@ export async function POST(request) {
                 return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
             }
 
-            const cart = await getCartSummary(cartId);
+            const cart = await getCartSummary(cartId, { fulfillmentMode: fulfillment.fulfillmentMode });
 
             if (!cart.items.length) {
                 return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
@@ -269,6 +269,8 @@ export async function POST(request) {
                 quantity: cart.itemCount,
                 subtotalCents: cart.subtotalCents,
                 onlineFeeCents: cart.onlineFeeCents,
+                taxCents: cart.taxCents,
+                shippingCents: cart.shippingCents,
                 totalCents: cart.totalCents,
                 idempotencyKey,
                 cartId,

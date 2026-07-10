@@ -18,6 +18,8 @@ export async function createPendingShopOrder({
     quantity,
     subtotalCents,
     onlineFeeCents,
+    taxCents = 0,
+    shippingCents = 0,
     totalCents,
     idempotencyKey,
     cartId,
@@ -48,8 +50,10 @@ export async function createPendingShopOrder({
             shipping_postal_code,
             shipping_country,
             shipping_validation_status,
+            tax_cents,
+            shipping_cents,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -72,6 +76,8 @@ export async function createPendingShopOrder({
             toNullableText(shipping?.postalCode),
             toNullableText(shipping?.country),
             toNullableText(shippingValidationStatus) || "pending",
+            Math.max(0, Math.round(Number(taxCents) || 0)),
+            Math.max(0, Math.round(Number(shippingCents) || 0)),
         ]
     );
 }

@@ -245,6 +245,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         itemCount: 0,
         subtotalCents: 0,
         onlineFeeCents: 0,
+        taxCents: 0,
+        shippingCents: 0,
         totalCents: 0,
         hasUnavailableItems: false,
     });
@@ -276,7 +278,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         setCartLoading(true);
 
         try {
-            const response = await fetch("/api/shop/cart", { cache: "no-store" });
+            // Pass the fulfillment mode so tax + (mode-dependent) shipping are reflected in the totals.
+            const query = fulfillmentMode ? `?mode=${encodeURIComponent(fulfillmentMode)}` : "";
+            const response = await fetch(`/api/shop/cart${query}`, { cache: "no-store" });
             const payload = await response.json().catch(() => null);
 
             if (!response.ok || !payload) {
@@ -290,7 +294,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         } finally {
             setCartLoading(false);
         }
-    }, [canShowCart]);
+    }, [canShowCart, fulfillmentMode]);
 
     const mutateCart = useCallback(async (payload) => {
         const targetCatalogObjectId = String(payload?.catalogObjectId || "").trim();
@@ -840,6 +844,15 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                         <div className="shop-payment-breakdown">
                             <p><span>Subtotal</span><strong>{formatMoney(cartData.subtotalCents)}</strong></p>
+                            {cartData.taxCents ? (
+                                <p><span>Tax</span><strong>{formatMoney(cartData.taxCents)}</strong></p>
+                            ) : null}
+                            {fulfillmentMode === "shipping" ? (
+                                <p>
+                                    <span>Shipping</span>
+                                    <strong>{cartData.shippingCents ? formatMoney(cartData.shippingCents) : "FREE"}</strong>
+                                </p>
+                            ) : null}
                             <p><span>Online fee (3.5%)</span><strong>{formatMoney(cartData.onlineFeeCents)}</strong></p>
                             <p className="shop-payment-total"><span>Total</span><strong>{formatMoney(cartData.totalCents)}</strong></p>
                         </div>

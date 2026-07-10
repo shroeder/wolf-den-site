@@ -38,7 +38,8 @@ export async function GET(request) {
 
         try {
             const cartId = await getCartIdFromCookies();
-            const cart = await getCartSummary(cartId);
+            const fulfillmentMode = new URL(request.url).searchParams.get("mode") || null;
+            const cart = await getCartSummary(cartId, { fulfillmentMode });
 
             return NextResponse.json(cart, {
                 headers: {

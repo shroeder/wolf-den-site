@@ -2,6 +2,7 @@ import "server-only";
 
 import { calculateOnlineFeeCents, listShopInventory, toPriceCents } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
+import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
 import {
     getExistingCartId,
     setShopCartId,
@@ -206,7 +207,7 @@ export async function clearCartItems(cartId) {
     );
 }
 
-export async function getCartSummary(cartId) {
+export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
     await ensureCart(cartId);
 
     const [rows, categories] = await Promise.all([
@@ -272,6 +273,8 @@ export async function getCartSummary(cartId) {
     }
 
     const onlineFeeCents = calculateOnlineFeeCents(subtotalCents / 100);
+    const taxCents = shopTaxCents(subtotalCents);
+    const shippingCents = shopShippingCents(subtotalCents, fulfillmentMode);
 
     return {
         cartId,
@@ -279,7 +282,9 @@ export async function getCartSummary(cartId) {
         itemCount,
         subtotalCents,
         onlineFeeCents,
-        totalCents: subtotalCents + onlineFeeCents,
+        taxCents,
+        shippingCents,
+        totalCents: subtotalCents + onlineFeeCents + taxCents + shippingCents,
         hasUnavailableItems,
     };
 }
