@@ -29,6 +29,11 @@ export function serializeShopOrderForAdmin(o) {
         shippingService: o.shipping_service || null,
         shippingLabelUrl: o.shipping_label_url || null,
         hasShipment: Boolean(o.easypost_shipment_id && o.easypost_rate_id),
+        customerName: o.customer_name || o.shipping_name || null,
+        customerEmail: o.customer_email || o.shipping_email || null,
+        squareCustomerId: o.square_customer_id || null,
+        cancellationReason: o.cancellation_reason || null,
+        refundAmountCents: o.refund_amount_cents ?? null,
         items: parseItemsJson(o.items_json),
         shipping: {
             name: o.shipping_name,
@@ -73,6 +78,10 @@ export async function createPendingShopOrder({
     easyPostRateId = null,
     shippingCarrier = null,
     shippingService = null,
+    customerId = null,
+    customerEmail = null,
+    customerName = null,
+    squareCustomerId = null,
 }) {
     return db.queryOne(
         `INSERT INTO shop_orders (
@@ -102,8 +111,12 @@ export async function createPendingShopOrder({
             easypost_rate_id,
             shipping_carrier,
             shipping_service,
+            customer_id,
+            customer_email,
+            customer_name,
+            square_customer_id,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -132,6 +145,10 @@ export async function createPendingShopOrder({
             toNullableText(easyPostRateId),
             toNullableText(shippingCarrier),
             toNullableText(shippingService),
+            toNullableText(customerId),
+            toNullableText(customerEmail),
+            toNullableText(customerName),
+            toNullableText(squareCustomerId),
         ]
     );
 }

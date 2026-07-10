@@ -327,6 +327,9 @@ export async function POST(request) {
                 easyPostRateId,
                 shippingCarrier,
                 shippingService,
+                customerId: authenticatedCustomer?.id || null,
+                customerEmail: authenticatedCustomer?.email || fulfillment.shipping?.email || null,
+                customerName: fulfillment.shipping?.name || null,
             });
 
             let payment;

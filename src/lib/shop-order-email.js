@@ -143,8 +143,8 @@ export async function sendNewOrderAlertEmail(order) {
         <p><strong>#${shortId(order.id)}</strong> &middot; ${money(order.total_cents)} &middot; ${isPickup ? "Pickup" : "Ship"}</p>
         <ul>${itemsHtml(order.items_json)}</ul>
         <p>${totalsHtml(order)}</p>
-        <p><strong>Customer:</strong> ${escapeHtml(order.shipping_name || "—")}<br/>
-           ${escapeHtml(order.shipping_email || "—")} &middot; ${escapeHtml(order.shipping_phone || "—")}</p>
+        <p><strong>Customer:</strong> ${escapeHtml(order.customer_name || order.shipping_name || "—")}<br/>
+           ${escapeHtml(order.customer_email || order.shipping_email || "—")} &middot; ${escapeHtml(order.shipping_phone || "—")}</p>
         ${isPickup ? "" : `<p><strong>Ship to:</strong><br/>${shipToHtml(order)}</p>`}
         ${order.receipt_url ? `<p><a href="${escapeHtml(order.receipt_url)}">Square receipt →</a></p>` : ""}
     `;
