@@ -6012,3 +6012,10 @@ body.tv-mode .shop-mobile-cart-fab {
     object-fit: cover;
     background: var(--elevated);
 }
+
+/* Swap picker row: card thumb + label sit together on the left (the row is space-between). */
+.mkt-swap-row-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+}

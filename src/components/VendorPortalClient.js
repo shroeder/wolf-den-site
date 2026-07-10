@@ -1132,14 +1132,19 @@ function SwapBuilder({ myListings = [], onChanged }) {
                     <ul className="mkt-admin-list mkt-swap-list">
                         {results.map((l) => (
                             <li key={l.id} className="mkt-admin-row">
-                                <label className="mkt-admin-info">
-                                    <input type="checkbox" checked={request.has(l.id)} onChange={() => toggleRequest(l)} />{" "}
-                                    <strong>{l.title}</strong>
-                                    <span className="mkt-offer-meta">
-                                        {l.setName ? `${l.setName} · ` : ""}
-                                        {formatPrice(l.wholesalePrice ?? l.price)} · {l.vendor.displayName}
-                                    </span>
-                                </label>
+                                <div className="mkt-swap-row-main">
+                                    {l.imageUrl ? (
+                                        <Image src={l.imageUrl} alt="" width={40} height={56} className="mkt-listing-thumb" />
+                                    ) : null}
+                                    <label className="mkt-admin-info">
+                                        <input type="checkbox" checked={request.has(l.id)} onChange={() => toggleRequest(l)} />{" "}
+                                        <strong>{l.title}</strong>
+                                        <span className="mkt-offer-meta">
+                                            {l.setName ? `${l.setName} · ` : ""}
+                                            {formatPrice(l.wholesalePrice ?? l.price)} · {l.vendor.displayName}
+                                        </span>
+                                    </label>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -1149,14 +1154,19 @@ function SwapBuilder({ myListings = [], onChanged }) {
                     <ul className="mkt-admin-list mkt-swap-list">
                         {sellable.map((l) => (
                             <li key={l.id} className="mkt-admin-row">
-                                <label className="mkt-admin-info">
-                                    <input type="checkbox" checked={offer.has(l.id)} onChange={() => toggleOffer(l.id)} />{" "}
-                                    <strong>{l.title}</strong>
-                                    <span className="mkt-offer-meta">
-                                        {l.setName ? `${l.setName} · ` : ""}
-                                        {formatPrice(l.price)}
-                                    </span>
-                                </label>
+                                <div className="mkt-swap-row-main">
+                                    {l.imageUrl ? (
+                                        <Image src={l.imageUrl} alt="" width={40} height={56} className="mkt-listing-thumb" />
+                                    ) : null}
+                                    <label className="mkt-admin-info">
+                                        <input type="checkbox" checked={offer.has(l.id)} onChange={() => toggleOffer(l.id)} />{" "}
+                                        <strong>{l.title}</strong>
+                                        <span className="mkt-offer-meta">
+                                            {l.setName ? `${l.setName} · ` : ""}
+                                            {formatPrice(l.price)}
+                                        </span>
+                                    </label>
+                                </div>
                             </li>
                         ))}
                     </ul>
