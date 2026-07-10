@@ -14,6 +14,7 @@ import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import { sendNewOrderAlertEmail, sendOrderConfirmationEmail } from "@/lib/shop-order-email.js";
+import { sendAdminPush } from "@/lib/push/send.js";
 import {
     createPendingShopOrder,
     updateShopOrderPaymentResult,
@@ -385,11 +386,18 @@ export async function POST(request) {
                     });
                 }
 
-                // Order emails: customer confirmation + owner alert. Awaited (so the serverless function
-                // doesn't terminate first) but never allowed to fail the order — allSettled never rejects.
+                // Order emails + owner push. Awaited (so the serverless function doesn't terminate first)
+                // but never allowed to fail the order — allSettled never rejects.
+                const orderItemCount = Number(updatedOrder.quantity) || cart.itemCount;
                 await Promise.allSettled([
                     sendOrderConfirmationEmail(updatedOrder),
                     sendNewOrderAlertEmail(updatedOrder),
+                    sendAdminPush({
+                        title: "🛒 New Wolf Den order",
+                        body: `${orderItemCount} item${orderItemCount === 1 ? "" : "s"} · $${((updatedOrder.total_cents || 0) / 100).toFixed(2)}${updatedOrder.fulfillment_mode === "pickup" ? " · Pickup" : ""}`,
+                        route: "shopOrders",
+                        data: { orderId: updatedOrder.id },
+                    }),
                 ]);
 
                 if (saveCustomerProfile && fulfillment.fulfillmentMode === "shipping" && fulfillment.shipping) {

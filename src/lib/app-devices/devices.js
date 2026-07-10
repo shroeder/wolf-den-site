@@ -71,21 +71,26 @@ export async function setDeviceAuthorized(id, authorized) {
 
 // Upsert a device on check-in and report whether it's revoked. Keeps an owner-set label (COALESCE on
 // the existing label) so a rename isn't overwritten by the model the app keeps sending.
-export async function heartbeat({ deviceId, channel = "employee", label = null, appVersion = null }) {
+export async function heartbeat({ deviceId, channel = "employee", label = null, appVersion = null, fcmToken = null }) {
     if (!deviceId) {
         throw new Error("deviceId is required.");
     }
 
+    // Only overwrite fcm_token when the app actually sends one, so a heartbeat without a token
+    // (token not ready yet) doesn't wipe a previously-registered token.
+    const token = typeof fcmToken === "string" && fcmToken.trim() ? fcmToken.trim() : null;
+
     const row = await db.queryOne(
-        `INSERT INTO app_device (id, channel, label, app_version)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO app_device (id, channel, label, app_version, fcm_token)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (id) DO UPDATE SET
             last_seen_at = NOW(),
             app_version = EXCLUDED.app_version,
             channel = EXCLUDED.channel,
-            label = COALESCE(app_device.label, EXCLUDED.label)
+            label = COALESCE(app_device.label, EXCLUDED.label),
+            fcm_token = COALESCE(EXCLUDED.fcm_token, app_device.fcm_token)
          RETURNING revoked`,
-        [deviceId, channel, label, appVersion]
+        [deviceId, channel, label, appVersion, token]
     );
 
     return { revoked: Boolean(row?.revoked) };

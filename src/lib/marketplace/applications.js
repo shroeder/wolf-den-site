@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { sendNewApplicationEmail, sendVendorInviteEmail } from "@/lib/marketplace/email.js";
 import { createVendor, createVendorInvite, getVendorByEmail, setVendorLogo } from "@/lib/marketplace/vendors.js";
+import { sendAdminPush } from "@/lib/push/send.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const applicationsLogger = createServerLogger({ source: "api", subsystem: "marketplace-applications" });
@@ -96,6 +97,13 @@ export async function createApplication(input = {}) {
     } catch (error) {
         applicationsLogger.warn("marketplace.application.notify_failed", { reason: error.message });
     }
+
+    await sendAdminPush({
+        title: "🧑‍💼 New vendor application",
+        body: `${application.business_name}${application.location_label ? ` · ${application.location_label}` : ""} (${application.email})`,
+        route: "marketplace",
+        data: { applicationId: application.id },
+    });
 
     applicationsLogger.info("marketplace.application.created", { applicationId: application.id });
 

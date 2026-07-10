@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendWantAvailableEmail } from "@/lib/marketplace/email.js";
+import { sendAdminPush } from "@/lib/push/send.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 // Buyer "notify me when a vendor lists this" demand signals. Capture -> alert on first matching
@@ -39,7 +40,7 @@ export async function createWant({
     }
 
     // Confirm the product exists in the catalog before recording demand against it.
-    const product = await db.queryOne("SELECT id FROM tcg_cards WHERE id = $1", [catalogProductId]);
+    const product = await db.queryOne("SELECT id, name FROM tcg_cards WHERE id = $1", [catalogProductId]);
     if (!product) {
         throw new Error("That product isn't in the catalog.");
     }
@@ -65,6 +66,13 @@ export async function createWant({
     );
 
     wantsLogger.info("marketplace.want.created", { catalogProductId, hasMaxPrice: normalizedMax != null, qty });
+
+    await sendAdminPush({
+        title: "🔎 New buy order",
+        body: `Wants ${product.name || "a product"}${qty > 1 ? ` ×${qty}` : ""}${normalizedMax != null ? ` · up to $${normalizedMax.toFixed(2)}` : ""}`,
+        route: "marketplace",
+        data: { catalogProductId },
+    });
 }
 
 // One open buy order with its buyer email + product, for a vendor's "I can fill this" response.

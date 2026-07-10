@@ -27,6 +27,7 @@ export async function POST(request) {
                 channel: body.channel || "employee",
                 label: body.label || null,
                 appVersion: body.appVersion || null,
+                fcmToken: body.fcmToken || null,
             });
 
             return NextResponse.json({ revoked }, { headers: { "Cache-Control": "no-store" } });
