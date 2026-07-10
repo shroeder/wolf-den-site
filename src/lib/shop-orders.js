@@ -34,6 +34,8 @@ export function serializeShopOrderForAdmin(o) {
         squareCustomerId: o.square_customer_id || null,
         cancellationReason: o.cancellation_reason || null,
         refundAmountCents: o.refund_amount_cents ?? null,
+        cancellationRequested: Boolean(o.cancellation_requested_at) && o.fulfillment_status !== "cancelled",
+        cancellationRequestReason: o.cancellation_request_reason || null,
         items: parseItemsJson(o.items_json),
         shipping: {
             name: o.shipping_name,

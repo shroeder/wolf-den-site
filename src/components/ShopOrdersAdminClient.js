@@ -117,6 +117,11 @@ function OrderCard({ order: o, onUpdate }) {
                 {o.createdAt ? new Date(o.createdAt).toLocaleString() : ""} ·{" "}
                 <strong>{o.fulfillmentStatus.replace("_", " ")}</strong>
             </p>
+            {o.cancellationRequested ? (
+                <p style={{ color: "#f0c674", fontWeight: 600 }}>
+                    🙋 Customer requested cancellation{o.cancellationRequestReason ? `: “${o.cancellationRequestReason}”` : ""} — use “Cancel & refund” to honor it, or leave it.
+                </p>
+            ) : null}
             <ul>
                 {o.items.map((it, i) => (
                     <li key={i}>
