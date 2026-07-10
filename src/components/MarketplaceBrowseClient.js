@@ -224,6 +224,12 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                     <Link href="/marketplace" className="pill">
                         Search by item instead
                     </Link>
+                    <Link href="/marketplace/portal" className="pill">
+                        🏪 Vendor sign in
+                    </Link>
+                    <Link href="/marketplace/apply" className="pill">
+                        Become a vendor
+                    </Link>
                 </div>
                 {locError ? <p className="muted">{locError}</p> : null}
             </section>
