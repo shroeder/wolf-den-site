@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const BRAND = "#D4AF37";
 const MN_SOUTH_METRO = [44.45, -93.55];
 const DEFAULT_ZOOM = 9;
 
@@ -55,10 +54,10 @@ export default function MarketplaceDemandMap() {
                 if (v.lat == null || v.lng == null) return;
                 const marker = L.circleMarker([v.lat, v.lng], {
                     radius: 9,
-                    color: BRAND,
+                    color: "#ffffff",
                     weight: 2,
-                    fillColor: BRAND,
-                    fillOpacity: 0.85,
+                    fillColor: "#2563EB",
+                    fillOpacity: 0.95,
                 }).addTo(map);
                 marker.bindPopup(
                     `<strong>${v.name}</strong><br/>${v.locationLabel || v.region || ""}<br/>` +
@@ -105,10 +104,10 @@ export default function MarketplaceDemandMap() {
                 const t = d.weight / maxW;
                 const circle = L.circle([d.lat, d.lng], {
                     radius: 1200 + 4500 * t,
-                    color: "#F59E0B",
-                    weight: 0,
-                    fillColor: "#F59E0B",
-                    fillOpacity: 0.14 + 0.34 * t,
+                    color: "#EA580C",
+                    weight: 1,
+                    fillColor: "#F97316",
+                    fillOpacity: 0.3 + 0.4 * t,
                 });
                 circle.on("click", async () => {
                     L.popup().setLatLng([d.lat, d.lng]).setContent("Loading demand…").openOn(map);

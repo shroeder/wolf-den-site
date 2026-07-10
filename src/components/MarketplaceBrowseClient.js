@@ -12,7 +12,6 @@ import { VENDOR_SPECIALTIES } from "@/lib/marketplace/specialties.js";
 // Default view: south metro of the Twin Cities / Montgomery area — the Wolf Den's recruiting turf.
 const MN_SOUTH_METRO = [44.66, -93.42];
 const DEFAULT_ZOOM = 10;
-const BRAND = "#D4AF37";
 
 function monthYear(iso) {
     const d = iso ? new Date(iso) : null;
@@ -133,10 +132,10 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
             located.forEach((v) => {
                 const marker = L.circleMarker([v.latitude, v.longitude], {
                     radius: 9,
-                    color: BRAND,
+                    color: "#ffffff",
                     weight: 2,
-                    fillColor: BRAND,
-                    fillOpacity: 0.85,
+                    fillColor: "#2563EB",
+                    fillOpacity: 0.95,
                 }).addTo(map);
 
                 marker.bindPopup(
@@ -195,10 +194,10 @@ export default function MarketplaceBrowseClient({ vendors, stats = null }) {
                 const t = d.weight / maxW;
                 const circle = L.circle([d.lat, d.lng], {
                     radius: 1200 + 4500 * t, // meters
-                    color: "#F59E0B",
-                    weight: 0,
-                    fillColor: "#F59E0B",
-                    fillOpacity: 0.14 + 0.34 * t,
+                    color: "#EA580C",
+                    weight: 1,
+                    fillColor: "#F97316",
+                    fillOpacity: 0.3 + 0.4 * t,
                 });
                 circle.on("click", async () => {
                     L.popup().setLatLng([d.lat, d.lng]).setContent("Loading demand…").openOn(map);
