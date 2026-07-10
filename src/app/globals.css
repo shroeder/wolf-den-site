@@ -5166,13 +5166,48 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 /* Leaflet popups render on a white tile; keep their text dark for contrast. */
+/* Themed Leaflet popups: dark bubble + gold accents to match the site (defaults are tiny white). */
+.mkt-map .leaflet-popup-content-wrapper {
+    background: var(--elevated);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+}
+
+.mkt-map .leaflet-popup-tip {
+    background: var(--elevated);
+    border: 1px solid var(--line);
+    box-shadow: none;
+}
+
 .mkt-map .leaflet-popup-content {
-    color: #1a1a1a;
+    color: var(--ink);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    margin: 0.75rem 0.95rem;
+}
+
+.mkt-map .leaflet-popup-content strong {
+    color: var(--accent);
+    font-size: 0.95rem;
+}
+
+.mkt-map .leaflet-popup-content em {
+    color: var(--ink-secondary);
+    font-style: normal;
+    font-weight: 600;
 }
 
 .mkt-map .leaflet-popup-content a {
-    color: #8a6d1a;
+    color: var(--accent);
     font-weight: 700;
+}
+
+.mkt-map .leaflet-popup-close-button {
+    color: var(--ink-secondary) !important;
+    font-size: 1.1rem;
+    padding: 6px 8px 0 0 !important;
 }
 
 .mkt-vendor-list {
