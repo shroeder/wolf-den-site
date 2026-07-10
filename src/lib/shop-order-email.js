@@ -131,6 +131,29 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
     return !result?.error;
 }
 
+/** Owner alert: a customer requested to cancel an order (owner decides whether to honor it). */
+export async function sendOrderCancelRequestAlertEmail(order, { reason } = {}) {
+    const resend = getResendClient();
+    if (!resend || !order) {
+        return false;
+    }
+    const html = `
+        <h1>🙋 Cancellation request</h1>
+        <p>A customer asked to cancel order <strong>#${shortId(order.id)}</strong> (${money(order.total_cents)}, ${order.fulfillment_mode === "pickup" ? "Pickup" : "Ship"}).</p>
+        <p><strong>Customer:</strong> ${escapeHtml(order.customer_name || order.shipping_name || "—")} &middot; ${escapeHtml(order.customer_email || order.shipping_email || "—")}</p>
+        ${reason ? `<p><strong>Their reason:</strong> ${escapeHtml(reason)}</p>` : ""}
+        <ul>${itemsHtml(order.items_json)}</ul>
+        <p>Review it in the admin app — you decide whether to <strong>Cancel &amp; refund</strong> or keep the order.</p>
+    `;
+    const result = await resend.emails.send({
+        from: FROM,
+        to: ownerEmail(),
+        subject: `Cancellation request — order #${shortId(order.id)}`,
+        html,
+    });
+    return !result?.error;
+}
+
 /** New-order alert to the store owner so an order is never missed. */
 export async function sendNewOrderAlertEmail(order) {
     const resend = getResendClient();

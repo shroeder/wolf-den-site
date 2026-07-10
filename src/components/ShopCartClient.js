@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ThemedSelect from "@/components/ThemedSelect";
@@ -227,6 +228,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [fieldErrors, setFieldErrors] = useState({});
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [redirecting, setRedirecting] = useState(false);
     const [cartData, setCartData] = useState({
         items: [],
         itemCount: 0,
@@ -245,6 +247,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
     const cardRef = useRef(null);
     const mountId = "square-cart-page-card";
+    const router = useRouter();
 
     // Env flag is the single source of truth for exposing checkout — no local-storage gate (that was a
     // launch footgun: customers hit a dead-end "cart hidden" screen). Off env = the guard above hides it.
@@ -618,12 +621,15 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 throw new Error(payload?.error || "Checkout failed. Please try again.");
             }
 
-            setSuccess("Payment complete. Thank you for your order.");
-            await refreshCart();
+            // Success: leave the cart immediately and take them to their order (no in-place dual state).
             emitCartUpdated();
+            setRedirecting(true);
+            setSuccess("Payment complete — taking you to your order…");
+            const orderId = payload?.order?.id;
+            router.push(orderId ? `/shop/orders?ordered=${orderId}` : "/shop/orders");
+            return;
         } catch (nextError) {
             setError(nextError instanceof Error ? nextError.message : "Checkout failed.");
-        } finally {
             setCheckoutBusy(false);
         }
     };
@@ -983,13 +989,18 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                         <button
                             type="button"
                             className="button primary shop-payment-submit shop-payment-submit-desktop"
-                            disabled={!canSubmitCheckout}
+                            disabled={!canSubmitCheckout || redirecting}
                             onClick={handleCheckout}
                         >
-                            {checkoutBusy ? "Processing..." : `Pay ${formatMoney(cartData.totalCents)}`}
+                            {redirecting ? "Payment complete…" : checkoutBusy ? "Processing..." : `Pay ${formatMoney(cartData.totalCents)}`}
                         </button>
                         {!hasFulfillmentChoice ? <p className="secondary">Select shipping or pickup to enable payment.</p> : null}
                         {fulfillmentMode === "shipping" && !isShippingReady ? <p className="secondary">Complete shipping fields to enable payment.</p> : null}
+                        <p className="secondary" style={{ fontSize: "0.75rem", marginTop: "0.5rem", opacity: 0.8 }}>
+                            All sales are final. By paying, you agree your order is confirmed and payment is captured.
+                            You may request a cancellation from <Link href="/shop/orders">My Orders</Link>, but approvals
+                            and refunds are at The Wolf Den&apos;s sole discretion.
+                        </p>
                     </article>
                 </div>
             )}
@@ -1003,10 +1014,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                     <button
                         type="button"
                         className="button primary shop-payment-submit shop-payment-submit-mobile"
-                        disabled={!canSubmitCheckout}
+                        disabled={!canSubmitCheckout || redirecting}
                         onClick={handleCheckout}
                     >
-                        {checkoutBusy ? "Processing..." : "Pay now"}
+                        {redirecting ? "Payment complete…" : checkoutBusy ? "Processing..." : "Pay now"}
                     </button>
                 </div>
             )}

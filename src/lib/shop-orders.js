@@ -217,6 +217,56 @@ export async function getShopOrderById(orderId) {
     );
 }
 
+// A customer's own orders (newest first) for their "My Orders" page. Camel-cased + safe to expose.
+export async function listCustomerOrders(customerId, { limit = 50 } = {}) {
+    if (!customerId) {
+        return [];
+    }
+    const rows = await db.query(
+        `SELECT * FROM shop_orders
+         WHERE customer_id = $1 AND status = 'completed'
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [customerId, Math.min(Number(limit) || 50, 200)]
+    );
+    return rows.map(serializeShopOrderForCustomer);
+}
+
+// Customer-facing order shape — what the buyer is allowed to see about their own order.
+export function serializeShopOrderForCustomer(o) {
+    return {
+        id: o.id,
+        createdAt: o.created_at ? new Date(o.created_at).toISOString() : null,
+        fulfillmentMode: o.fulfillment_mode,
+        fulfillmentStatus: o.fulfillment_status || "unfulfilled",
+        totalCents: o.total_cents,
+        subtotalCents: o.subtotal_cents,
+        taxCents: o.tax_cents ?? null,
+        shippingCents: o.shipping_cents ?? null,
+        onlineFeeCents: o.online_fee_cents,
+        trackingNumber: o.tracking_number || null,
+        shippingCarrier: o.shipping_carrier || null,
+        shippingService: o.shipping_service || null,
+        receiptUrl: o.receipt_url || null,
+        cancellationReason: o.cancellation_reason || null,
+        refundAmountCents: o.refund_amount_cents ?? null,
+        cancellationRequestedAt: o.cancellation_requested_at ? new Date(o.cancellation_requested_at).toISOString() : null,
+        cancellationRequestReason: o.cancellation_request_reason || null,
+        items: parseItemsJson(o.items_json),
+    };
+}
+
+// One order that belongs to a specific customer (ownership-checked) — for the request-cancel action.
+export async function getCustomerOrderById(orderId, customerId) {
+    if (!orderId || !customerId) {
+        return null;
+    }
+    return db.queryOne(
+        `SELECT * FROM shop_orders WHERE id = $1 AND customer_id = $2`,
+        [orderId, customerId]
+    );
+}
+
 // Admin: recent orders for the order-management view. Defaults to paid orders (the actionable ones).
 export async function listShopOrders({ limit = 100, paymentStatus = "completed", fulfillmentStatus = null } = {}) {
     const params = [];
