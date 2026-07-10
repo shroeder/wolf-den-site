@@ -7,7 +7,7 @@ const DEFAULT_ZOOM = 9;
 
 // Self-contained supply-vs-demand map for the vendor portal: vendor pins + buyer-demand heat, tap a
 // hot area to see what's being searched/wanted there. Fetches its own data from the map endpoints.
-export default function MarketplaceDemandMap() {
+export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = null } = {}) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const demandLayerRef = useRef(null);
@@ -72,6 +72,19 @@ export default function MarketplaceDemandMap() {
                 map.fitBounds(points, { padding: [40, 40], maxZoom: 11 });
                 if (map.getZoom() < 8) map.setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
             }
+
+            // "You are here" — a distinct green marker + center on the vendor when we know their location.
+            if (vendorLat != null && vendorLng != null) {
+                L.circleMarker([vendorLat, vendorLng], {
+                    radius: 11,
+                    color: "#ffffff",
+                    weight: 3,
+                    fillColor: "#16A34A",
+                    fillOpacity: 1,
+                }).addTo(map).bindPopup("<strong>You are here</strong>");
+                map.setView([vendorLat, vendorLng], 10);
+            }
+
             setTimeout(() => map.invalidateSize(), 0);
             if (!cancelled) setMapReady(true);
         })();
@@ -83,7 +96,7 @@ export default function MarketplaceDemandMap() {
                 mapRef.current = null;
             }
         };
-    }, [loaded, vendors]);
+    }, [loaded, vendors, vendorLat, vendorLng]);
 
     // Demand heatmap: orange circles weighted by buyer activity; click to see what's wanted there.
     useEffect(() => {
@@ -112,16 +125,31 @@ export default function MarketplaceDemandMap() {
                 circle.on("click", async () => {
                     L.popup().setLatLng([d.lat, d.lng]).setContent("Loading demand…").openOn(map);
                     try {
-                        const res = await fetch(`/api/marketplace/map/demand?lat=${d.lat}&lng=${d.lng}&radiusKm=15`);
-                        const data = res.ok ? await res.json() : {};
+                        // Searches/most-wanted + the actual open buy orders in this area (app parity).
+                        const [demandRes, ordersRes] = await Promise.all([
+                            fetch(`/api/marketplace/map/demand?lat=${d.lat}&lng=${d.lng}&radiusKm=15`),
+                            fetch(`/api/marketplace/buy-orders?lat=${d.lat}&lng=${d.lng}&radiusKm=25&limit=8`),
+                        ]);
+                        const data = demandRes.ok ? await demandRes.json() : {};
+                        const orderData = ordersRes.ok ? await ordersRes.json() : {};
                         const searches = (data.searches || []).slice(0, 6);
                         const products = (data.products || []).slice(0, 6);
+                        const orders = (orderData.orders || []).slice(0, 6);
+                        const buyOrdersHtml = orders.length
+                            ? `<em>🛒 Buy orders:</em><br/>${orders
+                                  .map(
+                                      (o) =>
+                                          `• ${o.name}${o.maxPrice != null ? ` — up to $${Number(o.maxPrice).toFixed(2)}` : ""}`
+                                  )
+                                  .join("<br/>")}<br/>`
+                            : "";
                         const html =
                             `<strong>What buyers want near here</strong><br/>` +
+                            buyOrdersHtml +
                             (searches.length ? `<em>Searches:</em> ${searches.join(", ")}<br/>` : "") +
                             (products.length
                                 ? `<em>Most-wanted:</em><br/>${products.map((p) => `• ${p.name}`).join("<br/>")}`
-                                : searches.length
+                                : searches.length || orders.length
                                   ? ""
                                   : "No recent activity.");
                         if (!cancelled) L.popup().setLatLng([d.lat, d.lng]).setContent(html).openOn(map);

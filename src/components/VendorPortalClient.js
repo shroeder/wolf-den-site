@@ -1973,7 +1973,24 @@ function MessagesPanel() {
     );
 }
 
-function BuyOrdersBoard() {
+// Add "X mi away" to each buy order relative to the vendor's location and sort nearest-first
+// (orders without a location fall to the end). Buy orders already carry lat/lng, so this is client-side.
+function withDistanceMi(orders, vLat, vLng) {
+    if (!orders || vLat == null || vLng == null) return orders;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const R = 3958.8;
+    const dist = (aLat, aLng, bLat, bLng) => {
+        const dLat = toRad(bLat - aLat);
+        const dLng = toRad(bLng - aLng);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+    };
+    return [...orders]
+        .map((o) => ({ ...o, distanceMi: o.lat != null && o.lng != null ? dist(vLat, vLng, o.lat, o.lng) : null }))
+        .sort((a, b) => (a.distanceMi == null ? 1 : b.distanceMi == null ? -1 : a.distanceMi - b.distanceMi));
+}
+
+function BuyOrdersBoard({ vendorLat = null, vendorLng = null } = {}) {
     const [orders, setOrders] = useState(null);
     const [respondingId, setRespondingId] = useState(null);
     const [message, setMessage] = useState("");
@@ -2025,15 +2042,18 @@ function BuyOrdersBoard() {
         return null;
     }
 
+    const hasVendorLoc = vendorLat != null && vendorLng != null;
+    const shown = withDistanceMi(orders, vendorLat, vendorLng);
+
     return (
         <section className="card">
-            <h2>🛒 Buy orders — buyers want these</h2>
+            <h2>🛒 Buy orders — buyers want these{hasVendorLoc ? " (nearest first)" : ""}</h2>
             <p className="muted">Open requests from buyers, with what they&apos;ll pay. Fill one and they&apos;ll hear from you by email.</p>
             {orders == null ? (
                 <p className="muted">Loading…</p>
             ) : (
                 <ul className="mkt-admin-list">
-                    {orders.map((o) => (
+                    {shown.map((o) => (
                         <li key={o.id} className="mkt-admin-row">
                             <div className="mkt-admin-info">
                                 <strong>{o.name}</strong>
@@ -2042,6 +2062,7 @@ function BuyOrdersBoard() {
                                     {o.maxPrice != null ? `up to $${Number(o.maxPrice).toFixed(2)}` : "any price"}
                                     {o.quantity > 1 ? ` · qty ${o.quantity}` : ""}
                                     {o.marketPrice != null ? ` · market $${Number(o.marketPrice).toFixed(2)}` : ""}
+                                    {o.distanceMi != null ? ` · ${o.distanceMi.toFixed(0)} mi away` : ""}
                                 </span>
                                 {o.note ? <span className="mkt-offer-meta">&ldquo;{o.note}&rdquo;</span> : null}
                                 {respondingId === o.id ? (
@@ -2095,6 +2116,7 @@ function BuyOrdersBoard() {
 }
 
 const PORTAL_TABS = [
+    { id: "home", label: "🏠 Home" },
     { id: "store", label: "🏪 Store" },
     { id: "listings", label: "📦 Listings" },
     { id: "add", label: "➕ Add" },
@@ -2123,9 +2145,9 @@ export default function VendorPortalClient({
     const router = useRouter();
     // Initial tab honors a ?tab= deep link (the new-message email sends vendors to ?tab=messages).
     const [tab, setTab] = useState(() => {
-        if (typeof window === "undefined") return "store";
+        if (typeof window === "undefined") return "home";
         const t = new URLSearchParams(window.location.search).get("tab");
-        return t && PORTAL_TABS.some((x) => x.id === t) ? t : "store";
+        return t && PORTAL_TABS.some((x) => x.id === t) ? t : "home";
     });
     const sellBidMap = new Map(sellBids.map((b) => [b.sellOfferId, b.amount]));
     // Category filter for the Listings tab (client-side over the already-loaded listings).
@@ -2193,6 +2215,20 @@ export default function VendorPortalClient({
                     </button>
                 ))}
             </nav>
+
+            {tab === "home" && (
+                <>
+                    <section className="card">
+                        <h2>🏠 Your marketplace at a glance</h2>
+                        <p className="muted">
+                            Where buyers are, what they want, and who&apos;s near you — plus other vendors on the map.
+                            Manage listings and your profile in the other tabs.
+                        </p>
+                    </section>
+                    <MarketplaceDemandMap vendorLat={vendor.latitude} vendorLng={vendor.longitude} />
+                    <BuyOrdersBoard vendorLat={vendor.latitude} vendorLng={vendor.longitude} />
+                </>
+            )}
 
             {tab === "store" && (
             <section className="card">
