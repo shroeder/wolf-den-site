@@ -16,7 +16,6 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     const [showDemand, setShowDemand] = useState(true);
     const [mapReady, setMapReady] = useState(false);
     const [loaded, setLoaded] = useState(false);
-    const [dbg, setDbg] = useState("b10 …");
 
     useEffect(() => {
         let cancelled = false;
@@ -99,14 +98,14 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
             // card has finished laying out. Retried across frames + on any later container resize.
             const remeasure = () => {
                 if (cancelled || !mapRef.current) return;
-                mapRef.current.invalidateSize();
-                const el = containerRef.current;
-                if (el) {
-                    const cs = window.getComputedStyle(el);
-                    setDbg(
-                        `b10 cont ${el.clientWidth} card ${el.parentElement?.clientWidth} ` +
-                        `css ${cs.width} inline "${el.style.width || "-"}" off ${el.offsetLeft}`
-                    );
+                const m = mapRef.current;
+                m.invalidateSize();
+                // Force a full tile reposition + reload for the CURRENT size. invalidateSize() skips
+                // this when it believes the size is unchanged (it latched a stale early measurement),
+                // leaving tiles laid out for the wrong size — the "quadrants out of order" render.
+                // This does programmatically what a manual pan/zoom does to fix it.
+                if (typeof m._resetView === "function") {
+                    m._resetView(m.getCenter(), m.getZoom());
                 }
             };
             requestAnimationFrame(remeasure);
@@ -205,7 +204,6 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
     return (
         <section className="card" style={{ animation: "none", transform: "none" }}>
             <h2>Demand map</h2>
-            <p className="muted" style={{ fontSize: "0.7rem", opacity: 0.6 }}>{dbg}</p>
             <p className="muted" style={{ fontSize: "0.85rem" }}>
                 🔵 Vendors &nbsp;·&nbsp; 🟠 Buyer demand — tap an orange area to see what&rsquo;s being searched &amp; wanted
                 there. Spot the gaps you could fill.
