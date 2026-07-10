@@ -11,6 +11,7 @@ import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-ses
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
+import { sendNewOrderAlertEmail, sendOrderConfirmationEmail } from "@/lib/shop-order-email.js";
 import {
     createPendingShopOrder,
     updateShopOrderPaymentResult,
@@ -321,6 +322,13 @@ export async function POST(request) {
 
             if (updatedOrder.status === "completed") {
                 await clearCartItems(cartId);
+
+                // Order emails: customer confirmation + owner alert. Awaited (so the serverless function
+                // doesn't terminate first) but never allowed to fail the order — allSettled never rejects.
+                await Promise.allSettled([
+                    sendOrderConfirmationEmail(updatedOrder),
+                    sendNewOrderAlertEmail(updatedOrder),
+                ]);
 
                 if (saveCustomerProfile && fulfillment.fulfillmentMode === "shipping" && fulfillment.shipping) {
                     await upsertSquareCustomerProfile({
