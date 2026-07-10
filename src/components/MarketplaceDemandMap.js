@@ -141,7 +141,11 @@ export default function MarketplaceDemandMap({ vendors = [], demand = [], vendor
                         ]);
                         const data = demandRes.ok ? await demandRes.json() : {};
                         const orderData = ordersRes.ok ? await ordersRes.json() : {};
-                        const searches = (data.searches || []).slice(0, 6);
+                        // searches come back as { term, weight } objects — pull the term string.
+                        const searches = (data.searches || [])
+                            .map((s) => (typeof s === "string" ? s : s?.term))
+                            .filter(Boolean)
+                            .slice(0, 6);
                         const products = (data.products || []).slice(0, 6);
                         const orders = (orderData.orders || []).slice(0, 6);
                         const buyOrdersHtml = orders.length
