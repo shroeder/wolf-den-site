@@ -212,6 +212,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [authLoading, setAuthLoading] = useState(false);
     const [authCustomer, setAuthCustomer] = useState(null);
     const [fulfillmentMode, setFulfillmentMode] = useState("");
+    const [pickupName, setPickupName] = useState("");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
     const [profileLookupBusy, setProfileLookupBusy] = useState(false);
     const [profileLookupMessage, setProfileLookupMessage] = useState("");
@@ -257,7 +258,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const shippingFieldErrors = useMemo(() => validateShippingForm(normalizedShipping), [normalizedShipping]);
     const hasFulfillmentChoice = fulfillmentMode === "shipping" || fulfillmentMode === "pickup";
     const isShippingReady = fulfillmentMode === "shipping" && Object.keys(shippingFieldErrors).length === 0;
-    const isFulfillmentReady = fulfillmentMode === "pickup" || isShippingReady;
+    // Pickup needs a name so the owner can match the person to their order at the counter.
+    const isPickupReady = fulfillmentMode === "pickup" && pickupName.trim().length >= 2;
+    const isFulfillmentReady = isPickupReady || isShippingReady;
 
     // When EasyPost returns live rates, the buyer must pick one and the totals use that rate;
     // otherwise the flat shipping from the server cart applies.
@@ -572,6 +575,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             fulfillmentMode,
             saveCustomerProfile: Boolean(saveCustomerProfile && authCustomer),
         };
+
+        if (fulfillmentMode === "pickup") {
+            checkoutPayload.pickupName = pickupName.trim();
+        }
 
         if (fulfillmentMode === "shipping") {
             const localFieldErrors = validateShippingForm(normalizedShipping);
@@ -916,7 +923,22 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 ) : null}
 
                                 {fulfillmentMode === "pickup" ? (
-                                    <p className="secondary">Local pickup selected. Shipping address is not required.</p>
+                                    <div className="cart-shipping-form">
+                                        <p className="secondary">
+                                            Local pickup at The Wolf Den in Montgomery. Give the name your order is under —
+                                            just come in and say it to pick up.
+                                        </p>
+                                        <label className="cart-field-full">
+                                            <span>Name for pickup</span>
+                                            <input
+                                                type="text"
+                                                value={pickupName}
+                                                onChange={(event) => setPickupName(event.target.value)}
+                                                placeholder="Name we&rsquo;ll match at the counter"
+                                                autoComplete="name"
+                                            />
+                                        </label>
+                                    </div>
                                 ) : null}
 
                                 {fulfillmentMode === "shipping" && isShippingReady ? (

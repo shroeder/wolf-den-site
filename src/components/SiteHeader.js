@@ -121,6 +121,11 @@ export default function SiteHeader() {
                         {authLoading ? "Account..." : authCustomer ? "My Account" : "Sign In"}
                     </Link>
                     {authCustomer ? (
+                        <Link href="/shop/orders" className="pill" onClick={() => setOpen(false)}>
+                            My Orders
+                        </Link>
+                    ) : null}
+                    {authCustomer ? (
                         <button
                             type="button"
                             className="pill"

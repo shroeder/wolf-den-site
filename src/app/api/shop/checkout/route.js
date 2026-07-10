@@ -329,7 +329,10 @@ export async function POST(request) {
                 shippingService,
                 customerId: authenticatedCustomer?.id || null,
                 customerEmail: authenticatedCustomer?.email || fulfillment.shipping?.email || null,
-                customerName: fulfillment.shipping?.name || null,
+                customerName:
+                    (fulfillment.fulfillmentMode === "pickup"
+                        ? String(body?.pickupName || "").trim()
+                        : fulfillment.shipping?.name) || null,
             });
 
             let payment;

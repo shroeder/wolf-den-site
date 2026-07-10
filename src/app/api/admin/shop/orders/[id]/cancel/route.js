@@ -28,6 +28,9 @@ export async function POST(request, { params }) {
             const { id } = await params;
             const body = await request.json().catch(() => ({}));
             const reason = String(body?.reason || "").trim();
+            // Restock defaults to true; the owner unchecks it for the rare lost-in-shipping case where
+            // the item won't come back, so we shouldn't put it back in Square as sellable.
+            const restock = body?.restock !== false;
 
             if (!reason) {
                 return NextResponse.json({ error: "A cancellation reason is required." }, { status: 400 });
@@ -69,14 +72,17 @@ export async function POST(request, { params }) {
                 }
             }
 
-            // Put the items back in stock (best-effort — a Square hiccup shouldn't block the cancel).
-            try {
-                await restockInventoryForCancel(parseItems(order.items_json), { idempotencyKey: `cancel-${order.id}` });
-            } catch (restockError) {
-                logger.warn("shop.order.cancel.restock_failed", {
-                    orderId: order.id,
-                    errorMessage: restockError instanceof Error ? restockError.message : "unknown_error",
-                });
+            // Put the items back in stock unless the owner opted out (best-effort — a Square hiccup
+            // shouldn't block the cancel).
+            if (restock) {
+                try {
+                    await restockInventoryForCancel(parseItems(order.items_json), { idempotencyKey: `cancel-${order.id}` });
+                } catch (restockError) {
+                    logger.warn("shop.order.cancel.restock_failed", {
+                        orderId: order.id,
+                        errorMessage: restockError instanceof Error ? restockError.message : "unknown_error",
+                    });
+                }
             }
 
             const updated = await setShopOrderCancelled(id, { reason, refundId, refundAmountCents });

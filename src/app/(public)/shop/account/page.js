@@ -185,10 +185,11 @@ export default function ShopAccountPage() {
                         <p className="cart-fulfillment-label">Signed in</p>
                         <p className="secondary">You are signed in as <strong>{customer.email}</strong>.</p>
                         <div className="cart-account-row">
+                            <Link href="/shop/orders" className="button primary">📦 My Orders</Link>
+                            <Link href="/cart" className="button">Back to checkout</Link>
                             <button type="button" className="button" onClick={handleLogout} disabled={busy}>
                                 {busy ? "Signing out..." : "Sign out"}
                             </button>
-                            <Link href="/cart" className="button primary">Back to checkout</Link>
                         </div>
                     </div>
                 ) : twoFactorPending ? (
