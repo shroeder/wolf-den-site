@@ -528,7 +528,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                 setCheckoutCardState("error");
                 console.warn("Square card initialization failed", nextError);
-                setError("Secure card form is temporarily unavailable. Refresh and try again.");
+                setError(
+                    `Secure card form couldn't load: ${nextError?.message || "unknown error"}. Refresh and try again.`
+                );
             }
         };
 
