@@ -357,10 +357,15 @@ export async function listAgingInventory(vendorId) {
 
 // Dealer-to-dealer sourcing: OTHER vendors' listings flagged available to dealers, with wholesale
 // price + who's selling. Excludes the requesting vendor's own stock.
-export async function listDealerInventory({ excludeVendorId = null, query = "", game = null, limit = 60 } = {}) {
+export async function listDealerInventory({ excludeVendorId = null, query = "", game = null, limit = 60, includeAllActive = false } = {}) {
     const params = [];
-    // Dealer-facing: both listings opened to dealers and hidden vendor-only (wholesale/overstock) stock.
-    const where = ["l.status = 'active'", "(l.dealer_available = TRUE OR l.vendor_only = TRUE)", "v.status = 'active'"];
+    // Dealer-facing sourcing. By default only listings opened to dealers (dealer-available) or hidden
+    // vendor-only (wholesale/overstock) stock. includeAllActive widens to ANY active listing from other
+    // vendors — used by the swap picker, since a swap is just a proposal the other vendor approves.
+    const where = ["l.status = 'active'", "v.status = 'active'"];
+    if (!includeAllActive) {
+        where.push("(l.dealer_available = TRUE OR l.vendor_only = TRUE)");
+    }
 
     if (excludeVendorId) {
         params.push(excludeVendorId);

@@ -20,6 +20,8 @@ export async function GET(request) {
                 excludeVendorId: vendor.id,
                 query: searchParams.get("q") || "",
                 game: searchParams.get("game") || null,
+                // Swap picker passes all=1: any active listing is swap-requestable (proposal, not a buy).
+                includeAllActive: searchParams.get("all") === "1",
             });
 
             return NextResponse.json({ listings }, { headers: { "Cache-Control": "no-store" } });

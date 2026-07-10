@@ -1035,7 +1035,9 @@ function SwapBuilder({ myListings = [], onChanged }) {
                 return;
             }
             try {
-                const res = await fetch(`/api/marketplace/vendor/dealer-inventory?q=${encodeURIComponent(query)}`, {
+                // all=1: swaps can request ANY active listing from other vendors (a proposal they approve),
+                // not just wholesale/dealer-available stock.
+                const res = await fetch(`/api/marketplace/vendor/dealer-inventory?all=1&q=${encodeURIComponent(query)}`, {
                     cache: "no-store",
                 });
                 const data = await res.json().catch(() => null);
@@ -1132,19 +1134,19 @@ function SwapBuilder({ myListings = [], onChanged }) {
                     <ul className="mkt-admin-list mkt-swap-list">
                         {results.map((l) => (
                             <li key={l.id} className="mkt-admin-row">
-                                <div className="mkt-swap-row-main">
+                                <label className="mkt-swap-row-main">
+                                    <input type="checkbox" checked={request.has(l.id)} onChange={() => toggleRequest(l)} />
                                     {l.imageUrl ? (
                                         <Image src={l.imageUrl} alt="" width={40} height={56} className="mkt-listing-thumb" />
                                     ) : null}
-                                    <label className="mkt-admin-info">
-                                        <input type="checkbox" checked={request.has(l.id)} onChange={() => toggleRequest(l)} />{" "}
+                                    <span className="mkt-admin-info">
                                         <strong>{l.title}</strong>
                                         <span className="mkt-offer-meta">
                                             {l.setName ? `${l.setName} · ` : ""}
                                             {formatPrice(l.wholesalePrice ?? l.price)} · {l.vendor.displayName}
                                         </span>
-                                    </label>
-                                </div>
+                                    </span>
+                                </label>
                             </li>
                         ))}
                     </ul>
@@ -1154,19 +1156,19 @@ function SwapBuilder({ myListings = [], onChanged }) {
                     <ul className="mkt-admin-list mkt-swap-list">
                         {sellable.map((l) => (
                             <li key={l.id} className="mkt-admin-row">
-                                <div className="mkt-swap-row-main">
+                                <label className="mkt-swap-row-main">
+                                    <input type="checkbox" checked={offer.has(l.id)} onChange={() => toggleOffer(l.id)} />
                                     {l.imageUrl ? (
                                         <Image src={l.imageUrl} alt="" width={40} height={56} className="mkt-listing-thumb" />
                                     ) : null}
-                                    <label className="mkt-admin-info">
-                                        <input type="checkbox" checked={offer.has(l.id)} onChange={() => toggleOffer(l.id)} />{" "}
+                                    <span className="mkt-admin-info">
                                         <strong>{l.title}</strong>
                                         <span className="mkt-offer-meta">
                                             {l.setName ? `${l.setName} · ` : ""}
                                             {formatPrice(l.price)}
                                         </span>
-                                    </label>
-                                </div>
+                                    </span>
+                                </label>
                             </li>
                         ))}
                     </ul>
