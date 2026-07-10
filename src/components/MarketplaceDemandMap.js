@@ -44,7 +44,12 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
         (async () => {
             const L = (await import("leaflet")).default;
             if (cancelled || !containerRef.current || mapRef.current) return;
-            map = L.map(containerRef.current, { scrollWheelZoom: false }).setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
+            const hasVendorLoc = vendorLat != null && vendorLng != null;
+            // Create the map ALREADY at its final center/zoom — never pan after init. A post-init
+            // setView reloads tiles for a new area, and if the container is mid-resize the old tiles
+            // linger, which is what produced the split/stale-tile render on mobile.
+            map = L.map(containerRef.current, { scrollWheelZoom: false })
+                .setView(hasVendorLoc ? [vendorLat, vendorLng] : MN_SOUTH_METRO, hasVendorLoc ? 10 : DEFAULT_ZOOM);
             mapRef.current = map;
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution: "&copy; OpenStreetMap contributors",
@@ -78,33 +83,27 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
                 }).addTo(map).bindPopup("<strong>You are here</strong>");
             }
 
-            // Apply the intended view INSIDE settle() — i.e. only after invalidateSize — so tiles never
-            // lay out against a stale container size (the cause of the "two offset map halves" glitch on
-            // mobile, where the card height isn't final at init).
-            const applyView = () => {
-                if (vendorLat != null && vendorLng != null) {
-                    map.setView([vendorLat, vendorLng], 10);
-                } else if (points.length === 1) {
+            // Only frame the vendor pins when we DON'T already know the vendor's own location (that
+            // already centered the map above). This is the sole place bounds are set — no later pan.
+            if (!hasVendorLoc) {
+                if (points.length === 1) {
                     map.setView(points[0], Math.max(DEFAULT_ZOOM, 11));
                 } else if (points.length > 1) {
                     map.fitBounds(points, { padding: [40, 40], maxZoom: 11 });
                     if (map.getZoom() < 8) map.setView(MN_SOUTH_METRO, DEFAULT_ZOOM);
                 }
-            };
-            const settle = () => {
-                if (cancelled || !mapRef.current) return;
-                map.invalidateSize();
-                applyView();
-            };
-            settle();
-            setTimeout(settle, 150);
-            setTimeout(settle, 450);
+            }
 
-            // Re-fit tiles whenever the container actually changes size (mobile layout settling).
+            // Re-measure ONLY (never re-center) so tiles fill the real container size once the tabbed
+            // card has finished laying out. Retried across frames + on any later container resize.
+            const remeasure = () => {
+                if (!cancelled && mapRef.current) mapRef.current.invalidateSize();
+            };
+            requestAnimationFrame(remeasure);
+            setTimeout(remeasure, 200);
+            setTimeout(remeasure, 600);
             if (typeof ResizeObserver !== "undefined" && containerRef.current) {
-                resizeObs = new ResizeObserver(() => {
-                    if (mapRef.current) mapRef.current.invalidateSize();
-                });
+                resizeObs = new ResizeObserver(remeasure);
                 resizeObs.observe(containerRef.current);
             }
 
