@@ -5933,20 +5933,16 @@ body.tv-mode .shop-mobile-cart-fab {
 /* Vendor portal: segmented tab bar so the dashboard reads like an app, not one endless scroll. */
 .mkt-portal-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.3rem;
     padding: 0.35rem;
     margin: 0;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 14px;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-.mkt-portal-tabs::-webkit-scrollbar {
-    display: none;
 }
 .mkt-portal-tab {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
     white-space: nowrap;
     padding: 0.5rem 0.8rem;
     border: none;
