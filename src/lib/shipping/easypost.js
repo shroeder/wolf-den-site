@@ -35,6 +35,8 @@ function getApiKey() {
 }
 
 function getShipFromAddress() {
+    // Ship-from / return address, set via env so the owner's personal address isn't committed to git.
+    // Returns + undeliverables should go to the owner's home, NOT the shop (theft risk).
     const street1 = String(process.env.SHOP_SHIP_FROM_STREET1 || "").trim();
     const city = String(process.env.SHOP_SHIP_FROM_CITY || "").trim();
     const state = String(process.env.SHOP_SHIP_FROM_STATE || "").trim().toUpperCase();
