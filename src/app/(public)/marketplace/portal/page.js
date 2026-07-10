@@ -3,6 +3,7 @@ import VendorPortalClient from "@/components/VendorPortalClient";
 import { getVendorRequestStats, listVendorContactRequests } from "@/lib/marketplace/contact.js";
 import { listSearchDemand } from "@/lib/marketplace/demand.js";
 import { listAgingInventory, listVendorListings } from "@/lib/marketplace/listings.js";
+import { getMarketplaceMap } from "@/lib/marketplace/map.js";
 import { listDealerStockInDemand, listVendorMissions } from "@/lib/marketplace/missions.js";
 import { listDealerOffers } from "@/lib/marketplace/offers.js";
 import { getVendorSalesCount } from "@/lib/marketplace/sales.js";
@@ -42,10 +43,12 @@ export default async function VendorPortalPage() {
         listAgingInventory(vendor.id).catch(() => []),
     ]);
     const swaps = await listSwaps(vendor.id).catch(() => ({ incoming: [], outgoing: [] }));
+    const mapData = await getMarketplaceMap({ days: 90 }).catch(() => ({ vendors: [], demand: [] }));
 
     return (
         <VendorPortalClient
             vendor={vendor}
+            mapData={mapData}
             listings={listings}
             wanted={wanted}
             salesCount={salesCount}

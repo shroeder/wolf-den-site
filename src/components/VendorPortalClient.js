@@ -2128,6 +2128,7 @@ const PORTAL_TABS = [
 
 export default function VendorPortalClient({
     vendor,
+    mapData = { vendors: [], demand: [] },
     listings,
     wanted = [],
     salesCount = 0,
@@ -2225,7 +2226,12 @@ export default function VendorPortalClient({
                             Manage listings and your profile in the other tabs.
                         </p>
                     </section>
-                    <MarketplaceDemandMap vendorLat={vendor.latitude} vendorLng={vendor.longitude} />
+                    <MarketplaceDemandMap
+                        vendors={mapData.vendors}
+                        demand={mapData.demand}
+                        vendorLat={vendor.latitude}
+                        vendorLng={vendor.longitude}
+                    />
                     <BuyOrdersBoard vendorLat={vendor.latitude} vendorLng={vendor.longitude} />
                 </>
             )}
@@ -2283,7 +2289,7 @@ export default function VendorPortalClient({
 
             {tab === "messages" && <MessagesPanel />}
 
-            {tab === "map" && <MarketplaceDemandMap />}
+            {tab === "map" && <MarketplaceDemandMap vendors={mapData.vendors} demand={mapData.demand} />}
 
             {/* Contactable leads first — real buyers you can respond to, above the anonymous signal. */}
             {tab === "leads" && <BuyOrdersBoard />}
