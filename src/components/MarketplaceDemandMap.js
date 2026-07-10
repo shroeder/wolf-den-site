@@ -207,7 +207,7 @@ export default function MarketplaceDemandMap({ vendorLat = null, vendorLng = nul
                     </button>
                 </div>
             ) : null}
-            <div ref={containerRef} className="mkt-map" style={{ minHeight: 420 }} />
+            <div ref={containerRef} className="mkt-map" />
         </section>
     );
 }
