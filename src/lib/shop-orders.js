@@ -220,16 +220,24 @@ export async function getShopOrderById(orderId) {
 }
 
 // A customer's own orders (newest first) for their "My Orders" page. Camel-cased + safe to expose.
-export async function listCustomerOrders(customerId, { limit = 50 } = {}) {
+export async function listCustomerOrders(customerId, { limit = 50, email = null } = {}) {
     if (!customerId) {
         return [];
     }
+    const cappedLimit = Math.min(Number(limit) || 50, 200);
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+    // Their account's orders PLUS any guest orders placed with the same (account-verified) email that
+    // never got linked — so the full history shows, cancelled/refunded included (fulfillment_status
+    // varies but status stays 'completed'). The email match is limited to unlinked guest orders so it
+    // can't surface another logged-in customer's orders.
     const rows = await db.query(
         `SELECT * FROM shop_orders
-         WHERE customer_id = $1 AND status = 'completed'
+         WHERE status = 'completed'
+           AND (customer_id = $1
+                OR ($2::text IS NOT NULL AND customer_id IS NULL AND lower(customer_email) = $2))
          ORDER BY created_at DESC
-         LIMIT $2`,
-        [customerId, Math.min(Number(limit) || 50, 200)]
+         LIMIT $3`,
+        [customerId, normalizedEmail, cappedLimit]
     );
     return rows.map(serializeShopOrderForCustomer);
 }

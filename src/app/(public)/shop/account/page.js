@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function ShopAccountPage() {
+    const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [customer, setCustomer] = useState(null);
     const [mode, setMode] = useState("login");
@@ -96,6 +98,9 @@ export default function ShopAccountPage() {
             setPassword("");
             setStatus(mode === "register" ? "Account ready." : "Signed in successfully.");
             window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
+            // Re-render server components so the header + any server-read session reflect the new
+            // login immediately, without the user having to manually refresh.
+            router.refresh();
         } catch (nextError) {
             setError(nextError instanceof Error ? nextError.message : "Could not sign in.");
         } finally {
@@ -156,6 +161,7 @@ export default function ShopAccountPage() {
             setTwoFactorCode("");
             setStatus("Signed in successfully.");
             window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
+            router.refresh();
         } catch (nextError) {
             setError(nextError instanceof Error ? nextError.message : "Could not verify sign-in code.");
         } finally {

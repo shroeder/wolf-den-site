@@ -73,7 +73,9 @@ export async function sendShopEmailVerificationEmail({ to, token }) {
 
 export async function sendShopPasswordResetEmail({ to, token }) {
     const resend = getResendClient();
-    const resetUrl = buildSiteUrl("/shop/account/reset-password", { token });
+    // Include the email so the reset page can prefill it as the saved username (email + new password),
+    // and keep the token out of any visible field.
+    const resetUrl = buildSiteUrl("/shop/account/reset-password", { token, email: to });
 
     const result = await resend.emails.send({
         from: "The Wolf Den <portal@wolfdengamingmn.com>",

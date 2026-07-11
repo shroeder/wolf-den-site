@@ -31,7 +31,7 @@ export default async function ShopOrdersPage() {
         );
     }
 
-    const orders = await listCustomerOrders(customer.id);
+    const orders = await listCustomerOrders(customer.id, { email: customer.email });
 
     return <ShopOrdersClient orders={orders} email={customer.email} />;
 }
