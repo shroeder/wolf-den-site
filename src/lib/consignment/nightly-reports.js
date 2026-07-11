@@ -3,6 +3,7 @@ import "server-only";
 import { sendNightlyConsignmentReportEmail } from "@/lib/consignment/email";
 import { getTotalPaidForConsignor } from "@/lib/consignment/payouts";
 import { listConsignorCatalog, searchSalesForVariations } from "@/lib/consignment/square";
+import { listConsignmentTradeSales } from "@/lib/consignment/trade-sales";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -34,18 +35,34 @@ async function buildConsignorReport(consignor, window) {
     const catalog = await listConsignorCatalog(consignor.square_category_id);
     const variationLookup = new Map(catalog.map((item) => [item.id, item]));
 
-    const dailySales = await searchSalesForVariations(variationLookup, {
+    const nowIso = new Date().toISOString();
+
+    // Square order sales + off-Square trade store-credit sales (consigned items taken in a trade).
+    const dailySquareSales = await searchSalesForVariations(variationLookup, {
         startAt: window.startAt,
         endAt: window.endAt,
     });
+    const dailyTradeSales = await listConsignmentTradeSales(consignor.id, {
+        startAt: window.startAt,
+        endAt: window.endAt,
+    });
+    const dailySales = [...dailySquareSales, ...dailyTradeSales].sort(
+        (left, right) => Number(right.revenue || 0) - Number(left.revenue || 0) || left.name.localeCompare(right.name)
+    );
 
-    const lifetimeSales = await searchSalesForVariations(variationLookup, {
+    const lifetimeSquareSales = await searchSalesForVariations(variationLookup, {
         startAt: ALL_TIME_SALES_START_AT,
-        endAt: new Date().toISOString(),
+        endAt: nowIso,
+    });
+    const lifetimeTradeSales = await listConsignmentTradeSales(consignor.id, {
+        startAt: ALL_TIME_SALES_START_AT,
+        endAt: nowIso,
     });
 
     const todayNetRevenue = dailySales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
-    const totalNetRevenue = lifetimeSales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
+    const totalNetRevenue =
+        lifetimeSquareSales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0) +
+        lifetimeTradeSales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
     const payoutRate = Number(consignor.payout_rate || 0);
     const estimatedPayoutGross = totalNetRevenue * payoutRate;
     const totalPaid = await getTotalPaidForConsignor(consignor.id);

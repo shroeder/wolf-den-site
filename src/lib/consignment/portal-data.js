@@ -3,6 +3,7 @@ import "server-only";
 import { getConsignorById } from "@/lib/consignment/config";
 import { getTotalPaidForConsignor, listPayoutsForConsignor } from "@/lib/consignment/payouts";
 import { getInventoryCounts, listConsignorCatalog, searchSalesForVariations } from "@/lib/consignment/square";
+import { listConsignmentTradeSales } from "@/lib/consignment/trade-sales";
 import { createServerLogger } from "@/lib/server-logger";
 
 const portalDataLogger = createServerLogger({ source: "api", subsystem: "consignment-portal-data" });
@@ -82,11 +83,29 @@ async function buildDashboard(consignor, options = {}) {
         }))
         .sort(sortByName);
 
-    const sales = await searchSalesForVariations(variationLookup, options);
-    const salesForSummary = await searchSalesForVariations(variationLookup, {
+    const nowIso = new Date().toISOString();
+    const lookbackDays = Number(options.lookbackDays) || 90;
+    const displayStart = options.startAt || new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
+    const displayEnd = options.endAt || nowIso;
+
+    // Square order sales + off-Square trade store-credit sales (consigned items taken in a trade decrement
+    // Square inventory instead of creating an order, so they never show up in searchSalesForVariations).
+    const squareSales = await searchSalesForVariations(variationLookup, options);
+    const tradeSales = await listConsignmentTradeSales(consignor.id, { startAt: displayStart, endAt: displayEnd });
+    const sales = [...squareSales, ...tradeSales].sort(
+        (left, right) => Number(right.revenue || 0) - Number(left.revenue || 0) || left.name.localeCompare(right.name)
+    );
+
+    const squareSalesAllTime = await searchSalesForVariations(variationLookup, {
         startAt: ALL_TIME_SALES_START_AT,
-        endAt: new Date().toISOString(),
+        endAt: nowIso,
     });
+    const tradeSalesAllTime = await listConsignmentTradeSales(consignor.id, {
+        startAt: ALL_TIME_SALES_START_AT,
+        endAt: nowIso,
+    });
+    const salesForSummary = [...squareSalesAllTime, ...tradeSalesAllTime];
+
     const payouts = await listPayoutsForConsignor(consignor.id);
     const summary = await buildSummary(consignor, inventory, salesForSummary, options);
 

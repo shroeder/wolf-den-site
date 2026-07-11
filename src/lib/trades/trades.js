@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { recordConsignmentTradeSalesForTrade } from "@/lib/consignment/trade-sales";
 import { createServerLogger } from "@/lib/server-logger";
 
 // Trade ledger data layer. A trade is a header (`trade`) plus directional lines (`trade_line`):
@@ -68,7 +69,7 @@ export async function createTrade(input) {
         }
     }
 
-    return db.tx(async (client) => {
+    const result = await db.tx(async (client) => {
         const existing = await client.query(`SELECT id FROM trade WHERE id = $1`, [id]);
         if (existing.rows.length > 0) {
             tradesLogger.info("trade.create.duplicate_ignored", { step: "duplicate_ignored", tradeId: id });
@@ -128,6 +129,33 @@ export async function createTrade(input) {
         tradesLogger.info("trade.create.success", { step: "trade_created", tradeId: id, lineCount: lines.length });
         return { trade: await loadTrade(client, id), created: true };
     });
+
+    // Attribute any consigned store-credit items taken in this trade to their consignor. A consigned
+    // item leaves the shop as a Square inventory DECREMENT (not an order), so the standard owed
+    // calculation never sees it — this is the only record of the consignor's payable. Idempotent per
+    // trade, so it's safe on a retry (duplicate) too. Skipped for historical sheet imports. Non-fatal:
+    // the trade ledger is the priority and must never fail because consignment attribution hiccuped.
+    if (input.source !== "sheets-import") {
+        try {
+            const outLines = lines
+                .filter((line) => line.direction === "OUT" && line.squareVariationId)
+                .map((line) => ({
+                    squareVariationId: line.squareVariationId,
+                    squareItemId: line.squareItemId || null,
+                    itemName: line.itemName,
+                    quantity: line.quantity,
+                    unitMarket: line.unitMarket,
+                    lineTotal: line.lineTotal,
+                }));
+            if (outLines.length > 0) {
+                await recordConsignmentTradeSalesForTrade(id, outLines, { soldAt: input.tradedAt || null });
+            }
+        } catch (error) {
+            tradesLogger.error("trade.create.consignment_sales_failed", error, { tradeId: id });
+        }
+    }
+
+    return result;
 }
 
 async function loadTrade(client, id) {

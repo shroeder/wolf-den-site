@@ -414,6 +414,59 @@ export async function listConsignorCatalog(categoryId) {
     }));
 }
 
+// Given Square variation ids, return Map(variationId -> string[] of the parent item's category ids).
+// Used to attribute an off-Square trade-out to a consignor (whose items all live under one Square
+// category). Mirrors the category detection in listConsignorCatalog / listShopInventory: an item can
+// carry a legacy `category_id`, a `reporting_category`, and/or a `categories[]` array.
+export async function resolveVariationCategories(variationIds) {
+    const ids = Array.from(new Set((variationIds || []).map((id) => String(id || "")).filter(Boolean)));
+    const result = new Map();
+
+    if (!ids.length) {
+        return result;
+    }
+
+    const collectItemCategories = (itemCategories, item) => {
+        if (!item || item.type !== "ITEM" || !item.id) {
+            return;
+        }
+        const data = item.item_data || {};
+        const set = new Set();
+        if (data.category_id) set.add(data.category_id);
+        if (data.reporting_category?.id) set.add(data.reporting_category.id);
+        for (const category of data.categories || []) {
+            if (category?.id) set.add(category.id);
+        }
+        itemCategories.set(item.id, set);
+    };
+
+    for (const batch of chunk(ids, 900)) {
+        if (!batch.length) {
+            continue;
+        }
+
+        const payload = await squareFetch("/v2/catalog/batch-retrieve", {
+            method: "POST",
+            body: JSON.stringify({ object_ids: batch, include_related_objects: true }),
+        });
+
+        const itemCategories = new Map(); // itemId -> Set(categoryId)
+        for (const obj of payload.related_objects || []) collectItemCategories(itemCategories, obj);
+        for (const obj of payload.objects || []) collectItemCategories(itemCategories, obj);
+
+        for (const obj of payload.objects || []) {
+            if (obj.type !== "ITEM_VARIATION" || !obj.id) {
+                continue;
+            }
+            const itemId = obj.item_variation_data?.item_id;
+            const cats = itemId ? itemCategories.get(itemId) : null;
+            result.set(obj.id, cats ? Array.from(cats) : []);
+        }
+    }
+
+    return result;
+}
+
 export async function getInventoryCounts(variationIds) {
     const locationId = getSquareLocationId();
 

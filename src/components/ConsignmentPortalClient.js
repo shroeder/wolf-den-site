@@ -358,7 +358,12 @@ export default function ConsignmentPortalClient({ slug, displayName, consignment
                                                     <div className="consignment-item-thumb consignment-item-thumb-placeholder" aria-hidden="true" />
                                                 )}
                                             </td>
-                                            <td>{item.name}</td>
+                                            <td>
+                                                {item.name}
+                                                {item.source === "trade" ? (
+                                                    <span className="consignment-sale-tag" title="Sold as store credit in a trade">Trade</span>
+                                                ) : null}
+                                            </td>
                                             <td>{item.quantitySold}</td>
                                             {sales.some((s) => s.quantityReturned > 0) ? <td>{item.quantityReturned || 0}</td> : null}
                                             <td>{formatCurrency(item.revenue)}</td>
