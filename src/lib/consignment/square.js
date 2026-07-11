@@ -1453,7 +1453,10 @@ export async function restockInventoryForCancel(items, { idempotencyKey } = {}) 
             adjustment: {
                 catalog_object_id: catalogObjectId,
                 location_id: locationId,
-                from_state: "SOLD",
+                // Square rejects SOLD -> IN_STOCK ("Unsupported adjustment state transition"). Adding a
+                // unit back to sellable stock is a NONE -> IN_STOCK receive; the prior SOLD record stays
+                // as history, and the net IN_STOCK count returns to what it was before the sale.
+                from_state: "NONE",
                 to_state: "IN_STOCK",
                 quantity: String(quantity),
                 occurred_at: occurredAt,
