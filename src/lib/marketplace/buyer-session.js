@@ -258,7 +258,15 @@ export async function setBuyerSessionCookie(token) {
 
 export async function clearBuyerSessionCookie() {
     const cookieStore = await cookies();
-    cookieStore.delete(MKT_BUYER_COOKIE);
+    // Overwrite with an expired cookie using the same attributes (a bare delete() can miss on some
+    // browsers when path/secure/sameSite don't match).
+    cookieStore.set(MKT_BUYER_COOKIE, "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 0,
+    });
 }
 
 // Token from the Authorization header (app) OR the buyer cookie (web).

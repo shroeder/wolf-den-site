@@ -2180,7 +2180,9 @@ export default function VendorPortalClient({
 
     async function logout() {
         await fetch("/api/marketplace/vendor/logout", { method: "POST" });
-        router.refresh();
+        // Full navigation (not router.refresh) so the browser drops all in-memory portal state and
+        // re-requests with the cleared cookies — guarantees the signed-out view.
+        window.location.assign("/marketplace/portal");
     }
 
     // Open leads need action; sold/closed go into a collapsible history.

@@ -112,7 +112,15 @@ export async function setVendorSessionCookie(token) {
 export async function clearVendorSessionCookie() {
     const cookieStore = await cookies();
 
-    cookieStore.delete(MKT_VENDOR_COOKIE);
+    // Overwrite with an expired cookie using the SAME attributes it was set with. A bare delete() can
+    // leave the cookie in place on some browsers when path/secure/sameSite don't match.
+    cookieStore.set(MKT_VENDOR_COOKIE, "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 0,
+    });
 }
 
 // Bearer token from the Authorization header — how the native app authenticates (same session
