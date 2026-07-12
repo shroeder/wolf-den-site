@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendNewApplicationEmail, sendVendorInviteEmail } from "@/lib/marketplace/email.js";
-import { createVendor, createVendorInvite, getVendorByEmail, setVendorLogo } from "@/lib/marketplace/vendors.js";
+import { createVendor, createVendorInvite, getVendorByEmail, getVendorById, setVendorLogo } from "@/lib/marketplace/vendors.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -137,9 +137,11 @@ export async function approveApplication(id) {
     }
 
     if (application.status === "approved" && application.vendorId) {
-        // Idempotent-ish: re-issue an invite for the already-created vendor.
-        const token = await createVendorInvite(application.vendorId);
-        return { application, vendorId: application.vendorId, inviteToken: token, reused: true };
+        // Already approved: re-issue AND re-send the invite. "Approve + invite" should always send an
+        // invite, so an already-approved vendor who never got the email (or lost it) gets a fresh one.
+        const existingVendor = await getVendorById(application.vendorId);
+        const { inviteToken, emailSent } = await issueAndEmailInvite(existingVendor, application);
+        return { application, vendorId: application.vendorId, inviteToken, emailSent, reused: true };
     }
 
     // Reuse an existing vendor with this email if one exists, else create a fresh one.
@@ -161,8 +163,6 @@ export async function approveApplication(id) {
         vendor = await setVendorLogo(vendor.id, application.logoUrl);
     }
 
-    const inviteToken = await createVendorInvite(vendor.id);
-
     await db.query(
         `UPDATE mkt_vendor_application
          SET status = 'approved', vendor_id = $2, reviewed_at = NOW(), updated_at = NOW()
@@ -170,21 +170,40 @@ export async function approveApplication(id) {
         [application.id, vendor.id]
     );
 
-    try {
-        await sendVendorInviteEmail({ vendor, businessName: application.businessName, inviteToken });
-    } catch (error) {
-        applicationsLogger.warn("marketplace.application.invite_email_failed", {
-            applicationId: application.id,
-            reason: error.message,
-        });
-    }
+    const { inviteToken, emailSent } = await issueAndEmailInvite(vendor, application);
 
     applicationsLogger.info("marketplace.application.approved", {
         applicationId: application.id,
         vendorId: vendor.id,
+        emailSent,
     });
 
-    return { application: { ...application, status: "approved", vendorId: vendor.id }, vendorId: vendor.id, inviteToken };
+    return { application: { ...application, status: "approved", vendorId: vendor.id }, vendorId: vendor.id, inviteToken, emailSent };
+}
+
+// Create a single-use invite for a vendor and email it. Returns { inviteToken, emailSent }. The email
+// is best-effort — a send failure never blocks approval — but emailSent is surfaced so the admin can be
+// told to share the link manually when it doesn't go out.
+async function issueAndEmailInvite(vendor, application) {
+    const inviteToken = await createVendorInvite(vendor.id);
+    let emailSent = false;
+    if (vendor?.email) {
+        try {
+            await sendVendorInviteEmail({ vendor, businessName: application.businessName, inviteToken });
+            emailSent = true;
+        } catch (error) {
+            applicationsLogger.warn("marketplace.application.invite_email_failed", {
+                applicationId: application.id,
+                reason: error.message,
+            });
+        }
+    } else {
+        applicationsLogger.warn("marketplace.application.invite_email_skipped_no_email", {
+            applicationId: application.id,
+            vendorId: vendor?.id,
+        });
+    }
+    return { inviteToken, emailSent };
 }
 
 export async function rejectApplication(id) {

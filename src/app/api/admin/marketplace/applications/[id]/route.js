@@ -18,8 +18,14 @@ export async function POST(request, { params }) {
             const action = String(body.action || "").trim();
             if (action === "approve") {
                 const result = await approveApplication(id);
-                logger.info("admin.marketplace.application.approved", { applicationId: id, vendorId: result.vendorId });
-                return NextResponse.json({ ok: true, vendorId: result.vendorId });
+                logger.info("admin.marketplace.application.approved", { applicationId: id, vendorId: result.vendorId, emailSent: result.emailSent });
+                return NextResponse.json({
+                    ok: true,
+                    vendorId: result.vendorId,
+                    emailSent: result.emailSent,
+                    // Fallback so the invite can be shared manually if the email didn't go out.
+                    inviteUrl: `${new URL(request.url).origin}/marketplace/onboard?token=${result.inviteToken}`,
+                });
             }
             if (action === "reject") {
                 await rejectApplication(id);

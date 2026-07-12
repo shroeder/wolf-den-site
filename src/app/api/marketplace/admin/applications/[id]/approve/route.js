@@ -23,6 +23,7 @@ export async function POST(request, { params }) {
             return NextResponse.json({
                 ok: true,
                 vendorId: result.vendorId,
+                emailSent: result.emailSent,
                 // Surfaced so Luke can copy/share the invite link directly, in addition to the email.
                 inviteUrl: `/marketplace/onboard?token=${result.inviteToken}`,
             });
