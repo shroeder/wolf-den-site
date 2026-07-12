@@ -38,6 +38,7 @@ function mapApplication(row) {
         status: row.status,
         reviewedAt: toIso(row.reviewed_at),
         vendorId: row.vendor_id,
+        invitedAt: toIso(row.invited_at),
         createdAt: toIso(row.created_at),
         updatedAt: toIso(row.updated_at),
     };
@@ -111,12 +112,20 @@ export async function createApplication(input = {}) {
 }
 
 export async function listApplications({ status } = {}) {
+    // Join the linked vendor so we can surface when the invite was last sent (mkt_vendor.invited_at).
+    const cols = `a.id, a.business_name, a.contact_name, a.email, a.phone, a.city, a.region,
+        a.location_label, a.sells, a.links, a.notes, a.logo_url, a.status, a.reviewed_at,
+        a.vendor_id, a.created_at, a.updated_at, v.invited_at AS invited_at`;
     const rows = status
         ? await db.query(
-              `SELECT ${APPLICATION_COLUMNS} FROM mkt_vendor_application WHERE status = $1 ORDER BY created_at DESC`,
+              `SELECT ${cols} FROM mkt_vendor_application a LEFT JOIN mkt_vendor v ON v.id = a.vendor_id
+               WHERE a.status = $1 ORDER BY a.created_at DESC`,
               [status]
           )
-        : await db.query(`SELECT ${APPLICATION_COLUMNS} FROM mkt_vendor_application ORDER BY created_at DESC`);
+        : await db.query(
+              `SELECT ${cols} FROM mkt_vendor_application a LEFT JOIN mkt_vendor v ON v.id = a.vendor_id
+               ORDER BY a.created_at DESC`
+          );
 
     return rows.map(mapApplication);
 }
