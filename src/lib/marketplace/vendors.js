@@ -303,12 +303,23 @@ export async function setVendorStatus(id, status) {
     return mapVendor(row);
 }
 
-// Permanently delete a vendor and everything under it. FK cascades take care of listings, sessions,
-// offers, swaps, threads+messages, sales, event links, and sell bids; the vendor's application is
-// unlinked (vendor_id -> NULL). Returns the deleted id, or null if there was no such vendor.
+// Permanently delete a vendor AND their linked login account. FK cascades take care of the vendor's
+// listings, sessions, offers, swaps, threads+messages, sales, event links, and sell bids; the vendor's
+// application is unlinked (vendor_id -> NULL). Then the mkt_buyer login account it belongs to is deleted
+// too (cascading its buyer sessions + threads). Returns the deleted vendor id, or null if none.
 export async function deleteVendor(id) {
-    const row = await db.queryOne(`DELETE FROM mkt_vendor WHERE id = $1 RETURNING id`, [id]);
-    return row?.id || null;
+    return db.tx(async (client) => {
+        const existing = await client.query(`SELECT account_id FROM mkt_vendor WHERE id = $1`, [id]);
+        if (existing.rows.length === 0) {
+            return null;
+        }
+        const accountId = existing.rows[0].account_id;
+        await client.query(`DELETE FROM mkt_vendor WHERE id = $1`, [id]);
+        if (accountId) {
+            await client.query(`DELETE FROM mkt_buyer WHERE id = $1`, [accountId]);
+        }
+        return id;
+    });
 }
 
 // Admin view: every vendor (any status) + their active listing count, newest first.
