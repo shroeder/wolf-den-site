@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { upsertCashEntry } from "@/lib/cash/cash-ledger.js";
 import { db } from "@/lib/db";
+import { upsertEntry } from "@/lib/ledger/ledger.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const payoutsLogger = createServerLogger({ source: "api", subsystem: "consignment-payouts" });
@@ -173,15 +174,39 @@ export async function createPayoutForConsignor(consignor, payload) {
         amount,
     });
 
-    // A cash payout comes out of the register, so mirror it into cash-on-hand as an outflow. Keyed by
-    // the payout id so it's idempotent (a re-save updates the same row). Non-cash methods (Venmo, check,
-    // card) don't touch the till. Best-effort — never fail the payout over the cash mirror.
-    if (String(payload.paymentMethod || "").toLowerCase().includes("cash")) {
+    // A consignor payout is a business expense (the store's cost on consigned sales). Record it in the
+    // MAIN ledger, and — when paid in cash — in the cash-on-hand (till) ledger too, sharing one entry id
+    // so the cash side is a single linked row (no double-count). Idempotent (a re-save updates the same
+    // rows). Best-effort: never fail the payout over the ledger mirror.
+    const entryId = `consignor-payout-${rows[0].id}`;
+    const isCashPayout = String(payload.paymentMethod || "").toLowerCase().includes("cash");
+    const description = `Consignment payout — ${consignor.display_name}`;
+    const nowMs = Date.now();
+    try {
+        await upsertEntry({
+            entryId,
+            date: paidAt.getTime(),
+            type: "Expense",
+            category: "Other",
+            description,
+            amount: -Math.abs(amount),
+            paymentMethod: isCashPayout ? "Cash On Hand" : payload.paymentMethod || null,
+            accountType: isCashPayout ? "Cash On Hand" : "Business",
+            reimbursable: false,
+            notes: `Consignor payout receipt ${receiptNumber}`,
+            isRelevantForCashOnHand: isCashPayout,
+            createdAt: nowMs,
+            updatedAt: nowMs,
+        });
+    } catch (error) {
+        payoutsLogger.warn("consignment.payouts.ledger_entry_failed", { payoutId: rows[0].id, reason: error.message });
+    }
+    if (isCashPayout) {
         try {
             await upsertCashEntry({
-                entryId: `consignor-payout-${rows[0].id}`,
+                entryId,
                 occurredOn: paidAt.toISOString().slice(0, 10),
-                description: `Consignor payout — ${consignor.display_name}`,
+                description,
                 amount: -Math.abs(amount),
                 paymentMethod: "Cash On Hand",
                 source: "consignment",
