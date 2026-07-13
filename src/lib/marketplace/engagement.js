@@ -12,18 +12,39 @@ export async function recordEngagement(kind, { catalogProductId = null, searchTe
         const h = await headers();
         const c = await cookies();
         const vid = vidOverride || h.get("x-mkt-vid") || c.get("mkt_vid")?.value || null;
+        const vidStr = vid ? String(vid).slice(0, 80) : null;
         const cityRaw = h.get("x-vercel-ip-city");
         // Approximate (city-level) coordinates from Vercel edge geo, for the demand heatmap.
         const lat = Number(h.get("x-vercel-ip-latitude"));
         const lng = Number(h.get("x-vercel-ip-longitude"));
+
+        // A live-search box fires a request on every keystroke, so a single query gets logged as
+        // "c","ca","car"…  Coalesce a typing burst: if this visitor searched in the last few seconds,
+        // update that row to the latest term instead of storing every keystroke as its own search.
+        const term = searchTerm ? String(searchTerm).slice(0, 120) : null;
+        if (kind === "search" && vidStr && term) {
+            const coalesced = await db.query(
+                `UPDATE mkt_engagement SET search_term = $2, created_at = NOW()
+                 WHERE id = (
+                     SELECT id FROM mkt_engagement
+                     WHERE visitor_id = $1 AND kind = 'search'
+                       AND created_at > NOW() - INTERVAL '10 seconds'
+                     ORDER BY created_at DESC LIMIT 1
+                 )
+                 RETURNING id`,
+                [vidStr, term]
+            );
+            if (coalesced.length) return;
+        }
+
         await db.query(
             `INSERT INTO mkt_engagement (visitor_id, kind, catalog_product_id, search_term, path, country, region, city, lat, lng)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
             [
-                vid ? String(vid).slice(0, 80) : null,
+                vidStr,
                 String(kind).slice(0, 24),
                 catalogProductId ? Number(catalogProductId) || null : null,
-                searchTerm ? String(searchTerm).slice(0, 120) : null,
+                term,
                 path ? String(path).slice(0, 200) : null,
                 h.get("x-vercel-ip-country") || null,
                 h.get("x-vercel-ip-country-region") || null,
