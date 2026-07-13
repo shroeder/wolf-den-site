@@ -303,6 +303,14 @@ export async function setVendorStatus(id, status) {
     return mapVendor(row);
 }
 
+// Permanently delete a vendor and everything under it. FK cascades take care of listings, sessions,
+// offers, swaps, threads+messages, sales, event links, and sell bids; the vendor's application is
+// unlinked (vendor_id -> NULL). Returns the deleted id, or null if there was no such vendor.
+export async function deleteVendor(id) {
+    const row = await db.queryOne(`DELETE FROM mkt_vendor WHERE id = $1 RETURNING id`, [id]);
+    return row?.id || null;
+}
+
 // Admin view: every vendor (any status) + their active listing count, newest first.
 export async function listVendorsForAdmin() {
     const rows = await db.query(

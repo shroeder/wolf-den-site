@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { listVendorListings } from "@/lib/marketplace/listings.js";
-import { getVendorById, setVendorStatus } from "@/lib/marketplace/vendors.js";
+import { deleteVendor, getVendorById, setVendorStatus } from "@/lib/marketplace/vendors.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -45,6 +45,24 @@ export async function PATCH(request, { params }) {
             return NextResponse.json({ ok: true, vendor });
         } catch (error) {
             return internalError(error, { event: "admin.marketplace.vendor.status.failure" });
+        }
+    });
+}
+
+// Permanently delete a vendor + all their data (listings, sessions, offers, swaps, threads, sales…).
+// Irreversible — the app confirms before calling this. Suspend is the reversible option.
+export async function DELETE(request, { params }) {
+    return withRequestLogging(request, "DELETE /api/admin/marketplace/vendors/[id]", async ({ logger, internalError }) => {
+        const authError = await requireAdminAccess(request, "marketplace.manage", logger);
+        if (authError) return authError;
+        try {
+            const { id } = await params;
+            const deleted = await deleteVendor(id);
+            if (!deleted) return NextResponse.json({ error: "not_found" }, { status: 404 });
+            logger.info("admin.marketplace.vendor.deleted", { vendorId: id });
+            return NextResponse.json({ ok: true, deleted: id });
+        } catch (error) {
+            return internalError(error, { event: "admin.marketplace.vendor.delete.failure" });
         }
     });
 }
