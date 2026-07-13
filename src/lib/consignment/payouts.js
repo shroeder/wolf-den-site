@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { upsertCashEntry } from "@/lib/cash/cash-ledger.js";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -171,6 +172,24 @@ export async function createPayoutForConsignor(consignor, payload) {
         payoutId: rows[0]?.id,
         amount,
     });
+
+    // A cash payout comes out of the register, so mirror it into cash-on-hand as an outflow. Keyed by
+    // the payout id so it's idempotent (a re-save updates the same row). Non-cash methods (Venmo, check,
+    // card) don't touch the till. Best-effort — never fail the payout over the cash mirror.
+    if (String(payload.paymentMethod || "").toLowerCase().includes("cash")) {
+        try {
+            await upsertCashEntry({
+                entryId: `consignor-payout-${rows[0].id}`,
+                occurredOn: paidAt.toISOString().slice(0, 10),
+                description: `Consignor payout — ${consignor.display_name}`,
+                amount: -Math.abs(amount),
+                paymentMethod: "Cash On Hand",
+                source: "consignment",
+            });
+        } catch (error) {
+            payoutsLogger.warn("consignment.payouts.cash_ledger_failed", { payoutId: rows[0].id, reason: error.message });
+        }
+    }
 
     return {
         payout: mapPayoutRow(rows[0]),
