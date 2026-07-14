@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import ThemedSelect from "@/components/ThemedSelect";
+import { GAME_SLUGS, gameLabel } from "@/lib/tcg-games";
 
 const priceFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
@@ -83,9 +84,17 @@ function ListingTile({ listing }) {
 
 export default function VendorStorefrontListings({ listings }) {
     const [search, setSearch] = useState("");
+    const [gameFilter, setGameFilter] = useState("");
     const [setFilter, setSetFilter] = useState("");
     const [conditionFilter, setConditionFilter] = useState("");
     const [sortMode, setSortMode] = useState("featured");
+
+    // Games present in this vendor's stock, in the canonical TCG_GAMES order (Magic, Pokémon, Yu-Gi-Oh…).
+    const availableGames = useMemo(() => {
+        const seen = new Set();
+        for (const l of listings) if (l.game) seen.add(l.game);
+        return GAME_SLUGS.filter((g) => seen.has(g));
+    }, [listings]);
 
     const availableSets = useMemo(() => {
         const seen = new Set();
@@ -111,6 +120,7 @@ export default function VendorStorefrontListings({ listings }) {
         let out = listings.filter(
             (l) =>
                 (!q || (l.title || "").toLowerCase().includes(q) || (l.setName || "").toLowerCase().includes(q)) &&
+                (!gameFilter || l.game === gameFilter) &&
                 (!setFilter || l.setName === setFilter) &&
                 (!conditionFilter || listingCondition(l) === conditionFilter)
         );
@@ -139,6 +149,18 @@ export default function VendorStorefrontListings({ listings }) {
                     onChange={(e) => setSearch(e.target.value)}
                     aria-label="Search listings"
                 />
+                {availableGames.length > 1 && (
+                    <div className="shop-sort-control">
+                        <label className="shop-sort-label">Game</label>
+                        <ThemedSelect
+                            block
+                            ariaLabel="Filter by game"
+                            value={gameFilter}
+                            onChange={setGameFilter}
+                            options={[{ value: "", label: "All games" }, ...availableGames.map((g) => ({ value: g, label: gameLabel(g) }))]}
+                        />
+                    </div>
+                )}
                 {availableSets.length > 0 && (
                     <div className="shop-sort-control">
                         <label className="shop-sort-label">Set</label>

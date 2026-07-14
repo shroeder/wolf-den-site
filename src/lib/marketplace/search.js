@@ -608,7 +608,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
                 l.price, l.quantity, l.catalog_product_id,
                 l.title, l.set_name, l.card_number, l.updated_at,
                 COALESCE(l.image_url, c.image_url) AS image_url,
-                c.market_price
+                c.market_price, c.game
          FROM mkt_listing l
          LEFT JOIN tcg_cards c ON c.id = l.catalog_product_id
          WHERE l.vendor_id = $1 AND l.status = 'active' AND NOT l.vendor_only
@@ -687,6 +687,7 @@ export async function getVendorStorefront(vendorId, { includeInactive = false } 
             cardNumber: row.card_number,
             imageUrl: row.image_url,
             marketPrice: toNumber(row.market_price),
+            game: row.game || null,
         })),
     };
 }
