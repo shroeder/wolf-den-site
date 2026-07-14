@@ -258,6 +258,20 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const shippingFieldErrors = useMemo(() => validateShippingForm(normalizedShipping), [normalizedShipping]);
     const hasFulfillmentChoice = fulfillmentMode === "shipping" || fulfillmentMode === "pickup";
     const isShippingReady = fulfillmentMode === "shipping" && Object.keys(shippingFieldErrors).length === 0;
+    // Live rates only need the destination ADDRESS — not name/email/phone. Gate the rate lookup on just
+    // the address so entering it shows real shipping right away; name/email/phone are still required to
+    // place the order (they gate the pay button below), just not to price shipping.
+    const isShippingAddressReady = useMemo(() => {
+        if (fulfillmentMode !== "shipping") return false;
+        const state = String(normalizedShipping.state || "").trim().toUpperCase();
+        const zip = String(normalizedShipping.postalCode || "").trim();
+        return (
+            Boolean(String(normalizedShipping.addressLine1 || "").trim()) &&
+            Boolean(String(normalizedShipping.city || "").trim()) &&
+            /^[A-Z]{2}$/.test(state) &&
+            /^\d{5}(?:-\d{4})?$/.test(zip)
+        );
+    }, [fulfillmentMode, normalizedShipping]);
     // Pickup needs a name so the owner can match the person to their order at the counter.
     const isPickupReady = fulfillmentMode === "pickup" && pickupName.trim().length >= 2;
     const isFulfillmentReady = isPickupReady || isShippingReady;
@@ -362,7 +376,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     useEffect(() => {
         let cancelled = false;
         const ready =
-            canShowCart && fulfillmentMode === "shipping" && isShippingReady && cartData.items.length > 0;
+            canShowCart && fulfillmentMode === "shipping" && isShippingAddressReady && cartData.items.length > 0;
 
         const disable = () => {
             setShipRates({ enabled: false, options: [], shipmentId: null });
@@ -426,7 +440,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             cancelled = true;
             window.clearTimeout(timeoutId);
         };
-    }, [canShowCart, fulfillmentMode, isShippingReady, cartData.items.length, normalizedShipping]);
+    }, [canShowCart, fulfillmentMode, isShippingAddressReady, cartData.items.length, normalizedShipping]);
 
     const refreshAuthSession = useCallback(async () => {
         if (!canShowCart) {
@@ -941,7 +955,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                     </div>
                                 ) : null}
 
-                                {fulfillmentMode === "shipping" && isShippingReady ? (
+                                {fulfillmentMode === "shipping" && !isShippingAddressReady ? (
+                                    <p className="secondary">Enter your full shipping address (street, city, state, ZIP) to see live shipping rates.</p>
+                                ) : null}
+
+                                {fulfillmentMode === "shipping" && isShippingAddressReady ? (
                                     <div className="cart-shipping-rates">
                                         {ratesLoading ? (
                                             <p className="secondary">Getting live shipping rates…</p>
