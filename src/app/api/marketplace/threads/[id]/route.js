@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { sendNewMessageEmail } from "@/lib/marketplace/email.js";
-import { getThreadForViewer, getThreadParties, postMessage, threadParticipantSide } from "@/lib/marketplace/messaging.js";
+import { getThreadForViewer, getThreadParties, isOwnerStorefront, postMessage, threadParticipantSide } from "@/lib/marketplace/messaging.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -27,8 +27,8 @@ async function nudge(threadId, senderSide, preview) {
         const openUrl = `${SITE}/marketplace/messages?thread=${threadId}`;
         if (to) await sendNewMessageEmail(to, { fromName: fromName || "A member", preview, openUrl });
 
-        // Owner push: only when a buyer messages a vendor (a lead worth a fast reply).
-        if (senderSide === "buyer") {
+        // Owner push: only when a buyer messages the OWNER's own storefront (not other vendors).
+        if (senderSide === "buyer" && isOwnerStorefront(p.vendor_name)) {
             await sendAdminPush({
                 title: "💬 New buyer message",
                 body: `${p.buyer_name || "A buyer"} → ${p.vendor_name || "vendor"}: ${preview.slice(0, 90)}`,

@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { db } from "@/lib/db";
 import { sendNewMessageEmail } from "@/lib/marketplace/email.js";
-import { getThreadParties, listThreadsForBuyer, listThreadsForVendor, startThread } from "@/lib/marketplace/messaging.js";
+import { getThreadParties, isOwnerStorefront, listThreadsForBuyer, listThreadsForVendor, startThread } from "@/lib/marketplace/messaging.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { getBuyOrderById } from "@/lib/marketplace/wants.js";
@@ -26,8 +26,9 @@ async function nudge(threadId, senderSide, preview) {
         // on the web it's the role-aware messages page.
         const openUrl = `${SITE}/marketplace/messages?thread=${threadId}`;
         if (to) await sendNewMessageEmail(to, { fromName: fromName || "A member", preview, openUrl });
-        // Owner push: a buyer starting a conversation is a hot lead worth a fast reply.
-        if (senderSide === "buyer") {
+        // Owner push: a buyer starting a conversation is a hot lead — but only for the owner's own
+        // storefront, not other vendors in the marketplace.
+        if (senderSide === "buyer" && isOwnerStorefront(p.vendor_name)) {
             await sendAdminPush({
                 title: "💬 New buyer message",
                 body: `${p.buyer_name || "A buyer"} → ${p.vendor_name || "vendor"}: ${preview.slice(0, 90)}`,

@@ -4,6 +4,14 @@ import { db } from "@/lib/db";
 
 // Owned buyer<->vendor messaging. One thread per pair; read state via per-side last-read timestamps.
 
+// The owner's admin app should only be pushed about messages to THEIR OWN storefront (The Wolf Den),
+// not other vendors in the marketplace. Matched by display name (the house-vendor convention used by
+// the Square sync job); override with MARKETPLACE_OWNER_VENDOR_NAME if the storefront is ever renamed.
+export function isOwnerStorefront(vendorName) {
+    const needle = (process.env.MARKETPLACE_OWNER_VENDOR_NAME || "wolf den").trim().toLowerCase();
+    return String(vendorName || "").toLowerCase().includes(needle);
+}
+
 function clampBody(value) {
     const s = String(value || "").trim();
     if (!s) throw new Error("Message can't be empty.");
