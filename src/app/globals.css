@@ -5007,6 +5007,31 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 1rem;
 }
 
+/* Vendor storefront filter/sort bar (search + set + condition + sort). */
+.mkt-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.6rem 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.mkt-filter-search {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 0.5rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink);
+    font-size: 0.95rem;
+}
+.mkt-filter-search::placeholder {
+    color: var(--ink-secondary);
+}
+.mkt-filter-bar .shop-sort-control {
+    flex: 0 1 auto;
+}
+
 .mkt-card {
     display: flex;
     flex-direction: column;

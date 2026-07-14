@@ -1,26 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import VendorStorefrontListings from "@/components/VendorStorefrontListings";
 import { getMarketplaceAdmin } from "@/lib/admin-app/web-session";
 import { getVendorStorefront } from "@/lib/marketplace/search.js";
-
-const priceFormatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-});
-
-const CONDITION_LABELS = {
-    NM: "Near Mint",
-    LP: "Lightly Played",
-    MP: "Moderately Played",
-    HP: "Heavily Played",
-    DMG: "Damaged",
-};
-
-function formatPrice(value) {
-    return value === null || value === undefined ? null : priceFormatter.format(Number(value));
-}
 
 function monthYear(iso) {
     const d = iso ? new Date(iso) : null;
@@ -62,55 +45,6 @@ export async function generateMetadata({ params }) {
         description: `Browse ${vendor.displayName}'s inventory${vendor.locationLabel ? ` in ${vendor.locationLabel}` : ""} on The Wolf Den Vendor Marketplace.`,
         alternates: { canonical: `/marketplace/vendor/${vendor.id}` },
     };
-}
-
-function ListingTile({ listing }) {
-    const price = formatPrice(listing.price);
-    const market = formatPrice(listing.marketPrice);
-    const condition = listing.graded
-        ? [listing.gradingCompany, listing.grade].filter(Boolean).join(" ") || "Graded"
-        : listing.condition
-          ? CONDITION_LABELS[listing.condition] || listing.condition
-          : null;
-
-    const inner = (
-        <>
-            <div className="mkt-card-art">
-                {listing.imageUrl ? (
-                    <Image
-                        src={listing.imageUrl}
-                        alt={listing.title}
-                        width={146}
-                        height={204}
-                        sizes="146px"
-                        className="mkt-card-image"
-                    />
-                ) : (
-                    <div className="mkt-card-image mkt-card-image-empty" aria-hidden="true" />
-                )}
-            </div>
-            <div className="mkt-card-body">
-                <h3 className="mkt-card-name">{listing.title}</h3>
-                <p className="mkt-card-meta">
-                    {listing.setName || (listing.kind === "sealed" ? "Sealed" : "Single")}
-                    {condition ? ` · ${condition}` : ""}
-                    {listing.language && listing.language !== "English" ? ` · ${listing.language}` : ""}
-                </p>
-                {price ? <p className="mkt-card-price">{price}</p> : null}
-                {market ? <p className="mkt-card-market">Market {market}</p> : null}
-                <p className="mkt-card-sub">{listing.quantity} available</p>
-            </div>
-        </>
-    );
-
-    // Matched items link to the shared product page; unmatched ones are just shown.
-    return listing.catalogProductId ? (
-        <Link href={`/marketplace/product/${listing.catalogProductId}`} className="mkt-card">
-            {inner}
-        </Link>
-    ) : (
-        <div className="mkt-card">{inner}</div>
-    );
 }
 
 export default async function VendorStorefrontPage({ params }) {
@@ -194,11 +128,7 @@ export default async function VendorStorefrontPage({ params }) {
                 {vendor.listings.length === 0 ? (
                     <p className="muted">This vendor has no active listings right now.</p>
                 ) : (
-                    <div className="mkt-grid">
-                        {vendor.listings.map((listing) => (
-                            <ListingTile key={listing.listingId} listing={listing} />
-                        ))}
-                    </div>
+                    <VendorStorefrontListings listings={vendor.listings} />
                 )}
             </section>
         </div>
