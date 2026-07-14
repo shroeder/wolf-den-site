@@ -83,7 +83,9 @@ const SORT_OPTIONS = [
 
 // Single-card condition, parsed from the trailing token in the item name (e.g. "Charizard 4/102 NM").
 // Sealed/accessories have no condition token, so they read as null and are unaffected by the filter.
-const CONDITION_RE = /\s(NM|LP|MP|HP|DMG)\s*$/i;
+// Uppercase-only + anchored to the end with a leading space: the app always writes conditions in
+// uppercase as the trailing token, so this can't misread "NM" inside a name or a lowercase word.
+const CONDITION_RE = /\s(NM|LP|MP|HP|DMG)\s*$/;
 const CONDITION_ORDER = ["NM", "LP", "MP", "HP", "DMG"];
 const CONDITION_LABELS = {
     NM: "Near Mint (NM)",
