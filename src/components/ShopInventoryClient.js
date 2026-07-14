@@ -81,6 +81,22 @@ const SORT_OPTIONS = [
     { value: "price-desc", label: "Price: High to Low" },
 ];
 
+// Single-card condition, parsed from the trailing token in the item name (e.g. "Charizard 4/102 NM").
+// Sealed/accessories have no condition token, so they read as null and are unaffected by the filter.
+const CONDITION_RE = /\s(NM|LP|MP|HP|DMG)\s*$/i;
+const CONDITION_ORDER = ["NM", "LP", "MP", "HP", "DMG"];
+const CONDITION_LABELS = {
+    NM: "Near Mint (NM)",
+    LP: "Lightly Played (LP)",
+    MP: "Moderately Played (MP)",
+    HP: "Heavily Played (HP)",
+    DMG: "Damaged (DMG)",
+};
+const getItemCondition = (name) => {
+    const match = CONDITION_RE.exec(String(name || "").trim());
+    return match ? match[1].toUpperCase() : null;
+};
+
 const sortVisibleItems = (items, sortMode) => {
     if (sortMode !== "price-asc" && sortMode !== "price-desc") {
         return items;
@@ -156,6 +172,7 @@ export default function ShopInventoryClient({
     const [detailItemKey, setDetailItemKey] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [setFilter, setSetFilter] = useState("");
+    const [conditionFilter, setConditionFilter] = useState("");
     const [sortMode, setSortMode] = useState("featured");
 
     // Sets present among in-stock singles (tagged server-side from the TCG SKU) — drives the Set filter.
@@ -167,6 +184,18 @@ export default function ShopInventoryClient({
             }
         }
         return Array.from(seen).sort();
+    }, [orderedCategories]);
+
+    // Conditions present among in-stock singles — drives the Condition filter (canonical NM→DMG order).
+    const availableConditions = useMemo(() => {
+        const seen = new Set();
+        for (const category of orderedCategories) {
+            for (const item of category.items || []) {
+                const condition = getItemCondition(item.name);
+                if (condition) seen.add(condition);
+            }
+        }
+        return CONDITION_ORDER.filter((c) => seen.has(c));
     }, [orderedCategories]);
     const [cartCount, setCartCount] = useState(null);
     const [cartItemQuantities, setCartItemQuantities] = useState({});
@@ -187,7 +216,7 @@ export default function ShopInventoryClient({
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const isSearching = normalizedSearch.length > 0;
-    const isFiltering = isSearching || Boolean(setFilter);
+    const isFiltering = isSearching || Boolean(setFilter) || Boolean(conditionFilter);
 
     const matchedItems = isFiltering
         ? dedupeSearchItems(
@@ -196,7 +225,8 @@ export default function ShopInventoryClient({
                     .filter(
                         (item) =>
                             (!normalizedSearch || item.name.toLowerCase().includes(normalizedSearch)) &&
-                            (!setFilter || item.setName === setFilter)
+                            (!setFilter || item.setName === setFilter) &&
+                            (!conditionFilter || getItemCondition(item.name) === conditionFilter)
                     )
                     .map((item) => ({ ...item, categoryName: category.name }))
             )
@@ -660,6 +690,22 @@ export default function ShopInventoryClient({
                                 value={setFilter}
                                 onChange={setSetFilter}
                                 options={[{ value: "", label: "All sets" }, ...availableSets.map((name) => ({ value: name, label: name }))]}
+                            />
+                        </div>
+                    )}
+
+                    {availableConditions.length > 0 && (
+                        <div className="shop-sort-control">
+                            <label className="shop-sort-label">Condition</label>
+                            <ThemedSelect
+                                block
+                                ariaLabel="Filter by condition"
+                                value={conditionFilter}
+                                onChange={setConditionFilter}
+                                options={[
+                                    { value: "", label: "All conditions" },
+                                    ...availableConditions.map((code) => ({ value: code, label: CONDITION_LABELS[code] || code })),
+                                ]}
                             />
                         </div>
                     )}
