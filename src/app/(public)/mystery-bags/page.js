@@ -69,7 +69,6 @@ export default async function MysteryBagsPage() {
     const bagPriceResolution = resolveBagPrice(squareBagPrice, metrics);
     const bagPrice = bagPriceResolution.value;
     const remainingPacks = data?.remainingPacks ?? null;
-    const averagePackValue = data?.averagePackValue ?? null;
     const marketTotal = metrics.marketTotal || 0;
 
     return (
@@ -78,7 +77,6 @@ export default async function MysteryBagsPage() {
                 cards={cards}
                 bagPrice={bagPrice}
                 remainingPacks={remainingPacks}
-                averagePackValue={averagePackValue}
                 marketTotal={marketTotal}
                 qrCodes={qrCodes}
             />

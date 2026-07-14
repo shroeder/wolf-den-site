@@ -29,7 +29,6 @@ export default function MysteryBagShowcaseClient({
     cards,
     bagPrice,
     remainingPacks = null,
-    averagePackValue = null,
     marketTotal = 0,
     qrCodes = [],
 }) {
@@ -114,10 +113,6 @@ export default function MysteryBagShowcaseClient({
                 <article className="mb2-stat-card">
                     <span>Packs left</span>
                     <strong>{remainingPacks !== null ? remainingPacks.toLocaleString("en-US") : "—"}</strong>
-                </article>
-                <article className="mb2-stat-card">
-                    <span>Avg. value / pack</span>
-                    <strong>{averagePackValue !== null ? formatMoney(averagePackValue) : "—"}</strong>
                 </article>
                 <article className="mb2-stat-card">
                     <span>Current top hit</span>
