@@ -35,9 +35,11 @@ function ContactForm({ offer, productName, onDone }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [sent, setSent] = useState(false);
-    // Who's viewing: a logged-in buyer messages via owned threads; everyone else uses the email path.
+    // Who's viewing: a logged-in buyer messages via owned threads; everyone else is nudged to sign in,
+    // with email kept as an escape hatch behind a small link.
     const [buyer, setBuyer] = useState(null);
     const [authChecked, setAuthChecked] = useState(false);
+    const [showEmail, setShowEmail] = useState(false);
 
     useEffect(() => {
         let alive = true;
@@ -138,8 +140,38 @@ function ContactForm({ offer, productName, onDone }) {
         );
     }
 
+    // Anonymous: lead with sign-in (owned messaging), email tucked behind a link.
+    if (!showEmail) {
+        return (
+            <div className="mkt-contact-signin">
+                <p className="statement-copy" style={{ marginTop: 0 }}>
+                    Sign in to message <strong>{offer.vendor.displayName}</strong> — your conversation and their
+                    replies stay in your account and the app, so nothing gets lost in email.
+                </p>
+                <div className="btn-row">
+                    <Link className="button primary" href="/marketplace/login">Sign in to message</Link>
+                    <Link className="button" href="/marketplace/login">Create an account</Link>
+                </div>
+                <p className="muted" style={{ fontSize: "0.8rem", marginTop: "0.6rem" }}>
+                    Prefer not to?{" "}
+                    <button type="button" className="mkt-linklike" onClick={() => setShowEmail(true)}>
+                        Send a quick email instead
+                    </button>
+                    .
+                </p>
+            </div>
+        );
+    }
+
     return (
         <form className="contact-form mkt-contact-form" onSubmit={submitEmail}>
+            <p className="muted" style={{ marginTop: 0, fontSize: "0.8rem" }}>
+                Emailing {offer.vendor.displayName}.{" "}
+                <button type="button" className="mkt-linklike" onClick={() => setShowEmail(false)}>
+                    Sign in to message instead
+                </button>{" "}
+                to keep replies in your account.
+            </p>
             <label htmlFor={`mkt-name-${offer.listingId}`}>Your name</label>
             <input
                 id={`mkt-name-${offer.listingId}`}
@@ -168,9 +200,6 @@ function ContactForm({ offer, productName, onDone }) {
                 {submitting ? "Sending..." : `Send to ${offer.vendor.displayName}`}
             </button>
             {error ? <p className="muted">{error}</p> : null}
-            <p className="muted" style={{ fontSize: "0.8rem" }}>
-                Have an account? <Link href="/marketplace/login">Sign in</Link> to message {offer.vendor.displayName} and track replies in your account.
-            </p>
         </form>
     );
 }

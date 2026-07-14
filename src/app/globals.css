@@ -5007,6 +5007,17 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 1rem;
 }
 
+/* Inline link-styled button (e.g. the "email instead" escape hatch in vendor contact). */
+.mkt-linklike {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent-hover, #b45309);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
 /* Per-card game badge so you can tell Pokémon from Yu-Gi-Oh from Magic at a glance. */
 .mkt-game-tag {
     display: inline-block;
