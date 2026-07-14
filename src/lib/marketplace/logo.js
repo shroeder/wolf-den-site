@@ -35,6 +35,27 @@ export async function uploadVendorLogo(file) {
     return blob.url;
 }
 
+// User avatar — same raster-only rules, stored under a separate prefix. Returns the blob URL.
+export async function uploadAvatar(file) {
+    if (!file || typeof file.arrayBuffer !== "function") {
+        throw new Error("No image file was provided.");
+    }
+    const type = (file.type || "").toLowerCase();
+    const ext = ALLOWED_TYPES.get(type);
+    if (!ext) {
+        throw new Error("Avatar must be a PNG, JPG, or WEBP image.");
+    }
+    if (file.size > MAX_BYTES) {
+        throw new Error("Avatar must be under 8 MB.");
+    }
+    const blob = await put(`marketplace/avatars/avatar.${ext}`, file, {
+        access: "public",
+        addRandomSuffix: true,
+        contentType: type,
+    });
+    return blob.url;
+}
+
 // Event cover image — same raster-only rules, stored under a separate prefix. Returns the blob URL.
 export async function uploadEventImage(file) {
     if (!file || typeof file.arrayBuffer !== "function") {

@@ -5007,6 +5007,66 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 1rem;
 }
 
+/* --- First-class user profiles: avatar, badges, profile header --- */
+.user-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(135deg, #3a3a3a, #1e1e1e);
+    color: var(--ink);
+    font-weight: 700;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.user-avatar-lg {
+    width: 88px;
+    height: 88px;
+    font-size: 2rem;
+}
+.user-avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+}
+.user-profile-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.user-profile-meta h1 {
+    margin: 0 0 0.15rem;
+}
+.user-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+.user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    padding: 0.14rem 0.55rem;
+    border-radius: 999px;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+    white-space: nowrap;
+}
+.user-badge-icon {
+    font-size: 0.85rem;
+}
+
 /* Inline link-styled button (e.g. the "email instead" escape hatch in vendor contact). */
 .mkt-linklike {
     background: none;

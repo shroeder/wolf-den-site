@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 // Buyer-side web messages inbox + thread view (mirrors the vendor portal MessagesPanel, role=buyer).
@@ -84,7 +85,10 @@ export default function MarketplaceMessagesClient({ buyerName = null }) {
                         <h1>Messages</h1>
                         <p className="muted">Your conversations with vendors{buyerName ? ` · ${buyerName}` : ""}.</p>
                     </div>
-                    <button type="button" className="pill" onClick={signOut}>Sign out</button>
+                    <div className="btn-row">
+                        <Link className="pill" href="/marketplace/profile">Your profile</Link>
+                        <button type="button" className="pill" onClick={signOut}>Sign out</button>
+                    </div>
                 </div>
 
                 {threads == null ? (
