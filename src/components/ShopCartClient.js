@@ -261,17 +261,19 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // Live rates only need the destination ADDRESS — not name/email/phone. Gate the rate lookup on just
     // the address so entering it shows real shipping right away; name/email/phone are still required to
     // place the order (they gate the pay button below), just not to price shipping.
-    const isShippingAddressReady = useMemo(() => {
-        if (fulfillmentMode !== "shipping") return false;
-        const state = String(normalizedShipping.state || "").trim().toUpperCase();
-        const zip = String(normalizedShipping.postalCode || "").trim();
-        return (
-            Boolean(String(normalizedShipping.addressLine1 || "").trim()) &&
-            Boolean(String(normalizedShipping.city || "").trim()) &&
-            /^[A-Z]{2}$/.test(state) &&
-            /^\d{5}(?:-\d{4})?$/.test(zip)
-        );
+    // Which address fields still block a rate quote. Named explicitly because a phone's saved-address
+    // autofill can't populate the custom State dropdown, so people fill everything else and don't
+    // realize State (or ZIP) is still missing.
+    const missingAddressFields = useMemo(() => {
+        if (fulfillmentMode !== "shipping") return [];
+        const out = [];
+        if (!String(normalizedShipping.addressLine1 || "").trim()) out.push("street address");
+        if (!String(normalizedShipping.city || "").trim()) out.push("city");
+        if (!/^[A-Z]{2}$/.test(String(normalizedShipping.state || "").trim().toUpperCase())) out.push("state");
+        if (!/^\d{5}(?:-\d{4})?$/.test(String(normalizedShipping.postalCode || "").trim())) out.push("ZIP code");
+        return out;
     }, [fulfillmentMode, normalizedShipping]);
+    const isShippingAddressReady = fulfillmentMode === "shipping" && missingAddressFields.length === 0;
     // Pickup needs a name so the owner can match the person to their order at the counter.
     const isPickupReady = fulfillmentMode === "pickup" && pickupName.trim().length >= 2;
     const isFulfillmentReady = isPickupReady || isShippingReady;
@@ -976,7 +978,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 ) : null}
 
                                 {fulfillmentMode === "shipping" && !isShippingAddressReady ? (
-                                    <p className="secondary">Enter your full shipping address (street, city, state, ZIP) to see live shipping rates.</p>
+                                    <p className="secondary">Still needed to calculate shipping: {missingAddressFields.join(", ")}.</p>
                                 ) : null}
 
                                 {fulfillmentMode === "shipping" && isShippingAddressReady ? (
