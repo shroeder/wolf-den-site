@@ -5007,6 +5007,31 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-top: 1rem;
 }
 
+/* Per-card game badge so you can tell Pokémon from Yu-Gi-Oh from Magic at a glance. */
+.mkt-game-tag {
+    display: inline-block;
+    font-size: 0.58rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.42rem;
+    border-radius: 999px;
+    margin-bottom: 0.28rem;
+    color: #1a1a1a;
+    background: #cbd5e1;
+    white-space: nowrap;
+}
+.mkt-game-pokemon,
+.mkt-game-pokemon-japan { background: #ffd75e; color: #4a3b00; }
+.mkt-game-magic { background: #e6a866; color: #3a2200; }
+.mkt-game-yugioh { background: #bda0f2; color: #2a1247; }
+.mkt-game-lorcana { background: #7ee0d0; color: #05403a; }
+.mkt-game-one-piece { background: #f39191; color: #4a0000; }
+.mkt-game-digimon { background: #86c4ff; color: #062a4a; }
+.mkt-game-dragon-ball-fusion { background: #ffb066; color: #4a2600; }
+.mkt-game-star-wars-unlimited { background: #9fb0c4; color: #0d1a29; }
+.mkt-game-flesh-and-blood { background: #e88f8f; color: #3a0000; }
+
 /* Vendor storefront filter/sort bar (search + set + condition + sort). */
 .mkt-filter-bar {
     display: flex;

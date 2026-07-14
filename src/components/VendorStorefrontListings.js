@@ -28,6 +28,26 @@ function formatPrice(value) {
     return value === null || value === undefined ? null : priceFormatter.format(Number(value));
 }
 
+// Compact game labels for the per-card badge (the full names get long, e.g. "Magic: The Gathering").
+const SHORT_GAME = {
+    magic: "Magic",
+    pokemon: "Pokémon",
+    "pokemon-japan": "Pokémon JP",
+    yugioh: "Yu-Gi-Oh!",
+    lorcana: "Lorcana",
+    "one-piece": "One Piece",
+    "flesh-and-blood": "Flesh & Blood",
+    digimon: "Digimon",
+    "dragon-ball-fusion": "Dragon Ball",
+    "star-wars-unlimited": "Star Wars",
+    "final-fantasy": "Final Fantasy",
+    gundam: "Gundam",
+    "union-arena": "Union Arena",
+};
+function shortGameLabel(slug) {
+    return SHORT_GAME[slug] || gameLabel(slug);
+}
+
 // The value the condition filter matches on: graded cards collapse to "GRADED", everything else uses
 // its raw condition code (NM/LP/MP/HP/DMG).
 function listingCondition(listing) {
@@ -60,6 +80,9 @@ function ListingTile({ listing }) {
                 )}
             </div>
             <div className="mkt-card-body">
+                {listing.game ? (
+                    <span className={`mkt-game-tag mkt-game-${listing.game}`}>{shortGameLabel(listing.game)}</span>
+                ) : null}
                 <h3 className="mkt-card-name">{listing.title}</h3>
                 <p className="mkt-card-meta">
                     {listing.setName || (listing.kind === "sealed" ? "Sealed" : "Single")}
