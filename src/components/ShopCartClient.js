@@ -770,7 +770,17 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 </div>
                                 <div className="cart-line-main">
                                     <h3>{item.name}</h3>
-                                    <p className="secondary">{formatMoney(item.priceCents)} each</p>
+                                    <p className="secondary">
+                                        {item.isDiscounted ? (
+                                            <>
+                                                <span className="shop-price-was">{formatMoney(item.originalPriceCents)}</span>{" "}
+                                                <span className="shop-price-now">{formatMoney(item.priceCents)}</span> each{" "}
+                                                <span className="shop-price-badge">10% off</span>
+                                            </>
+                                        ) : (
+                                            `${formatMoney(item.priceCents)} each`
+                                        )}
+                                    </p>
                                     {item.unavailable && (
                                         <p className="shop-payment-error">Availability changed. Update quantity to continue.</p>
                                     )}

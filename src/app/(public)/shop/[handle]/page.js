@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getInventoryItem } from "@/lib/inventory-feed/feed";
 import { productHandle, variationIdFromHandle } from "@/lib/inventory-feed/product-url";
 import { SITE_URL } from "@/lib/site";
+import { computeShopPricingDollars, isSingleName } from "@/lib/single-discount";
 
 // Regenerate each product's static HTML at most every 30 min (inventory reconcile runs ~every 15).
 export const revalidate = 1800;
@@ -54,6 +55,11 @@ export default async function ShopProductPage({ params }) {
 
     const url = `${SITE_URL}/shop/${productHandle(item.name, item.variationId)}`;
 
+    // Online singles promo: 10% off singles over $100. The online price (and the structured-data offer)
+    // reflect the discounted amount; the strikethrough shows the original.
+    const pricing = item.price != null ? computeShopPricingDollars(item.name, item.price) : null;
+    const isSingle = isSingleName(item.name);
+
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",
@@ -64,7 +70,7 @@ export default async function ShopProductPage({ params }) {
             ? {
                   offers: {
                       "@type": "Offer",
-                      price: item.price.toFixed(2),
+                      price: (pricing?.priceDollars ?? item.price).toFixed(2),
                       priceCurrency: "USD",
                       availability: item.inStock
                           ? "https://schema.org/InStock"
@@ -98,7 +104,15 @@ export default async function ShopProductPage({ params }) {
                         )}
                         {item.price != null && (
                             <p className="mkt-market-price">
-                                <strong>{currency.format(item.price)}</strong>
+                                {pricing?.isDiscounted ? (
+                                    <>
+                                        <span className="shop-price-was">{currency.format(pricing.originalDollars)}</span>{" "}
+                                        <strong className="shop-price-now">{currency.format(pricing.priceDollars)}</strong>{" "}
+                                        <span className="shop-price-badge">10% off online</span>
+                                    </>
+                                ) : (
+                                    <strong>{currency.format(item.price)}</strong>
+                                )}
                             </p>
                         )}
                         <p className="muted">
@@ -106,6 +120,12 @@ export default async function ShopProductPage({ params }) {
                                 ? `In stock${item.quantity > 1 ? ` · ${item.quantity} available` : ""} at our Montgomery, MN store`
                                 : "Currently out of stock"}
                         </p>
+                        {isSingle && (
+                            <p className="muted" style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>
+                                Condition is graded in-house to the best of our ability; the image is
+                                representative and minor wear consistent with the listed grade may be present.
+                            </p>
+                        )}
                         <div className="cta-row">
                             <a className="button primary" href="tel:+17014090782">
                                 Call: (701) 409-0782

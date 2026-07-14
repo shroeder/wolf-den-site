@@ -3,6 +3,7 @@ import "server-only";
 import { calculateOnlineFeeCents, getShopSalesTaxRate, listShopInventory, toPriceCents } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
+import { computeShopPricing } from "@/lib/single-discount";
 import {
     getExistingCartId,
     setShopCartId,
@@ -247,7 +248,11 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
             continue;
         }
 
-        const priceCents = toPriceCents(inventoryItem.price);
+        const fullPriceCents = toPriceCents(inventoryItem.price);
+        // Online-only promo: 10% off singles over $100. Applied here so the charged amount, tax, and
+        // order record all use the discounted price automatically (checkout derives its total from this).
+        const pricing = computeShopPricing(inventoryItem.name, fullPriceCents);
+        const priceCents = pricing.priceCents;
         const maxQuantity = Math.max(0, Number(inventoryItem.quantity || 0));
 
         if (maxQuantity < quantity || maxQuantity < 1) {
@@ -269,6 +274,8 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
             unavailable: maxQuantity < quantity || maxQuantity < 1,
             lineTotalCents,
             priceCents,
+            originalPriceCents: pricing.originalCents,
+            isDiscounted: pricing.isDiscounted,
         });
     }
 
