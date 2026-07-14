@@ -276,19 +276,39 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const isPickupReady = fulfillmentMode === "pickup" && pickupName.trim().length >= 2;
     const isFulfillmentReady = isPickupReady || isShippingReady;
 
-    // When EasyPost returns live rates, the buyer must pick one and the totals use that rate;
-    // otherwise the flat shipping from the server cart applies.
+    // When EasyPost returns live rates, the buyer must pick one and the totals use that rate.
     const selectedRate = shipRates.options.find((rate) => rate.id === selectedRateId) || null;
     const usingCalculatedShipping = shipRates.enabled && fulfillmentMode === "shipping";
     const baseCents = cartData.subtotalCents + cartData.onlineFeeCents + cartData.taxCents;
-    const displayShippingCents = fulfillmentMode !== "shipping"
-        ? 0
-        : usingCalculatedShipping
-            ? (selectedRate ? selectedRate.amountCents : null)
-            : cartData.shippingCents;
-    const displayTotalCents = usingCalculatedShipping
-        ? baseCents + (selectedRate ? selectedRate.amountCents : 0)
-        : cartData.totalCents;
+
+    // Be honest about shipping: don't show a flat number or "FREE" as if it were final before we've
+    // actually priced it from the address. It's "pending" until either a live rate is picked, or (only
+    // when EasyPost isn't returning rates at all) the server flat rate legitimately applies.
+    const isPickup = fulfillmentMode === "pickup";
+    let displayShippingCents;
+    let shippingPending;
+    if (isPickup) {
+        displayShippingCents = 0;
+        shippingPending = false;
+    } else if (fulfillmentMode === "shipping") {
+        if (usingCalculatedShipping) {
+            displayShippingCents = selectedRate ? selectedRate.amountCents : null;
+            shippingPending = !selectedRate;
+        } else if (!isShippingAddressReady || ratesLoading) {
+            displayShippingCents = null;
+            shippingPending = true; // haven't entered/priced the address yet
+        } else {
+            // Address entered, rating finished, but no live rates came back — EasyPost unavailable, so
+            // the server's flat rate is the real, applicable shipping (not a false "free").
+            displayShippingCents = cartData.shippingCents;
+            shippingPending = false;
+        }
+    } else {
+        displayShippingCents = 0;
+        shippingPending = false;
+    }
+    const shippingKnown = !shippingPending;
+    const displayTotalCents = shippingKnown ? baseCents + (displayShippingCents || 0) : null;
 
     const canSubmitCheckout = Boolean(
         checkoutCardState === "ready"
@@ -1003,16 +1023,21 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 <p>
                                     <span>Shipping</span>
                                     <strong>
-                                        {displayShippingCents === null
-                                            ? "Select an option"
-                                            : displayShippingCents
-                                                ? formatMoney(displayShippingCents)
-                                                : "FREE"}
+                                        {shippingPending
+                                            ? (!isShippingAddressReady
+                                                ? "Enter address"
+                                                : ratesLoading
+                                                    ? "Calculating…"
+                                                    : "Select an option")
+                                            : (displayShippingCents ? formatMoney(displayShippingCents) : "FREE")}
                                     </strong>
                                 </p>
                             ) : null}
                             <p><span>Online fee (3.5%)</span><strong>{formatMoney(cartData.onlineFeeCents)}</strong></p>
-                            <p className="shop-payment-total"><span>Total</span><strong>{formatMoney(displayTotalCents)}</strong></p>
+                            <p className="shop-payment-total">
+                                <span>Total</span>
+                                <strong>{displayTotalCents !== null ? formatMoney(displayTotalCents) : `${formatMoney(baseCents)} + shipping`}</strong>
+                            </p>
                         </div>
 
                         {!missingSquareConfig && checkoutCardState !== "error" && (
@@ -1032,10 +1057,19 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             disabled={!canSubmitCheckout || redirecting}
                             onClick={handleCheckout}
                         >
-                            {redirecting ? "Payment complete…" : checkoutBusy ? "Processing..." : `Pay ${formatMoney(cartData.totalCents)}`}
+                            {redirecting
+                                ? "Payment complete…"
+                                : checkoutBusy
+                                    ? "Processing..."
+                                    : displayTotalCents !== null
+                                        ? `Pay ${formatMoney(displayTotalCents)}`
+                                        : "Complete order details"}
                         </button>
                         {!hasFulfillmentChoice ? <p className="secondary">Select shipping or pickup to enable payment.</p> : null}
-                        {fulfillmentMode === "shipping" && !isShippingReady ? <p className="secondary">Complete shipping fields to enable payment.</p> : null}
+                        {fulfillmentMode === "shipping" && !isShippingReady ? <p className="secondary">Complete all shipping fields (name, email, phone, and address) to continue.</p> : null}
+                        {fulfillmentMode === "shipping" && isShippingReady && usingCalculatedShipping && !selectedRate ? <p className="secondary">Choose a shipping option above.</p> : null}
+                        {fulfillmentMode === "shipping" && isShippingReady && shippingPending && !usingCalculatedShipping ? <p className="secondary">Calculating shipping — one moment.</p> : null}
+                        {isFulfillmentReady && checkoutCardState !== "ready" && !missingSquareConfig ? <p className="secondary">Enter your card details to pay.</p> : null}
                         <p className="secondary" style={{ fontSize: "0.75rem", marginTop: "0.5rem", opacity: 0.8 }}>
                             All sales are final. By paying, you agree your order is confirmed and payment is captured.
                             You may request a cancellation from <Link href="/shop/orders">My Orders</Link>, but approvals
@@ -1049,7 +1083,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 <div className="shop-payment-mobile-bar" aria-live="polite">
                     <div className="shop-payment-mobile-meta">
                         <p className="shop-payment-mobile-total-label">Total</p>
-                        <strong className="shop-payment-mobile-total-value">{formatMoney(cartData.totalCents)}</strong>
+                        <strong className="shop-payment-mobile-total-value">
+                            {displayTotalCents !== null ? formatMoney(displayTotalCents) : `${formatMoney(baseCents)} + ship`}
+                        </strong>
                     </div>
                     <button
                         type="button"

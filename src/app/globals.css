@@ -2501,6 +2501,26 @@ textarea {
     width: 100%;
 }
 
+/* A disabled pay button must LOOK disabled — otherwise it reads as clickable while the form/payment
+   is incomplete. Grey it out, drop the emphasis, and show a not-allowed cursor. */
+.button.primary:disabled,
+.button.primary[disabled],
+.shop-payment-submit:disabled,
+.shop-payment-submit[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
+    box-shadow: none;
+    transform: none;
+}
+
+.button.primary:disabled:hover,
+.shop-payment-submit:disabled:hover {
+    opacity: 0.45;
+    transform: none;
+    box-shadow: none;
+}
+
 .shop-payment-submit-mobile {
     display: none;
 }
