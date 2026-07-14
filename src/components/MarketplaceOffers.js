@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -35,37 +35,53 @@ function ContactForm({ offer, productName, onDone }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [sent, setSent] = useState(false);
+    // Who's viewing: a logged-in buyer messages via owned threads; everyone else uses the email path.
+    const [buyer, setBuyer] = useState(null);
+    const [authChecked, setAuthChecked] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        fetch("/api/marketplace/auth/me", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+                if (!alive) return;
+                setBuyer(d && d.role === "buyer" ? d.buyer : null);
+                setAuthChecked(true);
+            })
+            .catch(() => {
+                if (alive) setAuthChecked(true);
+            });
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     if (sent) {
-        return (
+        return buyer ? (
+            <p className="statement-copy">
+                Sent to {offer.vendor.displayName}. Their reply will land in{" "}
+                <Link href="/marketplace/messages">your Messages</Link>.
+            </p>
+        ) : (
             <p className="statement-copy">
                 Sent! {offer.vendor.displayName} will get your message and can reply straight to your email.
             </p>
         );
     }
 
-    async function submit(event) {
+    // Logged-in buyer → start/continue an owned thread with the vendor.
+    async function submitMessage(event) {
         event.preventDefault();
         setSubmitting(true);
         setError("");
-
         try {
-            const response = await fetch("/api/marketplace/contact", {
+            const response = await fetch("/api/marketplace/threads", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    listingId: offer.listingId,
-                    buyerName: name,
-                    buyerEmail: email,
-                    message,
-                }),
+                body: JSON.stringify({ as: "buyer", listingId: offer.listingId, message }),
             });
             const data = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                throw new Error(data?.error || "Could not send your message.");
-            }
-
+            if (!response.ok) throw new Error(data?.error || "Could not send your message.");
             setSent(true);
             if (onDone) onDone();
         } catch (err) {
@@ -75,8 +91,55 @@ function ContactForm({ offer, productName, onDone }) {
         }
     }
 
+    // Anonymous visitor → email hand-off (creates a contact request the vendor replies to by email).
+    async function submitEmail(event) {
+        event.preventDefault();
+        setSubmitting(true);
+        setError("");
+        try {
+            const response = await fetch("/api/marketplace/contact", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ listingId: offer.listingId, buyerName: name, buyerEmail: email, message }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || "Could not send your message.");
+            setSent(true);
+            if (onDone) onDone();
+        } catch (err) {
+            setError(err?.message || "Could not send your message.");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    if (!authChecked) {
+        return <p className="muted">Loading…</p>;
+    }
+
+    if (buyer) {
+        return (
+            <form className="contact-form mkt-contact-form" onSubmit={submitMessage}>
+                <p className="muted" style={{ marginTop: 0 }}>
+                    Messaging as <strong>{buyer.displayName || buyer.name || buyer.email}</strong> — replies show up in your Messages.
+                </p>
+                <label htmlFor={`mkt-msg-${offer.listingId}`}>Message</label>
+                <textarea
+                    id={`mkt-msg-${offer.listingId}`}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={3}
+                />
+                <button className="button primary" type="submit" disabled={submitting}>
+                    {submitting ? "Sending..." : `Message ${offer.vendor.displayName}`}
+                </button>
+                {error ? <p className="muted">{error}</p> : null}
+            </form>
+        );
+    }
+
     return (
-        <form className="contact-form mkt-contact-form" onSubmit={submit}>
+        <form className="contact-form mkt-contact-form" onSubmit={submitEmail}>
             <label htmlFor={`mkt-name-${offer.listingId}`}>Your name</label>
             <input
                 id={`mkt-name-${offer.listingId}`}
@@ -105,6 +168,9 @@ function ContactForm({ offer, productName, onDone }) {
                 {submitting ? "Sending..." : `Send to ${offer.vendor.displayName}`}
             </button>
             {error ? <p className="muted">{error}</p> : null}
+            <p className="muted" style={{ fontSize: "0.8rem" }}>
+                Have an account? <Link href="/marketplace/login">Sign in</Link> to message {offer.vendor.displayName} and track replies in your account.
+            </p>
         </form>
     );
 }
