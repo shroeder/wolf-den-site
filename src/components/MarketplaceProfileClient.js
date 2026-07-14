@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import UserBadges from "@/components/UserBadges";
+import UserLevel from "@/components/UserLevel";
 
 export default function MarketplaceProfileClient() {
     const [loading, setLoading] = useState(true);
@@ -13,6 +14,7 @@ export default function MarketplaceProfileClient() {
     const [alias, setAlias] = useState("");
     const [avatarUrl, setAvatarUrl] = useState(null);
     const [badges, setBadges] = useState([]);
+    const [level, setLevel] = useState(null);
     const [savedAlias, setSavedAlias] = useState("");
     const [aliasState, setAliasState] = useState({ checking: false, ok: null, reason: null });
     const [saving, setSaving] = useState(false);
@@ -36,6 +38,7 @@ export default function MarketplaceProfileClient() {
                     setSavedAlias(b.alias || "");
                     setAvatarUrl(b.avatarUrl || null);
                     setBadges(b.badges || []);
+                    setLevel(b.level || null);
                 }
                 setLoading(false);
             })
@@ -143,6 +146,7 @@ export default function MarketplaceProfileClient() {
                 </div>
                 <div className="user-profile-meta">
                     <UserBadges badges={badges} />
+                    <UserLevel level={level} />
                     <div className="btn-row" style={{ marginTop: "0.5rem" }}>
                         <button type="button" className="button" disabled={uploading} onClick={() => fileRef.current?.click()}>
                             {uploading ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}

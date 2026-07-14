@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import UserBadges from "@/components/UserBadges";
+import UserLevel from "@/components/UserLevel";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const runtime = "nodejs";
@@ -44,6 +45,7 @@ export default async function UserProfilePage({ params }) {
                         <h1>{profile.displayLabel}</h1>
                         {profile.alias ? <p className="muted">@{profile.alias}</p> : null}
                         <UserBadges badges={profile.badges} />
+                        <UserLevel level={profile.level} />
                     </div>
                 </div>
             </section>

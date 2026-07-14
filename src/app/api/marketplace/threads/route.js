@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { sendNewMessageEmail } from "@/lib/marketplace/email.js";
 import { getThreadParties, isOwnerStorefront, listThreadsForBuyer, listThreadsForVendor, startThread } from "@/lib/marketplace/messaging.js";
 import { sendAdminPush } from "@/lib/push/send.js";
+import { awardXp, dailyKey } from "@/lib/marketplace/xp.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { getBuyOrderById } from "@/lib/marketplace/wants.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -111,6 +112,10 @@ export async function POST(request) {
             const { threadId } = await startThread({ buyerId, vendorId, sender: as, body: message, subject, listingId, catalogProductId });
             logger.info("marketplace.thread.started", { threadId, as });
             after(() => nudge(threadId, as, message));
+            // Loyalty XP for a buyer messaging (once per thread per day, so it can't be farmed).
+            if (as === "buyer" && buyerId) {
+                after(() => awardXp(buyerId, "message", { dedupeKey: dailyKey("message", buyerId, threadId), meta: { threadId } }));
+            }
             return NextResponse.json({ threadId });
         } catch (error) {
             return internalError(error, { event: "marketplace.threads.start.failure" });

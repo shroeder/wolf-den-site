@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
 // (alias), an avatar, and admin-curated badges. Levels/XP arrive in a later phase.
@@ -63,6 +64,7 @@ function mapProfile(row, badges = []) {
         // A friendly label for UI: full name, else alias, else the email local-part.
         displayLabel: fullName || row.alias || row.display_name || (row.email ? String(row.email).split("@")[0] : "Member"),
         badges,
+        level: levelForXp(row.xp || 0),
     };
 }
 
@@ -70,7 +72,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, display_name, first_name, last_name, alias, avatar_url
+        `SELECT id, email, display_name, first_name, last_name, alias, avatar_url, xp
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -83,7 +85,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

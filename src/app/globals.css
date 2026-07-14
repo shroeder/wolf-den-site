@@ -5067,6 +5067,44 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 0.85rem;
 }
 
+/* XP level badge + progress-to-next bar. */
+.user-level {
+    margin-top: 0.5rem;
+    max-width: 320px;
+}
+.user-level-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+.user-level-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #1a1400;
+    background: linear-gradient(135deg, #ffd75e, #c8a24a);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+}
+.user-level-xp {
+    font-size: 0.75rem;
+}
+.user-level-bar {
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+.user-level-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    transition: width 0.4s ease;
+}
+
 /* Inline link-styled button (e.g. the "email instead" escape hatch in vendor contact). */
 .mkt-linklike {
     background: none;
