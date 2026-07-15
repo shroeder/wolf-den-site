@@ -45,7 +45,7 @@ export default async function HomePage() {
                     <p>{justInCountLabel} Be first to grab them before someone else does.</p>
                 </div>
                 <div className="just-in-cta-actions">
-                    <Link className="button primary" href="/just-in">
+                    <Link className="button primary" href="/shop">
                         See What&apos;s New
                     </Link>
                     <Link className="button" href="/shop">

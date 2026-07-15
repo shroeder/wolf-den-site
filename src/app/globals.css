@@ -624,6 +624,32 @@ main.content {
     margin: 0;
     color: var(--ink-secondary, #b9b4c7);
 }
+
+/* Mobile web: keep the top bar to one clean line, and drop the full-screen hero logo. */
+@media (max-width: 700px) {
+    .top-row {
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+    }
+    .top-left,
+    .top-right {
+        gap: 0.5rem;
+        flex-wrap: nowrap;
+    }
+    .top-left {
+        min-width: 0;
+    }
+    /* Secondary controls move out of the cramped mobile bar (still in footer / menu / dock). */
+    .top-sep,
+    .nav-discord,
+    .nav-inbox,
+    .tv-toggle {
+        display: none;
+    }
+    .hero-logo {
+        display: none;
+    }
+}
 @media (max-width: 560px) {
     .account-hub-fields {
         grid-template-columns: 1fr;
