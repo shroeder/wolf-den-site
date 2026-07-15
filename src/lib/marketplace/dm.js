@@ -15,11 +15,11 @@ function pair(a, b) {
 
 function mapUser(row) {
     if (!row) return null;
-    const name = `${row.first_name || ""} ${row.last_name || ""}`.trim();
     return {
         id: row.id,
         alias: row.alias || null,
-        displayLabel: name || row.alias || row.display_name || "Member",
+        // Public label — never the real first/last name (private). Handle / chosen display name only.
+        displayLabel: row.display_name || row.alias || "Member",
         avatarUrl: row.avatar_url || null,
         level: levelForXp(row.xp || 0).level,
     };

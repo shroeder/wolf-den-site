@@ -9,17 +9,17 @@ import { levelForXp } from "@/lib/marketplace/xp.js";
 
 function mapUser(row) {
     if (!row) return null;
-    const name = `${row.first_name || ""} ${row.last_name || ""}`.trim();
     return {
         id: row.id,
         alias: row.alias || null,
-        displayLabel: name || row.alias || row.display_name || "Member",
+        // Public label — never the real first/last name (private). Handle / chosen display name only.
+        displayLabel: row.display_name || row.alias || "Member",
         avatarUrl: row.avatar_url || null,
         level: levelForXp(row.xp || 0).level,
     };
 }
 
-const USER_COLS = "id, alias, first_name, last_name, display_name, avatar_url, xp";
+const USER_COLS = "id, alias, display_name, avatar_url, xp";
 
 // Search members to add (by @handle or name). Excludes self. Annotates the relationship so the UI can
 // show "Add" / "Requested" / "Friends" / "Respond".
@@ -27,11 +27,13 @@ export async function searchUsers(query, viewerId, limit = 15) {
     const q = String(query || "").trim();
     if (q.length < 2) return [];
     const like = `%${q.replace(/[%_]/g, "\\$&").toLowerCase()}%`;
+    // Search by @handle or chosen display name only — NOT real first/last name, so members can't be
+    // enumerated/confirmed by legal name.
     const rows = await db
         .query(
             `SELECT ${USER_COLS} FROM mkt_buyer
               WHERE id <> $2 AND alias IS NOT NULL
-                AND (LOWER(alias) LIKE $1 OR LOWER(COALESCE(first_name,'') || ' ' || COALESCE(last_name,'')) LIKE $1)
+                AND (LOWER(alias) LIKE $1 OR LOWER(COALESCE(display_name,'')) LIKE $1)
               ORDER BY xp DESC LIMIT $3`,
             [like, viewerId, limit]
         )

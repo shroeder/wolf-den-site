@@ -77,8 +77,10 @@ function mapProfile(row, badges = []) {
         fullName: fullName || null,
         alias: row.alias || null,
         avatarUrl: row.avatar_url || null,
-        // A friendly label for UI: full name, else alias, else the email local-part.
-        displayLabel: fullName || row.alias || row.display_name || (row.email ? String(row.email).split("@")[0] : "Member"),
+        // PUBLIC identity — never the real first/last name (those are private). Prefer the chosen
+        // display name, then the @handle. Real name only ever goes to the account owner (firstName/
+        // lastName/fullName fields below), never into a cross-user label.
+        displayLabel: row.display_name || row.alias || (row.email ? String(row.email).split("@")[0] : "Member"),
         badges,
         level: levelForXp(row.xp || 0),
         discordLinked: Boolean(row.discord_user_id),
@@ -129,8 +131,12 @@ export async function getPublicProfileByAlias(alias) {
     );
     if (!row) return null;
     const profile = mapProfile(row, await getUserBadges(row.id));
+    // Public view: strip every private field. The @handle / display name is the only public identity.
     delete profile.email;
     delete profile.phone;
+    delete profile.firstName;
+    delete profile.lastName;
+    delete profile.fullName;
     return profile;
 }
 
