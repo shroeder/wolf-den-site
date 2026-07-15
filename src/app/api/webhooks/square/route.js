@@ -110,7 +110,10 @@ async function handlePurchaseLoyalty(payload) {
 
     // Nobody to credit — offer the QR so the customer can claim it on their own phone.
     const claim = await createLoyaltyClaim({ squarePaymentId: payment.id, awardOrderId, amountCents, locationId: payment.location_id });
-    if (claim) await pushLoyaltyClaim({ token: claim.token, amountCents: claim.amountCents });
+    // Push ONLY when the claim is first minted. Square sends payment.created AND payment.updated (and
+    // can repeat payment.updated), and createLoyaltyClaim reuses the existing claim on those retries —
+    // pushing every time is what caused multiple notifications per transaction.
+    if (claim?.isNew) await pushLoyaltyClaim({ token: claim.token, amountCents: claim.amountCents });
     return { handled: true, awarded: false, claimed: Boolean(claim) };
 }
 
