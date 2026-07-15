@@ -231,7 +231,10 @@ export default function MarketplaceProfileClient() {
             ) : discordEnabled ? (
                 <div style={{ marginTop: 14 }}>
                     <a className="button" href="/api/marketplace/discord/start">Link Discord (+50 XP)</a>
-                    <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>Be in our Discord server first, then link to earn the bonus.</p>
+                    <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>
+                        You need to be in the Wolf Den Discord to earn the bonus.{" "}
+                        <a href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">Join the server →</a>
+                    </p>
                 </div>
             ) : null}
         </div>
