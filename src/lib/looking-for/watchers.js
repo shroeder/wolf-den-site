@@ -182,6 +182,24 @@ export async function attachWatcherEmail(watcherId, email) {
     return rawToken;
 }
 
+/**
+ * Attach a signed-in marketplace account to the watcher: use the account's (already-verified) email
+ * and turn alerts on immediately — no double opt-in. Also records buyer_id for provenance.
+ */
+export async function attachWatcherAccount(watcherId, buyer) {
+    await db.query(
+        `UPDATE card_watchers SET
+            email = $2,
+            email_normalized = $3,
+            email_verified = TRUE,
+            buyer_id = $4,
+            verify_token_hash = NULL,
+            updated_at = NOW()
+         WHERE id = $1`,
+        [watcherId, String(buyer.email).trim(), normalizeEmail(buyer.email), buyer.id]
+    );
+}
+
 export async function confirmWatcherEmail(rawToken) {
     if (!rawToken) {
         return null;

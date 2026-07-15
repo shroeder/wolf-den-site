@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -104,13 +105,27 @@ function CardTile({ card, inList, quantity, busy, onAdd, onRemove, onQuantityCha
     );
 }
 
-function EmailCapture({ idSuffix, email, emailVerified, emailInput, onChange, submitting, message, onSubmit, compact }) {
+function EmailCapture({ account, email, emailVerified, submitting, message, onEnable, compact }) {
     if (emailVerified) {
         return (
             <p className="statement-copy">
-                Alerts are on for <strong>{email}</strong>. We&apos;ll email you the moment a card on your list comes
-                into the shop.
+                Alerts are on{email ? <> for <strong>{email}</strong></> : null}. We&apos;ll email you the moment a card on
+                your list comes into the shop.
             </p>
+        );
+    }
+
+    // Account required — no more bare-email capture. Signed out visitors get a signup CTA.
+    if (!account) {
+        return (
+            <>
+                <p>
+                    {compact
+                        ? "Create a free account to get alerted the moment we get a card on your list."
+                        : "Create a free Wolf Den account to turn on restock alerts — we'll email you the moment a card on your list lands in the shop, and your list syncs with the app and your rewards."}
+                </p>
+                <Link href="/marketplace/login?signup=1" className="btn-gold">Create your free account →</Link>
+            </>
         );
     }
 
@@ -118,28 +133,12 @@ function EmailCapture({ idSuffix, email, emailVerified, emailInput, onChange, su
         <>
             <p>
                 {compact
-                    ? "Get an email the moment we get a card on your list — add your address to turn on alerts."
-                    : "Add your email and we'll send a one-click confirmation. After you confirm, you'll get an alert whenever a card on your list shows up in our inventory."}
+                    ? "Turn on alerts for the cards on your list."
+                    : "You're signed in — turn on alerts and we'll email you the moment a card on your list shows up in our inventory."}
             </p>
-            {email ? (
-                <p className="muted">
-                    Pending confirmation for <strong>{email}</strong>. Check your inbox for the link.
-                </p>
-            ) : null}
-            <form className="contact-form" onSubmit={onSubmit}>
-                <label htmlFor={`lf-email-${idSuffix}`}>Email</label>
-                <input
-                    id={`lf-email-${idSuffix}`}
-                    type="email"
-                    value={emailInput}
-                    onChange={onChange}
-                    placeholder="you@example.com"
-                    required
-                />
-                <button className="button primary" type="submit" disabled={submitting}>
-                    {submitting ? "Sending..." : email ? "Resend confirmation" : "Turn on alerts"}
-                </button>
-            </form>
+            <button type="button" className="button primary" disabled={submitting} onClick={onEnable}>
+                {submitting ? "Turning on…" : "Turn on alerts"}
+            </button>
             {message ? <p className="statement-copy">{message}</p> : null}
         </>
     );
@@ -159,8 +158,8 @@ export default function LookingForClient() {
     const [email, setEmail] = useState(null);
     const [emailVerified, setEmailVerified] = useState(false);
     const [pendingCardId, setPendingCardId] = useState(null);
+    const [account, setAccount] = useState(null);
 
-    const [emailInput, setEmailInput] = useState("");
     const [emailSubmitting, setEmailSubmitting] = useState(false);
     const [emailMessage, setEmailMessage] = useState("");
     const [listOpen, setListOpen] = useState(false);
@@ -244,6 +243,26 @@ export default function LookingForClient() {
             ignore = true;
         };
     }, [applyListResponse]);
+
+    // Resolve the signed-in marketplace account — alerts now require one.
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (res.ok) {
+                    const d = await res.json().catch(() => null);
+                    const mail = d?.buyer?.email || d?.account?.email || "";
+                    if (!ignore && mail) setAccount({ email: mail });
+                }
+            } catch {
+                /* signed out */
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     // Load the set list for the "Browse by set" picker whenever the game changes.
     useEffect(() => {
@@ -376,8 +395,7 @@ export default function LookingForClient() {
         }
     }, [applyListResponse]);
 
-    async function submitEmail(event) {
-        event.preventDefault();
+    async function enableAlerts() {
         setEmailSubmitting(true);
         setEmailMessage("");
 
@@ -385,20 +403,19 @@ export default function LookingForClient() {
             const response = await fetch("/api/looking-for/email", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ email: emailInput }),
+                body: "{}",
             });
             const data = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(data?.error || "Could not save your email.");
+                throw new Error(data?.error || "Could not turn on alerts.");
             }
 
             setEmail(data.email);
-            setEmailVerified(false);
-            setEmailInput("");
-            setEmailMessage(data.message || "Check your inbox to confirm.");
+            setEmailVerified(true);
+            setEmailMessage(data.message || "Alerts are on.");
         } catch (error) {
-            setEmailMessage(error?.message || "Could not save your email.");
+            setEmailMessage(error?.message || "Could not turn on alerts.");
         } finally {
             setEmailSubmitting(false);
         }
@@ -418,14 +435,12 @@ export default function LookingForClient() {
             <section className="card lf-alert-cta">
                 <h2>Get an email when we get your cards</h2>
                 <EmailCapture
-                    idSuffix="page"
+                    account={account}
                     email={email}
                     emailVerified={emailVerified}
-                    emailInput={emailInput}
-                    onChange={(event) => setEmailInput(event.target.value)}
                     submitting={emailSubmitting}
                     message={emailMessage}
-                    onSubmit={submitEmail}
+                    onEnable={enableAlerts}
                 />
             </section>
 
@@ -594,14 +609,12 @@ export default function LookingForClient() {
                                 <div className="lf-drawer-alerts">
                                     <h3>{emailVerified ? "Alerts are on" : "Get alerted when we get these"}</h3>
                                     <EmailCapture
-                                        idSuffix="drawer"
+                                        account={account}
                                         email={email}
                                         emailVerified={emailVerified}
-                                        emailInput={emailInput}
-                                        onChange={(event) => setEmailInput(event.target.value)}
                                         submitting={emailSubmitting}
                                         message={emailMessage}
-                                        onSubmit={submitEmail}
+                                        onEnable={enableAlerts}
                                         compact
                                     />
                                 </div>
