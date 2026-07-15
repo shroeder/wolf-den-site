@@ -5511,6 +5511,106 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 /* Friends list rows. */
+/* --- Community / friends directory (tile grid) --- */
+.mkt-social-hero h1 {
+    margin-bottom: 4px;
+}
+.mkt-member-filter {
+    width: 100%;
+    margin-top: 12px;
+}
+.mkt-social-h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+}
+.mkt-count-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.mkt-member-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+    gap: 12px;
+}
+.mkt-member-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 12px;
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    text-align: center;
+    transition: border-color 150ms ease, transform 150ms ease;
+}
+.mkt-member-tile:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    transform: translateY(-2px);
+}
+.mkt-member-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+    text-decoration: none;
+    color: inherit;
+}
+.mkt-member-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1.25rem;
+    flex: 0 0 auto;
+}
+.mkt-member-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.mkt-member-name {
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mkt-member-sub {
+    font-size: 0.78rem;
+    color: var(--muted, #b9b4c7);
+}
+.mkt-member-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 2px;
+}
+.mkt-member-actions .button,
+.mkt-member-actions .btn-gold {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+}
+
 .friend-list {
     list-style: none;
     margin: 0;

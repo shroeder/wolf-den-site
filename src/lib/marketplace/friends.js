@@ -44,6 +44,41 @@ export async function searchUsers(query, viewerId, limit = 15) {
     return withStatus;
 }
 
+// Browseable member directory: every member with a public @handle, newest-strongest first, annotated
+// with the viewer's relation. Optional `q` filters by handle / chosen display name (never real name).
+// Relations are batched into one query (not one per member).
+export async function listMembers(viewerId, { q = "", limit = 60, offset = 0 } = {}) {
+    const query = String(q || "").trim();
+    const params = [viewerId];
+    let where = `id <> $1 AND alias IS NOT NULL`;
+    if (query.length >= 1) {
+        params.push(`%${query.replace(/[%_]/g, "\\$&").toLowerCase()}%`);
+        where += ` AND (LOWER(alias) LIKE $${params.length} OR LOWER(COALESCE(display_name,'')) LIKE $${params.length})`;
+    }
+    params.push(Math.max(1, Math.min(100, limit)));
+    const limIdx = params.length;
+    params.push(Math.max(0, offset));
+    const offIdx = params.length;
+
+    const [rows, rels] = await Promise.all([
+        db.query(
+            `SELECT ${USER_COLS} FROM mkt_buyer WHERE ${where} ORDER BY COALESCE(xp,0) DESC, updated_at DESC LIMIT $${limIdx} OFFSET $${offIdx}`,
+            params
+        ).catch(() => []),
+        db.query(
+            `SELECT requester_id, addressee_id, status FROM mkt_friendship WHERE requester_id = $1 OR addressee_id = $1`,
+            [viewerId]
+        ).catch(() => []),
+    ]);
+
+    const relMap = new Map();
+    for (const f of rels) {
+        const other = f.requester_id === viewerId ? f.addressee_id : f.requester_id;
+        relMap.set(other, f.status === "accepted" ? "friends" : f.requester_id === viewerId ? "outgoing" : "incoming");
+    }
+    return rows.map((r) => ({ ...mapUser(r), relation: relMap.get(r.id) || "none" }));
+}
+
 // Relationship of `otherId` to `viewerId`: none | friends | outgoing (viewer requested) | incoming.
 export async function friendStatus(viewerId, otherId) {
     if (!viewerId || !otherId || viewerId === otherId) return "self";

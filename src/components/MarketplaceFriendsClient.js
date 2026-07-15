@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-function Avatar({ user }) {
+function Avatar({ user, size = 56 }) {
     return (
-        <span className="friend-avatar" aria-hidden="true">
+        <span className="mkt-member-avatar" style={{ width: size, height: size }} aria-hidden="true">
             {user.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={user.avatarUrl} alt="" />
@@ -17,20 +17,25 @@ function Avatar({ user }) {
     );
 }
 
-function UserRow({ user, children }) {
-    return (
-        <li className="friend-row">
+function MemberTile({ user, children }) {
+    const inner = (
+        <>
             <Avatar user={user} />
-            <span className="friend-id">
-                {user.alias ? (
-                    <Link href={`/marketplace/u/${user.alias}`}>{user.displayLabel}</Link>
-                ) : (
-                    <span>{user.displayLabel}</span>
-                )}
-                <span className="muted friend-handle">{user.alias ? `@${user.alias}` : ""} · Lv {user.level}</span>
+            <span className="mkt-member-name">{user.displayLabel}</span>
+            <span className="mkt-member-sub">
+                {user.alias ? `@${user.alias}` : "member"} · Lv {user.level}
             </span>
-            <span className="friend-actions">{children}</span>
-        </li>
+        </>
+    );
+    return (
+        <div className="mkt-member-tile">
+            {user.alias ? (
+                <Link href={`/marketplace/u/${user.alias}`} className="mkt-member-head">{inner}</Link>
+            ) : (
+                <span className="mkt-member-head">{inner}</span>
+            )}
+            <div className="mkt-member-actions">{children}</div>
+        </div>
     );
 }
 
@@ -39,11 +44,10 @@ export default function MarketplaceFriendsClient() {
     const [friends, setFriends] = useState([]);
     const [incoming, setIncoming] = useState([]);
     const [outgoing, setOutgoing] = useState([]);
+    const [members, setMembers] = useState(null);
     const [query, setQuery] = useState("");
-    const [results, setResults] = useState([]);
-    const [searching, setSearching] = useState(false);
     const [busyId, setBusyId] = useState(null);
-    const searchSeq = useRef(0);
+    const seq = useRef(0);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/friends", { cache: "no-store" }).catch(() => null);
@@ -55,41 +59,25 @@ export default function MarketplaceFriendsClient() {
         }
     }, []);
 
+    const loadMembers = useCallback(async (q) => {
+        const mine = ++seq.current;
+        const r = await fetch(`/api/marketplace/members?q=${encodeURIComponent(q || "")}`, { cache: "no-store" }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        if (mine === seq.current) setMembers(d?.members || []);
+    }, []);
+
     useEffect(() => {
-        load();
+        (async () => { await load(); })();
     }, [load]);
 
-    // Debounced search.
+    // Debounced directory filter.
     useEffect(() => {
-        const q = query.trim();
-        if (q.length < 2) {
-            setResults([]);
-            setSearching(false);
-            return;
-        }
-        setSearching(true);
-        const seq = ++searchSeq.current;
-        const t = setTimeout(async () => {
-            const r = await fetch(`/api/marketplace/users/search?q=${encodeURIComponent(q)}`, { cache: "no-store" }).catch(() => null);
-            const d = r && r.ok ? await r.json().catch(() => null) : null;
-            if (seq === searchSeq.current) {
-                setResults(d?.results || []);
-                setSearching(false);
-            }
-        }, 300);
+        const t = setTimeout(() => loadMembers(query.trim()), query.trim() ? 250 : 0);
         return () => clearTimeout(t);
-    }, [query]);
+    }, [query, loadMembers]);
 
     async function refreshAll() {
-        await Promise.all([load(), refreshSearch()]);
-    }
-
-    async function refreshSearch() {
-        const q = query.trim();
-        if (q.length < 2) return;
-        const r = await fetch(`/api/marketplace/users/search?q=${encodeURIComponent(q)}`, { cache: "no-store" }).catch(() => null);
-        const d = r && r.ok ? await r.json().catch(() => null) : null;
-        if (d) setResults(d.results || []);
+        await Promise.all([load(), loadMembers(query.trim())]);
     }
 
     async function addFriend(userId) {
@@ -103,12 +91,23 @@ export default function MarketplaceFriendsClient() {
         setBusyId(null);
     }
 
-    async function respond(requestId, action, userId) {
-        setBusyId(userId || requestId);
+    async function respond(requestId, action, keyId) {
+        setBusyId(keyId);
         await fetch("/api/marketplace/friends/respond", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action, requestId }),
+        }).catch(() => null);
+        await refreshAll();
+        setBusyId(null);
+    }
+
+    async function removeFriend(userId) {
+        setBusyId(userId);
+        await fetch("/api/marketplace/friends/respond", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "remove", userId }),
         }).catch(() => null);
         await refreshAll();
         setBusyId(null);
@@ -126,92 +125,88 @@ export default function MarketplaceFriendsClient() {
         if (d?.threadId) router.push(`/marketplace/dm/${d.threadId}`);
     }
 
-    async function remove(userId) {
-        setBusyId(userId);
-        await fetch("/api/marketplace/friends/respond", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "remove", userId }),
-        }).catch(() => null);
-        await refreshAll();
-        setBusyId(null);
-    }
-
-    function relationButton(u) {
-        if (u.relation === "friends") return <span className="muted" style={{ fontSize: "0.85rem" }}>✓ Friends</span>;
-        if (u.relation === "outgoing") return <button className="button" disabled onClick={() => {}}>Requested</button>;
-        if (u.relation === "incoming") return <button className="button primary" disabled={busyId === u.id} onClick={() => addFriend(u.id)}>Accept</button>;
-        return <button className="button primary" disabled={busyId === u.id} onClick={() => addFriend(u.id)}>Add</button>;
+    function relationAction(u) {
+        if (u.relation === "friends") {
+            return <button className="btn-gold" disabled={busyId === u.id} onClick={() => message(u.id)}>Message</button>;
+        }
+        if (u.relation === "outgoing") return <button className="button" disabled>Requested</button>;
+        if (u.relation === "incoming") return <button className="btn-gold" disabled={busyId === u.id} onClick={() => addFriend(u.id)}>Accept</button>;
+        return <button className="button primary" disabled={busyId === u.id} onClick={() => addFriend(u.id)}>Add friend</button>;
     }
 
     return (
-        <>
-            <section className="card">
-                <h1>Friends</h1>
-                <label htmlFor="friend-search" className="muted" style={{ fontSize: "0.9rem" }}>Find people by @handle or name</label>
+        <div className="stack reveal">
+            <section className="card mkt-social-hero">
+                <h1>Community</h1>
+                <p className="muted">Find players, add friends, and message them directly. Your @handle is your public identity.</p>
                 <input
-                    id="friend-search"
                     type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search members…"
+                    placeholder="Filter members by @handle or name…"
                     autoCapitalize="none"
                     autoCorrect="off"
-                    style={{ marginTop: 6 }}
+                    className="mkt-member-filter"
                 />
-                {query.trim().length >= 2 ? (
-                    <ul className="friend-list" style={{ marginTop: 10 }}>
-                        {searching && results.length === 0 ? <li className="muted">Searching…</li> : null}
-                        {!searching && results.length === 0 ? <li className="muted">No members found.</li> : null}
-                        {results.map((u) => (
-                            <UserRow key={u.id} user={u}>{relationButton(u)}</UserRow>
-                        ))}
-                    </ul>
-                ) : null}
             </section>
 
             {incoming.length > 0 ? (
                 <section className="card">
-                    <h2>Requests</h2>
-                    <ul className="friend-list">
+                    <h2 className="mkt-social-h2">Friend requests <span className="mkt-count-pill">{incoming.length}</span></h2>
+                    <div className="mkt-member-grid">
                         {incoming.map((u) => (
-                            <UserRow key={u.requestId} user={u}>
-                                <button className="button primary" disabled={busyId === u.requestId} onClick={() => respond(u.requestId, "accept", u.requestId)}>Accept</button>
+                            <MemberTile key={u.requestId} user={u}>
+                                <button className="btn-gold" disabled={busyId === u.requestId} onClick={() => respond(u.requestId, "accept", u.requestId)}>Accept</button>
                                 <button className="button" disabled={busyId === u.requestId} onClick={() => respond(u.requestId, "decline", u.requestId)}>Decline</button>
-                            </UserRow>
+                            </MemberTile>
                         ))}
-                    </ul>
+                    </div>
                 </section>
             ) : null}
 
             <section className="card">
-                <h2>Your friends ({friends.length})</h2>
+                <h2 className="mkt-social-h2">Your friends <span className="mkt-count-pill">{friends.length}</span></h2>
                 {friends.length === 0 ? (
-                    <p className="muted">No friends yet — search above to add some.</p>
+                    <p className="muted">No friends yet — add people from the directory below.</p>
                 ) : (
-                    <ul className="friend-list">
+                    <div className="mkt-member-grid">
                         {friends.map((u) => (
-                            <UserRow key={u.id} user={u}>
-                                <button className="button primary" disabled={busyId === u.id} onClick={() => message(u.id)}>Message</button>
-                                <button className="button" disabled={busyId === u.id} onClick={() => remove(u.id)}>Remove</button>
-                            </UserRow>
+                            <MemberTile key={u.id} user={u}>
+                                <button className="btn-gold" disabled={busyId === u.id} onClick={() => message(u.id)}>Message</button>
+                                <button className="button" disabled={busyId === u.id} onClick={() => removeFriend(u.id)}>Remove</button>
+                            </MemberTile>
                         ))}
-                    </ul>
+                    </div>
+                )}
+            </section>
+
+            <section className="card">
+                <h2 className="mkt-social-h2">{query.trim() ? "Search results" : "Discover members"}</h2>
+                {members === null ? (
+                    <p className="muted">Loading members…</p>
+                ) : members.length === 0 ? (
+                    <p className="muted">{query.trim() ? "No members match that." : "No members yet."}</p>
+                ) : (
+                    <div className="mkt-member-grid">
+                        {members.map((u) => (
+                            <MemberTile key={u.id} user={u}>{relationAction(u)}</MemberTile>
+                        ))}
+                    </div>
                 )}
             </section>
 
             {outgoing.length > 0 ? (
                 <section className="card">
-                    <h2>Sent requests</h2>
-                    <ul className="friend-list">
+                    <h2 className="mkt-social-h2">Sent requests <span className="mkt-count-pill">{outgoing.length}</span></h2>
+                    <div className="mkt-member-grid">
                         {outgoing.map((u) => (
-                            <UserRow key={u.requestId} user={u}>
-                                <button className="button" disabled={busyId === u.id} onClick={() => remove(u.id)}>Cancel</button>
-                            </UserRow>
+                            <MemberTile key={u.requestId} user={u}>
+                                <button className="button" disabled={busyId === u.id} onClick={() => removeFriend(u.id)}>Cancel</button>
+                            </MemberTile>
                         ))}
-                    </ul>
+                    </div>
                 </section>
             ) : null}
-        </>
+        </div>
     );
 }
