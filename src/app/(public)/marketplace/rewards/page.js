@@ -40,12 +40,12 @@ export default async function RewardsPage() {
                 <div className="mkt-hero-links" style={{ marginTop: 12 }}>
                     {signedIn ? (
                         <>
-                            <Link href="/marketplace/card" className="mkt-vendor-btn mkt-vendor-btn-primary">🎟️ Your loyalty card</Link>
+                            <Link href="/marketplace/card" className="btn-gold">🎟️ Your loyalty card</Link>
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>
                         </>
                     ) : (
                         <>
-                            <Link href="/marketplace/login?signup=1" className="mkt-vendor-btn mkt-vendor-btn-primary">
+                            <Link href="/marketplace/login?signup=1" className="btn-gold">
                                 Create your free account →
                             </Link>
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>
@@ -101,7 +101,7 @@ export default async function RewardsPage() {
                 <section className="card" style={{ textAlign: "center" }}>
                     <h2 style={{ marginTop: 0 }}>Start earning today</h2>
                     <p className="muted">Create a free account and earn points on your very next purchase.</p>
-                    <Link href="/marketplace/login?signup=1" className="mkt-vendor-btn mkt-vendor-btn-primary">
+                    <Link href="/marketplace/login?signup=1" className="btn-gold">
                         Create your free account →
                     </Link>
                 </section>

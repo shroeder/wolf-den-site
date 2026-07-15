@@ -11,7 +11,7 @@ export default function RewardsCallout({ href = "/marketplace/rewards", cta = "J
                     Earn points on every purchase — in-store &amp; online. Level up, climb the leaderboard. Free to join.
                 </div>
             </div>
-            <Link href={href} className="btn rewards-callout-btn">{cta}</Link>
+            <Link href={href} className="btn-gold">{cta}</Link>
         </section>
     );
 }

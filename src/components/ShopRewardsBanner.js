@@ -20,9 +20,9 @@ export default function ShopRewardsBanner({ hasRewards = false }) {
                 </div>
             </div>
             {hasRewards ? (
-                <Link href="/marketplace/card" className="btn rewards-callout-btn">View rewards</Link>
+                <Link href="/marketplace/card" className="btn-gold">View rewards</Link>
             ) : (
-                <Link href="/marketplace/login?signup=1" className="btn rewards-callout-btn">Claim your points →</Link>
+                <Link href="/marketplace/login?signup=1" className="btn-gold">Claim your points →</Link>
             )}
         </section>
     );
