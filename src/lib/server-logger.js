@@ -83,10 +83,13 @@ function emit(level, payload) {
 }
 
 function getRequestId(request) {
+    // Some route handlers have no request object (e.g. `export async function GET()` that call
+    // withRequestLogging(null, …)). Read defensively so those don't 500 on request.headers.
+    const headers = request?.headers;
     return (
-        request.headers.get("x-request-id") ||
-        request.headers.get("x-correlation-id") ||
-        request.headers.get("x-vercel-id") ||
+        headers?.get?.("x-request-id") ||
+        headers?.get?.("x-correlation-id") ||
+        headers?.get?.("x-vercel-id") ||
         randomUUID()
     );
 }
@@ -131,13 +134,18 @@ export function createServerLogger(baseContext = {}) {
 export function createRequestLogger(request, routeName) {
     const requestId = getRequestId(request);
     const startedAt = Date.now();
-    const url = new URL(request.url);
+    let path;
+    try {
+        path = request?.url ? new URL(request.url).pathname : undefined;
+    } catch {
+        path = undefined;
+    }
     const baseContext = {
         source: "api",
         requestId,
         route: routeName,
-        method: request.method,
-        path: url.pathname,
+        method: request?.method || "GET",
+        path,
         env: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
     };
     const logger = createServerLogger(baseContext);
