@@ -6,9 +6,10 @@ import { db } from "@/lib/db";
 import { awardPurchaseXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // Scan-to-earn loyalty claims. A claim ties a specific Square payment (amount + dedupe id) to a QR that
-// a customer scans to bank the XP on their own account. Single-use, short-lived, one per payment.
+// a customer scans to bank the XP on their own account. Single-use, one per payment. TTL is generous
+// (24h) so a cashier who misses the push can still pull the claim up later and have the QR redeem.
 
-const DEFAULT_TTL_MINUTES = 15;
+const DEFAULT_TTL_MINUTES = 24 * 60;
 
 // Create (or reuse) a claim for a Square payment. Idempotent per payment so webhook retries don't mint
 // duplicates. Returns { token, amountCents, isNew } or null.
@@ -31,6 +32,33 @@ export async function createLoyaltyClaim({ squarePaymentId, awardOrderId, amount
         .queryOne(`SELECT token, amount_cents FROM mkt_loyalty_claim WHERE square_payment_id = $1`, [squarePaymentId])
         .catch(() => null);
     return existing ? { token: existing.token, amountCents: existing.amount_cents, isNew: false } : null;
+}
+
+// Recent claims (newest first) for the admin/employee "pull up a QR" screen — so a missed push isn't a
+// lost claim. Staff-facing, so the redeemer's name is shown for confirmation.
+export async function listRecentClaims(limit = 50) {
+    const rows = await db
+        .query(
+            `SELECT c.token, c.amount_cents, c.created_at, c.expires_at, c.redeemed_at,
+                    b.first_name, b.last_name, b.alias, b.display_name
+               FROM mkt_loyalty_claim c
+               LEFT JOIN mkt_buyer b ON b.id = c.redeemed_buyer_id
+              ORDER BY c.created_at DESC
+              LIMIT $1`,
+            [Math.max(1, Math.min(200, limit))]
+        )
+        .catch(() => []);
+    return rows.map((r) => {
+        const name = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+        return {
+            token: r.token,
+            cents: Number(r.amount_cents) || 0,
+            createdAt: r.created_at,
+            expiresAt: r.expires_at,
+            redeemed: Boolean(r.redeemed_at),
+            memberName: r.redeemed_at ? name || r.display_name || r.alias || "Member" : null,
+        };
+    });
 }
 
 // Read a claim for display on the scan page (does not redeem). Returns { amountCents, expired, redeemed }.
