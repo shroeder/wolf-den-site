@@ -22,7 +22,7 @@ export default function AnnouncementBanner() {
 
     return (
         <div className="opening-banner" role="region" aria-label="Store announcement">
-            <p className="opening-banner-text shell">
+            <p className="opening-banner-text">
                 <strong>New hours:</strong> We&apos;re now open <strong>7 days a week</strong> &mdash; daily
                 <strong> 12&ndash;6 PM</strong>, with <strong>Thursday &amp; Friday until 7 PM</strong>.
             </p>
