@@ -76,7 +76,7 @@ export async function POST(request, { params }) {
             after(() => nudge(id, participant.side, message));
             // Loyalty XP for a buyer messaging (once per thread per day).
             if (participant.side === "buyer" && ids.buyerId) {
-                after(() => awardXp(ids.buyerId, "message", { dedupeKey: dailyKey("message", ids.buyerId, id), meta: { threadId: id } }));
+                after(() => awardXp(ids.buyerId, "message", { dedupeKey: dailyKey("message", ids.buyerId, id), dailyCap: 3, meta: { threadId: id } }));
             }
             return NextResponse.json({ ok: true });
         } catch (error) {

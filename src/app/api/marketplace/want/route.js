@@ -59,7 +59,7 @@ export async function POST(request) {
                 // Loyalty XP for a signed-in buyer adding to their wishlist (once per product).
                 if (session?.buyer?.id) {
                     const buyerId = session.buyer.id;
-                    after(() => awardXp(buyerId, "wishlist_add", { dedupeKey: `wishlist:${buyerId}:${body.catalogProductId}`, meta: { catalogProductId: body.catalogProductId } }));
+                    after(() => awardXp(buyerId, "wishlist_add", { dedupeKey: `wishlist:${buyerId}:${body.catalogProductId}`, dailyCap: 3, meta: { catalogProductId: body.catalogProductId } }));
                 }
 
                 return NextResponse.json({ ok: true });

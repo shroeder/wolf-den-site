@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { levelForXp } from "@/lib/marketplace/xp.js";
+import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
 // (alias), an avatar, and admin-curated badges. Levels/XP arrive in a later phase.
@@ -95,6 +95,14 @@ export async function getPublicProfileByAlias(alias) {
     return profile;
 }
 
+// One-time +XP once a profile has a name, a handle, and an avatar. Best-effort; dedupe key = once ever.
+async function maybeAwardProfileComplete(profile) {
+    if (!profile) return;
+    const complete = Boolean((profile.fullName || "").trim()) && Boolean(profile.alias) && Boolean(profile.avatarUrl);
+    if (!complete) return;
+    await awardXp(profile.id, "profile_complete", { dedupeKey: `profile_complete:${profile.id}` }).catch(() => {});
+}
+
 // Update name + handle. Throws a user-facing message on bad/taken handle. Any field may be omitted.
 export async function updateProfile(buyerId, { firstName, lastName, alias } = {}) {
     if (!buyerId) throw new Error("Not signed in.");
@@ -126,11 +134,15 @@ export async function updateProfile(buyerId, { firstName, lastName, alias } = {}
     if (sets.length === 0) return getProfile(buyerId);
 
     await db.query(`UPDATE mkt_buyer SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $1`, params);
-    return getProfile(buyerId);
+    const updated = await getProfile(buyerId);
+    await maybeAwardProfileComplete(updated);
+    return updated;
 }
 
 export async function setAvatar(buyerId, url) {
     if (!buyerId) throw new Error("Not signed in.");
     await db.query(`UPDATE mkt_buyer SET avatar_url = $2, updated_at = NOW() WHERE id = $1`, [buyerId, url || null]);
-    return getProfile(buyerId);
+    const updated = await getProfile(buyerId);
+    await maybeAwardProfileComplete(updated);
+    return updated;
 }

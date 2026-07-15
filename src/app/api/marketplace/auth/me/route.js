@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
+import { awardXp, dailyKey } from "@/lib/marketplace/xp.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { getVendorById } from "@/lib/marketplace/vendors.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -15,6 +16,8 @@ export async function GET(request) {
         try {
             const account = await getAuthenticatedBuyer();
             if (account) {
+                // Daily-active XP: first app open of the day (dedupe key = once per day). Best-effort.
+                after(() => awardXp(account.id, "daily_active", { dedupeKey: dailyKey("daily_active", account.id) }));
                 // Enrich with the first-class profile (name/alias/avatar/badges) so every surface can
                 // show it. Keep displayName for back-compat with existing consumers.
                 const profile = await getProfile(account.id);
