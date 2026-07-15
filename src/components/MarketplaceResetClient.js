@@ -42,7 +42,13 @@ export default function MarketplaceResetClient() {
         return (
             <section className="card">
                 <h1>Reset password</h1>
-                <p className="muted">This reset link is missing its token. Request a new one from the app.</p>
+                <p className="muted">This reset link is missing or expired.</p>
+                <p>
+                    <Link href="/marketplace/login" className="pill">
+                        Back to sign in
+                    </Link>{" "}
+                    — use &ldquo;Forgot password?&rdquo; there to get a fresh link.
+                </p>
             </section>
         );
     }
@@ -53,8 +59,8 @@ export default function MarketplaceResetClient() {
                 <h1>Password updated</h1>
                 <p>You can now sign in with your new password.</p>
                 <p>
-                    <Link href="/marketplace" className="pill">
-                        Go to the marketplace
+                    <Link href="/marketplace/login" className="button primary">
+                        Sign in
                     </Link>
                 </p>
             </section>
