@@ -29,15 +29,16 @@ export function nextRank(level) {
     return RANKS.find((r) => r.level > lvl) || null;
 }
 
-// Level-gated perks beyond badges. `soon: true` = designed but not built yet (custom borders, profile
-// flair, etc.) — they show on the rewards track as "Coming soon" so members see what's ahead. As each
-// feature ships, flip soon → false (and wire the unlock); the track picks it up with no layout change.
+// Level-gated perks beyond badges. `soon: true` = designed but not built yet — shows on the rewards
+// track as "Coming soon". As each feature ships, flip soon → false (and wire the unlock); the track
+// picks it up with no layout change. Profile borders are LIVE (equip on the profile). Keep these level
+// values in sync with BORDERS in borders.js.
 export const LEVEL_PERKS = [
-    { level: 5, icon: "🥉", label: "Bronze profile border", soon: true },
-    { level: 15, icon: "🥈", label: "Silver profile border", soon: true },
-    { level: 20, icon: "🎨", label: "Profile flair & accents", soon: true },
-    { level: 30, icon: "🥇", label: "Gold profile border", soon: true },
-    { level: 40, icon: "✨", label: "Animated name effect", soon: true },
-    { level: 50, icon: "🌈", label: "Legendary animated border", soon: true },
+    { level: 5, icon: "🥉", label: "Bronze profile border" },
+    { level: 15, icon: "🥈", label: "Silver profile border" },
+    { level: 20, icon: "💚", label: "Emerald profile border" },
+    { level: 30, icon: "🥇", label: "Gold profile border" },
+    { level: 40, icon: "🔮", label: "Amethyst animated border" },
+    { level: 50, icon: "🌈", label: "Legendary animated border" },
 ];
 

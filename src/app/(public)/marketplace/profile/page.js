@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import BorderPicker from "@/components/BorderPicker";
 import EarnChecklist from "@/components/EarnChecklist";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import RewardsHubHero from "@/components/RewardsHubHero";
@@ -47,6 +48,18 @@ export default async function ProfileHubPage() {
                     avatarUrl={profile?.avatarUrl}
                     badges={profile?.badges || []}
                     level={level}
+                    border={profile?.border}
+                />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Profile border</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Cosmetic frames you unlock by leveling up. Tap one you&apos;ve earned to wear it.</p>
+                <BorderPicker
+                    current={profile?.border}
+                    level={level?.level || 1}
+                    avatarUrl={profile?.avatarUrl}
+                    displayLabel={profile?.displayLabel}
                 />
             </section>
 

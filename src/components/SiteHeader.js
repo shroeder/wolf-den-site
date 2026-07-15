@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { borderClass } from "@/lib/marketplace/borders.js";
 import { useTvMode } from "@/lib/tv-mode-client";
 
 const navItems = [
@@ -39,6 +40,7 @@ export default function SiteHeader() {
     const [mktUnread, setMktUnread] = useState(0);
     const [mktAvatar, setMktAvatar] = useState(null);
     const [mktName, setMktName] = useState(null);
+    const [mktBorder, setMktBorder] = useState("none");
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
@@ -53,6 +55,7 @@ export default function SiteHeader() {
             if (alive && b) {
                 setMktAvatar(b.avatarUrl || null);
                 setMktName(b.displayLabel || null);
+                setMktBorder(b.border || "none");
             }
         })();
         return () => {
@@ -204,9 +207,9 @@ export default function SiteHeader() {
                                 <Link href="/shop/account" className="nav-account" title="Your account (orders, sign out)" aria-label="Your account" onClick={() => setOpen(false)}>
                                     {mktAvatar ? (
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img className="nav-account-avatar nav-account-avatar-img" src={mktAvatar} alt="Your account" />
+                                        <img className={`nav-account-avatar nav-account-avatar-img ${borderClass(mktBorder)}`.trim()} src={mktAvatar} alt="Your account" />
                                     ) : (
-                                        <span className="nav-account-avatar">{initialsOf({ name: mktName || authCustomer.name, email: authCustomer.email })}</span>
+                                        <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName || authCustomer.name, email: authCustomer.email })}</span>
                                     )}
                                 </Link>
                             ) : (

@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { discordConfig } from "@/lib/marketplace/discord.js";
+import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -113,6 +114,8 @@ function mapProfile(row, badges = []) {
         badges,
         level: levelForXp(row.xp || 0),
         discordLinked: Boolean(row.discord_user_id),
+        // Equipped cosmetic avatar border id ('none' when unset). Public — it's just a frame style.
+        border: row.equipped_border || "none",
     };
 }
 
@@ -120,7 +123,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -130,12 +133,26 @@ export async function getProfile(buyerId) {
     return profile;
 }
 
+// Equip a cosmetic profile border. Validated against the member's level (can't wear a locked frame).
+// Pass 'none' to clear. Returns the refreshed profile.
+export async function equipBorder(buyerId, borderId) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const border = borderById(borderId);
+    const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
+    const level = levelForXp(row?.xp || 0).level;
+    if (border.id !== "none" && !isBorderUnlocked(border.id, level)) {
+        throw new Error(`That border unlocks at Level ${border.level}.`);
+    }
+    await db.query(`UPDATE mkt_buyer SET equipped_border = $2, updated_at = NOW() WHERE id = $1`, [buyerId, border.id === "none" ? null : border.id]);
+    return getProfile(buyerId);
+}
+
 // Public leaderboard: top members by lifetime XP. Only accounts with a public @handle appear (opting in
 // via a handle), and only those who've earned something. Returns rank + display bits (no contact info).
 export async function getLeaderboard(limit = 50) {
     const rows = await db
         .query(
-            `SELECT id, alias, avatar_url, first_name, last_name, display_name, xp
+            `SELECT id, alias, avatar_url, first_name, last_name, display_name, xp, equipped_border
                FROM mkt_buyer
               WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0
               ORDER BY xp DESC, updated_at ASC
@@ -145,7 +162,7 @@ export async function getLeaderboard(limit = 50) {
         .catch(() => []);
     return rows.map((row, i) => {
         const p = mapProfile(row, []);
-        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0 };
+        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0, border: p.border };
     });
 }
 
@@ -154,7 +171,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

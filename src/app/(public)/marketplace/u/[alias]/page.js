@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
+import { borderClass } from "@/lib/marketplace/borders.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const runtime = "nodejs";
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }) {
 function Avatar({ profile, size = "lg" }) {
     const initial = (profile.displayLabel || profile.alias || "?").slice(0, 1).toUpperCase();
     return (
-        <div className={`user-avatar user-avatar-${size}`}>
+        <div className={`user-avatar user-avatar-${size} ${borderClass(profile.border)}`.trim()}>
             {profile.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={profile.avatarUrl} alt={`${profile.displayLabel} avatar`} />

@@ -2,12 +2,13 @@ import Link from "next/link";
 
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
+import { borderClass } from "@/lib/marketplace/borders.js";
 import { nextRank, rankForLevel } from "@/lib/marketplace/ranks.js";
 
 // The top of the rewards hub: identity + progress, built to feel like a game profile, not a form.
 // A level ring wraps the avatar and fills with your progress; the XP bar sweeps and counts up on load;
 // a rank chip names where you stand and teases the next rank. The CTA opens the full rewards track.
-export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], level }) {
+export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], level, border = "none" }) {
     if (!level) return null;
     const pct = Math.round(Math.min(1, Math.max(0, level.progress || 0)) * 100);
     const rank = rankForLevel(level.level);
@@ -17,7 +18,7 @@ export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], l
     return (
         <div className="rewards-hero">
             <div className="rewards-hero-id">
-                <div className="level-ring" style={{ "--ring-pct": `${pct}%` }}>
+                <div className={`level-ring ${borderClass(border)}`.trim()} style={{ "--ring-pct": `${pct}%` }}>
                     <div className="user-avatar user-avatar-xl">
                         {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element

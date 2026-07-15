@@ -5948,6 +5948,81 @@ body.tv-mode .shop-mobile-cart-fab {
     .track-node.is-next .track-node-marker { animation: none; }
 }
 
+/* ===== Custom profile borders (cosmetic avatar frames) ===== */
+/* Box-shadow rings so they render on ANY avatar without being clipped by its overflow. */
+.av-border { position: relative; }
+.av-border-bronze { box-shadow: 0 0 0 3px #a9713b, 0 0 8px rgba(169, 113, 59, 0.5); }
+.av-border-silver { box-shadow: 0 0 0 3px #c9ccd4, 0 0 8px rgba(201, 204, 212, 0.5); }
+.av-border-emerald { box-shadow: 0 0 0 3px #2fae72, 0 0 10px rgba(47, 174, 114, 0.55); }
+.av-border-gold { box-shadow: 0 0 0 3px #ffd75e, 0 0 12px rgba(255, 215, 94, 0.6); }
+.av-border-amethyst {
+    box-shadow: 0 0 0 3px #a06cff, 0 0 10px rgba(160, 108, 255, 0.55);
+    animation: av-amethyst 2.2s ease-in-out infinite;
+}
+.av-border-legendary { animation: av-legendary 4s linear infinite; }
+@keyframes av-amethyst {
+    0%, 100% { box-shadow: 0 0 0 3px #a06cff, 0 0 6px rgba(160, 108, 255, 0.4); }
+    50% { box-shadow: 0 0 0 3px #bb92ff, 0 0 18px rgba(160, 108, 255, 0.85); }
+}
+@keyframes av-legendary {
+    0% { box-shadow: 0 0 0 3px #ff4d4d, 0 0 14px rgba(255, 77, 77, 0.6); }
+    25% { box-shadow: 0 0 0 3px #ffd75e, 0 0 14px rgba(255, 215, 94, 0.6); }
+    50% { box-shadow: 0 0 0 3px #4ade80, 0 0 14px rgba(74, 222, 128, 0.6); }
+    75% { box-shadow: 0 0 0 3px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.6); }
+    100% { box-shadow: 0 0 0 3px #c084fc, 0 0 14px rgba(192, 132, 252, 0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .av-border-amethyst, .av-border-legendary { animation: none; }
+}
+
+/* Border picker (profile) */
+.border-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.border-swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 78px;
+    padding: 8px 4px;
+    background: none;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    color: var(--ink);
+    font: inherit;
+}
+.border-swatch:disabled { cursor: default; }
+.border-swatch.is-selected { background: rgba(255, 215, 94, 0.08); outline: 1px solid rgba(255, 215, 94, 0.4); }
+.border-swatch-av {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #14141f;
+    color: #ffd75e;
+    font-weight: 800;
+}
+.border-swatch-av img { width: 100%; height: 100%; object-fit: cover; }
+.border-swatch.is-locked .border-swatch-av { opacity: 0.5; filter: grayscale(0.4); }
+.border-swatch-lock {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+.border-swatch-label { font-weight: 700; font-size: 0.85rem; }
+.border-swatch-sub { font-size: 0.72rem; text-align: center; }
+
 /* Loyalty membership card — shown at the register to earn XP. */
 .loyalty-card {
     display: flex;
