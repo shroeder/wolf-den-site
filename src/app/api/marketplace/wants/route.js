@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { deleteWant, listWantsByEmail } from "@/lib/marketplace/wants.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 
-// A buyer's want list, by email (accountless — low-sensitivity, just cards they want).
+// The signed-in buyer's want list (account required).
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/wants", async ({ internalError }) => {
         try {
-            const { searchParams } = new URL(request.url);
-            const wants = await listWantsByEmail(searchParams.get("email") || "");
+            const buyer = await getAuthenticatedBuyer();
+            if (!buyer) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+            const wants = await listWantsByEmail(buyer.email);
             return NextResponse.json({ wants }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.wants.list.failure" });
@@ -18,15 +20,17 @@ export async function GET(request) {
     });
 }
 
-// Remove one want, authorized by the email it was created under.
+// Remove one of the signed-in buyer's wants.
 export async function DELETE(request) {
     return withRequestLogging(request, "DELETE /api/marketplace/wants", async ({ internalError }) => {
         try {
+            const buyer = await getAuthenticatedBuyer();
+            if (!buyer) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            if (!body?.id || !body?.email) {
-                return NextResponse.json({ error: "id and email are required." }, { status: 400 });
+            if (!body?.id) {
+                return NextResponse.json({ error: "id is required." }, { status: 400 });
             }
-            const removed = await deleteWant(body.id, body.email);
+            const removed = await deleteWant(body.id, buyer.email);
             return NextResponse.json({ ok: removed });
         } catch (error) {
             return internalError(error, { event: "marketplace.wants.delete.failure" });

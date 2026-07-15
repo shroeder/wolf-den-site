@@ -241,16 +241,39 @@ function OfferRow({ offer, productName }) {
 }
 
 function NotifyMe({ catalogProductId, productName }) {
-    const [email, setEmail] = useState("");
     const [maxPrice, setMaxPrice] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [done, setDone] = useState(false);
     const [error, setError] = useState("");
+    const [account, setAccount] = useState(null);
+    const [authChecked, setAuthChecked] = useState(false);
+
+    // Account required: notify-me now saves to the signed-in buyer's want list.
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (res.ok) {
+                    const d = await res.json().catch(() => null);
+                    const b = d?.buyer || (d?.account?.email ? d.account : null);
+                    if (!ignore && b?.email) setAccount(b);
+                }
+            } catch {
+                /* signed out */
+            } finally {
+                if (!ignore) setAuthChecked(true);
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
 
     if (done) {
         return (
             <p className="statement-copy">
-                Done — we&apos;ll email you the moment an approved vendor lists {productName}
+                Done — we&apos;ll notify you the moment an approved vendor lists {productName}
                 {maxPrice ? ` at or under $${Number(maxPrice).toFixed(2)}` : ""}.
             </p>
         );
@@ -265,7 +288,7 @@ function NotifyMe({ catalogProductId, productName }) {
             const response = await fetch("/api/marketplace/want", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ catalogProductId, email, maxPrice: maxPrice || null }),
+                body: JSON.stringify({ catalogProductId, maxPrice: maxPrice || null }),
             });
             const data = await response.json().catch(() => null);
             if (!response.ok) {
@@ -279,20 +302,28 @@ function NotifyMe({ catalogProductId, productName }) {
         }
     }
 
+    if (!account) {
+        return (
+            <div className="mkt-notify">
+                <p className="muted">No vendor has this in stock yet.</p>
+                {authChecked ? (
+                    <>
+                        <p className="statement-copy">
+                            Create a free Wolf Den account and we&apos;ll notify you the moment a vendor lists {productName} —
+                            it also saves to your want list and app.
+                        </p>
+                        <Link href="/marketplace/login?signup=1" className="btn-gold">Create your free account →</Link>
+                    </>
+                ) : null}
+            </div>
+        );
+    }
+
     return (
         <div className="mkt-notify">
             <p className="muted">No vendor has this in stock yet.</p>
             <form className="contact-form" onSubmit={submit}>
-                <label htmlFor="mkt-notify-email">Notify me when a vendor lists it</label>
-                <input
-                    id="mkt-notify-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                />
-                <label htmlFor="mkt-notify-price">Only if it&apos;s under (optional)</label>
+                <label htmlFor="mkt-notify-price">Notify me when a vendor lists it — only if under (optional)</label>
                 <input
                     id="mkt-notify-price"
                     type="number"

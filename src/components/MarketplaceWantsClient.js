@@ -45,18 +45,17 @@ function ResultCard({ r, onAdd, busy }) {
 }
 
 export default function MarketplaceWantsClient() {
-    const [email, setEmail] = useState("");
     const [wants, setWants] = useState(null); // null = not loaded yet
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState("");
-    const [account, setAccount] = useState(null); // signed-in buyer — auto-loads their list, no email needed
+    const [account, setAccount] = useState(null); // signed-in buyer
+    const [authChecked, setAuthChecked] = useState(false);
 
-    async function loadWants(mail = email) {
-        if (!mail) return;
+    async function loadWants() {
         try {
-            const res = await fetch(`/api/marketplace/wants?email=${encodeURIComponent(mail)}`, { cache: "no-store" });
+            const res = await fetch("/api/marketplace/wants", { cache: "no-store" });
             const data = await res.json().catch(() => null);
             setWants(res.ok ? data?.wants || [] : []);
         } catch {
@@ -64,23 +63,25 @@ export default function MarketplaceWantsClient() {
         }
     }
 
-    // If a buyer is signed in, resolve their email from the session and load their list automatically —
-    // no need to type an email. Falls back to the accountless email flow when signed out.
+    // Account required: resolve the signed-in buyer and load their list. Signed-out visitors get a
+    // "create a free account" prompt instead of an email box.
     useEffect(() => {
         let ignore = false;
         (async () => {
             try {
                 const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
-                if (!res.ok) return;
-                const data = await res.json().catch(() => null);
-                const mail = data?.buyer?.email || data?.account?.email || data?.vendor?.email || "";
-                if (!ignore && mail) {
-                    setAccount({ email: mail });
-                    setEmail(mail);
-                    loadWants(mail);
+                if (res.ok) {
+                    const data = await res.json().catch(() => null);
+                    const mail = data?.buyer?.email || data?.account?.email || data?.vendor?.email || "";
+                    if (!ignore && mail) {
+                        setAccount({ email: mail });
+                        loadWants();
+                    }
                 }
             } catch {
-                /* signed out — keep the email flow */
+                /* signed out */
+            } finally {
+                if (!ignore) setAuthChecked(true);
             }
         })();
         return () => {
@@ -108,8 +109,8 @@ export default function MarketplaceWantsClient() {
     }, [query]);
 
     async function add(r, max) {
-        if (!email) {
-            setMsg("Enter your email up top first.");
+        if (!account) {
+            setMsg("Create a free account to save cards to your want list.");
             return;
         }
         setBusy(true);
@@ -118,7 +119,7 @@ export default function MarketplaceWantsClient() {
             const res = await fetch("/api/marketplace/want", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ catalogProductId: r.catalogProductId, email, maxPrice: max || null }),
+                body: JSON.stringify({ catalogProductId: r.catalogProductId, maxPrice: max || null }),
             });
             const data = await res.json().catch(() => null);
             if (!res.ok) throw new Error(data?.error || "Could not add that.");
@@ -136,7 +137,7 @@ export default function MarketplaceWantsClient() {
             await fetch("/api/marketplace/wants", {
                 method: "DELETE",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ id, email }),
+                body: JSON.stringify({ id }),
             });
             await loadWants();
         } catch {
@@ -156,23 +157,18 @@ export default function MarketplaceWantsClient() {
                     <p className="muted">
                         Signed in as <strong>{account.email}</strong> — your want list is loaded below.
                     </p>
-                ) : (
-                    <div className="contact-form" style={{ maxWidth: "420px" }}>
-                        <label htmlFor="wl-email">Your email</label>
-                        <input
-                            id="wl-email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            onBlur={() => loadWants()}
-                            placeholder="you@example.com"
-                        />
-                        <button type="button" className="button primary" onClick={() => loadWants()} disabled={!email}>
-                            Load my list
-                        </button>
-                    </div>
-                )}
+                ) : authChecked ? (
+                    <p className="muted">
+                        Your want list lives on your free Wolf Den account — so it syncs with the app, feeds your
+                        rewards, and we can alert you the moment a card lands.
+                    </p>
+                ) : null}
                 <p className="mkt-hero-links">
+                    {!account && authChecked ? (
+                        <Link href="/marketplace/login?signup=1" className="btn-gold">
+                            Create your free account →
+                        </Link>
+                    ) : null}
                     <Link href="/marketplace" className="pill">
                         Search inventory instead
                     </Link>
@@ -205,7 +201,9 @@ export default function MarketplaceWantsClient() {
             <section className="card">
                 <h2>My want list{Array.isArray(wants) ? ` (${wants.length})` : ""}</h2>
                 {wants === null ? (
-                    <p className="muted">{account ? "Loading your list…" : "Enter your email above to load your list."}</p>
+                    <p className="muted">
+                        {account ? "Loading your list…" : "Sign in or create a free account above to build your want list."}
+                    </p>
                 ) : wants.length === 0 ? (
                     <p className="muted">Nothing yet. Search above and add the cards you&apos;re looking for.</p>
                 ) : (
