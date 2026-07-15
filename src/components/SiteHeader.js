@@ -33,8 +33,28 @@ export default function SiteHeader() {
     const [cartEnabled, setCartEnabled] = useState(false);
     const [authLoading, setAuthLoading] = useState(false);
     const [authCustomer, setAuthCustomer] = useState(null);
+    const [mktAuthed, setMktAuthed] = useState(false);
+    const [mktUnread, setMktUnread] = useState(0);
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
+
+    // Marketplace inbox badge: show an Inbox link + unread count for signed-in marketplace members.
+    useEffect(() => {
+        let alive = true;
+        const load = async () => {
+            const r = await fetch("/api/marketplace/unread", { cache: "no-store" }).catch(() => null);
+            const d = r && r.ok ? await r.json().catch(() => null) : null;
+            if (!alive || !d) return;
+            setMktAuthed(Boolean(d.authenticated));
+            setMktUnread(Number(d.total || 0));
+        };
+        load();
+        const id = setInterval(load, 60000);
+        return () => {
+            alive = false;
+            clearInterval(id);
+        };
+    }, []);
 
     useEffect(() => {
         if (!paymentsEnabled) {
@@ -147,6 +167,12 @@ export default function SiteHeader() {
                     </Link>
                     </>
                 )}
+                {mktAuthed ? (
+                    <Link href="/marketplace/inbox" className="pill nav-inbox" onClick={() => setOpen(false)}>
+                        Inbox
+                        {mktUnread > 0 ? <span className="nav-inbox-badge">{mktUnread > 99 ? "99+" : mktUnread}</span> : null}
+                    </Link>
+                ) : null}
                 <a className="pill nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
                     Join Discord
                 </a>

@@ -5305,6 +5305,27 @@ body.tv-mode .shop-mobile-cart-fab {
     color: #d6d0ef;
 }
 
+/* Nav inbox pill + unread badge. */
+.nav-inbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.nav-inbox-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ff4d4f;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
 /* Unified inbox rows. */
 .inbox-row {
     display: flex;
