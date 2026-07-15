@@ -7,6 +7,7 @@ import { cookies, headers } from "next/headers";
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 import { db } from "@/lib/db";
 import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
+import { ensureAlias } from "@/lib/marketplace/profile.js";
 import { claimPendingPurchases } from "@/lib/marketplace/xp.js";
 
 // Buyer accounts + token sessions for the marketplace phone app. Mirrors the vendor-session shape
@@ -71,6 +72,8 @@ export async function createBuyer({ email, password, displayName = null }) {
     // Link a Square customer up front (reuse-by-email or create) so the member is findable at the
     // register from day one, even before they save a profile or shop. Best-effort.
     await ensureSquareCustomerForBuyer(row.id).catch(() => {});
+    // Mandatory public @handle so every member shows on the leaderboard (user-editable later).
+    await ensureAlias(row.id, displayName || normalized.split("@")[0]).catch(() => {});
     return mapBuyer(row);
 }
 
@@ -308,6 +311,7 @@ export async function getOrCreateBuyerByEmail(email, { emailVerified = false } =
         // Mirror createBuyer's best-effort linking so a bridged account behaves like a normal one.
         await claimPendingPurchases(row.id, normalized).catch(() => {});
         await ensureSquareCustomerForBuyer(row.id).catch(() => {});
+        await ensureAlias(row.id, row.display_name || normalized.split("@")[0]).catch(() => {});
     }
     return mapBuyer(row);
 }

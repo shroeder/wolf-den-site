@@ -51,6 +51,35 @@ export async function isAliasAvailable(alias, exceptBuyerId = null) {
     return !row;
 }
 
+// Slugify a seed (display name / email local-part) into a valid handle base: a-z0-9_, 3–20 chars.
+function aliasBase(seed) {
+    let base = String(seed || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (base.length < 3) base = `${base}member`.slice(0, 8);
+    return base.slice(0, 20);
+}
+
+// Ensure a buyer has a public @handle — assign a unique one derived from `seed` if they don't. Handles
+// are mandatory (so everyone shows on the leaderboard); still user-editable afterward. Best-effort.
+export async function ensureAlias(buyerId, seed) {
+    if (!buyerId) return null;
+    const existing = await db.queryOne(`SELECT alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (existing?.alias) return existing.alias;
+
+    const base = aliasBase(seed);
+    let candidate = base;
+    let n = 1;
+    while (!(await isAliasAvailable(candidate, buyerId))) {
+        n += 1;
+        const suffix = String(n);
+        candidate = `${base.slice(0, 20 - suffix.length)}${suffix}`;
+        if (n > 5000) return null; // give up rather than loop forever
+    }
+    await db
+        .query(`UPDATE mkt_buyer SET alias = $2, alias_normalized = $2, updated_at = NOW() WHERE id = $1 AND alias IS NULL`, [buyerId, candidate])
+        .catch(() => {});
+    return candidate;
+}
+
 export async function getUserBadges(buyerId) {
     if (!buyerId) return [];
     return db.query(
