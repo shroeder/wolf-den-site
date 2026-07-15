@@ -5753,6 +5753,201 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 1.05rem;
 }
 
+/* ===== Rewards track (roadmap) ===== */
+.track-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.track-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.track-head-level {
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: #ffd75e;
+}
+.track-head-count {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.track-spine {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+}
+.track-node {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding-bottom: 20px;
+}
+/* Connector line behind the markers. Gold up to what's reached, dim beyond. */
+.track-node:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 17px;
+    top: 36px;
+    bottom: -2px;
+    width: 2px;
+    background: rgba(255, 255, 255, 0.12);
+}
+.track-node.is-done:not(:last-child)::before {
+    background: linear-gradient(#ffd75e, #c8a24a);
+}
+.track-node-marker {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 2px solid rgba(255, 255, 255, 0.16);
+    color: var(--ink);
+    z-index: 1;
+}
+.track-node.is-done .track-node-marker {
+    background: linear-gradient(135deg, #c8a24a, #ffd75e);
+    border-color: transparent;
+    color: #171008;
+}
+.track-node.is-next .track-node-marker {
+    border-color: #ffd75e;
+    color: #ffd75e;
+    animation: track-next-pulse 1.8s ease-in-out infinite;
+}
+@keyframes track-next-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 94, 0.5); }
+    50% { box-shadow: 0 0 0 7px rgba(255, 215, 94, 0); }
+}
+.track-node-body { flex: 1 1 auto; min-width: 0; padding-top: 4px; }
+.track-node-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.track-node-level { font-weight: 700; }
+.track-next-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #171008;
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    padding: 2px 9px;
+    border-radius: 999px;
+}
+.track-done-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #9de5a9;
+}
+.track-node.is-next .track-node-body {
+    /* Make the next step pop. */
+    background: rgba(255, 215, 94, 0.06);
+    border: 1px solid rgba(255, 215, 94, 0.3);
+    border-radius: 12px;
+    padding: 8px 12px;
+    margin-top: -4px;
+}
+.track-unlocks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.track-unlock {
+    font-size: 0.82rem;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.03);
+}
+.track-unlock.is-rank {
+    border-color: rgba(255, 215, 94, 0.4);
+    background: rgba(255, 215, 94, 0.08);
+}
+.track-unlock.is-badge { border-width: 1px; border-style: solid; }
+.track-unlock.is-perk {
+    border-style: dashed;
+    color: var(--muted, #b9b4c8);
+}
+.track-soon {
+    font-style: normal;
+    font-size: 0.72rem;
+    opacity: 0.7;
+}
+.track-node:not(.is-done) .track-unlock:not(.is-rank) { opacity: 0.82; }
+
+/* Achievements grid */
+.track-ach-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+.track-ach {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    background: rgba(255, 255, 255, 0.03);
+}
+.track-ach.is-done {
+    border-color: color-mix(in srgb, #4caf50 45%, transparent);
+    background: color-mix(in srgb, #4caf50 8%, transparent);
+}
+.track-ach-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.track-ach-icon { font-size: 1.3rem; }
+.track-ach-label { font-weight: 700; flex: 1 1 auto; }
+.track-ach-check {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #4caf50;
+}
+.track-ach-desc { font-size: 0.8rem; margin-bottom: 8px; }
+.track-ach-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+.track-ach-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    width: var(--pct, 0%);
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    animation: track-fill 1s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+.track-ach.is-done .track-ach-bar > span {
+    background: linear-gradient(90deg, #3f9b52, #6fd67f);
+}
+@keyframes track-fill {
+    from { width: 0; }
+    to { width: var(--pct, 0%); }
+}
+.track-ach-progress { font-size: 0.78rem; margin-top: 6px; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+    .track-ach-bar > span { animation: none; }
+    .track-node.is-next .track-node-marker { animation: none; }
+}
+
 /* Loyalty membership card — shown at the register to earn XP. */
 .loyalty-card {
     display: flex;

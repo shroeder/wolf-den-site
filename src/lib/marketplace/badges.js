@@ -38,8 +38,9 @@ async function heldSlugs(buyerId) {
     return new Set(rows.map((r) => r.badge_slug));
 }
 
-// Live metrics used to evaluate unlock rules. One buyer, a handful of cheap aggregates.
-async function computeMetrics(buyerId) {
+// Live metrics used to evaluate unlock rules AND to show progress on the rewards track. One buyer, a
+// handful of cheap aggregates. Exported so the track page reuses the exact same numbers the engine grants on.
+export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
@@ -56,9 +57,12 @@ async function computeMetrics(buyerId) {
     const allMilestones = ["spend", "first_purchase", "event_checkin", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
 
     const tenureDays = buyer?.created_at ? Math.floor((Date.now() - new Date(buyer.created_at).getTime()) / 86400000) : 0;
+    const levelObj = levelForXp(xp);
 
     return {
-        level: levelForXp(xp).level,
+        xp,
+        level: levelObj.level,
+        levelObj,
         spend: spendRow?.n || 0,
         events: eventRow?.n || 0,
         activeDays: daysRow?.n || 0,
@@ -70,20 +74,26 @@ async function computeMetrics(buyerId) {
     };
 }
 
-function qualifies(rule, threshold, m) {
+// Current vs. required for a rule — drives the track's progress bars. Booleans read as 0/1.
+export function progressForRule(rule, threshold, m) {
     const t = Number(threshold || 0);
     switch (rule) {
-        case "level": return m.level >= t;
-        case "spend": return m.spend >= t;
-        case "events": return m.events >= t;
-        case "active_days": return m.activeDays >= t;
-        case "tenure_days": return m.tenureDays >= t;
-        case "wishlist": return m.wishlist >= t;
-        case "friends": return m.friends >= t;
-        case "leaderboard_top": return m.isTop;
-        case "all_milestones": return m.allMilestones;
-        default: return false;
+        case "level": return { current: m.level, target: t };
+        case "spend": return { current: m.spend, target: t };
+        case "events": return { current: m.events, target: t };
+        case "active_days": return { current: m.activeDays, target: t };
+        case "tenure_days": return { current: m.tenureDays, target: t };
+        case "wishlist": return { current: m.wishlist, target: t };
+        case "friends": return { current: m.friends, target: t };
+        case "leaderboard_top": return { current: m.isTop ? 1 : 0, target: 1 };
+        case "all_milestones": return { current: m.allMilestones ? 1 : 0, target: 1 };
+        default: return { current: 0, target: t || 1 };
     }
+}
+
+function qualifies(rule, threshold, m) {
+    const { current, target } = progressForRule(rule, threshold, m);
+    return current >= target;
 }
 
 // Grant any unlockable badges the member now qualifies for. Returns the newly-granted badge defs (so a
@@ -98,7 +108,7 @@ export async function syncEarnedBadges(buyerId) {
     const candidates = auto.filter((b) => !held.has(b.slug));
     if (!candidates.length) return [];
 
-    const m = await computeMetrics(buyerId).catch(() => null);
+    const m = await getMemberMetrics(buyerId).catch(() => null);
     if (!m) return [];
 
     const earned = candidates.filter((b) => qualifies(b.autoRule, b.autoThreshold, m));
