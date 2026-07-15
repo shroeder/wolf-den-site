@@ -5305,6 +5305,125 @@ body.tv-mode .shop-mobile-cart-fab {
     color: #d6d0ef;
 }
 
+/* Unified inbox rows. */
+.inbox-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 6px;
+    border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    text-decoration: none;
+    color: inherit;
+}
+.inbox-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+.inbox-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.inbox-tag {
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--muted, #b9b4c7);
+}
+.inbox-tag-dm {
+    background: rgba(255, 215, 94, 0.18);
+    color: #ffd75e;
+}
+.inbox-preview {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+.inbox-row.unread .inbox-preview {
+    color: inherit;
+    font-weight: 600;
+}
+.inbox-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffd75e;
+}
+
+/* DM conversation. */
+.dm-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.dm-peer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+}
+.dm-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.dm-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.dm-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 80%;
+}
+.dm-msg.mine {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+.dm-bubble {
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.dm-msg.mine .dm-bubble {
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    color: #1a1206;
+}
+.dm-product-chip {
+    display: inline-block;
+    margin-bottom: 4px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(255, 215, 94, 0.12);
+    border: 1px solid rgba(255, 215, 94, 0.35);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+.dm-composer {
+    display: flex;
+    gap: 8px;
+}
+.dm-composer input {
+    flex: 1 1 auto;
+}
+
 /* Friends list rows. */
 .friend-list {
     list-style: none;

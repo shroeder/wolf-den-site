@@ -40,6 +40,15 @@ export default function ProfileSettingsPage() {
                     Manage
                 </Link>
             </section>
+            <section className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                    <div style={{ fontWeight: 600 }}>Inbox</div>
+                    <div className="muted" style={{ fontSize: "0.9rem" }}>All your messages — friends and shops — in one place.</div>
+                </div>
+                <Link className="btn" href="/marketplace/inbox">
+                    Open
+                </Link>
+            </section>
         </div>
     );
 }

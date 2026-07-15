@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 function Avatar({ user }) {
@@ -34,6 +35,7 @@ function UserRow({ user, children }) {
 }
 
 export default function MarketplaceFriendsClient() {
+    const router = useRouter();
     const [friends, setFriends] = useState([]);
     const [incoming, setIncoming] = useState([]);
     const [outgoing, setOutgoing] = useState([]);
@@ -112,6 +114,18 @@ export default function MarketplaceFriendsClient() {
         setBusyId(null);
     }
 
+    async function message(userId) {
+        setBusyId(userId);
+        const r = await fetch("/api/marketplace/dm/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ toUserId: userId }),
+        }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        setBusyId(null);
+        if (d?.threadId) router.push(`/marketplace/dm/${d.threadId}`);
+    }
+
     async function remove(userId) {
         setBusyId(userId);
         await fetch("/api/marketplace/friends/respond", {
@@ -178,7 +192,7 @@ export default function MarketplaceFriendsClient() {
                     <ul className="friend-list">
                         {friends.map((u) => (
                             <UserRow key={u.id} user={u}>
-                                <Link className="button" href={`/marketplace/u/${u.alias}`}>Profile</Link>
+                                <button className="button primary" disabled={busyId === u.id} onClick={() => message(u.id)}>Message</button>
                                 <button className="button" disabled={busyId === u.id} onClick={() => remove(u.id)}>Remove</button>
                             </UserRow>
                         ))}
