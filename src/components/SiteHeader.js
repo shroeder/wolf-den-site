@@ -8,8 +8,6 @@ import { useTvMode } from "@/lib/tv-mode-client";
 
 const navItems = [
     { href: "/about", label: "About" },
-    { href: "/pokemon-cards", label: "Pokemon Cards" },
-    { href: "/magic-the-gathering", label: "Magic: The Gathering" },
     { href: "/shop", label: "Shop" },
     { href: "/marketplace/rewards", label: "🏆 Rewards" },
     { href: "/looking-for", label: "Looking For" },
@@ -18,10 +16,6 @@ const navItems = [
     { href: "/mystery-bags", label: "Mystery Bags" },
     { href: "/events", label: "Events" },
     { href: "/sell-cards", label: "Sell Your Cards" },
-    { href: "/new-players", label: "New Players" },
-    { href: "/community", label: "Community" },
-    { href: "/faq", label: "FAQ" },
-    { href: "/contact", label: "Contact" },
 ];
 
 // Initials for the account avatar, from the customer's name or email.

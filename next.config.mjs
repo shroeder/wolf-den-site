@@ -17,6 +17,14 @@ const nextConfig = {
     },
     async redirects() {
         return [
+            // Consolidated into /about (concise combined page); Just In folded into /shop.
+            { source: '/pokemon-cards', destination: '/about#games', permanent: true },
+            { source: '/magic-the-gathering', destination: '/about#games', permanent: true },
+            { source: '/community', destination: '/about#community', permanent: true },
+            { source: '/new-players', destination: '/about#new-players', permanent: true },
+            { source: '/faq', destination: '/about#faq', permanent: true },
+            { source: '/contact', destination: '/about#contact', permanent: true },
+            { source: '/just-in', destination: '/shop', permanent: true },
             {
                 source: '/:path*',
                 has: [

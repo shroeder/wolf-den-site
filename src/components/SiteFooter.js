@@ -15,10 +15,10 @@ export default function SiteFooter() {
                             <Link href="/about">About The Wolf Den</Link>
                         </li>
                         <li>
-                            <Link href="/pokemon-cards">Pokemon Cards</Link>
+                            <Link href="/about#games">Pokemon Cards</Link>
                         </li>
                         <li>
-                            <Link href="/magic-the-gathering">Magic: The Gathering</Link>
+                            <Link href="/about#games">Magic: The Gathering</Link>
                         </li>
                         <li>
                             <a href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">

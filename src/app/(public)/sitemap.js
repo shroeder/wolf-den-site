@@ -22,23 +22,15 @@ export default async function sitemap() {
             ],
         },
         {
-            url: `${BASE_URL}/pokemon-cards`,
+            // Combined About (Pokémon, Magic, community, new players, FAQ, contact all folded in here).
+            url: `${BASE_URL}/about`,
             lastModified: new Date(),
             changeFrequency: "weekly",
             priority: 0.9,
             images: [
                 `${BASE_URL}/images/pokemon-etbs-and-sealed-product-the-wolf-den-montgomery-mn.jpg`,
-                `${BASE_URL}/images/pokemon-singles-display-case-the-wolf-den-montgomery-mn.jpg`,
-            ],
-        },
-        {
-            url: `${BASE_URL}/magic-the-gathering`,
-            lastModified: new Date(),
-            changeFrequency: "weekly",
-            priority: 0.9,
-            images: [
                 `${BASE_URL}/images/magic-the-gathering-products-the-wolf-den-montgomery-mn.jpg`,
-                `${BASE_URL}/images/magic-singles-case-the-wolf-den-montgomery-mn.jpg`,
+                `${BASE_URL}/images/tcg-play-tables-the-wolf-den-montgomery-mn.jpg`,
             ],
         },
         {
@@ -98,32 +90,6 @@ export default async function sitemap() {
             changeFrequency: "monthly",
             priority: 0.7,
             images: [`${BASE_URL}/images/magic-singles-case-the-wolf-den-montgomery-mn.jpg`],
-        },
-        {
-            url: `${BASE_URL}/community`,
-            lastModified: new Date(),
-            changeFrequency: "monthly",
-            priority: 0.7,
-            images: [`${BASE_URL}/images/tcg-play-tables-the-wolf-den-montgomery-mn.jpg`],
-        },
-        {
-            url: `${BASE_URL}/new-players`,
-            lastModified: new Date(),
-            changeFrequency: "monthly",
-            priority: 0.7,
-            images: [`${BASE_URL}/images/tcg-play-tables-the-wolf-den-montgomery-mn.jpg`],
-        },
-        {
-            url: `${BASE_URL}/faq`,
-            lastModified: new Date(),
-            changeFrequency: "monthly",
-            priority: 0.6,
-        },
-        {
-            url: `${BASE_URL}/contact`,
-            lastModified: new Date(),
-            changeFrequency: "monthly",
-            priority: 0.6,
         },
     ];
 

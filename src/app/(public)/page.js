@@ -259,14 +259,14 @@ export default async function HomePage() {
                 <article className="card lift">
                     <h2>Pokemon Cards</h2>
                     <p>Browse Pokemon singles, sealed product, and beginner-friendly local league play.</p>
-                    <Link className="text-link" href="/pokemon-cards">
+                    <Link className="text-link" href="/about#games">
                         Explore Pokemon
                     </Link>
                 </article>
                 <article className="card lift">
                     <h2>Magic: The Gathering</h2>
                     <p>Find MTG singles, sealed products, and Friday Commander Night updates.</p>
-                    <Link className="text-link" href="/magic-the-gathering">
+                    <Link className="text-link" href="/about#games">
                         Explore Magic
                     </Link>
                 </article>

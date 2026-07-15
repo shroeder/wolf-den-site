@@ -1,103 +1,183 @@
-import Image from "next/image";
 import Link from "next/link";
 
+const ADDRESS = "300 1st St S, Montgomery, MN 56069";
+const MAPS_URL = "https://www.google.com/maps/search/?api=1&query=300+1st+St+S+Montgomery+MN+56069";
+const DISCORD_URL = "https://discord.gg/Pad8U2KVsD";
+const FACEBOOK_URL = "https://www.facebook.com/WolfDenGamesMN";
+const PHONE = "(701) 409-0782";
+const PHONE_TEL = "+17014090782";
+const EMAIL = "luke@wolfdengamingmn.com";
+
+const TOWNS = "Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine";
+
+const FAQS = [
+    { q: "Where is The Wolf Den located?", a: `${ADDRESS} — a real storefront in downtown Montgomery.` },
+    { q: "What are your hours?", a: "Open 7 days a week, daily 12–6 PM, with Thursday and Friday until 7 PM." },
+    { q: "Do you sell Pokémon cards?", a: "Yes — Elite Trainer Boxes, booster boxes and bundles, sleeved boosters, Pokémon Center products, singles, and accessories." },
+    { q: "Do you sell Magic: The Gathering?", a: "Yes — play boosters, collector products, Commander decks, bundles and prerelease kits, singles, sealed, and accessories." },
+    { q: "Do you buy or trade cards?", a: "Yes — cash or store credit on qualifying Pokémon, Magic, and select collectibles. Bring them in or ask us." },
+    { q: "Do you host events?", a: "Yes — Thursday Kids Card Club (4–7 PM), Friday Commander Night (4–7 PM), and Saturday Pokémon community play (12–6 PM)." },
+    { q: "Are events beginner friendly?", a: "Absolutely. Our play is casual and welcoming — no tournament experience needed, and staff are happy to teach." },
+    { q: "Can kids play at The Wolf Den?", a: "Yes. We keep family-friendly tables and love helping new and younger players learn the ropes." },
+    { q: "Do I need to be competitive to show up?", a: "Not at all — most of what we run is casual Commander and community play." },
+    { q: "Do you offer local pickup?", a: "Yes — order online and pick it up in store." },
+    { q: "How do I get inventory and event updates?", a: "Join our Discord (and follow us on Facebook), or turn on New-Arrival Alerts on the site." },
+    { q: "What areas do you serve?", a: `${TOWNS}, and the surrounding southern Minnesota communities.` },
+];
+
 export const metadata = {
-    title: "About Our Montgomery Game Store",
+    title: "About The Wolf Den — Pokémon, Magic & Local Play in Montgomery, MN",
     description:
-        "Learn about The Wolf Den, a locally owned trading card game store in Montgomery, Minnesota serving Pokemon and Magic players across southern Minnesota.",
-    alternates: {
-        canonical: "/about",
-    },
+        "Locally owned trading card game store in Montgomery, Minnesota. Pokémon and Magic: The Gathering singles, sealed product, and accessories, weekly community play, trade-ins, and new-player help — serving New Prague, Faribault, Northfield, Lonsdale, and southern Minnesota.",
+    keywords: [
+        "Pokemon cards Montgomery MN",
+        "Magic The Gathering Montgomery MN",
+        "trading card game store southern Minnesota",
+        "card shop near me",
+        "game store near me",
+        "pokemon singles",
+        "pokemon sealed product",
+        "MTG singles",
+        "Friday Commander Night",
+        "new prague pokemon cards",
+        "faribault pokemon cards",
+        "northfield pokemon cards",
+        "new prague mtg",
+        "local game store southern Minnesota",
+    ],
+    alternates: { canonical: "/about" },
 };
+
+function faqJsonLd() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: FAQS.map((f) => ({
+            "@type": "Question",
+            name: f.q,
+            acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+    };
+}
 
 export default function AboutPage() {
     return (
-        <div className="stack reveal">
-            <section className="card hero-accent">
-                <h1>About The Wolf Den</h1>
-                <p>
-                    The Wolf Den is a locally owned trading card game store in Montgomery, Minnesota focused on building a welcoming space for collectors, players, and families across southern Minnesota.
-                </p>
-                <p>
-                    We want to give local communities a nearby option for Pokemon cards, Magic: The Gathering, accessories, and in-store play without always needing to drive into the cities.
-                </p>
-            </section>
+        <div className="stack reveal about-page">
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd()) }} />
 
-            <section className="grid two-col">
-                <article className="card">
-                    <h2>Why The Store Exists</h2>
-                    <p>
-                        The goal is simple: make trading card games more accessible for people in Montgomery and the surrounding area. That means real shelf inventory, real community events, and a real place to gather around the games people already love.
-                    </p>
-                    <p>
-                        The Wolf Den is being built around long-term community growth, not just one-time sales. We want the shop to become a trusted local place for releases, trade nights, casual play, and future organized events.
-                    </p>
-                </article>
-                <article className="card">
-                    <h2>Who We Serve</h2>
-                    <ul>
-                        <li>Collectors looking for sealed product and singles</li>
-                        <li>Pokemon families and casual players</li>
-                        <li>Commander players and local MTG groups</li>
-                        <li>New players learning the hobby for the first time</li>
-                        <li>Southern Minnesota communities that want a closer local game store</li>
-                    </ul>
-                </article>
-            </section>
-
-            <section className="grid two-col">
-                <article className="card lift">
-                    <h2>Inside The Wolf Den</h2>
-                    <Image
-                        src="/images/trading-card-store-interior-the-wolf-den-montgomery-mn.jpg"
-                        alt="Interior of The Wolf Den in Montgomery, Minnesota showing card displays and local play space"
-                        width={1200}
-                        height={900}
-                        sizes="(max-width: 900px) 100vw, 48vw"
-                        className="content-photo"
-                    />
-                </article>
-                <article className="card lift">
-                    <h2>Real Storefront Inventory</h2>
-                    <Image
-                        src="/images/local-game-store-interior-the-wolf-den-montgomery-mn.jpg"
-                        alt="Wide interior view of The Wolf Den storefront with shelves, display cases, and counter area"
-                        width={1200}
-                        height={900}
-                        sizes="(max-width: 900px) 100vw, 48vw"
-                        className="content-photo"
-                    />
-                </article>
-            </section>
-
-            <section className="card">
-                <h2>Serving Southern Minnesota</h2>
-                <p>
-                    The Wolf Den serves Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and surrounding southern Minnesota communities.
+            <section className="card hero-accent" id="top">
+                <h1>The Wolf Den</h1>
+                <p className="lead">
+                    A locally owned trading card game store in <strong>Montgomery, Minnesota</strong> — Pokémon and Magic:
+                    The Gathering, sealed and singles, weekly community play, and trade-ins. A real local option for players,
+                    collectors, and families across southern Minnesota, without the drive into the cities.
                 </p>
-                <p>
-                    We know many players have been underserved locally. The shop is meant to help shorten that drive and give the area a stronger local trading card community.
-                </p>
-            </section>
-
-            <section className="card">
-                <h2>Visit or Stay Connected</h2>
-                <p>300 1st St S, Montgomery, MN 56069</p>
                 <div className="cta-row">
-                    <a className="button primary" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
-                        Join Discord
-                    </a>
-                    <Link className="button" href="/events">
-                        View Events
-                    </Link>
-                    <a
-                        className="button"
-                        href="https://www.google.com/maps/search/?api=1&query=300+1st+St+S,+Montgomery,+MN+56069"
-                        target="_blank"
-                        rel="noreferrer"
-                    >
-                        Get Directions
-                    </a>
+                    <Link href="/shop" className="button primary">Shop Inventory</Link>
+                    <Link href="/events" className="button">View Events</Link>
+                    <a href={MAPS_URL} className="button" target="_blank" rel="noreferrer">Get Directions</a>
+                    <a href={DISCORD_URL} className="button" target="_blank" rel="noreferrer">Join Discord</a>
+                </div>
+            </section>
+
+            <section className="card" id="games">
+                <h2>What We Carry</h2>
+                <div className="grid two-col about-games">
+                    <article>
+                        <h3>🔴 Pokémon TCG</h3>
+                        <p>
+                            Elite Trainer Boxes, booster boxes and bundles, sleeved boosters and premium collections, Pokémon
+                            Center products, plus singles, sleeves, binders, and deck boxes. Rotating stock of current
+                            expansions.
+                        </p>
+                        <Link href="/shop" className="text-link">Shop Pokémon →</Link>
+                    </article>
+                    <article>
+                        <h3>⚫ Magic: The Gathering</h3>
+                        <p>
+                            Play booster boxes, collector products, Commander decks, bundles and prerelease kits, singles, and
+                            sealed — focused on current releases and Commander. Sleeves and accessories too.
+                        </p>
+                        <Link href="/shop" className="text-link">Shop Magic →</Link>
+                    </article>
+                </div>
+                <p className="secondary about-trade">
+                    We also <strong>buy and trade</strong> — cash or store credit on qualifying Pokémon, Magic, and select
+                    collectibles. <Link href="/sell-cards" className="text-link">Sell or trade your cards →</Link>
+                </p>
+            </section>
+
+            <section className="card" id="community">
+                <h2>Weekly Play &amp; Community</h2>
+                <p>
+                    The Wolf Den is built to be a gathering place, not just a shelf. Casual, welcoming tables — new players
+                    always welcome.
+                </p>
+                <ul className="about-events">
+                    <li><strong>Thursday · Kids Card Club</strong> — 4–7 PM</li>
+                    <li><strong>Friday · Commander Night</strong> — 4–7 PM casual Commander, trading, learn-to-play</li>
+                    <li><strong>Saturday · Pokémon Community</strong> — 12–6 PM</li>
+                </ul>
+                <div className="cta-row">
+                    <a href={DISCORD_URL} className="button primary" target="_blank" rel="noreferrer">Join Discord</a>
+                    <a href={FACEBOOK_URL} className="button" target="_blank" rel="noreferrer">Follow on Facebook</a>
+                    <Link href="/events" className="button">All Events</Link>
+                </div>
+            </section>
+
+            <section className="card" id="new-players">
+                <h2>New to the Hobby?</h2>
+                <p>
+                    Beginners, parents, and families are exactly who this store is for. Start small — a starter product,
+                    sleeves, a deck box, a binder — and ask us anything before you overspend. Commander and casual Pokémon
+                    are the easiest ways in, and you never need tournament experience to sit down and play.
+                </p>
+                <div className="cta-row">
+                    <Link href="/events" className="button primary">Come to a Community Night</Link>
+                    <Link href="/shop" className="button">Browse Starter Product</Link>
+                </div>
+            </section>
+
+            <section className="card" id="visit">
+                <h2>Visit Us</h2>
+                <div className="grid two-col about-visit">
+                    <div>
+                        <p><strong>Address</strong><br />{ADDRESS}</p>
+                        <p><strong>Hours</strong><br />Daily 12–6 PM · Thursday &amp; Friday until 7 PM</p>
+                    </div>
+                    <div>
+                        <p><strong>Phone</strong><br /><a href={`tel:${PHONE_TEL}`} className="text-link">{PHONE}</a></p>
+                        <p><strong>Email</strong><br /><a href={`mailto:${EMAIL}`} className="text-link">{EMAIL}</a></p>
+                    </div>
+                </div>
+                <p className="secondary">
+                    Serving {TOWNS}, and nearby southern Minnesota.
+                </p>
+                <div className="cta-row">
+                    <a href={MAPS_URL} className="button primary" target="_blank" rel="noreferrer">Get Directions</a>
+                </div>
+            </section>
+
+            <section className="card" id="faq">
+                <h2>FAQ</h2>
+                <dl className="about-faq">
+                    {FAQS.map((f) => (
+                        <div key={f.q} className="about-faq-item">
+                            <dt>{f.q}</dt>
+                            <dd>{f.a}</dd>
+                        </div>
+                    ))}
+                </dl>
+            </section>
+
+            <section className="card" id="contact">
+                <h2>Contact Us</h2>
+                <p>Questions about inventory, events, trade-ins, or getting started? The fastest ways to reach us:</p>
+                <div className="cta-row">
+                    <a href={`tel:${PHONE_TEL}`} className="button primary">Call {PHONE}</a>
+                    <a href={`mailto:${EMAIL}`} className="button">Email Us</a>
+                    <a href={DISCORD_URL} className="button" target="_blank" rel="noreferrer">Ask on Discord</a>
+                    <a href={MAPS_URL} className="button" target="_blank" rel="noreferrer">Get Directions</a>
                 </div>
             </section>
         </div>

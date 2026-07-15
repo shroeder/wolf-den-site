@@ -103,7 +103,7 @@ export default function SellCardsPage() {
                     The Wolf Den is a local option for sellers in Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine, and nearby southern Minnesota communities who want to sell Pokemon cards, Magic cards, or collections without a long drive.
                 </p>
                 <div className="cta-row">
-                    <Link className="button primary" href="/contact">
+                    <Link className="button primary" href="/about#contact">
                         Contact The Store
                     </Link>
                     <a className="button" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">

@@ -575,6 +575,55 @@ main.content {
     gap: 12px;
     margin-top: 10px;
 }
+
+/* Consolidated About page. */
+.about-page .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+.about-games article h3 {
+    margin-top: 0;
+}
+.about-trade {
+    margin-top: 14px;
+}
+.about-events {
+    list-style: none;
+    margin: 12px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.about-events li {
+    padding: 10px 14px;
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+}
+.about-visit p {
+    margin: 0 0 12px;
+}
+.about-faq {
+    margin: 0;
+}
+.about-faq-item {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+}
+.about-faq-item:last-child {
+    border-bottom: none;
+}
+.about-faq dt {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.about-faq dd {
+    margin: 0;
+    color: var(--ink-secondary, #b9b4c7);
+}
 @media (max-width: 560px) {
     .account-hub-fields {
         grid-template-columns: 1fr;
