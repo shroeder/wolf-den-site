@@ -6295,6 +6295,30 @@ body.tv-mode .shop-mobile-cart-fab {
     font-weight: 700;
     color: #ffd75e;
 }
+/* Earn items are clickable CTAs; completed ones read green. */
+.mkt-earn-cta {
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 150ms ease, transform 150ms ease, background 150ms ease;
+}
+.mkt-earn-cta .mkt-earn-label {
+    color: var(--ink);
+}
+.mkt-earn-cta:hover {
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    transform: translateY(-1px);
+}
+.mkt-earn-done {
+    border-color: color-mix(in srgb, #4caf50 45%, transparent);
+    background: color-mix(in srgb, #4caf50 9%, transparent);
+}
+.mkt-earn-done .mkt-earn-note {
+    color: #4caf50;
+}
+.mkt-earn-done .mkt-earn-points {
+    color: #4caf50;
+}
 /* Accent pill to make the Rewards link pop in the hero. */
 .pill.pill-accent {
     background: linear-gradient(90deg, #c8a24a, #ffd75e);

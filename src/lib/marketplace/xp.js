@@ -9,6 +9,31 @@ import { db } from "@/lib/db";
 // Anti-farm: dollars spent are uncapped (real money), everything else is capped via dedupe keys
 // (once-per-entity) and per-action daily caps at the call sites. The grindable actions' daily caps sum
 // under ~50 XP/day, so no amount of busywork moves you fast — only spending does.
+// Which rewards milestones a member has completed — drives the "How you earn" checklist. Repeatable
+// ones (spend, event, daily) report whether they've been earned (daily = earned today).
+export async function getRewardsProgress(buyerId) {
+    if (!buyerId) return {};
+    const rows = await db.query(`SELECT DISTINCT action FROM mkt_xp_event WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const actions = new Set(rows.map((r) => r.action));
+    const todayActive = await db
+        .queryOne(
+            `SELECT 1 FROM mkt_xp_event
+              WHERE buyer_id = $1 AND action = 'daily_active'
+                AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
+              LIMIT 1`,
+            [buyerId]
+        )
+        .catch(() => null);
+    return {
+        spend: actions.has("purchase_spend"),
+        first_purchase: actions.has("first_purchase"),
+        event_checkin: actions.has("event_checkin"),
+        discord_link: actions.has("discord_link"),
+        profile_complete: actions.has("profile_complete"),
+        daily_active: Boolean(todayActive),
+    };
+}
+
 export const XP_ACTIONS = {
     message: 5, // sending a message — dedupe once/thread/day, plus a 3/day cap
     wishlist_add: 10, // adding a card to a wishlist — dedupe once/card, plus a 3/day cap
