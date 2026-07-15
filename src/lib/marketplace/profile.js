@@ -140,12 +140,13 @@ export async function equipBorder(buyerId, borderId) {
     const border = borderById(borderId);
     const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
     const level = levelForXp(row?.xp || 0).level;
-    // Staff (owner/site_admin/staff) can wear any frame — a perk + lets the team demo/gift borders.
-    const staff = await db
-        .queryOne(`SELECT 1 AS ok FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'site_admin', 'staff') LIMIT 1`, [buyerId])
-        .catch(() => null);
-    if (border.id !== "none" && !staff && !isBorderUnlocked(border.id, level)) {
-        throw new Error(`That border unlocks at Level ${border.level}.`);
+    // Badges gate role borders; owner/site_admin/staff also get an "unlock all LEVEL borders" perk (but
+    // NOT role borders — those still need the actual badge).
+    const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const badges = badgeRows.map((r) => r.badge_slug);
+    const unlockAll = badges.some((s) => ["owner", "site_admin", "staff"].includes(s));
+    if (border.id !== "none" && !isBorderUnlocked(border.id, level, { badges, unlockAll })) {
+        throw new Error(border.requiresBadges ? `That frame is ${border.lockLabel || "role"}-exclusive.` : `That border unlocks at Level ${border.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_border = $2, updated_at = NOW() WHERE id = $1`, [buyerId, border.id === "none" ? null : border.id]);
     return getProfile(buyerId);

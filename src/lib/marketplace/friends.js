@@ -16,10 +16,33 @@ function mapUser(row) {
         displayLabel: row.display_name || row.alias || "Member",
         avatarUrl: row.avatar_url || null,
         level: levelForXp(row.xp || 0).level,
+        border: row.equipped_border || "none",
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, xp";
+const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border";
+
+// Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
+async function attachBadges(users) {
+    const list = users.filter(Boolean);
+    const ids = list.map((u) => u.id);
+    if (!ids.length) return users;
+    const rows = await db
+        .query(
+            `SELECT ub.buyer_id, b.slug, b.icon, b.label, b.color, b.admin_only
+               FROM mkt_user_badge ub JOIN mkt_badge b ON b.slug = ub.badge_slug
+              WHERE ub.buyer_id = ANY($1)
+              ORDER BY b.sort_order ASC`,
+            [ids]
+        )
+        .catch(() => []);
+    const byId = new Map();
+    for (const r of rows) {
+        if (!byId.has(r.buyer_id)) byId.set(r.buyer_id, []);
+        byId.get(r.buyer_id).push({ slug: r.slug, icon: r.icon || null, label: r.label, color: r.color || null, adminOnly: r.admin_only !== false });
+    }
+    return users.map((u) => (u ? { ...u, badges: byId.get(u.id) || [] } : u));
+}
 
 // Search members to add (by @handle or name). Excludes self. Annotates the relationship so the UI can
 // show "Add" / "Requested" / "Friends" / "Respond".
@@ -41,7 +64,7 @@ export async function searchUsers(query, viewerId, limit = 15) {
     const withStatus = await Promise.all(
         rows.map(async (r) => ({ ...mapUser(r), relation: await friendStatus(viewerId, r.id) }))
     );
-    return withStatus;
+    return attachBadges(withStatus);
 }
 
 // Browseable member directory: every member with a public @handle, newest-strongest first, annotated
@@ -76,7 +99,7 @@ export async function listMembers(viewerId, { q = "", limit = 60, offset = 0 } =
         const other = f.requester_id === viewerId ? f.addressee_id : f.requester_id;
         relMap.set(other, f.status === "accepted" ? "friends" : f.requester_id === viewerId ? "outgoing" : "incoming");
     }
-    return rows.map((r) => ({ ...mapUser(r), relation: relMap.get(r.id) || "none" }));
+    return attachBadges(rows.map((r) => ({ ...mapUser(r), relation: relMap.get(r.id) || "none" })));
 }
 
 // Relationship of `otherId` to `viewerId`: none | friends | outgoing (viewer requested) | incoming.
@@ -166,7 +189,7 @@ export async function listFriends(userId) {
             [userId]
         )
         .catch(() => []);
-    return rows.map(mapUser);
+    return attachBadges(rows.map(mapUser));
 }
 
 // Pending requests: incoming (awaiting my response) + outgoing (I sent). Incoming carry the request id.
@@ -187,8 +210,8 @@ export async function listPending(userId) {
         ).catch(() => []),
     ]);
     return {
-        incoming: incoming.map((r) => ({ requestId: r.request_id, ...mapUser(r) })),
-        outgoing: outgoing.map((r) => ({ requestId: r.request_id, ...mapUser(r) })),
+        incoming: await attachBadges(incoming.map((r) => ({ requestId: r.request_id, ...mapUser(r) }))),
+        outgoing: await attachBadges(outgoing.map((r) => ({ requestId: r.request_id, ...mapUser(r) }))),
     };
 }
 

@@ -63,6 +63,7 @@ export default async function ProfileHubPage() {
                     avatarUrl={profile?.avatarUrl}
                     displayLabel={profile?.displayLabel}
                     unlockAll={isStaff}
+                    badges={(profile?.badges || []).map((b) => b.slug)}
                 />
             </section>
 

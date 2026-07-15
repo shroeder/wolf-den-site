@@ -6028,6 +6028,27 @@ body.tv-mode .shop-mobile-cart-fab {
     75% { box-shadow: 0 0 0 3px #38bdf8, 0 0 16px rgba(56, 189, 248, 0.7); }
     100% { box-shadow: 0 0 0 3px #c084fc, 0 0 16px rgba(192, 132, 252, 0.7); }
 }
+/* --- Role-exclusive (badge-gated) frames --- */
+.av-border-role_admin { animation: av-role-admin 3s linear infinite; }
+.av-border-role_dev { animation: av-role-dev 1.6s ease-in-out infinite; }
+.av-border-role_staff { animation: av-role-staff 3.2s linear infinite; }
+.av-border-role_volunteer { animation: av-role-volunteer 2.4s ease-in-out infinite; }
+@keyframes av-role-admin {
+    0%, 100% { box-shadow: 0 0 0 3px #3b82f6, 0 0 16px rgba(59, 130, 246, 0.85); }
+    50% { box-shadow: 0 0 0 3px #ffd75e, 0 0 16px rgba(255, 215, 94, 0.85); }
+}
+@keyframes av-role-dev {
+    0%, 100% { box-shadow: 0 0 0 3px #22c55e, 0 0 10px rgba(34, 197, 94, 0.6); }
+    50% { box-shadow: 0 0 0 3px #4ade80, 0 0 22px rgba(34, 197, 94, 1); }
+}
+@keyframes av-role-staff {
+    0%, 100% { box-shadow: 0 0 0 3px #ffd75e, 0 0 16px rgba(255, 215, 94, 0.85); }
+    50% { box-shadow: 0 0 0 3px #a06cff, 0 0 16px rgba(160, 108, 255, 0.85); }
+}
+@keyframes av-role-volunteer {
+    0%, 100% { box-shadow: 0 0 0 3px #2dd4bf, 0 0 10px rgba(45, 212, 191, 0.6); }
+    50% { box-shadow: 0 0 0 3px #5eead4, 0 0 20px rgba(45, 212, 191, 0.95); }
+}
 @media (prefers-reduced-motion: reduce) {
     [class*="av-border-"] { animation: none !important; }
 }
@@ -6079,6 +6100,52 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 .border-swatch-label { font-weight: 700; font-size: 0.85rem; }
 .border-swatch-sub { font-size: 0.72rem; text-align: center; }
+
+/* ===== Member hero card ===== */
+.hero-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    transition: border-color 140ms ease, background 140ms ease;
+}
+.hero-card:hover { border-color: rgba(255, 215, 94, 0.28); }
+.hero-card-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-decoration: none;
+    color: var(--ink);
+}
+.hero-card-av {
+    position: relative;
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2a2340, #1c1830);
+    color: #ffd75e;
+    font-weight: 800;
+    font-size: 1.1rem;
+}
+.hero-card-av img { width: 100%; height: 100%; object-fit: cover; }
+.hero-card-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hero-card-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-card-handle { font-size: 0.8rem; }
+.hero-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
+.hero-card-lv { font-size: 0.78rem; font-weight: 700; color: #ffd75e; }
+.rank-chip-sm { font-size: 0.72rem; padding: 1px 8px; }
+.hero-card-action { flex: 0 0 auto; }
+.hero-card .user-badges { margin-top: 4px; }
 
 /* Loyalty membership card — shown at the register to earn XP. */
 .loyalty-card {
@@ -6361,6 +6428,162 @@ body.tv-mode .shop-mobile-cart-fab {
 
 /* Friends list rows. */
 /* --- Hoisted messaging dock (global, every marketplace page) --- */
+/* ===== Social hub (site-wide floating friends + messaging) ===== */
+.social-fab {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 900;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 215, 94, 0.5);
+    background: linear-gradient(135deg, #e6c76b, #d4af37 52%, #b8912e);
+    color: #171008;
+    font-size: 1.5rem;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.social-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
+.social-fab-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: #e5484d;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg, #0e0e12);
+}
+.social-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 86px;
+    z-index: 900;
+    width: min(400px, calc(100vw - 32px));
+    height: min(600px, calc(100vh - 130px));
+    display: flex;
+    flex-direction: column;
+    background: var(--surface, #16161c);
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+    border-radius: 16px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+.social-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px 0;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+}
+.social-tab {
+    flex: 1 1 auto;
+    padding: 9px 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted, #b9b4c8);
+    font-weight: 700;
+    font-size: 0.9rem;
+    border-bottom: 2px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+.social-tab.is-active { color: #ffd75e; border-bottom-color: #ffd75e; }
+.social-tab-badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #e5484d;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.social-close { flex: 0 0 auto; background: none; border: none; color: var(--muted, #b9b4c8); font-size: 1.4rem; cursor: pointer; padding: 0 6px; }
+.social-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px; }
+.social-people, .social-list { display: flex; flex-direction: column; gap: 8px; }
+.social-list-top { display: flex; justify-content: flex-end; }
+.social-list-full { font-size: 0.82rem; }
+.social-empty { padding: 18px 6px; text-align: center; }
+.social-section-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted, #b9b4c8);
+    margin: 6px 2px 2px;
+}
+.social-search {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink);
+    font: inherit;
+    margin-bottom: 4px;
+}
+.social-mini-btn {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.social-mini-btn.is-primary { background: linear-gradient(90deg, #c8a24a, #ffd75e); color: #171008; border-color: transparent; }
+.social-mini-btn:disabled { opacity: 0.6; cursor: default; }
+.social-mini-tag { font-size: 0.78rem; color: var(--muted, #b9b4c8); font-weight: 600; }
+.social-req-actions { display: flex; flex-direction: column; gap: 6px; }
+.social-msg-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ink);
+    cursor: pointer;
+    text-decoration: none;
+}
+.social-msg-row:hover { border-color: rgba(255, 215, 94, 0.25); }
+.social-dot { width: 8px; height: 8px; border-radius: 50%; background: #e5484d; flex: 0 0 auto; }
+.social-dot-spacer { width: 8px; flex: 0 0 auto; }
+.social-msg-main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.social-msg-top { display: flex; align-items: center; gap: 6px; }
+.social-msg-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.social-msg-tag { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 215, 94, 0.14); color: #ffd75e; }
+.social-msg-preview { font-size: 0.82rem; color: var(--muted, #b9b4c8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) {
+    .social-panel { right: 12px; left: 12px; width: auto; bottom: 84px; height: min(72vh, 560px); }
+    .social-fab { right: 16px; bottom: 16px; }
+}
+
 .mkt-dock-btn {
     position: fixed;
     right: 20px;

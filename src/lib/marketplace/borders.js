@@ -1,8 +1,10 @@
-// Custom profile borders — cosmetic avatar frames unlocked by level and equipped by the member.
-// Pure (no server-only) so the picker, header, track, and any avatar surface can import from here.
-// The visual for each id lives in globals.css as `.av-border-<id>` (box-shadow rings/glows so they
-// render on ANY avatar without being clipped). `level` = unlock level; `animated`/`glow` are hints;
-// `icon` is shown on the rewards track. Keep ids STABLE (they're stored in mkt_buyer.equipped_border).
+// Custom profile borders — cosmetic avatar frames. Two kinds:
+//   • Level borders — unlocked by reaching a level (the grindable collection).
+//   • Role borders — EXCLUSIVE, unlocked only by holding a specific badge (Admin/Dev/Staff/Volunteer).
+//     Role borders are NOT unlocked by the staff "unlockAll" bypass — you need the actual badge.
+// Pure (no server-only) so the picker, header, track, hero cards, and any avatar surface can import it.
+// The visual for each id lives in globals.css as `.av-border-<id>`. Keep ids STABLE (they're stored in
+// mkt_buyer.equipped_border).
 export const BORDERS = [
     { id: "none", label: "No border", level: 1, icon: "⚪", hint: "Clean look", animated: false },
     { id: "ember", label: "Ember", level: 3, icon: "🔥", hint: "A warm breathing glow", animated: true },
@@ -24,15 +26,23 @@ export const BORDERS = [
     { id: "rainbow", label: "Rainbow", level: 48, icon: "🌈", hint: "Full-spectrum cycle", animated: true },
     { id: "cosmic", label: "Cosmic", level: 49, icon: "✨", hint: "Deep-space color drift", animated: true },
     { id: "legendary", label: "Legendary", level: 50, icon: "👑", hint: "The rarest frame in the Den", animated: true },
+    // --- Role-exclusive (badge-gated) ---
+    { id: "role_volunteer", label: "Volunteer", icon: "🙌", hint: "Volunteer-only frame", animated: true, requiresBadges: ["volunteer"], lockLabel: "Volunteers" },
+    { id: "role_staff", label: "Staff", icon: "⭐", hint: "Staff-only frame", animated: true, requiresBadges: ["staff"], lockLabel: "Staff only" },
+    { id: "role_dev", label: "Developer", icon: "💻", hint: "Dev-only frame", animated: true, requiresBadges: ["developer"], lockLabel: "Devs only" },
+    { id: "role_admin", label: "Admin", icon: "🛡️", hint: "Admin-only frame", animated: true, requiresBadges: ["owner", "site_admin"], lockLabel: "Admins only" },
 ];
 
 export function borderById(id) {
     return BORDERS.find((b) => b.id === id) || BORDERS[0];
 }
 
-// True if a member at `level` has unlocked this border.
-export function isBorderUnlocked(id, level) {
-    return (Math.max(1, Math.floor(Number(level) || 1))) >= borderById(id).level;
+// True if a member has unlocked this border. Role borders require the badge; level borders the level
+// (or `unlockAll`, the staff bypass — which does NOT unlock role borders).
+export function isBorderUnlocked(id, level, { badges = [], unlockAll = false } = {}) {
+    const b = borderById(id);
+    if (b.requiresBadges) return b.requiresBadges.some((s) => badges.includes(s));
+    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= b.level;
 }
 
 // The class(es) to hang on an avatar container so it renders the frame. Empty for the default/none.
@@ -40,8 +50,7 @@ export function borderClass(id) {
     return id && id !== "none" ? `av-border av-border-${id}` : "";
 }
 
-// The catalog annotated with unlocked state for the picker. `unlockAll` (staff perk) unlocks everything.
-export function bordersForLevel(level, unlockAll = false) {
-    const lvl = Math.max(1, Math.floor(Number(level) || 1));
-    return BORDERS.map((b) => ({ ...b, unlocked: unlockAll || lvl >= b.level }));
+// The catalog annotated with unlocked state for the picker.
+export function bordersForLevel(level, { unlockAll = false, badges = [] } = {}) {
+    return BORDERS.map((b) => ({ ...b, unlocked: isBorderUnlocked(b.id, level, { badges, unlockAll }) }));
 }

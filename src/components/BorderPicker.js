@@ -8,12 +8,12 @@ import { bordersForLevel } from "@/lib/marketplace/borders.js";
 // Lets a member equip a cosmetic avatar border they've unlocked. Each swatch previews the frame on
 // THEIR avatar. Equipping POSTs to /api/marketplace/border then router.refresh() so the hero (and
 // every server-rendered avatar) picks up the change. Locked frames show their unlock level.
-export default function BorderPicker({ current = "none", level = 1, avatarUrl = null, displayLabel = "", unlockAll = false }) {
+export default function BorderPicker({ current = "none", level = 1, avatarUrl = null, displayLabel = "", unlockAll = false, badges = [] }) {
     const router = useRouter();
     const [equipped, setEquipped] = useState(current || "none");
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
-    const borders = bordersForLevel(level, unlockAll);
+    const borders = bordersForLevel(level, { unlockAll, badges });
     const initial = (displayLabel || "?").slice(0, 1).toUpperCase();
 
     async function equip(id, unlocked) {
@@ -64,7 +64,7 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
                                 {!b.unlocked ? <span className="border-swatch-lock" aria-hidden="true">🔒</span> : null}
                             </span>
                             <span className="border-swatch-label">{b.label}</span>
-                            <span className="border-swatch-sub muted">{b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : `Lv ${b.level}`}</span>
+                            <span className="border-swatch-sub muted">{b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : `Lv ${b.level}`)}</span>
                         </button>
                     );
                 })}
