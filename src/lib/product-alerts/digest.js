@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 import { sendNewArrivalsDigestEmail } from "@/lib/product-alerts/email";
+import { sendBuyerPush } from "@/lib/push/send";
 
 const digestLogger = createServerLogger({ source: "job", subsystem: "product-alerts-digest" });
 
@@ -16,6 +17,7 @@ export async function runProductAlertDigest() {
         `SELECT
             s.id AS subscriber_id,
             s.email AS email,
+            s.buyer_id AS buyer_id,
             s.unsubscribe_token AS unsubscribe_token,
             a.square_category_id AS category_id,
             cat.name AS category_name,
@@ -41,6 +43,7 @@ export async function runProductAlertDigest() {
         if (!subscriber) {
             subscriber = {
                 email: row.email,
+                buyerId: row.buyer_id || null,
                 unsubscribeToken: row.unsubscribe_token,
                 categories: new Map(), // categoryId -> { name, items:Map(itemKey -> {name, kind}) }
                 maxCreatedAt: row.created_at,
@@ -81,6 +84,18 @@ export async function runProductAlertDigest() {
 
         try {
             await sendNewArrivalsDigestEmail(subscriber.email, sections, subscriber.unsubscribeToken);
+
+            // Also push to the linked account's devices (best-effort; no-op if no push tokens).
+            if (subscriber.buyerId) {
+                const catNames = sections.map((s) => s.categoryName);
+                const label = catNames.slice(0, 2).join(", ") + (catNames.length > 2 ? "…" : "");
+                await sendBuyerPush(subscriber.buyerId, {
+                    title: "New arrivals at The Wolf Den",
+                    body: `${sectionItemCount} new ${sectionItemCount === 1 ? "item" : "items"}${label ? ` in ${label}` : ""}`,
+                    route: "alerts",
+                    data: { type: "new_arrivals" },
+                }).catch(() => {});
+            }
 
             await db.query(
                 `UPDATE product_alert_subscribers SET last_notified_at = $2, updated_at = NOW() WHERE id = $1`,

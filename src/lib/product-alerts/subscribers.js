@@ -54,6 +54,40 @@ export async function upsertSubscriberWithCategories(email, categoryIds) {
 }
 
 /**
+ * Account-based subscribe: the signed-in buyer follows `categoryIds`. Uses the account's already-
+ * verified email (no double opt-in), links buyer_id (so alerts can also push), and baselines
+ * last_notified_at so they only get arrivals from now on. Returns { ok, categoryIds } or { error }.
+ */
+export async function upsertAccountSubscriber(buyer, categoryIds) {
+    const validCategoryIds = await filterKnownCategoryIds(categoryIds);
+
+    if (!validCategoryIds.length) {
+        return { error: "no_categories" };
+    }
+
+    const normalized = normalizeEmail(buyer.email);
+
+    const subscriber = await db.queryOne(
+        `INSERT INTO product_alert_subscribers (
+            email, email_normalized, email_verified, buyer_id, unsubscribe_token, last_notified_at
+         ) VALUES ($1, $2, TRUE, $3, $4, NOW())
+         ON CONFLICT (email_normalized) DO UPDATE SET
+            email = EXCLUDED.email,
+            email_verified = TRUE,
+            buyer_id = EXCLUDED.buyer_id,
+            verify_token_hash = NULL,
+            last_notified_at = COALESCE(product_alert_subscribers.last_notified_at, NOW()),
+            updated_at = NOW()
+         RETURNING id`,
+        [String(buyer.email).trim(), normalized, buyer.id, createRawToken()]
+    );
+
+    await setCategories(subscriber.id, validCategoryIds);
+
+    return { ok: true, categoryIds: validCategoryIds };
+}
+
+/**
  * Replace a subscriber's followed categories with exactly `categoryIds`.
  */
 export async function setCategories(subscriberId, categoryIds) {

@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 export default function ProductAlertsSignupClient() {
     const [categories, setCategories] = useState([]);
     const [selected, setSelected] = useState(() => new Set());
-    const [email, setEmail] = useState("");
+    const [account, setAccount] = useState(null);
+    const [authChecked, setAuthChecked] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [message, setMessage] = useState("");
     const [done, setDone] = useState(false);
@@ -53,6 +55,28 @@ export default function ProductAlertsSignupClient() {
         };
     }, []);
 
+    // Account required — resolve the signed-in member.
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (res.ok) {
+                    const d = await res.json().catch(() => null);
+                    const mail = d?.buyer?.email || d?.account?.email || "";
+                    if (!ignore && mail) setAccount({ email: mail });
+                }
+            } catch {
+                /* signed out */
+            } finally {
+                if (!ignore) setAuthChecked(true);
+            }
+        })();
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
     function toggleCategory(id) {
         setSelected((prev) => {
             const next = new Set(prev);
@@ -76,16 +100,16 @@ export default function ProductAlertsSignupClient() {
             const response = await fetch("/api/product-alerts/subscribe", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ email, categoryIds: Array.from(selected) }),
+                body: JSON.stringify({ categoryIds: Array.from(selected) }),
             });
             const data = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(data?.error || "Could not sign you up.");
+                throw new Error(data?.error || "Could not turn on alerts.");
             }
 
             setDone(true);
-            setMessage(data.message || "Check your inbox to confirm.");
+            setMessage(data.message || "Alerts are on.");
         } catch (error) {
             setMessage(error?.message || "Could not sign you up.");
         } finally {
@@ -98,8 +122,8 @@ export default function ProductAlertsSignupClient() {
             <section className="card hero-accent">
                 <h1>New-Arrival Alerts</h1>
                 <p>
-                    Pick the categories you care about and we&apos;ll email you when new stock lands in the shop —
-                    including restocks of items that sold out. One quick confirmation and you&apos;re set.
+                    Pick the categories you care about and we&apos;ll email and notify you when new stock lands in the
+                    shop — including restocks of items that sold out. Saved to your free Wolf Den account.
                 </p>
                 {banner ? <p className="statement-copy">{banner}</p> : null}
             </section>
@@ -129,25 +153,24 @@ export default function ProductAlertsSignupClient() {
                             )}
                         </fieldset>
 
-                        <label htmlFor="pa-email">Email</label>
-                        <input
-                            id="pa-email"
-                            type="email"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                            placeholder="you@example.com"
-                            required
-                        />
+                        {account ? (
+                            <button
+                                className="button primary"
+                                type="submit"
+                                disabled={submitting || selected.size === 0}
+                            >
+                                {submitting ? "Turning on…" : "Turn on alerts"}
+                            </button>
+                        ) : authChecked ? (
+                            <div>
+                                <p className="muted" style={{ marginBottom: 8 }}>
+                                    Create a free Wolf Den account to turn on alerts — it syncs with the app and your rewards.
+                                </p>
+                                <Link href="/marketplace/login?signup=1" className="btn-gold">Create your free account →</Link>
+                            </div>
+                        ) : null}
 
-                        <button
-                            className="button primary"
-                            type="submit"
-                            disabled={submitting || selected.size === 0}
-                        >
-                            {submitting ? "Signing up…" : "Sign up for alerts"}
-                        </button>
-
-                        {selected.size === 0 ? (
+                        {account && selected.size === 0 ? (
                             <p className="muted">Pick at least one category to continue.</p>
                         ) : null}
                         {message ? <p className="statement-copy">{message}</p> : null}

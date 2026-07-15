@@ -52,6 +52,10 @@
             "schedule": "0 8 * * *"
         },
         {
+            "path": "/api/jobs/product-alerts",
+            "schedule": "0 9 * * *"
+        },
+        {
             "path": "/api/jobs/inventory-feed",
             "schedule": "*/15 * * * *"
         },
