@@ -10,6 +10,7 @@ import {
 } from "@/lib/consignment/square";
 import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
+import { awardPurchaseXp } from "@/lib/marketplace/xp.js";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
@@ -405,6 +406,24 @@ export async function POST(request) {
                         data: { orderId: updatedOrder.id },
                     }),
                 ]);
+
+                // Loyalty XP: credit the matching marketplace account (linked by email) for this
+                // purchase — merchandise subtotal only, deduped by order id. Best-effort.
+                try {
+                    const purchaseEmail =
+                        updatedOrder.customer_email || authenticatedCustomer?.email || fulfillment.shipping?.email || null;
+                    await awardPurchaseXp({
+                        email: purchaseEmail,
+                        amountCents: updatedOrder.subtotal_cents || cart.subtotalCents || 0,
+                        orderId: updatedOrder.id,
+                        squareCustomerId: authenticatedCustomer?.squareCustomerId || null,
+                    });
+                } catch (xpError) {
+                    logger.warn("shop.checkout.loyalty_xp_failed", {
+                        orderId: updatedOrder.id,
+                        errorMessage: xpError instanceof Error ? xpError.message : "unknown_error",
+                    });
+                }
 
                 if (saveCustomerProfile && fulfillment.fulfillmentMode === "shipping" && fulfillment.shipping) {
                     await upsertSquareCustomerProfile({

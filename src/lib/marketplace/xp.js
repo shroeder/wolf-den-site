@@ -87,6 +87,43 @@ export function dailyKey(action, buyerId, scope = "") {
     return `${action}:${buyerId}:${scope}:${day}`;
 }
 
+// Credit loyalty XP for a completed purchase to the matching marketplace account (found by email, or a
+// known buyerId). Best-effort. Awards: $1 spent = 1 XP (uncapped, once/order) + a flat purchase bonus
+// (once/order, capped 1/day) + a one-time first-purchase bonus. Also links the account to its Square
+// customer for in-store loyalty later. Dollars are computed from the merchandise subtotal the caller
+// passes (not tax/shipping). Deduped by order id so re-processing an order never double-credits.
+export async function awardPurchaseXp({ email = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
+    let id = buyerId;
+    if (!id && email) {
+        const row = await db
+            .queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1`, [String(email).trim().toLowerCase()])
+            .catch(() => null);
+        id = row?.id || null;
+    }
+    if (!id) return null;
+
+    const oid = String(orderId || "").trim();
+    const dollars = Math.max(0, Math.round((Number(amountCents) || 0) / 100));
+
+    if (dollars > 0 && oid) {
+        await awardXp(id, "purchase_spend", { points: dollars * SPEND_XP_PER_DOLLAR, dedupeKey: `spend:${oid}`, meta: { orderId: oid } });
+    }
+    if (oid) {
+        await awardXp(id, "purchase_flat", { dedupeKey: `purchase_flat:${oid}`, dailyCap: 1, meta: { orderId: oid } });
+    }
+    await awardXp(id, "first_purchase", { dedupeKey: `first_purchase:${id}`, meta: { orderId: oid } });
+
+    if (squareCustomerId) {
+        await db
+            .query(
+                `UPDATE mkt_buyer SET square_customer_id = $2 WHERE id = $1 AND (square_customer_id IS NULL OR square_customer_id = '')`,
+                [id, squareCustomerId]
+            )
+            .catch(() => {});
+    }
+    return id;
+}
+
 // Is there a level-up the user hasn't been shown yet? Compares current level to celebrated_level so the
 // celebration fires exactly once per level, tracked server-side (same on every device, never on login).
 export async function getPendingLevelUp(buyerId) {
