@@ -5305,6 +5305,58 @@ body.tv-mode .shop-mobile-cart-fab {
     color: #d6d0ef;
 }
 
+/* Friends list rows. */
+.friend-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.friend-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.friend-avatar {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 215, 94, 0.14);
+    border: 1px solid rgba(255, 215, 94, 0.3);
+    font-weight: 700;
+    color: #ffd75e;
+}
+.friend-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.friend-id {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+.friend-handle {
+    font-size: 0.8rem;
+}
+.friend-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
 /* Rewards join hook — used on home, shop, and post-checkout. */
 .rewards-callout {
     display: flex;

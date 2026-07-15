@@ -31,6 +31,15 @@ export default function ProfileSettingsPage() {
                     View
                 </Link>
             </section>
+            <section className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                    <div style={{ fontWeight: 600 }}>Friends</div>
+                    <div className="muted" style={{ fontSize: "0.9rem" }}>Add friends to share cards and message them.</div>
+                </div>
+                <Link className="btn" href="/marketplace/friends">
+                    Manage
+                </Link>
+            </section>
         </div>
     );
 }
