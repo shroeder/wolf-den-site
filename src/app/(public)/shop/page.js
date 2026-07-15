@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 import RewardsCallout from "@/components/RewardsCallout";
-import ShopInventoryClient from "@/components/ShopInventoryClient";
+import ShopBrowser from "@/components/ShopBrowser";
 import { listShopInventory } from "@/lib/consignment/square";
+import { listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
 
 export const metadata = {
@@ -14,20 +15,30 @@ export const metadata = {
     },
 };
 
+// Render against the live inventory + arrivals feed, not a build-time snapshot.
+export const dynamic = "force-dynamic";
+
+const JUST_IN_WINDOW_HOURS = 24 * 7;
+
 export default async function ShopPage() {
-    let categories = await listShopInventory().catch(() => null);
+    let [categories, justInItems] = await Promise.all([
+        listShopInventory().catch(() => null),
+        listRecentChanges({ windowHours: JUST_IN_WINDOW_HOURS }).catch(() => []),
+    ]);
     if (categories) {
         categories = await attachSetNames(categories).catch(() => categories);
     }
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
+    const hasContent = (categories && categories.length > 0) || (justInItems && justInItems.length > 0);
 
     return (
         <div className="stack reveal">
             {paymentsEnabled ? <RewardsCallout /> : null}
-            {categories && categories.length > 0 ? (
+            {hasContent ? (
                 <section className="card">
-                    <ShopInventoryClient
-                        categories={categories}
+                    <ShopBrowser
+                        justInItems={justInItems || []}
+                        categories={categories || []}
                         paymentsEnabled={paymentsEnabled}
                     />
                 </section>

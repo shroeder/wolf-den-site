@@ -12,7 +12,6 @@ const navItems = [
     { href: "/magic-the-gathering", label: "Magic: The Gathering" },
     { href: "/shop", label: "Shop" },
     { href: "/marketplace/rewards", label: "🏆 Rewards" },
-    { href: "/just-in", label: "Just In" },
     { href: "/looking-for", label: "Looking For" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/alerts", label: "New-Arrival Alerts" },

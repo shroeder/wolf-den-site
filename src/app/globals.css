@@ -535,6 +535,46 @@ main.content {
     margin-right: 6px;
     vertical-align: middle;
 }
+
+/* Shop: Just In vs All inventory view toggle. */
+.shop-view-toggle {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    margin-bottom: 16px;
+}
+.shop-view-tab {
+    border: none;
+    background: transparent;
+    color: var(--muted, #b9b4c7);
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0.5rem 1rem;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease;
+}
+.shop-view-tab:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.shop-view-tab-active {
+    background: linear-gradient(135deg, #e6c76b, #d4af37 55%, #b8912e);
+    color: #171008;
+}
+.just-in-intro {
+    margin-bottom: 16px;
+}
+.just-in-intro .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+}
 @media (max-width: 560px) {
     .account-hub-fields {
         grid-template-columns: 1fr;
