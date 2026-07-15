@@ -440,6 +440,97 @@ main.content {
     padding: 0;
 }
 
+/* --- Account hub (/shop/account when signed in) --- */
+.account-hub {
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+}
+.account-hub-card h2 {
+    margin: 0 0 12px;
+}
+.account-hub-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+.account-hub-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-weight: 800;
+    font-size: 1.3rem;
+    flex: 0 0 auto;
+}
+.account-hub-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.account-hub-name {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+.account-hub-link {
+    font-size: 0.85rem;
+}
+.account-hub-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.account-hub-fields .cart-field-full {
+    grid-column: 1 / -1;
+}
+.account-hub-hint {
+    font-size: 0.82rem;
+    margin: 8px 0 12px;
+}
+.account-hub-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+}
+.account-hub-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 4px;
+}
+.account-hub-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 150ms ease, transform 150ms ease;
+}
+.account-hub-tile:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    transform: translateY(-1px);
+}
+.account-hub-tile strong {
+    color: var(--accent-hover);
+}
+@media (max-width: 560px) {
+    .account-hub-fields {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Cart — icon only; the count badge renders only when there's something in the cart. */
 .nav-cart-icon {
     position: relative;

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import ShopAccountHub from "@/components/ShopAccountHub";
+
 export default function ShopAccountPage() {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
@@ -178,6 +180,20 @@ export default function ShopAccountPage() {
         );
     }
 
+    if (customer) {
+        return (
+            <section className="cart-page-shell">
+                <article className="card cart-hero-card">
+                    <h1>My Account</h1>
+                    <p className="secondary">Manage your profile, orders, and alerts — all in one place.</p>
+                </article>
+                <ShopAccountHub customerEmail={customer.email} onSignOut={handleLogout} signingOut={busy} />
+                {status ? <p className="shop-payment-success">{status}</p> : null}
+                {error ? <p className="shop-payment-error">{error}</p> : null}
+            </section>
+        );
+    }
+
     return (
         <section className="cart-page-shell">
             <article className="card cart-hero-card">
@@ -186,19 +202,7 @@ export default function ShopAccountPage() {
             </article>
 
             <article className="card cart-checkout-card">
-                {customer ? (
-                    <div className="cart-account-panel">
-                        <p className="cart-fulfillment-label">Signed in</p>
-                        <p className="secondary">You are signed in as <strong>{customer.email}</strong>.</p>
-                        <div className="cart-account-row">
-                            <Link href="/shop/orders" className="button primary">📦 My Orders</Link>
-                            <Link href="/cart" className="button">Back to checkout</Link>
-                            <button type="button" className="button" onClick={handleLogout} disabled={busy}>
-                                {busy ? "Signing out..." : "Sign out"}
-                            </button>
-                        </div>
-                    </div>
-                ) : twoFactorPending ? (
+                {twoFactorPending ? (
                     <div className="cart-account-panel">
                         <p className="cart-fulfillment-label">Two-factor verification</p>
                         <p className="secondary">Enter the 6-digit code sent to your email.</p>
