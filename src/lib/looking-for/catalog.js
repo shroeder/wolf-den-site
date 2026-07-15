@@ -128,6 +128,7 @@ export async function searchCards({ game, query, setId }) {
            AND c.name ILIKE $3
            AND ${SINGLES_FILTER}
          ORDER BY
+            (COALESCE(st.quantity, 0) > 0) DESC,
             (lower(c.name) = lower($2)) DESC,
             similarity(lower(c.name), lower($2)) DESC,
             c.name ASC,
