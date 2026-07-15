@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { awardXp, claimPendingPurchases, dailyKey } from "@/lib/marketplace/xp.js";
@@ -21,6 +22,8 @@ export async function GET(request) {
                 // Safety net: redeem any purchases parked for this email before signup (deduped, so a
                 // no-op once claimed). Covers races where a pending row lands after account creation.
                 after(() => claimPendingPurchases(account.id, account.email));
+                // Grant any unlockable badges the member now qualifies for (level, spend, tenure, …).
+                after(() => syncEarnedBadges(account.id));
                 // Enrich with the first-class profile (name/alias/avatar/badges) so every surface can
                 // show it. Keep displayName for back-compat with existing consumers.
                 const profile = await getProfile(account.id);
