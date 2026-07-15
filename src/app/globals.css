@@ -5596,7 +5596,9 @@ body.tv-mode .shop-mobile-cart-fab {
     border-radius: 10px;
     border: 1px solid rgba(255, 215, 94, 0.55);
     background: linear-gradient(135deg, #e6c76b, #d4af37 52%, #b8912e);
-    color: #171008;
+    /* !important: this button is used inside .hero-accent / .card, whose `a` color rules (higher
+       specificity) would otherwise repaint the text light-gold-on-gold and make it unreadable. */
+    color: #171008 !important;
     font-weight: 800;
     text-decoration: none;
     white-space: nowrap;
@@ -5608,7 +5610,7 @@ body.tv-mode .shop-mobile-cart-fab {
     transform: translateY(-1px);
     box-shadow: 0 8px 22px rgba(212, 175, 55, 0.42);
     filter: brightness(1.06);
-    color: #171008;
+    color: #171008 !important;
 }
 .rewards-callout.rewards-earned {
     background: linear-gradient(105deg, rgba(76, 217, 123, 0.16), rgba(255, 215, 94, 0.1));

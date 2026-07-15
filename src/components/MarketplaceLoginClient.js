@@ -9,7 +9,7 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
     const router = useRouter();
     const searchParams = useSearchParams();
     // Land straight on the sign-up form when linked from a "create account" CTA (?signup=1).
-    const [mode, setMode] = useState(searchParams?.get("signup") ? "register" : "login"); // login | register | verify
+    const [mode, setMode] = useState(searchParams?.get("signup") ? "register" : "login"); // login | register | verify | forgot
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [displayName, setDisplayName] = useState("");
@@ -49,6 +49,10 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
                 } else {
                     setError(d.error || "Sign up failed.");
                 }
+            } else if (mode === "forgot") {
+                // Always shows the same confirmation (never reveals whether the email is registered).
+                await post("/api/marketplace/auth/forgot", { email });
+                setInfo("If that email has an account, we've sent a password reset link. Check your inbox.");
             } else {
                 const { ok, d } = await post("/api/marketplace/auth/verify", { email, code });
                 if (ok && d.ok) {
@@ -68,11 +72,17 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
     return (
         <div className="stack reveal">
             <section className="card" style={{ maxWidth: 440, margin: "0 auto" }}>
-                <h1>{mode === "register" ? "Create your account" : mode === "verify" ? "Verify your email" : "Sign in"}</h1>
-                <p className="muted">The same account you use in the Wolf Den Marketplace app — for buy orders and messages.</p>
+                <h1>{mode === "register" ? "Create your account" : mode === "verify" ? "Verify your email" : mode === "forgot" ? "Reset your password" : "Sign in"}</h1>
+                <p className="muted">
+                    {mode === "forgot"
+                        ? "Enter your account email and we'll send you a link to set a new password."
+                        : "The same account you use in the Wolf Den Marketplace app — for buy orders and messages."}
+                </p>
                 <form onSubmit={submit} className="stack" style={{ gap: 10, marginTop: 14 }}>
                     {mode === "verify" ? (
                         <input placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} />
+                    ) : mode === "forgot" ? (
+                        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     ) : (
                         <>
                             {mode === "register" ? (
@@ -85,14 +95,19 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
                     {error ? <p style={{ color: "#e66" }}>{error}</p> : null}
                     {info ? <p className="muted">{info}</p> : null}
                     <button type="submit" className="button primary" style={{ width: "100%" }} disabled={busy}>
-                        {busy ? "…" : mode === "register" ? "Create account" : mode === "verify" ? "Verify" : "Sign in"}
+                        {busy ? "…" : mode === "register" ? "Create account" : mode === "verify" ? "Verify" : mode === "forgot" ? "Send reset link" : "Sign in"}
                     </button>
                 </form>
-                <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
                     {mode === "login" ? (
-                        <button type="button" style={linkStyle} onClick={() => { setMode("register"); setError(null); }}>New here? Create an account</button>
+                        <>
+                            <button type="button" style={linkStyle} onClick={() => { setMode("forgot"); setError(null); setInfo(null); }}>Forgot password?</button>
+                            <button type="button" style={linkStyle} onClick={() => { setMode("register"); setError(null); setInfo(null); }}>New here? Create an account</button>
+                        </>
                     ) : (
-                        <button type="button" style={linkStyle} onClick={() => { setMode("login"); setError(null); }}>Have an account? Sign in</button>
+                        <button type="button" style={linkStyle} onClick={() => { setMode("login"); setError(null); setInfo(null); }}>
+                            {mode === "forgot" ? "← Back to sign in" : "Have an account? Sign in"}
+                        </button>
                     )}
                 </div>
             </section>
