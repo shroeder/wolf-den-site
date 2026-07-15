@@ -625,7 +625,9 @@ main.content {
     color: var(--ink-secondary, #b9b4c7);
 }
 
-/* Mobile web: keep the top bar to one clean line, and drop the full-screen hero logo. */
+/* Mobile web: keep the top bar to one clean line, and drop the full-screen hero logo.
+   (Note: .nav-inbox / .tv-toggle hides live at the END of this file — their base rules come later,
+   so the override must too.) */
 @media (max-width: 700px) {
     .top-row {
         flex-wrap: nowrap;
@@ -639,11 +641,7 @@ main.content {
     .top-left {
         min-width: 0;
     }
-    /* Secondary controls move out of the cramped mobile bar (still in footer / menu / dock). */
-    .top-sep,
-    .nav-discord,
-    .nav-inbox,
-    .tv-toggle {
+    .top-sep {
         display: none;
     }
     .hero-logo {
@@ -7504,4 +7502,33 @@ body.tv-mode .shop-mobile-cart-fab {
     flex-shrink: 0;
     width: 1.1rem;
     height: 1.1rem;
+}
+
+/* --- Mobile header overrides — placed LAST so they beat the base .nav-inbox / .tv-toggle /
+   .nav-discord rules that appear earlier in this file (media queries don't add specificity). --- */
+.nav-discord-icon {
+    display: none;
+}
+@media (max-width: 700px) {
+    .nav-inbox,
+    .tv-toggle {
+        display: none;
+    }
+    /* Join Discord shrinks to a round icon button on mobile. */
+    .nav-discord {
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 50%;
+        justify-content: center;
+    }
+    .nav-discord-text {
+        display: none;
+    }
+    .nav-discord-icon {
+        display: block;
+        width: 20px;
+        height: 20px;
+    }
 }

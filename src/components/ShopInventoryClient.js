@@ -748,15 +748,7 @@ export default function ShopInventoryClient({
                         />
                     </div>
 
-                    {canShowPaymentUi && (
-                        <Link href="/cart" className="shop-cart-launch" aria-label={`Open cart with ${resolvedCartCount} item${resolvedCartCount === 1 ? "" : "s"}`}>
-                            <CartGlyph />
-                            <span className={cartCountLoading ? "shop-cart-badge shop-cart-badge-loading" : "shop-cart-badge"} aria-live="polite">
-                                {cartCountLoading ? "" : resolvedCartCount}
-                            </span>
-                            <span className="sr-only">Open cart</span>
-                        </Link>
-                    )}
+                    {/* Cart lives in the header (always visible) — no redundant launcher here. */}
                 </div>
 
                 {tvMode && active && !isSearching && (
