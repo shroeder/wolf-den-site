@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { syncSquareCustomer } from "@/lib/marketplace/loyalty.js";
 import { getProfile, updateProfile } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -35,7 +36,11 @@ export async function PATCH(request) {
                 firstName: body?.firstName,
                 lastName: body?.lastName,
                 alias: body?.alias,
+                phone: body?.phone,
             });
+            // When a phone is set/changed, push the contact to Square so the cashier can look them up at
+            // the register (and create the customer link if needed). Best-effort, off the response path.
+            if (body?.phone !== undefined) after(() => syncSquareCustomer(buyer.id));
             return noStore({ profile });
         } catch (error) {
             // updateProfile throws user-facing messages for a bad/taken handle.

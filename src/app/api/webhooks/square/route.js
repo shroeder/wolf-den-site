@@ -41,10 +41,10 @@ async function fetchOrderSubtotalCents(orderId) {
     }
 }
 
-// Fetch a Square customer's email so an in-store sale can be tied to the marketplace account by email.
-async function fetchCustomerEmail(customerId) {
+// Fetch a Square customer's email + phone so an in-store sale can be tied to the marketplace account.
+async function fetchCustomerContact(customerId) {
     const token = process.env.SQUARE_ACCESS_TOKEN;
-    if (!token || !customerId) return null;
+    if (!token || !customerId) return { email: null, phone: null };
     try {
         const res = await fetch(`https://connect.squareup.com/v2/customers/${encodeURIComponent(customerId)}`, {
             headers: {
@@ -52,10 +52,11 @@ async function fetchCustomerEmail(customerId) {
                 "Square-Version": process.env.SQUARE_API_VERSION || "2026-01-22",
             },
         });
-        if (!res.ok) return null;
-        return (await res.json())?.customer?.email_address || null;
+        if (!res.ok) return { email: null, phone: null };
+        const customer = (await res.json())?.customer || {};
+        return { email: customer.email_address || null, phone: customer.phone_number || null };
     } catch {
-        return null;
+        return { email: null, phone: null };
     }
 }
 
@@ -100,10 +101,10 @@ async function handlePurchaseLoyalty(payload) {
         if (subtotal != null) amountCents = subtotal;
     }
 
-    // Try to auto-credit a known customer (also parks by email when there's no account yet).
+    // Try to auto-credit a known customer (by Square id, email, or phone; also parks by email otherwise).
     if (payment.customer_id) {
-        const email = await fetchCustomerEmail(payment.customer_id);
-        const buyerId = await awardPurchaseXp({ email, squareCustomerId: payment.customer_id, amountCents, orderId: awardOrderId });
+        const { email, phone } = await fetchCustomerContact(payment.customer_id);
+        const buyerId = await awardPurchaseXp({ email, phone, squareCustomerId: payment.customer_id, amountCents, orderId: awardOrderId });
         if (buyerId) return { handled: true, awarded: true, buyerId };
     }
 

@@ -16,6 +16,20 @@ export function normalizeAlias(alias) {
     return String(alias || "").trim().toLowerCase();
 }
 
+// Normalize a phone to E.164 when we can (US-friendly), else best-effort digits. Null for empty.
+export function normalizePhone(input) {
+    const raw = String(input || "").trim();
+    if (!raw) return null;
+    if (raw.startsWith("+")) {
+        const d = raw.replace(/\D/g, "");
+        return d ? `+${d}` : null;
+    }
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    return digits || null;
+}
+
 // Returns the reason it's invalid, or null if the format is acceptable (uniqueness checked separately).
 export function aliasFormatError(alias) {
     const a = normalizeAlias(alias);
@@ -56,6 +70,7 @@ function mapProfile(row, badges = []) {
     return {
         id: row.id,
         email: row.email || null,
+        phone: row.phone || null,
         firstName: row.first_name || null,
         lastName: row.last_name || null,
         fullName: fullName || null,
@@ -72,7 +87,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, display_name, first_name, last_name, alias, avatar_url, xp
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -92,6 +107,7 @@ export async function getPublicProfileByAlias(alias) {
     if (!row) return null;
     const profile = mapProfile(row, await getUserBadges(row.id));
     delete profile.email;
+    delete profile.phone;
     return profile;
 }
 
@@ -104,7 +120,7 @@ async function maybeAwardProfileComplete(profile) {
 }
 
 // Update name + handle. Throws a user-facing message on bad/taken handle. Any field may be omitted.
-export async function updateProfile(buyerId, { firstName, lastName, alias } = {}) {
+export async function updateProfile(buyerId, { firstName, lastName, alias, phone } = {}) {
     if (!buyerId) throw new Error("Not signed in.");
 
     const sets = [];
@@ -116,6 +132,7 @@ export async function updateProfile(buyerId, { firstName, lastName, alias } = {}
 
     if (firstName !== undefined) push("first_name", firstName ? String(firstName).trim().slice(0, 80) : null);
     if (lastName !== undefined) push("last_name", lastName ? String(lastName).trim().slice(0, 80) : null);
+    if (phone !== undefined) push("phone", normalizePhone(phone));
 
     if (alias !== undefined) {
         if (alias === null || alias === "") {

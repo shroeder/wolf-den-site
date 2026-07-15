@@ -11,6 +11,7 @@ export default function MarketplaceProfileClient() {
     const [signedIn, setSignedIn] = useState(false);
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
+    const [phone, setPhone] = useState("");
     const [alias, setAlias] = useState("");
     const [avatarUrl, setAvatarUrl] = useState(null);
     const [badges, setBadges] = useState([]);
@@ -34,6 +35,7 @@ export default function MarketplaceProfileClient() {
                     setSignedIn(true);
                     setFirstName(b.firstName || "");
                     setLastName(b.lastName || "");
+                    setPhone(b.phone || "");
                     setAlias(b.alias || "");
                     setSavedAlias(b.alias || "");
                     setAvatarUrl(b.avatarUrl || null);
@@ -100,7 +102,7 @@ export default function MarketplaceProfileClient() {
             const r = await fetch("/api/marketplace/profile", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ firstName, lastName, alias: alias.trim() || null }),
+                body: JSON.stringify({ firstName, lastName, phone: phone.trim() || null, alias: alias.trim() || null }),
             });
             const d = await r.json().catch(() => null);
             if (!r.ok) throw new Error(d?.error || "Could not save.");
@@ -162,6 +164,18 @@ export default function MarketplaceProfileClient() {
 
                 <label htmlFor="pf-last">Last name</label>
                 <input id="pf-last" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" />
+
+                <label htmlFor="pf-phone">Phone</label>
+                <input
+                    id="pf-phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                />
+                <p className="muted" style={{ fontSize: "0.8rem" }}>Add your phone so we can find you at the register and credit in-store purchases.</p>
 
                 <label htmlFor="pf-alias">Handle</label>
                 <input

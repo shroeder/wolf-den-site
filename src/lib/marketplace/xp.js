@@ -92,7 +92,7 @@ export function dailyKey(action, buyerId, scope = "") {
 // (once/order, capped 1/day) + a one-time first-purchase bonus. Also links the account to its Square
 // customer for in-store loyalty later. Dollars are computed from the merchandise subtotal the caller
 // passes (not tax/shipping). Deduped by order id so re-processing an order never double-credits.
-export async function awardPurchaseXp({ email = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
+export async function awardPurchaseXp({ email = null, phone = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
     let id = buyerId;
     if (!id && squareCustomerId) {
         const row = await db
@@ -104,6 +104,10 @@ export async function awardPurchaseXp({ email = null, buyerId = null, amountCent
         const row = await db
             .queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1`, [String(email).trim().toLowerCase()])
             .catch(() => null);
+        id = row?.id || null;
+    }
+    if (!id && phone) {
+        const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE phone = $1`, [phone]).catch(() => null);
         id = row?.id || null;
     }
     if (!id) {
