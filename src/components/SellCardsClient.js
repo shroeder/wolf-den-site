@@ -30,6 +30,26 @@ export default function SellCardsClient({ defaultDestination = "sell", lockDesti
     const [sent, setSent] = useState(false);
     const abortRef = useRef(null);
 
+    // Prefill name/email from the signed-in marketplace account (doesn't clobber typed values).
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (!res.ok) return;
+                const d = await res.json().catch(() => null);
+                const b = d?.buyer || d?.account;
+                if (ignore || !b) return;
+                if (b.email) setEmail((cur) => cur || b.email);
+                const nm = b.fullName || [b.firstName, b.lastName].filter(Boolean).join(" ").trim();
+                if (nm) setName((cur) => cur || nm);
+            } catch {
+                /* signed out */
+            }
+        })();
+        return () => { ignore = true; };
+    }, []);
+
     useEffect(() => {
         const trimmed = query.trim();
         const handle = setTimeout(async () => {

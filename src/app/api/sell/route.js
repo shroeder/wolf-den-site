@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { createSellOffer } from "@/lib/marketplace/sell-offers.js";
 import { createSellInquiry, isValidEmail } from "@/lib/sell-inquiries.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -53,6 +54,10 @@ export async function POST(request) {
 
             const destination = ["sell", "consign", "vendors"].includes(body.destination) ? body.destination : "sell";
 
+            // Link to the marketplace account when signed in (guest submissions still allowed).
+            const buyer = await getAuthenticatedBuyer().catch(() => null);
+            const buyerId = buyer?.id ?? null;
+
             try {
                 if (destination === "vendors") {
                     await createSellOffer({
@@ -62,6 +67,7 @@ export async function POST(request) {
                         items,
                         askingPrice: body.askingPrice,
                         itemsJson: cards,
+                        buyerId,
                     });
                 } else {
                     await createSellInquiry({
@@ -72,6 +78,7 @@ export async function POST(request) {
                         items,
                         message: body.notes,
                         itemsJson: cards,
+                        buyerId,
                     });
                 }
 

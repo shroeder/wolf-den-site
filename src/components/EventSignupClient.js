@@ -23,6 +23,26 @@ export default function EventSignupClient({ eventSlug, eventTitle, signupLimit }
 
     const endpoint = useMemo(() => `/api/events/${eventSlug}/signup`, [eventSlug]);
 
+    // Prefill name/email from the signed-in marketplace account (doesn't clobber typed values).
+    useEffect(() => {
+        let ignore = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/marketplace/auth/me", { cache: "no-store" });
+                if (!res.ok) return;
+                const d = await res.json().catch(() => null);
+                const b = d?.buyer || d?.account;
+                if (ignore || !b) return;
+                if (b.email) setEmail((cur) => cur || b.email);
+                const nm = b.fullName || [b.firstName, b.lastName].filter(Boolean).join(" ").trim();
+                if (nm) setName((cur) => cur || nm);
+            } catch {
+                /* signed out */
+            }
+        })();
+        return () => { ignore = true; };
+    }, []);
+
     useEffect(() => {
         let ignore = false;
 

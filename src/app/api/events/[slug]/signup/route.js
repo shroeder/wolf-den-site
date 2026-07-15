@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { sendEventSignupConfirmationEmail } from "@/lib/events/email";
 import { getEventBySlug } from "@/lib/events";
 import { getEffectiveSignupLimit, getSeatsTaken, getSignupStatus } from "@/lib/event-signups";
@@ -18,13 +19,13 @@ function sanitizeName(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
 }
 
-async function reserveSeat({ slug, name, email, signupLimit }) {
+async function reserveSeat({ slug, name, email, signupLimit, buyerId = null }) {
     const normalizedEmail = normalizeEmail(email);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
         const inserted = await db.queryOne(
-            `INSERT INTO event_signups (event_slug, slot_number, name, email, email_normalized)
-             SELECT $1, seat.slot_number, $2, $3, $4
+            `INSERT INTO event_signups (event_slug, slot_number, name, email, email_normalized, buyer_id)
+             SELECT $1, seat.slot_number, $2, $3, $4, $6
              FROM generate_series(1, $5) AS seat(slot_number)
              WHERE NOT EXISTS (
                  SELECT 1
@@ -42,7 +43,7 @@ async function reserveSeat({ slug, name, email, signupLimit }) {
              LIMIT 1
              ON CONFLICT DO NOTHING
              RETURNING slot_number`,
-            [slug, name, email, normalizedEmail, signupLimit]
+            [slug, name, email, normalizedEmail, signupLimit, buyerId || null]
         );
 
         if (inserted?.slot_number) {
@@ -134,11 +135,15 @@ export async function POST(request, { params }) {
                 return badRequest("A valid email address is required.");
             }
 
+            // Link the RSVP to the marketplace account when signed in (guest RSVPs still allowed).
+            const buyer = await getAuthenticatedBuyer().catch(() => null);
+
             const signup = await reserveSeat({
                 slug,
                 name,
                 email,
                 signupLimit,
+                buyerId: buyer?.id ?? null,
             });
 
             const seatsTaken = await getSeatsTaken(slug);

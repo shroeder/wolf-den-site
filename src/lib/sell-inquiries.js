@@ -30,7 +30,7 @@ function escapeHtml(value) {
         .replace(/"/g, "&quot;");
 }
 
-export async function createSellInquiry({ kind, name, email, phone, items, message, itemsJson = null }) {
+export async function createSellInquiry({ kind, name, email, phone, items, message, itemsJson = null, buyerId = null }) {
     if (!isValidEmail(email)) {
         throw new Error("A valid email address is required.");
     }
@@ -42,8 +42,8 @@ export async function createSellInquiry({ kind, name, email, phone, items, messa
     const clean = (v) => (v ? String(v).slice(0, MAX_LEN).trim() : null);
 
     const row = await db.queryOne(
-        `INSERT INTO sell_inquiry (kind, name, email, phone, items, message, items_json)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO sell_inquiry (kind, name, email, phone, items, message, items_json, buyer_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id`,
         [
             normalizedKind,
@@ -53,6 +53,7 @@ export async function createSellInquiry({ kind, name, email, phone, items, messa
             String(items).slice(0, MAX_LEN).trim(),
             clean(message),
             itemsJson ? JSON.stringify(itemsJson) : null,
+            buyerId || null,
         ]
     );
 

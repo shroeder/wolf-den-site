@@ -38,7 +38,7 @@ function baseUrl() {
     return process.env.NEXT_PUBLIC_BASE_URL || SITE_URL;
 }
 
-export async function createSellOffer({ name, email, phone, items, askingPrice, itemsJson = null }) {
+export async function createSellOffer({ name, email, phone, items, askingPrice, itemsJson = null, buyerId = null }) {
     if (!isValidEmail(email)) {
         throw new Error("A valid email address is required.");
     }
@@ -49,8 +49,8 @@ export async function createSellOffer({ name, email, phone, items, askingPrice, 
     const clean = (v) => (v ? String(v).slice(0, MAX_LEN).trim() : null);
 
     const row = await db.queryOne(
-        `INSERT INTO sell_offer (name, email, phone, items, asking_price, items_json)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO sell_offer (name, email, phone, items, asking_price, items_json, buyer_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id`,
         [
             clean(name),
@@ -59,6 +59,7 @@ export async function createSellOffer({ name, email, phone, items, askingPrice, 
             String(items).slice(0, MAX_LEN).trim(),
             clean(askingPrice),
             itemsJson ? JSON.stringify(itemsJson) : null,
+            buyerId || null,
         ]
     );
 
