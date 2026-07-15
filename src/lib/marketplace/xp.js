@@ -16,7 +16,8 @@ export const XP_ACTIONS = {
     profile_complete: 25, // name + handle + avatar all set (once, ever)
     purchase_flat: 20, // flat per-purchase bonus, capped 1/day (wired in the POS phase)
     first_purchase: 100, // first-ever purchase (once, ever) (wired in the POS phase)
-    event_checkin: 50, // checking in at an event (once/event) (wired later)
+    event_checkin: 50, // checking in at an event (once/event)
+    discord_link: 50, // linking your Discord account while in the server (once, ever)
 };
 
 // Dollars spent → XP (uncapped). Used by the purchase/POS hook.

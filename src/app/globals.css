@@ -5305,6 +5305,65 @@ body.tv-mode .shop-mobile-cart-fab {
     color: #d6d0ef;
 }
 
+/* Loyalty leaderboard. */
+.mkt-leaderboard {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.mkt-leader-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.mkt-leader-rank {
+    flex: 0 0 32px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+.mkt-leader-avatar {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 215, 94, 0.14);
+    border: 1px solid rgba(255, 215, 94, 0.3);
+    font-weight: 700;
+    color: #ffd75e;
+}
+.mkt-leader-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.mkt-leader-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+.mkt-leader-handle {
+    font-size: 0.8rem;
+}
+.mkt-leader-level {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
 /* Inline link-styled button (e.g. the "email instead" escape hatch in vendor contact). */
 .mkt-linklike {
     background: none;

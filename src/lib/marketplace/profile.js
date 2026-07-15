@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { discordConfig } from "@/lib/marketplace/discord.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -80,6 +81,7 @@ function mapProfile(row, badges = []) {
         displayLabel: fullName || row.alias || row.display_name || (row.email ? String(row.email).split("@")[0] : "Member"),
         badges,
         level: levelForXp(row.xp || 0),
+        discordLinked: Boolean(row.discord_user_id),
     };
 }
 
@@ -87,12 +89,33 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
     if (!row) return null;
-    return mapProfile(row, await getUserBadges(row.id));
+    const profile = mapProfile(row, await getUserBadges(row.id));
+    profile.discordEnabled = discordConfig().enabled;
+    return profile;
+}
+
+// Public leaderboard: top members by lifetime XP. Only accounts with a public @handle appear (opting in
+// via a handle), and only those who've earned something. Returns rank + display bits (no contact info).
+export async function getLeaderboard(limit = 50) {
+    const rows = await db
+        .query(
+            `SELECT id, alias, avatar_url, first_name, last_name, display_name, xp
+               FROM mkt_buyer
+              WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0
+              ORDER BY xp DESC, updated_at ASC
+              LIMIT $1`,
+            [Math.max(1, Math.min(200, limit))]
+        )
+        .catch(() => []);
+    return rows.map((row, i) => {
+        const p = mapProfile(row, []);
+        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0 };
+    });
 }
 
 // A public profile by handle (no email exposed).

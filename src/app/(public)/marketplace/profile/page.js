@@ -22,6 +22,15 @@ export default function ProfileSettingsPage() {
                     Open card
                 </Link>
             </section>
+            <section className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                    <div style={{ fontWeight: 600 }}>Leaderboard</div>
+                    <div className="muted" style={{ fontSize: "0.9rem" }}>See where you rank against other members.</div>
+                </div>
+                <Link className="btn" href="/marketplace/leaderboard">
+                    View
+                </Link>
+            </section>
         </div>
     );
 }

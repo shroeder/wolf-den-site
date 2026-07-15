@@ -16,6 +16,8 @@ export default function MarketplaceProfileClient() {
     const [avatarUrl, setAvatarUrl] = useState(null);
     const [badges, setBadges] = useState([]);
     const [level, setLevel] = useState(null);
+    const [discordLinked, setDiscordLinked] = useState(false);
+    const [discordEnabled, setDiscordEnabled] = useState(false);
     const [savedAlias, setSavedAlias] = useState("");
     const [aliasState, setAliasState] = useState({ checking: false, ok: null, reason: null });
     const [saving, setSaving] = useState(false);
@@ -41,6 +43,8 @@ export default function MarketplaceProfileClient() {
                     setAvatarUrl(b.avatarUrl || null);
                     setBadges(b.badges || []);
                     setLevel(b.level || null);
+                    setDiscordLinked(Boolean(b.discordLinked));
+                    setDiscordEnabled(Boolean(b.discordEnabled));
                 }
                 setLoading(false);
             })
@@ -50,6 +54,28 @@ export default function MarketplaceProfileClient() {
         return () => {
             alive = false;
         };
+    }, []);
+
+    // Surface the result of the Discord OAuth round-trip (?discord=… on return), then clean the URL.
+    useEffect(() => {
+        const status = new URLSearchParams(window.location.search).get("discord");
+        if (!status) return;
+        const map = {
+            linked: { ok: "Discord linked — +50 XP!" },
+            already: { ok: "Discord account linked." },
+            notmember: { err: "Join our Discord server first, then link." },
+            taken: { err: "That Discord account is already linked to another member." },
+            signin: { err: "Please sign in, then link Discord." },
+            unavailable: { err: "Discord linking isn't set up yet." },
+            error: { err: "Couldn't link Discord — please try again." },
+        };
+        const m = map[status];
+        if (m?.ok) {
+            setSuccess(m.ok);
+            setDiscordLinked(true);
+        }
+        if (m?.err) setError(m.err);
+        window.history.replaceState({}, "", window.location.pathname);
     }, []);
 
     // Live handle availability (debounced). Skip when unchanged from the saved value.
@@ -199,6 +225,15 @@ export default function MarketplaceProfileClient() {
                 {error ? <p className="shop-payment-error">{error}</p> : null}
                 {success ? <p className="shop-payment-success">{success}</p> : null}
             </form>
+
+            {discordLinked ? (
+                <p className="muted" style={{ marginTop: 14, color: "#9de5a9" }}>✓ Discord linked</p>
+            ) : discordEnabled ? (
+                <div style={{ marginTop: 14 }}>
+                    <a className="button" href="/api/marketplace/discord/start">Link Discord (+50 XP)</a>
+                    <p className="muted" style={{ fontSize: "0.8rem", marginTop: 6 }}>Be in our Discord server first, then link to earn the bonus.</p>
+                </div>
+            ) : null}
         </div>
     );
 }
