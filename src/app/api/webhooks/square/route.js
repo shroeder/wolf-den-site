@@ -9,8 +9,62 @@ import {
 import { INVENTORY_EVENT_TYPES } from "@/lib/product-alerts/state";
 import { reconcileIfDue } from "@/lib/inventory-feed/reconcile";
 import { withRequestLogging } from "@/lib/server-logger";
+import { db } from "@/lib/db";
+import { awardPurchaseXp } from "@/lib/marketplace/xp";
 
 export const runtime = "nodejs";
+
+// Fetch an order's merchandise subtotal (total minus tax) in cents, so in-store XP is granted on the same
+// basis as online (pre-tax merchandise). Best-effort — returns null if the order can't be read.
+async function fetchOrderSubtotalCents(orderId) {
+    const token = process.env.SQUARE_ACCESS_TOKEN;
+    if (!token || !orderId) return null;
+    try {
+        const res = await fetch(`https://connect.squareup.com/v2/orders/${encodeURIComponent(orderId)}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Square-Version": process.env.SQUARE_API_VERSION || "2026-01-22",
+            },
+        });
+        if (!res.ok) return null;
+        const order = (await res.json())?.order;
+        if (!order) return null;
+        const total = Number(order.total_money?.amount || 0);
+        const tax = Number(order.total_tax_money?.amount || 0);
+        return Math.max(0, total - tax);
+    } catch {
+        return null;
+    }
+}
+
+// In-store loyalty: a completed Square payment attached to a Square customer credits XP to the matching
+// marketplace account (linked by square_customer_id). Online shop orders are skipped here — they already
+// earn XP via the checkout route (by email), and double-crediting is avoided by matching the payment id
+// against shop_orders. Deduped by Square order/payment id so Square's retries never double-credit.
+async function handlePurchaseLoyalty(payload) {
+    const payment = payload?.data?.object?.payment;
+    if (!payment) return { handled: false, reason: "no_payment" };
+    if (payment.status !== "COMPLETED") return { handled: true, skipped: "not_completed" };
+
+    const customerId = payment.customer_id || null;
+    if (!customerId) return { handled: true, skipped: "no_customer" };
+
+    // Online orders already awarded XP by email at checkout — don't double-credit them.
+    const online = await db
+        .queryOne(`SELECT 1 FROM shop_orders WHERE square_payment_id = $1 LIMIT 1`, [payment.id])
+        .catch(() => null);
+    if (online) return { handled: true, skipped: "online_order" };
+
+    const orderId = payment.order_id || payment.id;
+    let amountCents = Number(payment.amount_money?.amount || 0);
+    if (payment.order_id) {
+        const subtotal = await fetchOrderSubtotalCents(payment.order_id);
+        if (subtotal != null) amountCents = subtotal;
+    }
+
+    const buyerId = await awardPurchaseXp({ squareCustomerId: customerId, amountCents, orderId: `sq:${orderId}` });
+    return { handled: true, awarded: Boolean(buyerId), buyerId: buyerId || null };
+}
 
 function isValidSquareSignature({ signature, body, requestUrl }) {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || "";
@@ -85,6 +139,17 @@ export async function POST(request) {
         }
 
         const eventType = getEventType(payload);
+
+        // In-store loyalty XP. Side-effect only — never returns early, so mystery-bag/inventory handling
+        // below still runs for the same event. Best-effort: a failure must not 500 the webhook.
+        if (eventType === "payment.created" || eventType === "payment.updated") {
+            try {
+                const res = await handlePurchaseLoyalty(payload);
+                logger.info("webhooks.square.loyalty", { eventType, ...res });
+            } catch (error) {
+                logger.error("webhooks.square.loyalty.failure", error, { eventType });
+            }
+        }
 
         // Inventory/catalog changes drive the new-arrival feed, not mystery bags. Trigger a throttled
         // reconcile (new items / restocks / price drops -> Discord + website) and return early. The

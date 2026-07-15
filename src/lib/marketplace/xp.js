@@ -94,6 +94,12 @@ export function dailyKey(action, buyerId, scope = "") {
 // passes (not tax/shipping). Deduped by order id so re-processing an order never double-credits.
 export async function awardPurchaseXp({ email = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
     let id = buyerId;
+    if (!id && squareCustomerId) {
+        const row = await db
+            .queryOne(`SELECT id FROM mkt_buyer WHERE square_customer_id = $1`, [squareCustomerId])
+            .catch(() => null);
+        id = row?.id || null;
+    }
     if (!id && email) {
         const row = await db
             .queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1`, [String(email).trim().toLowerCase()])

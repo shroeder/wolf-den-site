@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 
 export const metadata = {
@@ -10,6 +12,15 @@ export default function ProfileSettingsPage() {
         <div className="stack reveal">
             <section className="card">
                 <MarketplaceProfileClient />
+            </section>
+            <section className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                    <div style={{ fontWeight: 600 }}>Loyalty card</div>
+                    <div className="muted" style={{ fontSize: "0.9rem" }}>Show this at the register to earn XP on in-store purchases.</div>
+                </div>
+                <Link className="btn" href="/marketplace/card">
+                    Open card
+                </Link>
             </section>
         </div>
     );

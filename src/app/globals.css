@@ -5231,6 +5231,80 @@ body.tv-mode .shop-mobile-cart-fab {
     transition: width 0.4s ease;
 }
 
+/* Loyalty membership card — shown at the register to earn XP. */
+.loyalty-card {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: stretch;
+    background: linear-gradient(160deg, #14141f 0%, #1d1830 60%, #241a2e 100%);
+    border: 1px solid rgba(255, 215, 94, 0.25);
+    color: #f3f0ff;
+}
+.loyalty-card-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.loyalty-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 215, 94, 0.14);
+    border: 1px solid rgba(255, 215, 94, 0.35);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #ffd75e;
+}
+.loyalty-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.loyalty-id {
+    min-width: 0;
+}
+.loyalty-name {
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1.2;
+}
+.loyalty-alias {
+    color: #c9c2e6;
+    font-size: 0.9rem;
+}
+.loyalty-brand {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #ffd75e;
+    opacity: 0.85;
+}
+.loyalty-qr {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    align-self: center;
+    line-height: 0;
+}
+.loyalty-qr img {
+    width: min(320px, 72vw);
+    height: auto;
+    display: block;
+}
+.loyalty-hint {
+    margin: 0;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #d6d0ef;
+}
+
 /* Inline link-styled button (e.g. the "email instead" escape hatch in vendor contact). */
 .mkt-linklike {
     background: none;
