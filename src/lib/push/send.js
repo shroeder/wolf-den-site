@@ -137,3 +137,68 @@ export async function sendAdminPush({ title, body, route = null, data = {}, chan
         return { sent: 0, error: true };
     }
 }
+
+/**
+ * Send a push to a marketplace member's devices (all tokens in mkt_push_token for that buyer).
+ * Best-effort: never throws. Shares the same FCM app + FIREBASE_SERVICE_ACCOUNT_JSON as admin push.
+ * @param {string} buyerId  mkt_buyer id
+ * @param {object} opts
+ * @param {string} opts.title
+ * @param {string} opts.body
+ * @param {string} [opts.route]  in-app route to deep-link on tap (e.g. "dm/<threadId>" or "friends")
+ * @param {Record<string,string|number>} [opts.data]
+ */
+export async function sendBuyerPush(buyerId, { title, body, route = null, data = {} }) {
+    try {
+        if (!buyerId) return { sent: 0, skipped: "no_buyer" };
+        const messaging = await getMessaging();
+        if (!messaging) return { sent: 0, skipped: "not_configured" };
+
+        const rows = await db.query(
+            `SELECT token FROM mkt_push_token WHERE buyer_id = $1 AND token IS NOT NULL AND token <> ''`,
+            [buyerId]
+        );
+        const tokens = rows.map((r) => r.token).filter(Boolean);
+        if (!tokens.length) return { sent: 0, skipped: "no_devices" };
+
+        const stringData = { route: route ? String(route) : "" };
+        for (const [key, value] of Object.entries(data || {})) {
+            stringData[key] = value == null ? "" : String(value);
+        }
+
+        const response = await messaging.sendEachForMulticast({
+            tokens,
+            notification: { title, body },
+            data: stringData,
+            android: {
+                priority: "high",
+                notification: { channelId: "wolfden_market" },
+            },
+        });
+
+        // Delete tokens FCM reports as permanently dead.
+        if (response.failureCount > 0) {
+            const dead = [];
+            response.responses.forEach((r, i) => {
+                const code = r.success ? "" : r.error?.code || "";
+                if (
+                    code.includes("registration-token-not-registered") ||
+                    code.includes("invalid-registration-token") ||
+                    code.includes("invalid-argument")
+                ) {
+                    dead.push(tokens[i]);
+                }
+            });
+            if (dead.length) {
+                await db.query(`DELETE FROM mkt_push_token WHERE token = ANY($1)`, [dead]);
+            }
+        }
+
+        return { sent: response.successCount, failed: response.failureCount };
+    } catch (error) {
+        pushLogger.warn("push.buyer_send_failed", {
+            errorMessage: error instanceof Error ? error.message : "unknown_error",
+        });
+        return { sent: 0, error: true };
+    }
+}

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { notifyFriendAccepted, notifyFriendRequest } from "@/lib/marketplace/social-notify.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // Friendships: mutual add (request -> accept/decline). All lookups are pair-based so direction doesn't
@@ -75,6 +76,8 @@ export async function sendFriendRequest(requesterId, addresseeId) {
         // They already requested me -> accept.
         if (existing.requester_id === addresseeId) {
             await db.query(`UPDATE mkt_friendship SET status = 'accepted', responded_at = NOW() WHERE id = $1`, [existing.id]).catch(() => {});
+            // The original requester (addresseeId) gets an "accepted" nudge.
+            await notifyFriendAccepted(addresseeId, requesterId);
             return { ok: true, status: "friends" };
         }
         return { ok: true, status: "outgoing" }; // already pending from me
@@ -82,6 +85,7 @@ export async function sendFriendRequest(requesterId, addresseeId) {
     await db
         .query(`INSERT INTO mkt_friendship (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [requesterId, addresseeId])
         .catch(() => {});
+    await notifyFriendRequest(addresseeId, requesterId);
     return { ok: true, status: "outgoing" };
 }
 
@@ -91,8 +95,9 @@ export async function respondToRequest(userId, requestId, accept) {
     if (accept) {
         const rows = await db
             .query(`UPDATE mkt_friendship SET status = 'accepted', responded_at = NOW()
-                     WHERE id = $1 AND addressee_id = $2 AND status = 'pending' RETURNING id`, [requestId, userId])
+                     WHERE id = $1 AND addressee_id = $2 AND status = 'pending' RETURNING requester_id`, [requestId, userId])
             .catch(() => []);
+        if (rows.length > 0) await notifyFriendAccepted(rows[0].requester_id, userId);
         return { ok: rows.length > 0 };
     }
     await db.query(`DELETE FROM mkt_friendship WHERE id = $1 AND addressee_id = $2 AND status = 'pending'`, [requestId, userId]).catch(() => {});

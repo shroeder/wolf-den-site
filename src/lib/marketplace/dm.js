@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { areFriends } from "@/lib/marketplace/friends.js";
 import { getProductCards } from "@/lib/marketplace/product-card.js";
+import { notifyNewDm } from "@/lib/marketplace/social-notify.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // User-to-user direct messages between friends. Distinct from the buyer<->vendor mkt_thread system; both
@@ -46,6 +47,11 @@ export async function postDmMessage(threadId, senderId, body, catalogProductId =
         )
         .catch(() => []);
     await db.query(`UPDATE mkt_dm_thread SET last_message_at = NOW() WHERE id = $1`, [threadId]).catch(() => {});
+
+    // Best-effort push to the other participant.
+    const recipientId = t.user_a === senderId ? t.user_b : t.user_a;
+    await notifyNewDm(recipientId, senderId, threadId, text || "Shared a card");
+
     return { ok: true, messageId: rows[0]?.id || null, createdAt: rows[0]?.created_at || null };
 }
 
