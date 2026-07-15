@@ -5305,6 +5305,41 @@ body.tv-mode .shop-mobile-cart-fab {
     color: #d6d0ef;
 }
 
+/* Rewards join hook — used on home, shop, and post-checkout. */
+.rewards-callout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: linear-gradient(105deg, rgba(200, 162, 74, 0.14), rgba(255, 215, 94, 0.08));
+    border: 1px solid rgba(255, 215, 94, 0.4);
+}
+.rewards-callout-text {
+    min-width: 0;
+    flex: 1 1 260px;
+}
+.rewards-callout-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+.rewards-callout-sub {
+    color: var(--muted, #b9b4c7);
+    font-size: 0.92rem;
+    margin-top: 2px;
+}
+.rewards-callout-btn {
+    flex: 0 0 auto;
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    color: #1a1206;
+    font-weight: 700;
+    border: none;
+}
+.rewards-callout.rewards-earned {
+    background: linear-gradient(105deg, rgba(76, 217, 123, 0.16), rgba(255, 215, 94, 0.1));
+    border-color: rgba(120, 220, 150, 0.5);
+}
+
 /* Rewards page — "how you earn" grid. */
 .mkt-earn-grid {
     list-style: none;

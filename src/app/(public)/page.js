@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import RewardsCallout from "@/components/RewardsCallout";
 import { events } from "@/lib/events";
 import { countRecentChanges } from "@/lib/inventory-feed/feed";
 
@@ -52,6 +53,8 @@ export default async function HomePage() {
                     </Link>
                 </div>
             </section>
+
+            <RewardsCallout />
 
             <section className="hero card hero-split">
                 <div className="hero-copy">

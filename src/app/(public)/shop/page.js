@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import RewardsCallout from "@/components/RewardsCallout";
 import ShopInventoryClient from "@/components/ShopInventoryClient";
 import { listShopInventory } from "@/lib/consignment/square";
 import { attachSetNames } from "@/lib/shop-set-tags";
@@ -22,6 +23,7 @@ export default async function ShopPage() {
 
     return (
         <div className="stack reveal">
+            {paymentsEnabled ? <RewardsCallout /> : null}
             {categories && categories.length > 0 ? (
                 <section className="card">
                     <ShopInventoryClient
