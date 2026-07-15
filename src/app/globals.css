@@ -5511,6 +5511,221 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 /* Friends list rows. */
+/* --- Hoisted messaging dock (global, every marketplace page) --- */
+.mkt-dock-btn {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 900;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 215, 94, 0.5);
+    background: linear-gradient(135deg, #e6c76b, #d4af37 52%, #b8912e);
+    color: #171008;
+    font-size: 1.5rem;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.mkt-dock-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.mkt-dock-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: #e5484d;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg, #0e0e12);
+}
+.mkt-dock-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 86px;
+    z-index: 900;
+    width: min(370px, calc(100vw - 32px));
+    height: min(560px, calc(100vh - 130px));
+    display: flex;
+    flex-direction: column;
+    background: var(--surface, #16161c);
+    border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+    border-radius: 16px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+.mkt-dock-listwrap,
+.mkt-dock-thread {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+.mkt-dock-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    flex: 0 0 auto;
+}
+.mkt-dock-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mkt-dock-full {
+    font-size: 0.8rem;
+}
+.mkt-dock-close,
+.mkt-dock-back {
+    background: none;
+    border: none;
+    color: var(--muted, #b9b4c7);
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.mkt-dock-list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+.mkt-dock-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 11px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.05));
+    color: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+.mkt-dock-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+.mkt-dock-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 6px;
+    flex: 0 0 auto;
+}
+.mkt-dock-dot-spacer {
+    width: 8px;
+    flex: 0 0 auto;
+}
+.mkt-dock-rowmain {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.mkt-dock-rowtop {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mkt-dock-rowname {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mkt-dock-tag {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent);
+    flex: 0 0 auto;
+}
+.mkt-dock-preview {
+    font-size: 0.82rem;
+    color: var(--muted, #b9b4c7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mkt-dock-msgs {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.mkt-dock-empty {
+    padding: 16px;
+    text-align: center;
+}
+.mkt-dock-bubble {
+    max-width: 80%;
+    padding: 8px 11px;
+    border-radius: 13px;
+    background: var(--surface-2, rgba(255, 255, 255, 0.06));
+    font-size: 0.9rem;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    word-break: break-word;
+}
+.mkt-dock-bubble.mine {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #171008;
+}
+.mkt-dock-product {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.15);
+    font-size: 0.82rem;
+}
+.mkt-dock-product img {
+    width: 34px;
+    height: 34px;
+    border-radius: 5px;
+    object-fit: cover;
+}
+.mkt-dock-composer {
+    display: flex;
+    gap: 6px;
+    padding: 10px;
+    border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    flex: 0 0 auto;
+}
+.mkt-dock-composer input {
+    flex: 1;
+    min-width: 0;
+}
+
 /* --- Community / friends directory (tile grid) --- */
 .mkt-social-hero h1 {
     margin-bottom: 4px;
