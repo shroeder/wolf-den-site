@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
-import { awardXp, dailyKey } from "@/lib/marketplace/xp.js";
+import { awardXp, claimPendingPurchases, dailyKey } from "@/lib/marketplace/xp.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { getVendorById } from "@/lib/marketplace/vendors.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -18,6 +18,9 @@ export async function GET(request) {
             if (account) {
                 // Daily-active XP: first app open of the day (dedupe key = once per day). Best-effort.
                 after(() => awardXp(account.id, "daily_active", { dedupeKey: dailyKey("daily_active", account.id) }));
+                // Safety net: redeem any purchases parked for this email before signup (deduped, so a
+                // no-op once claimed). Covers races where a pending row lands after account creation.
+                after(() => claimPendingPurchases(account.id, account.email));
                 // Enrich with the first-class profile (name/alias/avatar/badges) so every surface can
                 // show it. Keep displayName for back-compat with existing consumers.
                 const profile = await getProfile(account.id);

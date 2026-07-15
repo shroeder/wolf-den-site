@@ -37,10 +37,29 @@ async function fetchOrderSubtotalCents(orderId) {
     }
 }
 
-// In-store loyalty: a completed Square payment attached to a Square customer credits XP to the matching
-// marketplace account (linked by square_customer_id). Online shop orders are skipped here — they already
-// earn XP via the checkout route (by email), and double-crediting is avoided by matching the payment id
-// against shop_orders. Deduped by Square order/payment id so Square's retries never double-credit.
+// Fetch a Square customer's email so an in-store sale can be tied to the marketplace account by email.
+async function fetchCustomerEmail(customerId) {
+    const token = process.env.SQUARE_ACCESS_TOKEN;
+    if (!token || !customerId) return null;
+    try {
+        const res = await fetch(`https://connect.squareup.com/v2/customers/${encodeURIComponent(customerId)}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Square-Version": process.env.SQUARE_API_VERSION || "2026-01-22",
+            },
+        });
+        if (!res.ok) return null;
+        return (await res.json())?.customer?.email_address || null;
+    } catch {
+        return null;
+    }
+}
+
+// In-store loyalty: a completed Square payment credits purchase XP to the matching marketplace account.
+// Linked by square_customer_id OR by the Square customer's email — and if no account exists yet, the
+// credit is PARKED by email (inside awardPurchaseXp) so it's waiting when they register. Online shop
+// orders are skipped here (already awarded at checkout; double-credit avoided by matching the payment id
+// against shop_orders). Deduped by Square order/payment id so Square's retries never double-credit.
 async function handlePurchaseLoyalty(payload) {
     const payment = payload?.data?.object?.payment;
     if (!payment) return { handled: false, reason: "no_payment" };
@@ -62,8 +81,9 @@ async function handlePurchaseLoyalty(payload) {
         if (subtotal != null) amountCents = subtotal;
     }
 
-    const buyerId = await awardPurchaseXp({ squareCustomerId: customerId, amountCents, orderId: `sq:${orderId}` });
-    return { handled: true, awarded: Boolean(buyerId), buyerId: buyerId || null };
+    const email = await fetchCustomerEmail(customerId);
+    const buyerId = await awardPurchaseXp({ email, squareCustomerId: customerId, amountCents, orderId: `sq:${orderId}` });
+    return { handled: true, awarded: Boolean(buyerId), parked: !buyerId && Boolean(email), buyerId: buyerId || null };
 }
 
 function isValidSquareSignature({ signature, body, requestUrl }) {

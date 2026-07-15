@@ -106,7 +106,11 @@ export async function awardPurchaseXp({ email = null, buyerId = null, amountCent
             .catch(() => null);
         id = row?.id || null;
     }
-    if (!id) return null;
+    if (!id) {
+        // No marketplace account yet — park the credit by email so it's waiting the moment they register.
+        await parkPendingPurchase({ email, amountCents, orderId, squareCustomerId });
+        return null;
+    }
 
     const oid = String(orderId || "").trim();
     const dollars = Math.max(0, Math.round((Number(amountCents) || 0) / 100));
@@ -128,6 +132,56 @@ export async function awardPurchaseXp({ email = null, buyerId = null, amountCent
             .catch(() => {});
     }
     return id;
+}
+
+// Park a purchase that has no marketplace account yet, keyed by email. Redeemed into real XP when the
+// buyer registers with that email (see claimPendingPurchases). Deduped by (email, order). Best-effort.
+async function parkPendingPurchase({ email, amountCents = 0, orderId, squareCustomerId = null }) {
+    const normalized = email ? String(email).trim().toLowerCase() : null;
+    const oid = String(orderId || "").trim();
+    if (!normalized || !oid) return;
+    await db
+        .query(
+            `INSERT INTO mkt_pending_purchase (email_normalized, order_id, amount_cents, square_customer_id)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (email_normalized, order_id) DO NOTHING`,
+            [normalized, oid, Math.max(0, Number(amountCents) || 0), squareCustomerId || null]
+        )
+        .catch(() => {});
+}
+
+// Redeem any purchases parked for this buyer's email into real XP, and link their Square customer. Called
+// when an account is created/opened. Best-effort and idempotent — awardPurchaseXp is deduped by order id,
+// and each pending row is marked redeemed so it never replays. Safe to call often.
+export async function claimPendingPurchases(buyerId, email) {
+    const normalized = email ? String(email).trim().toLowerCase() : null;
+    if (!buyerId || !normalized) return 0;
+    const rows = await db
+        .query(
+            `SELECT id, order_id, amount_cents, square_customer_id
+               FROM mkt_pending_purchase
+              WHERE email_normalized = $1 AND redeemed_at IS NULL
+              ORDER BY created_at ASC`,
+            [normalized]
+        )
+        .then((r) => r?.rows || r || [])
+        .catch(() => []);
+    if (!rows.length) return 0;
+
+    let claimed = 0;
+    for (const row of rows) {
+        await awardPurchaseXp({
+            buyerId,
+            amountCents: row.amount_cents,
+            orderId: row.order_id,
+            squareCustomerId: row.square_customer_id || null,
+        });
+        await db
+            .query(`UPDATE mkt_pending_purchase SET redeemed_at = NOW(), redeemed_buyer_id = $2 WHERE id = $1`, [row.id, buyerId])
+            .catch(() => {});
+        claimed += 1;
+    }
+    return claimed;
 }
 
 // Is there a level-up the user hasn't been shown yet? Compares current level to celebrated_level so the
