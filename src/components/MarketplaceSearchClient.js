@@ -209,6 +209,7 @@ export default function MarketplaceSearchClient() {
                     <span className="mkt-chip">💬 Contact direct, no fees</span>
                 </div>
                 <div className="mkt-hero-links">
+                    <Link href="/marketplace/rewards" className="pill pill-accent">🏆 Rewards</Link>
                     <Link href="/marketplace/vendors" className="pill">📍 Browse vendors</Link>
                     <Link href="/marketplace/wants" className="pill">📋 Want list</Link>
                     <Link href="/marketplace/events" className="pill">📅 Events</Link>

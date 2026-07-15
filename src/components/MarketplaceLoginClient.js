@@ -1,13 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 // Marketplace BUYER login for the web — the SAME mkt_buyer account the app uses (sets a web cookie).
 // Separate from the flag-gated /shop account system.
 export default function MarketplaceLoginClient({ redirectTo = "/marketplace/messages" }) {
     const router = useRouter();
-    const [mode, setMode] = useState("login"); // login | register | verify
+    const searchParams = useSearchParams();
+    // Land straight on the sign-up form when linked from a "create account" CTA (?signup=1).
+    const [mode, setMode] = useState(searchParams?.get("signup") ? "register" : "login"); // login | register | verify
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [displayName, setDisplayName] = useState("");

@@ -5305,6 +5305,54 @@ body.tv-mode .shop-mobile-cart-fab {
     color: #d6d0ef;
 }
 
+/* Rewards page — "how you earn" grid. */
+.mkt-earn-grid {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+}
+.mkt-earn-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    border-radius: 12px;
+    background: rgba(255, 215, 94, 0.05);
+}
+.mkt-earn-icon {
+    font-size: 1.5rem;
+    flex: 0 0 auto;
+}
+.mkt-earn-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+.mkt-earn-label {
+    font-weight: 600;
+}
+.mkt-earn-note {
+    font-size: 0.8rem;
+}
+.mkt-earn-points {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: #ffd75e;
+}
+/* Accent pill to make the Rewards link pop in the hero. */
+.pill.pill-accent {
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    color: #1a1206;
+    border-color: transparent;
+    font-weight: 700;
+}
+
 /* Loyalty leaderboard. */
 .mkt-leaderboard {
     list-style: none;
