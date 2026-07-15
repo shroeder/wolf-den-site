@@ -71,8 +71,9 @@ async function getMessaging() {
  * @param {string} opts.body
  * @param {string} [opts.route]  in-app route to deep-link to on tap (e.g. "shopOrders")
  * @param {Record<string,string|number>} [opts.data] extra data payload (stringified)
+ * @param {string[]} [opts.channels] device channels to target (default ["full"]; e.g. ["full","employee"])
  */
-export async function sendAdminPush({ title, body, route = null, data = {} }) {
+export async function sendAdminPush({ title, body, route = null, data = {}, channels = ["full"] }) {
     try {
         const messaging = await getMessaging();
         if (!messaging) {
@@ -82,10 +83,11 @@ export async function sendAdminPush({ title, body, route = null, data = {} }) {
         const rows = await db.query(
             `SELECT DISTINCT fcm_token
              FROM app_device
-             WHERE channel = 'full'
+             WHERE channel = ANY($1)
                AND revoked = FALSE
                AND fcm_token IS NOT NULL
-               AND fcm_token <> ''`
+               AND fcm_token <> ''`,
+            [channels]
         );
 
         const tokens = rows.map((r) => r.fcm_token).filter(Boolean);

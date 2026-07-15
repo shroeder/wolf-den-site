@@ -11,8 +11,12 @@ import { reconcileIfDue } from "@/lib/inventory-feed/reconcile";
 import { withRequestLogging } from "@/lib/server-logger";
 import { db } from "@/lib/db";
 import { awardPurchaseXp } from "@/lib/marketplace/xp";
+import { createLoyaltyClaim } from "@/lib/marketplace/loyalty-claim.js";
+import { sendAdminPush } from "@/lib/push/send.js";
 
 export const runtime = "nodejs";
+
+const SITE_URL = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.wolfdengamingmn.com";
 
 // Fetch an order's merchandise subtotal (total minus tax) in cents, so in-store XP is granted on the same
 // basis as online (pre-tax merchandise). Best-effort — returns null if the order can't be read.
@@ -55,18 +59,32 @@ async function fetchCustomerEmail(customerId) {
     }
 }
 
-// In-store loyalty: a completed Square payment credits purchase XP to the matching marketplace account.
-// Linked by square_customer_id OR by the Square customer's email — and if no account exists yet, the
-// credit is PARKED by email (inside awardPurchaseXp) so it's waiting when they register. Online shop
-// orders are skipped here (already awarded at checkout; double-credit avoided by matching the payment id
-// against shop_orders). Deduped by Square order/payment id so Square's retries never double-credit.
+// Push a scan-to-earn claim's QR out to staff phones (owner + employee), so a cashier can show it to a
+// customer who isn't linked. The route string drives in-app navigation straight to the QR screen.
+async function pushLoyaltyClaim({ token, amountCents }) {
+    const cents = Math.max(0, Math.trunc(amountCents) || 0);
+    const dollars = (cents / 100).toFixed(2);
+    await sendAdminPush({
+        title: "Loyalty — offer points",
+        body: `Show the QR so this customer banks points on their $${dollars} purchase.`,
+        route: `loyaltyClaim/${token}/${cents}`,
+        channels: ["full", "employee"],
+        data: { token, amountCents: String(cents), claimUrl: `${SITE_URL}/marketplace/claim/${token}` },
+    });
+}
+
+// In-store loyalty for a completed Square payment.
+//   1. Online shop orders are skipped (already awarded at checkout; matched by payment id).
+//   2. If the sale already carries a Square customer we can map to an account (by square_customer_id or
+//      that customer's email), award silently — no QR needed. Unmatched-but-known emails are PARKED so
+//      the credit waits for sign-up.
+//   3. Otherwise mint a single-use claim for this payment and push its QR to staff phones — the customer
+//      scans it with their own phone to bank the XP.
+// Deduped by Square order id end to end so retries / a later sign-up never double-credit.
 async function handlePurchaseLoyalty(payload) {
     const payment = payload?.data?.object?.payment;
     if (!payment) return { handled: false, reason: "no_payment" };
     if (payment.status !== "COMPLETED") return { handled: true, skipped: "not_completed" };
-
-    const customerId = payment.customer_id || null;
-    if (!customerId) return { handled: true, skipped: "no_customer" };
 
     // Online orders already awarded XP by email at checkout — don't double-credit them.
     const online = await db
@@ -75,15 +93,24 @@ async function handlePurchaseLoyalty(payload) {
     if (online) return { handled: true, skipped: "online_order" };
 
     const orderId = payment.order_id || payment.id;
+    const awardOrderId = `sq:${orderId}`;
     let amountCents = Number(payment.amount_money?.amount || 0);
     if (payment.order_id) {
         const subtotal = await fetchOrderSubtotalCents(payment.order_id);
         if (subtotal != null) amountCents = subtotal;
     }
 
-    const email = await fetchCustomerEmail(customerId);
-    const buyerId = await awardPurchaseXp({ email, squareCustomerId: customerId, amountCents, orderId: `sq:${orderId}` });
-    return { handled: true, awarded: Boolean(buyerId), parked: !buyerId && Boolean(email), buyerId: buyerId || null };
+    // Try to auto-credit a known customer (also parks by email when there's no account yet).
+    if (payment.customer_id) {
+        const email = await fetchCustomerEmail(payment.customer_id);
+        const buyerId = await awardPurchaseXp({ email, squareCustomerId: payment.customer_id, amountCents, orderId: awardOrderId });
+        if (buyerId) return { handled: true, awarded: true, buyerId };
+    }
+
+    // Nobody to credit — offer the QR so the customer can claim it on their own phone.
+    const claim = await createLoyaltyClaim({ squarePaymentId: payment.id, awardOrderId, amountCents, locationId: payment.location_id });
+    if (claim) await pushLoyaltyClaim({ token: claim.token, amountCents: claim.amountCents });
+    return { handled: true, awarded: false, claimed: Boolean(claim) };
 }
 
 function isValidSquareSignature({ signature, body, requestUrl }) {

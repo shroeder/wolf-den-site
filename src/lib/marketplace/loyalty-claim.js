@@ -1,0 +1,82 @@
+import "server-only";
+
+import { randomBytes } from "node:crypto";
+
+import { db } from "@/lib/db";
+import { awardPurchaseXp, levelForXp } from "@/lib/marketplace/xp.js";
+
+// Scan-to-earn loyalty claims. A claim ties a specific Square payment (amount + dedupe id) to a QR that
+// a customer scans to bank the XP on their own account. Single-use, short-lived, one per payment.
+
+const DEFAULT_TTL_MINUTES = 15;
+
+// Create (or reuse) a claim for a Square payment. Idempotent per payment so webhook retries don't mint
+// duplicates. Returns { token, amountCents, isNew } or null.
+export async function createLoyaltyClaim({ squarePaymentId, awardOrderId, amountCents = 0, locationId = null, ttlMinutes = DEFAULT_TTL_MINUTES }) {
+    if (!squarePaymentId || !awardOrderId) return null;
+    const token = randomBytes(24).toString("hex");
+    const rows = await db
+        .query(
+            `INSERT INTO mkt_loyalty_claim (token, square_payment_id, award_order_id, amount_cents, location_id, expires_at)
+             VALUES ($1, $2, $3, $4, $5, NOW() + ($6 || ' minutes')::interval)
+             ON CONFLICT (square_payment_id) DO NOTHING
+             RETURNING token, amount_cents`,
+            [token, squarePaymentId, awardOrderId, Math.max(0, Math.trunc(amountCents) || 0), locationId, String(Math.max(1, ttlMinutes))]
+        )
+        .catch(() => []);
+    if (rows.length) return { token: rows[0].token, amountCents: rows[0].amount_cents, isNew: true };
+
+    // A claim already exists for this payment (retry) — reuse it.
+    const existing = await db
+        .queryOne(`SELECT token, amount_cents FROM mkt_loyalty_claim WHERE square_payment_id = $1`, [squarePaymentId])
+        .catch(() => null);
+    return existing ? { token: existing.token, amountCents: existing.amount_cents, isNew: false } : null;
+}
+
+// Read a claim for display on the scan page (does not redeem). Returns { amountCents, expired, redeemed }.
+export async function getLoyaltyClaim(token) {
+    if (!token) return null;
+    const row = await db
+        .queryOne(`SELECT amount_cents, expires_at, redeemed_at FROM mkt_loyalty_claim WHERE token = $1`, [token])
+        .catch(() => null);
+    if (!row) return null;
+    return {
+        amountCents: row.amount_cents,
+        redeemed: Boolean(row.redeemed_at),
+        expired: new Date(row.expires_at) < new Date(),
+    };
+}
+
+// Redeem a claim for a signed-in buyer: bank the payment's XP on their account, once. Idempotent and
+// race-safe (the UPDATE atomically wins the claim). Returns { ok, points, level } or { ok:false, error }.
+export async function redeemLoyaltyClaim(token, buyerId) {
+    if (!token || !buyerId) return { ok: false, error: "invalid" };
+
+    // Atomically win the claim: only the first unredeemed, unexpired redeemer gets the row.
+    const won = await db
+        .query(
+            `UPDATE mkt_loyalty_claim
+                SET redeemed_at = NOW(), redeemed_buyer_id = $2
+              WHERE token = $1 AND redeemed_at IS NULL AND expires_at > NOW()
+              RETURNING award_order_id, amount_cents`,
+            [token, buyerId]
+        )
+        .catch(() => []);
+
+    if (!won.length) {
+        // Didn't win — figure out why for a friendly message.
+        const row = await db
+            .queryOne(`SELECT expires_at, redeemed_at, redeemed_buyer_id FROM mkt_loyalty_claim WHERE token = $1`, [token])
+            .catch(() => null);
+        if (!row) return { ok: false, error: "not_found" };
+        if (row.redeemed_at) return { ok: false, error: row.redeemed_buyer_id === buyerId ? "already_yours" : "already_claimed" };
+        return { ok: false, error: "expired" };
+    }
+
+    const before = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    await awardPurchaseXp({ buyerId, amountCents: won[0].amount_cents, orderId: won[0].award_order_id });
+    const after = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+
+    const points = Math.max(0, (after?.xp || 0) - (before?.xp || 0));
+    return { ok: true, points, level: levelForXp(after?.xp || 0) };
+}
