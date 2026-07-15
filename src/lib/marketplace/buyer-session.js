@@ -289,12 +289,50 @@ export async function getBuyerSessionToken() {
     }
 }
 
-// The authenticated buyer for the current request (bearer token or web cookie), or null.
+// Get (or auto-provision) the marketplace account for an email. Used to bridge a signed-in /shop
+// customer into their marketplace identity so ONE sign-in covers rewards/friends/wants. Provisioned
+// accounts are passwordless (they authenticate via the shop session; they can set a marketplace
+// password later via reset). Does NOT copy the real name into display_name (that stays private).
+export async function getOrCreateBuyerByEmail(email, { emailVerified = false } = {}) {
+    const normalized = normalizeEmail(email);
+    if (!normalized || !isValidBuyerEmail(email)) return null;
+    let row = await db.queryOne(`SELECT id, email, display_name FROM mkt_buyer WHERE email_normalized = $1`, [normalized]);
+    if (!row) {
+        row = await db.queryOne(
+            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, email_verified)
+             VALUES ($1, $2, NULL, $3)
+             ON CONFLICT (email_normalized) DO UPDATE SET updated_at = NOW()
+             RETURNING id, email, display_name`,
+            [String(email).trim(), normalized, Boolean(emailVerified)]
+        );
+        // Mirror createBuyer's best-effort linking so a bridged account behaves like a normal one.
+        await claimPendingPurchases(row.id, normalized).catch(() => {});
+        await ensureSquareCustomerForBuyer(row.id).catch(() => {});
+    }
+    return mapBuyer(row);
+}
+
+// A signed-in /shop customer is the same person as their marketplace account — resolve/provision it.
+async function buyerFromShopSession() {
+    try {
+        const { getAuthenticatedShopCustomerFromCookies } = await import("@/lib/shop-customer-session");
+        const customer = await getAuthenticatedShopCustomerFromCookies();
+        if (!customer?.email) return null;
+        return await getOrCreateBuyerByEmail(customer.email, { emailVerified: true });
+    } catch {
+        return null;
+    }
+}
+
+// The authenticated buyer for the current request: marketplace session (bearer token or web cookie)
+// first, then a bridged /shop session so a single sign-in covers everything. Null if neither.
 export async function getAuthenticatedBuyer() {
     const token = await getBuyerSessionToken();
-    if (!token) return null;
-    const session = await resolveBuyerSession(token);
-    return session ? session.buyer : null;
+    if (token) {
+        const session = await resolveBuyerSession(token);
+        if (session) return session.buyer;
+    }
+    return await buyerFromShopSession();
 }
 
 // The active vendor (seller) profile linked to an account, or null. Drives the derived role: an
