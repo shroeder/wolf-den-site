@@ -6,6 +6,7 @@ import { cookies, headers } from "next/headers";
 
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 import { db } from "@/lib/db";
+import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
 import { claimPendingPurchases } from "@/lib/marketplace/xp.js";
 
 // Buyer accounts + token sessions for the marketplace phone app. Mirrors the vendor-session shape
@@ -67,6 +68,9 @@ export async function createBuyer({ email, password, displayName = null }) {
     // Redeem any in-store/online purchases parked for this email before they had an account — their XP
     // (and Square-customer link) is waiting for them. Best-effort; never blocks signup.
     await claimPendingPurchases(row.id, normalized).catch(() => {});
+    // Link a Square customer up front (reuse-by-email or create) so the member is findable at the
+    // register from day one, even before they save a profile or shop. Best-effort.
+    await ensureSquareCustomerForBuyer(row.id).catch(() => {});
     return mapBuyer(row);
 }
 
