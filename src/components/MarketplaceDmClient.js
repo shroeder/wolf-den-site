@@ -69,7 +69,21 @@ export default function MarketplaceDmClient({ threadId }) {
                 <div className="dm-messages">
                     {thread.messages.map((m) => (
                         <div key={m.id} className={`dm-msg${m.mine ? " mine" : ""}`}>
-                            {m.catalogProductId ? (
+                            {m.product ? (
+                                <Link href={`/marketplace/product/${m.product.id}`} className="dm-product-card">
+                                    {m.product.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={m.product.imageUrl} alt="" />
+                                    ) : null}
+                                    <span className="dm-product-info">
+                                        <strong>{m.product.name}</strong>
+                                        <span className="muted">
+                                            {m.product.setName || ""}
+                                            {m.product.price != null ? ` · from $${m.product.price.toFixed(2)}` : ""}
+                                        </span>
+                                    </span>
+                                </Link>
+                            ) : m.catalogProductId ? (
                                 <Link href={`/marketplace/product/${m.catalogProductId}`} className="dm-product-chip">🃏 View shared card →</Link>
                             ) : null}
                             {m.body ? <div className="dm-bubble">{m.body}</div> : null}

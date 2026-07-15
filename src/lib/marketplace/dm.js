@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { areFriends } from "@/lib/marketplace/friends.js";
+import { getProductCards } from "@/lib/marketplace/product-card.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // User-to-user direct messages between friends. Distinct from the buyer<->vendor mkt_thread system; both
@@ -97,16 +98,24 @@ export async function getDmThread(threadId, userId) {
         .catch(() => []);
     const readCol = t.user_a === userId ? "a_last_read_at" : "b_last_read_at";
     await db.query(`UPDATE mkt_dm_thread SET ${readCol} = NOW() WHERE id = $1`, [threadId]).catch(() => {});
+
+    // Resolve any shared products so the client can render a rich card inline.
+    const cards = await getProductCards(messages.map((m) => m.catalog_product_id).filter(Boolean));
+
     return {
         id: threadId,
         counterpart: other,
-        messages: messages.map((m) => ({
-            id: m.id,
-            mine: m.sender_id === userId,
-            body: m.body,
-            catalogProductId: m.catalog_product_id != null ? String(m.catalog_product_id) : null,
-            createdAt: m.created_at,
-        })),
+        messages: messages.map((m) => {
+            const pid = m.catalog_product_id != null ? String(m.catalog_product_id) : null;
+            return {
+                id: m.id,
+                mine: m.sender_id === userId,
+                body: m.body,
+                catalogProductId: pid,
+                product: pid ? cards[pid] || null : null,
+                createdAt: m.created_at,
+            };
+        }),
     };
 }
 

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import MarketplaceOffers from "@/components/MarketplaceOffers";
 import ProductViewBeacon from "@/components/ProductViewBeacon";
+import ShareProduct from "@/components/ShareProduct";
 import { getProductWithOffers } from "@/lib/marketplace/search.js";
 import { SITE_URL } from "@/lib/site";
 
@@ -114,6 +115,7 @@ export default async function MarketplaceProductPage({ params }) {
                         <p className="muted">
                             {product.offers.length} vendor offer{product.offers.length === 1 ? "" : "s"} available.
                         </p>
+                        <ShareProduct catalogProductId={product.catalogProductId} name={product.name} />
                     </div>
                 </div>
             </section>

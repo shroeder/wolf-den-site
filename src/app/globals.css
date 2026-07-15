@@ -5423,6 +5423,71 @@ body.tv-mode .shop-mobile-cart-fab {
 .dm-composer input {
     flex: 1 1 auto;
 }
+/* Rich shared-product card inside a DM. */
+.dm-product-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 280px;
+    margin-bottom: 4px;
+    padding: 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 215, 94, 0.3);
+    text-decoration: none;
+    color: inherit;
+}
+.dm-product-card img {
+    width: 44px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex: 0 0 auto;
+}
+.dm-product-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+.dm-product-info .muted {
+    font-size: 0.8rem;
+}
+
+/* Share-product control on the product page. */
+.share-product {
+    margin-top: 12px;
+}
+.share-panel {
+    margin-top: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+    background: rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 340px;
+}
+.share-friend-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.share-friend {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 215, 94, 0.4);
+    background: rgba(255, 215, 94, 0.1);
+    color: inherit;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.share-friend:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
 
 /* Friends list rows. */
 .friend-list {
