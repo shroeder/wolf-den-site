@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import EventCheckinClient from "@/components/EventCheckinClient";
 import { getEventWithVendors, listEventInventory } from "@/lib/marketplace/events.js";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export default async function EventPage({ params }) {
                     {event.eventDate || "date TBD"}
                     {event.locationLabel ? ` · ${event.locationLabel}` : ""}
                 </p>
+                <EventCheckinClient eventId={id} />
             </section>
 
             <section className="card">
