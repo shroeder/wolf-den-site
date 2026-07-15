@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
 
-export default function MarketplaceProfileClient() {
+export default function MarketplaceProfileClient({ embedded = false }) {
     const [loading, setLoading] = useState(true);
     const [signedIn, setSignedIn] = useState(false);
     const [firstName, setFirstName] = useState("");
@@ -161,7 +161,7 @@ export default function MarketplaceProfileClient() {
 
     return (
         <div>
-            <h1>Your profile</h1>
+            {!embedded && <h1>Your profile</h1>}
 
             <div className="user-profile-head" style={{ marginBottom: "1.2rem" }}>
                 <div className="user-avatar user-avatar-lg">
@@ -173,8 +173,8 @@ export default function MarketplaceProfileClient() {
                     )}
                 </div>
                 <div className="user-profile-meta">
-                    <UserBadges badges={badges} />
-                    <UserLevel level={level} />
+                    {!embedded && <UserBadges badges={badges} />}
+                    {!embedded && <UserLevel level={level} />}
                     <div className="btn-row" style={{ marginTop: "0.5rem" }}>
                         <button type="button" className="button" disabled={uploading} onClick={() => fileRef.current?.click()}>
                             {uploading ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}

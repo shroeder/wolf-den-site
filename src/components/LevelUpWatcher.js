@@ -78,6 +78,20 @@ export default function LevelUpWatcher() {
         };
     }, []);
 
+    // On-demand preview: fires the exact same celebration (no server call, nothing acknowledged) so a
+    // member can see what leveling looks like. Dispatched by the rewards hub's "Preview" buttons.
+    useEffect(() => {
+        const onPreview = (e) => {
+            if (activeRef.current) return;
+            const lvl = Math.max(2, Math.floor(Number(e?.detail?.level) || 2));
+            activeRef.current = true;
+            setLevel(lvl);
+            playLevelUpSound(isMilestoneLevel(lvl));
+        };
+        window.addEventListener("wolfden-levelup-preview", onPreview);
+        return () => window.removeEventListener("wolfden-levelup-preview", onPreview);
+    }, []);
+
     useEffect(() => {
         if (level == null) return;
         const t = setTimeout(() => {
