@@ -105,13 +105,20 @@ function CardTile({ card, inList, quantity, busy, onAdd, onRemove, onQuantityCha
     );
 }
 
-function EmailCapture({ account, email, emailVerified, submitting, message, onEnable, compact }) {
+function EmailCapture({ account, email, emailVerified, submitting, message, onEnable, onDisable, compact }) {
     if (emailVerified) {
         return (
-            <p className="statement-copy">
-                Alerts are on{email ? <> for <strong>{email}</strong></> : null}. We&apos;ll email you the moment a card on
-                your list comes into the shop.
-            </p>
+            <>
+                <p className="statement-copy">
+                    <span className="lf-alert-dot" aria-hidden="true" /> Alerts are <strong>on</strong>
+                    {email ? <> for <strong>{email}</strong></> : null}. We&apos;ll email you the moment a card on your list
+                    comes into the shop.
+                </p>
+                <button type="button" className="button" disabled={submitting} onClick={onDisable}>
+                    {submitting ? "Turning off…" : "Turn off alerts"}
+                </button>
+                {message ? <p className="statement-copy">{message}</p> : null}
+            </>
         );
     }
 
@@ -421,6 +428,25 @@ export default function LookingForClient() {
         }
     }
 
+    async function disableAlerts() {
+        setEmailSubmitting(true);
+        setEmailMessage("");
+
+        try {
+            const response = await fetch("/api/looking-for/email", { method: "DELETE" });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(data?.error || "Could not turn off alerts.");
+            }
+            setEmailVerified(false);
+            setEmailMessage("Alerts turned off. You can turn them back on anytime.");
+        } catch (error) {
+            setEmailMessage(error?.message || "Could not turn off alerts.");
+        } finally {
+            setEmailSubmitting(false);
+        }
+    }
+
     return (
         <div className="stack reveal">
             <section className="card hero-accent">
@@ -441,6 +467,7 @@ export default function LookingForClient() {
                     submitting={emailSubmitting}
                     message={emailMessage}
                     onEnable={enableAlerts}
+                    onDisable={disableAlerts}
                 />
             </section>
 
@@ -615,6 +642,7 @@ export default function LookingForClient() {
                                         submitting={emailSubmitting}
                                         message={emailMessage}
                                         onEnable={enableAlerts}
+                    onDisable={disableAlerts}
                                         compact
                                     />
                                 </div>

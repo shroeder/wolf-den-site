@@ -200,6 +200,18 @@ export async function attachWatcherAccount(watcherId, buyer) {
     );
 }
 
+// Turn OFF restock alerts. Disables this device's watcher plus every watcher on the account (so the
+// off switch is account-wide, not just this browser). The wishlist itself is kept.
+export async function disableWatcherAlerts(watcherId, buyerId = null) {
+    if (buyerId) {
+        await db
+            .query(`UPDATE card_watchers SET email_verified = FALSE, updated_at = NOW() WHERE id = $1 OR buyer_id = $2`, [watcherId, buyerId])
+            .catch(() => {});
+    } else {
+        await db.query(`UPDATE card_watchers SET email_verified = FALSE, updated_at = NOW() WHERE id = $1`, [watcherId]).catch(() => {});
+    }
+}
+
 export async function confirmWatcherEmail(rawToken) {
     if (!rawToken) {
         return null;

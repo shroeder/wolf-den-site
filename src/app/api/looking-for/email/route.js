@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
-import { attachWatcherAccount, getOrCreateWatcher } from "@/lib/looking-for/watchers";
+import { attachWatcherAccount, disableWatcherAlerts, getOrCreateWatcher } from "@/lib/looking-for/watchers";
 
 export const runtime = "nodejs";
 
@@ -29,6 +29,24 @@ export async function POST(request) {
             });
         } catch (error) {
             return internalError(error, { event: "looking_for.email.attach.failed" });
+        }
+    });
+}
+
+// Turn OFF restock alerts for the signed-in member (account-wide). Keeps the wishlist.
+export async function DELETE(request) {
+    return withRequestLogging(request, "DELETE /api/looking-for/email", async ({ internalError }) => {
+        try {
+            const buyer = await getAuthenticatedBuyer();
+            if (!buyer) {
+                return NextResponse.json({ error: "Sign in to manage alerts." }, { status: 401 });
+            }
+            const cookieStore = await cookies();
+            const watcher = await getOrCreateWatcher(cookieStore);
+            await disableWatcherAlerts(watcher.id, buyer.id);
+            return NextResponse.json({ success: true, emailVerified: false });
+        } catch (error) {
+            return internalError(error, { event: "looking_for.email.disable.failed" });
         }
     });
 }

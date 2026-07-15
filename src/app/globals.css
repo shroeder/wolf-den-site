@@ -525,6 +525,16 @@ main.content {
 .account-hub-tile strong {
     color: var(--accent-hover);
 }
+
+.lf-alert-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4caf50;
+    margin-right: 6px;
+    vertical-align: middle;
+}
 @media (max-width: 560px) {
     .account-hub-fields {
         grid-template-columns: 1fr;
