@@ -86,3 +86,21 @@ export function dailyKey(action, buyerId, scope = "") {
     const day = new Date().toISOString().slice(0, 10);
     return `${action}:${buyerId}:${scope}:${day}`;
 }
+
+// Is there a level-up the user hasn't been shown yet? Compares current level to celebrated_level so the
+// celebration fires exactly once per level, tracked server-side (same on every device, never on login).
+export async function getPendingLevelUp(buyerId) {
+    if (!buyerId) return { pending: false };
+    const row = await db.queryOne(`SELECT xp, celebrated_level FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!row) return { pending: false };
+    const level = levelForXp(row.xp || 0).level;
+    const celebrated = Math.max(1, Number(row.celebrated_level || 1));
+    return level > celebrated ? { pending: true, level, from: celebrated } : { pending: false, level };
+}
+
+// Mark that the user has seen the celebration up through [level] — so it never replays for that level.
+export async function acknowledgeLevel(buyerId, level) {
+    if (!buyerId) return;
+    const lvl = Math.max(1, Math.floor(Number(level) || 1));
+    await db.query(`UPDATE mkt_buyer SET celebrated_level = GREATEST(celebrated_level, $2) WHERE id = $1`, [buyerId, lvl]).catch(() => {});
+}
