@@ -138,7 +138,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
     const params = term ? [`%${term}%`, lim, off] : [lim, off];
     const rows = await db
         .query(
-            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, COALESCE(xp, 0) AS xp
+            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, equipped_border, COALESCE(xp, 0) AS xp
                FROM mkt_buyer
                ${where}
               ORDER BY COALESCE(xp, 0) DESC, created_at DESC
@@ -171,6 +171,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
         name: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
         email: r.email || null,
         avatarUrl: r.avatar_url || null,
+        border: r.equipped_border || "none",
         level: levelForXp(r.xp || 0).level,
         xp: Number(r.xp || 0),
         badges: byBuyer.get(r.id) || [],
