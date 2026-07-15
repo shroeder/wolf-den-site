@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, listBadges, progressForRule } from "@/lib/marketplace/badges.js";
+import { BORDERS } from "@/lib/marketplace/borders.js";
 import { LEVEL_PERKS, RANKS, rankForLevel } from "@/lib/marketplace/ranks.js";
 
 // Cumulative XP required to REACH a level (mirrors levelForXp's curve: 50*(L-1)*L).
@@ -42,10 +43,12 @@ export async function getRewardsTrack(buyerId) {
     const achievementBadges = autoBadges.filter((b) => b.autoRule !== "level");
 
     // ---- Level spine ----
+    const unlockableBorders = BORDERS.filter((b) => b.id !== "none");
     const notableLevels = Array.from(
         new Set([
             ...RANKS.map((r) => r.level),
             ...levelBadges.map((b) => b.autoThreshold),
+            ...unlockableBorders.map((b) => b.level),
             ...LEVEL_PERKS.map((p) => p.level),
         ])
     ).sort((a, b) => a - b);
@@ -65,7 +68,10 @@ export async function getRewardsTrack(buyerId) {
             badges: levelBadges
                 .filter((b) => b.autoThreshold === L)
                 .map((b) => ({ slug: b.slug, label: b.label, icon: b.icon, color: b.color, description: b.description, held: held.has(b.slug) })),
-            perks: LEVEL_PERKS.filter((p) => p.level === L).map((p) => ({ icon: p.icon, label: p.label, soon: p.soon })),
+            perks: [
+                ...unlockableBorders.filter((b) => b.level === L).map((b) => ({ icon: b.icon, label: `${b.label} border`, soon: false })),
+                ...LEVEL_PERKS.filter((p) => p.level === L).map((p) => ({ icon: p.icon, label: p.label, soon: p.soon })),
+            ],
         };
     });
 

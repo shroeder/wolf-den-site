@@ -39,6 +39,8 @@ export default async function ProfileHubPage() {
         getRewardsProgress(buyer.id).catch(() => ({})),
     ]);
     const level = profile?.level || null;
+    // Staff can equip any border regardless of level (matches the server-side bypass).
+    const isStaff = (profile?.badges || []).some((b) => ["owner", "site_admin", "staff"].includes(b.slug));
 
     return (
         <div className="stack reveal">
@@ -60,6 +62,7 @@ export default async function ProfileHubPage() {
                     level={level?.level || 1}
                     avatarUrl={profile?.avatarUrl}
                     displayLabel={profile?.displayLabel}
+                    unlockAll={isStaff}
                 />
             </section>
 
