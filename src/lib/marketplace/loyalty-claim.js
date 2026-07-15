@@ -48,15 +48,32 @@ export async function listRecentClaims(limit = 50) {
             [Math.max(1, Math.min(200, limit))]
         )
         .catch(() => []);
+    const now = new Date();
     return rows.map((r) => {
         const name = `${r.first_name || ""} ${r.last_name || ""}`.trim();
+        const redeemed = Boolean(r.redeemed_at);
+        const status = redeemed ? "redeemed" : new Date(r.expires_at) <= now ? "expired" : "active";
+        let createdLabel = "";
+        try {
+            createdLabel = new Date(r.created_at).toLocaleString("en-US", {
+                timeZone: "America/Chicago",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+            });
+        } catch {
+            /* leave blank */
+        }
         return {
             token: r.token,
             cents: Number(r.amount_cents) || 0,
             createdAt: r.created_at,
+            createdLabel,
             expiresAt: r.expires_at,
-            redeemed: Boolean(r.redeemed_at),
-            memberName: r.redeemed_at ? name || r.display_name || r.alias || "Member" : null,
+            redeemed,
+            status,
+            memberName: redeemed ? name || r.display_name || r.alias || "Member" : null,
         };
     });
 }
