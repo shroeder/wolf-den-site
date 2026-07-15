@@ -32,6 +32,9 @@ export default function SiteFooter() {
                             <Link href="/shop">Shop Inventory</Link>
                         </li>
                         <li>
+                            <Link href="/marketplace/rewards">Wolf Den Rewards</Link>
+                        </li>
+                        <li>
                             <Link href="/sell-cards">Sell Us Your Cards</Link>
                         </li>
                     </ul>

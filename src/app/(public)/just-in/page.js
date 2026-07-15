@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import JustInClient from "@/components/JustInClient";
+import RewardsCallout from "@/components/RewardsCallout";
 import { listRecentChanges } from "@/lib/inventory-feed/feed";
 
 export const metadata = {
@@ -38,6 +39,8 @@ export default async function JustInPage() {
                     </Link>
                 </div>
             </section>
+
+            <RewardsCallout />
 
             {items.length > 0 ? (
                 <JustInClient items={items} />
