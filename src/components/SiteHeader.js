@@ -25,6 +25,15 @@ const navItems = [
     { href: "/contact", label: "Contact" },
 ];
 
+// Initials for the account avatar, from the customer's name or email.
+function initialsOf(customer) {
+    const src = String(customer?.name || customer?.firstName || customer?.email || "").trim();
+    if (!src) return "?";
+    const parts = src.split(/[\s@._-]+/).filter(Boolean);
+    const chars = parts.length >= 2 ? parts[0][0] + parts[1][0] : src.slice(0, 2);
+    return chars.toUpperCase();
+}
+
 export default function SiteHeader() {
     const [open, setOpen] = useState(false);
     const [tvMode, setTvMode] = useTvMode();
@@ -138,32 +147,22 @@ export default function SiteHeader() {
                 </Link>
                 {paymentsEnabled && cartEnabled && (
                     <>
-                    <Link href="/shop/account" className="pill nav-cart" onClick={() => setOpen(false)}>
-                        {authLoading ? "Account..." : authCustomer ? "My Account" : "Sign In"}
-                    </Link>
                     {authCustomer ? (
-                        <Link href="/shop/orders" className="pill" onClick={() => setOpen(false)}>
-                            My Orders
+                        <Link href="/shop/account" className="nav-account" title="Your account (orders, sign out)" aria-label="Your account" onClick={() => setOpen(false)}>
+                            <span className="nav-account-avatar">{initialsOf(authCustomer)}</span>
                         </Link>
-                    ) : null}
-                    {authCustomer ? (
-                        <button
-                            type="button"
-                            className="pill"
-                            onClick={async () => {
-                                await fetch("/api/shop/auth", { method: "DELETE" }).catch(() => undefined);
-                                setAuthCustomer(null);
-                                window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
-                            }}
-                        >
-                            Sign Out
-                        </button>
-                    ) : null}
-                    <Link href="/cart" className="pill nav-cart" onClick={() => setOpen(false)}>
-                        Cart
-                        <span className={cartLoading ? "nav-cart-count nav-cart-count-loading" : "nav-cart-count"} aria-live="polite">
-                            {cartLoading ? "" : Number(cartCount || 0)}
-                        </span>
+                    ) : (
+                        <Link href="/shop/account" className="pill" onClick={() => setOpen(false)}>
+                            {authLoading ? "…" : "Sign In"}
+                        </Link>
+                    )}
+                    <Link href="/cart" className="nav-cart-icon" title="Cart" aria-label="Cart" onClick={() => setOpen(false)}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="9" cy="21" r="1" />
+                            <circle cx="20" cy="21" r="1" />
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                        </svg>
+                        {Number(cartCount || 0) > 0 ? <span className="nav-cart-badge">{cartCount > 99 ? "99+" : cartCount}</span> : null}
                     </Link>
                     </>
                 )}
@@ -178,12 +177,19 @@ export default function SiteHeader() {
                 </a>
                 <button
                     type="button"
-                    className={`pill tv-toggle${tvMode ? " tv-toggle-active" : ""}`}
+                    className={`tv-toggle${tvMode ? " tv-toggle-active" : ""}`}
                     onClick={toggleTvMode}
                     aria-pressed={tvMode}
-                    title="Toggle TV mode"
+                    aria-label={tvMode ? "Exit fullscreen / TV mode" : "Fullscreen / TV mode"}
+                    title={tvMode ? "Exit TV mode" : "Fullscreen / TV mode"}
                 >
-                    TV Mode: {tvMode ? "On" : "Off"}
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        {tvMode ? (
+                            <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+                        ) : (
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                        )}
+                    </svg>
                 </button>
                 <button
                     className="hamburger"
