@@ -193,20 +193,52 @@ export async function grantBadge(buyerId, slug, awardedBy = "admin") {
     return { ok: true, isNew };
 }
 
-// Email a member a congrats for a badge they hold. Best-effort. Used on grant + for backfills.
+// Email a member a congrats for a badge, then mark it emailed so the auto-backfill never re-sends it.
+// Best-effort. `def` must carry { slug, label, icon, description }.
 async function sendBadgeCongrats(buyerId, def) {
     const member = await db.queryOne(`SELECT email, display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!member?.email) return false;
-    return sendBadgeAwardedEmail(member.email, {
+    const ok = await sendBadgeAwardedEmail(member.email, {
         label: def.label,
         icon: def.icon || "",
         description: def.description || "",
         name: member.display_name || member.alias || "",
     }).catch(() => false);
+    if (ok && def.slug) {
+        await db.query(`UPDATE mkt_user_badge SET congrats_emailed_at = NOW() WHERE buyer_id = $1 AND badge_slug = $2`, [buyerId, def.slug]).catch(() => {});
+    }
+    return ok;
 }
 
-// Backfill: email a member congrats for every curated (admin-assigned) badge they already hold. For
-// people who were granted badges before the congrats email existed. Returns how many were sent.
+// Auto-backfill: email congrats for any manually-granted curated badge that hasn't been emailed yet
+// (covers grants made before the congrats email existed, e.g. Eric's). Idempotent via
+// congrats_emailed_at; only targets awarded_by='admin' so it never spams seeded/system badges. Runs
+// best-effort off the admin badge screen, so it needs no manual action.
+export async function backfillBadgeCongrats(limit = 25) {
+    const rows = await db
+        .query(
+            `SELECT ub.buyer_id, b.slug, b.label, b.icon, b.description
+               FROM mkt_user_badge ub
+               JOIN mkt_badge b ON b.slug = ub.badge_slug
+               JOIN mkt_buyer m ON m.id = ub.buyer_id
+              WHERE ub.congrats_emailed_at IS NULL
+                AND ub.awarded_by = 'admin'
+                AND b.admin_only = TRUE
+                AND m.email IS NOT NULL
+              ORDER BY ub.awarded_at ASC
+              LIMIT $1`,
+            [limit]
+        )
+        .catch(() => []);
+    let sent = 0;
+    for (const def of rows) {
+        const ok = await sendBadgeCongrats(def.buyer_id, def).catch(() => false);
+        if (ok) sent += 1;
+    }
+    return sent;
+}
+
+// Manual re-send (kept for the app button): email congrats for every curated badge a member holds.
 export async function notifyMemberBadges(buyerId) {
     if (!buyerId) return 0;
     const rows = await db

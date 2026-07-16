@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { listMembersWithBadges } from "@/lib/marketplace/badges.js";
+import { backfillBadgeCongrats, listMembersWithBadges } from "@/lib/marketplace/badges.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -20,6 +20,8 @@ export async function GET(request) {
             const limit = searchParams.get("limit") || 40;
             const offset = searchParams.get("offset") || 0;
             const members = await listMembersWithBadges({ q, limit, offset });
+            // Auto-send any pending badge-congrats emails (no manual action needed). Best-effort, off-path.
+            after(() => backfillBadgeCongrats());
             return NextResponse.json({ members }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.badges.members.failure" });
