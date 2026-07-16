@@ -5,51 +5,77 @@ import { useMemo, useState } from "react";
 
 import ThemedSelect from "@/components/ThemedSelect";
 import {
-    AVATAR_STYLES,
-    STYLE_KEYS,
+    ACCESSORIES,
+    AVATAR_FIELDS,
+    BACKGROUND_COLORS,
+    CLOTHES_COLORS,
+    CLOTHINGS,
+    CLOTHING_GRAPHICS,
+    DEFAULT_AVATAR,
+    EYEBROWS,
+    EYES,
+    FACIAL_HAIR,
+    FACIAL_HAIR_COLORS,
+    HAIR_COLORS,
+    MOUTHS,
+    SKIN_COLORS,
     avatarUrlFor,
     humanizeAvatarLabel,
-    sanitizeAvatarConfig,
-    styleFields,
 } from "@/lib/marketplace/avatar-options.js";
 
-// A fresh default config for a style.
-const defaultFor = (styleKey) => ({ ...AVATAR_STYLES[styleKey].default });
+const SELECTS = [
+    { field: "top", label: "Hair / Hat", values: AVATAR_FIELDS.top },
+    { field: "clothing", label: "Outfit", values: CLOTHINGS },
+    { field: "clothingGraphic", label: "Shirt design", values: CLOTHING_GRAPHICS },
+    { field: "eyes", label: "Eyes", values: EYES },
+    { field: "eyebrows", label: "Eyebrows", values: EYEBROWS },
+    { field: "mouth", label: "Mouth", values: MOUTHS },
+    { field: "facialHair", label: "Facial hair", values: FACIAL_HAIR },
+    { field: "accessories", label: "Glasses", values: ACCESSORIES },
+];
+const SWATCHES = [
+    { field: "skinColor", label: "Skin", values: SKIN_COLORS },
+    { field: "hairColor", label: "Hair color", values: HAIR_COLORS },
+    { field: "facialHairColor", label: "Beard color", values: FACIAL_HAIR_COLORS },
+    { field: "hatColor", label: "Hat color", values: CLOTHES_COLORS },
+    { field: "clothesColor", label: "Outfit color", values: CLOTHES_COLORS },
+    { field: "accessoriesColor", label: "Glasses color", values: CLOTHES_COLORS },
+    { field: "backgroundColor", label: "Background", values: BACKGROUND_COLORS },
+];
 
-function randomFor(styleKey) {
-    const cfg = { style: styleKey };
-    for (const f of styleFields(styleKey)) {
-        if (f.optional && Math.random() < 0.35) {
-            cfg[f.key] = "none";
-        } else {
-            cfg[f.key] = f.values[Math.floor(Math.random() * f.values.length)];
-        }
+function randomAvatar() {
+    const cfg = {};
+    for (const [field, values] of Object.entries(AVATAR_FIELDS)) {
+        cfg[field] = values[Math.floor(Math.random() * values.length)];
     }
     return cfg;
 }
 
-// Build your avatar: pick an art set, then customize its native options. Live preview renders via our own
-// /api/marketplace/avatar route. Save stores the config; "Use a photo instead" clears it.
+// Quick starting looks so it's obvious you're not stuck as one gender. These just set hair/clothing/face
+// as a jumping-off point — every field is still fully customizable afterward.
+const FEM_HAIR = ["bob", "bun", "curly", "curvy", "straight01", "straight02", "straightAndStrand", "longButNotTooLong", "miaWallace", "bigHair", "frida"];
+const MASC_HAIR = ["shortFlat", "shortRound", "shortWaved", "shortCurly", "theCaesar", "theCaesarAndSidePart", "sides", "shavedSides", "fro", "frizzle", "shaggy", "shaggyMullet"];
+const pickOne = (a) => a[Math.floor(Math.random() * a.length)];
+function presetLook(kind) {
+    if (kind === "fem") {
+        return { top: pickOne(FEM_HAIR), facialHair: "none", eyebrows: "defaultNatural", clothing: pickOne(["shirtScoopNeck", "shirtVNeck", "collarAndSweater", "blazerAndShirt"]) };
+    }
+    return { top: pickOne(MASC_HAIR), facialHair: pickOne(["none", "none", "beardLight", "beardMedium", "moustacheFancy"]), eyebrows: "default", clothing: pickOne(["shirtCrewNeck", "hoodie", "blazerAndShirt", "collarAndSweater"]) };
+}
+
+// Build your "vanilla" avatar (base identity — skin, hair, face, basic clothes). Live preview renders via
+// our own /api/marketplace/avatar route. Save stores the config; "Use a photo instead" clears it.
 export default function AvatarBuilder({ current = null }) {
     const router = useRouter();
-    const [config, setConfig] = useState(() => sanitizeAvatarConfig(current || AVATAR_STYLES[STYLE_KEYS[0]].default));
+    const [config, setConfig] = useState(() => ({ ...DEFAULT_AVATAR, ...(current || {}) }));
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState("");
     const [err, setErr] = useState("");
 
-    const styleKey = config.style;
-    const fields = useMemo(() => styleFields(styleKey), [styleKey]);
-    const colors = fields.filter((f) => f.type === "color");
-    const selects = fields.filter((f) => f.type === "enum");
     const previewUrl = useMemo(() => avatarUrlFor(config), [config]);
 
     function set(field, value) {
         setConfig((c) => ({ ...c, [field]: value }));
-        setMsg("");
-    }
-    function switchStyle(key) {
-        if (key === styleKey) return;
-        setConfig(defaultFor(key));
         setMsg("");
     }
 
@@ -80,42 +106,31 @@ export default function AvatarBuilder({ current = null }) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="avatar-builder-img" src={previewUrl} alt="Avatar preview" width={140} height={140} />
                 <div className="avatar-presets">
-                    <span className="avatar-ctrl-label">Art style</span>
+                    <span className="avatar-ctrl-label">Start from a look</span>
                     <div className="avatar-preset-row">
-                        {STYLE_KEYS.map((key) => (
-                            <button
-                                key={key}
-                                type="button"
-                                className={`btn-ghost avatar-style-btn${key === styleKey ? " is-selected" : ""}`}
-                                onClick={() => switchStyle(key)}
-                                disabled={busy}
-                                aria-pressed={key === styleKey}
-                            >
-                                {AVATAR_STYLES[key].label}
-                            </button>
-                        ))}
+                        <button type="button" className="btn-ghost" onClick={() => setConfig((c) => ({ ...c, ...presetLook("fem") }))} disabled={busy}>♀ Feminine</button>
+                        <button type="button" className="btn-ghost" onClick={() => setConfig((c) => ({ ...c, ...presetLook("masc") }))} disabled={busy}>♂ Masculine</button>
+                        <button type="button" className="btn-ghost" onClick={() => setConfig(randomAvatar())} disabled={busy}>🎲 Surprise me</button>
                     </div>
-                    <button type="button" className="btn-ghost avatar-builder-random" onClick={() => setConfig(randomFor(styleKey))} disabled={busy}>
-                        🎲 Surprise me
-                    </button>
+                    <span className="muted" style={{ fontSize: "0.78rem" }}>Just a starting point — change any hair, face, or outfit below.</span>
                 </div>
             </div>
 
             <div className="avatar-builder-controls">
-                {colors.map(({ key, label, values }) => (
-                    <div className="avatar-ctrl" key={key}>
+                {SWATCHES.map(({ field, label, values }) => (
+                    <div className="avatar-ctrl" key={field}>
                         <span className="avatar-ctrl-label">{label}</span>
                         <div className="avatar-swatches">
                             {values.map((v) => (
                                 <button
                                     key={v}
                                     type="button"
-                                    className={`avatar-swatch${config[key] === v ? " is-selected" : ""}`}
-                                    style={{ background: `#${v}` }}
-                                    onClick={() => set(key, v)}
-                                    aria-label={`${label}: #${v}`}
-                                    aria-pressed={config[key] === v}
-                                    title={`#${v}`}
+                                    className={`avatar-swatch${config[field] === v ? " is-selected" : ""}${v === "none" ? " is-none" : ""}`}
+                                    style={v === "none" ? undefined : { background: `#${v}` }}
+                                    onClick={() => set(field, v)}
+                                    aria-label={`${label}: ${v === "none" ? "None" : `#${v}`}`}
+                                    aria-pressed={config[field] === v}
+                                    title={v === "none" ? "None" : `#${v}`}
                                 />
                             ))}
                         </div>
@@ -123,18 +138,15 @@ export default function AvatarBuilder({ current = null }) {
                 ))}
 
                 <div className="avatar-selects">
-                    {selects.map(({ key, label, values, optional }) => (
-                        <label className="avatar-ctrl" key={key}>
+                    {SELECTS.map(({ field, label, values }) => (
+                        <label className="avatar-ctrl" key={field}>
                             <span className="avatar-ctrl-label">{label}</span>
                             <ThemedSelect
                                 block
-                                value={config[key]}
-                                onChange={(v) => set(key, v)}
+                                value={config[field]}
+                                onChange={(v) => set(field, v)}
                                 ariaLabel={label}
-                                options={[
-                                    ...(optional ? [{ value: "none", label: "None" }] : []),
-                                    ...values.map((v) => ({ value: v, label: humanizeAvatarLabel(v) })),
-                                ]}
+                                options={values.map((v) => ({ value: v, label: humanizeAvatarLabel(v) }))}
                             />
                         </label>
                     ))}

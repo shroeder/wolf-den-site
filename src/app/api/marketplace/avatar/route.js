@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { sanitizeAvatarConfig, styleFields, styleKeyOf } from "@/lib/marketplace/avatar-options.js";
+import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
@@ -14,10 +14,9 @@ export const dynamic = "force-dynamic";
 // to defaults via sanitize, so this can never error on crafted input.
 export async function GET(request) {
     const { searchParams } = new URL(request.url);
-    const style = styleKeyOf({ style: searchParams.get("style") });
-    const config = { style };
-    for (const f of styleFields(style)) {
-        if (searchParams.has(f.key)) config[f.key] = searchParams.get(f.key);
+    const config = {};
+    for (const key of Object.keys(AVATAR_FIELDS)) {
+        if (searchParams.has(key)) config[key] = searchParams.get(key);
     }
     const clean = sanitizeAvatarConfig(config);
     // format=png rasterizes the avatar (used as the reference image for AI sprite generation).

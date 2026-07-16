@@ -1,43 +1,71 @@
 import "server-only";
 
 import { createAvatar } from "@dicebear/core";
-import { lorelei, notionists } from "@dicebear/collection";
+import { avataaars } from "@dicebear/collection";
 
-import { sanitizeAvatarConfig, styleFields } from "@/lib/marketplace/avatar-options.js";
+import { AVATAR_STYLE, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
-// Server-side avatar SVG generation via DiceBear. The ONLY module that pulls in the DiceBear dependency,
-// so it stays out of page/client bundles. One entry per supported style.
-const STYLE_MODULES = { lorelei, notionists };
+// Server-side avatar SVG generation via DiceBear. This is the ONLY module that pulls in the DiceBear
+// dependency, so it stays out of page/client bundles — mappings just build the render URL.
 
-// Map our stored config to DiceBear options for its style. Colors -> [hex]; optional features use the
-// style's <field>Probability (100 to show the chosen variant, 0 for "none").
+// Turn our stored config (one value per field) into DiceBear avataaars options. "none"/"bald" map to the
+// probability toggles the style uses to omit a layer.
 function toDicebearOptions(config) {
-    const clean = sanitizeAvatarConfig(config);
-    const opts = { seed: "wolfden", backgroundColor: [] };
-    for (const f of styleFields(clean.style)) {
-        const val = clean[f.key];
-        if (f.type === "color") {
-            opts[f.key] = [val];
-        } else if (f.optional && val === "none") {
-            opts[`${f.key}Probability`] = 0;
-        } else {
-            opts[f.key] = [val];
-            if (f.optional) opts[`${f.key}Probability`] = 100;
-        }
+    const c = sanitizeAvatarConfig(config);
+    const opts = {
+        seed: "wolfden", // all features are explicit, so the seed only settles anything left unset
+        size: 240,
+        skinColor: [c.skinColor],
+        hairColor: [c.hairColor],
+        eyes: [c.eyes],
+        eyebrows: [c.eyebrows],
+        mouth: [c.mouth],
+        clothing: [c.clothing],
+        clothesColor: [c.clothesColor],
+        clothingGraphic: [c.clothingGraphic], // only used when clothing is graphicShirt
+        hatColor: [c.hatColor], // only used when top is a hat
+    };
+
+    if (c.top === "bald") {
+        opts.top = [];
+        opts.topProbability = 0;
+    } else {
+        opts.top = [c.top];
+        opts.topProbability = 100;
     }
-    return { style: clean.style, opts };
+
+    if (c.facialHair === "none") {
+        opts.facialHairProbability = 0;
+    } else {
+        opts.facialHair = [c.facialHair];
+        opts.facialHairColor = [c.facialHairColor];
+        opts.facialHairProbability = 100;
+    }
+
+    if (c.accessories === "none") {
+        opts.accessoriesProbability = 0;
+    } else {
+        opts.accessories = [c.accessories];
+        opts.accessoriesColor = [c.accessoriesColor];
+        opts.accessoriesProbability = 100;
+    }
+
+    // "none" background = transparent, so the card's ring/frame shows through.
+    opts.backgroundColor = c.backgroundColor && c.backgroundColor !== "none" ? [c.backgroundColor] : [];
+
+    return opts;
 }
 
-// The avatar as an SVG string, in the config's chosen style.
+// The avatar as an SVG string. AVATAR_STYLE is documented for reference; the style object is imported.
 export function generateAvatarSvg(config) {
-    const { style, opts } = toDicebearOptions(config);
-    const mod = STYLE_MODULES[style] || STYLE_MODULES.lorelei;
-    return createAvatar(mod, { ...opts, size: 240 }).toString();
+    void AVATAR_STYLE;
+    return createAvatar(avataaars, toDicebearOptions(config)).toString();
 }
 
-// The avatar rasterized to a PNG buffer for the OpenAI edits endpoint (the AI sprite reference). The
-// head-and-shoulders avatar is placed in the TOP portion with empty space below, so the model has room to
-// draw a full body instead of just restyling a bust that fills the frame.
+// The avatar rasterized to a PNG buffer (square, transparent) for use as the reference image fed to the
+// OpenAI edits endpoint. The head-and-shoulders avatar is placed in the TOP portion of the canvas with
+// empty space below, so the model has room to draw a full body (torso/legs/feet) instead of just
+// restyling a bust that fills the frame.
 export async function renderAvatarPng(config, size = 1024) {
     const { default: sharp } = await import("sharp");
     const svg = generateAvatarSvg(config);

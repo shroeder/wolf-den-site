@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { avatarConfigToQuery, DEFAULT_AVATAR } from "@/lib/marketplace/avatar-options.js";
+import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
 // The ONE shared default sprite used for members who haven't built their own avatar — so we don't spend
 // AI generating a unique sprite for everyone. Generated once from the default avatar, stored in settings.
@@ -18,12 +18,48 @@ export const getDefaultSpriteUrl = () => getSetting(DEFAULT_SPRITE_KEY);
 // style as the boss art. The cron job (server-side) trickles a few per day; the admin app can also
 // generate them directly on the phone (like the boss art) and upload the finished PNG.
 
-// Prompt for the EDITS endpoint: the member's avatar PNG is the reference (image-to-image), so identity
-// comes from the picture — we just tell the model to redraw it as a full-body game character. Style tokens
-// mirror the boss art (BossArt.kt) so sprites and bosses read as the same game universe. (Config arg kept
-// for API compatibility; the reference image carries the look, not text.)
-export function buildSpritePrompt() {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference. 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
+const SKIN_NAMES = { ffdbb4: "pale", edb98a: "fair", fd9841: "tan", f8d25c: "golden", d08b5b: "brown", ae5d29: "dark brown", 614335: "deep brown" };
+const HAIR_NAMES = { "2c1b18": "black", "4a312c": "dark brown", "724133": "brown", a55728: "auburn", b58143: "light brown", d6b370: "blonde", c93305: "fiery red", e8e1e1: "platinum", ecdcbf: "pale blonde", f59797: "pink" };
+const CLOTH_NAMES = { "262e33": "black", "3c4f5c": "slate", "25557c": "navy", "5199e4": "blue", "65c9ff": "sky-blue", b1e2ff: "pale blue", "929598": "gray", e6e6e6: "light gray", ffffff: "white", a7ffc4: "mint green", ffffb1: "pale yellow", ffafb9: "pink", ff488e: "hot pink", ff5c5c: "red" };
+
+const colorName = (map, hex) => map[String(hex || "").toLowerCase()] || "colored";
+
+// Build a plain-English description of the avatar for the art prompt.
+export function describeAvatar(rawConfig) {
+    const c = sanitizeAvatarConfig(rawConfig);
+    const parts = [];
+    parts.push(`${colorName(SKIN_NAMES, c.skinColor)} skin`);
+
+    if (c.top === "bald") {
+        parts.push("bald head");
+    } else if (HAT_TOPS.includes(c.top)) {
+        parts.push(`wearing a ${humanizeAvatarLabel(c.top).toLowerCase()}`);
+    } else {
+        parts.push(`${colorName(HAIR_NAMES, c.hairColor)} ${humanizeAvatarLabel(c.top).toLowerCase()} hair`);
+    }
+
+    if (c.facialHair && c.facialHair !== "none") {
+        parts.push(`a ${colorName(HAIR_NAMES, c.facialHairColor)} ${humanizeAvatarLabel(c.facialHair).toLowerCase()}`);
+    }
+    if (c.accessories && c.accessories !== "none") {
+        parts.push(c.accessories === "eyepatch" ? "an eyepatch" : `${humanizeAvatarLabel(c.accessories).toLowerCase()} glasses`);
+    }
+
+    const clothColor = colorName(CLOTH_NAMES, c.clothesColor);
+    if (c.clothing === "graphicShirt") {
+        parts.push(`a ${clothColor} graphic t-shirt with a ${humanizeAvatarLabel(c.clothingGraphic).toLowerCase()} design`);
+    } else {
+        parts.push(`a ${clothColor} ${humanizeAvatarLabel(c.clothing).toLowerCase()}`);
+    }
+    return parts.join(", ");
+}
+
+// Prompt for the EDITS endpoint: the member's avatar PNG is the reference, so tell the model to keep its
+// identity and redraw it as a full-body game character. The style tokens below are kept IDENTICAL to the
+// boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
+// sprites and bosses look like the same game universe.
+export function buildSpritePrompt(config) {
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
 }
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
