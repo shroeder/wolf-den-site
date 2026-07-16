@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -125,10 +126,13 @@ export async function awardXp(buyerId, action, { points = null, dedupeKey = null
             const newLevel = levelForXp(newXp).level;
             const oldLevel = levelForXp(newXp - pts).level;
             if (newLevel > oldLevel) {
+                const unlocks = unlocksAtLevel(newLevel);
                 await sendWebPush(buyerId, {
-                    title: "⬆️ Level up!",
-                    body: `You reached level ${newLevel}. Tap to see what you unlocked.`,
-                    url: "/marketplace/rewards",
+                    title: unlocks.length ? "🎁 New reward unlocked!" : "⬆️ Level up!",
+                    body: unlocks.length
+                        ? `Level ${newLevel} — you unlocked ${unlocks.slice(0, 2).join(" · ")}${unlocks.length > 2 ? ` +${unlocks.length - 2} more` : ""}!`
+                        : `You reached level ${newLevel}. Tap to see what's next.`,
+                    url: "/marketplace/track",
                     tag: "level-up",
                     data: { type: "level_up", level: newLevel },
                 }).catch(() => {});

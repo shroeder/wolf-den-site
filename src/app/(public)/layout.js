@@ -1,5 +1,6 @@
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
+import RewardNudge from "@/components/RewardNudge";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SocialHub from "@/components/SocialHub";
@@ -10,6 +11,7 @@ export default function PublicLayout({ children }) {
         <>
             <AnnouncementBanner />
             <SiteHeader />
+            <RewardNudge />
             <main className="shell content">{children}</main>
             <SiteFooter />
             {/* Site-wide so a level-up earned while shopping still celebrates, not just on /marketplace. */}
