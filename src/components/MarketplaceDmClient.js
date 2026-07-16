@@ -3,11 +3,41 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { borderClass } from "@/lib/marketplace/borders.js";
+
+const REACTIONS = ["❤️", "👍", "😂", "🔥", "😮", "😢"];
+
+function timeLabel(iso) {
+    try {
+        return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } catch {
+        return "";
+    }
+}
+
+function dayLabel(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diff = Math.round((startOf(now) - startOf(d)) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
+function sameDay(a, b) {
+    const x = new Date(a);
+    const y = new Date(b);
+    return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
 export default function MarketplaceDmClient({ threadId }) {
     const [thread, setThread] = useState(null);
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
+    const [pickerFor, setPickerFor] = useState(null);
     const endRef = useRef(null);
+    const lastTypingRef = useRef(0);
 
     const load = useCallback(async () => {
         const r = await fetch(`/api/marketplace/dm/${threadId}`, { cache: "no-store" }).catch(() => null);
@@ -17,13 +47,20 @@ export default function MarketplaceDmClient({ threadId }) {
 
     useEffect(() => {
         load();
-        const t = setInterval(load, 15000); // light polling for new messages
+        const t = setInterval(load, 3000); // snappy polling for live feel (typing, receipts, reactions)
         return () => clearInterval(t);
     }, [load]);
 
     useEffect(() => {
         endRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [thread?.messages?.length]);
+    }, [thread?.messages?.length, thread?.otherTyping]);
+
+    function pingTyping() {
+        const now = Date.now();
+        if (now - lastTypingRef.current < 2500) return;
+        lastTypingRef.current = now;
+        fetch(`/api/marketplace/dm/${threadId}/typing`, { method: "POST" }).catch(() => {});
+    }
 
     async function send(e) {
         e.preventDefault();
@@ -40,16 +77,29 @@ export default function MarketplaceDmClient({ threadId }) {
         setSending(false);
     }
 
+    async function react(messageId, emoji) {
+        setPickerFor(null);
+        await fetch(`/api/marketplace/dm/${threadId}/react`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageId, emoji }),
+        }).catch(() => null);
+        await load();
+    }
+
     if (!thread) return <section className="card"><p className="muted">Loading…</p></section>;
     const c = thread.counterpart;
+    const messages = thread.messages || [];
+    const lastMine = [...messages].reverse().find((m) => m.mine);
+    const seen = lastMine && thread.otherLastReadAt && new Date(thread.otherLastReadAt) >= new Date(lastMine.createdAt);
 
     return (
         <>
-            <section className="card dm-header">
-                <Link href="/marketplace/inbox" className="muted">← Inbox</Link>
+            <section className="card dm-topbar">
+                <Link href="/marketplace/inbox" className="dm-back" aria-label="Back to inbox">‹</Link>
                 {c ? (
                     <Link href={c.alias ? `/marketplace/u/${c.alias}` : "#"} className="dm-peer">
-                        <span className="friend-avatar" aria-hidden="true">
+                        <span className={`dm-peer-av ${borderClass(c.border)}`.trim()}>
                             {c.avatarUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={c.avatarUrl} alt="" />
@@ -57,43 +107,91 @@ export default function MarketplaceDmClient({ threadId }) {
                                 <span>{(c.displayLabel || "?").slice(0, 1).toUpperCase()}</span>
                             )}
                         </span>
-                        <span>
+                        <span className="dm-peer-meta">
                             <strong>{c.displayLabel}</strong>
-                            {c.alias ? <span className="muted" style={{ display: "block", fontSize: "0.8rem" }}>@{c.alias}</span> : null}
+                            <span className="dm-peer-status muted">
+                                {thread.otherTyping ? "typing…" : thread.otherOnline ? <><span className="dm-online-dot" /> Online</> : c.alias ? `@${c.alias}` : "Offline"}
+                            </span>
                         </span>
                     </Link>
                 ) : null}
             </section>
 
             <section className="card dm-thread">
-                <div className="dm-messages">
-                    {thread.messages.map((m) => (
-                        <div key={m.id} className={`dm-msg${m.mine ? " mine" : ""}`}>
-                            {m.product ? (
-                                <Link href={`/marketplace/product/${m.product.id}`} className="dm-product-card">
-                                    {m.product.imageUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={m.product.imageUrl} alt="" />
-                                    ) : null}
-                                    <span className="dm-product-info">
-                                        <strong>{m.product.name}</strong>
-                                        <span className="muted">
-                                            {m.product.setName || ""}
-                                            {m.product.price != null ? ` · from $${m.product.price.toFixed(2)}` : ""}
-                                        </span>
-                                    </span>
-                                </Link>
-                            ) : m.catalogProductId ? (
-                                <Link href={`/marketplace/product/${m.catalogProductId}`} className="dm-product-chip">🃏 View shared card →</Link>
-                            ) : null}
-                            {m.body ? <div className="dm-bubble">{m.body}</div> : null}
+                <div className="dm-messages" onClick={() => setPickerFor(null)}>
+                    {messages.map((m, i) => {
+                        const prev = messages[i - 1];
+                        const showDay = !prev || !sameDay(prev.createdAt, m.createdAt);
+                        const grouped = prev && prev.mine === m.mine && sameDay(prev.createdAt, m.createdAt) && new Date(m.createdAt) - new Date(prev.createdAt) < 4 * 60 * 1000 && !showDay;
+                        return (
+                            <div key={m.id}>
+                                {showDay ? <div className="dm-day"><span>{dayLabel(m.createdAt)}</span></div> : null}
+                                <div className={`dm-row${m.mine ? " mine" : ""}${grouped ? " grouped" : ""}`}>
+                                    <div className="dm-bubble-wrap">
+                                        {m.product ? (
+                                            <Link href={`/marketplace/product/${m.product.id}`} className="dm-product-card">
+                                                {m.product.imageUrl ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={m.product.imageUrl} alt="" />
+                                                ) : null}
+                                                <span className="dm-product-info">
+                                                    <strong>{m.product.name}</strong>
+                                                    <span className="muted">{m.product.setName || ""}{m.product.price != null ? ` · from $${m.product.price.toFixed(2)}` : ""}</span>
+                                                </span>
+                                            </Link>
+                                        ) : m.catalogProductId ? (
+                                            <Link href={`/marketplace/product/${m.catalogProductId}`} className="dm-product-chip">🃏 View shared card →</Link>
+                                        ) : null}
+                                        {m.body ? (
+                                            <button
+                                                type="button"
+                                                className="dm-bubble"
+                                                onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === m.id ? null : m.id); }}
+                                                title="Tap to react"
+                                            >
+                                                {m.body}
+                                            </button>
+                                        ) : null}
+                                        {pickerFor === m.id ? (
+                                            <div className="dm-react-picker" onClick={(e) => e.stopPropagation()}>
+                                                {REACTIONS.map((emoji) => (
+                                                    <button type="button" key={emoji} onClick={() => react(m.id, emoji)}>{emoji}</button>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        {m.reactions?.length ? (
+                                            <div className="dm-reactions">
+                                                {m.reactions.map((r) => (
+                                                    <button type="button" key={r.emoji} className={`dm-reaction${r.mine ? " mine" : ""}`} onClick={(e) => { e.stopPropagation(); react(m.id, r.emoji); }}>
+                                                        {r.emoji} {r.count > 1 ? r.count : ""}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        <span className="dm-time">{timeLabel(m.createdAt)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {thread.otherTyping ? (
+                        <div className="dm-row">
+                            <div className="dm-bubble dm-typing"><span></span><span></span><span></span></div>
                         </div>
-                    ))}
+                    ) : null}
+                    {seen ? <div className="dm-seen muted">Seen</div> : null}
                     <div ref={endRef} />
                 </div>
                 <form onSubmit={send} className="dm-composer">
-                    <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Message…" autoComplete="off" />
-                    <button className="button primary" disabled={sending || !text.trim()}>Send</button>
+                    <input
+                        value={text}
+                        onChange={(e) => { setText(e.target.value); pingTyping(); }}
+                        placeholder="Message…"
+                        autoComplete="off"
+                    />
+                    <button className="dm-send" disabled={sending || !text.trim()} aria-label="Send">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 20.5v-6l8-2.5-8-2.5v-6l19 8.5z" /></svg>
+                    </button>
                 </form>
             </section>
         </>

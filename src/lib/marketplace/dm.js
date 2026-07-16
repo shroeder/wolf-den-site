@@ -96,28 +96,51 @@ export async function listDmThreads(userId) {
     });
 }
 
-// Load a DM thread the user is in, its messages, and mark it read.
+// Load a DM thread the user is in, its messages, reactions, presence + typing of the other person,
+// and mark it read. Powers the first-class conversation view.
 export async function getDmThread(threadId, userId) {
-    const t = await db.queryOne(`SELECT id, user_a, user_b FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
+    const t = await db.queryOne(`SELECT id, user_a, user_b, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
     if (!t || (t.user_a !== userId && t.user_b !== userId)) return null;
     const otherId = t.user_a === userId ? t.user_b : t.user_a;
-    const other = mapUser(
-        await db
-            .queryOne(`SELECT id, alias, first_name, last_name, display_name, avatar_url, xp FROM mkt_buyer WHERE id = $1`, [otherId])
-            .catch(() => null)
-    );
+    const otherLastReadAt = t.user_a === otherId ? t.a_last_read_at : t.b_last_read_at;
+    const otherRow = await db
+        .queryOne(`SELECT id, alias, first_name, last_name, display_name, avatar_url, xp, equipped_border, last_seen_at FROM mkt_buyer WHERE id = $1`, [otherId])
+        .catch(() => null);
+    const other = mapUser(otherRow);
+    const otherOnline = otherRow?.last_seen_at ? Date.now() - new Date(otherRow.last_seen_at).getTime() < 2 * 60 * 1000 : false;
+
+    const typingRow = await db.queryOne(`SELECT updated_at FROM mkt_dm_typing WHERE thread_id = $1 AND buyer_id = $2`, [threadId, otherId]).catch(() => null);
+    const otherTyping = typingRow?.updated_at ? Date.now() - new Date(typingRow.updated_at).getTime() < 6000 : false;
+
     const messages = await db
         .query(`SELECT id, sender_id, body, catalog_product_id, created_at FROM mkt_dm_message WHERE thread_id = $1 ORDER BY created_at ASC`, [threadId])
         .catch(() => []);
     const readCol = t.user_a === userId ? "a_last_read_at" : "b_last_read_at";
     await db.query(`UPDATE mkt_dm_thread SET ${readCol} = NOW() WHERE id = $1`, [threadId]).catch(() => {});
 
-    // Resolve any shared products so the client can render a rich card inline.
+    // Reactions across the thread's messages, grouped per message with a "mine" flag.
+    const ids = messages.map((m) => m.id);
+    const reactRows = ids.length
+        ? await db.query(`SELECT message_id, emoji, buyer_id FROM mkt_dm_reaction WHERE message_id = ANY($1)`, [ids]).catch(() => [])
+        : [];
+    const reactByMsg = new Map();
+    for (const rr of reactRows) {
+        if (!reactByMsg.has(rr.message_id)) reactByMsg.set(rr.message_id, new Map());
+        const em = reactByMsg.get(rr.message_id);
+        const cur = em.get(rr.emoji) || { emoji: rr.emoji, count: 0, mine: false };
+        cur.count += 1;
+        if (rr.buyer_id === userId) cur.mine = true;
+        em.set(rr.emoji, cur);
+    }
+
     const cards = await getProductCards(messages.map((m) => m.catalog_product_id).filter(Boolean));
 
     return {
         id: threadId,
         counterpart: other,
+        otherLastReadAt,
+        otherOnline,
+        otherTyping,
         messages: messages.map((m) => {
             const pid = m.catalog_product_id != null ? String(m.catalog_product_id) : null;
             return {
@@ -127,9 +150,52 @@ export async function getDmThread(threadId, userId) {
                 catalogProductId: pid,
                 product: pid ? cards[pid] || null : null,
                 createdAt: m.created_at,
+                reactions: reactByMsg.has(m.id) ? Array.from(reactByMsg.get(m.id).values()) : [],
             };
         }),
     };
+}
+
+// Verify the user is a participant of the thread. Returns the thread row or null.
+async function threadForUser(threadId, userId) {
+    const t = await db.queryOne(`SELECT user_a, user_b FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
+    if (!t || (t.user_a !== userId && t.user_b !== userId)) return null;
+    return t;
+}
+
+// Toggle an emoji reaction on a message (one reaction per person per message — same emoji removes it,
+// a different emoji replaces it).
+export async function reactToMessage(threadId, userId, messageId, emoji) {
+    if (!threadId || !userId || !messageId || !emoji) return { error: "invalid" };
+    const t = await threadForUser(threadId, userId);
+    if (!t) return { error: "forbidden" };
+    const msg = await db.queryOne(`SELECT thread_id FROM mkt_dm_message WHERE id = $1`, [messageId]).catch(() => null);
+    if (!msg || msg.thread_id !== threadId) return { error: "not_found" };
+    const e = String(emoji).slice(0, 8);
+    const existing = await db.queryOne(`SELECT emoji FROM mkt_dm_reaction WHERE message_id = $1 AND buyer_id = $2`, [messageId, userId]).catch(() => null);
+    if (existing?.emoji === e) {
+        await db.query(`DELETE FROM mkt_dm_reaction WHERE message_id = $1 AND buyer_id = $2`, [messageId, userId]).catch(() => {});
+    } else {
+        await db
+            .query(
+                `INSERT INTO mkt_dm_reaction (message_id, buyer_id, emoji) VALUES ($1, $2, $3)
+                 ON CONFLICT (message_id, buyer_id) DO UPDATE SET emoji = EXCLUDED.emoji, created_at = NOW()`,
+                [messageId, userId, e]
+            )
+            .catch(() => {});
+    }
+    return { ok: true };
+}
+
+// Ping that the user is typing in a thread (ephemeral; the other side polls it).
+export async function setTyping(threadId, userId) {
+    if (!threadId || !userId) return { error: "invalid" };
+    const t = await threadForUser(threadId, userId);
+    if (!t) return { error: "forbidden" };
+    await db
+        .query(`INSERT INTO mkt_dm_typing (thread_id, buyer_id) VALUES ($1, $2) ON CONFLICT (thread_id, buyer_id) DO UPDATE SET updated_at = NOW()`, [threadId, userId])
+        .catch(() => {});
+    return { ok: true };
 }
 
 export async function unreadDmCount(userId) {
