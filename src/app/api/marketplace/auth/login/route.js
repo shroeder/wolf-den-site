@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { accountNeedsPasswordSetup, authenticateBuyer, createBuyerSession, createEmailVerification, createPasswordReset, getAccountLinkedVendorId, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
+import { accountNeedsPasswordSetup, authenticateBuyer, createBuyerSession, createEmailVerification, createPasswordReset, getAccountLinkedVendorId, logAuthAttempt, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
 import { createVendorSession } from "@/lib/marketplace/vendor-session.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/marketplace/email.js";
 import { authenticateVendor, getVendorById } from "@/lib/marketplace/vendors.js";
@@ -19,6 +19,7 @@ export async function POST(request) {
             const { email, password } = body;
 
             const account = await authenticateBuyer(email, password);
+            await logAuthAttempt("login", email, account ? (account.emailVerified ? "ok" : "ok_unverified") : "auth_failed").catch(() => {});
             if (account) {
                 if (!account.emailVerified) {
                     // Block unverified accounts; re-send a fresh code so they can finish verifying.

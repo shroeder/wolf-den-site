@@ -77,6 +77,22 @@ export async function createBuyer({ email, password, displayName = null }) {
     return mapBuyer(row);
 }
 
+// TEMPORARY diagnostic: record what an auth attempt actually submitted + whether it matched an account.
+// No passwords. Best-effort — never blocks or throws into the request path.
+export async function logAuthAttempt(route, email, outcome) {
+    try {
+        const raw = String(email ?? "");
+        const norm = normalizeEmail(raw);
+        const acct = norm ? await db.queryOne(`SELECT (password_hash IS NULL) AS no_pw FROM mkt_buyer WHERE email_normalized = $1`, [norm]) : null;
+        await db.query(
+            `INSERT INTO auth_attempt_log (route, email_attempted, email_len, account_found, no_password, outcome) VALUES ($1, $2, $3, $4, $5, $6)`,
+            [route, raw.slice(0, 160), raw.length, Boolean(acct), acct ? Boolean(acct.no_pw) : null, outcome]
+        );
+    } catch {
+        // diagnostics only
+    }
+}
+
 // The email tied to a valid, unexpired reset token — so the reset form can show it as the browser's
 // "username" field (otherwise password managers save the new password under a blank username and can't
 // autofill it at the next sign-in). Null if the token is unknown/expired.

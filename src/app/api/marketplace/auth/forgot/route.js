@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createPasswordReset } from "@/lib/marketplace/buyer-session.js";
+import { createPasswordReset, logAuthAttempt } from "@/lib/marketplace/buyer-session.js";
 import { sendPasswordResetEmail } from "@/lib/marketplace/email.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -12,6 +12,7 @@ export async function POST(request) {
         try {
             const body = await request.json().catch(() => ({}));
             const reset = await createPasswordReset(body.email);
+            await logAuthAttempt("forgot", body.email, reset ? "token_created" : "no_account").catch(() => {});
             if (reset) {
                 try {
                     await sendPasswordResetEmail(reset.email, reset.token);
