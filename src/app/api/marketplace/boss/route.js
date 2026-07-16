@@ -1,0 +1,21 @@
+import { NextResponse } from "next/server";
+
+import { getBossState } from "@/lib/marketplace/boss.js";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { withRequestLogging } from "@/lib/server-logger";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Current shared boss state: HP, contributors, and (if signed in) the viewer's attacks-left + damage.
+export async function GET(request) {
+    return withRequestLogging(request, "GET /api/marketplace/boss", async ({ internalError }) => {
+        try {
+            const buyer = await getAuthenticatedBuyer().catch(() => null);
+            const state = await getBossState(buyer?.id || null);
+            return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
+        } catch (error) {
+            return internalError(error, { event: "marketplace.boss.state.failure" });
+        }
+    });
+}

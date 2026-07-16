@@ -9054,3 +9054,44 @@ body.tv-mode .shop-mobile-cart-fab {
 .rewards-hero-primary { display: flex; align-items: center; justify-content: center; padding: 13px 18px; }
 .rewards-hero-secondary { display: flex; flex-wrap: wrap; gap: 10px; }
 .rewards-hero-secondary > * { flex: 1 1 calc(50% - 5px); min-width: 130px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; }
+
+/* ---- Monthly boss (real, shared) ---- */
+.boss2 { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; }
+.boss2-stage {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 24px 16px 20px; border-radius: 18px; overflow: hidden;
+    background: radial-gradient(80% 70% at 50% 32%, rgba(224, 68, 40, 0.3), transparent 65%), linear-gradient(160deg, #1c0e0b, #0b0a10);
+    border: 1px solid rgba(224, 68, 40, 0.32);
+}
+.boss2-title { font-size: 0.82rem; color: #e6b8a8; font-weight: 600; text-align: center; }
+.boss2-enemy { font-size: 8.5rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 22px rgba(224, 68, 40, 0.6)); animation: boss2-breathe 3s ease-in-out infinite; }
+.boss2-stage.is-hit .boss2-enemy { animation: boss2-shake 0.18s linear; color: #ff9a6a; filter: drop-shadow(0 0 32px rgba(255, 140, 80, 0.95)); }
+@keyframes boss2-breathe { 0%, 100% { transform: scale(1) translateY(0); } 50% { transform: scale(1.04) translateY(-4px); } }
+@keyframes boss2-shake { 25% { transform: translateX(-8px) rotate(-2deg); } 75% { transform: translateX(8px) rotate(2deg); } }
+.boss2-name { font-size: 1.3rem; font-weight: 800; color: #ffdccb; }
+.boss2-tier { font-size: 0.9rem; color: #cdbfa6; font-weight: 600; }
+.boss2-hpbar { width: 100%; max-width: 440px; height: 16px; border-radius: 10px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.15); overflow: hidden; margin-top: 4px; }
+.boss2-hpbar span { display: block; height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ff3d3d, #ff8a3d); transition: width 0.4s ease; box-shadow: 0 0 10px rgba(255, 80, 40, 0.6); }
+.boss2-hp { font-size: 0.85rem; font-weight: 700; color: #ffd0b8; }
+.boss2-floater { position: absolute; font-weight: 800; font-size: 1.2rem; color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; animation: boss2-float 0.85s ease-out forwards; }
+.boss2-floater.is-crit { font-size: 1.9rem; color: #ff5a5a; }
+@keyframes boss2-float { 0% { opacity: 1; transform: translateY(0) scale(0.8); } 100% { opacity: 0; transform: translateY(-48px) scale(1.3); } }
+@media (prefers-reduced-motion: reduce) { .boss2-enemy { animation: none; } }
+
+.boss2-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.boss2-attack { width: 100%; max-width: 440px; text-align: center; justify-content: center; padding: 14px; font-size: 1.05rem; }
+.boss2-spent { padding: 12px; color: #cdbfa6; text-align: center; font-weight: 600; }
+.boss2-you { font-size: 0.85rem; }
+.boss2-xp { color: #ffd75e; font-weight: 800; }
+.boss2-board h3 { margin: 0 0 8px; }
+.boss2-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.boss2-rank li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.boss2-rank li.is-you { background: rgba(255, 215, 94, 0.12); }
+.boss2-rank-n { width: 18px; font-weight: 800; color: #ffd75e; text-align: center; }
+.boss2-rank-name { flex: 1; font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boss2-rank-dmg { font-size: 0.8rem; color: #cdbfa6; }
+.boss2-rank-tix { font-size: 0.82rem; font-weight: 700; }
+.boss2-note { font-size: 0.8rem; margin-top: 10px; }
+.boss2-victory-overlay { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.72); }
+.boss2-victory { text-align: center; padding: 28px; }
+.boss2-victory-x { font-size: 4rem; }

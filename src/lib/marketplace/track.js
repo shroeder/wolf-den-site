@@ -35,6 +35,8 @@ function progressLabel(rule, current, target) {
         case "top_card": return `best card $${current.toLocaleString()} / $${target.toLocaleString()}`;
         case "donation_count": return `${current} / ${target} donations`;
         case "donation_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} donated`;
+        case "boss_hits": return `${current} / ${target} boss hits`;
+        case "boss_damage": return `${current.toLocaleString()} / ${target.toLocaleString()} boss dmg`;
         default: return `${current} / ${target}`;
     }
 }

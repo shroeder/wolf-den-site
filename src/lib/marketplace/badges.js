@@ -58,7 +58,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, messageRow, badgeRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, messageRow, badgeRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -76,6 +76,7 @@ export async function getMemberMetrics(buyerId) {
                FROM mkt_donation_claim WHERE redeemed_buyer_id = $1`,
             [buyerId]
         ).catch(() => null),
+        db.queryOne(`SELECT COUNT(*)::int AS hits, COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE buyer_id = $1`, [buyerId]).catch(() => null),
         // Messages this member has SENT — friend DMs + their side of store threads.
         db.queryOne(
             `SELECT ((SELECT COUNT(*) FROM mkt_dm_message WHERE sender_id = $1)
@@ -116,6 +117,8 @@ export async function getMemberMetrics(buyerId) {
         topCard: Math.round(Number(tradeRow?.top_cents || 0) / 100),
         donationCount: donationRow?.donations || 0,
         donationValue: Math.round(Number(donationRow?.value_cents || 0) / 100),
+        bossHits: bossRow?.hits || 0,
+        bossDamage: bossRow?.dmg || 0,
     };
 }
 
@@ -141,6 +144,8 @@ export function progressForRule(rule, threshold, m) {
         case "top_card": return { current: m.topCard, target: t };
         case "donation_count": return { current: m.donationCount, target: t };
         case "donation_value": return { current: m.donationValue, target: t };
+        case "boss_hits": return { current: m.bossHits, target: t };
+        case "boss_damage": return { current: m.bossDamage, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }

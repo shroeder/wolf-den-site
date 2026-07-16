@@ -55,6 +55,7 @@ export const XP_ACTIONS = {
     first_friend: 40, // make your first friend
     first_wishlist: 30, // add your first card to your Looking For list
     first_equip: 20, // customize your look — equip a border or background
+    boss_attack: 10, // one swing at the monthly boss (capped by the per-day attack limit)
 };
 
 // Award a one-time onboarding milestone. dedupe on (action, buyerId) so it can only ever fire once.
