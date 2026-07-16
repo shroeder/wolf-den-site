@@ -26,6 +26,8 @@ function progressLabel(rule, current, target) {
         case "cards_traded": return `${current} / ${target} cards traded`;
         case "trade_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} traded`;
         case "top_card": return `best card $${current.toLocaleString()} / $${target.toLocaleString()}`;
+        case "donation_count": return `${current} / ${target} donations`;
+        case "donation_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} donated`;
         default: return `${current} / ${target}`;
     }
 }

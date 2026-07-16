@@ -45,7 +45,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -56,6 +56,11 @@ export async function getMemberMetrics(buyerId) {
             `SELECT COUNT(*)::int AS trades, COALESCE(SUM(card_count), 0)::int AS cards,
                     COALESCE(SUM(total_value_cents), 0)::bigint AS value_cents, COALESCE(MAX(top_card_value_cents), 0)::int AS top_cents
                FROM mkt_trade_claim WHERE redeemed_buyer_id = $1`,
+            [buyerId]
+        ).catch(() => null),
+        db.queryOne(
+            `SELECT COUNT(*)::int AS donations, COALESCE(SUM(amount_cents), 0)::bigint AS value_cents
+               FROM mkt_donation_claim WHERE redeemed_buyer_id = $1`,
             [buyerId]
         ).catch(() => null),
     ]);
@@ -82,6 +87,8 @@ export async function getMemberMetrics(buyerId) {
         cardsTraded: tradeRow?.cards || 0,
         tradeValue: Math.round(Number(tradeRow?.value_cents || 0) / 100),
         topCard: Math.round(Number(tradeRow?.top_cents || 0) / 100),
+        donationCount: donationRow?.donations || 0,
+        donationValue: Math.round(Number(donationRow?.value_cents || 0) / 100),
     };
 }
 
@@ -102,6 +109,8 @@ export function progressForRule(rule, threshold, m) {
         case "cards_traded": return { current: m.cardsTraded, target: t };
         case "trade_value": return { current: m.tradeValue, target: t };
         case "top_card": return { current: m.topCard, target: t };
+        case "donation_count": return { current: m.donationCount, target: t };
+        case "donation_value": return { current: m.donationValue, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }
