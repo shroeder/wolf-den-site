@@ -8547,14 +8547,15 @@ body.tv-mode .shop-mobile-cart-fab {
 /* --- Professional top bar (consolidated; placed LAST so it beats the scattered header rules earlier
    in the file — media queries don't add specificity). Left: menu + brand. Right: a tidy row of equal
    icons ending in the account avatar (far right, like most apps). --- */
-.top-row { flex-wrap: nowrap; gap: 10px; padding: 10px 0; justify-content: flex-start; }
+.top-row { flex-wrap: nowrap; gap: 10px; padding: 10px 0; justify-content: flex-start; position: relative; }
 .top-left { gap: 10px; flex-wrap: nowrap; min-width: 0; flex: 0 0 auto; }
-.top-right { gap: 6px; flex-wrap: nowrap; margin-left: auto; flex: 0 0 auto; }
+.top-right { gap: 14px; flex-wrap: nowrap; margin-left: auto; flex: 0 0 auto; }
 .brand { font-size: 1.1rem; margin-right: 0; min-width: 0; align-items: center; }
 .brand > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Every header control shares one height (36px), perfectly centered. */
+/* Every header control shares one height (36px), perfectly centered. Logo is cropped to a tight circle
+   (its PNG has padding around the badge) so it fills its box instead of floating small + off-center. */
 .top-row, .top-left, .top-right { align-items: center; }
-.brand-mark { height: 36px; width: auto; }
+.brand-mark { height: 36px; width: 36px; object-fit: cover; border-radius: 50%; }
 
 /* Unified round icon buttons in the top-right utility row. */
 .nav-icon {
@@ -8587,11 +8588,12 @@ body.tv-mode .shop-mobile-cart-fab {
 .nav-account-avatar { width: 30px; height: 30px; font-size: 0.72rem; }
 .nav-signin { padding: 0.42rem 0.9rem; }
 
-/* Menu lives at the far left — same 36px box as the icons, bars centered. */
-.hamburger { margin-left: 0; width: 36px; height: 36px; padding: 0; align-items: center; justify-content: center; }
+/* Menu is a round button floated DEAD-CENTER on mobile (absolute, so the logo/account widths don't
+   shove it off-center); on desktop it's hidden and the nav sits inline. */
+.nav-menu { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; }
 
-/* Desktop: nav links sit inline in the header (single-line); the separate nav row + hamburger hide.
-   Mobile: the hamburger opens the dropdown row and the inline nav hides. */
+/* Desktop: nav links sit inline in the header (single-line); the separate nav row + menu button hide.
+   Mobile: the menu button opens the dropdown row and the inline nav hides. */
 .nav-inline { display: none; align-items: center; gap: 2px; margin-left: 1.25rem; min-width: 0; flex-wrap: wrap; }
 .nav-inline .nav-link { padding: 0.4rem 0.7rem; }
 .nav-link-discord { display: inline-flex; align-items: center; gap: 6px; }
@@ -8599,7 +8601,7 @@ body.tv-mode .shop-mobile-cart-fab {
 
 @media (min-width: 701px) {
     .nav-inline { display: flex; }
-    .hamburger { display: none; }
+    .nav-menu { display: none; }
     .nav-row { display: none; }
 }
 @media (max-width: 700px) {

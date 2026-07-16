@@ -146,17 +146,6 @@ export default function SiteHeader() {
         <header className="site-header">
             <div className="shell top-row">
                 <div className="top-left">
-                    <button
-                        className="hamburger"
-                        aria-label={open ? "Close menu" : "Open menu"}
-                        aria-expanded={open}
-                        disabled={tvMode}
-                        onClick={() => setOpen((v) => !v)}
-                    >
-                        <span className={`ham-bar${open ? " open" : ""}`} />
-                        <span className={`ham-bar${open ? " open" : ""}`} />
-                        <span className={`ham-bar${open ? " open" : ""}`} />
-                    </button>
                     <Link href="/" className="brand" onClick={() => setOpen(false)}>
                         <Image
                             className="brand-mark"
@@ -171,6 +160,18 @@ export default function SiteHeader() {
                     </Link>
                 </div>
                 <nav className="nav-inline" aria-label="Primary">{navContent}</nav>
+                <button
+                    type="button"
+                    className="nav-icon nav-menu"
+                    aria-label={open ? "Close menu" : "Open menu"}
+                    aria-expanded={open}
+                    disabled={tvMode}
+                    onClick={() => setOpen((v) => !v)}
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                        {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+                    </svg>
+                </button>
                 <div className="top-right">
                     <button
                         type="button"
