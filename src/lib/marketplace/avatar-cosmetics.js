@@ -13,6 +13,15 @@ export const AVATAR_COSMETICS = [
     { id: "winter_hat", slot: "headwear", kind: "native", opts: { top: "winterHat03" }, label: "Winter Hat", icon: "🎿", level: 10, animated: false, hint: "A warm winter hat" },
     { id: "snow_cap", slot: "headwear", kind: "native", opts: { top: "winterHat04" }, label: "Snow Cap", icon: "⛄", level: 16, animated: false, hint: "A snowy cap" },
     { id: "classic_hat", slot: "headwear", kind: "native", opts: { top: "hat" }, label: "Classic Hat", icon: "🎩", level: 24, animated: false, hint: "A classic hat" },
+    // Custom vector art (our own SVG) rendered as an overlay — a test of how "worn" flair reads.
+    {
+        id: "crown", slot: "headwear", kind: "svg", place: "crown", label: "Golden Crown", icon: "👑", level: 20, animated: false, hint: "A regal gold crown",
+        svg: '<svg viewBox="0 0 100 66" xmlns="http://www.w3.org/2000/svg"><path d="M6 56 L13 18 L32 42 L50 10 L68 42 L87 18 L94 56 Z" fill="#f5c542" stroke="#a9760f" stroke-width="3" stroke-linejoin="round"/><rect x="6" y="52" width="88" height="12" rx="3" fill="#e0a92e" stroke="#a9760f" stroke-width="3"/><circle cx="50" cy="24" r="4.5" fill="#ff5a6a"/><circle cx="21" cy="34" r="3.5" fill="#5a9bff"/><circle cx="79" cy="34" r="3.5" fill="#5affaf"/></svg>',
+    },
+    {
+        id: "halo", slot: "headwear", kind: "svg", place: "halo", label: "Halo", icon: "💫", level: 28, animated: true, hint: "An angelic glowing halo",
+        svg: '<svg viewBox="0 0 100 44" xmlns="http://www.w3.org/2000/svg"><ellipse cx="50" cy="22" rx="44" ry="13" fill="none" stroke="#ffe27a" stroke-width="7"/></svg>',
+    },
     // Aura — a soft glow behind the portrait (CSS).
     { id: "aura_gold", slot: "aura", kind: "overlay", label: "Golden Aura", icon: "🟡", level: 6, animated: false, hint: "A warm gold glow" },
     { id: "aura_aqua", slot: "aura", kind: "overlay", label: "Aqua Aura", icon: "🔵", level: 12, animated: false, hint: "A cool cyan glow" },

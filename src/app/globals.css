@@ -8877,3 +8877,11 @@ body.tv-mode .shop-mobile-cart-fab {
     .cos-picker { grid-template-columns: auto 1fr; align-items: start; }
     .cos-preview { position: sticky; top: 12px; padding-top: 8px; }
 }
+
+/* Custom SVG avatar cosmetics (overlay test: crown = worn, halo = ambient ring) */
+.av-svg { position: absolute; pointer-events: none; z-index: 3; left: 50%; }
+.av-svg svg { width: 100%; height: auto; display: block; }
+.av-svg-crown { top: 0.02em; width: 0.58em; transform: translateX(-50%); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
+.av-svg-halo { top: -0.12em; width: 0.66em; transform: translateX(-50%); filter: drop-shadow(0 0 3px rgba(255, 225, 120, 0.9)); animation: av-halo 2.8s ease-in-out infinite; }
+@keyframes av-halo { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .av-svg-halo { animation: none; } }
