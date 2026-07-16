@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { discordConfig } from "@/lib/marketplace/discord.js";
+import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrounds.js";
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
@@ -116,6 +117,8 @@ function mapProfile(row, badges = []) {
         discordLinked: Boolean(row.discord_user_id),
         // Equipped cosmetic avatar border id ('none' when unset). Public — it's just a frame style.
         border: row.equipped_border || "none",
+        // Equipped cosmetic profile background id ('none' when unset).
+        background: row.equipped_background || "none",
     };
 }
 
@@ -123,7 +126,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -152,6 +155,21 @@ export async function equipBorder(buyerId, borderId) {
     return getProfile(buyerId);
 }
 
+// Equip a cosmetic profile background. Validated against level (staff bypass unlocks all). 'none' clears.
+export async function equipBackground(buyerId, backgroundId) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const bg = backgroundById(backgroundId);
+    const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
+    const level = levelForXp(row?.xp || 0).level;
+    const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
+    if (bg.id !== "none" && !isBackgroundUnlocked(bg.id, level, { unlockAll })) {
+        throw new Error(`That background unlocks at Level ${bg.level}.`);
+    }
+    await db.query(`UPDATE mkt_buyer SET equipped_background = $2, updated_at = NOW() WHERE id = $1`, [buyerId, bg.id === "none" ? null : bg.id]);
+    return getProfile(buyerId);
+}
+
 // Public leaderboard: top members by lifetime XP. Only accounts with a public @handle appear (opting in
 // via a handle), and only those who've earned something. Returns rank + display bits (no contact info).
 export async function getLeaderboard(limit = 50) {
@@ -176,7 +194,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

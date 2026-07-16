@@ -6101,6 +6101,75 @@ body.tv-mode .shop-mobile-cart-fab {
 .border-swatch-label { font-weight: 700; font-size: 0.85rem; }
 .border-swatch-sub { font-size: 0.72rem; text-align: center; }
 
+/* ===== Custom profile backgrounds (cosmetic scenes behind the hero) ===== */
+/* Applied to a .card container; dark gradients keep white text readable. */
+.bg-scene { position: relative; }
+.bg-midnight { background: linear-gradient(160deg, #0b1026, #131a3a 55%, #1a1030) !important; }
+.bg-ember { background: radial-gradient(120% 100% at 20% 0%, rgba(255, 120, 40, 0.22), transparent 55%), linear-gradient(160deg, #241008, #180d08) !important; }
+.bg-forest { background: linear-gradient(160deg, #08120e, #0e241c 55%, #0a1a14) !important; }
+.bg-ocean { background: linear-gradient(160deg, #08172a, #0e2a44 55%, #0a1e33) !important; }
+.bg-sunset { background: radial-gradient(120% 100% at 80% 0%, rgba(255, 90, 140, 0.26), transparent 55%), linear-gradient(160deg, #2a1030, #3a1a2a 55%, #1a1020) !important; }
+.bg-nebula {
+    background: linear-gradient(130deg, #1a0b2e, #3a1a5a, #5a1a4a, #1a0b2e) !important;
+    background-size: 300% 300% !important;
+    animation: bg-shift 18s ease infinite;
+}
+.bg-aurora {
+    background: linear-gradient(130deg, #08160e, #0e3a2a, #1a2a5a, #2a1a4a, #08160e) !important;
+    background-size: 300% 300% !important;
+    animation: bg-shift 16s ease infinite;
+}
+.bg-galaxy {
+    background: radial-gradient(80% 60% at 30% 20%, rgba(120, 90, 255, 0.22), transparent 60%), linear-gradient(160deg, #070610, #0e0a24, #120a2a, #070610) !important;
+    background-size: 300% 300% !important;
+    animation: bg-shift 22s ease infinite;
+}
+.bg-prismatic {
+    background: linear-gradient(130deg, #3a1a2a, #1a2a5a, #163a3a, #3a2a1a, #3a1a2a) !important;
+    background-size: 400% 400% !important;
+    animation: bg-shift 14s ease infinite;
+}
+@keyframes bg-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .bg-nebula, .bg-aurora, .bg-galaxy, .bg-prismatic { animation: none; }
+}
+
+/* Background picker (profile) */
+.bg-swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 12px; }
+.bg-swatch {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+    background: none;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    color: var(--ink);
+    font: inherit;
+}
+.bg-swatch:disabled { cursor: default; }
+.bg-swatch.is-selected { outline: 1px solid rgba(255, 215, 94, 0.5); background: rgba(255, 215, 94, 0.08); }
+.bg-swatch-scene {
+    position: relative;
+    height: 54px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #14141f;
+}
+.bg-swatch.is-locked .bg-swatch-scene { opacity: 0.55; }
+.bg-swatch-lock { font-size: 1.1rem; }
+.bg-swatch-label { font-weight: 700; font-size: 0.82rem; }
+.bg-swatch-sub { font-size: 0.7rem; text-align: center; }
+
 /* ===== Member hero card ===== */
 .hero-card {
     display: flex;

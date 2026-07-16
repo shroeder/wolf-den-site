@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
+import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { borderClass } from "@/lib/marketplace/borders.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
@@ -39,7 +40,7 @@ export default async function UserProfilePage({ params }) {
 
     return (
         <div className="stack reveal">
-            <section className="card">
+            <section className={`card ${backgroundClass(profile.background)}`.trim()}>
                 <div className="user-profile-head">
                     <Avatar profile={profile} />
                     <div className="user-profile-meta">
