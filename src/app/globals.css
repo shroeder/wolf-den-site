@@ -8748,39 +8748,39 @@ body.tv-mode .shop-mobile-cart-fab {
     .frame-role_dev::after, .frame-role_admin::after { animation: none; }
 }
 
-/* ---- Primary-badge "folder tab" — sticks up above the card's top edge (Manila-folder style) ---- */
-.has-card-tab { position: relative; margin-top: 30px; }
-/* A seamless "manila folder" tab: same gradient fill + border as the card, bottom merged into the card
-   top edge (no border/gap between them) so it reads as one continuous piece — not a pill on top. */
+/* ---- Featured-badge tab — a bold, badge-COLOURED ribbon that sticks up on the card's top-left,
+       always showing the badge's name so it reads clearly and carries the badge's weight ---- */
+.has-card-tab { position: relative; margin-top: 32px; }
 .card-tab {
     position: absolute;
-    top: 1px;                          /* overlap the card's top border by 1px so there's no seam line */
+    top: 1px;                          /* overlap the card's top edge by 1px — no seam line */
     left: 16px;
     transform: translateY(-100%);      /* sit fully above; bottom flush with the card top */
-    z-index: 2;
+    z-index: 3;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    max-width: 62%;
-    padding: 5px 14px 7px;
-    border-radius: 10px 10px 0 0;      /* only the top corners round */
-    background: linear-gradient(160deg, rgba(30, 24, 48, 0.6), rgba(20, 20, 31, 0.4)); /* == card fill */
-    border: 1px solid rgba(255, 215, 94, 0.22); /* == card border, on top + sides only */
+    gap: 6px;
+    max-width: calc(100% - 32px);
+    padding: 5px 14px 8px;
+    border-radius: 11px 11px 0 0;      /* only the top corners round; flat bottom onto the card */
+    /* Filled with the badge's own colour + a dark overlay so white text stays readable on ANY colour. */
+    background: var(--tab-color, #c8a24a);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5)), var(--tab-color, #c8a24a);
+    border: 1px solid rgba(255, 255, 255, 0.32);
     border-bottom: none;
-    color: #f4e4bc;
-    font-size: 0.72rem;
-    font-weight: 700;
+    color: #fff;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
     line-height: 1.1;
     white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.4);
 }
-.card-tab-icon { font-size: 0.85rem; flex: 0 0 auto; }
+.card-tab-icon { font-size: 0.95rem; flex: 0 0 auto; line-height: 1; }
 .card-tab-label { overflow: hidden; text-overflow: ellipsis; }
-.card-tab-compact { left: 14px; max-width: 70%; padding: 4px 10px 6px; font-size: 0.66rem; }
-.hero-card.has-card-tab { margin-top: 24px; }
-/* Member hero cards use a flat surface, so match the tab fill to it there. */
-.hero-card .card-tab { background: rgba(255, 255, 255, 0.045); border-color: var(--border, rgba(255, 255, 255, 0.1)); }
-/* On tight cards, the tab is icon-only so it never crowds the row. */
-.hero-card .card-tab-label { display: none; }
+.card-tab-compact { left: 12px; padding: 4px 12px 7px; font-size: 0.7rem; }
+.hero-card.has-card-tab { margin-top: 26px; }
 
 /* Primary-badge picker (profile) */
 .feat-badge-chips { display: flex; flex-wrap: wrap; gap: 8px; }
