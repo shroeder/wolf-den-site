@@ -63,17 +63,20 @@ export default function ShopAccountHub({ customerEmail, onSignOut, signingOut })
             <section className="card account-hub-card">
                 <h2>Profile</h2>
                 <div className="account-hub-identity">
-                    <span className="account-hub-avatar">
+                    <Link href="/marketplace/profile/avatar" className="account-hub-avatar" title="Edit your avatar" aria-label="Edit your avatar">
                         {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={avatarUrl} alt="" />
                         ) : (
                             <span>{initials}</span>
                         )}
-                    </span>
-                    <div>
+                    </Link>
+                    <div className="account-hub-identity-body">
                         <p className="account-hub-name">{profile?.displayLabel || "Your profile"}</p>
-                        <Link href="/marketplace/profile" className="account-hub-link">Change photo & full profile →</Link>
+                        <div className="account-hub-identity-actions">
+                            <Link href="/marketplace/profile/avatar" className="button primary account-hub-edit-avatar">✏️ Edit avatar</Link>
+                            <Link href="/marketplace/profile" className="account-hub-link">Full profile →</Link>
+                        </div>
                     </div>
                 </div>
                 <div className="account-hub-fields">

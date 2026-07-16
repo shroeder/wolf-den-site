@@ -183,10 +183,6 @@ export default function ShopAccountPage() {
     if (customer) {
         return (
             <section className="cart-page-shell">
-                <article className="card cart-hero-card">
-                    <h1>My Account</h1>
-                    <p className="secondary">Manage your profile, orders, and alerts — all in one place.</p>
-                </article>
                 <ShopAccountHub customerEmail={customer.email} onSignOut={handleLogout} signingOut={busy} />
                 {status ? <p className="shop-payment-success">{status}</p> : null}
                 {error ? <p className="shop-payment-error">{error}</p> : null}
