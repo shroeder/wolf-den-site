@@ -5,6 +5,7 @@ import { notifyFriendAccepted, notifyFriendRequest } from "@/lib/marketplace/soc
 import { awardOnce, levelForXp } from "@/lib/marketplace/xp.js";
 import { pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { avatarUrlFor } from "@/lib/marketplace/avatar-options.js";
+import { sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
 
 // Both people in a new friendship get a one-time "first friend" onboarding reward (deduped, so it
 // only ever fires for each once). Best-effort.
@@ -23,6 +24,7 @@ function mapUser(row) {
         // Public label — never the real first/last name (private). Handle / chosen display name only.
         displayLabel: row.display_name || row.alias || "Member",
         avatarUrl: avatarUrlFor(row.avatar_config) || row.avatar_url || null,
+        avatarCosmetics: sanitizeCosmetics(row.avatar_cosmetics),
         level: levelForXp(row.xp || 0).level,
         border: row.equipped_border || "none",
         frame: row.equipped_frame || "none",
@@ -30,7 +32,7 @@ function mapUser(row) {
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, avatar_config, xp, equipped_border, equipped_frame, showcase_badge_slugs";
+const USER_COLS = "id, alias, display_name, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_frame, showcase_badge_slugs";
 
 // Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
 async function attachBadges(users) {

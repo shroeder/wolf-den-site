@@ -8825,3 +8825,55 @@ body.tv-mode .shop-mobile-cart-fab {
 @media (max-width: 520px) {
     .avatar-selects { grid-template-columns: 1fr; }
 }
+
+/* ---- Layered avatar stack: base portrait + equipped cosmetics ---- */
+.av-stack { position: relative; display: inline-block; vertical-align: top; flex: 0 0 auto; line-height: 1; }
+.av-stack-clip {
+    position: absolute; inset: 0; border-radius: 50%; overflow: hidden; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #3a3a3a, #1e1e1e);
+}
+.av-stack-clip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av-stack-initial { font-size: 0.42em; font-weight: 700; color: #f4e4bc; }
+.av-stack .av-headwear, .av-stack .av-pet, .av-stack .av-effect { position: absolute; pointer-events: none; z-index: 3; }
+.av-headwear { top: -0.30em; left: 50%; transform: translateX(-50%) rotate(-8deg); font-size: 0.5em; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
+.av-pet { bottom: -0.06em; right: -0.10em; font-size: 0.42em; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
+.av-effect { top: -0.04em; left: -0.04em; font-size: 0.34em; }
+
+/* Aura glow (behind the portrait) */
+.av-aura { position: absolute; inset: -0.14em; border-radius: 50%; z-index: 0; filter: blur(4px); }
+.av-aura-aura_gold { background: radial-gradient(circle, rgba(255, 200, 80, 0.75), transparent 70%); }
+.av-aura-aura_aqua { background: radial-gradient(circle, rgba(90, 220, 240, 0.7), transparent 70%); }
+.av-aura-aura_violet { background: radial-gradient(circle, rgba(170, 90, 255, 0.75), transparent 70%); animation: av-pulse 2.6s ease-in-out infinite; }
+.av-aura-aura_rainbow { background: conic-gradient(from 0deg, #ff5a7a, #ffd45a, #5affaf, #5a9bff, #b45aff, #ff5a7a); opacity: 0.6; animation: av-spin 6s linear infinite; }
+@keyframes av-pulse { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.06); } }
+@keyframes av-spin { to { transform: rotate(360deg); } }
+.av-effect-sparkles { animation: av-twinkle 1.8s ease-in-out infinite; }
+.av-effect-embers { animation: av-float 2.2s ease-in-out infinite; }
+.av-effect-frost { animation: av-twinkle 2.6s ease-in-out infinite; }
+@keyframes av-twinkle { 0%, 100% { opacity: 0.5; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes av-float { 0% { transform: translateY(2px); opacity: 0.6; } 50% { opacity: 1; } 100% { transform: translateY(-3px); opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) {
+    .av-aura-aura_violet, .av-aura-aura_rainbow, .av-effect { animation: none; }
+}
+
+/* Avatar cosmetics picker */
+.cos-picker { display: grid; gap: 16px; }
+.cos-preview { display: flex; justify-content: center; padding: 22px 0 8px; }
+.cos-slots { display: grid; gap: 12px; }
+.cos-slot { display: flex; flex-direction: column; gap: 5px; }
+.cos-slot-label { font-size: 0.8rem; color: #cdbfa6; font-weight: 600; }
+.cos-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.cos-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 6px 11px; border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.04);
+    color: var(--ink); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.cos-chip:disabled { cursor: default; }
+.cos-chip.is-locked { opacity: 0.5; }
+.cos-chip.is-selected { outline: 2px solid #ffd75e; outline-offset: 1px; background: rgba(255, 215, 94, 0.12); }
+.cos-chip-lock { color: #cdbfa6; font-size: 0.72rem; }
+@media (min-width: 640px) {
+    .cos-picker { grid-template-columns: auto 1fr; align-items: start; }
+    .cos-preview { position: sticky; top: 12px; padding-top: 8px; }
+}

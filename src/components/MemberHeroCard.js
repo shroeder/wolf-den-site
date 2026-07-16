@@ -1,8 +1,8 @@
 import Link from "next/link";
 
+import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
 import UserBadges from "@/components/UserBadges";
-import { borderClass } from "@/lib/marketplace/borders.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { rankForLevel } from "@/lib/marketplace/ranks.js";
 
@@ -16,14 +16,7 @@ export default function MemberHeroCard({ member, action = null, href = null, com
 
     const identity = (
         <>
-            <span className={`hero-card-av ${borderClass(member.border)}`.trim()}>
-                {member.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={member.avatarUrl} alt="" />
-                ) : (
-                    <span aria-hidden="true">{initial}</span>
-                )}
-            </span>
+            <AvatarStack avatarUrl={member.avatarUrl} initial={initial} size={48} border={member.border} cosmetics={member.avatarCosmetics} className="hero-card-av-stack" />
             <span className="hero-card-body">
                 <span className="hero-card-name">{member.displayLabel}</span>
                 {member.alias ? <span className="hero-card-handle muted">@{member.alias}</span> : null}

@@ -7,6 +7,7 @@ import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { avatarUrlFor, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -114,6 +115,8 @@ function mapProfile(row, badges = []) {
         avatarUrl: avatarUrlFor(row.avatar_config) || row.avatar_url || null,
         // The raw config so the avatar builder can load the member's current choices.
         avatarConfig: row.avatar_config || null,
+        // Equipped avatar cosmetics per slot (aura/headwear/effect/pet) — layered onto the portrait.
+        avatarCosmetics: sanitizeCosmetics(row.avatar_cosmetics),
         // PUBLIC identity — never the real first/last name (those are private). Prefer the chosen
         // display name, then the @handle. Real name only ever goes to the account owner (firstName/
         // lastName/fullName fields below), never into a cross-user label.
@@ -143,7 +146,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -223,6 +226,26 @@ export async function setAvatarConfig(buyerId, config) {
     return getProfile(buyerId);
 }
 
+// Equip (or clear, id=null) an avatar cosmetic in a slot. Validates the cosmetic is unlocked for the
+// member's level (staff bypass). Returns the refreshed profile.
+export async function equipAvatarCosmetic(buyerId, slot, id) {
+    if (!buyerId) throw new Error("Not signed in.");
+    if (!COSMETIC_SLOTS.includes(slot)) throw new Error("Unknown slot.");
+    const row = await db.queryOne(`SELECT xp, avatar_cosmetics FROM mkt_buyer WHERE id = $1`, [buyerId]);
+    const current = sanitizeCosmetics(row?.avatar_cosmetics);
+    if (id) {
+        const cosmetic = cosmeticById(id);
+        if (!cosmetic || cosmetic.slot !== slot) throw new Error("That cosmetic doesn't fit here.");
+        const level = levelForXp(row?.xp || 0).level;
+        const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+        const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
+        if (!isCosmeticUnlocked(cosmetic, level, { unlockAll })) throw new Error(`That unlocks at Level ${cosmetic.level}.`);
+    }
+    const next = { ...current, [slot]: id || null };
+    await db.query(`UPDATE mkt_buyer SET avatar_cosmetics = $2::jsonb, updated_at = NOW() WHERE id = $1`, [buyerId, JSON.stringify(next)]);
+    return getProfile(buyerId);
+}
+
 // Set the badges the member showcases on their card (up to MAX_SHOWCASE). Each must be a badge they
 // hold; pass [] to clear (falls back to their top few). The top-ranked of the set becomes the tab.
 export async function setShowcaseBadges(buyerId, slugs) {
@@ -242,7 +265,7 @@ export async function setShowcaseBadges(buyerId, slugs) {
 export async function getLeaderboard(limit = 50) {
     const rows = await db
         .query(
-            `SELECT id, alias, avatar_url, avatar_config, first_name, last_name, display_name, xp, equipped_border, equipped_frame
+            `SELECT id, alias, avatar_url, avatar_config, avatar_cosmetics, first_name, last_name, display_name, xp, equipped_border, equipped_frame
                FROM mkt_buyer
               WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0
               ORDER BY xp DESC, updated_at ASC
@@ -252,7 +275,7 @@ export async function getLeaderboard(limit = 50) {
         .catch(() => []);
     return rows.map((row, i) => {
         const p = mapProfile(row, []);
-        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0, border: p.border, frame: p.frame };
+        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0, border: p.border, frame: p.frame, avatarCosmetics: p.avatarCosmetics };
     });
 }
 
@@ -261,7 +284,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

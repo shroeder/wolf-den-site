@@ -5,6 +5,7 @@ import { BACKGROUNDS } from "@/lib/marketplace/backgrounds.js";
 import { getMemberMetrics, listBadges, progressForRule } from "@/lib/marketplace/badges.js";
 import { BORDERS } from "@/lib/marketplace/borders.js";
 import { FRAMES } from "@/lib/marketplace/frames.js";
+import { AVATAR_COSMETICS } from "@/lib/marketplace/avatar-cosmetics.js";
 import { LEVEL_PERKS, RANKS, rankForLevel } from "@/lib/marketplace/ranks.js";
 
 // Cumulative XP required to REACH a level (mirrors levelForXp's curve: 50*(L-1)*L).
@@ -58,6 +59,7 @@ export async function getRewardsTrack(buyerId) {
     const unlockableBorders = BORDERS.filter((b) => b.id !== "none" && !b.requiresBadges);
     const unlockableBackgrounds = BACKGROUNDS.filter((b) => b.id !== "none");
     const unlockableFrames = FRAMES.filter((f) => f.id !== "none" && !f.requiresBadges);
+    const unlockableCosmetics = AVATAR_COSMETICS.filter((c) => !c.requiresBadges);
     const notableLevels = Array.from(
         new Set([
             ...RANKS.map((r) => r.level),
@@ -65,6 +67,7 @@ export async function getRewardsTrack(buyerId) {
             ...unlockableBorders.map((b) => b.level),
             ...unlockableBackgrounds.map((b) => b.level),
             ...unlockableFrames.map((f) => f.level),
+            ...unlockableCosmetics.map((c) => c.level),
             ...LEVEL_PERKS.map((p) => p.level),
         ])
     ).sort((a, b) => a - b);
@@ -88,6 +91,7 @@ export async function getRewardsTrack(buyerId) {
                 ...unlockableBorders.filter((b) => b.level === L).map((b) => ({ icon: b.icon, label: `${b.label} border`, soon: false })),
                 ...unlockableBackgrounds.filter((b) => b.level === L).map((b) => ({ icon: b.icon, label: `${b.label} background`, soon: false })),
                 ...unlockableFrames.filter((f) => f.level === L).map((f) => ({ icon: f.icon, label: `${f.label} frame`, soon: false })),
+                ...unlockableCosmetics.filter((c) => c.level === L).map((c) => ({ icon: c.icon, label: `${c.label} (avatar)`, soon: false })),
                 ...LEVEL_PERKS.filter((p) => p.level === L).map((p) => ({ icon: p.icon, label: p.label, soon: p.soon })),
             ],
         };

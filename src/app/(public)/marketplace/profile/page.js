@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import BackgroundPicker from "@/components/BackgroundPicker";
 import AvatarBuilder from "@/components/AvatarBuilder";
+import AvatarCosmeticsPicker from "@/components/AvatarCosmeticsPicker";
 import BorderPicker from "@/components/BorderPicker";
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
@@ -60,6 +61,7 @@ export default async function ProfileHubPage() {
                     badges={profile?.displayBadges || []}
                     level={level}
                     border={profile?.border}
+                    cosmetics={profile?.avatarCosmetics}
                 />
             </section>
 
@@ -67,6 +69,19 @@ export default async function ProfileHubPage() {
                 <h2 style={{ marginTop: 0 }}>Your avatar</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Build a character that&apos;s yours — skin, hair, face, and outfit. Cool cosmetics to layer on come later as you unlock them.</p>
                 <AvatarBuilder current={profile?.avatarConfig} />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Avatar cosmetics</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Flair you unlock as you level up — an aura, headwear, a companion, effects. Tap to equip; tap again to remove.</p>
+                <AvatarCosmeticsPicker
+                    avatarUrl={profile?.avatarUrl}
+                    initial={(profile?.displayLabel || "?").slice(0, 1).toUpperCase()}
+                    level={level?.level || 1}
+                    unlockAll={isStaff}
+                    badges={(profile?.badges || []).map((b) => b.slug)}
+                    current={profile?.avatarCosmetics || {}}
+                />
             </section>
 
             <section className="card">
