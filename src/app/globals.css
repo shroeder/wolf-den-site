@@ -5066,6 +5066,14 @@ body.tv-mode .shop-mobile-cart-fab {
     gap: 0.6rem;
     margin: 0.25rem 0 0.5rem;
 }
+.sell-send-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 12px;
+}
+.sell-send-note { font-size: 0.85rem; }
 
 .sell-dest {
     text-align: left;

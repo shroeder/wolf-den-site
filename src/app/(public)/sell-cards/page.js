@@ -21,9 +21,9 @@ export default function SellCardsPage() {
                     The Wolf Den buys Pokemon cards, Magic: The Gathering cards, and select collectibles in Montgomery, Minnesota.
                 </p>
                 <p>
-                    Pick your exact cards below and choose how you want to move them: <strong>sell to us</strong>,{" "}
-                    <strong>consign</strong>, or <strong>get offers from local vendors</strong> — like shopping a card
-                    show without leaving home.
+                    Tell us what you&apos;ve got and it opens a <strong>direct conversation with the shop</strong> — not a
+                    form into the void. We reply personally with a cash or store-credit offer, or you can{" "}
+                    <strong>consign</strong> and we&apos;ll move them for you.
                 </p>
                 <div className="cta-row">
                     <a className="button primary" href="#sell-form">
@@ -38,8 +38,8 @@ export default function SellCardsPage() {
             <section className="card" id="sell-form">
                 <h2>Tell us what you have</h2>
                 <p className="muted">
-                    Search the catalog and add your cards, pick where they should go, and we&apos;ll take it from there.
-                    Free and no obligation — even if we can&apos;t buy it outright, local vendors often will.
+                    Add your cards (or just describe them), then send — it starts a direct message with The Wolf Den, so
+                    you get a real reply, not silence. Free and no obligation.
                 </p>
                 <SellCardsClient defaultDestination="sell" />
             </section>

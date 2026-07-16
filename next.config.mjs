@@ -25,6 +25,7 @@ const nextConfig = {
             { source: '/faq', destination: '/about#faq', permanent: true },
             { source: '/contact', destination: '/about#contact', permanent: true },
             { source: '/just-in', destination: '/shop', permanent: true },
+            { source: '/get-offers', destination: '/sell-cards', permanent: true },
             {
                 source: '/:path*',
                 has: [

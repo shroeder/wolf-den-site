@@ -12,6 +12,15 @@ export function isOwnerStorefront(vendorName) {
     return String(vendorName || "").toLowerCase().includes(needle);
 }
 
+// The Wolf Den's own vendor id, so buyers can message the store directly (e.g. to sell/trade cards).
+export async function getOwnerVendorId() {
+    const needle = (process.env.MARKETPLACE_OWNER_VENDOR_NAME || "wolf den").trim().toLowerCase();
+    const row = await db
+        .queryOne(`SELECT id FROM mkt_vendor WHERE LOWER(display_name) LIKE $1 ORDER BY created_at ASC LIMIT 1`, [`%${needle}%`])
+        .catch(() => null);
+    return row?.id || null;
+}
+
 function clampBody(value) {
     const s = String(value || "").trim();
     if (!s) throw new Error("Message can't be empty.");
