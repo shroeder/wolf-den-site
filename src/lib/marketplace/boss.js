@@ -125,6 +125,7 @@ export async function getBossState(buyerId = null) {
             imageUrl: boss.image_url || null,
             backgroundUrl: boss.background_url || null,
             rewards: boss.rewards_text || null,
+            prize: boss.prize_name ? { name: boss.prize_name, imageUrl: boss.prize_image_url || null } : null,
             ticketDivisor: divisor,
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),

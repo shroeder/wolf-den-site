@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GiSpikedDragonHead } from "react-icons/gi";
 
 // The 2D side-scrolling battle stage: the boss's own AI background, the boss sprite anchored right, and
@@ -18,21 +18,28 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             out.push({ id: `pad-${pad}`, spriteUrl: defaultSprite, pad: true });
             pad += 1;
         }
-        return out.map((f, i) => {
-            const back = i % 2 === 1;
-            return {
-                key: f.id || `f-${i}`,
-                spriteUrl: f.spriteUrl,
-                you: Boolean(f.you),
-                pad: Boolean(f.pad),
-                left: 3 + Math.floor(i / 2) * 8.5, // spread across the left third
-                bottom: back ? 20 : 6, // back row sits higher (further away)
-                scale: back ? 0.82 : 1,
-                z: back ? 1 : 3,
-                delay: (i * 0.35).toFixed(2),
-            };
-        });
+        return applyPositions(out);
     }, [fighters, defaultSprite]);
+
+    // Ambient auto-attack sparks on the boss — so the passive damage is visibly happening even when nobody
+    // is manually swinging. Purely cosmetic (the real damage is applied hourly server-side).
+    const [sparks, setSparks] = useState([]);
+    const sid = useRef(0);
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
+        let alive = true;
+        let timer;
+        const tick = () => {
+            if (!alive) return;
+            const id = sid.current++;
+            const chip = Math.random() < 0.4 ? Math.floor(4 + Math.random() * 18) : null;
+            setSparks((s) => [...s, { id, top: 20 + Math.random() * 45, right: 6 + Math.random() * 22, chip }]);
+            setTimeout(() => setSparks((s) => s.filter((x) => x.id !== id)), 750);
+            timer = setTimeout(tick, 900 + Math.random() * 1500);
+        };
+        timer = setTimeout(tick, 700);
+        return () => { alive = false; clearTimeout(timer); };
+    }, []);
 
     return (
         <div className="battle">
@@ -55,6 +62,12 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                 )}
             </div>
 
+            {sparks.map((s) => (
+                <span key={s.id} className="battle-spark" style={{ top: `${s.top}%`, right: `${s.right}%` }}>
+                    {s.chip ? <span className="battle-chip">-{s.chip}</span> : null}
+                </span>
+            ))}
+
             <div className="battle-party">
                 {party.map((f) => (
                     <div key={f.key} className={`fighter${f.pad ? " is-pad" : ""}${f.you ? " is-you" : ""}`} style={{ left: `${f.left}%`, bottom: `${f.bottom}%`, zIndex: f.z, "--s": f.scale }}>
@@ -73,4 +86,22 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             ))}
         </div>
     );
+}
+
+// Lay fighters out in two depth rows across the left of the stage.
+function applyPositions(out) {
+    return out.map((f, i) => {
+        const back = i % 2 === 1;
+        return {
+            key: f.id || `f-${i}`,
+            spriteUrl: f.spriteUrl,
+            you: Boolean(f.you),
+            pad: Boolean(f.pad),
+            left: 3 + Math.floor(i / 2) * 8.5, // spread across the left third
+            bottom: back ? 20 : 6, // back row sits higher (further away)
+            scale: back ? 0.82 : 1,
+            z: back ? 1 : 3,
+            delay: (i * 0.35).toFixed(2),
+        };
+    });
 }

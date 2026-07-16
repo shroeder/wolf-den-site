@@ -9105,6 +9105,10 @@ body.tv-mode .shop-mobile-cart-fab {
 @keyframes fighter-attack { 0%, 52%, 82%, 100% { transform: translateX(0); } 64% { transform: translateX(26px); } 72% { transform: translateX(20px); } }
 @keyframes fighter-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 
+.battle-spark { position: absolute; z-index: 6; width: 15px; height: 15px; pointer-events: none; border-radius: 50%; background: radial-gradient(circle, rgba(255,225,140,0.95), rgba(255,140,60,0.55) 45%, transparent 70%); animation: battle-spark 0.75s ease-out forwards; }
+.battle-spark .battle-chip { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); font-size: 0.8rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; white-space: nowrap; animation: battle-chip 0.75s ease-out forwards; }
+@keyframes battle-spark { 0% { opacity: 0; transform: scale(0.3); } 30% { opacity: 1; transform: scale(1.35); } 100% { opacity: 0; transform: scale(0.8); } }
+@keyframes battle-chip { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.7); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -22px) scale(1); } }
 .battle-floater { position: absolute; font-weight: 800; font-size: clamp(1rem, 3.4vw, 1.4rem); color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; z-index: 7; animation: boss2-float 0.85s ease-out forwards; }
 .battle-floater.is-crit { font-size: clamp(1.5rem, 5vw, 2.1rem); color: #ff5a5a; }
 @media (prefers-reduced-motion: reduce) {
@@ -9116,6 +9120,11 @@ body.tv-mode .shop-mobile-cart-fab {
 .boss2-figure.is-hit { animation: boss2-shake 0.18s linear; }
 .boss2-figure.is-hit .boss2-enemy, .boss2-figure.is-hit .boss2-art { filter: brightness(1.4) drop-shadow(0 0 32px rgba(255, 140, 80, 0.95)); }
 .boss2-rewards { font-size: 0.85rem; color: #ffe0b0; text-align: center; max-width: 460px; font-weight: 600; }
+.boss-prize { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(255,215,94,0.4); background: radial-gradient(120% 120% at 0% 0%, rgba(255,215,94,0.16), transparent 60%); }
+.boss-prize-img { width: 84px; height: 84px; object-fit: contain; border-radius: 12px; background: rgba(255,255,255,0.06); flex-shrink: 0; }
+.boss-prize-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.boss-prize-eyebrow { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd75e; }
+.boss-prize-name { font-size: 1.15rem; font-weight: 800; color: #fff; }
 @keyframes boss2-breathe { 0%, 100% { transform: scale(1) translateY(0); } 50% { transform: scale(1.04) translateY(-4px); } }
 @keyframes boss2-shake { 25% { transform: translateX(-8px) rotate(-2deg); } 75% { transform: translateX(8px) rotate(2deg); } }
 .boss2-name { font-size: 1.3rem; font-weight: 800; color: #ffdccb; }

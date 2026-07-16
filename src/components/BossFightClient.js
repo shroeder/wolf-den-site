@@ -109,6 +109,19 @@ export default function BossFightClient() {
                 ) : null}
             </div>
 
+            {boss.prize ? (
+                <div className="boss-prize">
+                    {boss.prize.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="boss-prize-img" src={boss.prize.imageUrl} alt={boss.prize.name} />
+                    ) : null}
+                    <div className="boss-prize-body">
+                        <span className="boss-prize-eyebrow">🎟️ This week&apos;s raffle prize</span>
+                        <span className="boss-prize-name">{boss.prize.name}</span>
+                        <span className="muted">Every point of damage earns tickets toward the draw — {boss.ticketDivisor} dmg per ticket.</span>
+                    </div>
+                </div>
+            ) : null}
             {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             <div className="boss2-actions">

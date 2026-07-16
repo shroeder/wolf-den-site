@@ -105,6 +105,17 @@ export async function releaseBoss(bossId, { days = 7, notify = true } = {}) {
     return boss;
 }
 
+// Set (or clear) the boss's raffle prize — a Square catalog item (name + image). Pass null-ish to clear.
+export async function setBossPrize(bossId, { name, imageUrl, squareId } = {}) {
+    const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    await db.query(
+        `UPDATE boss_event SET prize_name = $2, prize_image_url = $3, prize_square_id = $4 WHERE id = $1`,
+        [bossId, name ? String(name).slice(0, 200) : null, imageUrl || null, squareId || null]
+    );
+    return { ok: true, prizeName: name || null, prizeImageUrl: imageUrl || null };
+}
+
 export async function endBoss(bossId) {
     await db.query(`UPDATE boss_event SET status = 'ended' WHERE id = $1`, [bossId]);
     return { ok: true };
