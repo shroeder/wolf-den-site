@@ -1,8 +1,22 @@
 import "server-only";
 
+import { put } from "@vercel/blob";
+
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { generateImage } from "@/lib/marketplace/openai-image.js";
+
+// Store a finished PNG (base64, generated directly on the phone) as the boss art — fast, no OpenAI wait.
+export async function setBossArt(bossId, base64) {
+    const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
+    const buffer = Buffer.from(clean, "base64");
+    if (!buffer.length) throw new Error("Empty image");
+    const blob = await put(`marketplace/boss/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, buffer, { access: "public", contentType: "image/png" });
+    await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, blob.url]);
+    return blob.url;
+}
 
 // Admin-only weekly-boss management: draft -> generate art (retry) -> release (broadcast) -> live -> ended.
 
