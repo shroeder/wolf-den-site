@@ -21,7 +21,7 @@ const FAQS = [
     { q: "Can kids play at The Wolf Den?", a: "Yes. We keep family-friendly tables and love helping new and younger players learn the ropes." },
     { q: "Do I need to be competitive to show up?", a: "Not at all — most of what we run is casual Commander and community play." },
     { q: "Do you offer local pickup?", a: "Yes — order online and pick it up in store." },
-    { q: "How do I get inventory and event updates?", a: "Join our Discord (and follow us on Facebook), or turn on New-Arrival Alerts on the site." },
+    { q: "How do I get inventory and event updates?", a: "Join our Discord (and follow us on Facebook) — we post new arrivals, restocks, and events there." },
     { q: "What areas do you serve?", a: `${TOWNS}, and the surrounding southern Minnesota communities.` },
 ];
 

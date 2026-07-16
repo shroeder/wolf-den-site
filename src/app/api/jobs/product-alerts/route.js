@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { runProductAlertScan } from "@/lib/product-alerts/detection";
-import { runProductAlertDigest } from "@/lib/product-alerts/digest";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -13,8 +12,9 @@ function isAuthorized(request) {
     return (request.headers.get("authorization") || "") === `Bearer ${expected}`;
 }
 
-// New-arrival alerts pipeline: scan Square inventory for new/restocked items, then email + push a
-// digest to account subscribers by followed category. First scan seeds the baseline silently.
+// Scan Square inventory for new/restocked items (keeps the "Just In" feed + Discord broadcast state
+// current). The per-subscriber email/push digest was retired with the on-site alerts feature — Discord
+// is the channel now — so only the scan runs.
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/jobs/product-alerts", async ({ logger, internalError }) => {
         try {
@@ -24,9 +24,7 @@ export async function GET(request) {
             }
 
             const scan = await runProductAlertScan();
-            const digest = await runProductAlertDigest();
-
-            return NextResponse.json({ success: true, scan, digest });
+            return NextResponse.json({ success: true, scan });
         } catch (error) {
             return internalError(error, { event: "product_alerts.job.run.failure" });
         }

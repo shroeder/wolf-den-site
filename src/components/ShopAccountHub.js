@@ -112,10 +112,6 @@ export default function ShopAccountHub({ customerEmail, onSignOut, signingOut })
                 <h2>Alerts &amp; notifications</h2>
                 <p className="secondary">Manage what you get notified about. Everything is tied to this account.</p>
                 <div className="account-hub-links">
-                    <Link href="/alerts" className="account-hub-tile">
-                        <strong>New-Arrival Alerts</strong>
-                        <span className="secondary">Categories you follow for new stock</span>
-                    </Link>
                     <Link href="/looking-for" className="account-hub-tile">
                         <strong>Looking For</strong>
                         <span className="secondary">Cards you want — restock alerts</span>

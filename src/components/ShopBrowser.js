@@ -46,10 +46,12 @@ export default function ShopBrowser({ justInItems = [], categories = [], payment
                                 before someone else does.
                             </p>
                             <div className="cta-row">
-                                <Link className="btn-gold" href="/alerts">🔔 Get New-Arrival Alerts</Link>
-                                <button type="button" className="btn-ghost" onClick={() => setView("all")}>
+                                <button type="button" className="btn-gold" onClick={() => setView("all")}>
                                     See all inventory →
                                 </button>
+                                <a className="btn-ghost" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer">
+                                    💬 Get drop alerts on Discord
+                                </a>
                             </div>
                         </div>
                         <JustInClient items={justInItems} />

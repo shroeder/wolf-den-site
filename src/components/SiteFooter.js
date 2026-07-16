@@ -40,10 +40,10 @@ export default function SiteFooter() {
                     </ul>
                 </div>
                 <div>
-                    <h3>New-Arrival Alerts</h3>
-                    <p>Be first to know when new product hits the shelves. Pick your categories and we&apos;ll email you when fresh stock and restocks come in.</p>
+                    <h3>Get drop alerts</h3>
+                    <p>We post new arrivals, restocks, and events in our Discord — join to be first to know.</p>
                     <p>
-                        <Link href="/alerts" className="button primary">Get new-arrival alerts</Link>
+                        <a href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer" className="button primary">Join our Discord</a>
                     </p>
                 </div>
                 <div>

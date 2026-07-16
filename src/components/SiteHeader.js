@@ -13,7 +13,6 @@ const navItems = [
     { href: "/marketplace/rewards", label: "🏆 Rewards" },
     { href: "/looking-for", label: "Looking For" },
     { href: "/marketplace", label: "Marketplace" },
-    { href: "/alerts", label: "New-Arrival Alerts" },
     { href: "/mystery-bags", label: "Mystery Bags" },
     { href: "/events", label: "Events" },
     { href: "/sell-cards", label: "Sell Your Cards" },
