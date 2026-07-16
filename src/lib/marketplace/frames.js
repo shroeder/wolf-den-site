@@ -16,14 +16,23 @@ export const FRAMES = [
     { id: "ember", label: "Ember", level: 40, icon: "🔥", hint: "A smoldering ember trim", animated: true },
     { id: "royal", label: "Royal", level: 46, icon: "👑", hint: "An ornate royal frame", animated: false },
     { id: "mythic", label: "Mythic", level: 50, icon: "🌈", hint: "A living prismatic frame", animated: true },
+    // --- Role-exclusive (badge-gated, NOT unlocked by the level/staff bypass) ---
+    { id: "role_volunteer", label: "Volunteer", icon: "🙌", hint: "Volunteer-only frame", animated: false, requiresBadges: ["volunteer"], lockLabel: "Volunteers" },
+    { id: "role_staff", label: "Staff", icon: "⭐", hint: "Staff-only frame", animated: false, requiresBadges: ["staff"], lockLabel: "Staff only" },
+    { id: "role_dev", label: "Developer", icon: "💻", hint: "Dev-only frame", animated: true, requiresBadges: ["developer"], lockLabel: "Devs only" },
+    { id: "role_admin", label: "Admin", icon: "🛡️", hint: "Admin-only frame", animated: true, requiresBadges: ["owner", "site_admin"], lockLabel: "Admins only" },
 ];
 
 export function frameById(id) {
     return FRAMES.find((f) => f.id === id) || FRAMES[0];
 }
 
-export function isFrameUnlocked(id, level, { unlockAll = false } = {}) {
-    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= frameById(id).level;
+// Role frames require the badge; level frames the level (or `unlockAll`, the staff bypass — which does
+// NOT unlock role frames).
+export function isFrameUnlocked(id, level, { badges = [], unlockAll = false } = {}) {
+    const f = frameById(id);
+    if (f.requiresBadges) return f.requiresBadges.some((s) => badges.includes(s));
+    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= f.level;
 }
 
 // The class(es) to hang on the card container so it draws the inset frame. Empty for the default/none.
@@ -31,6 +40,6 @@ export function frameClass(id) {
     return id && id !== "none" ? `frame frame-${id}` : "";
 }
 
-export function framesForLevel(level, { unlockAll = false } = {}) {
-    return FRAMES.map((f) => ({ ...f, unlocked: isFrameUnlocked(f.id, level, { unlockAll }) }));
+export function framesForLevel(level, { unlockAll = false, badges = [] } = {}) {
+    return FRAMES.map((f) => ({ ...f, unlocked: isFrameUnlocked(f.id, level, { badges, unlockAll }) }));
 }

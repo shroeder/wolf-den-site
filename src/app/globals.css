@@ -8716,3 +8716,82 @@ body.tv-mode .shop-mobile-cart-fab {
 /* Frame picker swatch: a mini card showing the inset frame around the frame's icon. */
 .frame-swatch { background: #14141f; }
 .frame-swatch-mark { font-size: 1.3rem; opacity: 0.9; }
+
+/* Role-exclusive frames (badge-gated) — distinctive authority looks. */
+.frame-role_volunteer::after {
+    border: 3px double rgba(80, 210, 160, 0.85);
+    box-shadow: inset 0 0 12px rgba(60, 200, 150, 0.22);
+}
+.frame-role_staff::after {
+    border: 3px double rgba(255, 210, 110, 0.9);
+    box-shadow: inset 0 0 12px rgba(255, 195, 80, 0.25), 0 0 6px rgba(255, 195, 80, 0.18);
+}
+.frame-role_dev::after {
+    border: 2px solid transparent;
+    border-image: repeating-linear-gradient(90deg, #37e0c8 0, #37e0c8 6px, #1a9bd6 6px, #1a9bd6 12px) 2;
+    box-shadow: 0 0 10px rgba(55, 224, 200, 0.3), inset 0 0 10px rgba(55, 224, 200, 0.12);
+    animation: frame-flicker 3.6s ease-in-out infinite;
+}
+.frame-role_admin::after {
+    border: 4px double rgba(255, 110, 120, 0.85);
+    box-shadow: inset 0 0 14px rgba(230, 60, 70, 0.3), 0 0 8px rgba(230, 60, 70, 0.22);
+    animation: frame-flicker 3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .frame-role_dev::after, .frame-role_admin::after { animation: none; }
+}
+
+/* ---- Primary-badge "folder tab" — sticks up above the card's top edge (Manila-folder style) ---- */
+.has-card-tab { position: relative; margin-top: 18px; }
+.card-tab {
+    position: absolute;
+    top: 0;
+    left: 20px;
+    transform: translateY(-72%);
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 62%;
+    padding: 4px 13px 9px;              /* extra bottom pad tucks it under the card edge */
+    border-radius: 11px 11px 0 0;
+    background: #1b1712;
+    border: 1px solid var(--tab-color, #c8a24a);
+    border-top-width: 3px;              /* thicker colored spine reads as a tab */
+    border-bottom: none;
+    color: #f4e4bc;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+    box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.35);
+}
+.card-tab-icon { font-size: 0.85rem; flex: 0 0 auto; }
+.card-tab-label { overflow: hidden; text-overflow: ellipsis; }
+.card-tab-compact { left: 14px; max-width: 70%; padding: 3px 10px 8px; font-size: 0.66rem; }
+.hero-card.has-card-tab { margin-top: 16px; }
+/* On tight cards, the tab is icon-only so it never crowds the row. */
+.hero-card .card-tab-label { display: none; }
+
+/* Primary-badge picker (profile) */
+.feat-badge-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.feat-badge-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--chip-color, rgba(255, 255, 255, 0.18));
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.feat-badge-chip:disabled { cursor: default; opacity: 0.7; }
+.feat-badge-chip.is-selected {
+    background: color-mix(in srgb, var(--chip-color, #c8a24a) 22%, transparent);
+    outline: 2px solid var(--chip-color, #c8a24a);
+    outline-offset: 1px;
+}

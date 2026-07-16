@@ -2,7 +2,9 @@ import Link from "next/link";
 
 import BackgroundPicker from "@/components/BackgroundPicker";
 import BorderPicker from "@/components/BorderPicker";
+import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
+import FeaturedBadgePicker from "@/components/FeaturedBadgePicker";
 import FramePicker from "@/components/FramePicker";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -49,7 +51,8 @@ export default async function ProfileHubPage() {
 
     return (
         <div className="stack reveal">
-            <section className={`card rewards-hub-card ${backgroundClass(profile?.background)} ${frameClass(profile?.frame)}`.trim()}>
+            <section className={`card rewards-hub-card ${backgroundClass(profile?.background)} ${frameClass(profile?.frame)} ${profile?.featuredBadge ? "has-card-tab" : ""}`.trim()}>
+                <CardTab badge={profile?.featuredBadge} />
                 <RewardsHubHero
                     displayLabel={profile?.displayLabel}
                     avatarUrl={profile?.avatarUrl}
@@ -81,7 +84,13 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Profile frame</h2>
                 <p className="muted" style={{ marginTop: 0 }}>A textured border that hugs your card&apos;s edge — unlock more by leveling up.</p>
-                <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} />
+                <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} badges={(profile?.badges || []).map((b) => b.slug)} />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Primary badge</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Pin one badge as the tab that sticks up on your card. The rest still show below it.</p>
+                <FeaturedBadgePicker badges={profile?.badges || []} current={profile?.featuredBadgeSlug || null} />
             </section>
 
             <section className="card">

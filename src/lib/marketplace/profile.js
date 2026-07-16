@@ -122,6 +122,11 @@ function mapProfile(row, badges = []) {
         background: row.equipped_background || "none",
         // Equipped cosmetic profile frame id ('none' when unset) — the inset textured card border.
         frame: row.equipped_frame || "none",
+        // The member's PRIMARY badge — shown as a "folder tab" above their card. Their chosen one if
+        // still held, else their top-ranked badge (badges are pre-sorted by sort_order). null if none.
+        featuredBadge: badges && badges.length ? badges.find((b) => b.slug === (row.featured_badge_slug || null)) || badges[0] : null,
+        // The RAW stored choice (null = "Auto"/top-ranked). Lets the picker show Auto vs an explicit pick.
+        featuredBadgeSlug: row.featured_badge_slug || null,
         // Email notification prefs (default on).
         notifyEmailDm: row.notify_email_dm !== false,
         notifyEmailFriend: row.notify_email_friend !== false,
@@ -132,7 +137,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, featured_badge_slug, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -195,11 +200,25 @@ export async function equipFrame(buyerId, frameId) {
     const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
     const level = levelForXp(row?.xp || 0).level;
     const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
-    if (frame.id !== "none" && !isFrameUnlocked(frame.id, level, { unlockAll })) {
-        throw new Error(`That frame unlocks at Level ${frame.level}.`);
+    const badges = badgeRows.map((r) => r.badge_slug);
+    const unlockAll = badges.some((s) => ["owner", "site_admin", "staff"].includes(s));
+    if (frame.id !== "none" && !isFrameUnlocked(frame.id, level, { badges, unlockAll })) {
+        throw new Error(frame.requiresBadges ? `That frame is ${frame.lockLabel || "role"}-exclusive.` : `That frame unlocks at Level ${frame.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_frame = $2, updated_at = NOW() WHERE id = $1`, [buyerId, frame.id === "none" ? null : frame.id]);
+    return getProfile(buyerId);
+}
+
+// Set the member's PRIMARY badge (the folder tab). Must be a badge they hold; pass null/'' to clear
+// (falls back to their top-ranked badge). Returns the refreshed profile.
+export async function setFeaturedBadge(buyerId, slug) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const clean = slug ? String(slug).trim() : null;
+    if (clean) {
+        const held = await db.queryOne(`SELECT 1 FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug = $2`, [buyerId, clean]).catch(() => null);
+        if (!held) throw new Error("You haven't earned that badge.");
+    }
+    await db.query(`UPDATE mkt_buyer SET featured_badge_slug = $2, updated_at = NOW() WHERE id = $1`, [buyerId, clean]);
     return getProfile(buyerId);
 }
 
@@ -227,7 +246,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background, equipped_frame
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background, equipped_frame, featured_badge_slug
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

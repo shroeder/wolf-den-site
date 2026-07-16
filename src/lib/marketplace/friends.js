@@ -24,10 +24,11 @@ function mapUser(row) {
         level: levelForXp(row.xp || 0).level,
         border: row.equipped_border || "none",
         frame: row.equipped_frame || "none",
+        featuredSlug: row.featured_badge_slug || null,
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border, equipped_frame";
+const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border, equipped_frame, featured_badge_slug";
 
 // Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
 async function attachBadges(users) {
@@ -48,7 +49,13 @@ async function attachBadges(users) {
         if (!byId.has(r.buyer_id)) byId.set(r.buyer_id, []);
         byId.get(r.buyer_id).push({ slug: r.slug, icon: r.icon || null, label: r.label, color: r.color || null, adminOnly: r.admin_only !== false });
     }
-    return users.map((u) => (u ? { ...u, badges: byId.get(u.id) || [] } : u));
+    return users.map((u) => {
+        if (!u) return u;
+        const badges = byId.get(u.id) || [];
+        // Primary badge for the folder tab: their chosen one if held, else the top-ranked badge.
+        const featuredBadge = badges.length ? badges.find((b) => b.slug === u.featuredSlug) || badges[0] : null;
+        return { ...u, badges, featuredBadge };
+    });
 }
 
 // Search members to add (by @handle or name). Excludes self. Annotates the relationship so the UI can

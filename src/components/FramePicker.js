@@ -7,12 +7,12 @@ import { framesForLevel } from "@/lib/marketplace/frames.js";
 
 // Lets a member equip a cosmetic profile frame they've unlocked. Each swatch previews the inset frame
 // on a mini card. Equipping POSTs to /api/marketplace/frame then router.refresh() so the hero re-renders.
-export default function FramePicker({ current = "none", level = 1, unlockAll = false }) {
+export default function FramePicker({ current = "none", level = 1, unlockAll = false, badges = [] }) {
     const router = useRouter();
     const [equipped, setEquipped] = useState(current || "none");
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
-    const frames = framesForLevel(level, { unlockAll });
+    const frames = framesForLevel(level, { unlockAll, badges });
 
     async function equip(id, unlocked) {
         if (!unlocked || busy || id === equipped) return;

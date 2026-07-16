@@ -57,7 +57,7 @@ export async function getRewardsTrack(buyerId) {
     // Role borders are badge-gated, not level-gated — they don't belong on the level spine.
     const unlockableBorders = BORDERS.filter((b) => b.id !== "none" && !b.requiresBadges);
     const unlockableBackgrounds = BACKGROUNDS.filter((b) => b.id !== "none");
-    const unlockableFrames = FRAMES.filter((f) => f.id !== "none");
+    const unlockableFrames = FRAMES.filter((f) => f.id !== "none" && !f.requiresBadges);
     const notableLevels = Array.from(
         new Set([
             ...RANKS.map((r) => r.level),

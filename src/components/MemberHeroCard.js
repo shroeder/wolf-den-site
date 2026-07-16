@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import CardTab from "@/components/CardTab";
 import UserBadges from "@/components/UserBadges";
 import { borderClass } from "@/lib/marketplace/borders.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
@@ -36,7 +37,8 @@ export default function MemberHeroCard({ member, action = null, href = null, com
     );
 
     return (
-        <div className={`hero-card${compact ? " is-compact" : ""} ${frameClass(member.frame)}`.trim()}>
+        <div className={`hero-card${compact ? " is-compact" : ""}${member.featuredBadge ? " has-card-tab" : ""} ${frameClass(member.frame)}`.trim()}>
+            <CardTab badge={member.featuredBadge} compact />
             {href ? (
                 <Link href={href} className="hero-card-main">{identity}</Link>
             ) : (

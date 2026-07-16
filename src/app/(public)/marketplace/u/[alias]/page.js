@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import CardTab from "@/components/CardTab";
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
@@ -41,7 +42,8 @@ export default async function UserProfilePage({ params }) {
 
     return (
         <div className="stack reveal">
-            <section className={`card ${backgroundClass(profile.background)} ${frameClass(profile.frame)}`.trim()}>
+            <section className={`card ${backgroundClass(profile.background)} ${frameClass(profile.frame)} ${profile.featuredBadge ? "has-card-tab" : ""}`.trim()}>
+                <CardTab badge={profile.featuredBadge} />
                 <div className="user-profile-head">
                     <Avatar profile={profile} />
                     <div className="user-profile-meta">
