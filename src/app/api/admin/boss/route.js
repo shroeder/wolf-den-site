@@ -44,7 +44,7 @@ export async function POST(request) {
                 if (!body.bossId || !body.image) return noStore({ error: "missing_image" }, { status: 400 });
                 return noStore({ imageUrl: await setBossArt(body.bossId, body.image) });
             }
-            if (action === "release") return noStore({ boss: await releaseBoss(body.bossId, { days: body.days }) });
+            if (action === "release") return noStore({ boss: await releaseBoss(body.bossId, { days: body.days, notify: body.notify !== false }) });
             if (action === "end") return noStore(await endBoss(body.bossId));
             return noStore({ error: "unknown_action" }, { status: 400 });
         } catch (error) {

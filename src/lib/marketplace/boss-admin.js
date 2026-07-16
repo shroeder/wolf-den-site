@@ -45,7 +45,7 @@ export async function createDraftBoss({ name, description, maxHp, rewardsText, t
 export async function generateBossArt(bossId, prompt) {
     const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
     if (!boss) throw new Error("Boss not found");
-    const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. Epic fantasy video-game boss creature, dramatic dynamic action pose, dark and ominous, glowing rim lighting, richly detailed digital painting, centered full-body, transparent background, no text, no logo, no watermark, no border.`;
+    const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. 2D video-game boss art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, dramatic dynamic action pose, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
     const url = await generateImage(full, { size: "1024x1024", pathPrefix: "marketplace/boss" });
     await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, url]);
     return url;
@@ -64,8 +64,8 @@ export async function updateDraftBoss(bossId, { name, description, maxHp, reward
     return db.queryOne(`UPDATE boss_event SET ${sets.join(", ")} WHERE id = $1 AND status = 'draft' RETURNING *`, params);
 }
 
-// Release a draft: ends any current live boss, goes live for `days`, and blasts notifications everywhere.
-export async function releaseBoss(bossId, { days = 7 } = {}) {
+// Release a draft: ends any current live boss, goes live for `days`. Broadcasts everywhere unless notify=false.
+export async function releaseBoss(bossId, { days = 7, notify = true } = {}) {
     const d = Math.max(1, Math.floor(Number(days) || 7));
     await db.query(`UPDATE boss_event SET status = 'ended' WHERE status = 'live' AND id <> $1`, [bossId]).catch(() => {});
     const boss = await db.queryOne(
@@ -74,7 +74,7 @@ export async function releaseBoss(bossId, { days = 7 } = {}) {
         [bossId, d]
     );
     if (!boss) throw new Error("Boss not found");
-    await broadcastBoss(boss).catch(() => {});
+    if (notify) await broadcastBoss(boss).catch(() => {});
     return boss;
 }
 
