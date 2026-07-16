@@ -80,16 +80,16 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                 </p>
                 <form onSubmit={submit} className="stack" style={{ gap: 10, marginTop: 14 }}>
                     {mode === "verify" ? (
-                        <input placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} />
+                        <input placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" />
                     ) : mode === "forgot" ? (
-                        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                        <input type="email" name="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
                     ) : (
                         <>
                             {mode === "register" ? (
-                                <input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                                <input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
                             ) : null}
-                            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                            <input type="email" name="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
+                            <input type="password" name="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} required />
                         </>
                     )}
                     {error ? <p style={{ color: "#e66" }}>{error}</p> : null}

@@ -77,6 +77,16 @@ export async function createBuyer({ email, password, displayName = null }) {
     return mapBuyer(row);
 }
 
+// The email tied to a valid, unexpired reset token — so the reset form can show it as the browser's
+// "username" field (otherwise password managers save the new password under a blank username and can't
+// autofill it at the next sign-in). Null if the token is unknown/expired.
+export async function getResetEmail(token) {
+    if (!token) return null;
+    const row = await db.queryOne(`SELECT email, reset_expires_at FROM mkt_buyer WHERE reset_token_hash = $1`, [hashToken(token)]).catch(() => null);
+    if (!row || !row.reset_expires_at || new Date(row.reset_expires_at) <= new Date()) return null;
+    return row.email;
+}
+
 // True when an account exists for this email but has NO usable password (e.g. a shop-bridged account).
 // Such a member can't "log in" — they must set a password via reset. Lets the login route guide them
 // instead of returning a misleading "incorrect password".

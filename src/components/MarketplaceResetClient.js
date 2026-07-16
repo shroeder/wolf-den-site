@@ -2,14 +2,25 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function MarketplaceResetClient() {
     const token = useSearchParams().get("token") || "";
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
     const [status, setStatus] = useState("idle"); // idle | submitting | done
     const [error, setError] = useState("");
+
+    // Fetch the account email so we can put it in a username field — this is what lets the browser's
+    // password manager save the new password against the right account (instead of a blank username).
+    useEffect(() => {
+        if (!token) return;
+        fetch(`/api/marketplace/auth/reset?token=${encodeURIComponent(token)}`, { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => { if (d?.email) setEmail(d.email); })
+            .catch(() => {});
+    }, [token]);
 
     async function submit(e) {
         e.preventDefault();
@@ -71,8 +82,21 @@ export default function MarketplaceResetClient() {
         <section className="card">
             <h1>Set a new password</h1>
             <form onSubmit={submit} className="contact-form">
+                {/* Email as the username field so the browser saves the new password against this account. */}
+                {email ? <label htmlFor="reset-email">Account</label> : null}
+                <input
+                    id="reset-email"
+                    type="email"
+                    name="username"
+                    autoComplete="username"
+                    value={email}
+                    readOnly
+                    style={email ? undefined : { display: "none" }}
+                    aria-hidden={email ? undefined : true}
+                    tabIndex={email ? undefined : -1}
+                />
                 <label htmlFor="pw">New password</label>
-                <input id="pw" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <input id="pw" type="password" name="new-password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
                 <label htmlFor="pw2">Confirm password</label>
                 <input id="pw2" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 {error ? <p className="muted">{error}</p> : null}
