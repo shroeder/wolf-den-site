@@ -5,15 +5,12 @@
 // Slot-based like gear: one per slot, unlocked by level on the reward track. Pure module. Keep ids STABLE.
 import { avatarUrlFor, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
-export const COSMETIC_SLOTS = ["headwear", "aura"];
+export const COSMETIC_SLOTS = ["aura"];
 
 export const AVATAR_COSMETICS = [
-    // Headwear — REAL DiceBear hats (native art, drawn on the head; a hat replaces the hairstyle slot).
-    { id: "beanie", slot: "headwear", kind: "native", opts: { top: "winterHat1" }, label: "Bobble Beanie", icon: "🧶", level: 5, animated: false, hint: "A cozy bobble beanie" },
-    { id: "winter_hat", slot: "headwear", kind: "native", opts: { top: "winterHat03" }, label: "Winter Hat", icon: "🎿", level: 10, animated: false, hint: "A warm winter hat" },
-    { id: "snow_cap", slot: "headwear", kind: "native", opts: { top: "winterHat04" }, label: "Snow Cap", icon: "⛄", level: 16, animated: false, hint: "A snowy cap" },
-    { id: "classic_hat", slot: "headwear", kind: "native", opts: { top: "hat" }, label: "Classic Hat", icon: "🎩", level: 24, animated: false, hint: "A classic hat" },
-    // Aura — a soft glow behind the portrait (CSS).
+    // Aura — a soft glow behind the portrait (CSS). Hats + everything else DiceBear draws are now FREE
+    // in the avatar builder; the only "cosmetic" left on the avatar is the ambient aura (it reads well
+    // because it's a detached glow, not a worn item stuck on top).
     { id: "aura_gold", slot: "aura", kind: "overlay", label: "Golden Aura", icon: "🟡", level: 6, animated: false, hint: "A warm gold glow" },
     { id: "aura_aqua", slot: "aura", kind: "overlay", label: "Aqua Aura", icon: "🔵", level: 12, animated: false, hint: "A cool cyan glow" },
     { id: "aura_violet", slot: "aura", kind: "overlay", label: "Violet Aura", icon: "🟣", level: 22, animated: true, hint: "A pulsing purple glow" },

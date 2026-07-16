@@ -10,13 +10,13 @@ import {
     BACKGROUND_COLORS,
     CLOTHES_COLORS,
     CLOTHINGS,
+    CLOTHING_GRAPHICS,
     DEFAULT_AVATAR,
     EYEBROWS,
     EYES,
     FACIAL_HAIR,
     FACIAL_HAIR_COLORS,
     HAIR_COLORS,
-    HAIR_TOPS,
     MOUTHS,
     SKIN_COLORS,
     avatarUrlFor,
@@ -24,8 +24,9 @@ import {
 } from "@/lib/marketplace/avatar-options.js";
 
 const SELECTS = [
-    { field: "top", label: "Hair", values: HAIR_TOPS },
+    { field: "top", label: "Hair / Hat", values: AVATAR_FIELDS.top },
     { field: "clothing", label: "Outfit", values: CLOTHINGS },
+    { field: "clothingGraphic", label: "Shirt design", values: CLOTHING_GRAPHICS },
     { field: "eyes", label: "Eyes", values: EYES },
     { field: "eyebrows", label: "Eyebrows", values: EYEBROWS },
     { field: "mouth", label: "Mouth", values: MOUTHS },
@@ -36,7 +37,9 @@ const SWATCHES = [
     { field: "skinColor", label: "Skin", values: SKIN_COLORS },
     { field: "hairColor", label: "Hair color", values: HAIR_COLORS },
     { field: "facialHairColor", label: "Beard color", values: FACIAL_HAIR_COLORS },
+    { field: "hatColor", label: "Hat color", values: CLOTHES_COLORS },
     { field: "clothesColor", label: "Outfit color", values: CLOTHES_COLORS },
+    { field: "accessoriesColor", label: "Glasses color", values: CLOTHES_COLORS },
     { field: "backgroundColor", label: "Background", values: BACKGROUND_COLORS },
 ];
 

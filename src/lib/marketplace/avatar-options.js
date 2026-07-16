@@ -15,8 +15,10 @@ export const HAIR_TOPS = [
 // Hats aren't offered in the base picker (they're headwear COSMETICS), but they're valid `top` values,
 // so sanitize must allow them through when a native headwear cosmetic sets one.
 export const HAT_TOPS = ["hat", "turban", "hijab", "winterHat1", "winterHat02", "winterHat03", "winterHat04"];
-// Basic tops only — graphicShirt (logo tees) held back as a cosmetic unlock.
-export const CLOTHINGS = ["shirtCrewNeck", "shirtScoopNeck", "shirtVNeck", "hoodie", "collarAndSweater", "blazerAndShirt", "blazerAndSweater", "overall"];
+// Full clothing set incl. graphicShirt (a logo tee — pairs with clothingGraphic).
+export const CLOTHINGS = ["shirtCrewNeck", "shirtScoopNeck", "shirtVNeck", "hoodie", "collarAndSweater", "blazerAndShirt", "blazerAndSweater", "overall", "graphicShirt"];
+// Designs printed on a graphicShirt.
+export const CLOTHING_GRAPHICS = ["bat", "bear", "cumbia", "deer", "diamond", "hola", "pizza", "resist", "skull", "skullOutline"];
 export const EYES = ["default", "happy", "wink", "winkWacky", "surprised", "squint", "side", "hearts", "closed", "eyeRoll", "cry", "xDizzy"];
 export const EYEBROWS = ["default", "defaultNatural", "raisedExcited", "raisedExcitedNatural", "flatNatural", "angry", "angryNatural", "sadConcerned", "sadConcernedNatural", "unibrowNatural", "upDown", "upDownNatural", "frownNatural"];
 export const MOUTHS = ["smile", "default", "twinkle", "serious", "tongue", "eating", "grimace", "disbelief", "concerned", "sad", "screamOpen", "vomit"];
@@ -41,30 +43,35 @@ export const DEFAULT_AVATAR = {
     facialHair: "none",
     facialHairColor: "4a312c",
     accessories: "none",
+    accessoriesColor: "262e33",
     clothing: "shirtCrewNeck",
     clothesColor: "5199e4",
+    clothingGraphic: "skull",
+    hatColor: "262e33",
     backgroundColor: "none",
 };
 
-// field -> its allowed value list, in stored order. Drives validation + the picker.
+// field -> its allowed value list, in stored order. Drives validation + the picker. `top` includes hats
+// now (full customization). Colors reuse the clothes palette.
 export const AVATAR_FIELDS = {
     skinColor: SKIN_COLORS,
-    top: HAIR_TOPS,
+    top: [...HAIR_TOPS, ...HAT_TOPS],
     hairColor: HAIR_COLORS,
+    hatColor: CLOTHES_COLORS,
     eyes: EYES,
     eyebrows: EYEBROWS,
     mouth: MOUTHS,
     facialHair: FACIAL_HAIR,
     facialHairColor: FACIAL_HAIR_COLORS,
     accessories: ACCESSORIES,
+    accessoriesColor: CLOTHES_COLORS,
     clothing: CLOTHINGS,
     clothesColor: CLOTHES_COLORS,
+    clothingGraphic: CLOTHING_GRAPHICS,
     backgroundColor: BACKGROUND_COLORS,
 };
 
 const ALLOWED = Object.fromEntries(Object.entries(AVATAR_FIELDS).map(([k, v]) => [k, new Set(v)]));
-// Hats are valid `top` values even though the base picker only lists hairstyles (native headwear cosmetics set them).
-ALLOWED.top = new Set([...HAIR_TOPS, ...HAT_TOPS]);
 
 // Keep only known fields with allowed values; fall back to the default for anything missing/invalid.
 export function sanitizeAvatarConfig(config) {

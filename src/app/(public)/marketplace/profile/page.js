@@ -68,13 +68,13 @@ export default async function ProfileHubPage() {
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Your avatar</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Build a character that&apos;s yours — skin, hair, face, and outfit. Cool cosmetics to layer on come later as you unlock them.</p>
+                <p className="muted" style={{ marginTop: 0 }}>Full control of your character — skin, hair &amp; hats, face, beard, outfit &amp; graphics, glasses, and every color.</p>
                 <AvatarBuilder current={profile?.avatarConfig} />
             </section>
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Avatar cosmetics</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Flair you unlock as you level up — a hat that&apos;s drawn right into your avatar, or an aura glow. Tap to equip; tap again to remove.</p>
+                <p className="muted" style={{ marginTop: 0 }}>An aura glow you unlock as you level up — a soft light behind your avatar. Tap to equip; tap again to remove.</p>
                 <AvatarCosmeticsPicker
                     avatarConfig={profile?.avatarConfig}
                     initial={(profile?.displayLabel || "?").slice(0, 1).toUpperCase()}

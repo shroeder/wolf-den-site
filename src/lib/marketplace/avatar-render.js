@@ -22,6 +22,8 @@ function toDicebearOptions(config) {
         mouth: [c.mouth],
         clothing: [c.clothing],
         clothesColor: [c.clothesColor],
+        clothingGraphic: [c.clothingGraphic], // only used when clothing is graphicShirt
+        hatColor: [c.hatColor], // only used when top is a hat
     };
 
     if (c.top === "bald") {
@@ -44,6 +46,7 @@ function toDicebearOptions(config) {
         opts.accessoriesProbability = 0;
     } else {
         opts.accessories = [c.accessories];
+        opts.accessoriesColor = [c.accessoriesColor];
         opts.accessoriesProbability = 100;
     }
 
