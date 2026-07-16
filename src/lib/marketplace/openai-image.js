@@ -13,7 +13,7 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size, background: "transparent", quality: "high", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size, background: "transparent", quality: "medium", n: 1 }),
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
