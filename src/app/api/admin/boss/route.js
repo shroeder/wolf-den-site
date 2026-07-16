@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { createDraftBoss, endBoss, generateBossArt, listBossesAdmin, releaseBoss, setBossArt, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
+import { createDraftBoss, deleteBoss, endBoss, generateBossArt, listBossesAdmin, releaseBoss, setBossArt, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -46,6 +46,7 @@ export async function POST(request) {
             }
             if (action === "release") return noStore({ boss: await releaseBoss(body.bossId, { days: body.days, notify: body.notify !== false }) });
             if (action === "end") return noStore(await endBoss(body.bossId));
+            if (action === "delete") return noStore(await deleteBoss(body.bossId));
             return noStore({ error: "unknown_action" }, { status: 400 });
         } catch (error) {
             if (error?.message && !/database|query/i.test(error.message)) return noStore({ error: error.message }, { status: 400 });

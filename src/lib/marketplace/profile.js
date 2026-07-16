@@ -222,7 +222,14 @@ export async function equipFrame(buyerId, frameId) {
 export async function setAvatarConfig(buyerId, config) {
     if (!buyerId) throw new Error("Not signed in.");
     const clean = config ? sanitizeAvatarConfig(config) : null;
-    await db.query(`UPDATE mkt_buyer SET avatar_config = $2::jsonb, updated_at = NOW() WHERE id = $1`, [buyerId, clean ? JSON.stringify(clean) : null]);
+    // Bump avatar_updated_at only when they set/change a built avatar, so the sprite job knows to redraw it.
+    await db.query(
+        `UPDATE mkt_buyer
+            SET avatar_config = $2::jsonb, updated_at = NOW(),
+                avatar_updated_at = CASE WHEN $2 IS NULL THEN avatar_updated_at ELSE NOW() END
+          WHERE id = $1`,
+        [buyerId, clean ? JSON.stringify(clean) : null]
+    );
     return getProfile(buyerId);
 }
 

@@ -82,3 +82,13 @@ export async function endBoss(bossId) {
     await db.query(`UPDATE boss_event SET status = 'ended' WHERE id = $1`, [bossId]);
     return { ok: true };
 }
+
+// Permanently delete a boss (drafts/ended only — a live boss must be ended first). Clears its hits too.
+export async function deleteBoss(bossId) {
+    const boss = await db.queryOne(`SELECT status FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) return { ok: true };
+    if (boss.status === "live") throw new Error("End the boss before deleting it.");
+    await db.query(`DELETE FROM boss_hit WHERE boss_id = $1`, [bossId]).catch(() => {});
+    await db.query(`DELETE FROM boss_event WHERE id = $1`, [bossId]);
+    return { ok: true };
+}
