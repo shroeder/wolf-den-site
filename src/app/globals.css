@@ -8749,34 +8749,36 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 /* ---- Primary-badge "folder tab" — sticks up above the card's top edge (Manila-folder style) ---- */
-.has-card-tab { position: relative; margin-top: 18px; }
+.has-card-tab { position: relative; margin-top: 30px; }
+/* A seamless "manila folder" tab: same gradient fill + border as the card, bottom merged into the card
+   top edge (no border/gap between them) so it reads as one continuous piece — not a pill on top. */
 .card-tab {
     position: absolute;
-    top: 0;
+    top: 1px;                          /* overlap the card's top border by 1px so there's no seam line */
     left: 16px;
-    transform: translateY(-55%);
+    transform: translateY(-100%);      /* sit fully above; bottom flush with the card top */
     z-index: 2;
     display: inline-flex;
     align-items: center;
     gap: 5px;
     max-width: 62%;
-    padding: 4px 13px 9px;              /* extra bottom pad tucks it under the card edge */
-    border-radius: 11px 11px 0 0;
-    background: #1b1712;
-    border: 1px solid var(--tab-color, #c8a24a);
-    border-top-width: 3px;              /* thicker colored spine reads as a tab */
+    padding: 5px 14px 7px;
+    border-radius: 10px 10px 0 0;      /* only the top corners round */
+    background: linear-gradient(160deg, rgba(30, 24, 48, 0.6), rgba(20, 20, 31, 0.4)); /* == card fill */
+    border: 1px solid rgba(255, 215, 94, 0.22); /* == card border, on top + sides only */
     border-bottom: none;
     color: #f4e4bc;
     font-size: 0.72rem;
     font-weight: 700;
     line-height: 1.1;
     white-space: nowrap;
-    box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.35);
 }
 .card-tab-icon { font-size: 0.85rem; flex: 0 0 auto; }
 .card-tab-label { overflow: hidden; text-overflow: ellipsis; }
-.card-tab-compact { left: 14px; max-width: 70%; padding: 3px 10px 8px; font-size: 0.66rem; }
-.hero-card.has-card-tab { margin-top: 16px; }
+.card-tab-compact { left: 14px; max-width: 70%; padding: 4px 10px 6px; font-size: 0.66rem; }
+.hero-card.has-card-tab { margin-top: 24px; }
+/* Member hero cards use a flat surface, so match the tab fill to it there. */
+.hero-card .card-tab { background: rgba(255, 255, 255, 0.045); border-color: var(--border, rgba(255, 255, 255, 0.1)); }
 /* On tight cards, the tab is icon-only so it never crowds the row. */
 .hero-card .card-tab-label { display: none; }
 
