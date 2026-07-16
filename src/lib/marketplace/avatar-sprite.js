@@ -52,7 +52,7 @@ export function describeAvatar(rawConfig) {
 // boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
 // sprites and bosses look like the same game universe.
 export function buildSpritePrompt(config) {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors as the reference (${describeAvatar(config)}). 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, confident heroic full-body standing pose facing forward, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
 }
 
 // Buyers whose sprite is missing or stale (avatar changed since it was last drawn). Oldest/never first.
@@ -85,8 +85,9 @@ export async function listSpritesAdmin() {
         buyerId: r.id,
         label: r.display_name || (r.alias ? `@${r.alias}` : "Member"),
         spriteUrl: r.avatar_sprite_url || null,
-        // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar).
-        avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png`,
+        // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar, bust
+        // placed at the top with room below). v bumps when the framing changes (immutable-cached URL).
+        avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=2`,
         prompt: buildSpritePrompt(r.avatar_config),
         pending: !r.avatar_sprite_url || (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) || !r.avatar_sprite_at,
     }));

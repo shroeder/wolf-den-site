@@ -62,10 +62,20 @@ export function generateAvatarSvg(config) {
     return createAvatar(avataaars, toDicebearOptions(config)).toString();
 }
 
-// The avatar rasterized to a PNG buffer (square, transparent). Used as the reference image fed to the
-// OpenAI edits endpoint so the generated sprite matches the member's actual avatar.
+// The avatar rasterized to a PNG buffer (square, transparent) for use as the reference image fed to the
+// OpenAI edits endpoint. The head-and-shoulders avatar is placed in the TOP portion of the canvas with
+// empty space below, so the model has room to draw a full body (torso/legs/feet) instead of just
+// restyling a bust that fills the frame.
 export async function renderAvatarPng(config, size = 1024) {
     const { default: sharp } = await import("sharp");
     const svg = generateAvatarSvg(config);
-    return sharp(Buffer.from(svg)).resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    const bust = Math.round(size * 0.42);
+    const avatarPng = await sharp(Buffer.from(svg))
+        .resize(bust, bust, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .png()
+        .toBuffer();
+    return sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+        .composite([{ input: avatarPng, top: Math.round(size * 0.03), left: Math.round((size - bust) / 2) }])
+        .png()
+        .toBuffer();
 }
