@@ -77,6 +77,15 @@ export async function createBuyer({ email, password, displayName = null }) {
     return mapBuyer(row);
 }
 
+// True when an account exists for this email but has NO usable password (e.g. a shop-bridged account).
+// Such a member can't "log in" — they must set a password via reset. Lets the login route guide them
+// instead of returning a misleading "incorrect password".
+export async function accountNeedsPasswordSetup(email) {
+    const normalized = normalizeEmail(email);
+    const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1 AND password_hash IS NULL`, [normalized]);
+    return Boolean(row);
+}
+
 // Verify email + password, returning the buyer (with emailVerified) or null.
 export async function authenticateBuyer(email, password) {
     const normalized = normalizeEmail(email);

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { authenticateBuyer, createBuyerSession, createEmailVerification, getAccountLinkedVendorId, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
+import { accountNeedsPasswordSetup, authenticateBuyer, createBuyerSession, createEmailVerification, createPasswordReset, getAccountLinkedVendorId, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
 import { createVendorSession } from "@/lib/marketplace/vendor-session.js";
-import { sendVerificationEmail } from "@/lib/marketplace/email.js";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/marketplace/email.js";
 import { authenticateVendor, getVendorById } from "@/lib/marketplace/vendors.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -67,6 +67,24 @@ export async function POST(request) {
                     role: "vendor",
                     vendor: { id: vendor.id, displayName: vendor.displayName, email: vendor.email },
                 });
+            }
+
+            // Account exists but has no password yet (e.g. bridged from the shop) — they can't "log in".
+            // Email them a set-password link and say so, instead of a misleading "incorrect password".
+            if (await accountNeedsPasswordSetup(email)) {
+                const reset = await createPasswordReset(email);
+                if (reset) {
+                    try {
+                        await sendPasswordResetEmail(reset.email, reset.token);
+                    } catch (emailError) {
+                        logger.warn("marketplace.auth.login_setup_email_failed", { reason: emailError.message });
+                    }
+                }
+                logger.info("marketplace.auth.login_needs_password_setup");
+                return NextResponse.json(
+                    { error: "This email is registered but doesn't have a password yet. We just emailed you a link to set one.", needsPasswordSetup: true },
+                    { status: 401 }
+                );
             }
 
             return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
