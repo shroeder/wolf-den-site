@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { sendWebPush } from "@/lib/push/web-push.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -117,7 +118,22 @@ export async function awardXp(buyerId, action, { points = null, dedupeKey = null
         return null; // deduped (or a transient error) — never break the caller
     }
     try {
-        await db.query(`UPDATE mkt_buyer SET xp = xp + $2, updated_at = NOW() WHERE id = $1`, [buyerId, pts]);
+        const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts]);
+        // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).
+        if (row) {
+            const newXp = Number(row.xp) || 0;
+            const newLevel = levelForXp(newXp).level;
+            const oldLevel = levelForXp(newXp - pts).level;
+            if (newLevel > oldLevel) {
+                await sendWebPush(buyerId, {
+                    title: "⬆️ Level up!",
+                    body: `You reached level ${newLevel}. Tap to see what you unlocked.`,
+                    url: "/marketplace/rewards",
+                    tag: "level-up",
+                    data: { type: "level_up", level: newLevel },
+                }).catch(() => {});
+            }
+        }
     } catch {
         // Ledger row exists; total will self-heal on the next recompute if we ever add one.
     }

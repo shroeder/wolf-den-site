@@ -11,6 +11,7 @@ import {
 import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { awardPurchaseXp } from "@/lib/marketplace/xp.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
@@ -412,12 +413,23 @@ export async function POST(request) {
                 try {
                     const purchaseEmail =
                         updatedOrder.customer_email || authenticatedCustomer?.email || fulfillment.shipping?.email || null;
-                    await awardPurchaseXp({
+                    const buyerId = await awardPurchaseXp({
                         email: purchaseEmail,
                         amountCents: updatedOrder.subtotal_cents || cart.subtotalCents || 0,
                         orderId: updatedOrder.id,
                         squareCustomerId: authenticatedCustomer?.squareCustomerId || null,
                     });
+                    // Confirm their online order in the browser (no dollar amounts — a desktop notification
+                    // can be seen by others nearby).
+                    if (buyerId) {
+                        await sendWebPush(buyerId, {
+                            title: "🎉 Order confirmed",
+                            body: "Thanks for your order! We'll let you know when it's ready.",
+                            url: "/shop/orders",
+                            tag: `order-${updatedOrder.id}`,
+                            data: { type: "order", orderId: updatedOrder.id },
+                        }).catch(() => {});
+                    }
                 } catch (xpError) {
                     logger.warn("shop.checkout.loyalty_xp_failed", {
                         orderId: updatedOrder.id,

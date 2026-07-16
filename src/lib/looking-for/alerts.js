@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { createServerLogger } from "@/lib/server-logger";
 import { listInStockTcgSkus } from "@/lib/consignment/square";
 import { sendCardRestockEmail } from "@/lib/looking-for/email";
+import { sendWebPush } from "@/lib/push/web-push.js";
 
 const alertsLogger = createServerLogger({ source: "job", subsystem: "looking-for-alerts" });
 
@@ -36,6 +37,7 @@ export async function runLookingForAlerts() {
         `SELECT
             w.id AS watcher_id,
             w.email AS email,
+            w.buyer_id AS buyer_id,
             c.id AS card_id,
             c.name AS name,
             c.number AS number,
@@ -58,7 +60,7 @@ export async function runLookingForAlerts() {
 
     for (const row of pending) {
         if (!byWatcher.has(row.watcher_id)) {
-            byWatcher.set(row.watcher_id, { email: row.email, cards: [] });
+            byWatcher.set(row.watcher_id, { email: row.email, buyerId: row.buyer_id || null, cards: [] });
         }
 
         byWatcher.get(row.watcher_id).cards.push({
@@ -74,9 +76,21 @@ export async function runLookingForAlerts() {
     let watchersNotified = 0;
     let cardsNotified = 0;
 
-    for (const [watcherId, { email, cards }] of byWatcher) {
+    for (const [watcherId, { email, buyerId, cards }] of byWatcher) {
         try {
             await sendCardRestockEmail(email, cards);
+
+            // Also browser-push watchers who have a marketplace account (the drop alert, on this device).
+            if (buyerId) {
+                const more = cards.length > 1 ? ` +${cards.length - 1} more` : "";
+                await sendWebPush(buyerId, {
+                    title: "🔥 Back in stock",
+                    body: `${cards[0].name}${more} on your Looking-For list just came in`,
+                    url: "/looking-for",
+                    tag: "restock",
+                    data: { type: "restock", count: cards.length },
+                }).catch(() => {});
+            }
 
             await db.query(
                 `UPDATE card_watchlist_items
