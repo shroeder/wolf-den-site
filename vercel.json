@@ -60,6 +60,10 @@
             "schedule": "0 10 * * *"
         },
         {
+            "path": "/api/jobs/boss-auto-tick",
+            "schedule": "0 * * * *"
+        },
+        {
             "path": "/api/jobs/inventory-feed",
             "schedule": "*/15 * * * *"
         },

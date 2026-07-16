@@ -76,7 +76,7 @@ export async function getMemberMetrics(buyerId) {
                FROM mkt_donation_claim WHERE redeemed_buyer_id = $1`,
             [buyerId]
         ).catch(() => null),
-        db.queryOne(`SELECT COUNT(*)::int AS hits, COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE buyer_id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT COUNT(*) FILTER (WHERE kind = 'manual')::int AS hits, COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE buyer_id = $1`, [buyerId]).catch(() => null),
         // Messages this member has SENT — friend DMs + their side of store threads.
         db.queryOne(
             `SELECT ((SELECT COUNT(*) FROM mkt_dm_message WHERE sender_id = $1)

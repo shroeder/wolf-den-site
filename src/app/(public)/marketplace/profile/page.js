@@ -15,6 +15,7 @@ import RewardsTrackPreview from "@/components/RewardsTrackPreview";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
@@ -47,10 +48,11 @@ export default async function ProfileHubPage() {
         );
     }
 
-    const [profile, progress, track] = await Promise.all([
+    const [profile, progress, track, bossSummary] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         getRewardsProgress(buyer.id).catch(() => ({})),
         getRewardsTrack(buyer.id).catch(() => null),
+        getMyBossSummary(buyer.id).catch(() => null),
     ]);
     const level = profile?.level || null;
     // Staff can equip any border regardless of level (matches the server-side bypass).
@@ -69,6 +71,17 @@ export default async function ProfileHubPage() {
                     cosmetics={profile?.avatarCosmetics}
                 />
             </section>
+
+            {bossSummary ? (
+                <Link href="/marketplace/boss" className="card boss-ticket-card">
+                    <span className="boss-ticket-icon" aria-hidden="true">⚔️</span>
+                    <span className="boss-ticket-body">
+                        <span className="boss-ticket-title">This week vs. {bossSummary.bossName}</span>
+                        <span className="muted">Your damage {bossSummary.dmg.toLocaleString()} · your avatar is auto-attacking</span>
+                    </span>
+                    <span className="boss-ticket-tix">🎟️ {bossSummary.tickets}<small>tickets</small></span>
+                </Link>
+            ) : null}
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Jump in</h2>

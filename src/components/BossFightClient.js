@@ -3,17 +3,34 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import AvatarStack from "@/components/AvatarStack";
 import BossBattleScene from "@/components/BossBattleScene";
 
-// The REAL monthly boss: shared, persistent HP (from the server), daily-limited attacks, XP per hit,
-// contributor ranking + raffle tickets. Polls so you see the community chip away live.
+// Compact damage-over-time chart (fed by the server's hourly hit buckets — manual + auto).
+function BossDpsChart({ series }) {
+    const data = series.slice(-24);
+    const max = Math.max(1, ...data.map((d) => d.dmg));
+    return (
+        <div className="boss-dps">
+            <h3>📈 Damage over time</h3>
+            <div className="boss-dps-bars">
+                {data.map((d, i) => (
+                    <span key={i} className="boss-dps-bar" style={{ height: `${Math.max(4, Math.round((d.dmg / max) * 100))}%` }} title={`${d.t}: ${d.dmg.toLocaleString()} dmg`} />
+                ))}
+            </div>
+            <div className="boss-dps-x muted"><span>{data[0]?.t}</span><span>now</span></div>
+        </div>
+    );
+}
+
+// The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
+// from the whole pack (server-driven). Polls so you watch the community drain it live.
 export default function BossFightClient() {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [hit, setHit] = useState(false);
     const [busy, setBusy] = useState(false);
     const [floaters, setFloaters] = useState([]);
+    const [burst, setBurst] = useState(null);
     const [victory, setVictory] = useState(null);
     const [xpFlash, setXpFlash] = useState(false);
     const floatId = useRef(0);
@@ -27,17 +44,16 @@ export default function BossFightClient() {
 
     useEffect(() => {
         load();
-        const t = setInterval(load, 10000); // watch the community drain it live
+        const t = setInterval(load, 10000);
         return () => clearInterval(t);
     }, [load]);
 
     function popDamage(amount, crit) {
         const id = floatId.current++;
-        // Pop near the boss (right side of the stage).
         setFloaters((f) => [...f, { id, amount, crit, top: 14 + Math.random() * 38, left: 60 + Math.random() * 24 }]);
         setTimeout(() => setFloaters((f) => f.filter((x) => x.id !== id)), 850);
         setHit(true);
-        setTimeout(() => setHit(false), 180);
+        setTimeout(() => setHit(false), 260);
     }
 
     async function attack() {
@@ -51,14 +67,17 @@ export default function BossFightClient() {
                 await load();
                 return;
             }
+            // Dopamine: name the ability, throw the big number.
+            setBurst({ ability: res.ability, damage: res.damage, crit: res.crit, key: floatId.current++ });
+            setTimeout(() => setBurst(null), 1500);
             popDamage(res.damage, res.crit);
             setXpFlash(true);
             setTimeout(() => setXpFlash(false), 1400);
-            setData((d) => ({
-                ...d,
-                boss: { ...d.boss, hp: res.hp, maxHp: res.maxHp },
-                you: { ...d.you, attacksLeft: res.attacksLeft, dmg: (d.you?.dmg || 0) + res.damage },
-            }));
+            const divisor = data.boss.ticketDivisor || 100;
+            setData((d) => {
+                const dmg = (d.you?.dmg || 0) + res.damage;
+                return { ...d, boss: { ...d.boss, hp: res.hp, maxHp: res.maxHp }, you: { ...d.you, attacksLeft: res.attacksLeft, dmg, tickets: Math.floor(dmg / divisor) } };
+            });
             if (res.defeated) {
                 setVictory({ name: res.name });
                 setTimeout(() => { setVictory(null); load(); }, 3200);
@@ -73,13 +92,23 @@ export default function BossFightClient() {
     if (!loaded) return <p className="muted">Summoning the boss…</p>;
     if (!data?.boss) return <p className="muted">No active boss right now — check back soon.</p>;
 
-    const { boss, roster = [], fighters = [], you, defaultSpriteUrl } = data;
+    const { boss, roster = [], fighters = [], series = [], you } = data;
     const pct = Math.max(0, Math.min(100, Math.round((boss.hp / boss.maxHp) * 100)));
 
     return (
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
-            <BossBattleScene boss={boss} fighters={fighters} defaultSprite={defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
+
+            <div className="boss-stage-wrap">
+                <BossBattleScene boss={boss} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
+                {burst ? (
+                    <div className={`boss-burst${burst.crit ? " is-crit" : ""}`} key={burst.key}>
+                        <div className="boss-burst-name">{burst.crit ? "💥 " : ""}{burst.ability}{burst.crit ? " 💥" : ""}</div>
+                        <div className="boss-burst-dmg">-{burst.damage.toLocaleString()}</div>
+                    </div>
+                ) : null}
+            </div>
+
             {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             <div className="boss2-actions">
@@ -87,37 +116,50 @@ export default function BossFightClient() {
                     <Link href="/marketplace/login?returnTo=/marketplace/boss" className="btn-gold boss2-attack">Sign in to join the fight</Link>
                 ) : you.attacksLeft > 0 ? (
                     <button type="button" className="btn-gold boss2-attack" onClick={attack} disabled={busy}>
-                        {busy ? "Striking…" : `⚔️ Attack · ${you.attacksLeft} left today`}
+                        {busy ? "Unleashing…" : "⚔️ Unleash your daily strike"}
                     </button>
                 ) : (
-                    <div className="boss2-spent">🕒 Out of swings — come back tomorrow for more.</div>
+                    <div className="boss2-spent">🕒 Strike used — your avatar keeps auto-attacking. Come back tomorrow for another.</div>
                 )}
                 {you ? (
-                    <div className="boss2-you muted">
-                        Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong> · +10 XP per hit
+                    <div className="boss2-you">
+                        <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
+                        <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
                         {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
                     </div>
                 ) : null}
             </div>
 
+            {series.length > 1 ? <BossDpsChart series={series} /> : null}
+
             {roster.length ? (
                 <div className="boss2-board">
-                    <h3>🏆 Top damage</h3>
-                    <ol className="boss2-rank">
-                        {roster.slice(0, 8).map((f, i) => (
-                            <li key={f.id} className={f.you ? "is-you" : ""}>
-                                <span className="boss2-rank-n">{i + 1}</span>
-                                <AvatarStack avatarUrl={f.avatarUrl} initial={(f.name || "?").slice(0, 1).toUpperCase()} size={32} />
-                                <span className="boss2-rank-name">{f.name}</span>
-                                <span className="boss2-rank-dmg">{f.dmg.toLocaleString()} dmg</span>
-                                <span className="boss2-rank-tix">🎟️ {f.tickets}</span>
-                            </li>
+                    <h3>🏆 The pack &mdash; damage &amp; tickets</h3>
+                    <div className="boss-heroes">
+                        {roster.slice(0, 12).map((f, i) => (
+                            <div key={f.id} className={`hero-card2${f.you ? " is-you" : ""}`}>
+                                <div className="hero-card2-rank">#{i + 1}</div>
+                                <div className="hero-card2-sprite">
+                                    {f.spriteUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={f.spriteUrl} alt="" />
+                                    ) : (
+                                        <span className="hero-card2-initial">{(f.name || "?").slice(0, 1).toUpperCase()}</span>
+                                    )}
+                                </div>
+                                <div className="hero-card2-name">{f.name}{f.you ? " (you)" : ""}</div>
+                                <div className="hero-card2-lv">Lv {f.level}</div>
+                                <div className="hero-card2-stats">
+                                    <span>{f.dmg.toLocaleString()} dmg</span>
+                                    <span className="boss2-tix">🎟️ {f.tickets}</span>
+                                </div>
+                            </div>
                         ))}
-                    </ol>
-                    <p className="muted boss2-note">Every hit earns raffle tickets for this month&apos;s giveaway — more damage, more tickets.</p>
+                    </div>
+                    <p className="muted boss2-note">Damage (your daily strike + your avatar&apos;s auto-attacks) converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️.</p>
                 </div>
             ) : (
-                <p className="muted boss2-note">Be the first to strike — no one has hit this boss yet.</p>
+                <p className="muted boss2-note">Be the first to strike — the pack is warming up.</p>
             )}
 
             {victory ? (
@@ -125,7 +167,7 @@ export default function BossFightClient() {
                     <div className="boss2-victory">
                         <div className="boss2-victory-x">🏆</div>
                         <h3>{victory.name} defeated!</h3>
-                        <p className="muted">You landed the killing blow. A tougher one is already rising…</p>
+                        <p className="muted">The pack brought it down. A new challenger will rise soon…</p>
                     </div>
                 </div>
             ) : null}

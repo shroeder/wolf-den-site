@@ -9142,6 +9142,47 @@ body.tv-mode .shop-mobile-cart-fab {
 .boss2-rank-dmg { font-size: 0.8rem; color: #cdbfa6; }
 .boss2-rank-tix { font-size: 0.82rem; font-weight: 700; }
 .boss2-note { font-size: 0.8rem; margin-top: 10px; }
+
+/* ---- dopamine manual-strike burst ---- */
+.boss-stage-wrap { position: relative; }
+.boss-burst { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 8; animation: boss-burst-in 1.5s ease-out forwards; }
+.boss-burst-name { font-weight: 800; font-size: clamp(1.1rem, 4.5vw, 2rem); color: #ffd75e; text-shadow: 0 2px 10px #000, 0 0 20px rgba(255,180,60,0.7); letter-spacing: 0.02em; text-align: center; }
+.boss-burst-dmg { font-weight: 900; font-size: clamp(2.4rem, 11vw, 5rem); color: #fff; text-shadow: 0 3px 14px #000, 0 0 28px rgba(255,120,60,0.85); line-height: 1; }
+.boss-burst.is-crit .boss-burst-dmg { color: #ff5a5a; }
+.boss-burst.is-crit .boss-burst-name { color: #ff8a5a; }
+@keyframes boss-burst-in { 0% { opacity: 0; transform: scale(0.5); } 15% { opacity: 1; transform: scale(1.12); } 35% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05) translateY(-16px); } }
+@media (prefers-reduced-motion: reduce) { .boss-burst { animation: none; } }
+
+.boss2-you { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: 0.9rem; }
+.boss2-tix { font-weight: 800; color: #ffd75e; }
+
+/* ---- damage-over-time chart ---- */
+.boss-dps { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px 14px; }
+.boss-dps h3 { margin: 0 0 10px; font-size: 0.95rem; }
+.boss-dps-bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; }
+.boss-dps-bar { flex: 1; min-width: 3px; background: linear-gradient(180deg, #ff8a3d, #ff3d3d); border-radius: 3px 3px 0 0; }
+.boss-dps-x { display: flex; justify-content: space-between; font-size: 0.72rem; margin-top: 6px; }
+
+/* ---- hero cards (the pack) ---- */
+.boss-heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.hero-card2 { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px 8px; border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.25)); border: 1px solid rgba(255,255,255,0.08); text-align: center; }
+.hero-card2.is-you { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e inset, 0 0 18px -6px #ffd75e; }
+.hero-card2-rank { position: absolute; top: 6px; left: 8px; font-weight: 800; font-size: 0.75rem; color: #ffd75e; }
+.hero-card2-sprite { width: 100%; height: 92px; display: grid; place-items: center; }
+.hero-card2-sprite img { height: 92px; width: auto; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+.hero-card2-initial { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.1); display: grid; place-items: center; font-weight: 800; font-size: 1.3rem; }
+.hero-card2-name { font-weight: 700; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.hero-card2-lv { font-size: 0.72rem; color: #cdbfa6; font-weight: 700; }
+.hero-card2-stats { display: flex; flex-direction: column; gap: 1px; font-size: 0.78rem; margin-top: 3px; }
+.hero-card2-stats span:first-child { color: #ffd0b8; font-weight: 600; }
+
+/* ---- profile boss-ticket card ---- */
+.boss-ticket-card { display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; border: 1px solid rgba(224,68,40,0.35); background: radial-gradient(120% 120% at 0% 0%, rgba(224,68,40,0.14), transparent 60%); }
+.boss-ticket-icon { font-size: 1.8rem; }
+.boss-ticket-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.boss-ticket-title { font-weight: 800; }
+.boss-ticket-tix { display: flex; flex-direction: column; align-items: center; font-weight: 900; font-size: 1.5rem; color: #ffd75e; line-height: 1; }
+.boss-ticket-tix small { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #cdbfa6; }
 .boss2-victory-overlay { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.72); }
 .boss2-victory { text-align: center; padding: 28px; }
 .boss2-victory-x { font-size: 4rem; }
