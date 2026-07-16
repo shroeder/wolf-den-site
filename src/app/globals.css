@@ -8550,9 +8550,11 @@ body.tv-mode .shop-mobile-cart-fab {
 .top-row { flex-wrap: nowrap; gap: 10px; padding: 10px 0; justify-content: flex-start; }
 .top-left { gap: 10px; flex-wrap: nowrap; min-width: 0; flex: 0 0 auto; }
 .top-right { gap: 6px; flex-wrap: nowrap; margin-left: auto; flex: 0 0 auto; }
-.brand { font-size: 1.1rem; margin-right: 0; min-width: 0; }
+.brand { font-size: 1.1rem; margin-right: 0; min-width: 0; align-items: center; }
 .brand > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand-mark { height: 30px; }
+/* Every header control shares one height (36px), perfectly centered. */
+.top-row, .top-left, .top-right { align-items: center; }
+.brand-mark { height: 36px; width: auto; }
 
 /* Unified round icon buttons in the top-right utility row. */
 .nav-icon {
@@ -8579,12 +8581,14 @@ body.tv-mode .shop-mobile-cart-fab {
 .nav-icon.nav-discord:hover { filter: brightness(1.08); background: linear-gradient(135deg, #5865f2, #4752c4); }
 .nav-icon.nav-discord svg { width: 16px; height: 16px; }
 
-/* Account avatar — the rightmost element, sized to match the icon row. */
-.nav-account-avatar { width: 32px; height: 32px; font-size: 0.78rem; }
+/* Account avatar — the rightmost element. 30px avatar + its equipped 3px border ring = 36px outer,
+   so it matches the cart/icon buttons exactly instead of ballooning past them. */
+.nav-account { display: inline-flex; align-items: center; height: 36px; }
+.nav-account-avatar { width: 30px; height: 30px; font-size: 0.72rem; }
 .nav-signin { padding: 0.42rem 0.9rem; }
 
-/* Menu lives at the far left now. */
-.hamburger { margin-left: 0; }
+/* Menu lives at the far left — same 36px box as the icons, bars centered. */
+.hamburger { margin-left: 0; width: 36px; height: 36px; padding: 0; align-items: center; justify-content: center; }
 
 /* Desktop: nav links sit inline in the header (single-line); the separate nav row + hamburger hide.
    Mobile: the hamburger opens the dropdown row and the inline nav hides. */
