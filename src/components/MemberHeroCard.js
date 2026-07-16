@@ -31,7 +31,7 @@ export default function MemberHeroCard({ member, action = null, href = null, com
                     <span className="rank-chip rank-chip-sm">{rank.emoji} {rank.title}</span>
                     <span className="hero-card-lv">Lv {member.level || 1}</span>
                 </span>
-                {!compact && member.badges?.length ? <UserBadges badges={member.badges} /> : null}
+                {!compact && (member.displayBadges || member.badges)?.length ? <UserBadges badges={member.displayBadges || member.badges} /> : null}
             </span>
         </>
     );

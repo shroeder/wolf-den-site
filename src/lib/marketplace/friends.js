@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { notifyFriendAccepted, notifyFriendRequest } from "@/lib/marketplace/social-notify.js";
 import { awardOnce, levelForXp } from "@/lib/marketplace/xp.js";
+import { pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 
 // Both people in a new friendship get a one-time "first friend" onboarding reward (deduped, so it
 // only ever fires for each once). Best-effort.
@@ -24,11 +25,11 @@ function mapUser(row) {
         level: levelForXp(row.xp || 0).level,
         border: row.equipped_border || "none",
         frame: row.equipped_frame || "none",
-        featuredSlug: row.featured_badge_slug || null,
+        showcaseSlugs: row.showcase_badge_slugs || null,
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border, equipped_frame, featured_badge_slug";
+const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border, equipped_frame, showcase_badge_slugs";
 
 // Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
 async function attachBadges(users) {
@@ -52,9 +53,9 @@ async function attachBadges(users) {
     return users.map((u) => {
         if (!u) return u;
         const badges = byId.get(u.id) || [];
-        // Primary badge for the folder tab: their chosen one if held, else the top-ranked badge.
-        const featuredBadge = badges.length ? badges.find((b) => b.slug === u.featuredSlug) || badges[0] : null;
-        return { ...u, badges, featuredBadge };
+        // Cap what shows on the card to the member's showcase (or their top few), tab = the top of those.
+        const displayBadges = pickShowcaseBadges(badges, u.showcaseSlugs);
+        return { ...u, badges, displayBadges, featuredBadge: displayBadges[0] || null };
     });
 }
 

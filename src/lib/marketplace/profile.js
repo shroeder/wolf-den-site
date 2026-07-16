@@ -5,6 +5,7 @@ import { discordConfig } from "@/lib/marketplace/discord.js";
 import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrounds.js";
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
+import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -122,11 +123,12 @@ function mapProfile(row, badges = []) {
         background: row.equipped_background || "none",
         // Equipped cosmetic profile frame id ('none' when unset) — the inset textured card border.
         frame: row.equipped_frame || "none",
-        // The member's PRIMARY badge — shown as a "folder tab" above their card. Their chosen one if
-        // still held, else their top-ranked badge (badges are pre-sorted by sort_order). null if none.
-        featuredBadge: badges && badges.length ? badges.find((b) => b.slug === (row.featured_badge_slug || null)) || badges[0] : null,
-        // The RAW stored choice (null = "Auto"/top-ranked). Lets the picker show Auto vs an explicit pick.
-        featuredBadgeSlug: row.featured_badge_slug || null,
+        // Badges shown ON the card: the member's showcase (up to 3), or their top few by default.
+        displayBadges: pickShowcaseBadges(badges, row.showcase_badge_slugs || null),
+        // The "folder tab" = the top-ranked of the showcased badges (silent; no explicit primary).
+        featuredBadge: pickShowcaseBadges(badges, row.showcase_badge_slugs || null)[0] || null,
+        // The RAW stored showcase (for the picker). Empty = default (top few).
+        showcaseSlugs: row.showcase_badge_slugs || [],
         // Email notification prefs (default on).
         notifyEmailDm: row.notify_email_dm !== false,
         notifyEmailFriend: row.notify_email_friend !== false,
@@ -137,7 +139,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, featured_badge_slug, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -209,16 +211,17 @@ export async function equipFrame(buyerId, frameId) {
     return getProfile(buyerId);
 }
 
-// Set the member's PRIMARY badge (the folder tab). Must be a badge they hold; pass null/'' to clear
-// (falls back to their top-ranked badge). Returns the refreshed profile.
-export async function setFeaturedBadge(buyerId, slug) {
+// Set the badges the member showcases on their card (up to MAX_SHOWCASE). Each must be a badge they
+// hold; pass [] to clear (falls back to their top few). The top-ranked of the set becomes the tab.
+export async function setShowcaseBadges(buyerId, slugs) {
     if (!buyerId) throw new Error("Not signed in.");
-    const clean = slug ? String(slug).trim() : null;
-    if (clean) {
-        const held = await db.queryOne(`SELECT 1 FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug = $2`, [buyerId, clean]).catch(() => null);
-        if (!held) throw new Error("You haven't earned that badge.");
+    let clean = Array.isArray(slugs) ? [...new Set(slugs.map((s) => String(s).trim()).filter(Boolean))].slice(0, MAX_SHOWCASE) : [];
+    if (clean.length) {
+        const held = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug = ANY($2)`, [buyerId, clean]).catch(() => []);
+        const heldSet = new Set(held.map((r) => r.badge_slug));
+        clean = clean.filter((s) => heldSet.has(s));
     }
-    await db.query(`UPDATE mkt_buyer SET featured_badge_slug = $2, updated_at = NOW() WHERE id = $1`, [buyerId, clean]);
+    await db.query(`UPDATE mkt_buyer SET showcase_badge_slugs = $2, updated_at = NOW() WHERE id = $1`, [buyerId, clean.length ? clean : null]);
     return getProfile(buyerId);
 }
 
@@ -246,7 +249,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background, equipped_frame, featured_badge_slug
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

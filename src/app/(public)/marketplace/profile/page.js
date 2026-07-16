@@ -4,8 +4,8 @@ import BackgroundPicker from "@/components/BackgroundPicker";
 import BorderPicker from "@/components/BorderPicker";
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
-import FeaturedBadgePicker from "@/components/FeaturedBadgePicker";
 import FramePicker from "@/components/FramePicker";
+import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import RewardsHubHero from "@/components/RewardsHubHero";
@@ -56,7 +56,7 @@ export default async function ProfileHubPage() {
                 <RewardsHubHero
                     displayLabel={profile?.displayLabel}
                     avatarUrl={profile?.avatarUrl}
-                    badges={profile?.badges || []}
+                    badges={profile?.displayBadges || []}
                     level={level}
                     border={profile?.border}
                 />
@@ -88,9 +88,9 @@ export default async function ProfileHubPage() {
             </section>
 
             <section className="card">
-                <h2 style={{ marginTop: 0 }}>Primary badge</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Pin one badge as the tab that sticks up on your card. The rest still show below it.</p>
-                <FeaturedBadgePicker badges={profile?.badges || []} current={profile?.featuredBadgeSlug || null} />
+                <h2 style={{ marginTop: 0 }}>Badges on your card</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Choose up to 3 to show. Your top-ranked pick becomes the tab that sticks up on your card.</p>
+                <ShowcaseBadgePicker badges={profile?.badges || []} current={profile?.showcaseSlugs || []} />
             </section>
 
             <section className="card">

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { setFeaturedBadge } from "@/lib/marketplace/profile.js";
+import { setShowcaseBadges } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -11,21 +11,21 @@ function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
 
-// Set the member's PRIMARY badge (the folder tab). Body: { slug: "<held-badge-slug>" | null }.
+// Set the badges the member showcases on their card. Body: { slugs: ["<held-badge-slug>", ...] } (up to 3).
 export async function POST(request) {
-    return withRequestLogging(request, "POST /api/marketplace/featured-badge", async ({ internalError }) => {
+    return withRequestLogging(request, "POST /api/marketplace/showcase-badges", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const slug = body?.slug ? String(body.slug) : null;
-            const profile = await setFeaturedBadge(buyer.id, slug);
+            const slugs = Array.isArray(body?.slugs) ? body.slugs : [];
+            const profile = await setShowcaseBadges(buyer.id, slugs);
             return noStore({ profile });
         } catch (error) {
             if (error?.message && !/database|query/i.test(error.message)) {
                 return noStore({ error: error.message }, { status: 400 });
             }
-            return internalError(error, { event: "marketplace.featured_badge.failure" });
+            return internalError(error, { event: "marketplace.showcase_badges.failure" });
         }
     });
 }

@@ -49,7 +49,7 @@ export default async function UserProfilePage({ params }) {
                     <div className="user-profile-meta">
                         <h1>{profile.displayLabel}</h1>
                         {profile.alias ? <p className="muted">@{profile.alias}</p> : null}
-                        <UserBadges badges={profile.badges} />
+                        <UserBadges badges={profile.displayBadges || profile.badges} />
                         <UserLevel level={profile.level} />
                     </div>
                 </div>
