@@ -153,7 +153,7 @@ export default function SiteHeader() {
                             alt="The Wolf Den logo"
                             width={1536}
                             height={1024}
-                            sizes="30px"
+                            sizes="50px"
                             priority
                         />
                         <span>The Wolf Den</span>

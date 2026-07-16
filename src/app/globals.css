@@ -8559,10 +8559,10 @@ body.tv-mode .shop-mobile-cart-fab {
 .top-right { gap: 14px; flex-wrap: nowrap; margin-left: auto; flex: 0 0 auto; }
 .brand { font-size: 1.1rem; margin-right: 0; min-width: 0; align-items: center; }
 .brand > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Every header control shares one height (36px), perfectly centered. Logo is cropped to a tight circle
-   (its PNG has padding around the badge) so it fills its box instead of floating small + off-center. */
+/* Utility controls share one height (36px), perfectly centered. The logo is the brand, so it's larger
+   (50px) — cropped to a tight circle (its PNG has padding around the badge) so it fills its box. */
 .top-row, .top-left, .top-right { align-items: center; }
-.brand-mark { height: 36px; width: 36px; object-fit: cover; border-radius: 50%; }
+.brand-mark { height: 50px; width: 50px; object-fit: cover; border-radius: 50%; }
 
 /* Unified round icon buttons in the top-right utility row. */
 .nav-icon {
