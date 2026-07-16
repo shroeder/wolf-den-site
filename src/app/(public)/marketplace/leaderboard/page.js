@@ -17,6 +17,7 @@ export default async function LeaderboardPage() {
             <section className="card hero-accent">
                 <h1>Leaderboard</h1>
                 <p className="muted">Top members by lifetime XP. Earn XP by shopping, checking in at events, and being active.</p>
+                <p style={{ marginTop: 10 }}><Link href="/marketplace/badges" className="pill">🎖️ Your badges &amp; what&apos;s next →</Link></p>
             </section>
 
             <section className="card">

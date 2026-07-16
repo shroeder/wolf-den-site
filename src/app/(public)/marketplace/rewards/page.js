@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import EarnChecklist from "@/components/EarnChecklist";
+import NextBadgeNudge from "@/components/NextBadgeNudge";
 import RewardsTrackPreview from "@/components/RewardsTrackPreview";
+import { getBadgeBoard } from "@/lib/marketplace/badges.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getLeaderboard } from "@/lib/marketplace/profile.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
@@ -20,10 +22,11 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default async function RewardsPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    const [top, progress, memberTrack] = await Promise.all([
+    const [top, progress, memberTrack, badgeBoard] = await Promise.all([
         getLeaderboard(5).catch(() => []),
         buyer ? getRewardsProgress(buyer.id).catch(() => ({})) : Promise.resolve({}),
         buyer ? getRewardsTrack(buyer.id).catch(() => null) : Promise.resolve(null),
+        buyer ? getBadgeBoard(buyer.id).catch(() => null) : Promise.resolve(null),
     ]);
     const signedIn = Boolean(buyer);
 
@@ -40,6 +43,7 @@ export default async function RewardsPage() {
                         <Link href="/marketplace/track" className="btn-gold rewards-hero-primary">Your rewards track →</Link>
                         <div className="rewards-hero-secondary">
                             <Link href="/marketplace/boss" className="pill">⚔️ Boss fight</Link>
+                            <Link href="/marketplace/badges" className="pill">🎖️ Badges</Link>
                             <Link href="/marketplace/card" className="pill">🎟️ Loyalty card</Link>
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>
                         </div>
@@ -53,6 +57,8 @@ export default async function RewardsPage() {
                     </div>
                 )}
             </section>
+
+            {signedIn && badgeBoard ? <NextBadgeNudge next={badgeBoard.next} earnedCount={badgeBoard.earnedCount} totalCount={badgeBoard.totalCount} /> : null}
 
             {signedIn ? (
                 <RewardsTrackPreview track={memberTrack} />

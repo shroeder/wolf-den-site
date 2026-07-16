@@ -10,11 +10,13 @@ import FramePicker from "@/components/FramePicker";
 import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
+import NextBadgeNudge from "@/components/NextBadgeNudge";
 import RewardsHubHero from "@/components/RewardsHubHero";
 import RewardsTrackPreview from "@/components/RewardsTrackPreview";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { getBadgeBoard } from "@/lib/marketplace/badges.js";
 import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
@@ -31,6 +33,7 @@ const TILES = [
     { href: "/marketplace/profile/avatar", icon: "🎨", label: "Your avatar", sub: "Build your look" },
     { href: "/marketplace/friends", icon: "👥", label: "Friends", sub: "Add & message" },
     { href: "/marketplace/inbox", icon: "✉️", label: "Inbox", sub: "All your messages" },
+    { href: "/marketplace/badges", icon: "🎖️", label: "Badges", sub: "Show off & earn" },
     { href: "/marketplace/leaderboard", icon: "🏆", label: "Leaderboard", sub: "See your rank" },
     { href: "/marketplace/card", icon: "🎟️", label: "Loyalty card", sub: "Scan at the register" },
 ];
@@ -48,11 +51,12 @@ export default async function ProfileHubPage() {
         );
     }
 
-    const [profile, progress, track, bossSummary] = await Promise.all([
+    const [profile, progress, track, bossSummary, badgeBoard] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         getRewardsProgress(buyer.id).catch(() => ({})),
         getRewardsTrack(buyer.id).catch(() => null),
         getMyBossSummary(buyer.id).catch(() => null),
+        getBadgeBoard(buyer.id).catch(() => null),
     ]);
     const level = profile?.level || null;
     // Staff can equip any border regardless of level (matches the server-side bypass).
@@ -95,6 +99,8 @@ export default async function ProfileHubPage() {
                     ))}
                 </div>
             </section>
+
+            {badgeBoard ? <NextBadgeNudge next={badgeBoard.next} earnedCount={badgeBoard.earnedCount} totalCount={badgeBoard.totalCount} /> : null}
 
             <RewardsTrackPreview track={track} />
 
@@ -148,6 +154,7 @@ export default async function ProfileHubPage() {
                 <h2 style={{ marginTop: 0 }}>Badges on your card</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Choose up to 3 to show. Your top-ranked pick becomes the tab that sticks up on your card.</p>
                 <ShowcaseBadgePicker badges={profile?.badges || []} current={profile?.showcaseSlugs || []} />
+                <p style={{ marginTop: 12 }}><Link href="/marketplace/badges" className="pill">🎖️ See all badges &amp; what&apos;s next →</Link></p>
             </section>
 
             <section className="card">

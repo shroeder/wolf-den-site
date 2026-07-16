@@ -166,6 +166,32 @@ function qualifies(rule, threshold, m) {
     return current >= target;
 }
 
+// The full badge board for a member: every badge with earned/locked state + progress on the unlockables,
+// plus the single "next badge" (closest unearned unlockable). Powers the Badges hub + the next-badge nudge.
+export async function getBadgeBoard(buyerId) {
+    const [all, held, m] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId)]);
+    const badges = all.map((b) => {
+        const earned = held.has(b.slug);
+        let progress = null;
+        if (!earned && b.autoRule) {
+            const { current, target } = progressForRule(b.autoRule, b.autoThreshold, m);
+            const t = Math.max(1, target);
+            progress = { current: Math.max(0, Math.min(current, t)), target: t, pct: Math.max(0, Math.min(100, Math.round((current / t) * 100))) };
+        }
+        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), earned, progress };
+    });
+    // Next = closest unearned UNLOCKABLE badge by progress (admin-assigned ones can't be "earned" by progress).
+    const next = badges
+        .filter((b) => !b.earned && b.unlockable && b.progress)
+        .sort((a, z) => z.progress.pct - a.progress.pct)[0] || null;
+    return {
+        badges,
+        earnedCount: badges.filter((b) => b.earned).length,
+        totalCount: badges.length,
+        next: next ? { label: next.label, icon: next.icon, color: next.color, ...next.progress } : null,
+    };
+}
+
 // Grant any unlockable badges the member now qualifies for. Returns the newly-granted badge defs (so a
 // caller can celebrate them). Best-effort and idempotent — a held badge is skipped, nothing is revoked.
 export async function syncEarnedBadges(buyerId) {
