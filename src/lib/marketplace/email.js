@@ -127,6 +127,37 @@ export async function sendBadgeAwardedEmail(email, { label, icon = "", descripti
     return true;
 }
 
+// Sent to every member when the weekly boss is slain. Winners get the "come claim your prize" version.
+export async function sendBossDefeatedEmail(email, { bossName, winnerLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
+    if (!email) return false;
+    if (!process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    const hi = name ? `Hey ${name},` : "Hey there,";
+    const bossUrl = `${baseUrl()}/marketplace/boss`;
+    const prizeBlock = prizeName
+        ? `<div style="text-align:center;padding:18px;margin:14px 0;border:1px solid #e6c76b;border-radius:14px;background:#fff8e6;">
+               ${prizeImageUrl ? `<img src="${prizeImageUrl}" alt="${prizeName}" style="max-width:120px;max-height:120px;object-fit:contain;" />` : ""}
+               <div style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#b8860b;font-weight:800;margin-top:6px;">Raffle prize</div>
+               <div style="font-size:18px;font-weight:800;">${prizeName}</div>
+           </div>`
+        : "";
+    await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: isWinner ? `🏆 You won the ${bossName} raffle!` : `☠️ ${bossName} has been slain!`,
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <p>${hi}</p>
+                ${isWinner
+                    ? `<p><strong>Congratulations — you won the raffle!</strong> The pack took down <strong>${bossName}</strong> and your ticket was drawn.</p>${prizeBlock}<p>Come by The Wolf Den to claim your prize. 🐺</p>`
+                    : `<p>The whole pack just brought down <strong>${bossName}</strong>! ${winnerLabel ? `The raffle winner is <strong>${winnerLabel}</strong>.` : ""}</p>${prizeBlock}<p>Thanks for fighting — everyone who took part earned XP.</p>`}
+                <p><a href="${bossUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">See the final battle stats →</a></p>
+            </div>
+        `,
+    });
+    return true;
+}
+
 export async function sendNewApplicationEmail(application, toEmail) {
     if (!toEmail) {
         return false;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
+import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -56,6 +56,10 @@ export async function POST(request) {
             if (action === "setPrize") {
                 if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });
                 return noStore(await setBossPrize(body.bossId, { name: body.prizeName, imageUrl: body.prizeImageUrl, squareId: body.prizeSquareId }));
+            }
+            if (action === "claimPrize") {
+                if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });
+                return noStore(await claimBossPrize(body.bossId));
             }
             if (action === "end") return noStore(await endBoss(body.bossId));
             if (action === "delete") return noStore(await deleteBoss(body.bossId));

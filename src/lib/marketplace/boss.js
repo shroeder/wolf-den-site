@@ -5,6 +5,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
@@ -28,11 +29,11 @@ const ABILITIES = ["Fang Strike", "Howling Slash", "Pack Fury", "Savage Bite", "
 const CRIT_ABILITIES = ["APEX PREDATOR", "BLOODMOON CRIT", "PACK LEADER'S WRATH", "DEVASTATION"];
 const pickAbility = (crit) => (crit ? CRIT_ABILITIES : ABILITIES)[Math.floor(Math.random() * (crit ? CRIT_ABILITIES : ABILITIES).length)];
 
-// The current LIVE boss (admin-released). No auto-spawn — bosses are manually created + released and
-// expire at ends_at. Returns null between bosses.
+// The current LIVE boss (admin-released). No auto-spawn, and it does NOT expire on a timer — it stays live
+// until the pack kills it (HP hits 0). ends_at is informational only. Returns null between bosses.
 export async function getActiveBoss() {
     return db
-        .queryOne(`SELECT * FROM boss_event WHERE status = 'live' AND (ends_at IS NULL OR ends_at > NOW()) AND defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`)
+        .queryOne(`SELECT * FROM boss_event WHERE status = 'live' AND defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`)
         .catch(() => null);
 }
 
@@ -52,8 +53,14 @@ async function manualAttacksToday(buyerId) {
 // Full state for the boss screen: boss HP, contributors (with sprites + tickets), the pack of fighters,
 // the viewer's own stats (damage + tickets + swings left), and a damage-over-time series for the chart.
 export async function getBossState(buyerId = null) {
-    const boss = await getActiveBoss();
-    if (!boss) return { boss: null };
+    let boss = await getActiveBoss();
+    if (!boss) {
+        // No live boss — show the aftermath of the most recent kill for a week (winner + prize + stats).
+        boss = await db
+            .queryOne(`SELECT * FROM boss_event WHERE status = 'ended' AND defeated_at IS NOT NULL AND defeated_at > NOW() - INTERVAL '7 days' ORDER BY defeated_at DESC LIMIT 1`)
+            .catch(() => null);
+        if (!boss) return { boss: null };
+    }
 
     const divisor = Math.max(1, boss.ticket_divisor || 100);
 
@@ -107,6 +114,21 @@ export async function getBossState(buyerId = null) {
         you: buyerId && c.id === buyerId,
     }));
 
+    // Raffle winner (shown on the defeated screen).
+    let winner = null;
+    if (boss.winner_buyer_id) {
+        const w = await db.queryOne(`SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [boss.winner_buyer_id]).catch(() => null);
+        if (w) {
+            winner = {
+                name: w.display_name || w.alias || "Member",
+                avatarUrl: avatarImageUrl(w.avatar_config, w.avatar_cosmetics) || w.avatar_url || DEFAULT_AVATAR_URL,
+                spriteUrl: w.avatar_sprite_url || defaultSprite || null,
+                tickets: boss.winner_tickets || 0,
+                you: Boolean(buyerId && buyerId === boss.winner_buyer_id),
+            };
+        }
+    }
+
     let you = null;
     if (buyerId) {
         const used = await manualAttacksToday(buyerId);
@@ -129,6 +151,7 @@ export async function getBossState(buyerId = null) {
             ticketDivisor: divisor,
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
+            winner,
         },
         roster,
         fighters,
@@ -151,8 +174,52 @@ export async function getMyBossSummary(buyerId) {
 
 async function markDefeatIfDead(bossId, hp, defeatedBy = null) {
     if (hp > 0) return false;
-    await db.query(`UPDATE boss_event SET defeated_at = NOW(), defeated_by = $2, status = 'ended' WHERE id = $1 AND defeated_at IS NULL`, [bossId, defeatedBy]).catch(() => {});
+    // Only the caller that flips defeated_at (wins the race) runs the finalize — draw + rewards + notify.
+    const won = await db
+        .queryOne(`UPDATE boss_event SET defeated_at = NOW(), defeated_by = $2, status = 'ended' WHERE id = $1 AND defeated_at IS NULL RETURNING id`, [bossId, defeatedBy])
+        .catch(() => null);
+    if (won) await finalizeBossKill(bossId).catch(() => {});
     return true;
+}
+
+// Ticket-weighted raffle draw + rewards + the big "boss slain" announcement. Runs exactly once per boss.
+async function finalizeBossKill(bossId) {
+    const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
+    if (!boss) return;
+    const divisor = Math.max(1, boss.ticket_divisor || 100);
+
+    const parts = await db
+        .query(`SELECT buyer_id, SUM(damage)::int AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
+        .catch(() => []);
+    const pool = parts.map((p) => ({ id: p.buyer_id, dmg: p.dmg, tickets: Math.floor(p.dmg / divisor) }));
+
+    // Weight by tickets; fall back to raw damage if nobody cleared a full ticket.
+    let winner = null;
+    if (pool.length) {
+        const key = pool.some((p) => p.tickets > 0) ? "tickets" : "dmg";
+        const total = pool.reduce((s, p) => s + p[key], 0);
+        if (total > 0) {
+            let roll = Math.random() * total;
+            for (const p of pool) { roll -= p[key]; if (roll <= 0) { winner = p; break; } }
+            if (!winner) winner = pool[pool.length - 1];
+        }
+    }
+    if (winner) {
+        await db.query(`UPDATE boss_event SET winner_buyer_id = $2, winner_tickets = $3, winner_drawn_at = NOW() WHERE id = $1`, [bossId, winner.id, winner.tickets]).catch(() => {});
+    }
+
+    // XP: everyone who fought earns participation; the winner gets a bonus (deduped per boss).
+    for (const p of pool) await awardXp(p.id, "boss_participated", { dedupeKey: `boss_participated:${bossId}:${p.id}` }).catch(() => {});
+    if (winner) await awardXp(winner.id, "boss_won", { dedupeKey: `boss_won:${bossId}` }).catch(() => {});
+    // Milestone badges (raid veteran/warlord/legend; champion for the winner).
+    for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
+
+    let winnerInfo = null;
+    if (winner) {
+        const w = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [winner.id]).catch(() => null);
+        winnerInfo = { buyerId: winner.id, label: w?.display_name || w?.alias || "A member" };
+    }
+    await broadcastBossDefeated(boss, winnerInfo).catch(() => {});
 }
 
 // The big daily MANUAL ability. Level-scaled, splashy (returns crit + an ability name for the animation).

@@ -58,7 +58,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, messageRow, badgeRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -76,7 +76,14 @@ export async function getMemberMetrics(buyerId) {
                FROM mkt_donation_claim WHERE redeemed_buyer_id = $1`,
             [buyerId]
         ).catch(() => null),
-        db.queryOne(`SELECT COUNT(*) FILTER (WHERE kind = 'manual')::int AS hits, COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE buyer_id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(
+            `SELECT COUNT(*) FILTER (WHERE kind = 'manual')::int AS hits,
+                    COALESCE(SUM(damage), 0)::int AS dmg,
+                    COUNT(DISTINCT boss_id)::int AS bosses
+               FROM boss_hit WHERE buyer_id = $1`,
+            [buyerId]
+        ).catch(() => null),
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM boss_event WHERE winner_buyer_id = $1`, [buyerId]).catch(() => null),
         // Messages this member has SENT — friend DMs + their side of store threads.
         db.queryOne(
             `SELECT ((SELECT COUNT(*) FROM mkt_dm_message WHERE sender_id = $1)
@@ -119,6 +126,8 @@ export async function getMemberMetrics(buyerId) {
         donationValue: Math.round(Number(donationRow?.value_cents || 0) / 100),
         bossHits: bossRow?.hits || 0,
         bossDamage: bossRow?.dmg || 0,
+        bossesFought: bossRow?.bosses || 0,
+        bossesWon: bossWonRow?.n || 0,
     };
 }
 
@@ -146,6 +155,8 @@ export function progressForRule(rule, threshold, m) {
         case "donation_value": return { current: m.donationValue, target: t };
         case "boss_hits": return { current: m.bossHits, target: t };
         case "boss_damage": return { current: m.bossDamage, target: t };
+        case "bosses_fought": return { current: m.bossesFought, target: t };
+        case "bosses_won": return { current: m.bossesWon, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }

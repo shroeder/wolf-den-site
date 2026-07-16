@@ -9162,6 +9162,15 @@ body.tv-mode .shop-mobile-cart-fab {
 @keyframes boss-burst-in { 0% { opacity: 0; transform: scale(0.5); } 15% { opacity: 1; transform: scale(1.12); } 35% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05) translateY(-16px); } }
 @media (prefers-reduced-motion: reduce) { .boss-burst { animation: none; } }
 
+.boss-defeated { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 16px; border-radius: 16px; border: 1px solid rgba(255,215,94,0.45); background: radial-gradient(120% 120% at 50% 0%, rgba(255,215,94,0.18), transparent 65%); text-align: center; }
+.boss-defeated-title { font-size: clamp(1.2rem, 4.5vw, 1.8rem); font-weight: 900; color: #ffd75e; text-shadow: 0 2px 8px #000; }
+.boss-winner { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+.boss-winner.is-you { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e inset, 0 0 22px -6px #ffd75e; }
+.boss-winner-av { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; }
+.boss-winner-body { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.boss-winner-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd75e; }
+.boss-winner-name { font-size: 1.3rem; font-weight: 900; }
+.boss-winner-claim { color: #a7ffc4; font-weight: 700; font-size: 0.9rem; margin-top: 4px; }
 .boss2-you { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: 0.9rem; }
 .boss2-tix { font-weight: 800; color: #ffd75e; }
 

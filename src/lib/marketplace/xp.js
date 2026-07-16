@@ -56,6 +56,8 @@ export const XP_ACTIONS = {
     first_wishlist: 30, // add your first card to your Looking For list
     first_equip: 20, // customize your look — equip a border or background
     boss_attack: 10, // one swing at the monthly boss (capped by the per-day attack limit)
+    boss_participated: 30, // your avatar took part in a boss that the pack slayed (once per boss)
+    boss_won: 150, // won the boss-fight raffle prize (once per boss)
 };
 
 // Award a one-time onboarding milestone. dedupe on (action, buyerId) so it can only ever fire once.

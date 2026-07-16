@@ -124,24 +124,49 @@ export default function BossFightClient() {
             ) : null}
             {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
-            <div className="boss2-actions">
-                {!you ? (
-                    <Link href="/marketplace/login?returnTo=/marketplace/boss" className="btn-gold boss2-attack">Sign in to join the fight</Link>
-                ) : you.attacksLeft > 0 ? (
-                    <button type="button" className="btn-gold boss2-attack" onClick={attack} disabled={busy}>
-                        {busy ? "Unleashing…" : "⚔️ Unleash your daily strike"}
-                    </button>
-                ) : (
-                    <div className="boss2-spent">🕒 Strike used — your avatar keeps auto-attacking. Come back tomorrow for another.</div>
-                )}
-                {you ? (
-                    <div className="boss2-you">
-                        <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
-                        <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
-                        {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
-                    </div>
-                ) : null}
-            </div>
+            {boss.defeated ? (
+                <div className="boss-defeated">
+                    <div className="boss-defeated-title">☠️ {boss.name} has been slain!</div>
+                    {boss.winner ? (
+                        <div className={`boss-winner${boss.winner.you ? " is-you" : ""}`}>
+                            {boss.winner.avatarUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="boss-winner-av" src={boss.winner.avatarUrl} alt="" />
+                            ) : null}
+                            <div className="boss-winner-body">
+                                <span className="boss-winner-label">🏆 Raffle winner</span>
+                                <span className="boss-winner-name">{boss.winner.you ? "🎉 You won!" : boss.winner.name}</span>
+                                <span className="muted">
+                                    {boss.prize ? `wins ${boss.prize.name} · ` : ""}{boss.winner.tickets} 🎟️ ticket{boss.winner.tickets === 1 ? "" : "s"}
+                                </span>
+                                {boss.winner.you ? <span className="boss-winner-claim">Come to The Wolf Den to claim your prize!</span> : null}
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="muted">The pack brought it down. A new boss will rise soon.</p>
+                    )}
+                    {you ? <div className="boss2-you"><span className="muted">Your final damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span><span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span></div> : null}
+                </div>
+            ) : (
+                <div className="boss2-actions">
+                    {!you ? (
+                        <Link href="/marketplace/login?returnTo=/marketplace/boss" className="btn-gold boss2-attack">Sign in to join the fight</Link>
+                    ) : you.attacksLeft > 0 ? (
+                        <button type="button" className="btn-gold boss2-attack" onClick={attack} disabled={busy}>
+                            {busy ? "Unleashing…" : "⚔️ Unleash your daily strike"}
+                        </button>
+                    ) : (
+                        <div className="boss2-spent">🕒 Strike used — your avatar keeps auto-attacking. Come back tomorrow for another.</div>
+                    )}
+                    {you ? (
+                        <div className="boss2-you">
+                            <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
+                            <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
+                            {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
+                        </div>
+                    ) : null}
+                </div>
+            )}
 
             {series.length > 1 ? <BossDpsChart series={series} /> : null}
 

@@ -25,7 +25,8 @@ export async function listBossesAdmin() {
         .query(
             `SELECT b.*,
                     (SELECT COALESCE(SUM(damage), 0)::int FROM boss_hit WHERE boss_id = b.id) AS total_dmg,
-                    (SELECT COUNT(DISTINCT buyer_id)::int FROM boss_hit WHERE boss_id = b.id) AS fighters
+                    (SELECT COUNT(DISTINCT buyer_id)::int FROM boss_hit WHERE boss_id = b.id) AS fighters,
+                    (SELECT COALESCE(display_name, alias, 'Member') FROM mkt_buyer WHERE id = b.winner_buyer_id) AS winner_label
                FROM boss_event b ORDER BY b.started_at DESC LIMIT 20`
         )
         .catch(() => []);
@@ -114,6 +115,12 @@ export async function setBossPrize(bossId, { name, imageUrl, squareId } = {}) {
         [bossId, name ? String(name).slice(0, 200) : null, imageUrl || null, squareId || null]
     );
     return { ok: true, prizeName: name || null, prizeImageUrl: imageUrl || null };
+}
+
+// Owner hands the raffle prize to the winner — mark it claimed so it drops off the "to hand out" list.
+export async function claimBossPrize(bossId) {
+    await db.query(`UPDATE boss_event SET prize_claimed_at = NOW() WHERE id = $1`, [bossId]);
+    return { ok: true };
 }
 
 export async function endBoss(bossId) {
