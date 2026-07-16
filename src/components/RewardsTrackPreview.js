@@ -11,7 +11,7 @@ function levelItems(node) {
     return items;
 }
 
-export default function RewardsTrackPreview({ track }) {
+export default function RewardsTrackPreview({ track, heading = "🎁 Up next to unlock", ctaHref = "/marketplace/track", ctaLabel = "See your full rewards track →" }) {
     if (!track) return null;
     const upcoming = (track.spine || []).filter((n) => !n.reached).slice(0, 3);
     if (!upcoming.length) return null; // maxed out
@@ -19,7 +19,7 @@ export default function RewardsTrackPreview({ track }) {
     return (
         <section className="card track-preview">
             <div className="track-preview-head">
-                <h2 style={{ margin: 0 }}>🎁 Up next to unlock</h2>
+                <h2 style={{ margin: 0 }}>{heading}</h2>
                 <span className="track-preview-count muted">{track.unlockedUnlockable}/{track.totalUnlockable} earned</span>
             </div>
 
@@ -51,7 +51,7 @@ export default function RewardsTrackPreview({ track }) {
                 })}
             </ol>
 
-            <Link href="/marketplace/track" className="button primary track-preview-cta">See your full rewards track →</Link>
+            <Link href={ctaHref} className="button primary track-preview-cta">{ctaLabel}</Link>
         </section>
     );
 }

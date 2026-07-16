@@ -1,8 +1,11 @@
 import Link from "next/link";
 
 import EarnChecklist from "@/components/EarnChecklist";
+import RewardsTrackPreview from "@/components/RewardsTrackPreview";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getLeaderboard } from "@/lib/marketplace/profile.js";
+import { getRewardsTrack } from "@/lib/marketplace/track.js";
+import { showcaseTrack } from "@/lib/marketplace/unlocks.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +20,10 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default async function RewardsPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    const [top, progress] = await Promise.all([
+    const [top, progress, memberTrack] = await Promise.all([
         getLeaderboard(5).catch(() => []),
         buyer ? getRewardsProgress(buyer.id).catch(() => ({})) : Promise.resolve({}),
+        buyer ? getRewardsTrack(buyer.id).catch(() => null) : Promise.resolve(null),
     ]);
     const signedIn = Boolean(buyer);
 
@@ -48,6 +52,17 @@ export default async function RewardsPage() {
                     )}
                 </div>
             </section>
+
+            {signedIn ? (
+                <RewardsTrackPreview track={memberTrack} />
+            ) : (
+                <RewardsTrackPreview
+                    track={showcaseTrack()}
+                    heading="🎁 Unlock these as you level up"
+                    ctaHref="/marketplace/login?signup=1"
+                    ctaLabel="Create a free account to start →"
+                />
+            )}
 
             <section className="card">
                 <h2>How you earn</h2>

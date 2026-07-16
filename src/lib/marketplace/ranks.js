@@ -11,10 +11,15 @@ export const RANKS = [
     { level: 30, title: "Legend", emoji: "⭐" },
     { level: 40, title: "Mythic", emoji: "🔥" },
     { level: 50, title: "Ascended", emoji: "💫" },
+    { level: 55, title: "Warbringer", emoji: "⚔️" },
     { level: 60, title: "Celestial", emoji: "🌠" },
+    { level: 65, title: "Starforged", emoji: "🌟" },
     { level: 70, title: "Empyrean", emoji: "☄️" },
+    { level: 75, title: "Voidwalker", emoji: "🌀" },
     { level: 80, title: "Eternal", emoji: "♾️" },
+    { level: 85, title: "Worldeater", emoji: "🌋" },
     { level: 90, title: "Ragnarök", emoji: "⚡" },
+    { level: 95, title: "Godspaw", emoji: "☀️" },
     { level: 100, title: "Fenrir", emoji: "🐺" },
 ];
 

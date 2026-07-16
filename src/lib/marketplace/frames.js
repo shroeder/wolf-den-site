@@ -16,6 +16,8 @@ export const FRAMES = [
     { id: "ember", label: "Ember", level: 40, icon: "🔥", hint: "A smoldering ember trim", animated: true },
     { id: "royal", label: "Royal", level: 46, icon: "👑", hint: "An ornate royal frame", animated: false },
     { id: "mythic", label: "Mythic", level: 50, icon: "🌈", hint: "A living prismatic frame", animated: true },
+    { id: "runed", label: "Runed", level: 74, icon: "🔯", hint: "Etched with glowing runes", animated: true },
+    { id: "celestial", label: "Celestial", level: 96, icon: "🌌", hint: "Woven from starlight", animated: true },
     // --- Role-exclusive (badge-gated, NOT unlocked by the level/staff bypass) ---
     { id: "role_volunteer", label: "Volunteer", icon: "🙌", hint: "Volunteer-only frame", animated: false, requiresBadges: ["volunteer"], lockLabel: "Volunteers" },
     { id: "role_staff", label: "Staff", icon: "⭐", hint: "Staff-only frame", animated: false, requiresBadges: ["staff"], lockLabel: "Staff only" },

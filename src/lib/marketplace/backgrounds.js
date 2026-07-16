@@ -12,6 +12,9 @@ export const BACKGROUNDS = [
     { id: "aurora", label: "Aurora", level: 38, icon: "🌌", hint: "Shifting northern lights", animated: true },
     { id: "galaxy", label: "Galaxy", level: 45, icon: "✨", hint: "A slow-turning starfield", animated: true },
     { id: "prismatic", label: "Prismatic", level: 50, icon: "🌈", hint: "A living rainbow mesh", animated: true },
+    { id: "voidstorm", label: "Voidstorm", level: 66, icon: "🌀", hint: "A churning dark tempest", animated: true },
+    { id: "empyrean", label: "Empyrean", level: 88, icon: "🌟", hint: "Golden heavens", animated: true },
+    { id: "singularity", label: "Singularity", level: 100, icon: "🌌", hint: "The end of everything", animated: true },
 ];
 
 export function backgroundById(id) {

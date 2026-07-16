@@ -26,6 +26,10 @@ export const BORDERS = [
     { id: "rainbow", label: "Rainbow", level: 48, icon: "🌈", hint: "Full-spectrum cycle", animated: true },
     { id: "cosmic", label: "Cosmic", level: 49, icon: "✨", hint: "Deep-space color drift", animated: true },
     { id: "legendary", label: "Legendary", level: 50, icon: "👑", hint: "The rarest frame in the Den", animated: true },
+    { id: "solar", label: "Solar", level: 58, icon: "☀️", hint: "A blazing corona", animated: true },
+    { id: "abyss", label: "Abyss", level: 72, icon: "🕳️", hint: "Light-swallowing dark", animated: true },
+    { id: "godray", label: "Godray", level: 90, icon: "🌟", hint: "Radiance of the divine", animated: true },
+    { id: "singularity", label: "Singularity", level: 100, icon: "🌌", hint: "Only for the Fenrir", animated: true },
     // --- Role-exclusive (badge-gated) ---
     { id: "role_volunteer", label: "Volunteer", icon: "🙌", hint: "Volunteer-only frame", animated: true, requiresBadges: ["volunteer"], lockLabel: "Volunteers" },
     { id: "role_staff", label: "Staff", icon: "⭐", hint: "Staff-only frame", animated: true, requiresBadges: ["staff"], lockLabel: "Staff only" },

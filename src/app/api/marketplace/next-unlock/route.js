@@ -20,14 +20,14 @@ export async function GET(request) {
             const xp = Math.max(0, Math.floor(Number(row?.xp) || 0));
             const level = levelForXp(xp).level;
             const next = nextUnlock(level);
-            if (!next) return NextResponse.json({ authed: true, maxed: true }, { headers: { "Cache-Control": "no-store" } });
+            if (!next) return NextResponse.json({ authed: true, maxed: true, xp }, { headers: { "Cache-Control": "no-store" } });
 
             const target = 50 * (next.level - 1) * next.level; // cumulative XP to REACH next.level
             const xpToGo = Math.max(0, target - xp);
             const pct = target > 0 ? Math.min(100, Math.round((xp / target) * 100)) : 0;
 
             return NextResponse.json(
-                { authed: true, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
+                { authed: true, xp, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
                 { headers: { "Cache-Control": "no-store" } }
             );
         } catch (error) {

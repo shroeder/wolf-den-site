@@ -15,6 +15,9 @@ export const AVATAR_COSMETICS = [
     { id: "aura_aqua", slot: "aura", kind: "overlay", label: "Aqua Aura", icon: "🔵", level: 12, animated: false, hint: "A cool cyan glow" },
     { id: "aura_violet", slot: "aura", kind: "overlay", label: "Violet Aura", icon: "🟣", level: 22, animated: true, hint: "A pulsing purple glow" },
     { id: "aura_rainbow", slot: "aura", kind: "overlay", label: "Rainbow Aura", icon: "🌈", level: 40, animated: true, hint: "A shifting rainbow glow" },
+    { id: "aura_ember", slot: "aura", kind: "overlay", label: "Ember Aura", icon: "🔥", level: 55, animated: true, hint: "A smoldering glow" },
+    { id: "aura_frost", slot: "aura", kind: "overlay", label: "Frost Aura", icon: "❄️", level: 70, animated: false, hint: "An icy chill" },
+    { id: "aura_cosmic", slot: "aura", kind: "overlay", label: "Cosmic Aura", icon: "🌌", level: 88, animated: true, hint: "Starlight bends around you" },
 ];
 
 export function cosmeticById(id) {

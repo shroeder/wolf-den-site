@@ -32,3 +32,24 @@ export function unlocksAtLevel(level) {
     const lvl = Math.max(1, Math.floor(Number(level) || 1));
     return allUnlocks().filter((u) => u.level === lvl).map((u) => `${u.icon} ${u.label}`);
 }
+
+// A track-shaped object for logged-out visitors: every level-gated unlock grouped by level as "upcoming"
+// — a pitch of what's waiting. Matches the shape RewardsTrackPreview expects. Pure (no DB).
+export function showcaseTrack() {
+    const byLevel = new Map();
+    for (const u of allUnlocks()) {
+        if (!byLevel.has(u.level)) byLevel.set(u.level, []);
+        byLevel.get(u.level).push(u);
+    }
+    const levels = [...byLevel.keys()].sort((a, b) => a - b);
+    const spine = levels.map((L, i) => ({
+        level: L,
+        reached: false,
+        isNext: i === 0,
+        xpToGo: 50 * (L - 1) * L,
+        rank: null,
+        badges: [],
+        perks: byLevel.get(L).map((u) => ({ icon: u.icon, label: u.label, soon: false })),
+    }));
+    return { spine, unlockedUnlockable: 0, totalUnlockable: allUnlocks().length };
+}
