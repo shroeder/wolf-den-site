@@ -3,6 +3,7 @@ import Link from "next/link";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import BorderPicker from "@/components/BorderPicker";
 import EarnChecklist from "@/components/EarnChecklist";
+import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import RewardsHubHero from "@/components/RewardsHubHero";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
@@ -78,6 +79,12 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Earn more XP</h2>
                 <EarnChecklist progress={progress} signedIn />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Notifications</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Email me when I miss something while I&apos;m away. (You always get in-app + push.)</p>
+                <NotifyPrefsClient initialDm={profile?.notifyEmailDm !== false} initialFriend={profile?.notifyEmailFriend !== false} />
             </section>
 
             <section className="card">

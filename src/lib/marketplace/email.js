@@ -51,6 +51,53 @@ export async function sendVerificationEmail(email, code) {
     });
 }
 
+// Notify a member (by email) that they got a DM while away. Best-effort. Rate-limited by the caller
+// (only the first unread message in a thread triggers this).
+export async function sendDmNotificationEmail(email, { senderName = "Someone", preview = "", name = "" } = {}) {
+    if (!email || !process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    const hi = name ? `Hey ${name},` : "Hey,";
+    const inboxUrl = `${baseUrl()}/marketplace/inbox`;
+    const snippet = preview?.trim() ? `“${preview.trim().slice(0, 160)}”` : "";
+    await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: `${senderName} sent you a message`,
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <p>${hi}</p>
+                <p><strong>${senderName}</strong> sent you a message on The Wolf Den.</p>
+                ${snippet ? `<p style="color:#555;border-left:3px solid #d4af37;padding-left:12px;">${snippet}</p>` : ""}
+                <p><a href="${inboxUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">Read &amp; reply →</a></p>
+                <p style="color:#888;font-size:12px;">Manage these emails in your profile notification settings.</p>
+            </div>
+        `,
+    });
+    return true;
+}
+
+// Notify a member (by email) of a friend request while away. Best-effort.
+export async function sendFriendRequestEmail(email, { requesterName = "Someone", name = "" } = {}) {
+    if (!email || !process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    const hi = name ? `Hey ${name},` : "Hey,";
+    const friendsUrl = `${baseUrl()}/marketplace/friends`;
+    await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: `${requesterName} wants to be your friend`,
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <p>${hi}</p>
+                <p><strong>${requesterName}</strong> sent you a friend request on The Wolf Den. 🐺</p>
+                <p><a href="${friendsUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">View request →</a></p>
+                <p style="color:#888;font-size:12px;">Manage these emails in your profile notification settings.</p>
+            </div>
+        `,
+    });
+    return true;
+}
+
 // Congratulate a member on a badge an admin awarded them by hand. Best-effort: returns false (no throw)
 // when there's no recipient or no API key, so it never blocks the grant.
 export async function sendBadgeAwardedEmail(email, { label, icon = "", description = "", name = "" } = {}) {

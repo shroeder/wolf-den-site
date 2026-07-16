@@ -6648,6 +6648,78 @@ body.tv-mode .shop-mobile-cart-fab {
 .social-msg-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .social-msg-tag { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 215, 94, 0.14); color: #ffd75e; }
 .social-msg-preview { font-size: 0.82rem; color: var(--muted, #b9b4c8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Notifications bubble (CTA on return / on new activity) */
+.social-bubble {
+    position: fixed;
+    right: 20px;
+    bottom: 86px;
+    z-index: 899;
+    display: flex;
+    align-items: stretch;
+    max-width: min(300px, calc(100vw - 40px));
+    background: var(--surface, #16161c);
+    border: 1px solid rgba(255, 215, 94, 0.4);
+    border-radius: 14px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    animation: social-bubble-in 0.3s cubic-bezier(0.2, 1, 0.4, 1);
+}
+@keyframes social-bubble-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+.social-bubble-main { display: flex; align-items: center; gap: 10px; padding: 12px; background: none; border: none; cursor: pointer; color: var(--ink); text-align: left; flex: 1 1 auto; min-width: 0; }
+.social-bubble-icon { font-size: 1.3rem; flex: 0 0 auto; }
+.social-bubble-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.social-bubble-text strong { font-size: 0.88rem; }
+.social-bubble-cta { font-size: 0.76rem; color: #ffd75e; font-weight: 700; }
+.social-bubble-x { flex: 0 0 auto; background: none; border: none; color: var(--muted, #b9b4c8); font-size: 1.1rem; padding: 0 10px; cursor: pointer; }
+@media (max-width: 480px) { .social-bubble { right: 16px; bottom: 82px; } }
+
+/* DM thread counterpart avatar in the panel header */
+.social-thread-av {
+    position: relative;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2a2340, #1c1830);
+    color: #ffd75e;
+    font-weight: 800;
+    font-size: 0.85rem;
+}
+.social-thread-av img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Notification preference toggles (profile) */
+.notif-prefs { display: flex; flex-direction: column; gap: 10px; }
+.notif-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ink);
+    cursor: pointer;
+    font: inherit;
+}
+.notif-toggle-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif-toggle-label { font-weight: 700; }
+.notif-toggle-sub { font-size: 0.8rem; }
+.notif-switch { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: rgba(255, 255, 255, 0.15); position: relative; transition: background 150ms ease; }
+.notif-toggle.is-on .notif-switch { background: linear-gradient(90deg, #c8a24a, #ffd75e); }
+.notif-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 150ms ease; }
+.notif-toggle.is-on .notif-knob { transform: translateX(18px); }
+.notif-toggle:disabled { opacity: 0.7; cursor: default; }
 @media (max-width: 480px) {
     .social-panel { right: 12px; left: 12px; width: auto; bottom: 84px; height: min(72vh, 560px); }
     .social-fab { right: 16px; bottom: 16px; }

@@ -36,10 +36,18 @@ export async function getOrCreateDmThread(userId, otherId) {
 }
 
 export async function postDmMessage(threadId, senderId, body, catalogProductId = null) {
-    const t = await db.queryOne(`SELECT user_a, user_b FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
+    const t = await db
+        .queryOne(`SELECT user_a, user_b, last_message_at, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId])
+        .catch(() => null);
     if (!t || (t.user_a !== senderId && t.user_b !== senderId)) return { error: "forbidden" };
     const text = String(body || "").trim().slice(0, 4000);
     if (!text && !catalogProductId) return { error: "empty" };
+
+    // Was the recipient caught up BEFORE this message? If so, this is their first unread → email-worthy.
+    const recipientId = t.user_a === senderId ? t.user_b : t.user_a;
+    const recipientRead = t.user_a === recipientId ? t.a_last_read_at : t.b_last_read_at;
+    const firstUnread = !t.last_message_at || (recipientRead != null && new Date(recipientRead) >= new Date(t.last_message_at));
+
     const rows = await db
         .query(
             `INSERT INTO mkt_dm_message (thread_id, sender_id, body, catalog_product_id) VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
@@ -48,9 +56,8 @@ export async function postDmMessage(threadId, senderId, body, catalogProductId =
         .catch(() => []);
     await db.query(`UPDATE mkt_dm_thread SET last_message_at = NOW() WHERE id = $1`, [threadId]).catch(() => {});
 
-    // Best-effort push to the other participant.
-    const recipientId = t.user_a === senderId ? t.user_b : t.user_a;
-    await notifyNewDm(recipientId, senderId, threadId, text || "Shared a card");
+    // Best-effort push (always) + email (only when offline + first unread).
+    await notifyNewDm(recipientId, senderId, threadId, text || "Shared a card", { firstUnread });
 
     return { ok: true, messageId: rows[0]?.id || null, createdAt: rows[0]?.created_at || null };
 }

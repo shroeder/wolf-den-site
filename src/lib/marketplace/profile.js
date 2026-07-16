@@ -119,6 +119,9 @@ function mapProfile(row, badges = []) {
         border: row.equipped_border || "none",
         // Equipped cosmetic profile background id ('none' when unset).
         background: row.equipped_background || "none",
+        // Email notification prefs (default on).
+        notifyEmailDm: row.notify_email_dm !== false,
+        notifyEmailFriend: row.notify_email_friend !== false,
     };
 }
 
@@ -126,7 +129,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -152,6 +155,17 @@ export async function equipBorder(buyerId, borderId) {
         throw new Error(border.requiresBadges ? `That frame is ${border.lockLabel || "role"}-exclusive.` : `That border unlocks at Level ${border.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_border = $2, updated_at = NOW() WHERE id = $1`, [buyerId, border.id === "none" ? null : border.id]);
+    return getProfile(buyerId);
+}
+
+// Update email notification prefs. Only the keys provided are changed.
+export async function updateNotifyPrefs(buyerId, { dm, friend } = {}) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const sets = [];
+    const params = [buyerId];
+    if (dm !== undefined) { params.push(Boolean(dm)); sets.push(`notify_email_dm = $${params.length}`); }
+    if (friend !== undefined) { params.push(Boolean(friend)); sets.push(`notify_email_friend = $${params.length}`); }
+    if (sets.length) await db.query(`UPDATE mkt_buyer SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $1`, params).catch(() => {});
     return getProfile(buyerId);
 }
 

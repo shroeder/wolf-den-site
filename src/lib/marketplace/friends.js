@@ -225,3 +225,12 @@ export async function friendCount(userId) {
         .catch(() => null);
     return row?.n || 0;
 }
+
+// Count of incoming friend requests awaiting the user's response (drives the notifications bubble).
+export async function incomingRequestCount(userId) {
+    if (!userId) return 0;
+    const row = await db
+        .queryOne(`SELECT COUNT(*)::int AS n FROM mkt_friendship WHERE addressee_id = $1 AND status = 'pending'`, [userId])
+        .catch(() => null);
+    return row?.n || 0;
+}

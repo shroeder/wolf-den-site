@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
+import { borderClass } from "@/lib/marketplace/borders.js";
 
 // Ever-present social hub: a floating launcher on EVERY page (signed-in members only) that opens a
 // tabbed panel — Messages (unified inbox + inline chat), Friends (your friends + requests), and
@@ -13,10 +14,18 @@ function money(v) {
     return v != null ? `$${Number(v).toFixed(2)}` : null;
 }
 
+function notifSummary(unread, requests) {
+    const parts = [];
+    if (unread > 0) parts.push(`${unread} new message${unread === 1 ? "" : "s"}`);
+    if (requests > 0) parts.push(`${requests} friend request${requests === 1 ? "" : "s"}`);
+    return parts.join(" · ") || "You're all caught up";
+}
+
 // A single DM conversation, opened inline in the panel.
 function Thread({ thread, onBack, onActivity }) {
     const [messages, setMessages] = useState(null);
     const [counterpart, setCounterpart] = useState(thread.name || "Conversation");
+    const [cp, setCp] = useState(null);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const endRef = useRef(null);
@@ -27,6 +36,7 @@ function Thread({ thread, onBack, onActivity }) {
         const t = d?.thread;
         if (t) {
             setCounterpart(t.counterpart?.displayLabel || thread.name || "Conversation");
+            setCp(t.counterpart || null);
             setMessages(Array.isArray(t.messages) ? t.messages : []);
             onActivity?.();
         } else {
@@ -65,6 +75,14 @@ function Thread({ thread, onBack, onActivity }) {
         <div className="mkt-dock-thread">
             <div className="mkt-dock-head">
                 <button type="button" className="mkt-dock-back" onClick={onBack} aria-label="Back">‹</button>
+                <span className={`social-thread-av ${borderClass(cp?.border)}`.trim()}>
+                    {cp?.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cp.avatarUrl} alt="" />
+                    ) : (
+                        <span aria-hidden="true">{(counterpart || "?").slice(0, 1).toUpperCase()}</span>
+                    )}
+                </span>
                 <strong className="mkt-dock-title">{counterpart}</strong>
             </div>
             <div className="mkt-dock-msgs">
@@ -113,6 +131,9 @@ function ActionButton({ member, busy, onAdd, onMessage, onRespond }) {
 export default function SocialHub() {
     const [authed, setAuthed] = useState(false);
     const [unread, setUnread] = useState(0);
+    const [requests, setRequests] = useState(0);
+    const [bubble, setBubble] = useState(false);
+    const prevTotalRef = useRef(-1);
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState("messages");
     const [thread, setThread] = useState(null);
@@ -129,6 +150,13 @@ export default function SocialHub() {
         if (d) {
             setAuthed(Boolean(d.authenticated));
             setUnread(d.total || 0);
+            setRequests(d.requests || 0);
+            // Pop the notifications bubble on first load with pending items, and again whenever the
+            // total grows (something new arrived) — so it grabs attention both on return and live.
+            const total = (d.total || 0) + (d.requests || 0);
+            if (total > 0 && (prevTotalRef.current === -1 || total > prevTotalRef.current)) setBubble(true);
+            if (total === 0) setBubble(false);
+            prevTotalRef.current = total;
         }
     }, []);
 
@@ -205,18 +233,41 @@ export default function SocialHub() {
 
     if (!authed) return null;
 
-    const incomingCount = friends?.incoming?.length || 0;
+    const incomingCount = requests || friends?.incoming?.length || 0;
+    const totalNotif = (unread || 0) + (requests || 0);
+    const openTo = (t) => { setBubble(false); setTab(t); setThread(null); setOpen(true); };
 
     return (
         <>
+            {bubble && !open && totalNotif > 0 ? (
+                <div className="social-bubble" role="status">
+                    <button type="button" className="social-bubble-main" onClick={() => openTo(unread > 0 ? "messages" : "friends")}>
+                        <span className="social-bubble-icon" aria-hidden="true">🔔</span>
+                        <span className="social-bubble-text">
+                            <strong>{notifSummary(unread, requests)}</strong>
+                            <span className="social-bubble-cta">Tap to view →</span>
+                        </span>
+                    </button>
+                    <button type="button" className="social-bubble-x" onClick={() => setBubble(false)} aria-label="Dismiss">×</button>
+                </div>
+            ) : null}
+
             <button
                 type="button"
                 className="social-fab"
-                onClick={() => setOpen((o) => !o)}
-                aria-label={unread > 0 ? `Social, ${unread} unread` : "Social"}
+                onClick={() => { setBubble(false); setOpen((o) => !o); }}
+                aria-label={totalNotif > 0 ? `Social, ${totalNotif} new` : "Social"}
             >
-                <span aria-hidden="true">{open ? "×" : "👥"}</span>
-                {!open && unread > 0 ? <span className="social-fab-badge">{unread > 99 ? "99+" : unread}</span> : null}
+                {open ? (
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                ) : (
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                    </svg>
+                )}
+                {!open && totalNotif > 0 ? <span className="social-fab-badge">{totalNotif > 99 ? "99+" : totalNotif}</span> : null}
             </button>
 
             {open ? (
