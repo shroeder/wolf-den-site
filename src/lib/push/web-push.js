@@ -81,3 +81,32 @@ export async function sendWebPush(buyerId, { title, body, url = "/", tag = null,
         return { sent: 0, error: true };
     }
 }
+
+// Broadcast a web push to EVERY subscribed browser (e.g. a boss release). Best-effort; prunes dead subs.
+export async function broadcastWebPush({ title, body, url = "/", tag = null, data = {} }) {
+    try {
+        const wp = await getWebPush();
+        if (!wp) return { sent: 0, skipped: "not_configured" };
+        const rows = await db.query(`SELECT endpoint, p256dh, auth FROM mkt_web_push`).catch(() => []);
+        if (!rows.length) return { sent: 0, skipped: "no_subs" };
+        const payload = JSON.stringify({ title, body, url, tag: tag || undefined, data });
+        const dead = [];
+        let sent = 0;
+        await Promise.all(
+            rows.map(async (r) => {
+                try {
+                    await wp.sendNotification({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } }, payload, { TTL: 3600, urgency: "high" });
+                    sent += 1;
+                } catch (err) {
+                    const c = err?.statusCode;
+                    if (c === 404 || c === 410) dead.push(r.endpoint);
+                }
+            })
+        );
+        if (dead.length) await db.query(`DELETE FROM mkt_web_push WHERE endpoint = ANY($1)`, [dead]).catch(() => {});
+        return { sent, pruned: dead.length };
+    } catch (error) {
+        logger.warn("web_push.broadcast_failed", { errorMessage: error instanceof Error ? error.message : "unknown_error" });
+        return { sent: 0, error: true };
+    }
+}

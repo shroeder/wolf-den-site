@@ -1,0 +1,70 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
+import { generateImage } from "@/lib/marketplace/openai-image.js";
+
+// Admin-only weekly-boss management: draft -> generate art (retry) -> release (broadcast) -> live -> ended.
+
+export async function listBossesAdmin() {
+    return db
+        .query(
+            `SELECT b.*,
+                    (SELECT COALESCE(SUM(damage), 0)::int FROM boss_hit WHERE boss_id = b.id) AS total_dmg,
+                    (SELECT COUNT(DISTINCT buyer_id)::int FROM boss_hit WHERE boss_id = b.id) AS fighters
+               FROM boss_event b ORDER BY b.started_at DESC LIMIT 20`
+        )
+        .catch(() => []);
+}
+
+export async function createDraftBoss({ name, description, maxHp, rewardsText, ticketDivisor }) {
+    const hp = Math.max(100, Math.floor(Number(maxHp) || 10000));
+    const div = Math.max(1, Math.floor(Number(ticketDivisor) || 100));
+    return db.queryOne(
+        `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, rewards_text, ticket_divisor)
+         VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5) RETURNING *`,
+        [String(name || "Boss").slice(0, 80), hp, description ? String(description).slice(0, 600) : null, rewardsText ? String(rewardsText).slice(0, 400) : null, div]
+    );
+}
+
+// Generate boss art from a description (call again to retry). Wraps the prompt for a consistent look.
+export async function generateBossArt(bossId, prompt) {
+    const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. Epic fantasy video-game boss creature, dramatic dynamic action pose, dark and ominous, glowing rim lighting, richly detailed digital painting, centered full-body, transparent background, no text, no logo, no watermark, no border.`;
+    const url = await generateImage(full, { size: "1024x1024", pathPrefix: "marketplace/boss" });
+    await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, url]);
+    return url;
+}
+
+export async function updateDraftBoss(bossId, { name, description, maxHp, rewardsText, ticketDivisor }) {
+    const sets = [];
+    const params = [bossId];
+    const add = (col, val) => { params.push(val); sets.push(`${col} = $${params.length}`); };
+    if (name !== undefined) add("name", String(name).slice(0, 80));
+    if (description !== undefined) add("description", description ? String(description).slice(0, 600) : null);
+    if (rewardsText !== undefined) add("rewards_text", rewardsText ? String(rewardsText).slice(0, 400) : null);
+    if (maxHp !== undefined) { const hp = Math.max(100, Math.floor(Number(maxHp) || 10000)); add("max_hp", hp); add("hp", hp); }
+    if (ticketDivisor !== undefined) add("ticket_divisor", Math.max(1, Math.floor(Number(ticketDivisor) || 100)));
+    if (!sets.length) return db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]);
+    return db.queryOne(`UPDATE boss_event SET ${sets.join(", ")} WHERE id = $1 AND status = 'draft' RETURNING *`, params);
+}
+
+// Release a draft: ends any current live boss, goes live for `days`, and blasts notifications everywhere.
+export async function releaseBoss(bossId, { days = 7 } = {}) {
+    const d = Math.max(1, Math.floor(Number(days) || 7));
+    await db.query(`UPDATE boss_event SET status = 'ended' WHERE status = 'live' AND id <> $1`, [bossId]).catch(() => {});
+    const boss = await db.queryOne(
+        `UPDATE boss_event SET status = 'live', started_at = NOW(), ends_at = NOW() + ($2::int || ' days')::interval, defeated_at = NULL
+          WHERE id = $1 RETURNING *`,
+        [bossId, d]
+    );
+    if (!boss) throw new Error("Boss not found");
+    await broadcastBoss(boss).catch(() => {});
+    return boss;
+}
+
+export async function endBoss(bossId) {
+    await db.query(`UPDATE boss_event SET status = 'ended' WHERE id = $1`, [bossId]);
+    return { ok: true };
+}

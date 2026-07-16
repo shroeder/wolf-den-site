@@ -9064,8 +9064,12 @@ body.tv-mode .shop-mobile-cart-fab {
     border: 1px solid rgba(224, 68, 40, 0.32);
 }
 .boss2-title { font-size: 0.82rem; color: #e6b8a8; font-weight: 600; text-align: center; }
-.boss2-enemy { font-size: 8.5rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 22px rgba(224, 68, 40, 0.6)); animation: boss2-breathe 3s ease-in-out infinite; }
-.boss2-stage.is-hit .boss2-enemy { animation: boss2-shake 0.18s linear; color: #ff9a6a; filter: drop-shadow(0 0 32px rgba(255, 140, 80, 0.95)); }
+.boss2-figure { animation: boss2-breathe 3.4s ease-in-out infinite; }
+.boss2-enemy { font-size: 8.5rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 22px rgba(224, 68, 40, 0.6)); }
+.boss2-art { display: block; width: 210px; height: 210px; object-fit: contain; filter: drop-shadow(0 6px 22px rgba(224, 68, 40, 0.5)); }
+.boss2-figure.is-hit { animation: boss2-shake 0.18s linear; }
+.boss2-figure.is-hit .boss2-enemy, .boss2-figure.is-hit .boss2-art { filter: brightness(1.4) drop-shadow(0 0 32px rgba(255, 140, 80, 0.95)); }
+.boss2-rewards { font-size: 0.85rem; color: #ffe0b0; text-align: center; max-width: 460px; font-weight: 600; }
 @keyframes boss2-breathe { 0%, 100% { transform: scale(1) translateY(0); } 50% { transform: scale(1.04) translateY(-4px); } }
 @keyframes boss2-shake { 25% { transform: translateX(-8px) rotate(-2deg); } 75% { transform: translateX(8px) rotate(2deg); } }
 .boss2-name { font-size: 1.3rem; font-weight: 800; color: #ffdccb; }
@@ -9076,7 +9080,7 @@ body.tv-mode .shop-mobile-cart-fab {
 .boss2-floater { position: absolute; font-weight: 800; font-size: 1.2rem; color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; animation: boss2-float 0.85s ease-out forwards; }
 .boss2-floater.is-crit { font-size: 1.9rem; color: #ff5a5a; }
 @keyframes boss2-float { 0% { opacity: 1; transform: translateY(0) scale(0.8); } 100% { opacity: 0; transform: translateY(-48px) scale(1.3); } }
-@media (prefers-reduced-motion: reduce) { .boss2-enemy { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .boss2-figure { animation: none; } }
 
 .boss2-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .boss2-attack { width: 100%; max-width: 440px; text-align: center; justify-content: center; padding: 14px; font-size: 1.05rem; }
@@ -9095,3 +9099,9 @@ body.tv-mode .shop-mobile-cart-fab {
 .boss2-victory-overlay { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.72); }
 .boss2-victory { text-align: center; padding: 28px; }
 .boss2-victory-x { font-size: 4rem; }
+
+/* Boss admin status chips */
+.boss-status { font-size: 0.7rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; vertical-align: middle; text-transform: uppercase; }
+.boss-status-draft { background: rgba(255, 255, 255, 0.1); color: #cdbfa6; }
+.boss-status-live { background: rgba(224, 68, 40, 0.22); color: #ff9a6a; }
+.boss-status-ended { background: rgba(255, 255, 255, 0.06); color: #8a8a8a; }

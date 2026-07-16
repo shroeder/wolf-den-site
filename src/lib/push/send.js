@@ -202,3 +202,39 @@ export async function sendBuyerPush(buyerId, { title, body, route = null, data =
         return { sent: 0, error: true };
     }
 }
+
+// Broadcast an FCM push to EVERY marketplace device (e.g. a boss release). Best-effort; prunes dead tokens.
+export async function broadcastBuyerPushAll({ title, body, route = null, data = {} }) {
+    try {
+        const messaging = await getMessaging();
+        if (!messaging) return { sent: 0, skipped: "not_configured" };
+        const rows = await db.query(`SELECT DISTINCT token FROM mkt_push_token WHERE token IS NOT NULL AND token <> ''`);
+        const tokens = rows.map((r) => r.token).filter(Boolean);
+        if (!tokens.length) return { sent: 0, skipped: "no_devices" };
+        const stringData = { route: route ? String(route) : "" };
+        for (const [k, v] of Object.entries(data || {})) stringData[k] = v == null ? "" : String(v);
+        let sent = 0;
+        for (let i = 0; i < tokens.length; i += 500) {
+            const batch = tokens.slice(i, i + 500);
+            const resp = await messaging.sendEachForMulticast({
+                tokens: batch,
+                notification: { title, body },
+                data: stringData,
+                android: { priority: "high", notification: { channelId: "wolfden_market" } },
+            });
+            sent += resp.successCount;
+            if (resp.failureCount > 0) {
+                const dead = [];
+                resp.responses.forEach((r, idx) => {
+                    const code = r.success ? "" : r.error?.code || "";
+                    if (code.includes("registration-token-not-registered") || code.includes("invalid-registration-token") || code.includes("invalid-argument")) dead.push(batch[idx]);
+                });
+                if (dead.length) await db.query(`DELETE FROM mkt_push_token WHERE token = ANY($1)`, [dead]).catch(() => {});
+            }
+        }
+        return { sent };
+    } catch (error) {
+        pushLogger.warn("push.broadcast_failed", { errorMessage: error instanceof Error ? error.message : "unknown_error" });
+        return { sent: 0, error: true };
+    }
+}

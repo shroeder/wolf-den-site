@@ -7,25 +7,17 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 
 // The shared, persistent monthly boss. HP lives in the DB and is shared across everyone.
 export const DAILY_ATTACKS = 3; // swings per member per day (staff bypass for testing)
-const BOSS_NAMES = ["Ancient Wyrm", "Elder Wyrm", "Voidmaw", "Dread Wyrm", "Fenrir's Bane", "The Devourer"];
 
 function isStaff(badgeSlugs) {
     return (badgeSlugs || []).some((s) => ["owner", "site_admin", "staff"].includes(s));
 }
 
-// The active boss (auto-spawns the next, tougher one once the previous is defeated).
+// The current LIVE boss (admin-released). No auto-spawn — bosses are manually created + released and
+// expire at ends_at. Returns null between bosses.
 export async function getActiveBoss() {
-    let boss = await db.queryOne(`SELECT * FROM boss_event WHERE defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`).catch(() => null);
-    if (!boss) {
-        const last = await db.queryOne(`SELECT max_hp, tier FROM boss_event ORDER BY started_at DESC LIMIT 1`).catch(() => null);
-        const tier = (last?.tier || 0) + 1;
-        const hp = last ? Math.round(last.max_hp * 1.4) : 10000;
-        const name = BOSS_NAMES[Math.min(tier - 1, BOSS_NAMES.length - 1)];
-        boss = await db.queryOne(
-            `INSERT INTO boss_event (name, icon, tier, max_hp, hp) VALUES ($1, 'dragon', $2, $3, $3) RETURNING *`,
-            [name, tier, hp]
-        );
-    }
+    const boss = await db
+        .queryOne(`SELECT * FROM boss_event WHERE status = 'live' AND (ends_at IS NULL OR ends_at > NOW()) AND defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`)
+        .catch(() => null);
     return boss;
 }
 
@@ -56,13 +48,14 @@ export async function getBossState(buyerId = null) {
         )
         .catch(() => []);
 
+    const divisor = Math.max(1, boss.ticket_divisor || 100);
     const roster = contributors.map((c) => ({
         id: c.id,
         name: c.display_name || c.alias || "Member",
         avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || null,
         dmg: c.dmg,
         hits: c.hits,
-        tickets: Math.max(1, Math.round(c.dmg / 40)),
+        tickets: Math.floor(c.dmg / divisor),
         you: buyerId && c.id === buyerId,
     }));
 
@@ -76,7 +69,18 @@ export async function getBossState(buyerId = null) {
     }
 
     return {
-        boss: { id: boss.id, name: boss.name, tier: boss.tier, hp: boss.hp, maxHp: boss.max_hp, defeated: Boolean(boss.defeated_at) },
+        boss: {
+            id: boss.id,
+            name: boss.name,
+            tier: boss.tier,
+            hp: boss.hp,
+            maxHp: boss.max_hp,
+            imageUrl: boss.image_url || null,
+            rewards: boss.rewards_text || null,
+            ticketDivisor: divisor,
+            endsAt: boss.ends_at || null,
+            defeated: Boolean(boss.defeated_at),
+        },
         roster,
         you,
     };
@@ -107,7 +111,7 @@ export async function attackBoss(buyerId) {
 
     let defeated = false;
     if (row.hp <= 0) {
-        await db.query(`UPDATE boss_event SET defeated_at = NOW(), defeated_by = $2 WHERE id = $1 AND defeated_at IS NULL`, [boss.id, buyerId]).catch(() => {});
+        await db.query(`UPDATE boss_event SET defeated_at = NOW(), defeated_by = $2, status = 'ended' WHERE id = $1 AND defeated_at IS NULL`, [boss.id, buyerId]).catch(() => {});
         defeated = true;
     }
     await syncEarnedBadges(buyerId).catch(() => {});

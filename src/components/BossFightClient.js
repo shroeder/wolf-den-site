@@ -77,12 +77,20 @@ export default function BossFightClient() {
 
     return (
         <div className="boss2">
-            <div className={`boss2-stage${hit ? " is-hit" : ""}`}>
-                <div className="boss2-title">⚔️ This month&apos;s boss — the whole pack vs.</div>
-                <div className="boss2-enemy"><GiSpikedDragonHead aria-hidden="true" /></div>
-                <div className="boss2-name">{boss.name} <span className="boss2-tier">· Tier {boss.tier}</span></div>
+            <div className="boss2-stage">
+                <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs.</div>
+                <div className={`boss2-figure${hit ? " is-hit" : ""}`}>
+                    {boss.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="boss2-art" src={boss.imageUrl} alt={boss.name} />
+                    ) : (
+                        <span className="boss2-enemy"><GiSpikedDragonHead aria-hidden="true" /></span>
+                    )}
+                </div>
+                <div className="boss2-name">{boss.name}</div>
                 <div className="boss2-hpbar"><span style={{ width: `${pct}%` }} /></div>
                 <div className="boss2-hp">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</div>
+                {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
                 {floaters.map((f) => (
                     <span key={f.id} className={`boss2-floater${f.crit ? " is-crit" : ""}`} style={{ top: `${f.top}%`, left: `${f.left}%` }}>
                         {f.crit ? `${f.amount}!` : f.amount}
