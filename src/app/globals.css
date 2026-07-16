@@ -8808,7 +8808,8 @@ body.tv-mode .shop-mobile-cart-fab {
 
 /* ---- Avatar builder (profile) ---- */
 .avatar-builder { display: grid; gap: 16px; }
-.avatar-builder-preview { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+/* Pin the preview so changes are visible while you scroll the controls (was scrolling off on mobile). */
+.avatar-builder-preview { display: flex; flex-direction: column; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 5; background: var(--surface); padding: 10px 0 8px; }
 .avatar-builder-img {
     width: 140px; height: 140px; border-radius: 50%;
     background: rgba(255, 255, 255, 0.05);
