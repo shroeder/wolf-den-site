@@ -12,6 +12,9 @@ export const HAIR_TOPS = [
     "dreads", "dreads01", "dreads02", "frida", "fro", "froBand", "frizzle", "longButNotTooLong",
     "miaWallace", "shaggy", "shaggyMullet", "bigHair", "bald",
 ];
+// Hats aren't offered in the base picker (they're headwear COSMETICS), but they're valid `top` values,
+// so sanitize must allow them through when a native headwear cosmetic sets one.
+export const HAT_TOPS = ["hat", "turban", "hijab", "winterHat1", "winterHat02", "winterHat03", "winterHat04"];
 // Basic tops only — graphicShirt (logo tees) held back as a cosmetic unlock.
 export const CLOTHINGS = ["shirtCrewNeck", "shirtScoopNeck", "shirtVNeck", "hoodie", "collarAndSweater", "blazerAndShirt", "blazerAndSweater", "overall"];
 export const EYES = ["default", "happy", "wink", "winkWacky", "surprised", "squint", "side", "hearts", "closed", "eyeRoll", "cry", "xDizzy"];
@@ -23,6 +26,7 @@ export const ACCESSORIES = ["none", "round", "wayfarers", "sunglasses", "prescri
 // Colors (hex WITHOUT the leading '#', DiceBear's format).
 export const SKIN_COLORS = ["ffdbb4", "edb98a", "fd9841", "f8d25c", "d08b5b", "ae5d29", "614335"];
 export const HAIR_COLORS = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "c93305", "e8e1e1", "ecdcbf", "f59797"];
+export const FACIAL_HAIR_COLORS = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "c93305", "e8e1e1", "ecdcbf", "f59797"];
 export const CLOTHES_COLORS = ["262e33", "3c4f5c", "25557c", "5199e4", "65c9ff", "b1e2ff", "929598", "e6e6e6", "ffffff", "a7ffc4", "ffffb1", "ffafb9", "ff488e", "ff5c5c"];
 export const BACKGROUND_COLORS = ["none", "65c9ff", "5199e4", "a7ffc4", "ffafb9", "ffffb1", "ff5c5c", "e6e6e6", "262e33"];
 
@@ -35,6 +39,7 @@ export const DEFAULT_AVATAR = {
     eyebrows: "default",
     mouth: "smile",
     facialHair: "none",
+    facialHairColor: "4a312c",
     accessories: "none",
     clothing: "shirtCrewNeck",
     clothesColor: "5199e4",
@@ -50,6 +55,7 @@ export const AVATAR_FIELDS = {
     eyebrows: EYEBROWS,
     mouth: MOUTHS,
     facialHair: FACIAL_HAIR,
+    facialHairColor: FACIAL_HAIR_COLORS,
     accessories: ACCESSORIES,
     clothing: CLOTHINGS,
     clothesColor: CLOTHES_COLORS,
@@ -57,6 +63,8 @@ export const AVATAR_FIELDS = {
 };
 
 const ALLOWED = Object.fromEntries(Object.entries(AVATAR_FIELDS).map(([k, v]) => [k, new Set(v)]));
+// Hats are valid `top` values even though the base picker only lists hairstyles (native headwear cosmetics set them).
+ALLOWED.top = new Set([...HAIR_TOPS, ...HAT_TOPS]);
 
 // Keep only known fields with allowed values; fall back to the default for anything missing/invalid.
 export function sanitizeAvatarConfig(config) {

@@ -14,6 +14,7 @@ import {
     EYEBROWS,
     EYES,
     FACIAL_HAIR,
+    FACIAL_HAIR_COLORS,
     HAIR_COLORS,
     HAIR_TOPS,
     MOUTHS,
@@ -34,6 +35,7 @@ const SELECTS = [
 const SWATCHES = [
     { field: "skinColor", label: "Skin", values: SKIN_COLORS },
     { field: "hairColor", label: "Hair color", values: HAIR_COLORS },
+    { field: "facialHairColor", label: "Beard color", values: FACIAL_HAIR_COLORS },
     { field: "clothesColor", label: "Outfit color", values: CLOTHES_COLORS },
     { field: "backgroundColor", label: "Background", values: BACKGROUND_COLORS },
 ];

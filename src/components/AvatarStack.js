@@ -6,6 +6,7 @@ import { borderClass } from "@/lib/marketplace/borders.js";
 // server-or-client safe. `size` is the circle diameter in px; overlays scale from it (font-size = size).
 export default function AvatarStack({ avatarUrl, initial = "?", size = 48, border = "none", cosmetics = null, className = "" }) {
     const c = resolveCosmetics(cosmetics);
+    // Native cosmetics (hats) are already drawn into avatarUrl; only OVERLAY cosmetics (auras) render here.
     return (
         <span className={`av-stack ${className}`.trim()} style={{ width: size, height: size, fontSize: `${size}px` }}>
             {c.aura ? <span className={`av-aura av-aura-${c.aura.id}`} aria-hidden="true" /> : null}
@@ -17,9 +18,6 @@ export default function AvatarStack({ avatarUrl, initial = "?", size = 48, borde
                     <span className="av-stack-initial" aria-hidden="true">{initial}</span>
                 )}
             </span>
-            {c.effect ? <span className={`av-effect av-effect-${c.effect.id}`} aria-hidden="true">{c.effect.glyph}</span> : null}
-            {c.headwear ? <span className="av-headwear" aria-hidden="true">{c.headwear.glyph}</span> : null}
-            {c.pet ? <span className="av-pet" aria-hidden="true">{c.pet.glyph}</span> : null}
         </span>
     );
 }

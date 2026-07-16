@@ -36,6 +36,7 @@ function toDicebearOptions(config) {
         opts.facialHairProbability = 0;
     } else {
         opts.facialHair = [c.facialHair];
+        opts.facialHairColor = [c.facialHairColor];
         opts.facialHairProbability = 100;
     }
 

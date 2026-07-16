@@ -73,9 +73,9 @@ export default async function ProfileHubPage() {
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Avatar cosmetics</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Flair you unlock as you level up — an aura, headwear, a companion, effects. Tap to equip; tap again to remove.</p>
+                <p className="muted" style={{ marginTop: 0 }}>Flair you unlock as you level up — a hat that&apos;s drawn right into your avatar, or an aura glow. Tap to equip; tap again to remove.</p>
                 <AvatarCosmeticsPicker
-                    avatarUrl={profile?.avatarUrl}
+                    avatarConfig={profile?.avatarConfig}
                     initial={(profile?.displayLabel || "?").slice(0, 1).toUpperCase()}
                     level={level?.level || 1}
                     unlockAll={isStaff}

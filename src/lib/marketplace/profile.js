@@ -6,8 +6,8 @@ import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrou
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
-import { avatarUrlFor, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
-import { COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
+import { sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { avatarImageUrl, COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -111,8 +111,8 @@ function mapProfile(row, badges = []) {
         lastName: row.last_name || null,
         fullName: fullName || null,
         alias: row.alias || null,
-        // Built ("vanilla") avatar wins; else an uploaded photo; else initials (handled by the UI).
-        avatarUrl: avatarUrlFor(row.avatar_config) || row.avatar_url || null,
+        // Built avatar (with any native hat cosmetic baked in) wins; else photo; else initials.
+        avatarUrl: avatarImageUrl(row.avatar_config, row.avatar_cosmetics) || row.avatar_url || null,
         // The raw config so the avatar builder can load the member's current choices.
         avatarConfig: row.avatar_config || null,
         // Equipped avatar cosmetics per slot (aura/headwear/effect/pet) — layered onto the portrait.

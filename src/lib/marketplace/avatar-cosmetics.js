@@ -1,29 +1,23 @@
-// Equippable avatar cosmetics — the first "flair you unlock." They layer ON TOP of the base DiceBear
-// portrait (aura behind, headwear above, pet beside, effect over) via CSS in globals.css. Slot-based
-// like gear: one equipped cosmetic per slot. Unlocked by level on the reward track (role/purchase gates
-// can be added later). Pure module so the picker, AvatarStack, and mappings can all import it. Keep ids
-// STABLE (stored in mkt_buyer.avatar_cosmetics).
-export const COSMETIC_SLOTS = ["aura", "headwear", "effect", "pet"];
+// Equippable avatar cosmetics. Two honest kinds (no slapped-on emoji):
+//   • NATIVE — drawn INTO the avatar by DiceBear itself (e.g. real hats via the `top` option), so they
+//     match the art exactly. These merge into the render options (see avatarImageUrl).
+//   • OVERLAY — a tasteful CSS treatment layered by AvatarStack (auras = a soft glow behind the portrait).
+// Slot-based like gear: one per slot, unlocked by level on the reward track. Pure module. Keep ids STABLE.
+import { avatarUrlFor, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+
+export const COSMETIC_SLOTS = ["headwear", "aura"];
 
 export const AVATAR_COSMETICS = [
-    // Aura — a colored glow behind the portrait (CSS).
-    { id: "aura_gold", slot: "aura", label: "Golden Aura", icon: "🟡", level: 6, animated: false, hint: "A warm gold glow" },
-    { id: "aura_aqua", slot: "aura", label: "Aqua Aura", icon: "🔵", level: 12, animated: false, hint: "A cool cyan glow" },
-    { id: "aura_violet", slot: "aura", label: "Violet Aura", icon: "🟣", level: 22, animated: true, hint: "A pulsing purple glow" },
-    { id: "aura_rainbow", slot: "aura", label: "Rainbow Aura", icon: "🌈", level: 40, animated: true, hint: "A shifting rainbow glow" },
-    // Headwear — sits on top of the head (emoji glyph).
-    { id: "cap", slot: "headwear", label: "Ball Cap", icon: "🧢", glyph: "🧢", level: 5, animated: false, hint: "A casual cap" },
-    { id: "gradcap", slot: "headwear", label: "Grad Cap", icon: "🎓", glyph: "🎓", level: 9, animated: false, hint: "Top of the class" },
-    { id: "crown", slot: "headwear", label: "Crown", icon: "👑", glyph: "👑", level: 16, animated: false, hint: "Wear your status" },
-    { id: "tophat", slot: "headwear", label: "Top Hat", icon: "🎩", glyph: "🎩", level: 24, animated: false, hint: "Dapper" },
-    // Effect — an ambient accent over the portrait (emoji, animated).
-    { id: "sparkles", slot: "effect", label: "Sparkles", icon: "✨", glyph: "✨", level: 18, animated: true, hint: "Twinkling sparkles" },
-    { id: "embers", slot: "effect", label: "Embers", icon: "🔥", glyph: "🔥", level: 30, animated: true, hint: "Rising embers" },
-    { id: "frost", slot: "effect", label: "Frost", icon: "❄️", glyph: "❄️", level: 36, animated: true, hint: "A cold shimmer" },
-    // Pet — a little companion beside them (emoji).
-    { id: "pet_cat", slot: "pet", label: "Cat", icon: "🐱", glyph: "🐱", level: 14, animated: false, hint: "A loyal cat" },
-    { id: "pet_wolf", slot: "pet", label: "Wolf Pup", icon: "🐺", glyph: "🐺", level: 20, animated: false, hint: "A wolf companion" },
-    { id: "pet_dragon", slot: "pet", label: "Dragon", icon: "🐉", glyph: "🐉", level: 45, animated: true, hint: "A tiny dragon" },
+    // Headwear — REAL DiceBear hats (native art, drawn on the head; a hat replaces the hairstyle slot).
+    { id: "beanie", slot: "headwear", kind: "native", opts: { top: "winterHat1" }, label: "Bobble Beanie", icon: "🧶", level: 5, animated: false, hint: "A cozy bobble beanie" },
+    { id: "winter_hat", slot: "headwear", kind: "native", opts: { top: "winterHat03" }, label: "Winter Hat", icon: "🎿", level: 10, animated: false, hint: "A warm winter hat" },
+    { id: "snow_cap", slot: "headwear", kind: "native", opts: { top: "winterHat04" }, label: "Snow Cap", icon: "⛄", level: 16, animated: false, hint: "A snowy cap" },
+    { id: "classic_hat", slot: "headwear", kind: "native", opts: { top: "hat" }, label: "Classic Hat", icon: "🎩", level: 24, animated: false, hint: "A classic hat" },
+    // Aura — a soft glow behind the portrait (CSS).
+    { id: "aura_gold", slot: "aura", kind: "overlay", label: "Golden Aura", icon: "🟡", level: 6, animated: false, hint: "A warm gold glow" },
+    { id: "aura_aqua", slot: "aura", kind: "overlay", label: "Aqua Aura", icon: "🔵", level: 12, animated: false, hint: "A cool cyan glow" },
+    { id: "aura_violet", slot: "aura", kind: "overlay", label: "Violet Aura", icon: "🟣", level: 22, animated: true, hint: "A pulsing purple glow" },
+    { id: "aura_rainbow", slot: "aura", kind: "overlay", label: "Rainbow Aura", icon: "🌈", level: 40, animated: true, hint: "A shifting rainbow glow" },
 ];
 
 export function cosmeticById(id) {
@@ -55,10 +49,23 @@ export function sanitizeCosmetics(obj) {
     return out;
 }
 
-// slot -> cosmetic def (or null), for rendering.
+// slot -> cosmetic def (or null). AvatarStack renders only the OVERLAY ones (native ones are in the image).
 export function resolveCosmetics(obj) {
     const clean = sanitizeCosmetics(obj);
     const out = {};
     for (const slot of COSMETIC_SLOTS) out[slot] = clean[slot] ? cosmeticById(clean[slot]) : null;
     return out;
+}
+
+// The avatar image URL with NATIVE cosmetics (hats) baked into the drawing. Overlay cosmetics (auras)
+// are NOT in the image — AvatarStack adds those. Returns null when the member has no built avatar.
+export function avatarImageUrl(config, cosmetics) {
+    if (!config || typeof config !== "object" || !Object.keys(config).length) return null;
+    const merged = { ...sanitizeAvatarConfig(config) };
+    const clean = sanitizeCosmetics(cosmetics);
+    for (const slot of COSMETIC_SLOTS) {
+        const c = clean[slot] ? cosmeticById(clean[slot]) : null;
+        if (c && c.kind === "native" && c.opts) Object.assign(merged, c.opts);
+    }
+    return avatarUrlFor(merged);
 }

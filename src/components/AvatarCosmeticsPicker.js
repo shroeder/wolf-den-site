@@ -1,20 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
-import { COSMETIC_SLOTS, cosmeticsForSlotWithLock } from "@/lib/marketplace/avatar-cosmetics.js";
+import { avatarImageUrl, COSMETIC_SLOTS, cosmeticsForSlotWithLock } from "@/lib/marketplace/avatar-cosmetics.js";
 
-const SLOT_LABELS = { aura: "Aura", headwear: "Headwear", effect: "Effect", pet: "Companion" };
+const SLOT_LABELS = { headwear: "Headwear", aura: "Aura" };
 
-// Equip avatar cosmetics per slot (aura/headwear/effect/pet) onto the member's portrait, with a live
-// layered preview. Locked cosmetics show their unlock level. POSTs each change to /avatar-cosmetic.
-export default function AvatarCosmeticsPicker({ avatarUrl = null, initial = "?", level = 1, unlockAll = false, badges = [], current = {} }) {
+// Equip avatar cosmetics per slot onto the member's portrait, with a live preview. Native cosmetics
+// (hats) are drawn into the avatar image; auras layer on via AvatarStack. POSTs each change.
+export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "?", level = 1, unlockAll = false, badges = [], current = {} }) {
     const router = useRouter();
     const [equipped, setEquipped] = useState(() => ({ ...current }));
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
+    const previewUrl = useMemo(() => avatarImageUrl(avatarConfig, equipped), [avatarConfig, equipped]);
 
     async function commit(slot, nextId) {
         if (busy) return;
@@ -48,7 +49,7 @@ export default function AvatarCosmeticsPicker({ avatarUrl = null, initial = "?",
     return (
         <div className="cos-picker">
             <div className="cos-preview">
-                <AvatarStack avatarUrl={avatarUrl} initial={initial} size={120} cosmetics={equipped} />
+                <AvatarStack avatarUrl={previewUrl} initial={initial} size={120} cosmetics={equipped} />
             </div>
             <div className="cos-slots">
                 {COSMETIC_SLOTS.map((slot) => {
