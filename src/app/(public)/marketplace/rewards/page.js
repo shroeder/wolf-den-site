@@ -35,23 +35,23 @@ export default async function RewardsPage() {
                     Earn points on everything you do — every purchase, every event, every day. Level up, unlock your spot on the
                     leaderboard, and get recognized in the community. It&apos;s free.
                 </p>
-                <div className="mkt-hero-links" style={{ marginTop: 12 }}>
-                    {signedIn ? (
-                        <>
-                            <Link href="/marketplace/track" className="btn-gold">Your rewards track →</Link>
+                {signedIn ? (
+                    <div className="rewards-hero-cta">
+                        <Link href="/marketplace/track" className="btn-gold rewards-hero-primary">Your rewards track →</Link>
+                        <div className="rewards-hero-secondary">
                             <Link href="/marketplace/boss" className="pill">⚔️ Boss fight</Link>
                             <Link href="/marketplace/card" className="pill">🎟️ Loyalty card</Link>
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>
-                        </>
-                    ) : (
-                        <>
-                            <Link href="/marketplace/login?signup=1" className="btn-gold">
-                                Create your free account →
-                            </Link>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="rewards-hero-cta">
+                        <Link href="/marketplace/login?signup=1" className="btn-gold rewards-hero-primary">Create your free account →</Link>
+                        <div className="rewards-hero-secondary">
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>
-                        </>
-                    )}
-                </div>
+                        </div>
+                    </div>
+                )}
             </section>
 
             {signedIn ? (

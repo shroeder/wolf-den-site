@@ -9048,3 +9048,9 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 @keyframes xp-toast-in { from { transform: translateX(-50%) translateY(16px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
 @media (max-width: 520px) { .xp-toast { left: 12px; right: 12px; transform: none; text-align: center; } @keyframes xp-toast-in { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } }
+
+/* ---- Rewards hero CTAs: primary full-width, secondary evenly aligned ---- */
+.rewards-hero-cta { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.rewards-hero-primary { display: flex; align-items: center; justify-content: center; padding: 13px 18px; }
+.rewards-hero-secondary { display: flex; flex-wrap: wrap; gap: 10px; }
+.rewards-hero-secondary > * { flex: 1 1 calc(50% - 5px); min-width: 130px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; }
