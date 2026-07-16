@@ -84,6 +84,7 @@ function Thread({ thread, onBack, onActivity }) {
                     )}
                 </span>
                 <strong className="mkt-dock-title">{counterpart}</strong>
+                <Link href={`/marketplace/dm/${thread.id}`} className="mkt-dock-full">Open ↗</Link>
             </div>
             <div className="mkt-dock-msgs">
                 {messages === null ? (
