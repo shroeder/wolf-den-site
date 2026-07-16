@@ -6610,11 +6610,44 @@ body.tv-mode .shop-mobile-cart-fab {
     margin-right: auto;
 }
 @media (prefers-reduced-motion: reduce) { .social-panel { animation: none; } }
+.social-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    flex: 0 0 auto;
+}
+.social-topbar-title { font-weight: 800; font-size: 1.1rem; }
+.social-crumb {
+    background: none;
+    border: none;
+    color: #ffd75e;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px 6px 4px 0;
+}
+.social-exit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 140ms ease;
+}
+.social-exit:hover { background: rgba(255, 255, 255, 0.13); }
 .social-tabs {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 6px 8px 0;
+    padding: 0 8px;
     flex: 0 0 auto;
     border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
 }

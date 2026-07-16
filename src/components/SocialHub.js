@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
@@ -22,7 +23,7 @@ function notifSummary(unread, requests) {
 }
 
 // A single DM conversation, opened inline in the panel.
-function Thread({ thread, onBack, onActivity }) {
+function Thread({ thread, onActivity }) {
     const [messages, setMessages] = useState(null);
     const [counterpart, setCounterpart] = useState(thread.name || "Conversation");
     const [cp, setCp] = useState(null);
@@ -74,7 +75,6 @@ function Thread({ thread, onBack, onActivity }) {
     return (
         <div className="mkt-dock-thread">
             <div className="mkt-dock-head">
-                <button type="button" className="mkt-dock-back" onClick={onBack} aria-label="Back">‹</button>
                 <span className={`social-thread-av ${borderClass(cp?.border)}`.trim()}>
                     {cp?.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -175,6 +175,27 @@ export default function SocialHub() {
         return () => { document.body.style.overflow = prev; };
     }, [open]);
 
+    // Browser / phone back button closes the hub (pushes a throwaway history entry while open).
+    useEffect(() => {
+        if (!open) return undefined;
+        window.history.pushState({ socialHub: true }, "");
+        const onPop = () => { setThread(null); setOpen(false); };
+        window.addEventListener("popstate", onPop);
+        return () => window.removeEventListener("popstate", onPop);
+    }, [open]);
+
+    // Any in-hub navigation (opening a profile, a product, or the full conversation) closes the hub so
+    // it doesn't sit on top of the page you navigated to.
+    const pathname = usePathname();
+    const pathRef = useRef(pathname);
+    useEffect(() => {
+        if (pathname !== pathRef.current) {
+            pathRef.current = pathname;
+            setThread(null);
+            setOpen(false);
+        }
+    }, [pathname]);
+
     const loadInbox = useCallback(async () => {
         const r = await fetch("/api/marketplace/inbox", { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
@@ -245,6 +266,7 @@ export default function SocialHub() {
     const incomingCount = requests || friends?.incoming?.length || 0;
     const totalNotif = (unread || 0) + (requests || 0);
     const openTo = (t) => { setBubble(false); setTab(t); setThread(null); setOpen(true); };
+    const closeHub = () => window.history.back();
 
     return (
         <>
@@ -264,7 +286,7 @@ export default function SocialHub() {
             <button
                 type="button"
                 className="social-fab"
-                onClick={() => { setBubble(false); setOpen((o) => !o); }}
+                onClick={() => { setBubble(false); setOpen(true); }}
                 aria-label={totalNotif > 0 ? `Social, ${totalNotif} new` : "Social"}
             >
                 {open ? (
@@ -281,8 +303,16 @@ export default function SocialHub() {
 
             {open ? (
                 <div className="social-panel" role="dialog" aria-label="Social">
+                    <div className="social-topbar">
+                        {thread ? (
+                            <button type="button" className="social-crumb" onClick={() => { setThread(null); refreshUnread(); loadInbox(); }}>‹ Messages</button>
+                        ) : (
+                            <span className="social-topbar-title">Social</span>
+                        )}
+                        <button type="button" className="social-exit" onClick={closeHub} aria-label="Close">Close ✕</button>
+                    </div>
                     {thread ? (
-                        <Thread thread={thread} onBack={() => { setThread(null); refreshUnread(); loadInbox(); }} onActivity={refreshUnread} />
+                        <Thread thread={thread} onActivity={refreshUnread} />
                     ) : (
                         <>
                             <div className="social-tabs">
@@ -295,7 +325,6 @@ export default function SocialHub() {
                                 <button type="button" className={`social-tab${tab === "discover" ? " is-active" : ""}`} onClick={() => setTab("discover")}>
                                     Discover
                                 </button>
-                                <button type="button" className="social-close" onClick={() => setOpen(false)} aria-label="Close">×</button>
                             </div>
 
                             <div className="social-body">
@@ -331,9 +360,6 @@ export default function SocialHub() {
 function MessagesTab({ inbox, onOpenDm }) {
     return (
         <div className="social-list">
-            <div className="social-list-top">
-                <Link href="/marketplace/inbox" className="social-list-full">Open full inbox →</Link>
-            </div>
             {inbox === null ? (
                 <p className="muted social-empty">Loading…</p>
             ) : inbox.length === 0 ? (
