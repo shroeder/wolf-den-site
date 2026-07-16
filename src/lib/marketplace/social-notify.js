@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { sendDmNotificationEmail, sendFriendRequestEmail } from "@/lib/marketplace/email.js";
 import { sendBuyerPush } from "@/lib/push/send.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 
 // Best-effort notifications for marketplace social events (DMs, friend requests): push to the member's
 // phone app always, plus an EMAIL when they're offline (so an away member doesn't miss it). Every
@@ -17,6 +18,15 @@ async function displayName(userId) {
     if (!row) return "Someone";
     const name = `${row.first_name || ""} ${row.last_name || ""}`.trim();
     return name || row.alias || row.display_name || "Someone";
+}
+
+// PUBLIC label only — display name or @handle, NEVER a real first/last name. Used for browser (web)
+// push, which surfaces on a shared desktop, so it must not leak a member's real name.
+async function publicLabel(userId) {
+    const row = await db
+        .queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [userId])
+        .catch(() => null);
+    return row?.display_name || row?.alias || "Someone";
 }
 
 // Recipient's email + prefs + presence, for deciding whether to email.
@@ -53,6 +63,14 @@ export async function notifyNewDm(recipientId, senderId, threadId, preview, { fi
             route: `dm/${threadId}`,
             data: { type: "dm", threadId },
         });
+        // Browser push uses the public label (no real names on a possibly-shared desktop).
+        await sendWebPush(recipientId, {
+            title: `💬 ${await publicLabel(senderId)}`,
+            body: preview?.trim() ? preview.trim().slice(0, 140) : "Sent you a message",
+            url: "/marketplace/messages",
+            tag: `dm-${threadId}`,
+            data: { type: "dm", threadId },
+        });
         if (firstUnread) {
             const c = await recipientContact(recipientId);
             if (c?.email && c.notify_email_dm !== false && isOffline(c.last_seen_at)) {
@@ -75,6 +93,13 @@ export async function notifyFriendRequest(addresseeId, requesterId) {
             route: "friends",
             data: { type: "friend_request" },
         });
+        await sendWebPush(addresseeId, {
+            title: "🤝 New friend request",
+            body: `${await publicLabel(requesterId)} wants to be friends`,
+            url: "/marketplace/friends",
+            tag: "friend-request",
+            data: { type: "friend_request" },
+        });
         const c = await recipientContact(addresseeId);
         if (c?.email && c.notify_email_friend !== false && isOffline(c.last_seen_at)) {
             await sendFriendRequestEmail(c.email, { requesterName: name, name: c.first_name || c.display_name || c.alias || "" }).catch(() => {});
@@ -93,6 +118,13 @@ export async function notifyFriendAccepted(requesterId, accepterId) {
             title: "Friend request accepted",
             body: `${name} accepted your friend request`,
             route: "friends",
+            data: { type: "friend_accept" },
+        });
+        await sendWebPush(requesterId, {
+            title: "🎉 Friend request accepted",
+            body: `${await publicLabel(accepterId)} accepted your friend request`,
+            url: "/marketplace/friends",
+            tag: "friend-accept",
             data: { type: "friend_accept" },
         });
     } catch {

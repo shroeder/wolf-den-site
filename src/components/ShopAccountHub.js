@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import WebPushToggle from "@/components/WebPushToggle";
+
 // Signed-in account hub: profile + @handle editing (marketplace profile, bridged to the shop login),
 // orders, password, sign out, and alert management. Shown on /shop/account when signed in.
 export default function ShopAccountHub({ customerEmail, onSignOut, signingOut }) {
@@ -111,6 +113,7 @@ export default function ShopAccountHub({ customerEmail, onSignOut, signingOut })
             <section className="card account-hub-card">
                 <h2>Alerts &amp; notifications</h2>
                 <p className="secondary">Manage what you get notified about. Everything is tied to this account.</p>
+                <WebPushToggle />
                 <div className="account-hub-links">
                     <Link href="/looking-for" className="account-hub-tile">
                         <strong>Looking For</strong>

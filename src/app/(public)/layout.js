@@ -3,6 +3,7 @@ import LevelUpWatcher from "@/components/LevelUpWatcher";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SocialHub from "@/components/SocialHub";
+import WebPushManager from "@/components/WebPushManager";
 
 export default function PublicLayout({ children }) {
     return (
@@ -15,6 +16,8 @@ export default function PublicLayout({ children }) {
             <LevelUpWatcher />
             {/* Ever-present social hub (friends + discover + messaging) for signed-in members, every page. */}
             <SocialHub />
+            {/* Registers the push service worker + offers to turn on browser notifications (signed-in). */}
+            <WebPushManager />
         </>
     );
 }

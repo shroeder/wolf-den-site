@@ -3,6 +3,19 @@ import "server-only";
 import { db } from "@/lib/db";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
+
+// Browser push for a newly-earned badge. Best-effort; `def` carries { slug, label, icon, description }.
+async function pushBadgeEarned(buyerId, def) {
+    if (!buyerId || !def?.slug) return;
+    await sendWebPush(buyerId, {
+        title: `${def.icon || "🏅"} Badge unlocked!`,
+        body: def.description ? `${def.label} — ${def.description}` : `You earned ${def.label}`,
+        url: "/marketplace/rewards",
+        tag: `badge-${def.slug}`,
+        data: { type: "badge", slug: def.slug },
+    }).catch(() => {});
+}
 
 // The badge system has two tiers (see migration 104):
 //   • Curated (admin_only) — roles & recognition the owner assigns by hand.
@@ -161,6 +174,7 @@ export async function syncEarnedBadges(buyerId) {
             .catch(() => false);
         if (ok) granted.push(b);
     }
+    for (const b of granted) await pushBadgeEarned(buyerId, b); // celebrate each newly-earned badge in the browser
     return granted;
 }
 
@@ -230,6 +244,7 @@ export async function grantBadge(buyerId, slug, awardedBy = "admin") {
         .catch(() => []);
     const isNew = Array.isArray(inserted) && inserted.length > 0;
     if (isNew && awardedBy !== "system") await sendBadgeCongrats(buyerId, def).catch(() => {});
+    if (isNew) await pushBadgeEarned(buyerId, def);
     return { ok: true, isNew };
 }
 
