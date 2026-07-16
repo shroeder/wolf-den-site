@@ -48,9 +48,11 @@ export function describeAvatar(rawConfig) {
 }
 
 // Prompt for the EDITS endpoint: the member's avatar PNG is the reference, so tell the model to keep its
-// identity and just redraw it as a full-body game character.
+// identity and redraw it as a full-body game character. The style tokens below are kept IDENTICAL to the
+// boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
+// sprites and bosses look like the same game universe.
 export function buildSpritePrompt(config) {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. Keep the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors as the reference (${describeAvatar(config)}). Confident heroic standing pose facing forward, full body head to toe, bold stylized illustration with clean confident outlines and cel-shaded flat vibrant colors, polished RPG game-art style, clean coherent anatomy, transparent background, no text, no logo, no watermark, no border.`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors as the reference (${describeAvatar(config)}). 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, confident heroic full-body standing pose facing forward, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
 }
 
 // Buyers whose sprite is missing or stale (avatar changed since it was last drawn). Oldest/never first.
