@@ -4,6 +4,7 @@ import BackgroundPicker from "@/components/BackgroundPicker";
 import AvatarBuilder from "@/components/AvatarBuilder";
 import AvatarCosmeticsPicker from "@/components/AvatarCosmeticsPicker";
 import BorderPicker from "@/components/BorderPicker";
+import CollectibleGrid from "@/components/CollectibleGrid";
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
 import FramePicker from "@/components/FramePicker";
@@ -107,6 +108,12 @@ export default async function ProfileHubPage() {
                 <h2 style={{ marginTop: 0 }}>Profile frame</h2>
                 <p className="muted" style={{ marginTop: 0 }}>A textured border that hugs your card&apos;s edge — unlock more by leveling up.</p>
                 <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} badges={(profile?.badges || []).map((b) => b.slug)} />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Collection</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Relics, weapons, and beasts you unlock as you level up. These become real, equippable gear down the road.</p>
+                <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} />
             </section>
 
             <section className="card">

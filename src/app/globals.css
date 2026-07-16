@@ -8885,3 +8885,21 @@ body.tv-mode .shop-mobile-cart-fab {
 .av-svg-halo { top: -0.12em; width: 0.66em; transform: translateX(-50%); filter: drop-shadow(0 0 3px rgba(255, 225, 120, 0.9)); animation: av-halo 2.8s ease-in-out infinite; }
 @keyframes av-halo { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .av-svg-halo { animation: none; } }
+
+/* ---- Collection grid (unlockable game-icon items — seed of the gear system) ---- */
+.collectible-count { margin: 0 0 10px; font-weight: 600; }
+.collectible-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 10px; }
+.collectible {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+    padding: 12px 6px; border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03);
+}
+.collectible-icon { font-size: 2.1rem; line-height: 1; display: flex; }
+.collectible-icon svg { width: 1em; height: 1em; }
+.collectible-name { font-size: 0.68rem; font-weight: 600; color: #cdbfa6; line-height: 1.2; }
+.collectible.is-locked { opacity: 0.45; }
+.collectible.is-locked .collectible-icon { color: #5b6472; }
+.collectible.rar-rare.is-unlocked { border-color: rgba(74, 144, 217, 0.5); }
+.collectible.rar-epic.is-unlocked { border-color: rgba(168, 85, 247, 0.55); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2); }
+.collectible.rar-legendary.is-unlocked { border-color: rgba(245, 166, 35, 0.6); box-shadow: 0 0 12px rgba(245, 166, 35, 0.28); }
+.collectible-credit { font-size: 0.72rem; margin: 10px 0 0; }
