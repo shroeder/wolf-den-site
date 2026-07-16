@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function MarketplaceLoginPage() {
-    return <MarketplaceLoginClient redirectTo="/marketplace/messages" />;
+    return <MarketplaceLoginClient redirectTo="/marketplace/profile" />;
 }

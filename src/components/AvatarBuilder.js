@@ -51,6 +51,18 @@ function randomAvatar() {
     return cfg;
 }
 
+// Quick starting looks so it's obvious you're not stuck as one gender. These just set hair/clothing/face
+// as a jumping-off point — every field is still fully customizable afterward.
+const FEM_HAIR = ["bob", "bun", "curly", "curvy", "straight01", "straight02", "straightAndStrand", "longButNotTooLong", "miaWallace", "bigHair", "frida"];
+const MASC_HAIR = ["shortFlat", "shortRound", "shortWaved", "shortCurly", "theCaesar", "theCaesarAndSidePart", "sides", "shavedSides", "fro", "frizzle", "shaggy", "shaggyMullet"];
+const pickOne = (a) => a[Math.floor(Math.random() * a.length)];
+function presetLook(kind) {
+    if (kind === "fem") {
+        return { top: pickOne(FEM_HAIR), facialHair: "none", eyebrows: "defaultNatural", clothing: pickOne(["shirtScoopNeck", "shirtVNeck", "collarAndSweater", "blazerAndShirt"]) };
+    }
+    return { top: pickOne(MASC_HAIR), facialHair: pickOne(["none", "none", "beardLight", "beardMedium", "moustacheFancy"]), eyebrows: "default", clothing: pickOne(["shirtCrewNeck", "hoodie", "blazerAndShirt", "collarAndSweater"]) };
+}
+
 // Build your "vanilla" avatar (base identity — skin, hair, face, basic clothes). Live preview renders via
 // our own /api/marketplace/avatar route. Save stores the config; "Use a photo instead" clears it.
 export default function AvatarBuilder({ current = null }) {
@@ -93,9 +105,15 @@ export default function AvatarBuilder({ current = null }) {
             <div className="avatar-builder-preview">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="avatar-builder-img" src={previewUrl} alt="Avatar preview" width={140} height={140} />
-                <button type="button" className="btn-ghost avatar-builder-random" onClick={() => setConfig(randomAvatar())} disabled={busy}>
-                    🎲 Surprise me
-                </button>
+                <div className="avatar-presets">
+                    <span className="avatar-ctrl-label">Start from a look</span>
+                    <div className="avatar-preset-row">
+                        <button type="button" className="btn-ghost" onClick={() => setConfig((c) => ({ ...c, ...presetLook("fem") }))} disabled={busy}>♀ Feminine</button>
+                        <button type="button" className="btn-ghost" onClick={() => setConfig((c) => ({ ...c, ...presetLook("masc") }))} disabled={busy}>♂ Masculine</button>
+                        <button type="button" className="btn-ghost" onClick={() => setConfig(randomAvatar())} disabled={busy}>🎲 Surprise me</button>
+                    </div>
+                    <span className="muted" style={{ fontSize: "0.78rem" }}>Just a starting point — change any hair, face, or outfit below.</span>
+                </div>
             </div>
 
             <div className="avatar-builder-controls">

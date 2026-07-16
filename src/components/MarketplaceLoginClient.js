@@ -1,13 +1,15 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 // Marketplace BUYER login for the web — the SAME mkt_buyer account the app uses (sets a web cookie).
 // Separate from the flag-gated /shop account system.
-export default function MarketplaceLoginClient({ redirectTo = "/marketplace/messages" }) {
-    const router = useRouter();
+export default function MarketplaceLoginClient({ redirectTo = "/marketplace/profile" }) {
     const searchParams = useSearchParams();
+    // Hard navigation (not router.push) after auth so EVERY server component + the header re-reads the new
+    // session cookie immediately — otherwise you look logged-out until a manual refresh.
+    const goAfterAuth = () => window.location.assign(redirectTo);
     // Land straight on the sign-up form when linked from a "create account" CTA (?signup=1).
     const [mode, setMode] = useState(searchParams?.get("signup") ? "register" : "login"); // login | register | verify | forgot
     const [email, setEmail] = useState("");
@@ -36,8 +38,7 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
                     setMode("verify");
                     setInfo("We emailed you a code to verify your account.");
                 } else if (ok && d.ok) {
-                    router.push(redirectTo);
-                    router.refresh();
+                    goAfterAuth();
                 } else {
                     setError(d.error || "Sign in failed.");
                 }
@@ -56,8 +57,7 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/mess
             } else {
                 const { ok, d } = await post("/api/marketplace/auth/verify", { email, code });
                 if (ok && d.ok) {
-                    router.push(redirectTo);
-                    router.refresh();
+                    goAfterAuth();
                 } else {
                     setError(d.error || "Invalid or expired code.");
                 }

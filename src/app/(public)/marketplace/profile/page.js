@@ -26,11 +26,12 @@ export const metadata = {
 };
 
 const TILES = [
-    { href: "/marketplace/card", icon: "🎟️", label: "Loyalty card", sub: "Scan at the register" },
-    { href: "/marketplace/leaderboard", icon: "🏆", label: "Leaderboard", sub: "See your rank" },
+    { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Join the raid" },
+    { href: "/marketplace/profile/avatar", icon: "🎨", label: "Your avatar", sub: "Build your look" },
     { href: "/marketplace/friends", icon: "👥", label: "Friends", sub: "Add & message" },
     { href: "/marketplace/inbox", icon: "✉️", label: "Inbox", sub: "All your messages" },
-    { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Preview" },
+    { href: "/marketplace/leaderboard", icon: "🏆", label: "Leaderboard", sub: "See your rank" },
+    { href: "/marketplace/card", icon: "🎟️", label: "Loyalty card", sub: "Scan at the register" },
 ];
 
 export default async function ProfileHubPage() {
@@ -67,6 +68,19 @@ export default async function ProfileHubPage() {
                     border={profile?.border}
                     cosmetics={profile?.avatarCosmetics}
                 />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Jump in</h2>
+                <div className="hub-tiles">
+                    {TILES.map((t) => (
+                        <Link key={t.href} href={t.href} className="hub-tile">
+                            <span className="hub-tile-icon" aria-hidden="true">{t.icon}</span>
+                            <span className="hub-tile-label">{t.label}</span>
+                            <span className="hub-tile-sub muted">{t.sub}</span>
+                        </Link>
+                    ))}
+                </div>
             </section>
 
             <RewardsTrackPreview track={track} />
@@ -132,19 +146,6 @@ export default async function ProfileHubPage() {
                 <h2 style={{ marginTop: 0 }}>Notifications</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Email me when I miss something while I&apos;m away. (You always get in-app + push.)</p>
                 <NotifyPrefsClient initialDm={profile?.notifyEmailDm !== false} initialFriend={profile?.notifyEmailFriend !== false} />
-            </section>
-
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Your stuff</h2>
-                <div className="hub-tiles">
-                    {TILES.map((t) => (
-                        <Link key={t.href} href={t.href} className="hub-tile">
-                            <span className="hub-tile-icon" aria-hidden="true">{t.icon}</span>
-                            <span className="hub-tile-label">{t.label}</span>
-                            <span className="hub-tile-sub muted">{t.sub}</span>
-                        </Link>
-                    ))}
-                </div>
             </section>
 
             <section className="card">
