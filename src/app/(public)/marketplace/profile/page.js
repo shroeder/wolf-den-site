@@ -11,10 +11,12 @@ import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import RewardsHubHero from "@/components/RewardsHubHero";
+import RewardsTrackPreview from "@/components/RewardsTrackPreview";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
+import { getRewardsTrack } from "@/lib/marketplace/track.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
 
 export const dynamic = "force-dynamic";
@@ -43,9 +45,10 @@ export default async function ProfileHubPage() {
         );
     }
 
-    const [profile, progress] = await Promise.all([
+    const [profile, progress, track] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         getRewardsProgress(buyer.id).catch(() => ({})),
+        getRewardsTrack(buyer.id).catch(() => null),
     ]);
     const level = profile?.level || null;
     // Staff can equip any border regardless of level (matches the server-side bypass).
@@ -64,6 +67,8 @@ export default async function ProfileHubPage() {
                     cosmetics={profile?.avatarCosmetics}
                 />
             </section>
+
+            <RewardsTrackPreview track={track} />
 
             <section className="card avatar-cta">
                 <AvatarStack
