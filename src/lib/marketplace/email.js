@@ -51,6 +51,35 @@ export async function sendVerificationEmail(email, code) {
     });
 }
 
+// Congratulate a member on a badge an admin awarded them by hand. Best-effort: returns false (no throw)
+// when there's no recipient or no API key, so it never blocks the grant.
+export async function sendBadgeAwardedEmail(email, { label, icon = "", description = "", name = "" } = {}) {
+    if (!email || !label) return false;
+    if (!process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    const hi = name ? `Hey ${name},` : "Hey there,";
+    const profileUrl = `${baseUrl()}/marketplace/profile`;
+    await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: `You earned the ${label} badge! ${icon}`.trim(),
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <p>${hi}</p>
+                <p>The Wolf Den just awarded you a badge:</p>
+                <div style="text-align:center;padding:22px;margin:14px 0;border:1px solid #e6c76b;border-radius:14px;background:#fff8e6;">
+                    <div style="font-size:44px;line-height:1;">${icon || "🏅"}</div>
+                    <div style="font-size:20px;font-weight:800;margin-top:8px;">${label}</div>
+                    ${description ? `<div style="color:#555;margin-top:6px;">${description}</div>` : ""}
+                </div>
+                <p>It's now on your profile for everyone to see. Thanks for being part of the pack! 🐺</p>
+                <p><a href="${profileUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">See it on your profile →</a></p>
+            </div>
+        `,
+    });
+    return true;
+}
+
 export async function sendNewApplicationEmail(application, toEmail) {
     if (!toEmail) {
         return false;

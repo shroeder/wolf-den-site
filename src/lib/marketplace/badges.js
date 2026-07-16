@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
 
 // The badge system has two tiers (see migration 104):
@@ -178,15 +179,51 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
     }));
 }
 
-// Grant a badge to a member (manual/admin). Records who granted it. Idempotent.
+// Grant a badge to a member (manual/admin). Records who granted it. Idempotent. On a NEW manual grant,
+// emails the member a congratulations (best-effort).
 export async function grantBadge(buyerId, slug, awardedBy = "admin") {
     if (!buyerId || !slug) return { ok: false, error: "missing_params" };
-    const def = await db.queryOne(`SELECT slug FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
+    const def = await db.queryOne(`SELECT slug, label, icon, description FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
     if (!def) return { ok: false, error: "unknown_badge" };
-    await db
-        .query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [buyerId, slug, awardedBy])
-        .catch(() => {});
-    return { ok: true };
+    const inserted = await db
+        .query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, slug, awardedBy])
+        .catch(() => []);
+    const isNew = Array.isArray(inserted) && inserted.length > 0;
+    if (isNew && awardedBy !== "system") await sendBadgeCongrats(buyerId, def).catch(() => {});
+    return { ok: true, isNew };
+}
+
+// Email a member a congrats for a badge they hold. Best-effort. Used on grant + for backfills.
+async function sendBadgeCongrats(buyerId, def) {
+    const member = await db.queryOne(`SELECT email, display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!member?.email) return false;
+    return sendBadgeAwardedEmail(member.email, {
+        label: def.label,
+        icon: def.icon || "",
+        description: def.description || "",
+        name: member.display_name || member.alias || "",
+    }).catch(() => false);
+}
+
+// Backfill: email a member congrats for every curated (admin-assigned) badge they already hold. For
+// people who were granted badges before the congrats email existed. Returns how many were sent.
+export async function notifyMemberBadges(buyerId) {
+    if (!buyerId) return 0;
+    const rows = await db
+        .query(
+            `SELECT b.slug, b.label, b.icon, b.description
+               FROM mkt_user_badge ub JOIN mkt_badge b ON b.slug = ub.badge_slug
+              WHERE ub.buyer_id = $1 AND b.admin_only = TRUE
+              ORDER BY b.sort_order ASC`,
+            [buyerId]
+        )
+        .catch(() => []);
+    let sent = 0;
+    for (const def of rows) {
+        const ok = await sendBadgeCongrats(buyerId, def).catch(() => false);
+        if (ok) sent += 1;
+    }
+    return sent;
 }
 
 // Remove a badge from a member (works for auto or curated — the owner has final say).

@@ -108,6 +108,9 @@ async function handlePurchaseLoyalty(payload) {
         if (buyerId) return { handled: true, awarded: true, buyerId };
     }
 
+    // A $0 payment (fully-comped sale, a $0 auth, etc.) earns nothing — never offer a QR for it.
+    if (amountCents <= 0) return { handled: true, skipped: "zero_amount" };
+
     // Nobody to credit — offer the QR so the customer can claim it on their own phone.
     const claim = await createLoyaltyClaim({ squarePaymentId: payment.id, awardOrderId, amountCents, locationId: payment.location_id });
     // Push ONLY when the claim is first minted. Square sends payment.created AND payment.updated (and
