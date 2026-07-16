@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import UserBadges from "@/components/UserBadges";
 import { borderClass } from "@/lib/marketplace/borders.js";
+import { frameClass } from "@/lib/marketplace/frames.js";
 import { rankForLevel } from "@/lib/marketplace/ranks.js";
 
 // One member, rendered as a rich "hero card": avatar with their equipped border, name + @handle, rank
@@ -35,7 +36,7 @@ export default function MemberHeroCard({ member, action = null, href = null, com
     );
 
     return (
-        <div className={`hero-card${compact ? " is-compact" : ""}`}>
+        <div className={`hero-card${compact ? " is-compact" : ""} ${frameClass(member.frame)}`.trim()}>
             {href ? (
                 <Link href={href} className="hero-card-main">{identity}</Link>
             ) : (

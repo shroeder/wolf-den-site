@@ -3,10 +3,12 @@ import Link from "next/link";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import BorderPicker from "@/components/BorderPicker";
 import EarnChecklist from "@/components/EarnChecklist";
+import FramePicker from "@/components/FramePicker";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import RewardsHubHero from "@/components/RewardsHubHero";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
+import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
@@ -47,7 +49,7 @@ export default async function ProfileHubPage() {
 
     return (
         <div className="stack reveal">
-            <section className={`card rewards-hub-card ${backgroundClass(profile?.background)}`.trim()}>
+            <section className={`card rewards-hub-card ${backgroundClass(profile?.background)} ${frameClass(profile?.frame)}`.trim()}>
                 <RewardsHubHero
                     displayLabel={profile?.displayLabel}
                     avatarUrl={profile?.avatarUrl}
@@ -74,6 +76,12 @@ export default async function ProfileHubPage() {
                 <h2 style={{ marginTop: 0 }}>Profile background</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Scenes you unlock by leveling up — they show behind your profile hero.</p>
                 <BackgroundPicker current={profile?.background} level={level?.level || 1} unlockAll={isStaff} />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Profile frame</h2>
+                <p className="muted" style={{ marginTop: 0 }}>A textured border that hugs your card&apos;s edge — unlock more by leveling up.</p>
+                <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} />
             </section>
 
             <section className="card">

@@ -23,10 +23,11 @@ function mapUser(row) {
         avatarUrl: row.avatar_url || null,
         level: levelForXp(row.xp || 0).level,
         border: row.equipped_border || "none",
+        frame: row.equipped_frame || "none",
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border";
+const USER_COLS = "id, alias, display_name, avatar_url, xp, equipped_border, equipped_frame";
 
 // Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
 async function attachBadges(users) {

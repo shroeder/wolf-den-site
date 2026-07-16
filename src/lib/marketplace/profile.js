@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { discordConfig } from "@/lib/marketplace/discord.js";
 import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrounds.js";
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
+import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -119,6 +120,8 @@ function mapProfile(row, badges = []) {
         border: row.equipped_border || "none",
         // Equipped cosmetic profile background id ('none' when unset).
         background: row.equipped_background || "none",
+        // Equipped cosmetic profile frame id ('none' when unset) — the inset textured card border.
+        frame: row.equipped_frame || "none",
         // Email notification prefs (default on).
         notifyEmailDm: row.notify_email_dm !== false,
         notifyEmailFriend: row.notify_email_friend !== false,
@@ -129,7 +132,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -184,12 +187,28 @@ export async function equipBackground(buyerId, backgroundId) {
     return getProfile(buyerId);
 }
 
+// Equip a cosmetic profile frame (the inset textured card border). Validated against level (staff
+// bypass unlocks all). 'none' clears. Returns the refreshed profile.
+export async function equipFrame(buyerId, frameId) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const frame = frameById(frameId);
+    const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
+    const level = levelForXp(row?.xp || 0).level;
+    const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
+    if (frame.id !== "none" && !isFrameUnlocked(frame.id, level, { unlockAll })) {
+        throw new Error(`That frame unlocks at Level ${frame.level}.`);
+    }
+    await db.query(`UPDATE mkt_buyer SET equipped_frame = $2, updated_at = NOW() WHERE id = $1`, [buyerId, frame.id === "none" ? null : frame.id]);
+    return getProfile(buyerId);
+}
+
 // Public leaderboard: top members by lifetime XP. Only accounts with a public @handle appear (opting in
 // via a handle), and only those who've earned something. Returns rank + display bits (no contact info).
 export async function getLeaderboard(limit = 50) {
     const rows = await db
         .query(
-            `SELECT id, alias, avatar_url, first_name, last_name, display_name, xp, equipped_border
+            `SELECT id, alias, avatar_url, first_name, last_name, display_name, xp, equipped_border, equipped_frame
                FROM mkt_buyer
               WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0
               ORDER BY xp DESC, updated_at ASC
@@ -199,7 +218,7 @@ export async function getLeaderboard(limit = 50) {
         .catch(() => []);
     return rows.map((row, i) => {
         const p = mapProfile(row, []);
-        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0, border: p.border };
+        return { rank: i + 1, alias: p.alias, avatarUrl: p.avatarUrl, displayLabel: p.displayLabel, level: p.level, xp: row.xp || 0, border: p.border, frame: p.frame };
     });
 }
 
@@ -208,7 +227,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background, equipped_frame
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );
