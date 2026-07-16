@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
+import { createTradeClaim, tradeStatsFromLines, tradeXp } from "@/lib/marketplace/trade-claim.js";
+import { SITE_URL } from "@/lib/site";
 import { createTrade, listTrades } from "@/lib/trades/trades.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -48,8 +50,20 @@ export async function POST(request) {
 
             try {
                 const { trade, created } = await createTrade(body);
-                logger.info("admin.trades.create.success", { tradeId: trade.id, created });
-                return NextResponse.json({ ok: true, trade, created }, { status: created ? 201 : 200 });
+                // On a NEW trade with cards coming in, mint a scan-to-earn claim so the customer can bank
+                // XP + trade badges. The app shows its QR. Only for real card trades (cards in > 0).
+                let claim = null;
+                if (created) {
+                    const stats = tradeStatsFromLines(body.lines || [], body.marketTotal);
+                    if (stats.cardCount > 0) {
+                        const minted = await createTradeClaim({ tradeId: trade.id, ...stats }).catch(() => null);
+                        if (minted?.token) {
+                            claim = { token: minted.token, url: `${SITE_URL}/marketplace/claim-trade/${minted.token}`, potentialXp: tradeXp(stats), ...stats };
+                        }
+                    }
+                }
+                logger.info("admin.trades.create.success", { tradeId: trade.id, created, claimed: Boolean(claim) });
+                return NextResponse.json({ ok: true, trade, created, claim }, { status: created ? 201 : 200 });
             } catch (validationError) {
                 return NextResponse.json({ error: validationError.message }, { status: 400 });
             }

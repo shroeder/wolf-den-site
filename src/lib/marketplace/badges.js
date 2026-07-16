@@ -45,13 +45,19 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM card_watchlist_items i JOIN card_watchers w ON w.id = i.watcher_id WHERE w.buyer_id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_friendship WHERE (requester_id = $1 OR addressee_id = $1) AND status = 'accepted'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT id FROM mkt_buyer WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0 ORDER BY xp DESC, updated_at ASC LIMIT 1`).catch(() => null),
+        db.queryOne(
+            `SELECT COUNT(*)::int AS trades, COALESCE(SUM(card_count), 0)::int AS cards,
+                    COALESCE(SUM(total_value_cents), 0)::bigint AS value_cents, COALESCE(MAX(top_card_value_cents), 0)::int AS top_cents
+               FROM mkt_trade_claim WHERE redeemed_buyer_id = $1`,
+            [buyerId]
+        ).catch(() => null),
     ]);
 
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
@@ -72,6 +78,10 @@ export async function getMemberMetrics(buyerId) {
         tenureDays,
         isTop: topRow?.id === buyerId,
         allMilestones,
+        tradeCount: tradeRow?.trades || 0,
+        cardsTraded: tradeRow?.cards || 0,
+        tradeValue: Math.round(Number(tradeRow?.value_cents || 0) / 100),
+        topCard: Math.round(Number(tradeRow?.top_cents || 0) / 100),
     };
 }
 
@@ -88,6 +98,10 @@ export function progressForRule(rule, threshold, m) {
         case "friends": return { current: m.friends, target: t };
         case "leaderboard_top": return { current: m.isTop ? 1 : 0, target: 1 };
         case "all_milestones": return { current: m.allMilestones ? 1 : 0, target: 1 };
+        case "trade_count": return { current: m.tradeCount, target: t };
+        case "cards_traded": return { current: m.cardsTraded, target: t };
+        case "trade_value": return { current: m.tradeValue, target: t };
+        case "top_card": return { current: m.topCard, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }

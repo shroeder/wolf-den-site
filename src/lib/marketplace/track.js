@@ -22,6 +22,10 @@ function progressLabel(rule, current, target) {
         case "friends": return `${current} / ${target} friends`;
         case "leaderboard_top": return current >= 1 ? "Reached #1" : "Climb to #1";
         case "all_milestones": return current >= 1 ? "All complete" : "Complete every way to earn";
+        case "trade_count": return `${current} / ${target} trades`;
+        case "cards_traded": return `${current} / ${target} cards traded`;
+        case "trade_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} traded`;
+        case "top_card": return `best card $${current.toLocaleString()} / $${target.toLocaleString()}`;
         default: return `${current} / ${target}`;
     }
 }
