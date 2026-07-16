@@ -8518,31 +8518,52 @@ body.tv-mode .shop-mobile-cart-fab {
     height: 1.1rem;
 }
 
-/* --- Mobile header overrides — placed LAST so they beat the base .nav-inbox / .tv-toggle /
-   .nav-discord rules that appear earlier in this file (media queries don't add specificity). --- */
-.nav-discord-icon {
-    display: none;
+/* --- Professional top bar (consolidated; placed LAST so it beats the scattered header rules earlier
+   in the file — media queries don't add specificity). Left: menu + brand. Right: a tidy row of equal
+   icons ending in the account avatar (far right, like most apps). --- */
+.top-row { flex-wrap: nowrap; gap: 10px; padding: 10px 0; }
+.top-left { gap: 10px; flex-wrap: nowrap; min-width: 0; }
+.top-right { gap: 6px; flex-wrap: nowrap; }
+.brand { font-size: 1.1rem; margin-right: 0; min-width: 0; }
+.brand > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-mark { height: 30px; }
+
+/* Unified round icon buttons in the top-right utility row. */
+.nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--ink);
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+    position: relative;
+    box-shadow: none;
+    transition: background 140ms ease;
 }
+.nav-icon:hover { background: rgba(255, 255, 255, 0.12); }
+.nav-icon svg { width: 18px; height: 18px; }
+.nav-icon.nav-discord { background: linear-gradient(135deg, #5865f2, #4752c4); border-color: transparent; color: #fff; }
+.nav-icon.nav-discord:hover { filter: brightness(1.08); background: linear-gradient(135deg, #5865f2, #4752c4); }
+.nav-icon.nav-discord svg { width: 16px; height: 16px; }
+
+/* Account avatar — the rightmost element, sized to match the icon row. */
+.nav-account-avatar { width: 32px; height: 32px; font-size: 0.78rem; }
+.nav-signin { padding: 0.42rem 0.9rem; }
+
+/* Menu lives at the far left now. */
+.hamburger { margin-left: 0; }
+
 @media (max-width: 700px) {
-    .nav-inbox,
-    .tv-toggle {
-        display: none;
-    }
-    /* Join Discord shrinks to a round icon button on mobile. */
-    .nav-discord {
-        width: 40px;
-        min-width: 40px;
-        height: 40px;
-        padding: 0;
-        border-radius: 50%;
-        justify-content: center;
-    }
-    .nav-discord-text {
-        display: none;
-    }
-    .nav-discord-icon {
-        display: block;
-        width: 20px;
-        height: 20px;
-    }
+    /* Fullscreen/TV toggle is only useful on an in-store display — hide on phones. */
+    .tv-toggle { display: none; }
+}
+@media (max-width: 380px) {
+    .brand > span { display: none; }
 }

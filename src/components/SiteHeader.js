@@ -36,8 +36,6 @@ export default function SiteHeader() {
     const [cartEnabled, setCartEnabled] = useState(false);
     const [authLoading, setAuthLoading] = useState(false);
     const [authCustomer, setAuthCustomer] = useState(null);
-    const [mktAuthed, setMktAuthed] = useState(false);
-    const [mktUnread, setMktUnread] = useState(0);
     const [mktAvatar, setMktAvatar] = useState(null);
     const [mktName, setMktName] = useState(null);
     const [mktBorder, setMktBorder] = useState("none");
@@ -60,24 +58,6 @@ export default function SiteHeader() {
         })();
         return () => {
             alive = false;
-        };
-    }, []);
-
-    // Marketplace inbox badge: show an Inbox link + unread count for signed-in marketplace members.
-    useEffect(() => {
-        let alive = true;
-        const load = async () => {
-            const r = await fetch("/api/marketplace/unread", { cache: "no-store" }).catch(() => null);
-            const d = r && r.ok ? await r.json().catch(() => null) : null;
-            if (!alive || !d) return;
-            setMktAuthed(Boolean(d.authenticated));
-            setMktUnread(Number(d.total || 0));
-        };
-        load();
-        const id = setInterval(load, 60000);
-        return () => {
-            alive = false;
-            clearInterval(id);
         };
     }, []);
 
@@ -150,75 +130,6 @@ export default function SiteHeader() {
         <header className="site-header">
             <div className="shell top-row">
                 <div className="top-left">
-                    <Link href="/" className="brand" onClick={() => setOpen(false)}>
-                        <Image
-                            className="brand-mark"
-                            src="/logo/logo.png"
-                            alt="The Wolf Den logo"
-                            width={1536}
-                            height={1024}
-                            sizes="34px"
-                            priority
-                        />
-                        <span>The Wolf Den</span>
-                    </Link>
-                    <span className="top-sep" aria-hidden="true" />
-                    <a className="pill nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer" aria-label="Join our Discord">
-                        <svg className="nav-discord-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.291.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.332-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.332-.946 2.418-2.157 2.418z" />
-                        </svg>
-                        <span className="nav-discord-text">Join Discord</span>
-                    </a>
-                    <button
-                        type="button"
-                        className={`tv-toggle${tvMode ? " tv-toggle-active" : ""}`}
-                        onClick={toggleTvMode}
-                        aria-pressed={tvMode}
-                        aria-label={tvMode ? "Exit fullscreen / TV mode" : "Fullscreen / TV mode"}
-                        title={tvMode ? "Exit TV mode" : "Fullscreen / TV mode"}
-                    >
-                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            {tvMode ? (
-                                <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
-                            ) : (
-                                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
-                            )}
-                        </svg>
-                    </button>
-                </div>
-                <div className="top-right">
-                    {mktAuthed ? (
-                        <Link href="/marketplace/inbox" className="pill nav-inbox" onClick={() => setOpen(false)}>
-                            Inbox
-                            {mktUnread > 0 ? <span className="nav-inbox-badge">{mktUnread > 99 ? "99+" : mktUnread}</span> : null}
-                        </Link>
-                    ) : null}
-                    {paymentsEnabled && cartEnabled && (
-                        <>
-                            <Link href="/cart" className="nav-cart-icon" title="Cart" aria-label="Cart" onClick={() => setOpen(false)}>
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                    <circle cx="9" cy="21" r="1" />
-                                    <circle cx="20" cy="21" r="1" />
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                                </svg>
-                                {Number(cartCount || 0) > 0 ? <span className="nav-cart-badge">{cartCount > 99 ? "99+" : cartCount}</span> : null}
-                            </Link>
-                            {authCustomer ? (
-                                <Link href="/shop/account" className="nav-account" title="Your account (orders, sign out)" aria-label="Your account" onClick={() => setOpen(false)}>
-                                    {mktAvatar ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img className={`nav-account-avatar nav-account-avatar-img ${borderClass(mktBorder)}`.trim()} src={mktAvatar} alt="Your account" />
-                                    ) : (
-                                        <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName || authCustomer.name, email: authCustomer.email })}</span>
-                                    )}
-                                </Link>
-                            ) : (
-                                <Link href="/shop/account" className="pill" onClick={() => setOpen(false)}>
-                                    {authLoading ? "…" : "Sign In"}
-                                </Link>
-                            )}
-                        </>
-                    )}
                     <button
                         className="hamburger"
                         aria-label={open ? "Close menu" : "Open menu"}
@@ -230,6 +141,65 @@ export default function SiteHeader() {
                         <span className={`ham-bar${open ? " open" : ""}`} />
                         <span className={`ham-bar${open ? " open" : ""}`} />
                     </button>
+                    <Link href="/" className="brand" onClick={() => setOpen(false)}>
+                        <Image
+                            className="brand-mark"
+                            src="/logo/logo.png"
+                            alt="The Wolf Den logo"
+                            width={1536}
+                            height={1024}
+                            sizes="30px"
+                            priority
+                        />
+                        <span>The Wolf Den</span>
+                    </Link>
+                </div>
+                <div className="top-right">
+                    <a className="nav-icon nav-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer" aria-label="Join our Discord" title="Join our Discord">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.291.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.332-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.332-.946 2.418-2.157 2.418z" />
+                        </svg>
+                    </a>
+                    <button
+                        type="button"
+                        className={`nav-icon tv-toggle${tvMode ? " tv-toggle-active" : ""}`}
+                        onClick={toggleTvMode}
+                        aria-pressed={tvMode}
+                        aria-label={tvMode ? "Exit fullscreen / TV mode" : "Fullscreen / TV mode"}
+                        title={tvMode ? "Exit TV mode" : "Fullscreen / TV mode"}
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            {tvMode ? (
+                                <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+                            ) : (
+                                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                            )}
+                        </svg>
+                    </button>
+                    {paymentsEnabled && cartEnabled && (
+                        <Link href="/cart" className="nav-icon nav-cart-icon" title="Cart" aria-label="Cart" onClick={() => setOpen(false)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <circle cx="9" cy="21" r="1" />
+                                <circle cx="20" cy="21" r="1" />
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                            </svg>
+                            {Number(cartCount || 0) > 0 ? <span className="nav-cart-badge">{cartCount > 99 ? "99+" : cartCount}</span> : null}
+                        </Link>
+                    )}
+                    {paymentsEnabled && cartEnabled && authCustomer ? (
+                        <Link href="/shop/account" className="nav-account" title="Your account (orders, sign out)" aria-label="Your account" onClick={() => setOpen(false)}>
+                            {mktAvatar ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className={`nav-account-avatar nav-account-avatar-img ${borderClass(mktBorder)}`.trim()} src={mktAvatar} alt="Your account" />
+                            ) : (
+                                <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName || authCustomer.name, email: authCustomer.email })}</span>
+                            )}
+                        </Link>
+                    ) : paymentsEnabled && cartEnabled ? (
+                        <Link href="/shop/account" className="pill nav-signin" onClick={() => setOpen(false)}>
+                            {authLoading ? "…" : "Sign In"}
+                        </Link>
+                    ) : null}
                 </div>
             </div>
             <nav
