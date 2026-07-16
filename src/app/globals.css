@@ -7240,6 +7240,32 @@ body.tv-mode .shop-mobile-cart-fab {
     filter: brightness(1.06);
     color: #171008 !important;
 }
+/* Secondary/ghost button — outlined to fit the dark+gold theme (pairs with .btn-gold). */
+.btn-ghost {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.62rem 1.2rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 215, 94, 0.4);
+    background: transparent;
+    color: #ffd75e !important;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease;
+}
+.btn-ghost:hover,
+.btn-ghost:focus-visible {
+    background: rgba(255, 215, 94, 0.1);
+    border-color: rgba(255, 215, 94, 0.65);
+    color: #ffd75e !important;
+}
+
 .rewards-callout.rewards-earned {
     background: linear-gradient(105deg, rgba(76, 217, 123, 0.16), rgba(255, 215, 94, 0.1));
     border-color: rgba(120, 220, 150, 0.5);
@@ -8521,9 +8547,9 @@ body.tv-mode .shop-mobile-cart-fab {
 /* --- Professional top bar (consolidated; placed LAST so it beats the scattered header rules earlier
    in the file — media queries don't add specificity). Left: menu + brand. Right: a tidy row of equal
    icons ending in the account avatar (far right, like most apps). --- */
-.top-row { flex-wrap: nowrap; gap: 10px; padding: 10px 0; }
-.top-left { gap: 10px; flex-wrap: nowrap; min-width: 0; }
-.top-right { gap: 6px; flex-wrap: nowrap; }
+.top-row { flex-wrap: nowrap; gap: 10px; padding: 10px 0; justify-content: flex-start; }
+.top-left { gap: 10px; flex-wrap: nowrap; min-width: 0; flex: 0 0 auto; }
+.top-right { gap: 6px; flex-wrap: nowrap; margin-left: auto; flex: 0 0 auto; }
 .brand { font-size: 1.1rem; margin-right: 0; min-width: 0; }
 .brand > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-mark { height: 30px; }
@@ -8560,7 +8586,20 @@ body.tv-mode .shop-mobile-cart-fab {
 /* Menu lives at the far left now. */
 .hamburger { margin-left: 0; }
 
+/* Desktop: nav links sit inline in the header (single-line); the separate nav row + hamburger hide.
+   Mobile: the hamburger opens the dropdown row and the inline nav hides. */
+.nav-inline { display: none; align-items: center; gap: 2px; margin-left: 1.25rem; min-width: 0; flex-wrap: wrap; }
+.nav-inline .nav-link { padding: 0.4rem 0.7rem; }
+.nav-link-discord { display: inline-flex; align-items: center; gap: 6px; }
+.nav-link-discord svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
+@media (min-width: 701px) {
+    .nav-inline { display: flex; }
+    .hamburger { display: none; }
+    .nav-row { display: none; }
+}
 @media (max-width: 700px) {
+    .nav-inline { display: none; }
     /* Fullscreen/TV toggle is only useful on an in-store display — hide on phones. */
     .tv-toggle { display: none; }
 }

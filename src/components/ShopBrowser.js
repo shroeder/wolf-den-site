@@ -47,7 +47,7 @@ export default function ShopBrowser({ justInItems = [], categories = [], payment
                             </p>
                             <div className="cta-row">
                                 <Link className="btn-gold" href="/alerts">🔔 Get New-Arrival Alerts</Link>
-                                <button type="button" className="text-link" onClick={() => setView("all")}>
+                                <button type="button" className="btn-ghost" onClick={() => setView("all")}>
                                     See all inventory →
                                 </button>
                             </div>
