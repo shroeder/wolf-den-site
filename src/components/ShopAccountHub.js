@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import AvatarStack from "@/components/AvatarStack";
 import WebPushToggle from "@/components/WebPushToggle";
 
 // Signed-in account hub: profile + @handle editing (marketplace profile, bridged to the shop login),
@@ -63,20 +64,12 @@ export default function ShopAccountHub({ customerEmail, onSignOut, signingOut })
             <section className="card account-hub-card">
                 <h2>Profile</h2>
                 <div className="account-hub-identity">
-                    <Link href="/marketplace/profile/avatar" className="account-hub-avatar" title="Edit your avatar" aria-label="Edit your avatar">
-                        {avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={avatarUrl} alt="" />
-                        ) : (
-                            <span>{initials}</span>
-                        )}
+                    <Link href="/marketplace/profile/avatar" className="account-hub-avatar-link" title="Edit your avatar" aria-label="Edit your avatar">
+                        <AvatarStack avatarUrl={avatarUrl} initial={initials} size={64} border={profile?.border} cosmetics={profile?.avatarCosmetics} />
                     </Link>
                     <div className="account-hub-identity-body">
                         <p className="account-hub-name">{profile?.displayLabel || "Your profile"}</p>
-                        <div className="account-hub-identity-actions">
-                            <Link href="/marketplace/profile/avatar" className="button primary account-hub-edit-avatar">✏️ Edit avatar</Link>
-                            <Link href="/marketplace/profile" className="account-hub-link">Full profile →</Link>
-                        </div>
+                        <Link href="/marketplace/profile/avatar" className="button primary account-hub-edit-avatar">✏️ Edit avatar</Link>
                     </div>
                 </div>
                 <div className="account-hub-fields">

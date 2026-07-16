@@ -8963,9 +8963,8 @@ body.tv-mode .shop-mobile-cart-fab {
 .avatar-cta { display: flex; align-items: center; gap: 16px; }
 .avatar-cta-body { display: flex; flex-direction: column; min-width: 0; }
 
-/* Clickable account avatar → avatar editor, + edit CTA row */
-.account-hub-avatar { cursor: pointer; transition: outline-color 120ms ease; outline: 2px solid transparent; outline-offset: 2px; }
-.account-hub-avatar:hover { outline-color: rgba(255, 215, 94, 0.55); }
-.account-hub-identity-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.account-hub-identity-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* Clickable account avatar → avatar editor, + single edit CTA */
+.account-hub-avatar-link { display: inline-flex; border-radius: 50%; cursor: pointer; outline: 2px solid transparent; outline-offset: 3px; transition: outline-color 120ms ease; flex: 0 0 auto; }
+.account-hub-avatar-link:hover { outline-color: rgba(255, 215, 94, 0.55); }
+.account-hub-identity-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; align-items: flex-start; }
 .account-hub-edit-avatar { padding: 7px 15px; font-size: 0.85rem; }
