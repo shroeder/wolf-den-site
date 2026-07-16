@@ -8,7 +8,7 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 // The shared, persistent monthly boss. HP lives in the DB and is shared across everyone.
-export const DAILY_ATTACKS = 3; // swings per member per day (staff bypass for testing)
+export const DAILY_ATTACKS = 1; // one manual swing per member per day (staff bypass for testing)
 
 function isStaff(badgeSlugs) {
     return (badgeSlugs || []).some((s) => ["owner", "site_admin", "staff"].includes(s));
@@ -53,6 +53,23 @@ export async function getBossState(buyerId = null) {
         getDefaultSpriteUrl().catch(() => null),
     ]);
 
+    // The whole pack for the battle scene — every registered member fights, attackers ranked first.
+    const members = await db
+        .query(
+            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, COALESCE(SUM(h.damage), 0)::int AS dmg
+               FROM mkt_buyer b
+               LEFT JOIN boss_hit h ON h.buyer_id = b.id AND h.boss_id = $1
+              WHERE b.alias IS NOT NULL
+              GROUP BY b.id
+              ORDER BY dmg DESC, b.xp DESC NULLS LAST
+              LIMIT 14`,
+            [boss.id]
+        )
+        .catch(() => []);
+    const fighters = members
+        .map((m) => ({ id: m.id, name: m.display_name || m.alias || "Member", spriteUrl: m.avatar_sprite_url || defaultSprite || null, you: buyerId && m.id === buyerId }))
+        .filter((m) => m.spriteUrl);
+
     const divisor = Math.max(1, boss.ticket_divisor || 100);
     const roster = contributors.map((c) => ({
         id: c.id,
@@ -90,6 +107,7 @@ export async function getBossState(buyerId = null) {
             defeated: Boolean(boss.defeated_at),
         },
         roster,
+        fighters,
         defaultSpriteUrl: defaultSprite || null,
         you,
     };

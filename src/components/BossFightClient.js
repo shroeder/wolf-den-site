@@ -73,13 +73,13 @@ export default function BossFightClient() {
     if (!loaded) return <p className="muted">Summoning the boss…</p>;
     if (!data?.boss) return <p className="muted">No active boss right now — check back soon.</p>;
 
-    const { boss, roster = [], you, defaultSpriteUrl } = data;
+    const { boss, roster = [], fighters = [], you, defaultSpriteUrl } = data;
     const pct = Math.max(0, Math.min(100, Math.round((boss.hp / boss.maxHp) * 100)));
 
     return (
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
-            <BossBattleScene boss={boss} fighters={roster} defaultSprite={defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
+            <BossBattleScene boss={boss} fighters={fighters} defaultSprite={defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
             {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             <div className="boss2-actions">

@@ -15,8 +15,9 @@ export default function BossPage() {
             <section className="card">
                 <h1 style={{ marginTop: 0 }}>⚔️ Weekly Boss</h1>
                 <p className="muted" style={{ marginTop: 0 }}>
-                    The whole pack chips away at one shared boss all week. Everyone gets a few swings a day — land hits to earn
-                    XP and raffle tickets for the giveaway. Its HP is real and shared: drop in anytime and help finish it off.
+                    The whole pack chips away at one shared boss all week. Everyone gets <strong>one swing a day</strong> — land
+                    your hit to earn XP and raffle tickets for the giveaway. Its HP is real and shared across all members: drop
+                    in daily and help finish it off.
                 </p>
                 <BossFightClient />
             </section>

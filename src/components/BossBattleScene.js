@@ -6,7 +6,7 @@ import { GiSpikedDragonHead } from "react-icons/gi";
 // The 2D side-scrolling battle stage: the boss's own AI background, the boss sprite anchored right, and
 // the pack of member sprites on the left attacking on a staggered loop. Purely presentational — the parent
 // (BossFightClient) owns HP/attack state and passes it down.
-const MAX_FIGHTERS = 8;
+const MAX_FIGHTERS = 10;
 
 export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100 }) {
     const party = useMemo(() => {

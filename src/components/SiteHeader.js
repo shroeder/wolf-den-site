@@ -10,6 +10,7 @@ import { useTvMode } from "@/lib/tv-mode-client";
 const navItems = [
     { href: "/about", label: "About" },
     { href: "/shop", label: "Shop" },
+    { href: "/marketplace/boss", label: "⚔️ Boss" },
     { href: "/marketplace/rewards", label: "🏆 Rewards" },
     { href: "/looking-for", label: "Looking For" },
     { href: "/marketplace", label: "Marketplace" },
