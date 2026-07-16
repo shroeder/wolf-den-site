@@ -28,12 +28,22 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
 
     async function submit(e) {
         e.preventDefault();
+        // Read the ACTUAL field values from the form, not just React state. Browser autofill can populate
+        // the DOM without firing React's onChange, which would otherwise submit a blank email/password and
+        // cause a bogus "invalid credentials" / no-email-sent. DOM value wins; state is the fallback.
+        const els = e.currentTarget.elements;
+        const emailVal = String(els.username?.value ?? email ?? "").trim();
+        const passVal = String(els.password?.value ?? password ?? "");
+        const codeVal = String(els.code?.value ?? code ?? "").trim();
+        const nameVal = String(els.fullname?.value ?? displayName ?? "").trim();
+        // Keep state in sync so the follow-up verify step (and the UI) use the same values.
+        if (emailVal !== email) setEmail(emailVal);
         setBusy(true);
         setError(null);
         setInfo(null);
         try {
             if (mode === "login") {
-                const { ok, d } = await post("/api/marketplace/auth/login", { email, password });
+                const { ok, d } = await post("/api/marketplace/auth/login", { email: emailVal, password: passVal });
                 if (d.needsVerification) {
                     setMode("verify");
                     setInfo("We emailed you a code to verify your account.");
@@ -43,7 +53,7 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                     setError(d.error || "Sign in failed.");
                 }
             } else if (mode === "register") {
-                const { ok, d } = await post("/api/marketplace/auth/register", { email, password, displayName });
+                const { ok, d } = await post("/api/marketplace/auth/register", { email: emailVal, password: passVal, displayName: nameVal });
                 if (ok) {
                     setMode("verify");
                     setInfo("We emailed you a 6-digit code.");
@@ -52,10 +62,10 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                 }
             } else if (mode === "forgot") {
                 // Always shows the same confirmation (never reveals whether the email is registered).
-                await post("/api/marketplace/auth/forgot", { email });
+                await post("/api/marketplace/auth/forgot", { email: emailVal });
                 setInfo("If that email has an account, we've sent a password reset link. Check your inbox.");
             } else {
-                const { ok, d } = await post("/api/marketplace/auth/verify", { email, code });
+                const { ok, d } = await post("/api/marketplace/auth/verify", { email: emailVal, code: codeVal });
                 if (ok && d.ok) {
                     goAfterAuth();
                 } else {
@@ -80,13 +90,13 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                 </p>
                 <form onSubmit={submit} className="stack" style={{ gap: 10, marginTop: 14 }}>
                     {mode === "verify" ? (
-                        <input placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" />
+                        <input name="code" placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" />
                     ) : mode === "forgot" ? (
                         <input type="email" name="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
                     ) : (
                         <>
                             {mode === "register" ? (
-                                <input placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
+                                <input name="fullname" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
                             ) : null}
                             <input type="email" name="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
                             <input type="password" name="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} required />
