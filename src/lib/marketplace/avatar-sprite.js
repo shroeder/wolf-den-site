@@ -3,9 +3,16 @@ import "server-only";
 import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
+import { getSetting, setSetting } from "@/lib/settings.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { AVATAR_FIELDS, avatarConfigToQuery, CLOTHINGS, HAIR_TOPS, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+
+// The ONE shared default sprite used for members who haven't built their own avatar — so we don't spend
+// AI generating a unique sprite for everyone. Generated once from the default avatar, stored in settings.
+const DEFAULT_SPRITE_KEY = "default_sprite_url";
+export const DEFAULT_SPRITE_AVATAR_PATH = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}&format=png&v=2`;
+export const getDefaultSpriteUrl = () => getSetting(DEFAULT_SPRITE_KEY);
 
 // Turns a member's built DiceBear avatar into a 2D game-art character ("sprite") via OpenAI, in the same
 // style as the boss art. The cron job (server-side) trickles a few per day; the admin app can also
@@ -54,6 +61,9 @@ export function describeAvatar(rawConfig) {
 export function buildSpritePrompt(config) {
     return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
 }
+
+// The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
+export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
 
 // Buyers whose sprite is missing or stale (avatar changed since it was last drawn). Oldest/never first.
 export function pendingSpriteIds(limit = 5) {
@@ -123,47 +133,24 @@ export async function generateBuyerSprite(buyerId) {
     return url;
 }
 
-// A random-but-tasteful built avatar, for members who never made one (so they show up + get a sprite).
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-export function randomAvatarConfig() {
-    return sanitizeAvatarConfig({
-        skinColor: pick(AVATAR_FIELDS.skinColor),
-        top: pick(HAIR_TOPS.filter((t) => t !== "bald")),
-        hairColor: pick(AVATAR_FIELDS.hairColor),
-        eyes: pick(["default", "happy", "wink", "squint", "side"]),
-        eyebrows: pick(["default", "defaultNatural", "raisedExcited", "flatNatural", "upDown"]),
-        mouth: pick(["smile", "default", "twinkle"]),
-        facialHair: Math.random() < 0.4 ? pick(["beardLight", "beardMedium", "moustacheFancy"]) : "none",
-        facialHairColor: pick(AVATAR_FIELDS.facialHairColor),
-        accessories: Math.random() < 0.3 ? pick(["round", "wayfarers", "prescription01", "prescription02"]) : "none",
-        accessoriesColor: pick(AVATAR_FIELDS.accessoriesColor),
-        clothing: pick(CLOTHINGS.filter((c) => c !== "graphicShirt")),
-        clothesColor: pick(AVATAR_FIELDS.clothesColor),
-        backgroundColor: "none",
-    });
+// Store a finished PNG (base64, generated on the phone from the DEFAULT avatar) as the shared default
+// sprite. Everyone without their own sprite falls back to this — one generation, not one per member.
+export async function setDefaultSpriteFromImage(base64) {
+    const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
+    const buffer = Buffer.from(clean, "base64");
+    if (!buffer.length) throw new Error("Empty image");
+    const blob = await put(`marketplace/sprite/default-${Date.now()}.png`, buffer, { access: "public", contentType: "image/png" });
+    await setSetting(DEFAULT_SPRITE_KEY, blob.url);
+    return blob.url;
 }
 
-// Members (with a handle) who have NEITHER a built avatar NOR an uploaded photo — safe to give a default.
-const MISSING_WHERE = `alias IS NOT NULL AND avatar_config IS NULL AND (avatar_url IS NULL OR avatar_url = '')`;
-
-export async function countMissingAvatars() {
-    const row = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE ${MISSING_WHERE}`).catch(() => ({ n: 0 }));
-    return row?.n || 0;
-}
-
-// Assign a random built avatar to every member missing one. Never overrides an existing avatar/photo.
-export async function backfillMissingAvatars() {
-    const rows = await db.query(`SELECT id FROM mkt_buyer WHERE ${MISSING_WHERE}`).catch(() => []);
-    let assigned = 0;
-    for (const r of rows) {
-        const cfg = randomAvatarConfig();
-        await db.query(
-            `UPDATE mkt_buyer SET avatar_config = $2::jsonb, avatar_updated_at = NOW() WHERE id = $1 AND avatar_config IS NULL`,
-            [r.id, JSON.stringify(cfg)]
-        );
-        assigned += 1;
-    }
-    return { assigned };
+// Server-side: draw the default sprite from the default avatar (web fallback for the phone flow).
+export async function generateDefaultSprite() {
+    const prompt = buildSpritePrompt(DEFAULT_AVATAR);
+    const png = await renderAvatarPng(DEFAULT_AVATAR, 1024);
+    const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
+    await setSetting(DEFAULT_SPRITE_KEY, url);
+    return url;
 }
 
 // Cron entry point: draw up to `limit` pending sprites. Small batch = cost + time control.

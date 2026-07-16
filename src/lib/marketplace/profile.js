@@ -6,7 +6,7 @@ import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrou
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
-import { sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { DEFAULT_AVATAR_URL, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { avatarImageUrl, COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
@@ -112,7 +112,7 @@ function mapProfile(row, badges = []) {
         fullName: fullName || null,
         alias: row.alias || null,
         // Built avatar (with any native hat cosmetic baked in) wins; else photo; else initials.
-        avatarUrl: avatarImageUrl(row.avatar_config, row.avatar_cosmetics) || row.avatar_url || null,
+        avatarUrl: avatarImageUrl(row.avatar_config, row.avatar_cosmetics) || row.avatar_url || DEFAULT_AVATAR_URL,
         // The raw config so the avatar builder can load the member's current choices.
         avatarConfig: row.avatar_config || null,
         // Equipped avatar cosmetics per slot (aura/headwear/effect/pet) — layered onto the portrait.

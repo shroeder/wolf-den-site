@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { backfillMissingAvatars, countMissingAvatars, generateBuyerSprite, listSpritesAdmin, setBuyerSprite } from "@/lib/marketplace/avatar-sprite.js";
+import { DEFAULT_SPRITE_AVATAR_PATH, DEFAULT_SPRITE_PROMPT, generateBuyerSprite, generateDefaultSprite, getDefaultSpriteUrl, listSpritesAdmin, setBuyerSprite, setDefaultSpriteFromImage } from "@/lib/marketplace/avatar-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -18,7 +18,12 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            return noStore({ members: await listSpritesAdmin(), missingCount: await countMissingAvatars() });
+            return noStore({
+                members: await listSpritesAdmin(),
+                defaultSpriteUrl: await getDefaultSpriteUrl(),
+                defaultSpriteAvatarPath: DEFAULT_SPRITE_AVATAR_PATH,
+                defaultSpritePrompt: DEFAULT_SPRITE_PROMPT,
+            });
         } catch (error) {
             return internalError(error, { event: "admin.sprites.list.failure" });
         }
@@ -33,7 +38,12 @@ export async function POST(request) {
         try {
             const body = await request.json().catch(() => ({}));
             const action = String(body?.action || "");
-            if (action === "backfillAvatars") return noStore(await backfillMissingAvatars());
+            // Default sprite (one shared image for everyone without their own) — no buyerId needed.
+            if (action === "setDefaultSprite") {
+                if (!body.image) return noStore({ error: "missing_image" }, { status: 400 });
+                return noStore({ defaultSpriteUrl: await setDefaultSpriteFromImage(body.image) });
+            }
+            if (action === "generateDefaultSprite") return noStore({ defaultSpriteUrl: await generateDefaultSprite() });
             if (!body.buyerId) return noStore({ error: "missing_buyer" }, { status: 400 });
             if (action === "setSprite") {
                 if (!body.image) return noStore({ error: "missing_image" }, { status: 400 });

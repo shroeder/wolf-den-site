@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
+import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
@@ -52,7 +53,7 @@ export async function getBossState(buyerId = null) {
     const roster = contributors.map((c) => ({
         id: c.id,
         name: c.display_name || c.alias || "Member",
-        avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || null,
+        avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || DEFAULT_AVATAR_URL,
         dmg: c.dmg,
         hits: c.hits,
         tickets: Math.floor(c.dmg / divisor),

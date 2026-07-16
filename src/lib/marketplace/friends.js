@@ -5,6 +5,7 @@ import { notifyFriendAccepted, notifyFriendRequest } from "@/lib/marketplace/soc
 import { awardOnce, levelForXp } from "@/lib/marketplace/xp.js";
 import { pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { avatarImageUrl, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
+import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 
 // Both people in a new friendship get a one-time "first friend" onboarding reward (deduped, so it
 // only ever fires for each once). Best-effort.
@@ -22,7 +23,7 @@ function mapUser(row) {
         alias: row.alias || null,
         // Public label — never the real first/last name (private). Handle / chosen display name only.
         displayLabel: row.display_name || row.alias || "Member",
-        avatarUrl: avatarImageUrl(row.avatar_config, row.avatar_cosmetics) || row.avatar_url || null,
+        avatarUrl: avatarImageUrl(row.avatar_config, row.avatar_cosmetics) || row.avatar_url || DEFAULT_AVATAR_URL,
         avatarCosmetics: sanitizeCosmetics(row.avatar_cosmetics),
         level: levelForXp(row.xp || 0).level,
         border: row.equipped_border || "none",

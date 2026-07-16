@@ -98,6 +98,9 @@ export function avatarUrlFor(config) {
     return `/api/marketplace/avatar?${avatarConfigToQuery(config)}`;
 }
 
+// The ONE shared default avatar shown for members who haven't built their own (instead of blank initials).
+export const DEFAULT_AVATAR_URL = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}`;
+
 // "shortFlat" -> "Short Flat", "straight01" -> "Straight 01", "none" -> "None".
 export function humanizeAvatarLabel(value) {
     if (value === "none") return "None";
