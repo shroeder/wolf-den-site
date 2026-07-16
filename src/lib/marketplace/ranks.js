@@ -11,6 +11,11 @@ export const RANKS = [
     { level: 30, title: "Legend", emoji: "⭐" },
     { level: 40, title: "Mythic", emoji: "🔥" },
     { level: 50, title: "Ascended", emoji: "💫" },
+    { level: 60, title: "Celestial", emoji: "🌠" },
+    { level: 70, title: "Empyrean", emoji: "☄️" },
+    { level: 80, title: "Eternal", emoji: "♾️" },
+    { level: 90, title: "Ragnarök", emoji: "⚡" },
+    { level: 100, title: "Fenrir", emoji: "🐺" },
 ];
 
 // The rank a member currently holds — the highest tier they've reached.
