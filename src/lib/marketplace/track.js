@@ -21,8 +21,11 @@ function progressLabel(rule, current, target) {
         case "tenure_days": return `${current} / ${target} days as a member`;
         case "wishlist": return `${current} / ${target} cards`;
         case "friends": return `${current} / ${target} friends`;
+        case "messages": return `${current} / ${target} messages sent`;
+        case "badge_count": return `${current} / ${target} badges earned`;
         case "leaderboard_top": return current >= 1 ? "Reached #1" : "Climb to #1";
         case "all_milestones": return current >= 1 ? "All complete" : "Complete every way to earn";
+        case "onboarding_complete": return current >= 1 ? "All onboarding done" : "Finish every onboarding step";
         case "trade_count": return `${current} / ${target} trades`;
         case "cards_traded": return `${current} / ${target} cards traded`;
         case "trade_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} traded`;

@@ -45,7 +45,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, messageRow, badgeRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -63,10 +63,21 @@ export async function getMemberMetrics(buyerId) {
                FROM mkt_donation_claim WHERE redeemed_buyer_id = $1`,
             [buyerId]
         ).catch(() => null),
+        // Messages this member has SENT — friend DMs + their side of store threads.
+        db.queryOne(
+            `SELECT ((SELECT COUNT(*) FROM mkt_dm_message WHERE sender_id = $1)
+                   + (SELECT COUNT(*) FROM mkt_message msg JOIN mkt_thread th ON th.id = msg.thread_id
+                       WHERE msg.sender = 'buyer' AND th.buyer_id = $1))::int AS n`,
+            [buyerId]
+        ).catch(() => null),
+        // How many badges they already hold (drives the meta "collect a lot of badges" badge).
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => null),
     ]);
 
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
     const allMilestones = ["spend", "first_purchase", "event_checkin", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
+    // Onboarding completionist: every one-time getting-started task done (the EARN checklist's one-timers).
+    const onboardingComplete = ["first_purchase", "discord_link", "profile_complete", "first_message", "first_friend", "first_wishlist", "first_equip"].every((k) => Boolean(progress[k]));
 
     const tenureDays = buyer?.created_at ? Math.floor((Date.now() - new Date(buyer.created_at).getTime()) / 86400000) : 0;
     const levelObj = levelForXp(xp);
@@ -83,6 +94,9 @@ export async function getMemberMetrics(buyerId) {
         tenureDays,
         isTop: topRow?.id === buyerId,
         allMilestones,
+        onboardingComplete,
+        messages: messageRow?.n || 0,
+        badgeCount: badgeRow?.n || 0,
         tradeCount: tradeRow?.trades || 0,
         cardsTraded: tradeRow?.cards || 0,
         tradeValue: Math.round(Number(tradeRow?.value_cents || 0) / 100),
@@ -103,8 +117,11 @@ export function progressForRule(rule, threshold, m) {
         case "tenure_days": return { current: m.tenureDays, target: t };
         case "wishlist": return { current: m.wishlist, target: t };
         case "friends": return { current: m.friends, target: t };
+        case "messages": return { current: m.messages, target: t };
+        case "badge_count": return { current: m.badgeCount, target: t };
         case "leaderboard_top": return { current: m.isTop ? 1 : 0, target: 1 };
         case "all_milestones": return { current: m.allMilestones ? 1 : 0, target: 1 };
+        case "onboarding_complete": return { current: m.onboardingComplete ? 1 : 0, target: 1 };
         case "trade_count": return { current: m.tradeCount, target: t };
         case "cards_traded": return { current: m.cardsTraded, target: t };
         case "trade_value": return { current: m.tradeValue, target: t };
