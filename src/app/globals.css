@@ -8903,3 +8903,48 @@ body.tv-mode .shop-mobile-cart-fab {
 .collectible.rar-epic.is-unlocked { border-color: rgba(168, 85, 247, 0.55); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2); }
 .collectible.rar-legendary.is-unlocked { border-color: rgba(245, 166, 35, 0.6); box-shadow: 0 0 12px rgba(245, 166, 35, 0.28); }
 .collectible-credit { font-size: 0.72rem; margin: 10px 0 0; }
+
+/* ---- Boss fight prototype ---- */
+.boss-wrap { display: flex; flex-direction: column; gap: 14px; }
+.boss-arena {
+    position: relative; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+    min-height: 300px; padding: 18px; border-radius: 16px; overflow: hidden;
+    background: radial-gradient(120% 90% at 85% 20%, rgba(120, 20, 20, 0.35), transparent 60%), linear-gradient(160deg, #14121a, #0b0a10);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.boss-fighters { display: flex; flex-wrap: wrap; gap: 10px 8px; align-content: center; max-width: 60%; }
+.boss-fighter { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 52px; transition: transform 160ms ease; }
+.boss-fighter-name { font-size: 0.6rem; color: #cdbfa6; max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boss-fighter.is-attacking { transform: translateX(26px) translateY(-4px) scale(1.12); z-index: 2; }
+.boss-fighter.is-you .boss-fighter-name { color: #ffd75e; font-weight: 700; }
+
+.boss-enemy-side { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 190px; }
+.boss-hpbar { width: 190px; height: 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.boss-hpbar span { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, #ff4d4d, #ff8a3d); transition: width 180ms ease; }
+.boss-hp-label { font-size: 0.72rem; color: #e6d5b8; font-weight: 600; }
+.boss-enemy { font-size: 8rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 16px rgba(224, 68, 58, 0.4)); animation: boss-breathe 2.4s ease-in-out infinite; }
+.boss-enemy.is-hit { animation: boss-shake 0.16s linear; color: #ff8a7a; }
+.boss-enemy.is-dead { filter: grayscale(1) brightness(0.5); opacity: 0.5; transform: rotate(8deg); transition: all 400ms ease; }
+@keyframes boss-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes boss-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.boss-floater { position: absolute; font-weight: 800; font-size: 1rem; color: #ffd75e; text-shadow: 0 1px 2px #000; pointer-events: none; animation: boss-float 0.85s ease-out forwards; }
+.boss-floater.is-crit { font-size: 1.5rem; color: #ff5a5a; }
+@keyframes boss-float { 0% { opacity: 1; transform: translateY(0) scale(0.8); } 100% { opacity: 0; transform: translateY(-42px) scale(1.2); } }
+@media (prefers-reduced-motion: reduce) { .boss-enemy { animation: none; } .boss-fighter { transition: none; } }
+
+.boss-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.boss-attack { font-size: 1rem; padding: 10px 22px; }
+.boss-victory { padding: 16px; border-radius: 14px; border: 1px solid rgba(255, 215, 94, 0.35); background: rgba(255, 215, 94, 0.06); }
+.boss-victory h3 { margin: 0 0 4px; }
+.boss-ranking { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.boss-ranking li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.boss-ranking li.is-you { background: rgba(255, 215, 94, 0.12); }
+.boss-rank-n { width: 18px; font-weight: 800; color: #ffd75e; text-align: center; }
+.boss-rank-name { flex: 1; font-weight: 600; font-size: 0.9rem; }
+.boss-rank-dmg { font-size: 0.8rem; color: #cdbfa6; }
+.boss-rank-tix { font-size: 0.82rem; font-weight: 700; }
+@media (max-width: 560px) {
+    .boss-arena { grid-template-columns: 1fr; }
+    .boss-fighters { max-width: none; }
+    .boss-enemy { font-size: 6rem; }
+}
