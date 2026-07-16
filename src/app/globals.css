@@ -8954,3 +8954,7 @@ body.tv-mode .shop-mobile-cart-fab {
     .boss-fighters { max-width: none; }
     .boss-enemy { font-size: 6rem; }
 }
+
+/* Compact avatar CTA on the profile (the full builder lives at /marketplace/profile/avatar) */
+.avatar-cta { display: flex; align-items: center; gap: 16px; }
+.avatar-cta-body { display: flex; flex-direction: column; min-width: 0; }
