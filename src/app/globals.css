@@ -5632,6 +5632,7 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 .level-ring-badge {
     position: absolute;
+    z-index: 3;
     bottom: -4px;
     left: 50%;
     transform: translateX(-50%);
@@ -8752,8 +8753,8 @@ body.tv-mode .shop-mobile-cart-fab {
 .card-tab {
     position: absolute;
     top: 0;
-    left: 20px;
-    transform: translateY(-72%);
+    left: 16px;
+    transform: translateY(-55%);
     z-index: 2;
     display: inline-flex;
     align-items: center;
@@ -8833,7 +8834,8 @@ body.tv-mode .shop-mobile-cart-fab {
 }
 
 /* ---- Layered avatar stack: base portrait + equipped cosmetics ---- */
-.av-stack { position: relative; display: inline-block; vertical-align: top; flex: 0 0 auto; line-height: 1; }
+/* isolate so the avatar's internal layers (image/aura/overlays) don't fight siblings like the Lv badge */
+.av-stack { position: relative; display: inline-block; vertical-align: top; flex: 0 0 auto; line-height: 1; isolation: isolate; }
 .av-stack-clip {
     position: absolute; inset: 0; border-radius: 50%; overflow: hidden; z-index: 1;
     display: flex; align-items: center; justify-content: center;
