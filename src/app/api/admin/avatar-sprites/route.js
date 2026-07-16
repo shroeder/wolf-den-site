@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { generateBuyerSprite, listSpritesAdmin, setBuyerSprite } from "@/lib/marketplace/avatar-sprite.js";
+import { backfillMissingAvatars, countMissingAvatars, generateBuyerSprite, listSpritesAdmin, setBuyerSprite } from "@/lib/marketplace/avatar-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            return noStore({ members: await listSpritesAdmin() });
+            return noStore({ members: await listSpritesAdmin(), missingCount: await countMissingAvatars() });
         } catch (error) {
             return internalError(error, { event: "admin.sprites.list.failure" });
         }
@@ -33,6 +33,7 @@ export async function POST(request) {
         try {
             const body = await request.json().catch(() => ({}));
             const action = String(body?.action || "");
+            if (action === "backfillAvatars") return noStore(await backfillMissingAvatars());
             if (!body.buyerId) return noStore({ error: "missing_buyer" }, { status: 400 });
             if (action === "setSprite") {
                 if (!body.image) return noStore({ error: "missing_image" }, { status: 400 });

@@ -5,7 +5,7 @@ import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { editImage } from "@/lib/marketplace/openai-image.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { avatarConfigToQuery, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { AVATAR_FIELDS, avatarConfigToQuery, CLOTHINGS, HAIR_TOPS, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
 // Turns a member's built DiceBear avatar into a 2D game-art character ("sprite") via OpenAI, in the same
 // style as the boss art. The cron job (server-side) trickles a few per day; the admin app can also
@@ -121,6 +121,49 @@ export async function generateBuyerSprite(buyerId) {
         [buyerId, url, prompt]
     );
     return url;
+}
+
+// A random-but-tasteful built avatar, for members who never made one (so they show up + get a sprite).
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+export function randomAvatarConfig() {
+    return sanitizeAvatarConfig({
+        skinColor: pick(AVATAR_FIELDS.skinColor),
+        top: pick(HAIR_TOPS.filter((t) => t !== "bald")),
+        hairColor: pick(AVATAR_FIELDS.hairColor),
+        eyes: pick(["default", "happy", "wink", "squint", "side"]),
+        eyebrows: pick(["default", "defaultNatural", "raisedExcited", "flatNatural", "upDown"]),
+        mouth: pick(["smile", "default", "twinkle"]),
+        facialHair: Math.random() < 0.4 ? pick(["beardLight", "beardMedium", "moustacheFancy"]) : "none",
+        facialHairColor: pick(AVATAR_FIELDS.facialHairColor),
+        accessories: Math.random() < 0.3 ? pick(["round", "wayfarers", "prescription01", "prescription02"]) : "none",
+        accessoriesColor: pick(AVATAR_FIELDS.accessoriesColor),
+        clothing: pick(CLOTHINGS.filter((c) => c !== "graphicShirt")),
+        clothesColor: pick(AVATAR_FIELDS.clothesColor),
+        backgroundColor: "none",
+    });
+}
+
+// Members (with a handle) who have NEITHER a built avatar NOR an uploaded photo — safe to give a default.
+const MISSING_WHERE = `alias IS NOT NULL AND avatar_config IS NULL AND (avatar_url IS NULL OR avatar_url = '')`;
+
+export async function countMissingAvatars() {
+    const row = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE ${MISSING_WHERE}`).catch(() => ({ n: 0 }));
+    return row?.n || 0;
+}
+
+// Assign a random built avatar to every member missing one. Never overrides an existing avatar/photo.
+export async function backfillMissingAvatars() {
+    const rows = await db.query(`SELECT id FROM mkt_buyer WHERE ${MISSING_WHERE}`).catch(() => []);
+    let assigned = 0;
+    for (const r of rows) {
+        const cfg = randomAvatarConfig();
+        await db.query(
+            `UPDATE mkt_buyer SET avatar_config = $2::jsonb, avatar_updated_at = NOW() WHERE id = $1 AND avatar_config IS NULL`,
+            [r.id, JSON.stringify(cfg)]
+        );
+        assigned += 1;
+    }
+    return { assigned };
 }
 
 // Cron entry point: draw up to `limit` pending sprites. Small batch = cost + time control.
