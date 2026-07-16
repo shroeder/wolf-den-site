@@ -6582,21 +6582,34 @@ body.tv-mode .shop-mobile-cart-fab {
     justify-content: center;
     border: 2px solid var(--bg, #0e0e12);
 }
+/* Full-screen "go in / get back out" experience — not a corner modal. Locks the page behind it. */
 .social-panel {
     position: fixed;
-    right: 20px;
-    bottom: 86px;
-    z-index: 900;
-    width: min(400px, calc(100vw - 32px));
-    height: min(600px, calc(100vh - 130px));
+    inset: 0;
+    z-index: 1000;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
-    background: var(--surface, #16161c);
-    border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
-    border-radius: 16px;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    background: var(--bg, #0e0e12);
+    border: none;
+    border-radius: 0;
     overflow: hidden;
+    animation: social-panel-in 0.25s ease;
 }
+@keyframes social-panel-in {
+    from { opacity: 0; transform: translateY(2%); }
+    to { opacity: 1; transform: none; }
+}
+/* Comfortable reading column on wide screens; full-bleed on phones. */
+.social-panel > * {
+    width: 100%;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+}
+@media (prefers-reduced-motion: reduce) { .social-panel { animation: none; } }
 .social-tabs {
     display: flex;
     align-items: center;
@@ -6768,7 +6781,6 @@ body.tv-mode .shop-mobile-cart-fab {
 .notif-toggle.is-on .notif-knob { transform: translateX(18px); }
 .notif-toggle:disabled { opacity: 0.7; cursor: default; }
 @media (max-width: 480px) {
-    .social-panel { right: 12px; left: 12px; width: auto; bottom: 84px; height: min(72vh, 560px); }
     .social-fab { right: 16px; bottom: 16px; }
 }
 

@@ -167,6 +167,14 @@ export default function SocialHub() {
         return () => clearInterval(iv);
     }, [refreshUnread]);
 
+    // Lock the page behind the full-screen hub so nothing scrolls underneath.
+    useEffect(() => {
+        if (!open) return undefined;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [open]);
+
     const loadInbox = useCallback(async () => {
         const r = await fetch("/api/marketplace/inbox", { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
