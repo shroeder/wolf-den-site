@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import BackgroundPicker from "@/components/BackgroundPicker";
+import AvatarBuilder from "@/components/AvatarBuilder";
 import BorderPicker from "@/components/BorderPicker";
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
@@ -60,6 +61,12 @@ export default async function ProfileHubPage() {
                     level={level}
                     border={profile?.border}
                 />
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Your avatar</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Build a character that&apos;s yours — skin, hair, face, and outfit. Cool cosmetics to layer on come later as you unlock them.</p>
+                <AvatarBuilder current={profile?.avatarConfig} />
             </section>
 
             <section className="card">

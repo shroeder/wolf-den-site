@@ -6,6 +6,7 @@ import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrou
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
+import { avatarUrlFor, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
@@ -109,7 +110,10 @@ function mapProfile(row, badges = []) {
         lastName: row.last_name || null,
         fullName: fullName || null,
         alias: row.alias || null,
-        avatarUrl: row.avatar_url || null,
+        // Built ("vanilla") avatar wins; else an uploaded photo; else initials (handled by the UI).
+        avatarUrl: avatarUrlFor(row.avatar_config) || row.avatar_url || null,
+        // The raw config so the avatar builder can load the member's current choices.
+        avatarConfig: row.avatar_config || null,
         // PUBLIC identity — never the real first/last name (those are private). Prefer the chosen
         // display name, then the @handle. Real name only ever goes to the account owner (firstName/
         // lastName/fullName fields below), never into a cross-user label.
@@ -139,7 +143,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -211,6 +215,14 @@ export async function equipFrame(buyerId, frameId) {
     return getProfile(buyerId);
 }
 
+// Save the member's built avatar config (validated), or clear it (pass null) to revert to their photo.
+export async function setAvatarConfig(buyerId, config) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const clean = config ? sanitizeAvatarConfig(config) : null;
+    await db.query(`UPDATE mkt_buyer SET avatar_config = $2::jsonb, updated_at = NOW() WHERE id = $1`, [buyerId, clean ? JSON.stringify(clean) : null]);
+    return getProfile(buyerId);
+}
+
 // Set the badges the member showcases on their card (up to MAX_SHOWCASE). Each must be a badge they
 // hold; pass [] to clear (falls back to their top few). The top-ranked of the set becomes the tab.
 export async function setShowcaseBadges(buyerId, slugs) {
@@ -230,7 +242,7 @@ export async function setShowcaseBadges(buyerId, slugs) {
 export async function getLeaderboard(limit = 50) {
     const rows = await db
         .query(
-            `SELECT id, alias, avatar_url, first_name, last_name, display_name, xp, equipped_border, equipped_frame
+            `SELECT id, alias, avatar_url, avatar_config, first_name, last_name, display_name, xp, equipped_border, equipped_frame
                FROM mkt_buyer
               WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0
               ORDER BY xp DESC, updated_at ASC
@@ -249,7 +261,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );
