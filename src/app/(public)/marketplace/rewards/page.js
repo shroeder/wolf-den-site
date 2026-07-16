@@ -38,7 +38,7 @@ export default async function RewardsPage() {
                 <div className="mkt-hero-links" style={{ marginTop: 12 }}>
                     {signedIn ? (
                         <>
-                            <Link href="/marketplace/track" className="btn-gold">🗺️ Your rewards track</Link>
+                            <Link href="/marketplace/track" className="btn-gold">Your rewards track →</Link>
                             <Link href="/marketplace/boss" className="pill">⚔️ Boss fight</Link>
                             <Link href="/marketplace/card" className="pill">🎟️ Loyalty card</Link>
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>
