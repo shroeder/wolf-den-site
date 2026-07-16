@@ -8680,7 +8680,8 @@ body.tv-mode .shop-mobile-cart-fab {
     pointer-events: none;
     z-index: 1;
 }
-.hero-card.frame::after { inset: 5px; border-radius: 9px; }
+/* On member cards the frame hugs the card EDGE (reads as the card's own border), not a floating inset. */
+.hero-card.frame::after { inset: 0; border-radius: 14px; }
 
 .frame-hairline::after { border: 1px solid rgba(255, 215, 94, 0.55); }
 .frame-rope::after { border: 3px dashed rgba(206, 164, 92, 0.8); }

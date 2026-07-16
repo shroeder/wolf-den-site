@@ -30,6 +30,7 @@ const TILES = [
     { href: "/marketplace/leaderboard", icon: "🏆", label: "Leaderboard", sub: "See your rank" },
     { href: "/marketplace/friends", icon: "👥", label: "Friends", sub: "Add & message" },
     { href: "/marketplace/inbox", icon: "✉️", label: "Inbox", sub: "All your messages" },
+    { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Preview" },
 ];
 
 export default async function ProfileHubPage() {
