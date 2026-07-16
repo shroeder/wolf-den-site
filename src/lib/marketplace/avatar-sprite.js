@@ -3,8 +3,9 @@ import "server-only";
 import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
-import { generateImage } from "@/lib/marketplace/openai-image.js";
-import { HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { editImage } from "@/lib/marketplace/openai-image.js";
+import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
+import { avatarConfigToQuery, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
 // Turns a member's built DiceBear avatar into a 2D game-art character ("sprite") via OpenAI, in the same
 // style as the boss art. The cron job (server-side) trickles a few per day; the admin app can also
@@ -46,11 +47,10 @@ export function describeAvatar(rawConfig) {
     return parts.join(", ");
 }
 
-const STYLE_SUFFIX =
-    "Full-body 2D video-game hero character splash art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, confident heroic standing pose facing forward, strong readable silhouette, centered, polished RPG game-art style, clean coherent anatomy, transparent background, no text, no logo, no watermark, no border.";
-
+// Prompt for the EDITS endpoint: the member's avatar PNG is the reference, so tell the model to keep its
+// identity and just redraw it as a full-body game character.
 export function buildSpritePrompt(config) {
-    return `A heroic fantasy adventurer character with ${describeAvatar(config)}. ${STYLE_SUFFIX}`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. Keep the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors as the reference (${describeAvatar(config)}). Confident heroic standing pose facing forward, full body head to toe, bold stylized illustration with clean confident outlines and cel-shaded flat vibrant colors, polished RPG game-art style, clean coherent anatomy, transparent background, no text, no logo, no watermark, no border.`;
 }
 
 // Buyers whose sprite is missing or stale (avatar changed since it was last drawn). Oldest/never first.
@@ -83,6 +83,8 @@ export async function listSpritesAdmin() {
         buyerId: r.id,
         label: r.display_name || (r.alias ? `@${r.alias}` : "Member"),
         spriteUrl: r.avatar_sprite_url || null,
+        // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar).
+        avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png`,
         prompt: buildSpritePrompt(r.avatar_config),
         pending: !r.avatar_sprite_url || (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) || !r.avatar_sprite_at,
     }));
@@ -103,12 +105,14 @@ export async function setBuyerSprite(buyerId, base64) {
     return blob.url;
 }
 
-// Server-side generation (used by the cron job). Builds the prompt, calls OpenAI, stores the URL.
+// Server-side generation (used by the cron job): rasterize the avatar, feed it to the edits endpoint so
+// the sprite matches the member's avatar, then store the URL.
 export async function generateBuyerSprite(buyerId) {
     const row = await db.queryOne(`SELECT avatar_config FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const prompt = buildSpritePrompt(row.avatar_config);
-    const url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
+    const png = await renderAvatarPng(row.avatar_config, 1024);
+    const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
     await db.query(
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3 WHERE id = $1`,
         [buyerId, url, prompt]

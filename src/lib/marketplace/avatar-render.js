@@ -61,3 +61,11 @@ export function generateAvatarSvg(config) {
     void AVATAR_STYLE;
     return createAvatar(avataaars, toDicebearOptions(config)).toString();
 }
+
+// The avatar rasterized to a PNG buffer (square, transparent). Used as the reference image fed to the
+// OpenAI edits endpoint so the generated sprite matches the member's actual avatar.
+export async function renderAvatarPng(config, size = 1024) {
+    const { default: sharp } = await import("sharp");
+    const svg = generateAvatarSvg(config);
+    return sharp(Buffer.from(svg)).resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+}

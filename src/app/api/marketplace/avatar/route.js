@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
-import { generateAvatarSvg } from "@/lib/marketplace/avatar-render.js";
+import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -18,7 +18,15 @@ export async function GET(request) {
     for (const key of Object.keys(AVATAR_FIELDS)) {
         if (searchParams.has(key)) config[key] = searchParams.get(key);
     }
-    const svg = generateAvatarSvg(sanitizeAvatarConfig(config));
+    const clean = sanitizeAvatarConfig(config);
+    // format=png rasterizes the avatar (used as the reference image for AI sprite generation).
+    if (searchParams.get("format") === "png") {
+        const png = await renderAvatarPng(clean, Number(searchParams.get("size")) || 1024);
+        return new Response(png, {
+            headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=31536000, immutable" },
+        });
+    }
+    const svg = generateAvatarSvg(clean);
     return new Response(svg, {
         headers: {
             "Content-Type": "image/svg+xml; charset=utf-8",
