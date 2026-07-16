@@ -46,7 +46,7 @@ export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], l
 
             <div className="rewards-hero-actions">
                 <Link href="/marketplace/track" className="rewards-preview-btn">
-                    🗺️ View your rewards track →
+                    View your rewards track →
                 </Link>
             </div>
         </div>

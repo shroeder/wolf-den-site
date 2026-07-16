@@ -5686,12 +5686,18 @@ body.tv-mode .shop-mobile-cart-fab {
 .rewards-preview-btn {
     appearance: none;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     font: inherit;
     font-weight: 700;
     font-size: 0.9rem;
     padding: 9px 16px;
     border-radius: 999px;
-    color: #171008;
+    /* Force dark text + no underline so global <a> link styles can't make it an unreadable blue link. */
+    color: #171008 !important;
+    text-decoration: none !important;
     background: linear-gradient(90deg, #c8a24a, #ffd75e);
     border: 1px solid transparent;
     transition: transform 120ms ease, box-shadow 120ms ease;
