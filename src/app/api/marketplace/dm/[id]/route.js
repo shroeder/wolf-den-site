@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getDmThread, postDmMessage } from "@/lib/marketplace/dm.js";
+import { awardOnce } from "@/lib/marketplace/xp.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -37,6 +38,7 @@ export async function POST(request, { params }) {
             const body = await request.json().catch(() => ({}));
             const result = await postDmMessage(id, buyer.id, body?.body, body?.catalogProductId || null);
             if (result.error) return noStore({ error: result.error }, { status: result.error === "forbidden" ? 403 : 400 });
+            await awardOnce(buyer.id, "first_message", { dmThreadId: id }); // onboarding: first message ever (best-effort)
             return noStore(result);
         } catch (error) {
             return internalError(error, { event: "marketplace.dm.post.failure" });

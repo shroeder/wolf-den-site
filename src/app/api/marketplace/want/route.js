@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { recordEngagement } from "@/lib/marketplace/engagement.js";
 import { createWant } from "@/lib/marketplace/wants.js";
-import { awardXp } from "@/lib/marketplace/xp.js";
+import { awardXp, awardOnce } from "@/lib/marketplace/xp.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -49,6 +49,7 @@ export async function POST(request) {
                 after(() => recordEngagement("want", { catalogProductId: body.catalogProductId }));
                 // Loyalty XP for adding to the wishlist (once per product).
                 after(() => awardXp(buyer.id, "wishlist_add", { dedupeKey: `wishlist:${buyer.id}:${body.catalogProductId}`, dailyCap: 3, meta: { catalogProductId: body.catalogProductId } }));
+                after(() => awardOnce(buyer.id, "first_wishlist", { catalogProductId: body.catalogProductId })); // onboarding: first Looking For card
 
                 return NextResponse.json({ ok: true });
             } catch (validationError) {

@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { sendNewMessageEmail } from "@/lib/marketplace/email.js";
 import { getThreadParties, isOwnerStorefront, listThreadsForBuyer, listThreadsForVendor, startThread } from "@/lib/marketplace/messaging.js";
 import { sendAdminPush } from "@/lib/push/send.js";
-import { awardXp, dailyKey } from "@/lib/marketplace/xp.js";
+import { awardXp, awardOnce, dailyKey } from "@/lib/marketplace/xp.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
 import { getBuyOrderById } from "@/lib/marketplace/wants.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -115,6 +115,7 @@ export async function POST(request) {
             // Loyalty XP for a buyer messaging (once per thread per day, so it can't be farmed).
             if (as === "buyer" && buyerId) {
                 after(() => awardXp(buyerId, "message", { dedupeKey: dailyKey("message", buyerId, threadId), dailyCap: 3, meta: { threadId } }));
+                after(() => awardOnce(buyerId, "first_message", { threadId })); // onboarding: first message ever
             }
             return NextResponse.json({ threadId });
         } catch (error) {

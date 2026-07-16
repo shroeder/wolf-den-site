@@ -31,6 +31,11 @@ export async function getRewardsProgress(buyerId) {
         discord_link: actions.has("discord_link"),
         profile_complete: actions.has("profile_complete"),
         daily_active: Boolean(todayActive),
+        // Onboarding milestones — one-time nudges to try the social/community features.
+        first_message: actions.has("first_message"),
+        first_friend: actions.has("first_friend"),
+        first_wishlist: actions.has("first_wishlist"),
+        first_equip: actions.has("first_equip"),
     };
 }
 
@@ -43,7 +48,19 @@ export const XP_ACTIONS = {
     first_purchase: 100, // first-ever purchase (once, ever) (wired in the POS phase)
     event_checkin: 50, // checking in at an event (once/event)
     discord_link: 50, // linking your Discord account while in the server (once, ever)
+    // Onboarding milestones (each once, ever) — reward trying a feature for the first time.
+    first_message: 40, // send your first message (store or a friend)
+    first_friend: 40, // make your first friend
+    first_wishlist: 30, // add your first card to your Looking For list
+    first_equip: 20, // customize your look — equip a border or background
 };
+
+// Award a one-time onboarding milestone. dedupe on (action, buyerId) so it can only ever fire once.
+// Best-effort; returns the points granted or null if already earned / skipped.
+export async function awardOnce(buyerId, action, meta = null) {
+    if (!buyerId) return null;
+    return awardXp(buyerId, action, { dedupeKey: `${action}:${buyerId}`, meta });
+}
 
 // Dollars spent → XP (uncapped). Used by the purchase/POS hook.
 export const SPEND_XP_PER_DOLLAR = 1;

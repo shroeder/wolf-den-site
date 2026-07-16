@@ -2,7 +2,13 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { notifyFriendAccepted, notifyFriendRequest } from "@/lib/marketplace/social-notify.js";
-import { levelForXp } from "@/lib/marketplace/xp.js";
+import { awardOnce, levelForXp } from "@/lib/marketplace/xp.js";
+
+// Both people in a new friendship get a one-time "first friend" onboarding reward (deduped, so it
+// only ever fires for each once). Best-effort.
+async function awardFirstFriend(a, b) {
+    await Promise.all([awardOnce(a, "first_friend", { friendId: b }), awardOnce(b, "first_friend", { friendId: a })]).catch(() => {});
+}
 
 // Friendships: mutual add (request -> accept/decline). All lookups are pair-based so direction doesn't
 // matter once accepted. Presentational mapping mirrors the public profile (no contact info).
@@ -138,6 +144,7 @@ export async function sendFriendRequest(requesterId, addresseeId) {
             await db.query(`UPDATE mkt_friendship SET status = 'accepted', responded_at = NOW() WHERE id = $1`, [existing.id]).catch(() => {});
             // The original requester (addresseeId) gets an "accepted" nudge.
             await notifyFriendAccepted(addresseeId, requesterId);
+            await awardFirstFriend(requesterId, addresseeId);
             return { ok: true, status: "friends" };
         }
         return { ok: true, status: "outgoing" }; // already pending from me
@@ -157,7 +164,10 @@ export async function respondToRequest(userId, requestId, accept) {
             .query(`UPDATE mkt_friendship SET status = 'accepted', responded_at = NOW()
                      WHERE id = $1 AND addressee_id = $2 AND status = 'pending' RETURNING requester_id`, [requestId, userId])
             .catch(() => []);
-        if (rows.length > 0) await notifyFriendAccepted(rows[0].requester_id, userId);
+        if (rows.length > 0) {
+            await notifyFriendAccepted(rows[0].requester_id, userId);
+            await awardFirstFriend(userId, rows[0].requester_id);
+        }
         return { ok: rows.length > 0 };
     }
     await db.query(`DELETE FROM mkt_friendship WHERE id = $1 AND addressee_id = $2 AND status = 'pending'`, [requestId, userId]).catch(() => {});

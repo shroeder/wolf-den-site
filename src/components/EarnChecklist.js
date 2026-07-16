@@ -10,6 +10,10 @@ export const EARN = [
     { key: "event_checkin", icon: "📅", label: "Check in at an event", points: "+50 XP", note: "each event", href: "/events", cta: "See events →", doneNote: "Checked in before", repeatable: true },
     { key: "discord_link", icon: "💬", label: "Link your Discord", points: "+50 XP", note: "join the server", href: "/api/marketplace/discord/start", cta: "Link Discord →" },
     { key: "profile_complete", icon: "✅", label: "Complete your profile", points: "+25 XP", note: "name, handle, photo", href: "/marketplace/profile", cta: "Edit profile →" },
+    { key: "first_message", icon: "✉️", label: "Send your first message", points: "+40 XP", note: "one-time bonus", href: "/marketplace/messages", cta: "Message the store →" },
+    { key: "first_friend", icon: "🤝", label: "Make your first friend", points: "+40 XP", note: "one-time bonus", href: "/marketplace/friends", cta: "Find friends →" },
+    { key: "first_wishlist", icon: "🔖", label: "Start your Looking For list", points: "+30 XP", note: "one-time bonus", href: "/looking-for", cta: "Add a card →" },
+    { key: "first_equip", icon: "🎨", label: "Customize your look", points: "+20 XP", note: "equip a border or background", href: "/marketplace/profile", cta: "Customize →" },
     { key: "daily_active", icon: "🔥", label: "Daily visits & activity", points: "+XP", note: "come back often", href: "/shop", cta: "Keep it up →", doneNote: "Active today", repeatable: true },
 ];
 
