@@ -4,7 +4,7 @@ import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
-import { generateImage } from "@/lib/marketplace/openai-image.js";
+import { generateImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
 
 // Store a finished PNG (base64, generated directly on the phone) as the boss art — fast, no OpenAI wait.
 export async function setBossArt(bossId, base64) {
@@ -48,6 +48,33 @@ export async function generateBossArt(bossId, prompt) {
     const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. 2D video-game boss art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, dramatic dynamic action pose, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
     const url = await generateImage(full, { size: "1024x1024", pathPrefix: "marketplace/boss" });
     await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, url]);
+    return url;
+}
+
+// Battle-stage background prompt (opaque landscape, same art universe, NO characters).
+export function bossBackgroundPrompt(subject) {
+    const scene = String(subject || "a dark fantasy lair").slice(0, 400);
+    return `The battle lair of ${scene}. Epic 2D video-game battle stage background, wide side-scrolling environment, dramatic atmospheric lighting, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, polished RPG game-art style, richly detailed scenery, an empty stage with NO characters or creatures, a clear foreground ground/floor for characters to stand on, no text, no logo, no watermark, no UI, no border.`;
+}
+
+// Store a finished background PNG (base64, generated on the phone). Fast, no OpenAI wait.
+export async function setBossBackground(bossId, base64) {
+    const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
+    const buffer = Buffer.from(clean, "base64");
+    if (!buffer.length) throw new Error("Empty image");
+    const blob = await put(`marketplace/boss-bg/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, buffer, { access: "public", contentType: "image/png" });
+    await db.query(`UPDATE boss_event SET background_url = $2 WHERE id = $1`, [bossId, blob.url]);
+    return blob.url;
+}
+
+// Server-side background generation (web fallback for the phone flow).
+export async function generateBossBackground(bossId, subject) {
+    const boss = await db.queryOne(`SELECT id, name, description FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    const url = await generateSceneImage(bossBackgroundPrompt(subject || boss.description || boss.name));
+    await db.query(`UPDATE boss_event SET background_url = $2 WHERE id = $1`, [bossId, url]);
     return url;
 }
 

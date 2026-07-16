@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GiSpikedDragonHead } from "react-icons/gi";
 
 import AvatarStack from "@/components/AvatarStack";
+import BossBattleScene from "@/components/BossBattleScene";
 
 // The REAL monthly boss: shared, persistent HP (from the server), daily-limited attacks, XP per hit,
 // contributor ranking + raffle tickets. Polls so you see the community chip away live.
@@ -33,7 +33,8 @@ export default function BossFightClient() {
 
     function popDamage(amount, crit) {
         const id = floatId.current++;
-        setFloaters((f) => [...f, { id, amount, crit, top: 15 + Math.random() * 45, left: 25 + Math.random() * 50 }]);
+        // Pop near the boss (right side of the stage).
+        setFloaters((f) => [...f, { id, amount, crit, top: 14 + Math.random() * 38, left: 60 + Math.random() * 24 }]);
         setTimeout(() => setFloaters((f) => f.filter((x) => x.id !== id)), 850);
         setHit(true);
         setTimeout(() => setHit(false), 180);
@@ -72,31 +73,14 @@ export default function BossFightClient() {
     if (!loaded) return <p className="muted">Summoning the boss…</p>;
     if (!data?.boss) return <p className="muted">No active boss right now — check back soon.</p>;
 
-    const { boss, roster = [], you } = data;
+    const { boss, roster = [], you, defaultSpriteUrl } = data;
     const pct = Math.max(0, Math.min(100, Math.round((boss.hp / boss.maxHp) * 100)));
 
     return (
         <div className="boss2">
-            <div className="boss2-stage">
-                <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs.</div>
-                <div className={`boss2-figure${hit ? " is-hit" : ""}`}>
-                    {boss.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="boss2-art" src={boss.imageUrl} alt={boss.name} />
-                    ) : (
-                        <span className="boss2-enemy"><GiSpikedDragonHead aria-hidden="true" /></span>
-                    )}
-                </div>
-                <div className="boss2-name">{boss.name}</div>
-                <div className="boss2-hpbar"><span style={{ width: `${pct}%` }} /></div>
-                <div className="boss2-hp">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</div>
-                {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
-                {floaters.map((f) => (
-                    <span key={f.id} className={`boss2-floater${f.crit ? " is-crit" : ""}`} style={{ top: `${f.top}%`, left: `${f.left}%` }}>
-                        {f.crit ? `${f.amount}!` : f.amount}
-                    </span>
-                ))}
-            </div>
+            <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
+            <BossBattleScene boss={boss} fighters={roster} defaultSprite={defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
+            {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             <div className="boss2-actions">
                 {!you ? (

@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
+import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
@@ -38,22 +39,27 @@ export async function getBossState(buyerId = null) {
     const boss = await getActiveBoss();
     if (!boss) return { boss: null };
 
-    const contributors = await db
-        .query(
-            `SELECT b.id, b.alias, b.display_name, b.avatar_url, b.avatar_config, b.avatar_cosmetics,
-                    SUM(h.damage)::int AS dmg, COUNT(*)::int AS hits
-               FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
-              WHERE h.boss_id = $1
-              GROUP BY b.id ORDER BY dmg DESC LIMIT 20`,
-            [boss.id]
-        )
-        .catch(() => []);
+    const [contributors, defaultSprite] = await Promise.all([
+        db
+            .query(
+                `SELECT b.id, b.alias, b.display_name, b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.avatar_sprite_url,
+                        SUM(h.damage)::int AS dmg, COUNT(*)::int AS hits
+                   FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+                  WHERE h.boss_id = $1
+                  GROUP BY b.id ORDER BY dmg DESC LIMIT 20`,
+                [boss.id]
+            )
+            .catch(() => []),
+        getDefaultSpriteUrl().catch(() => null),
+    ]);
 
     const divisor = Math.max(1, boss.ticket_divisor || 100);
     const roster = contributors.map((c) => ({
         id: c.id,
         name: c.display_name || c.alias || "Member",
         avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || DEFAULT_AVATAR_URL,
+        // Full-body sprite for the side-scroller: their own if generated, else the shared default.
+        spriteUrl: c.avatar_sprite_url || defaultSprite || null,
         dmg: c.dmg,
         hits: c.hits,
         tickets: Math.floor(c.dmg / divisor),
@@ -77,12 +83,14 @@ export async function getBossState(buyerId = null) {
             hp: boss.hp,
             maxHp: boss.max_hp,
             imageUrl: boss.image_url || null,
+            backgroundUrl: boss.background_url || null,
             rewards: boss.rewards_text || null,
             ticketDivisor: divisor,
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
         },
         roster,
+        defaultSpriteUrl: defaultSprite || null,
         you,
     };
 }

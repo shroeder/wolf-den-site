@@ -30,6 +30,28 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     return blob.url;
 }
 
+// Opaque landscape scene (no transparency) — used for boss battle backgrounds. Returns the Blob URL.
+export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg" } = {}) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("Missing OPENAI_API_KEY");
+
+    const resp = await fetch(IMAGES_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality: "medium", n: 1 }),
+    });
+    if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        throw new Error(`OpenAI scene ${resp.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await resp.json().catch(() => null);
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) throw new Error("OpenAI returned no image");
+    const buffer = Buffer.from(b64, "base64");
+    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, buffer, { access: "public", contentType: "image/png" });
+    return blob.url;
+}
+
 // Image-to-image: transform a reference PNG with a prompt (gpt-image-1 edits). Used to redraw a member's
 // avatar as a full-body sprite so it actually matches their avatar. Returns the stored Blob URL.
 export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai" } = {}) {
