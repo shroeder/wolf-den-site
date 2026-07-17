@@ -70,6 +70,10 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                 {party.map((f) => (
                     <div key={f.key} className={`fighter${f.pad ? " is-pad" : ""}${f.you ? " is-you" : ""}`} style={{ left: `${f.left}%`, bottom: `${f.bottom}%`, zIndex: f.z, "--s": f.scale }}>
                         <div className="fighter-lunge" style={{ animationDelay: `${f.delay}s` }}>
+                            {f.petSpriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="fighter-pet" src={f.petSpriteUrl} alt="" />
+                            ) : null}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="fighter-sprite" src={f.spriteUrl} alt="" />
                             {!f.pad && f.name ? <span className="fighter-name">{f.name}</span> : null}
@@ -94,6 +98,7 @@ function applyPositions(out) {
         return {
             key: f.id || `f-${i}`,
             spriteUrl: f.spriteUrl,
+            petSpriteUrl: f.petSpriteUrl || null,
             name: f.name || null,
             you: Boolean(f.you),
             pad: Boolean(f.pad),

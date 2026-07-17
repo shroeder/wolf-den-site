@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
+import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
@@ -125,6 +126,8 @@ export async function getBossState(buyerId = null) {
             .catch(() => []),
         getDefaultSpriteUrl().catch(() => null),
     ]);
+    // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
+    const petSprites = await getPetSpriteMap().catch(() => ({}));
 
     // Each contributor's most prestigious badge (lowest sort_order), in one query — so the roster cards
     // can show a badge next to the mini avatar to tell everyone apart.
@@ -146,7 +149,7 @@ export async function getBossState(buyerId = null) {
     // Whole-pack fighters for the scene — every registered member, attackers ranked first.
     const members = await db
         .query(
-            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, COALESCE(SUM(h.damage), 0)::int AS dmg
+            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.featured_collectible, COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
                LEFT JOIN boss_hit h ON h.buyer_id = b.id AND h.boss_id = $1
               WHERE b.alias IS NOT NULL
@@ -155,7 +158,13 @@ export async function getBossState(buyerId = null) {
         )
         .catch(() => []);
     const fighters = members
-        .map((m) => ({ id: m.id, name: m.display_name || m.alias || "Member", spriteUrl: m.avatar_sprite_url || defaultSprite || null, you: buyerId && m.id === buyerId }))
+        .map((m) => ({
+            id: m.id,
+            name: m.display_name || m.alias || "Member",
+            spriteUrl: m.avatar_sprite_url || defaultSprite || null,
+            petSpriteUrl: (m.featured_collectible && petSprites[m.featured_collectible]) || null,
+            you: buyerId && m.id === buyerId,
+        }))
         .filter((m) => m.spriteUrl);
 
     const roster = contributors.map((c) => ({

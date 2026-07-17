@@ -60,6 +60,10 @@
             "schedule": "*/15 * * * *"
         },
         {
+            "path": "/api/jobs/pet-sprites",
+            "schedule": "*/15 * * * *"
+        },
+        {
             "path": "/api/jobs/boss-auto-tick",
             "schedule": "*/10 * * * *"
         },

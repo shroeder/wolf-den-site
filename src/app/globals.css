@@ -9246,6 +9246,8 @@ body.tv-mode .shop-mobile-cart-fab {
 .fighter-sprite { display: block; height: clamp(78px, 19vw, 172px); width: auto; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); animation: fighter-bob 3s ease-in-out infinite; }
 .fighter.is-pad .fighter-sprite { opacity: 0.85; }
 .fighter.is-you .fighter-sprite { filter: drop-shadow(0 0 12px rgba(255,215,94,0.9)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); }
+/* Active pet fights beside its owner — a smaller companion at their feet. */
+.fighter-pet { position: absolute; left: -38%; bottom: 0; height: clamp(38px, 9vw, 82px); width: auto; filter: drop-shadow(0 4px 7px rgba(0,0,0,0.5)); animation: fighter-bob 2.4s ease-in-out infinite; }
 .fighter-name { position: absolute; left: 50%; bottom: -13px; transform: translateX(-50%); max-width: 84px; padding: 1px 6px; border-radius: 8px; background: rgba(0,0,0,0.62); color: #f4ead2; font-size: 0.62rem; font-weight: 700; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; pointer-events: none; }
 .fighter.is-you .fighter-name { background: rgba(120,86,10,0.82); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
 @keyframes fighter-attack { 0%, 52%, 82%, 100% { transform: translateX(0); } 64% { transform: translateX(26px); } 72% { transform: translateX(20px); } }
