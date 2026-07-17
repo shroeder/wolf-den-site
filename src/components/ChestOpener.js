@@ -51,7 +51,12 @@ export default function ChestOpener({ onLoot }) {
                     <div className="chest-grid">
                         {chests.map((c) => (
                             <button type="button" key={c.tier} className="chest-tile" style={{ "--chest": c.color }} onClick={() => open(c.tier)} disabled={busy}>
-                                <span className="chest-emoji">{c.emoji}</span>
+                                {c.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="chest-img" src={c.image} alt="" />
+                                ) : (
+                                    <span className="chest-emoji">{c.emoji}</span>
+                                )}
                                 <span className="chest-name">{c.label}</span>
                                 <span className="chest-count">×{c.count}</span>
                             </button>
@@ -65,7 +70,12 @@ export default function ChestOpener({ onLoot }) {
                     <div className="chest-modal-inner" onClick={(e) => e.stopPropagation()}>
                         {phase === "shaking" ? (
                             <div className="chest-shake" style={{ "--chest": (chests.find((c) => c.tier === modalTier) || {}).color }}>
-                                <span className="chest-emoji-big">{(chests.find((c) => c.tier === modalTier) || CHEST_FALLBACK).emoji || "🎁"}</span>
+                                {(chests.find((c) => c.tier === modalTier) || {}).image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="chest-img-big" src={chests.find((c) => c.tier === modalTier).image} alt="" />
+                                ) : (
+                                    <span className="chest-emoji-big">{(chests.find((c) => c.tier === modalTier) || CHEST_FALLBACK).emoji || "🎁"}</span>
+                                )}
                                 <p className="chest-opening">Opening…</p>
                             </div>
                         ) : reveal?.item ? (

@@ -9516,6 +9516,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .chest-tile:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 0 20px -4px var(--chest); }
 .chest-tile:disabled { opacity: 0.6; cursor: default; }
 .chest-emoji { font-size: 2rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.chest-img { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 10px color-mix(in srgb, var(--chest, #ffd75e) 45%, transparent)); }
 .chest-name { font-size: 0.72rem; font-weight: 700; }
 .chest-count { font-size: 0.8rem; font-weight: 800; color: var(--chest); }
 
@@ -9527,6 +9528,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 .chest-shake { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .chest-emoji-big { font-size: 6rem; line-height: 1; filter: drop-shadow(0 0 24px var(--chest, #ffd75e)); animation: chest-shake 0.5s ease-in-out infinite; }
+.chest-img-big { width: 168px; height: 168px; object-fit: contain; filter: drop-shadow(0 0 28px var(--chest, #ffd75e)); animation: chest-shake 0.5s ease-in-out infinite; }
 .chest-opening { color: #ffd75e; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; animation: chest-pulse 0.9s ease-in-out infinite; }
 @keyframes chest-shake { 0%, 100% { transform: rotate(-7deg) translateY(0); } 25% { transform: rotate(7deg) translateY(-6px); } 50% { transform: rotate(-5deg) translateY(0); } 75% { transform: rotate(5deg) translateY(-4px); } }
 @keyframes chest-pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
@@ -9546,5 +9548,5 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .chest-reward-sub { font-size: 0.8rem; }
 .chest-modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
 @media (prefers-reduced-motion: reduce) {
-    .chest-emoji-big, .chest-opening, .chest-reward, .chest-burst { animation: none; }
+    .chest-emoji-big, .chest-img-big, .chest-opening, .chest-reward, .chest-burst { animation: none; }
 }

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 
 // Loot chests: earned on level-up, opened for random gear. Higher tiers weight toward rarer loot.
 export const CHEST_TIERS = {
@@ -77,9 +78,12 @@ export async function syncLevelChests(buyerId) {
 export async function getChests(buyerId) {
     if (!buyerId) return [];
     await syncLevelChests(buyerId).catch(() => {});
-    const rows = await db.query(`SELECT tier, count FROM mkt_user_chest WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []);
+    const [rows, art] = await Promise.all([
+        db.query(`SELECT tier, count FROM mkt_user_chest WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
+        getChestArt().catch(() => ({})),
+    ]);
     const counts = Object.fromEntries(rows.map((r) => [r.tier, r.count]));
-    return CHEST_ORDER.filter((t) => counts[t]).map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t] }));
+    return CHEST_ORDER.filter((t) => counts[t]).map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t], image: art[t] || null }));
 }
 
 // Open one chest of a tier: roll a rarity, grant a random un-owned item of it (or gold dust if you own
