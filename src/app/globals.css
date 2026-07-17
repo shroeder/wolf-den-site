@@ -9450,3 +9450,15 @@ body.tv-mode .shop-mobile-cart-fab {
 .profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .herochip.is-link { cursor: pointer; text-decoration: none; color: inherit; transition: transform 0.1s ease, border-color 0.12s ease; }
 .herochip.is-link:hover { transform: translateY(-2px); border-color: rgba(255, 215, 94, 0.55); }
+
+/* Player trades */
+.button.gold { background: linear-gradient(90deg, #c8a24a, #ffd75e); color: #171008; border: none; }
+.trade-offer { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.07); flex-wrap: wrap; }
+.trade-offer:last-child { border-bottom: none; }
+.trade-offer-body { flex: 1 1 240px; min-width: 0; font-size: 0.9rem; }
+.trade-offer-actions { display: flex; gap: 8px; align-items: center; }
+.trade-line { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.trade-side { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.trade-gold { font-weight: 800; color: #ffd75e; }
+.trade-item { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid var(--rar, rgba(255,255,255,0.15)); color: #e7dcc4; }
+.trade-item svg { width: 0.95em; height: 0.95em; color: var(--rar); }

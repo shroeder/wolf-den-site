@@ -67,7 +67,7 @@ export default async function UserProfilePage({ params }) {
                         <UserLevel level={profile.level} />
                     </div>
                 </div>
-                <ProfileActions targetId={profile.id} relation={relation} signedIn={Boolean(viewer)} />
+                <ProfileActions targetId={profile.id} targetAlias={profile.alias} relation={relation} signedIn={Boolean(viewer)} />
             </section>
 
             <PublicGear inventory={inventory} displayLabel={profile.displayLabel} />
