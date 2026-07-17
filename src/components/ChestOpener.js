@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { itemIcon } from "@/lib/marketplace/items.js";
+import ChestIcon from "@/components/ChestIcon";
 
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC" };
 
@@ -55,7 +56,7 @@ export default function ChestOpener({ onLoot }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="chest-img" src={c.image} alt="" />
                                 ) : (
-                                    <span className="chest-emoji">{c.emoji}</span>
+                                    <ChestIcon className="chest-img" tier={c.tier} />
                                 )}
                                 <span className="chest-name">{c.label}</span>
                                 <span className="chest-count">×{c.count}</span>
@@ -74,7 +75,7 @@ export default function ChestOpener({ onLoot }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="chest-img-big" src={chests.find((c) => c.tier === modalTier).image} alt="" />
                                 ) : (
-                                    <span className="chest-emoji-big">{(chests.find((c) => c.tier === modalTier) || CHEST_FALLBACK).emoji || "🎁"}</span>
+                                    <ChestIcon className="chest-img-big" tier={modalTier} />
                                 )}
                                 <p className="chest-opening">Opening…</p>
                             </div>
@@ -99,8 +100,6 @@ export default function ChestOpener({ onLoot }) {
         </section>
     );
 }
-
-const CHEST_FALLBACK = { emoji: "🎁" };
 
 function Reward({ item }) {
     const Icon = itemIcon(item.icon);

@@ -7,14 +7,14 @@ import { put } from "@vercel/blob";
 const IMAGES_URL = "https://api.openai.com/v1/images/generations";
 const IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai" } = {}) {
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium" } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size, background: "transparent", quality: "medium", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size, background: "transparent", quality, n: 1 }),
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");

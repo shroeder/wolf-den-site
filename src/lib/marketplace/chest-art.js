@@ -9,26 +9,29 @@ import { generateImage } from "@/lib/marketplace/openai-image.js";
 
 const SETTING_KEY = "chest_art";
 
-// Shared art direction — kept in the same universe as the hero sprites + boss art (cel-shaded RPG).
+// Shared art direction — kept in the same universe as the hero sprites + boss art (cel-shaded RPG). The
+// negative clauses matter: gpt-image-1 will happily draw a cardboard shipping box if you just say "chest".
 const STYLE =
-    "2D video-game item icon, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, " +
-    "soft rim lighting, three-quarter view from slightly above, the chest closed and centered filling the frame, " +
-    "polished RPG loot-chest art, strong readable silhouette, transparent background, no ground shadow, no text, " +
-    "no logo, no watermark, no border.";
+    "A fantasy RPG treasure chest with a CURVED DOMED lid, thick metal corner brackets, a big ornate front lock " +
+    "plate with a keyhole, and reinforcing bands with rivets. Closed lid, three-quarter view from slightly above, " +
+    "centered and filling the frame. 2D video-game loot-chest icon, bold stylized illustration, clean confident " +
+    "outlines, cel-shaded vibrant colors, soft rim lighting, dramatic highlights, strong readable silhouette. " +
+    "It is a treasure chest, NOT a cardboard box, NOT a cube, NOT a crate, NOT a suitcase, no packing tape, no flat " +
+    "flaps. Transparent background, no ground, no shadow, no text, no logo, no watermark, no border.";
 
 export const CHEST_ART_PROMPTS = {
     wooden:
-        "A closed rustic wooden treasure loot chest bound with dark wrought-iron bands and a simple iron lock, " +
-        "weathered oak planks, warm brown tones. " + STYLE,
+        "A rugged wooden treasure chest of thick weathered oak planks bound with dark wrought-iron straps, warm " +
+        "rich brown wood tones with a worn adventurer feel. " + STYLE,
     iron:
-        "A closed sturdy treasure chest reinforced with riveted steel plates and heavy iron bands and a chunky " +
-        "padlock, cool gunmetal and brushed-silver tones. " + STYLE,
+        "A sturdy dungeon treasure chest clad in riveted brushed-steel plates and heavy dark iron bands with a " +
+        "chunky padlock, cool gunmetal and silver tones. " + STYLE,
     gold:
-        "A closed ornate golden treasure chest with elaborate scrollwork filigree, gemstone inlays and a glowing " +
-        "keyhole, radiant polished-gold tones with a soft warm glow. " + STYLE,
+        "A lavish royal treasure chest of polished gold with elaborate engraved scrollwork filigree, jewel inlays, " +
+        "and a glowing keyhole, radiant warm gold with a soft magical shine. " + STYLE,
     mythic:
-        "A closed magical crystalline treasure chest crackling with arcane energy, glowing emerald-teal runes " +
-        "carved into obsidian, floating light motes and a mystical aura. " + STYLE,
+        "A magical crystalline treasure chest of dark obsidian and glowing emerald-teal crystal, etched arcane runes " +
+        "pulsing with energy, floating light motes and a mystical aura. " + STYLE,
 };
 
 export const CHEST_ART_TIERS = ["wooden", "iron", "gold", "mythic"];
@@ -48,7 +51,7 @@ export async function getChestArt() {
 export async function generateChestArt(tier) {
     const prompt = CHEST_ART_PROMPTS[tier];
     if (!prompt) throw new Error(`Unknown chest tier: ${tier}`);
-    const url = await generateImage(prompt, { pathPrefix: "marketplace/chest" });
+    const url = await generateImage(prompt, { pathPrefix: "marketplace/chest", quality: "high" });
     const current = await getChestArt();
     current[tier] = url;
     await setSetting(SETTING_KEY, JSON.stringify(current));
