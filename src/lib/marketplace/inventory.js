@@ -39,6 +39,29 @@ export async function getEquippedStats(buyerId) {
     return sumItemStats(Object.values(bySlot));
 }
 
+// Equipped stats for many members at once (one query) — used by the hourly auto-tick.
+export async function getEquippedStatsForMembers(buyerIds = []) {
+    const out = new Map();
+    if (!buyerIds.length) return out;
+    const rows = await db.query(`SELECT buyer_id, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1)`, [buyerIds]).catch(() => []);
+    const byBuyer = new Map();
+    for (const r of rows) { if (!byBuyer.has(r.buyer_id)) byBuyer.set(r.buyer_id, []); byBuyer.get(r.buyer_id).push(r.item_id); }
+    for (const [id, ids] of byBuyer) out.set(id, sumItemStats(ids));
+    return out;
+}
+
+// Grant a random not-yet-owned item from a source pool (e.g. a boss-kill drop). Returns the item or null.
+export async function grantRandomDrop(buyerId, { source = "boss_drop" } = {}) {
+    const pool = ITEMS.filter((i) => i.source === source);
+    if (!pool.length) return null;
+    const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
+    const candidates = pool.filter((i) => !owned.has(i.id));
+    if (!candidates.length) return null;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const res = await grantItem(buyerId, pick.id, source);
+    return res.granted ? pick : null;
+}
+
 // Availability of a charged item's next use (charges left + cooldown elapsed).
 function chargeState(ownedRow, item) {
     if (!item?.charged) return null;
@@ -87,6 +110,11 @@ export async function equipItem(buyerId, slot, itemId) {
     if (!itemFitsSlot(item, slot)) throw new Error(`That doesn't go in the ${slot} slot.`);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (!owned) throw new Error("You don't own that item.");
+    // Enforce the item's requirements — you can OWN gear above your level, but not equip it yet.
+    const ctx = await memberContext(buyerId);
+    const metrics = item.reqMetric ? await getMemberMetrics(buyerId).catch(() => null) : null;
+    const lock = itemLockReason(item, ctx, metrics);
+    if (lock) throw new Error(lock + " to equip this.");
     // If it's equipped in the OTHER ring slot, move it (an item can't be in two slots).
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
     await db.query(

@@ -5,7 +5,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
-import { getEquippedStats } from "@/lib/marketplace/inventory.js";
+import { getEquippedStats, getEquippedStatsForMembers, grantRandomDrop } from "@/lib/marketplace/inventory.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
@@ -30,7 +30,7 @@ function manualHit(level, stats = {}) {
 // Passive per-member hourly auto-damage. Sized so the whole pack's combined drain is fast enough that the
 // live HP counter visibly ticks down second-by-second (the auto-sizer scales boss HP to match, so the
 // fight still lasts the target days — the numbers are just bigger and the counter feels alive).
-const autoPerHour = (level) => 250 + level * 50;
+const autoPerHour = (level, stats = {}) => Math.round((250 + level * 50) * (1 + (stats.ferocity || 0) / 100));
 
 // Expected damage a single member deals PER DAY at a given level: guaranteed passive auto-attacks 24/7
 // plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375).
@@ -202,9 +202,11 @@ export async function getBossState(buyerId = null) {
     let you = null;
     if (buyerId) {
         const used = await manualAttacksToday(buyerId);
+        const myStats = await getEquippedStats(buyerId).catch(() => ({}));
+        const dailyCap = DAILY_ATTACKS + (myStats.extra_strike || 0);
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
-        you = { attacksLeft: Math.max(0, DAILY_ATTACKS - used), dmg, tickets: Math.floor(dmg / divisor) };
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -287,6 +289,13 @@ async function finalizeBossKill(bossId) {
     // Milestone badges (raid veteran/warlord/legend; champion for the winner).
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
 
+    // LOOT: the winner is guaranteed a gear drop; other fighters get a chance. New gear lands in their bag.
+    if (winner) await grantRandomDrop(winner.id).catch(() => {});
+    for (const p of pool) {
+        if (winner && p.id === winner.id) continue;
+        if (Math.random() < 0.35) await grantRandomDrop(p.id).catch(() => {});
+    }
+
     let winnerInfo = null;
     if (winner) {
         const w = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [winner.id]).catch(() => null);
@@ -301,11 +310,12 @@ export async function attackBoss(buyerId) {
     const boss = await getActiveBoss();
     if (!boss || boss.hp <= 0 || boss.defeated_at) return { error: "defeated" };
 
+    const stats = await getEquippedStats(buyerId).catch(() => ({}));
+    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0); // gear can grant extra daily strikes
     const used = await manualAttacksToday(buyerId);
-    if (used >= DAILY_ATTACKS) return { error: "no_attacks_left", attacksLeft: 0 };
+    if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
     const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const stats = await getEquippedStats(buyerId).catch(() => ({}));
     const { damage, crit } = manualHit(lvl(me?.xp), stats);
     const ability = pickAbility(crit);
 
@@ -323,7 +333,7 @@ export async function attackBoss(buyerId) {
     const { effectiveHp, autoDps } = defeated
         ? { effectiveHp: 0, autoDps: 0 }
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
-    return { ok: true, damage, crit, ability, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, DAILY_ATTACKS - (used + 1)), name: boss.name };
+    return { ok: true, damage, crit, ability, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
 // Passive AUTO-attacks: every registered member's avatar chips away. Run by a background cron; applies the
@@ -346,7 +356,11 @@ export async function runBossAutoTick() {
     if (hours <= 0) return { applied: 0, fighters: 0 };
 
     const members = await db.query(`SELECT id, xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
-    const rows = members.map((m) => ({ id: m.id, damage: Math.round(autoPerHour(lvl(m.xp)) * hours) })).filter((r) => r.damage > 0);
+    // Equipped Ferocity boosts each member's passive auto-damage.
+    const statsByMember = await getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map());
+    const rows = members
+        .map((m) => ({ id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), statsByMember.get(m.id) || {}) * hours) }))
+        .filter((r) => r.damage > 0);
     if (!rows.length) return { applied: 0, fighters: 0 };
 
     const total = rows.reduce((s, r) => s + r.damage, 0);
