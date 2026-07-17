@@ -28,8 +28,8 @@ export const ACCESSORIES = ["none", "round", "wayfarers", "sunglasses", "prescri
 // Colors (hex WITHOUT the leading '#', DiceBear's format).
 export const SKIN_COLORS = ["ffdbb4", "edb98a", "fd9841", "f8d25c", "d08b5b", "ae5d29", "614335"];
 // Naturals first, then vivid/fun colors (purple, blue, green, teal, orange, hot pink) for hair + beard.
-export const HAIR_COLORS = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "c93305", "e8e1e1", "ecdcbf", "f59797", "ff5cad", "a44dff", "7d3cff", "5199e4", "3fb0ff", "2fbf71", "1abc9c", "ff6b35"];
-export const FACIAL_HAIR_COLORS = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "c93305", "e8e1e1", "ecdcbf", "f59797", "ff5cad", "a44dff", "7d3cff", "5199e4", "3fb0ff", "2fbf71", "1abc9c", "ff6b35"];
+export const HAIR_COLORS = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "e8c56a", "b89b5e", "c93305", "e8e1e1", "ecdcbf", "f59797", "ff5cad", "a44dff", "7d3cff", "5199e4", "3fb0ff", "2fbf71", "1abc9c", "ff6b35"];
+export const FACIAL_HAIR_COLORS = ["2c1b18", "4a312c", "724133", "a55728", "b58143", "d6b370", "e8c56a", "b89b5e", "c93305", "e8e1e1", "ecdcbf", "f59797", "ff5cad", "a44dff", "7d3cff", "5199e4", "3fb0ff", "2fbf71", "1abc9c", "ff6b35"];
 export const CLOTHES_COLORS = ["262e33", "3c4f5c", "25557c", "5199e4", "65c9ff", "b1e2ff", "929598", "e6e6e6", "ffffff", "a7ffc4", "ffffb1", "ffafb9", "ff488e", "ff5c5c", "a44dff", "7d3cff", "6c3fbf", "2fbf71", "1abc9c", "ff8c1a", "ffd75e", "c0392b", "7a4a2b", "111318"];
 export const BACKGROUND_COLORS = ["none", "65c9ff", "5199e4", "a7ffc4", "ffafb9", "ffffb1", "ff5c5c", "e6e6e6", "262e33", "a44dff", "7d3cff", "2fbf71", "ff8c1a", "ffd75e"];
 

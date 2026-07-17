@@ -34,26 +34,41 @@ function rollRarity(weights) {
     return Object.keys(weights)[0];
 }
 
-// Grant any loot chests owed for levels the member has reached since we last checked. Retroactive + safe.
-export async function syncLevelChests(buyerId) {
-    if (!buyerId) return {};
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(chest_level,0) AS chest_level FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    if (!row) return {};
-    const level = levelForXp(row.xp).level;
-    if (level <= row.chest_level) return {};
-    const tally = {};
-    for (let L = row.chest_level + 1; L <= level; L++) {
-        const t = tierForLevel(L);
-        tally[t] = (tally[t] || 0) + 1;
-        if (L % 10 === 0) tally.mythic = (tally.mythic || 0) + 1; // milestone bonus chest
-    }
+async function addChests(buyerId, tally) {
     for (const [t, n] of Object.entries(tally)) {
+        if (!n) continue;
         await db.query(
             `INSERT INTO mkt_user_chest (buyer_id, tier, count) VALUES ($1, $2, $3)
              ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + $3`,
             [buyerId, t, n]
         ).catch(() => {});
     }
+}
+
+// Grant loot chests for level-ups. CONSERVATIVE: no retroactive flood — the first time we see a member we
+// seed chest_level to their current level and give a single welcome chest; from then on each NEW level-up
+// grants one chest (tier scales with the level reached).
+export async function syncLevelChests(buyerId) {
+    if (!buyerId) return {};
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(chest_level,0) AS chest_level FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!row) return {};
+    const level = levelForXp(row.xp).level;
+
+    // First encounter: seed to current level, one welcome chest, NO back-fill.
+    if (row.chest_level === 0) {
+        const tally = { [tierForLevel(level)]: 1 };
+        await addChests(buyerId, tally);
+        await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
+        return tally;
+    }
+
+    if (level <= row.chest_level) return {};
+    const tally = {};
+    for (let L = row.chest_level + 1; L <= level; L++) {
+        const t = tierForLevel(L);
+        tally[t] = (tally[t] || 0) + 1;
+    }
+    await addChests(buyerId, tally);
     await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
     return tally;
 }
