@@ -8968,6 +8968,11 @@ body.tv-mode .shop-mobile-cart-fab {
 .game-chip.is-on { background: rgba(255, 215, 94, 0.16); border-color: #ffd75e; color: #ffe9a8; }
 .game-ask-actions { display: flex; align-items: center; gap: 10px; }
 
+.admin-roster { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.admin-roster th, .admin-roster td { text-align: left; padding: 7px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); white-space: nowrap; }
+.admin-roster th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: #cdbfa6; }
+.admin-roster td { color: #e7dcc4; }
+
 .fnm-cta { position: relative; overflow: hidden; border-color: rgba(81, 153, 228, 0.45); }
 .fnm-cta::before {
     content: ""; position: absolute; inset: 0; pointer-events: none;

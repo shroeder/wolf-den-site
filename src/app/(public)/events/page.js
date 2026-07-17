@@ -1,4 +1,5 @@
 import { events } from "@/lib/events";
+import { FNM_EVENTLINK_URL } from "@/lib/marketplace/games.js";
 import Image from "next/image";
 
 export const metadata = {
@@ -23,6 +24,20 @@ export default function EventsPage() {
                 <p>
                     Our weekly schedule is built around casual, community-focused events that help players, collectors, kids, and families meet each other, trade cards, learn games, and grow the local scene.
                 </p>
+            </section>
+
+            <section className="card fnm-cta">
+                <div className="fnm-cta-body">
+                    <span className="fnm-cta-eyebrow">🔵 Friday Night Magic</span>
+                    <h2 style={{ margin: "2px 0 4px" }}>Register your seat for Friday</h2>
+                    <p className="muted" style={{ margin: "0 0 12px" }}>
+                        Playing Magic this Friday? Sign up on Wizards EventLink so we can plan the night — and every
+                        registration helps The Wolf Den earn better product allocations from Wizards. 🐺
+                    </p>
+                    <a className="button primary" href={FNM_EVENTLINK_URL} target="_blank" rel="noreferrer">
+                        Register on EventLink →
+                    </a>
+                </div>
             </section>
 
             {featured && (
@@ -81,6 +96,13 @@ export default function EventsPage() {
                         <a className="text-link" href={`/events/${event.slug}`}>
                             View Event Details
                         </a>
+                        {event.slug === "friday-night-magic" && (
+                            <p style={{ marginTop: "0.75rem" }}>
+                                <a className="button primary" href={FNM_EVENTLINK_URL} target="_blank" rel="noreferrer">
+                                    🔵 Register on EventLink →
+                                </a>
+                            </p>
+                        )}
                     </article>
                 ))}
             </section>

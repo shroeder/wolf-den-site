@@ -303,6 +303,39 @@ export async function setGameInterests(buyerId, list) {
     return getProfile(buyerId);
 }
 
+// Admin report: how many members play each game, plus the contactable roster (optionally filtered to one
+// game — e.g. the Magic roster for FNM reminders). Includes email since this is admin-only.
+export async function getGameInterestReport({ game = null } = {}) {
+    const countRows = await db
+        .query(`SELECT g AS game, COUNT(*)::int AS n FROM mkt_buyer, unnest(game_interests) AS g WHERE game_interests IS NOT NULL GROUP BY g`)
+        .catch(() => []);
+    const counts = Object.fromEntries(countRows.map((r) => [r.game, r.n]));
+
+    const params = [];
+    let where = `game_interests IS NOT NULL AND cardinality(game_interests) > 0`;
+    if (game) { params.push(String(game)); where += ` AND $1 = ANY(game_interests)`; }
+    const rows = await db
+        .query(
+            `SELECT id, display_name, first_name, last_name, alias, email, game_interests, COALESCE(xp, 0) AS xp
+               FROM mkt_buyer WHERE ${where} ORDER BY display_name NULLS LAST, alias NULLS LAST`,
+            params
+        )
+        .catch(() => []);
+    const answered = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE game_interests IS NOT NULL`).catch(() => null);
+
+    return {
+        counts,
+        answered: answered?.n || 0,
+        members: rows.map((m) => ({
+            id: m.id,
+            name: m.display_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || m.alias || "Member",
+            alias: m.alias || null,
+            email: m.email || null,
+            interests: m.game_interests || [],
+        })),
+    };
+}
+
 // Dismiss the Friday Night Magic sign-up CTA so it stops showing for this member.
 export async function dismissFnmCta(buyerId) {
     if (!buyerId) throw new Error("Not signed in.");
