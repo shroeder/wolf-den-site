@@ -22,7 +22,10 @@ function manualHit(level) {
     const crit = Math.random() < 0.25;
     return { damage: crit ? Math.round(roll * 2.5) : roll, crit };
 }
-const autoPerHour = (level) => 8 + level * 2;
+// Passive per-member hourly auto-damage. Sized so the whole pack's combined drain is fast enough that the
+// live HP counter visibly ticks down second-by-second (the auto-sizer scales boss HP to match, so the
+// fight still lasts the target days — the numbers are just bigger and the counter feels alive).
+const autoPerHour = (level) => 250 + level * 50;
 
 // Expected damage a single member deals PER DAY at a given level: guaranteed passive auto-attacks 24/7
 // plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375).

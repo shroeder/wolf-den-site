@@ -21,8 +21,9 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
         return applyPositions(out);
     }, [fighters, defaultSprite]);
 
-    // Ambient auto-attack sparks on the boss — so the passive damage is visibly happening even when nobody
-    // is manually swinging. Purely cosmetic (the real damage is applied hourly server-side).
+    // Ambient impact glints on the boss — so the pack's passive attacks read as visibly landing. Purely
+    // decorative light hits (NO numbers): the real damage shows on the live HP counter, which ticks down
+    // continuously, and on the big floaters from actual manual strikes.
     const [sparks, setSparks] = useState([]);
     const sid = useRef(0);
     useEffect(() => {
@@ -32,8 +33,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
         const tick = () => {
             if (!alive) return;
             const id = sid.current++;
-            const chip = Math.random() < 0.4 ? Math.floor(4 + Math.random() * 18) : null;
-            setSparks((s) => [...s, { id, top: 20 + Math.random() * 45, right: 6 + Math.random() * 22, chip }]);
+            setSparks((s) => [...s, { id, top: 20 + Math.random() * 45, right: 6 + Math.random() * 22 }]);
             setTimeout(() => setSparks((s) => s.filter((x) => x.id !== id)), 750);
             timer = setTimeout(tick, 900 + Math.random() * 1500);
         };
@@ -63,9 +63,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             </div>
 
             {sparks.map((s) => (
-                <span key={s.id} className="battle-spark" style={{ top: `${s.top}%`, right: `${s.right}%` }}>
-                    {s.chip ? <span className="battle-chip">-{s.chip}</span> : null}
-                </span>
+                <span key={s.id} className="battle-spark" style={{ top: `${s.top}%`, right: `${s.right}%` }} />
             ))}
 
             <div className="battle-party">
