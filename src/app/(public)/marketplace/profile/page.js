@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import AvatarStack from "@/components/AvatarStack";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import BorderPicker from "@/components/BorderPicker";
 import CollectibleGrid from "@/components/CollectibleGrid";
@@ -103,21 +102,6 @@ export default async function ProfileHubPage() {
             {badgeBoard ? <NextBadgeNudge next={badgeBoard.next} earnedCount={badgeBoard.earnedCount} totalCount={badgeBoard.totalCount} /> : null}
 
             <RewardsTrackPreview track={track} />
-
-            <section className="card avatar-cta">
-                <AvatarStack
-                    avatarUrl={profile?.avatarUrl}
-                    initial={(profile?.displayLabel || "?").slice(0, 1).toUpperCase()}
-                    size={72}
-                    border={profile?.border}
-                    cosmetics={profile?.avatarCosmetics}
-                />
-                <div className="avatar-cta-body">
-                    <h2 style={{ margin: 0 }}>Your avatar</h2>
-                    <p className="muted" style={{ margin: "2px 0 10px" }}>Customize your character, hats, colors, and aura.</p>
-                    <Link href="/marketplace/profile/avatar" className="button primary">✏️ Edit avatar</Link>
-                </div>
-            </section>
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Profile border</h2>

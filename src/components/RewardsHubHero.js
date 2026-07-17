@@ -19,10 +19,17 @@ export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], l
     return (
         <div className="rewards-hero">
             <div className="rewards-hero-id">
-                <div className={`level-ring ${borderClass(border)}`.trim()} style={{ "--ring-pct": `${pct}%` }}>
+                <Link
+                    href="/marketplace/profile/avatar"
+                    className={`level-ring is-editable ${borderClass(border)}`.trim()}
+                    style={{ "--ring-pct": `${pct}%` }}
+                    aria-label="Edit your avatar"
+                    title="Edit your avatar"
+                >
                     <AvatarStack avatarUrl={avatarUrl} initial={initial} size={82} cosmetics={cosmetics} className="level-ring-stack" />
                     <span className="level-ring-badge">Lv {level.level}</span>
-                </div>
+                    <span className="level-ring-edit" aria-hidden="true">✏️</span>
+                </Link>
                 <div className="rewards-hero-meta">
                     <div className="rank-chip">
                         <span aria-hidden="true">{rank.emoji}</span> {rank.title}

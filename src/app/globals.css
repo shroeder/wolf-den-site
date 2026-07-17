@@ -5611,6 +5611,38 @@ body.tv-mode .shop-mobile-cart-fab {
         conic-gradient(#ffd75e var(--ring-pct, 0%), rgba(255, 255, 255, 0.12) 0);
     box-shadow: 0 0 18px rgba(255, 215, 94, 0.3);
 }
+/* Tap the avatar to edit it — the display itself is the call to action. */
+.level-ring.is-editable {
+    display: block;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.level-ring.is-editable:hover,
+.level-ring.is-editable:focus-visible {
+    transform: scale(1.04);
+    box-shadow: 0 0 22px rgba(255, 215, 94, 0.55);
+    outline: none;
+}
+.level-ring-edit {
+    position: absolute;
+    z-index: 4;
+    top: -2px;
+    right: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 0.8rem;
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+    color: #171008;
+    border: 2px solid #14141f;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.level-ring.is-editable:hover .level-ring-edit {
+    transform: scale(1.08);
+}
 .level-ring .user-avatar-xl {
     width: 100%;
     height: 100%;
