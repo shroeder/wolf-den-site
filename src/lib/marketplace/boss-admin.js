@@ -55,10 +55,45 @@ export async function generateBossArt(bossId, prompt) {
     return url;
 }
 
-// Battle-stage background prompt (opaque landscape, same art universe, NO characters).
-export function bossBackgroundPrompt(subject) {
-    const scene = String(subject || "a dark fantasy lair").slice(0, 400);
-    return `The battle lair of ${scene}. Epic 2D video-game battle stage background, wide side-scrolling environment, dramatic atmospheric lighting, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, polished RPG game-art style, richly detailed scenery, an empty stage with NO characters or creatures, a clear foreground ground/floor for characters to stand on, no text, no logo, no watermark, no UI, no border.`;
+// A RANDOM, surprising battle-stage environment — deliberately NOT derived from the boss (feeding the
+// creature's description in made the model redraw the boss into the scene). Each call picks a fresh biome.
+const BOSS_BG_SETTINGS = [
+    "a vast bioluminescent crystal cavern with glowing blue and violet crystals",
+    "an ancient overgrown jungle temple reclaimed by vines and moss",
+    "a frozen glacier canyon of pale blue ice and drifting snow",
+    "a volcanic obsidian wasteland with rivers of molten lava",
+    "a misty haunted graveyard under a full moon",
+    "a sunken coral ruin deep beneath the ocean, shafts of light above",
+    "a floating sky island of grassy cliffs above a sea of clouds",
+    "a golden desert of towering dunes and half-buried ruined pillars",
+    "a giant mushroom forest with towering glowing fungi",
+    "a stormy cliffside overlooking a raging sea, rain and lightning",
+    "an abandoned brass clockwork factory with huge gears",
+    "a lava-lit dwarven forge hall carved into the mountain",
+    "a moonlit bamboo forest with drifting fireflies",
+    "a shattered battlefield strewn with broken banners and swords",
+    "an enchanted autumn woodland of red and gold falling leaves",
+    "a shimmering ice palace interior of frozen columns",
+    "a foggy swamp of twisted roots and hanging moss",
+    "a red-rock canyon of stone arches glowing at sunset",
+    "a starlit celestial void with floating rocks and nebulae",
+    "a ruined gothic cathedral open to a stormy sky",
+    "a windswept snowy tundra beneath a rippling aurora",
+    "a pirate cove of shipwrecks and tide pools at dusk",
+    "a serene cherry-blossom shrine with a wooden bridge",
+    "a crackling thundercloud realm high above the world",
+    "an underground fungal cavern beside a still glowing lake",
+    "a scorched crater of black rock and drifting embers",
+    "a jade-green rainforest beside a thundering waterfall",
+    "a snowy pine forest at dusk with distant mountains",
+    "a sunbaked colosseum arena of cracked sandstone",
+    "a neon-lit rain-slicked cyberpunk alley at night",
+];
+
+// `subject` is intentionally ignored (see note above) — the background must not reproduce the boss.
+export function bossBackgroundPrompt() {
+    const scene = BOSS_BG_SETTINGS[Math.floor(Math.random() * BOSS_BG_SETTINGS.length)];
+    return `${scene}. Epic 2D video-game battle stage background, wide side-scrolling environment, dramatic atmospheric lighting, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, polished RPG game-art style, richly detailed scenery. Landscape and environment ONLY — absolutely no monsters, no dragons, no creatures, no people, no characters. Leave a clear flat foreground ground for characters to stand on, no text, no logo, no watermark, no UI, no border.`;
 }
 
 // Store a finished background PNG (base64, generated on the phone). Fast, no OpenAI wait.
@@ -77,7 +112,7 @@ export async function setBossBackground(bossId, base64) {
 export async function generateBossBackground(bossId, subject) {
     const boss = await db.queryOne(`SELECT id, name, description FROM boss_event WHERE id = $1`, [bossId]);
     if (!boss) throw new Error("Boss not found");
-    const url = await generateSceneImage(bossBackgroundPrompt(subject || boss.description || boss.name));
+    const url = await generateSceneImage(bossBackgroundPrompt());
     await db.query(`UPDATE boss_event SET background_url = $2 WHERE id = $1`, [bossId, url]);
     return url;
 }

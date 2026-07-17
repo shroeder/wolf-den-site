@@ -44,6 +44,29 @@ export async function projectBossHp({ targetDays = 7 } = {}) {
     return { hp, members: members.length, targetDays };
 }
 
+// Passive auto-damage accrues CONTINUOUSLY so the HP bar is never frozen between settle-ticks.
+// pending = the pack's auto-DPS × seconds since the last settle (capped). The displayed/effective HP
+// subtracts it; the background cron later materializes the same amount into stored hp + per-member 'auto'
+// boss_hit rows (tickets). Both use the same anchor (last auto hit), so nothing jumps at the boundary.
+const AUTO_SETTLE_CAP_SECONDS = 3 * 3600; // guard against a long cron outage settling a huge lump at once
+
+async function autoAccrual(boss) {
+    const [members, anchor] = await Promise.all([
+        db.query(`SELECT COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []),
+        db
+            .queryOne(
+                `SELECT EXTRACT(EPOCH FROM (NOW() - COALESCE(MAX(created_at), $2)))::float AS secs
+                   FROM boss_hit WHERE boss_id = $1 AND kind = 'auto'`,
+                [boss.id, boss.started_at]
+            )
+            .catch(() => null),
+    ]);
+    const autoDps = members.reduce((s, m) => s + autoPerHour(lvl(m.xp)), 0) / 3600; // damage per second
+    const secs = Math.min(AUTO_SETTLE_CAP_SECONDS, Math.max(0, anchor?.secs || 0));
+    const pending = Math.min(boss.hp, Math.round(autoDps * secs));
+    return { autoDps, secs, pending, effectiveHp: Math.max(0, boss.hp - pending) };
+}
+
 // Flavor names for the manual ability so the hit feels like a move, not a click.
 const ABILITIES = ["Fang Strike", "Howling Slash", "Pack Fury", "Savage Bite", "Rending Claw", "Alpha Smash", "Moonlit Cleave", "Feral Rush"];
 const CRIT_ABILITIES = ["APEX PREDATOR", "BLOODMOON CRIT", "PACK LEADER'S WRATH", "DEVASTATION"];
@@ -168,12 +191,16 @@ export async function getBossState(buyerId = null) {
         you = { attacksLeft: Math.max(0, DAILY_ATTACKS - used), dmg, tickets: Math.floor(dmg / divisor) };
     }
 
+    // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
+    const accrual = boss.defeated_at ? { autoDps: 0, effectiveHp: boss.hp } : await autoAccrual(boss);
+
     return {
         boss: {
             id: boss.id,
             name: boss.name,
             tier: boss.tier,
-            hp: boss.hp,
+            hp: accrual.effectiveHp,
+            autoDps: accrual.autoDps,
             maxHp: boss.max_hp,
             imageUrl: boss.image_url || null,
             backgroundUrl: boss.background_url || null,
@@ -274,7 +301,12 @@ export async function attackBoss(buyerId) {
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});
 
-    return { ok: true, damage, crit, ability, hp: row.hp, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, DAILY_ATTACKS - (used + 1)), name: boss.name };
+    // Report the EFFECTIVE hp (stored minus pending passive drain) so the client's bar stays consistent
+    // with the polled state instead of snapping back up after a manual strike.
+    const { effectiveHp, autoDps } = defeated
+        ? { effectiveHp: 0, autoDps: 0 }
+        : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
+    return { ok: true, damage, crit, ability, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, DAILY_ATTACKS - (used + 1)), name: boss.name };
 }
 
 // Passive AUTO-attacks: every registered member's avatar chips away. Run by a background cron; applies the
@@ -284,8 +316,20 @@ export async function runBossAutoTick() {
     const boss = await getActiveBoss();
     if (!boss) return { skipped: "no_active_boss" };
 
+    // Settle however much time has passed since the last auto tick (prorated), so this is safe to run at
+    // any cadence — a 10-min cron applies 1/6 of an hour, matching the continuous display accrual.
+    const anchor = await db
+        .queryOne(
+            `SELECT EXTRACT(EPOCH FROM (NOW() - COALESCE(MAX(created_at), $2)))::float AS secs
+               FROM boss_hit WHERE boss_id = $1 AND kind = 'auto'`,
+            [boss.id, boss.started_at]
+        )
+        .catch(() => null);
+    const hours = Math.min(AUTO_SETTLE_CAP_SECONDS, Math.max(0, anchor?.secs || 0)) / 3600;
+    if (hours <= 0) return { applied: 0, fighters: 0 };
+
     const members = await db.query(`SELECT id, xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
-    const rows = members.map((m) => ({ id: m.id, damage: autoPerHour(lvl(m.xp)) })).filter((r) => r.damage > 0);
+    const rows = members.map((m) => ({ id: m.id, damage: Math.round(autoPerHour(lvl(m.xp)) * hours) })).filter((r) => r.damage > 0);
     if (!rows.length) return { applied: 0, fighters: 0 };
 
     const total = rows.reduce((s, r) => s + r.damage, 0);

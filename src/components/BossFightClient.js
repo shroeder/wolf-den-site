@@ -16,6 +16,7 @@ export default function BossFightClient() {
     const [burst, setBurst] = useState(null);
     const [victory, setVictory] = useState(null);
     const [xpFlash, setXpFlash] = useState(false);
+    const [liveHp, setLiveHp] = useState(null);
     const floatId = useRef(0);
 
     const load = useCallback(async () => {
@@ -30,6 +31,19 @@ export default function BossFightClient() {
         const t = setInterval(load, 10000);
         return () => clearInterval(t);
     }, [load]);
+
+    // Reconcile the interpolated HP to the server's value on each poll / optimistic attack update.
+    useEffect(() => {
+        if (data?.boss) setLiveHp(data.boss.hp);
+    }, [data?.boss?.hp]);
+
+    // Creep the bar down continuously between polls using the pack's passive auto-DPS, so it never freezes.
+    useEffect(() => {
+        const dps = data?.boss?.autoDps || 0;
+        if (dps <= 0) return undefined;
+        const t = setInterval(() => setLiveHp((h) => (h == null ? h : Math.max(0, h - dps))), 1000);
+        return () => clearInterval(t);
+    }, [data?.boss?.autoDps]);
 
     function popDamage(amount, crit) {
         const id = floatId.current++;
@@ -76,14 +90,15 @@ export default function BossFightClient() {
     if (!data?.boss) return <p className="muted">No active boss right now — check back soon.</p>;
 
     const { boss, roster = [], fighters = [], you } = data;
-    const pct = Math.max(0, Math.min(100, Math.round((boss.hp / boss.maxHp) * 100)));
+    const displayHp = liveHp != null ? liveHp : boss.hp;
+    const pct = Math.max(0, Math.min(100, (displayHp / boss.maxHp) * 100));
 
     return (
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
 
             <div className="boss-stage-wrap">
-                <BossBattleScene boss={boss} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
+                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
                 {burst ? (
                     <div className={`boss-burst${burst.crit ? " is-crit" : ""}`} key={burst.key}>
                         <div className="boss-burst-name">{burst.crit ? "💥 " : ""}{burst.ability}{burst.crit ? " 💥" : ""}</div>

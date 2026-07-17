@@ -61,7 +61,7 @@
         },
         {
             "path": "/api/jobs/boss-auto-tick",
-            "schedule": "0 * * * *"
+            "schedule": "*/10 * * * *"
         },
         {
             "path": "/api/jobs/inventory-feed",
