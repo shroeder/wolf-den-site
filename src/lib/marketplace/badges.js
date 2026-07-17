@@ -32,6 +32,7 @@ function mapBadge(row) {
         icon: row.icon || null,
         color: row.color || null,
         adminOnly: row.admin_only !== false,
+        secret: row.secret === true,
         autoRule: row.auto_rule || null,
         autoThreshold: row.auto_threshold != null ? Number(row.auto_threshold) : null,
         sortOrder: Number(row.sort_order || 100),
@@ -41,7 +42,7 @@ function mapBadge(row) {
 // All badge definitions, ordered for display.
 export async function listBadges() {
     const rows = await db
-        .query(`SELECT slug, label, description, icon, color, admin_only, auto_rule, auto_threshold, sort_order FROM mkt_badge ORDER BY sort_order ASC, label ASC`)
+        .query(`SELECT slug, label, description, icon, color, admin_only, secret, auto_rule, auto_threshold, sort_order FROM mkt_badge ORDER BY sort_order ASC, label ASC`)
         .catch(() => []);
     return rows.map(mapBadge);
 }
@@ -170,7 +171,9 @@ function qualifies(rule, threshold, m) {
 // plus the single "next badge" (closest unearned unlockable). Powers the Badges hub + the next-badge nudge.
 export async function getBadgeBoard(buyerId) {
     const [all, held, m] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId)]);
-    const badges = all.map((b) => {
+    // Secret badges stay hidden until you actually hold one — no locked/mystery slot teasing them.
+    const visible = all.filter((b) => !b.secret || held.has(b.slug));
+    const badges = visible.map((b) => {
         const earned = held.has(b.slug);
         let progress = null;
         if (!earned && b.autoRule) {
