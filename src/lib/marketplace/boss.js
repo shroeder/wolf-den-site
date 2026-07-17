@@ -51,7 +51,8 @@ async function manualAttacksToday(buyerId) {
 }
 
 // Full state for the boss screen: boss HP, contributors (with sprites + tickets), the pack of fighters,
-// the viewer's own stats (damage + tickets + swings left), and a damage-over-time series for the chart.
+// the viewer's own stats (damage + tickets + swings left). Roster carries mini avatar + top badge so the
+// UI can show who's who at a glance.
 export async function getBossState(buyerId = null) {
     let boss = await getActiveBoss();
     if (!boss) {
@@ -64,7 +65,7 @@ export async function getBossState(buyerId = null) {
 
     const divisor = Math.max(1, boss.ticket_divisor || 100);
 
-    const [contributors, defaultSprite, series] = await Promise.all([
+    const [contributors, defaultSprite] = await Promise.all([
         db
             .query(
                 `SELECT b.id, b.alias, b.display_name, b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.avatar_sprite_url, b.xp,
@@ -77,15 +78,24 @@ export async function getBossState(buyerId = null) {
             )
             .catch(() => []),
         getDefaultSpriteUrl().catch(() => null),
-        db
-            .query(
-                `SELECT to_char(date_trunc('hour', created_at AT TIME ZONE 'America/Chicago'), 'MM/DD HH24:00') AS t, SUM(damage)::int AS dmg
-                   FROM boss_hit WHERE boss_id = $1 AND created_at > NOW() - INTERVAL '48 hours'
-                  GROUP BY date_trunc('hour', created_at AT TIME ZONE 'America/Chicago') ORDER BY 1`,
-                [boss.id]
-            )
-            .catch(() => []),
     ]);
+
+    // Each contributor's most prestigious badge (lowest sort_order), in one query — so the roster cards
+    // can show a badge next to the mini avatar to tell everyone apart.
+    const contribIds = contributors.map((c) => c.id);
+    let badgeByBuyer = new Map();
+    if (contribIds.length) {
+        const brows = await db
+            .query(
+                `SELECT DISTINCT ON (ub.buyer_id) ub.buyer_id, b.icon, b.label
+                   FROM mkt_user_badge ub JOIN mkt_badge b ON b.slug = ub.badge_slug
+                  WHERE ub.buyer_id = ANY($1)
+                  ORDER BY ub.buyer_id, b.sort_order ASC, b.label ASC`,
+                [contribIds]
+            )
+            .catch(() => []);
+        badgeByBuyer = new Map(brows.map((r) => [r.buyer_id, { icon: r.icon || "🏅", label: r.label }]));
+    }
 
     // Whole-pack fighters for the scene — every registered member, attackers ranked first.
     const members = await db
@@ -108,6 +118,7 @@ export async function getBossState(buyerId = null) {
         level: lvl(c.xp),
         avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || DEFAULT_AVATAR_URL,
         spriteUrl: c.avatar_sprite_url || defaultSprite || null,
+        badge: badgeByBuyer.get(c.id) || null,
         dmg: c.dmg,
         hits: c.hits,
         tickets: Math.floor(c.dmg / divisor),
@@ -155,7 +166,6 @@ export async function getBossState(buyerId = null) {
         },
         roster,
         fighters,
-        series,
         defaultSpriteUrl: defaultSprite || null,
         you,
     };

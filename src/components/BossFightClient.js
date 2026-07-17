@@ -5,23 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import BossBattleScene from "@/components/BossBattleScene";
 
-// Compact damage-over-time chart (fed by the server's hourly hit buckets — manual + auto).
-function BossDpsChart({ series }) {
-    const data = series.slice(-24);
-    const max = Math.max(1, ...data.map((d) => d.dmg));
-    return (
-        <div className="boss-dps">
-            <h3>📈 Damage over time</h3>
-            <div className="boss-dps-bars">
-                {data.map((d, i) => (
-                    <span key={i} className="boss-dps-bar" style={{ height: `${Math.max(4, Math.round((d.dmg / max) * 100))}%` }} title={`${d.t}: ${d.dmg.toLocaleString()} dmg`} />
-                ))}
-            </div>
-            <div className="boss-dps-x muted"><span>{data[0]?.t}</span><span>now</span></div>
-        </div>
-    );
-}
-
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
 export default function BossFightClient() {
@@ -92,7 +75,7 @@ export default function BossFightClient() {
     if (!loaded) return <p className="muted">Summoning the boss…</p>;
     if (!data?.boss) return <p className="muted">No active boss right now — check back soon.</p>;
 
-    const { boss, roster = [], fighters = [], series = [], you } = data;
+    const { boss, roster = [], fighters = [], you } = data;
     const pct = Math.max(0, Math.min(100, Math.round((boss.hp / boss.maxHp) * 100)));
 
     return (
@@ -168,33 +151,23 @@ export default function BossFightClient() {
                 </div>
             )}
 
-            {series.length > 1 ? <BossDpsChart series={series} /> : null}
-
             {roster.length ? (
                 <div className="boss2-board">
-                    <h3>🏆 The pack &mdash; damage &amp; tickets</h3>
-                    <div className="boss-heroes">
-                        {roster.slice(0, 12).map((f, i) => (
-                            <div key={f.id} className={`hero-card2${f.you ? " is-you" : ""}`}>
-                                <div className="hero-card2-rank">#{i + 1}</div>
-                                <div className="hero-card2-sprite">
-                                    {f.spriteUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={f.spriteUrl} alt="" />
-                                    ) : (
-                                        <span className="hero-card2-initial">{(f.name || "?").slice(0, 1).toUpperCase()}</span>
-                                    )}
+                    <h3>🛡️ Active heroes</h3>
+                    <div className="hero-strip">
+                        {roster.slice(0, 12).map((f) => (
+                            <div key={f.id} className={`herochip${f.you ? " is-you" : ""}`} title={`${f.name} · ${f.dmg.toLocaleString()} dmg`}>
+                                <div className="herochip-av">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={f.avatarUrl} alt="" />
+                                    {f.badge ? <span className="herochip-badge" title={f.badge.label}>{f.badge.icon}</span> : null}
                                 </div>
-                                <div className="hero-card2-name">{f.name}{f.you ? " (you)" : ""}</div>
-                                <div className="hero-card2-lv">Lv {f.level}</div>
-                                <div className="hero-card2-stats">
-                                    <span>{f.dmg.toLocaleString()} dmg</span>
-                                    <span className="boss2-tix">🎟️ {f.tickets}</span>
-                                </div>
+                                <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>
+                                <span className="herochip-meta">Lv {f.level} · 🎟️ {f.tickets}</span>
                             </div>
                         ))}
                     </div>
-                    <p className="muted boss2-note">Damage (your daily strike + your avatar&apos;s auto-attacks) converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️.</p>
+                    <p className="muted boss2-note">Damage converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️.</p>
                 </div>
             ) : (
                 <p className="muted boss2-note">Be the first to strike — the pack is warming up.</p>

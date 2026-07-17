@@ -75,6 +75,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="fighter-sprite" src={f.spriteUrl} alt="" />
                         </div>
+                        {!f.pad && f.name ? <span className="fighter-name">{f.name}</span> : null}
                     </div>
                 ))}
             </div>
@@ -95,6 +96,7 @@ function applyPositions(out) {
         return {
             key: f.id || `f-${i}`,
             spriteUrl: f.spriteUrl,
+            name: f.name || null,
             you: Boolean(f.you),
             pad: Boolean(f.pad),
             left: 3 + Math.floor(i / 2) * 8.5, // spread across the left third
