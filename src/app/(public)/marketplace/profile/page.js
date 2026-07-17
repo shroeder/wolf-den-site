@@ -6,6 +6,7 @@ import CollectibleGrid from "@/components/CollectibleGrid";
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
 import FramePicker from "@/components/FramePicker";
+import GameInterestsCta from "@/components/GameInterestsCta";
 import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -86,6 +87,8 @@ export default async function ProfileHubPage() {
                     <span className="boss-ticket-tix">🎟️ {bossSummary.tickets}<small>tickets</small></span>
                 </Link>
             ) : null}
+
+            <GameInterestsCta interests={profile?.gameInterests} fnmDismissed={profile?.fnmDismissed} />
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Jump in</h2>

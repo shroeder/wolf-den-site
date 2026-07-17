@@ -6,6 +6,7 @@ import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrou
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
 import { collectibleById, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
+import { sanitizeGameInterests } from "@/lib/marketplace/games.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { DEFAULT_AVATAR_URL, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { avatarImageUrl, COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
@@ -140,6 +141,10 @@ function mapProfile(row, badges = []) {
         // The collectible the member features on their card / public profile (id, or null). Level only ever
         // rises, so an unlocked pick stays valid — the display components resolve the id to its icon.
         featuredCollectibleId: row.featured_collectible || null,
+        // Games the member says they play (null = never answered → show the onboarding prompt). Drives
+        // targeted CTAs like Friday Night Magic sign-up.
+        gameInterests: row.game_interests || null,
+        fnmDismissed: Boolean(row.fnm_cta_dismissed_at),
         // Email notification prefs (default on).
         notifyEmailDm: row.notify_email_dm !== false,
         notifyEmailFriend: row.notify_email_friend !== false,
@@ -150,7 +155,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, featured_collectible, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, featured_collectible, game_interests, fnm_cta_dismissed_at, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -286,6 +291,22 @@ export async function setFeaturedCollectible(buyerId, id) {
         toStore = item.id;
     }
     await db.query(`UPDATE mkt_buyer SET featured_collectible = $2, updated_at = NOW() WHERE id = $1`, [buyerId, toStore]);
+    return getProfile(buyerId);
+}
+
+// Record which games the member plays (onboarding "what do you play?"). Stores a sanitized array (never
+// NULL once answered, so we stop prompting). Returns the refreshed profile.
+export async function setGameInterests(buyerId, list) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const clean = sanitizeGameInterests(list);
+    await db.query(`UPDATE mkt_buyer SET game_interests = $2, updated_at = NOW() WHERE id = $1`, [buyerId, clean]);
+    return getProfile(buyerId);
+}
+
+// Dismiss the Friday Night Magic sign-up CTA so it stops showing for this member.
+export async function dismissFnmCta(buyerId) {
+    if (!buyerId) throw new Error("Not signed in.");
+    await db.query(`UPDATE mkt_buyer SET fnm_cta_dismissed_at = NOW(), updated_at = NOW() WHERE id = $1`, [buyerId]);
     return getProfile(buyerId);
 }
 

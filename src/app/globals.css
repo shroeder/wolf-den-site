@@ -8956,6 +8956,32 @@ body.tv-mode .shop-mobile-cart-fab {
 .collectible.rar-legendary.is-unlocked { border-color: rgba(245, 166, 35, 0.6); box-shadow: 0 0 12px rgba(245, 166, 35, 0.28); }
 .collectible-credit { font-size: 0.72rem; margin: 10px 0 0; }
 
+/* ---- "What do you play?" onboarding + Friday Night Magic CTA ---- */
+.game-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.game-chip {
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; cursor: pointer;
+    padding: 7px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600;
+    color: #e7dcc4; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.14);
+    transition: border-color 0.12s ease, background 0.12s ease, transform 0.1s ease;
+}
+.game-chip:hover { transform: translateY(-1px); border-color: rgba(255, 215, 94, 0.45); }
+.game-chip.is-on { background: rgba(255, 215, 94, 0.16); border-color: #ffd75e; color: #ffe9a8; }
+.game-ask-actions { display: flex; align-items: center; gap: 10px; }
+
+.fnm-cta { position: relative; overflow: hidden; border-color: rgba(81, 153, 228, 0.45); }
+.fnm-cta::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 140% at 100% 0%, rgba(81, 153, 228, 0.18), transparent 55%);
+}
+.fnm-cta-body { position: relative; }
+.fnm-cta-eyebrow { display: inline-block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #7ab6ff; margin-bottom: 4px; }
+.fnm-cta-dismiss {
+    position: absolute; top: 8px; right: 10px; z-index: 2; cursor: pointer;
+    width: 26px; height: 26px; border-radius: 50%; line-height: 1; font-size: 1.1rem;
+    color: #cdbfa6; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.fnm-cta-dismiss:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+
 /* Featured-collectible chip (shown on the profile hero + public profile). */
 .featured-collectible {
     display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
