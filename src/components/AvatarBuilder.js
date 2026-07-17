@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import ThemedSelect from "@/components/ThemedSelect";
 import {
@@ -71,6 +71,15 @@ export default function AvatarBuilder({ current = null }) {
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState("");
     const [err, setErr] = useState("");
+    // The site header is sticky+opaque, so a preview stuck at top:0 slides behind it and the avatar's head
+    // gets clipped. Measure the header and stick the preview just below it (recompute on resize/rotate).
+    const [headerH, setHeaderH] = useState(0);
+    useEffect(() => {
+        const measure = () => setHeaderH(document.querySelector(".site-header")?.offsetHeight || 0);
+        measure();
+        window.addEventListener("resize", measure);
+        return () => window.removeEventListener("resize", measure);
+    }, []);
 
     const previewUrl = useMemo(() => avatarUrlFor(config), [config]);
 
@@ -102,7 +111,7 @@ export default function AvatarBuilder({ current = null }) {
 
     return (
         <div className="avatar-builder">
-            <div className="avatar-builder-preview">
+            <div className="avatar-builder-preview" style={headerH ? { top: headerH + 8 } : undefined}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="avatar-builder-img" src={previewUrl} alt="Avatar preview" width={140} height={140} />
                 <div className="avatar-presets">
