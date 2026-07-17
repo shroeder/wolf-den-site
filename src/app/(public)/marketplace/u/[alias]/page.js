@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 
 import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
+import CollectibleGrid from "@/components/CollectibleGrid";
+import FeaturedCollectible from "@/components/FeaturedCollectible";
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
@@ -49,9 +51,16 @@ export default async function UserProfilePage({ params }) {
                         <h1>{profile.displayLabel}</h1>
                         {profile.alias ? <p className="muted">@{profile.alias}</p> : null}
                         <UserBadges badges={profile.displayBadges || profile.badges} />
+                        {profile.featuredCollectibleId ? <FeaturedCollectible id={profile.featuredCollectibleId} size="sm" /> : null}
                         <UserLevel level={profile.level} />
                     </div>
                 </div>
+            </section>
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Collection</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Relics, weapons, and beasts {profile.displayLabel} has unlocked by leveling up.</p>
+                <CollectibleGrid level={profile.level?.level || 1} unlockedOnly />
             </section>
         </div>
     );

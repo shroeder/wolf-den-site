@@ -8937,10 +8937,15 @@ body.tv-mode .shop-mobile-cart-fab {
 .collectible-count { margin: 0 0 10px; font-weight: 600; }
 .collectible-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 10px; }
 .collectible {
+    position: relative; width: 100%; font: inherit; color: inherit;
     display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
     padding: 12px 6px; border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.03);
 }
+.collectible.is-clickable { cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.collectible.is-clickable:hover { transform: translateY(-2px); border-color: rgba(255, 215, 94, 0.5); }
+.collectible.is-featured { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e inset, 0 0 14px -4px #ffd75e; }
+.collectible-star { position: absolute; top: 4px; right: 6px; color: #ffd75e; font-size: 0.8rem; line-height: 1; }
 .collectible-icon { font-size: 2.1rem; line-height: 1; display: flex; }
 .collectible-icon svg { width: 1em; height: 1em; }
 .collectible-name { font-size: 0.68rem; font-weight: 600; color: #cdbfa6; line-height: 1.2; }
@@ -8950,6 +8955,21 @@ body.tv-mode .shop-mobile-cart-fab {
 .collectible.rar-epic.is-unlocked { border-color: rgba(168, 85, 247, 0.55); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2); }
 .collectible.rar-legendary.is-unlocked { border-color: rgba(245, 166, 35, 0.6); box-shadow: 0 0 12px rgba(245, 166, 35, 0.28); }
 .collectible-credit { font-size: 0.72rem; margin: 10px 0 0; }
+
+/* Featured-collectible chip (shown on the profile hero + public profile). */
+.featured-collectible {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
+    padding: 3px 9px 3px 6px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.featured-collectible-icon { display: flex; font-size: 1.05rem; line-height: 1; }
+.featured-collectible-icon svg { width: 1em; height: 1em; }
+.featured-collectible-name { font-size: 0.74rem; font-weight: 700; color: #e7dcc4; }
+.featured-collectible.fc-sm { padding: 2px 8px 2px 5px; }
+.featured-collectible.fc-sm .featured-collectible-icon { font-size: 0.95rem; }
+.featured-collectible.rar-epic { border-color: rgba(168, 85, 247, 0.55); }
+.featured-collectible.rar-legendary { border-color: rgba(245, 166, 35, 0.6); box-shadow: 0 0 10px -3px rgba(245, 166, 35, 0.4); }
+.featured-collectible.rar-mythic { border-color: rgba(90, 255, 175, 0.55); box-shadow: 0 0 10px -3px rgba(90, 255, 175, 0.4); }
 
 /* ---- Boss fight prototype ---- */
 .boss-wrap { display: flex; flex-direction: column; gap: 14px; }

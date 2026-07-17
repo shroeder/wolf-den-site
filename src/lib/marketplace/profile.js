@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { discordConfig } from "@/lib/marketplace/discord.js";
 import { backgroundById, isBackgroundUnlocked } from "@/lib/marketplace/backgrounds.js";
 import { borderById, isBorderUnlocked } from "@/lib/marketplace/borders.js";
+import { collectibleById, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
 import { frameById, isFrameUnlocked } from "@/lib/marketplace/frames.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { DEFAULT_AVATAR_URL, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
@@ -136,6 +137,9 @@ function mapProfile(row, badges = []) {
         featuredBadge: pickShowcaseBadges(badges, row.showcase_badge_slugs || null)[0] || null,
         // The RAW stored showcase (for the picker). Empty = default (top few).
         showcaseSlugs: row.showcase_badge_slugs || [],
+        // The collectible the member features on their card / public profile (id, or null). Level only ever
+        // rises, so an unlocked pick stays valid — the display components resolve the id to its icon.
+        featuredCollectibleId: row.featured_collectible || null,
         // Email notification prefs (default on).
         notifyEmailDm: row.notify_email_dm !== false,
         notifyEmailFriend: row.notify_email_friend !== false,
@@ -146,7 +150,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, featured_collectible, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -267,6 +271,24 @@ export async function setShowcaseBadges(buyerId, slugs) {
     return getProfile(buyerId);
 }
 
+// Feature one collectible on the member's card + public profile. Must be a real collectible they've
+// unlocked at their current level; pass null/"" to clear. Returns the refreshed profile.
+export async function setFeaturedCollectible(buyerId, id) {
+    if (!buyerId) throw new Error("Not signed in.");
+    const clean = String(id || "").trim();
+    let toStore = null;
+    if (clean) {
+        const item = collectibleById(clean);
+        if (!item) throw new Error("Unknown collectible.");
+        const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
+        const level = levelForXp(row?.xp || 0).level;
+        if (!isCollectibleUnlocked(item, level)) throw new Error(`Reach Level ${item.level} to feature ${item.name}.`);
+        toStore = item.id;
+    }
+    await db.query(`UPDATE mkt_buyer SET featured_collectible = $2, updated_at = NOW() WHERE id = $1`, [buyerId, toStore]);
+    return getProfile(buyerId);
+}
+
 // Public leaderboard: top members by lifetime XP. Only accounts with a public @handle appear (opting in
 // via a handle), and only those who've earned something. Returns rank + display bits (no contact info).
 export async function getLeaderboard(limit = 50) {
@@ -291,7 +313,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, featured_collectible
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

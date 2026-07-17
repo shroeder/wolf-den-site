@@ -72,6 +72,7 @@ export default async function ProfileHubPage() {
                     level={level}
                     border={profile?.border}
                     cosmetics={profile?.avatarCosmetics}
+                    featuredCollectibleId={profile?.featuredCollectibleId}
                 />
             </section>
 
@@ -130,8 +131,8 @@ export default async function ProfileHubPage() {
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Collection</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Relics, weapons, and beasts you unlock as you level up. These become real, equippable gear down the road.</p>
-                <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} />
+                <p className="muted" style={{ marginTop: 0 }}>Relics, weapons, and beasts you unlock as you level up. Tap an unlocked one to <strong>feature it</strong> on your card and public profile. These become real, equippable gear down the road.</p>
+                <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} selectable featuredId={profile?.featuredCollectibleId} />
             </section>
 
             <section className="card">

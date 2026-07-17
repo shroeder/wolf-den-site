@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import AvatarStack from "@/components/AvatarStack";
+import FeaturedCollectible from "@/components/FeaturedCollectible";
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
 import { borderClass } from "@/lib/marketplace/borders.js";
@@ -9,7 +10,7 @@ import { nextRank, rankForLevel } from "@/lib/marketplace/ranks.js";
 // The top of the rewards hub: identity + progress, built to feel like a game profile, not a form.
 // A level ring wraps the avatar and fills with your progress; the XP bar sweeps and counts up on load;
 // a rank chip names where you stand and teases the next rank. The CTA opens the full rewards track.
-export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], level, border = "none", cosmetics = null }) {
+export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], level, border = "none", cosmetics = null, featuredCollectibleId = null }) {
     if (!level) return null;
     const pct = Math.round(Math.min(1, Math.max(0, level.progress || 0)) * 100);
     const rank = rankForLevel(level.level);
@@ -36,6 +37,7 @@ export default function RewardsHubHero({ displayLabel, avatarUrl, badges = [], l
                     </div>
                     <div className="rewards-hero-name">{displayLabel || "Member"}</div>
                     <UserBadges badges={badges} />
+                    {featuredCollectibleId ? <FeaturedCollectible id={featuredCollectibleId} size="sm" /> : null}
                 </div>
             </div>
 

@@ -49,6 +49,10 @@ export const COLLECTIBLES = [
     { id: "singularity", name: "The Singularity", Icon: GiBlackHoleBolas, color: "#ff5a7a", level: 100, rarity: "mythic", hint: "The end of everything" },
 ];
 
+export function collectibleById(id) {
+    return COLLECTIBLES.find((c) => c.id === id) || null;
+}
+
 export function isCollectibleUnlocked(item, level, { unlockAll = false } = {}) {
     return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= item.level;
 }
