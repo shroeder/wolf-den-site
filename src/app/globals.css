@@ -9468,3 +9468,49 @@ body.tv-mode .shop-mobile-cart-fab {
 
 .hub-tile { position: relative; }
 .hub-tile-badge { position: absolute; top: 6px; right: 8px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0443a; color: #fff; font-size: 0.72rem; font-weight: 800; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+
+/* ============ Loot chests + reveal ============ */
+.chest-card { border-color: rgba(255, 215, 94, 0.35); }
+.chest-total { float: right; background: #e0443a; color: #fff; font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 1px 9px; }
+.chest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.chest-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; font: inherit; color: #e7dcc4;
+    padding: 12px 6px; border-radius: 14px; background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid var(--chest, #b08a52); box-shadow: 0 0 14px -6px var(--chest);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.chest-tile:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 0 20px -4px var(--chest); }
+.chest-tile:disabled { opacity: 0.6; cursor: default; }
+.chest-emoji { font-size: 2rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.chest-name { font-size: 0.72rem; font-weight: 700; }
+.chest-count { font-size: 0.8rem; font-weight: 800; color: var(--chest); }
+
+/* Reveal modal */
+.chest-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px;
+    background: rgba(5, 4, 8, 0.82); backdrop-filter: blur(4px); animation: chest-fade 0.2s ease; }
+.chest-modal-inner { text-align: center; max-width: 340px; width: 100%; }
+@keyframes chest-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.chest-shake { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.chest-emoji-big { font-size: 6rem; line-height: 1; filter: drop-shadow(0 0 24px var(--chest, #ffd75e)); animation: chest-shake 0.5s ease-in-out infinite; }
+.chest-opening { color: #ffd75e; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; animation: chest-pulse 0.9s ease-in-out infinite; }
+@keyframes chest-shake { 0%, 100% { transform: rotate(-7deg) translateY(0); } 25% { transform: rotate(7deg) translateY(-6px); } 50% { transform: rotate(-5deg) translateY(0); } 75% { transform: rotate(5deg) translateY(-4px); } }
+@keyframes chest-pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+/* Reward burst */
+.chest-reward { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 26px 18px; border-radius: 18px; background: rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--rar, #9aa7b5); box-shadow: 0 0 40px -6px var(--rar); animation: chest-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes chest-pop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+.chest-burst { position: absolute; inset: -30%; z-index: -1; border-radius: 50%;
+    background: radial-gradient(circle, var(--rar) 0%, transparent 62%); opacity: 0.34; animation: chest-burst 0.9s ease-out forwards; }
+@keyframes chest-burst { 0% { transform: scale(0.2); opacity: 0.6; } 100% { transform: scale(1.4); opacity: 0.12; } }
+.chest-rarity-tag { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.14em; color: var(--rar); text-transform: uppercase; }
+.chest-reward-glyph { font-size: 3.4rem; color: var(--rar); display: flex; }
+.chest-reward-glyph svg { width: 1em; height: 1em; }
+.chest-reward-name { font-size: 1.15rem; font-weight: 800; color: #fff; }
+.chest-reward-sub { font-size: 0.8rem; }
+.chest-modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) {
+    .chest-emoji-big, .chest-opening, .chest-reward, .chest-burst { animation: none; }
+}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import ChestOpener from "@/components/ChestOpener";
 import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot, itemIcon } from "@/lib/marketplace/items.js";
 
 // The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
@@ -79,6 +80,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
 
     return (
         <div className="equip">
+            <ChestOpener onLoot={load} />
             <div className="equip-doll" style={backdropUrl ? { backgroundImage: `linear-gradient(rgba(8,6,4,0.55), rgba(8,6,4,0.7)), url(${backdropUrl})` } : undefined}>
                 {EQUIP_SLOTS.map((s) => {
                     const id = equipped[s.slot];

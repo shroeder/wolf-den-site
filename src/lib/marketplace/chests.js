@@ -1,0 +1,92 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { grantItem } from "@/lib/marketplace/inventory.js";
+import { ITEMS } from "@/lib/marketplace/items.js";
+import { levelForXp } from "@/lib/marketplace/xp.js";
+
+// Loot chests: earned on level-up, opened for random gear. Higher tiers weight toward rarer loot.
+export const CHEST_TIERS = {
+    wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 68, rare: 27, epic: 5 } },
+    iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 34, rare: 42, epic: 21, legendary: 3 } },
+    gold: { label: "Gold Chest", emoji: "🪙", color: "#ffd75e", weights: { rare: 30, epic: 47, legendary: 20, mythic: 3 } },
+    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 36, legendary: 48, mythic: 16 } },
+};
+export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic"];
+
+// Gold consolation ("dust") when you already own every eligible item of the rolled rarity.
+const DUST = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900 };
+
+// Items a chest can produce (all non-charged loot gear). Charged/perk + level/shop items stay off the table.
+const CHEST_POOL = ITEMS.filter((i) => (i.source === "chest" || i.source === "boss_drop") && !i.charged);
+
+function tierForLevel(level) {
+    if (level >= 45) return "mythic";
+    if (level >= 25) return "gold";
+    if (level >= 10) return "iron";
+    return "wooden";
+}
+
+function rollRarity(weights) {
+    const total = Object.values(weights).reduce((s, w) => s + w, 0);
+    let r = Math.random() * total;
+    for (const [rarity, w] of Object.entries(weights)) { r -= w; if (r <= 0) return rarity; }
+    return Object.keys(weights)[0];
+}
+
+// Grant any loot chests owed for levels the member has reached since we last checked. Retroactive + safe.
+export async function syncLevelChests(buyerId) {
+    if (!buyerId) return {};
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(chest_level,0) AS chest_level FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!row) return {};
+    const level = levelForXp(row.xp).level;
+    if (level <= row.chest_level) return {};
+    const tally = {};
+    for (let L = row.chest_level + 1; L <= level; L++) {
+        const t = tierForLevel(L);
+        tally[t] = (tally[t] || 0) + 1;
+        if (L % 10 === 0) tally.mythic = (tally.mythic || 0) + 1; // milestone bonus chest
+    }
+    for (const [t, n] of Object.entries(tally)) {
+        await db.query(
+            `INSERT INTO mkt_user_chest (buyer_id, tier, count) VALUES ($1, $2, $3)
+             ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + $3`,
+            [buyerId, t, n]
+        ).catch(() => {});
+    }
+    await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
+    return tally;
+}
+
+// Current chest counts by tier (syncs owed chests first).
+export async function getChests(buyerId) {
+    if (!buyerId) return [];
+    await syncLevelChests(buyerId).catch(() => {});
+    const rows = await db.query(`SELECT tier, count FROM mkt_user_chest WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []);
+    const counts = Object.fromEntries(rows.map((r) => [r.tier, r.count]));
+    return CHEST_ORDER.filter((t) => counts[t]).map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t] }));
+}
+
+// Open one chest of a tier: roll a rarity, grant a random un-owned item of it (or gold dust if you own
+// them all). Returns the reveal for the animation.
+export async function openChest(buyerId, tier) {
+    const def = CHEST_TIERS[tier];
+    if (!def) return { ok: false, error: "unknown_tier" };
+    const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
+    if (!dec) return { ok: false, error: "no_chest" };
+
+    const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const owned = new Set(ownedRows.map((r) => r.item_id));
+    const rarity = rollRarity(def.weights);
+    // Prefer the rolled rarity; if you own them all, widen to any un-owned pool item before falling to dust.
+    let candidates = CHEST_POOL.filter((i) => i.rarity === rarity && !owned.has(i.id));
+    if (!candidates.length) candidates = CHEST_POOL.filter((i) => !owned.has(i.id));
+    if (candidates.length) {
+        const item = candidates[Math.floor(Math.random() * candidates.length)];
+        await grantItem(buyerId, item.id, "chest");
+        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel } };
+    }
+    const gold = DUST[rarity] || 25;
+    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
+    return { ok: true, remaining: dec.count, gold, rarity };
+}
