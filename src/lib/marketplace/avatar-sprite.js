@@ -71,7 +71,8 @@ export function pendingSpriteIds(limit = 5) {
         .query(
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
-                AND (avatar_sprite_url IS NULL OR (avatar_updated_at IS NOT NULL AND avatar_updated_at > avatar_sprite_at))
+                AND avatar_updated_at IS NOT NULL
+                AND (avatar_sprite_url IS NULL OR avatar_updated_at > avatar_sprite_at)
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_updated_at DESC NULLS LAST
               LIMIT $1`,
             [Math.max(1, Math.min(50, Math.floor(Number(limit) || 5)))]

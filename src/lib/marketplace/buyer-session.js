@@ -6,6 +6,7 @@ import { cookies, headers } from "next/headers";
 
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 import { db } from "@/lib/db";
+import { DEFAULT_AVATAR } from "@/lib/marketplace/avatar-options.js";
 import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
 import { ensureAlias } from "@/lib/marketplace/profile.js";
 import { claimPendingPurchases } from "@/lib/marketplace/xp.js";
@@ -86,6 +87,13 @@ export async function createBuyer({ email, password, displayName = null }) {
     await ensureSquareCustomerForBuyer(row.id).catch(() => {});
     // Mandatory public @handle so every member shows on the leaderboard (user-editable later).
     await ensureAlias(row.id, displayName || normalized.split("@")[0]).catch(() => {});
+    // Give every new member the default avatar up front — so they have a character and join the boss
+    // fight (visibly, on the default sprite) from the moment they register, with no empty state. We DON'T
+    // stamp avatar_updated_at, so the per-member sprite job leaves them on the shared default until they
+    // actually build their own look.
+    await db
+        .query(`UPDATE mkt_buyer SET avatar_config = $2::jsonb WHERE id = $1 AND avatar_config IS NULL AND avatar_url IS NULL`, [row.id, JSON.stringify(DEFAULT_AVATAR)])
+        .catch(() => {});
     return mapBuyer(row);
 }
 

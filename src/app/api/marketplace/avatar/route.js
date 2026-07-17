@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
+import { generateBuyerSprite } from "@/lib/marketplace/avatar-sprite.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -49,6 +50,13 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const config = body?.config ? sanitizeAvatarConfig(body.config) : null;
             const profile = await setAvatarConfig(buyer.id, config);
+            // Redraw their attacking boss-sprite right now (after the response) so their new look is in the
+            // fight within seconds — instead of waiting for the nightly sprite job. Best-effort.
+            if (config) {
+                after(async () => {
+                    await generateBuyerSprite(buyer.id).catch(() => {});
+                });
+            }
             return noStore({ profile });
         } catch (error) {
             return internalError(error, { event: "marketplace.avatar.save.failure" });
