@@ -9371,14 +9371,16 @@ body.tv-mode .shop-mobile-cart-fab {
 /* The paper-doll: 9 slots around the hero portrait. */
 .equip-doll {
     display: grid;
-    grid-template-columns: 1fr 1.5fr 1fr;
+    grid-template-columns: 1fr 1.3fr 1fr;
     grid-template-areas:
         "helm  hero  amul"
         "main  hero  off"
         "chest hero  belt"
         "ring1 boots ring2";
-    gap: 10px;
-    padding: 16px;
+    gap: 8px;
+    padding: 14px;
+    max-width: 460px;
+    margin: 0 auto;
     border-radius: 16px;
     background: radial-gradient(120% 90% at 50% 0%, #241d12, #141019 70%, #0d0a12);
     background-size: cover; background-position: center;
@@ -9392,7 +9394,8 @@ body.tv-mode .shop-mobile-cart-fab {
 .slot-boots { grid-area: boots; }
 
 .equip-slot {
-    aspect-ratio: 1; width: 100%; border-radius: 12px; cursor: pointer;
+    aspect-ratio: 1; width: 100%; max-width: 72px; justify-self: center; align-self: center;
+    border-radius: 12px; cursor: pointer;
     background: rgba(0, 0, 0, 0.4); border: 1.5px solid rgba(255, 255, 255, 0.12);
     display: grid; place-items: center; transition: transform 0.1s ease, box-shadow 0.12s ease;
     box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
@@ -9405,7 +9408,7 @@ body.tv-mode .shop-mobile-cart-fab {
 
 .equip-hero { grid-area: hero; position: relative; display: grid; place-items: center; padding: 4px; }
 .equip-hero img {
-    width: 100%; max-width: 168px; aspect-ratio: 1; object-fit: contain;
+    width: 100%; max-width: clamp(96px, 30vw, 150px); aspect-ratio: 1; object-fit: contain;
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6));
 }
 .equip-hero-lv {
