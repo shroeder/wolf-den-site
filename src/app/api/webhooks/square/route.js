@@ -85,7 +85,13 @@ async function pushLoyaltyClaim({ token, amountCents }) {
 async function handlePurchaseLoyalty(payload) {
     const payment = payload?.data?.object?.payment;
     if (!payment) return { handled: false, reason: "no_payment" };
-    if (payment.status !== "COMPLETED") return { handled: true, skipped: "not_completed" };
+    // Fire on APPROVED too, not just COMPLETED. Square sends payment.created/APPROVED the instant the card
+    // is tapped; COMPLETED only lands after card settlement (seconds-to-minutes later) — which is what made
+    // the loyalty-QR push arrive way too late, after the customer had left. The dedup below (claim.isNew +
+    // awardPurchaseXp's order-id dedupe) means the later COMPLETED event never double-pushes or double-credits.
+    if (payment.status !== "COMPLETED" && payment.status !== "APPROVED") {
+        return { handled: true, skipped: `status_${(payment.status || "unknown").toLowerCase()}` };
+    }
 
     // Online orders already awarded XP by email at checkout — don't double-credit them.
     const online = await db
