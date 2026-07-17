@@ -5,6 +5,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
+import { getEquippedStats } from "@/lib/marketplace/inventory.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
@@ -16,12 +17,15 @@ export const DAILY_ATTACKS = 1;
 
 const lvl = (xp) => levelForXp(xp || 0).level;
 
-// Damage formulas (both scale with level).
-function manualHit(level) {
-    const base = 120 + level * 15;
+// Damage formulas (both scale with level). Equipped-gear stats buff the manual strike: might (+% damage),
+// crit_chance (+% to crit, base 25%), crit_power (+% crit multiplier, base ×2.5).
+function manualHit(level, stats = {}) {
+    const base = (120 + level * 15) * (1 + (stats.might || 0) / 100);
     const roll = Math.round(base * (0.85 + Math.random() * 0.3));
-    const crit = Math.random() < 0.25;
-    return { damage: crit ? Math.round(roll * 2.5) : roll, crit };
+    const critProb = Math.min(0.9, 0.25 + (stats.crit_chance || 0) / 100);
+    const critMult = 2.5 + (stats.crit_power || 0) / 100;
+    const crit = Math.random() < critProb;
+    return { damage: crit ? Math.round(roll * critMult) : roll, crit };
 }
 // Passive per-member hourly auto-damage. Sized so the whole pack's combined drain is fast enough that the
 // live HP counter visibly ticks down second-by-second (the auto-sizer scales boss HP to match, so the
@@ -301,7 +305,8 @@ export async function attackBoss(buyerId) {
     if (used >= DAILY_ATTACKS) return { error: "no_attacks_left", attacksLeft: 0 };
 
     const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const { damage, crit } = manualHit(lvl(me?.xp));
+    const stats = await getEquippedStats(buyerId).catch(() => ({}));
+    const { damage, crit } = manualHit(lvl(me?.xp), stats);
     const ability = pickAbility(crit);
 
     const row = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, damage]);
