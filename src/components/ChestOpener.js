@@ -1,20 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { itemIcon } from "@/lib/marketplace/items.js";
 import ChestIcon from "@/components/ChestIcon";
 
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC" };
+const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0" };
+const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 46 };
+const BIG_RARITIES = new Set(["epic", "legendary", "mythic"]);
+
+function rarityOf(reveal) {
+    return reveal?.item?.rarity || reveal?.rarity || "common";
+}
 
 // Loot-chest opener with a suspense reveal. Fetches the member's chests, opens one on tap (server rolls
-// the loot), holds a beat of anticipation, then bursts the reward in with a rarity glow.
+// the loot), holds a beat of anticipation, then bursts the reward in with a full-screen celebration.
 export default function ChestOpener({ onLoot }) {
     const [chests, setChests] = useState(null);
     const [modalTier, setModalTier] = useState(null);
     const [phase, setPhase] = useState("idle"); // shaking | revealed
     const [reveal, setReveal] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => setMounted(true), []);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/chests", { cache: "no-store" }).catch(() => null);
@@ -22,6 +33,14 @@ export default function ChestOpener({ onLoot }) {
         setChests(d?.chests || []);
     }, []);
     useEffect(() => { load(); }, [load]);
+
+    // Lock body scroll while the celebration is up.
+    useEffect(() => {
+        if (!modalTier) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [modalTier]);
 
     function open(tier) {
         if (busy) return;
@@ -35,13 +54,36 @@ export default function ChestOpener({ onLoot }) {
             if (d?.error) { setModalTier(null); setBusy(false); return; }
             setReveal(d); setChests(d.chests || []); setPhase("revealed"); setBusy(false);
             onLoot?.();
-        }, 1400);
+        }, 1500);
     }
 
     function closeModal() { if (busy) return; setModalTier(null); setReveal(null); setPhase("idle"); }
 
     if (!chests) return null;
     const total = chests.reduce((s, c) => s + c.count, 0);
+    const activeChest = chests.find((c) => c.tier === modalTier) || null;
+    const remaining = activeChest?.count || 0;
+
+    const modal = modalTier ? (
+        <div className="chest-modal" onClick={phase === "revealed" ? closeModal : undefined}>
+            {phase === "shaking" ? (
+                <div className="chest-stage">
+                    <div className="chest-glowpad" style={{ "--chest": activeChest?.color }} />
+                    <div className="chest-shake">
+                        {activeChest?.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="chest-img-big" src={activeChest.image} alt="" />
+                        ) : (
+                            <ChestIcon className="chest-img-big" tier={modalTier} />
+                        )}
+                    </div>
+                    <p className="chest-opening">Opening…</p>
+                </div>
+            ) : (
+                <RewardReveal reveal={reveal} onClose={closeModal} onAgain={remaining > 0 ? () => open(modalTier) : null} />
+            )}
+        </div>
+    ) : null;
 
     return (
         <section className="card chest-card">
@@ -66,50 +108,72 @@ export default function ChestOpener({ onLoot }) {
                 </>
             ) : <p className="muted" style={{ margin: 0 }}>No chests right now — level up to earn one.</p>}
 
-            {modalTier ? (
-                <div className="chest-modal" onClick={phase === "revealed" ? closeModal : undefined}>
-                    <div className="chest-modal-inner" onClick={(e) => e.stopPropagation()}>
-                        {phase === "shaking" ? (
-                            <div className="chest-shake" style={{ "--chest": (chests.find((c) => c.tier === modalTier) || {}).color }}>
-                                {(chests.find((c) => c.tier === modalTier) || {}).image ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="chest-img-big" src={chests.find((c) => c.tier === modalTier).image} alt="" />
-                                ) : (
-                                    <ChestIcon className="chest-img-big" tier={modalTier} />
-                                )}
-                                <p className="chest-opening">Opening…</p>
-                            </div>
-                        ) : reveal?.item ? (
-                            <Reward item={reveal.item} />
-                        ) : (
-                            <div className={`chest-reward rar-${reveal?.rarity || "common"}`}>
-                                <span className="chest-reward-glyph">🪙</span>
-                                <div className="chest-reward-name">+{reveal?.gold} gold</div>
-                                <div className="chest-reward-sub muted">You already own that gear — take the dust.</div>
-                            </div>
-                        )}
-                        {phase === "revealed" ? (
-                            <div className="chest-modal-actions">
-                                {(chests.find((c) => c.tier === modalTier)?.count || 0) > 0 ? <button type="button" className="button gold" onClick={() => open(modalTier)}>Open another</button> : null}
-                                <button type="button" className="pill" onClick={closeModal}>Done</button>
-                            </div>
-                        ) : null}
-                    </div>
-                </div>
-            ) : null}
+            {mounted && modal ? createPortal(modal, document.body) : null}
         </section>
     );
 }
 
-function Reward({ item }) {
-    const Icon = itemIcon(item.icon);
+// The full-screen celebration: flash → light rays + particle burst → the reward slams in.
+function RewardReveal({ reveal, onClose, onAgain }) {
+    const rarity = rarityOf(reveal);
+    const color = RARITY_COLOR[rarity] || RARITY_COLOR.common;
+    const big = BIG_RARITIES.has(rarity);
+    const isItem = Boolean(reveal?.item);
+    const Icon = isItem ? itemIcon(reveal.item.icon) : null;
+
+    const particles = useMemo(() => {
+        const n = PARTICLE_COUNT[rarity] || 16;
+        const cols = [color, "#ffd75e", "#ffffff"];
+        return Array.from({ length: n }, (_, i) => {
+            const ang = (Math.PI * 2 * i) / n + (Math.random() - 0.5) * 0.6;
+            const dist = 110 + Math.random() * 150;
+            return {
+                tx: `${Math.cos(ang) * dist}px`,
+                ty: `${Math.sin(ang) * dist - 15}px`,
+                rot: `${Math.random() * 720 - 360}deg`,
+                delay: `${Math.random() * 0.12}s`,
+                c: cols[i % cols.length],
+                sz: `${6 + Math.random() * 9}px`,
+                round: i % 2 === 0,
+            };
+        });
+    }, [rarity, color]);
+
     return (
-        <div className={`chest-reward is-item rar-${item.rarity}`}>
-            <div className="chest-burst" />
-            <span className="chest-rarity-tag">{RARITY_LABEL[item.rarity] || item.rarity}</span>
-            <span className="chest-reward-glyph"><Icon aria-hidden="true" /></span>
-            <div className="chest-reward-name">{item.name}</div>
-            <div className="chest-reward-sub muted">{item.slot.replace("_", " ")} · Lv {item.reqLevel} to equip</div>
+        <div className="chest-stage" onClick={(e) => e.stopPropagation()}>
+            <div className="chest-flash" style={{ "--rar": color }} />
+            <div className={`chest-reward-wrap${big ? " slam" : ""}`}>
+                <div className="chest-rays" style={{ "--rar": color }} />
+                <div className="chest-particles" aria-hidden="true">
+                    {particles.map((p, i) => (
+                        <span
+                            key={i}
+                            className={`chest-particle${p.round ? " round" : ""}`}
+                            style={{ "--tx": p.tx, "--ty": p.ty, "--rot": p.rot, "--pc": p.c, "--sz": p.sz, animationDelay: p.delay }}
+                        />
+                    ))}
+                </div>
+                <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
+                    <span className="chest-rarity-tag">{RARITY_LABEL[rarity] || rarity}</span>
+                    {isItem ? (
+                        <>
+                            <span className="chest-reward-glyph"><Icon aria-hidden="true" /></span>
+                            <div className="chest-reward-name">{reveal.item.name}</div>
+                            <div className="chest-reward-sub muted">{reveal.item.slot.replace("_", " ")} · Lv {reveal.item.reqLevel} to equip</div>
+                        </>
+                    ) : (
+                        <>
+                            <span className="chest-reward-glyph">🪙</span>
+                            <div className="chest-reward-name">+{reveal?.gold} gold</div>
+                            <div className="chest-reward-sub muted">You already own that gear — take the dust!</div>
+                        </>
+                    )}
+                </div>
+            </div>
+            <div className="chest-modal-actions">
+                {onAgain ? <button type="button" className="button gold" onClick={onAgain}>Open another</button> : null}
+                <button type="button" className="pill" onClick={onClose}>Done</button>
+            </div>
         </div>
     );
 }

@@ -9520,33 +9520,75 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .chest-name { font-size: 0.72rem; font-weight: 700; }
 .chest-count { font-size: 0.8rem; font-weight: 800; color: var(--chest); }
 
-/* Reveal modal */
-.chest-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px;
-    background: rgba(5, 4, 8, 0.82); backdrop-filter: blur(4px); animation: chest-fade 0.2s ease; }
-.chest-modal-inner { text-align: center; max-width: 340px; width: 100%; }
+/* Reveal modal — full-screen celebration (portaled to <body> so it always covers the viewport). */
+.chest-modal { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 24px;
+    background: radial-gradient(circle at 50% 42%, rgba(24, 16, 38, 0.9), rgba(3, 2, 6, 0.97));
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: chest-fade 0.22s ease; overflow: hidden; }
 @keyframes chest-fade { from { opacity: 0; } to { opacity: 1; } }
+.chest-stage { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; width: 100%; max-width: 420px; text-align: center; }
 
-.chest-shake { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.chest-emoji-big { font-size: 6rem; line-height: 1; filter: drop-shadow(0 0 24px var(--chest, #ffd75e)); animation: chest-shake 0.5s ease-in-out infinite; }
-.chest-img-big { width: 168px; height: 168px; object-fit: contain; filter: drop-shadow(0 0 28px var(--chest, #ffd75e)); animation: chest-shake 0.5s ease-in-out infinite; }
-.chest-opening { color: #ffd75e; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; animation: chest-pulse 0.9s ease-in-out infinite; }
-@keyframes chest-shake { 0%, 100% { transform: rotate(-7deg) translateY(0); } 25% { transform: rotate(7deg) translateY(-6px); } 50% { transform: rotate(-5deg) translateY(0); } 75% { transform: rotate(5deg) translateY(-4px); } }
-@keyframes chest-pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+/* Anticipation: the chest rattles over a swelling glow. */
+.chest-glowpad { position: absolute; width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--chest, #ffd75e) 70%, transparent) 0%, transparent 65%);
+    filter: blur(6px); animation: chest-glowpad 1.5s ease-in-out infinite; }
+@keyframes chest-glowpad { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 0.6; transform: scale(1.1); } }
+.chest-shake { position: relative; z-index: 1; }
+.chest-img-big { width: clamp(180px, 60vw, 240px); height: clamp(180px, 60vw, 240px); object-fit: contain;
+    filter: drop-shadow(0 0 30px var(--chest, #ffd75e)); animation: chest-rattle 0.42s ease-in-out infinite; transform-origin: 50% 80%; }
+.chest-opening { position: relative; z-index: 1; color: #ffd75e; font-weight: 900; letter-spacing: 0.16em;
+    text-transform: uppercase; font-size: 1rem; animation: chest-pulse 0.9s ease-in-out infinite; }
+@keyframes chest-rattle {
+    0%, 100% { transform: rotate(-6deg) translateY(0) scale(1); }
+    20% { transform: rotate(7deg) translateY(-8px) scale(1.03); }
+    40% { transform: rotate(-8deg) translateY(0) scale(1); }
+    60% { transform: rotate(6deg) translateY(-5px) scale(1.02); }
+    80% { transform: rotate(-4deg) translateY(0) scale(1); }
+}
+@keyframes chest-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 
-/* Reward burst */
+/* Reveal: a full-bleed flash, rotating light rays, an outward particle burst, and the reward slamming in. */
+.chest-flash { position: fixed; inset: -20%; z-index: 1; pointer-events: none;
+    background: radial-gradient(circle at 50% 45%, #fff 0%, var(--rar, #ffd75e) 34%, transparent 70%);
+    animation: chest-flash 0.6s ease-out forwards; }
+@keyframes chest-flash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+.chest-reward-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+.chest-reward-wrap.slam { animation: chest-slam 0.55s cubic-bezier(0.18, 1.5, 0.4, 1); }
+@keyframes chest-slam { 0% { transform: scale(0.5); } 55% { transform: scale(1.08); } 70% { transform: scale(0.97); } 100% { transform: scale(1); } }
+.chest-rays { position: absolute; width: 460px; height: 460px; z-index: -2; border-radius: 50%; opacity: 0.22;
+    background: repeating-conic-gradient(from 0deg, var(--rar, #ffd75e) 0deg 7deg, transparent 7deg 20deg);
+    -webkit-mask: radial-gradient(circle, #000 8%, transparent 62%); mask: radial-gradient(circle, #000 8%, transparent 62%);
+    animation: chest-rays 9s linear infinite; }
+@keyframes chest-rays { to { transform: rotate(360deg); } }
+.chest-particles { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.chest-particle { position: absolute; left: 50%; top: 46%; width: var(--sz, 8px); height: var(--sz, 8px);
+    background: var(--pc, #ffd75e); box-shadow: 0 0 8px var(--pc, #ffd75e); transform: translate(-50%, -50%);
+    opacity: 0; animation: chest-particle 1.05s cubic-bezier(0.15, 0.7, 0.3, 1) forwards; }
+.chest-particle.round { border-radius: 50%; }
+@keyframes chest-particle {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0deg); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1) rotate(var(--rot)); }
+}
 .chest-reward { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 26px 18px; border-radius: 18px; background: rgba(0, 0, 0, 0.5);
-    border: 2px solid var(--rar, #9aa7b5); box-shadow: 0 0 40px -6px var(--rar); animation: chest-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1); }
+    padding: 28px 22px; border-radius: 20px; background: rgba(6, 5, 12, 0.72);
+    border: 2px solid var(--rar, #9aa7b5); box-shadow: 0 0 60px -8px var(--rar), inset 0 0 24px -12px var(--rar);
+    animation: chest-pop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1); }
 @keyframes chest-pop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
-.chest-burst { position: absolute; inset: -30%; z-index: -1; border-radius: 50%;
-    background: radial-gradient(circle, var(--rar) 0%, transparent 62%); opacity: 0.34; animation: chest-burst 0.9s ease-out forwards; }
-@keyframes chest-burst { 0% { transform: scale(0.2); opacity: 0.6; } 100% { transform: scale(1.4); opacity: 0.12; } }
-.chest-rarity-tag { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.14em; color: var(--rar); text-transform: uppercase; }
-.chest-reward-glyph { font-size: 3.4rem; color: var(--rar); display: flex; }
+.chest-rarity-tag { font-size: 0.82rem; font-weight: 900; letter-spacing: 0.18em; color: var(--rar); text-transform: uppercase;
+    text-shadow: 0 0 12px var(--rar); animation: chest-tag 0.5s ease both 0.15s; }
+@keyframes chest-tag { 0% { opacity: 0; transform: translateY(-8px); letter-spacing: 0.5em; } 100% { opacity: 1; transform: none; } }
+.chest-reward-glyph { font-size: clamp(3.4rem, 18vw, 5rem); line-height: 1; color: var(--rar); display: flex;
+    filter: drop-shadow(0 0 18px var(--rar)); animation: chest-glyph 2.4s ease-in-out infinite; }
 .chest-reward-glyph svg { width: 1em; height: 1em; }
-.chest-reward-name { font-size: 1.15rem; font-weight: 800; color: #fff; }
-.chest-reward-sub { font-size: 0.8rem; }
-.chest-modal-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+@keyframes chest-glyph { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-6px) rotate(2deg); } }
+.chest-reward-name { font-size: clamp(1.2rem, 5.5vw, 1.5rem); font-weight: 900; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+.chest-reward-sub { font-size: 0.85rem; }
+.chest-modal-actions { position: relative; z-index: 1; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.chest-modal-actions .button, .chest-modal-actions .pill { min-width: 130px; }
 @media (prefers-reduced-motion: reduce) {
-    .chest-emoji-big, .chest-img-big, .chest-opening, .chest-reward, .chest-burst { animation: none; }
+    .chest-img-big, .chest-opening, .chest-glowpad, .chest-reward, .chest-reward-wrap.slam,
+    .chest-flash, .chest-rays, .chest-particle, .chest-rarity-tag, .chest-reward-glyph { animation: none; }
+    .chest-flash { display: none; }
+    .chest-particle { display: none; }
 }
