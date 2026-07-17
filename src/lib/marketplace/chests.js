@@ -34,7 +34,7 @@ function rollRarity(weights) {
     return Object.keys(weights)[0];
 }
 
-async function addChests(buyerId, tally) {
+export async function addChests(buyerId, tally) {
     for (const [t, n] of Object.entries(tally)) {
         if (!n) continue;
         await db.query(

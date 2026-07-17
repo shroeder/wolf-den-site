@@ -6,6 +6,7 @@ import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
 import { getEquippedStats, getEquippedStatsForMembers, grantRandomDrop } from "@/lib/marketplace/inventory.js";
+import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
@@ -213,6 +214,9 @@ export async function getBossState(buyerId = null) {
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
     const accrual = boss.defeated_at ? { autoDps: 0, effectiveHp: boss.hp } : await autoAccrual(boss);
 
+    // Active admin buff (e.g. "Double Damage" for 2 hours) — shown as a banner over the fight.
+    const buff = boss.defeated_at ? null : await getActiveBuff().catch(() => null);
+
     return {
         boss: {
             id: boss.id,
@@ -228,6 +232,7 @@ export async function getBossState(buyerId = null) {
             ticketDivisor: divisor,
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
+            buff: buff ? { label: buff.label, emoji: buff.emoji, damageMult: buff.damageMult, expiresAt: buff.expiresAt } : null,
             winner,
         },
         roster,
@@ -317,7 +322,10 @@ export async function attackBoss(buyerId) {
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
     const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const { damage, crit } = manualHit(lvl(me?.xp), stats);
+    const swing = manualHit(lvl(me?.xp), stats);
+    const buffMult = await activeDamageMult().catch(() => 1);
+    const damage = Math.round(swing.damage * buffMult);
+    const crit = swing.crit;
     const ability = pickAbility(crit);
 
     const row = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, damage]);
@@ -359,8 +367,9 @@ export async function runBossAutoTick() {
     const members = await db.query(`SELECT id, xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
     // Equipped Ferocity boosts each member's passive auto-damage.
     const statsByMember = await getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map());
+    const buffMult = await activeDamageMult().catch(() => 1);
     const rows = members
-        .map((m) => ({ id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), statsByMember.get(m.id) || {}) * hours) }))
+        .map((m) => ({ id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), statsByMember.get(m.id) || {}) * hours * buffMult) }))
         .filter((r) => r.damage > 0);
     if (!rows.length) return { applied: 0, fighters: 0 };
 

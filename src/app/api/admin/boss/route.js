@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
 import { projectBossHp } from "@/lib/marketplace/boss.js";
+import { activateBuff, endBuff, getActiveBuff, BUFF_PRESETS } from "@/lib/marketplace/boss-buff.js";
+import { giveawayChest, giveawayGold, giveawayItem } from "@/lib/marketplace/giveaway.js";
+import { CHEST_ORDER, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,7 +22,13 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            return noStore({ bosses: await listBossesAdmin() });
+            const [bosses, buff] = await Promise.all([listBossesAdmin(), getActiveBuff().catch(() => null)]);
+            return noStore({
+                bosses,
+                buff, // currently active boss buff (or null)
+                buffPresets: BUFF_PRESETS,
+                chestTiers: CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji })),
+            });
         } catch (error) {
             return internalError(error, { event: "admin.boss.list.failure" });
         }
@@ -65,6 +74,17 @@ export async function POST(request) {
             }
             if (action === "end") return noStore(await endBoss(body.bossId));
             if (action === "delete") return noStore(await deleteBoss(body.bossId));
+            // Boss-fight buffs (timed damage multipliers, admin sets the duration when triggering).
+            if (action === "buff") return noStore({ buff: await activateBuff({ key: body.key, hours: body.hours }) });
+            if (action === "endBuff") return noStore(await endBuff());
+            // Giveaways to the CURRENT active-hero roster only (not future signups).
+            if (action === "giveaway") {
+                const kind = String(body.kind || "chest");
+                if (kind === "chest") return noStore(await giveawayChest({ tier: body.tier, count: body.count }));
+                if (kind === "gold") return noStore(await giveawayGold({ amount: body.amount }));
+                if (kind === "item") return noStore(await giveawayItem({ itemId: body.itemId }));
+                return noStore({ error: "unknown_giveaway" }, { status: 400 });
+            }
             return noStore({ error: "unknown_action" }, { status: 400 });
         } catch (error) {
             if (error?.message && !/database|query/i.test(error.message)) return noStore({ error: error.message }, { status: 400 });

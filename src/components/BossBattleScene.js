@@ -51,6 +51,13 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                 <div className="battle-name">{boss.name}</div>
                 <div className="battle-hpbar"><span style={{ width: `${pct}%` }} /></div>
                 <div className="battle-hp">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</div>
+                {boss.buff ? (
+                    <div className="battle-buff" title={`All damage ×${boss.buff.damageMult} while active`}>
+                        <span className="battle-buff-emoji">{boss.buff.emoji}</span>
+                        <span className="battle-buff-label">{boss.buff.label}</span>
+                        <span className="battle-buff-mult">×{boss.buff.damageMult}</span>
+                    </div>
+                ) : null}
             </div>
 
             <div className={`battle-boss${hit ? " is-hit" : ""}`}>
