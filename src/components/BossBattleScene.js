@@ -74,8 +74,8 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                         <div className="fighter-lunge" style={{ animationDelay: `${f.delay}s` }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="fighter-sprite" src={f.spriteUrl} alt="" />
+                            {!f.pad && f.name ? <span className="fighter-name">{f.name}</span> : null}
                         </div>
-                        {!f.pad && f.name ? <span className="fighter-name">{f.name}</span> : null}
                     </div>
                 ))}
             </div>
