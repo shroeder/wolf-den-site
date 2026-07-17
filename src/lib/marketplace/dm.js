@@ -30,14 +30,14 @@ export async function getOrCreateDmThread(userId, otherId) {
     if (!userId || !otherId || userId === otherId) return { error: "invalid" };
     if (!(await areFriends(userId, otherId))) return { error: "not_friends" };
     const [a, b] = pair(userId, otherId);
-    await db.query(`INSERT INTO mkt_dm_thread (user_a, user_b) VALUES ($1, $2) ON CONFLICT (user_a, user_b) DO NOTHING`, [a, b]).catch(() => {});
-    const row = await db.queryOne(`SELECT id FROM mkt_dm_thread WHERE user_a = $1 AND user_b = $2`, [a, b]).catch(() => null);
+    await db.query(`INSERT INTO mkt_dm_thread (user_a, user_b) VALUES ($1, $2) ON CONFLICT (user_a, user_b) WHERE vendor_id IS NULL DO NOTHING`, [a, b]).catch(() => {});
+    const row = await db.queryOne(`SELECT id FROM mkt_dm_thread WHERE user_a = $1 AND user_b = $2 AND vendor_id IS NULL`, [a, b]).catch(() => null);
     return row ? { threadId: row.id } : { error: "failed" };
 }
 
 export async function postDmMessage(threadId, senderId, body, catalogProductId = null) {
     const t = await db
-        .queryOne(`SELECT user_a, user_b, last_message_at, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId])
+        .queryOne(`SELECT user_a, user_b, last_message_at, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1 AND vendor_id IS NULL`, [threadId])
         .catch(() => null);
     if (!t || (t.user_a !== senderId && t.user_b !== senderId)) return { error: "forbidden" };
     const text = String(body || "").trim().slice(0, 4000);
@@ -74,7 +74,7 @@ export async function listDmThreads(userId) {
                LEFT JOIN LATERAL (
                    SELECT body, sender_id, catalog_product_id FROM mkt_dm_message WHERE thread_id = t.id ORDER BY created_at DESC LIMIT 1
                ) m ON true
-              WHERE (t.user_a = $1 OR t.user_b = $1) AND t.last_message_at IS NOT NULL
+              WHERE (t.user_a = $1 OR t.user_b = $1) AND t.vendor_id IS NULL AND t.last_message_at IS NOT NULL
               ORDER BY t.last_message_at DESC`,
             [userId]
         )
@@ -99,7 +99,7 @@ export async function listDmThreads(userId) {
 // Load a DM thread the user is in, its messages, reactions, presence + typing of the other person,
 // and mark it read. Powers the first-class conversation view.
 export async function getDmThread(threadId, userId) {
-    const t = await db.queryOne(`SELECT id, user_a, user_b, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
+    const t = await db.queryOne(`SELECT id, user_a, user_b, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1 AND vendor_id IS NULL`, [threadId]).catch(() => null);
     if (!t || (t.user_a !== userId && t.user_b !== userId)) return null;
     const otherId = t.user_a === userId ? t.user_b : t.user_a;
     const otherLastReadAt = t.user_a === otherId ? t.a_last_read_at : t.b_last_read_at;
@@ -158,7 +158,7 @@ export async function getDmThread(threadId, userId) {
 
 // Verify the user is a participant of the thread. Returns the thread row or null.
 async function threadForUser(threadId, userId) {
-    const t = await db.queryOne(`SELECT user_a, user_b FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
+    const t = await db.queryOne(`SELECT user_a, user_b FROM mkt_dm_thread WHERE id = $1 AND vendor_id IS NULL`, [threadId]).catch(() => null);
     if (!t || (t.user_a !== userId && t.user_b !== userId)) return null;
     return t;
 }
@@ -204,7 +204,7 @@ export async function unreadDmCount(userId) {
             `SELECT COUNT(*)::int AS n
                FROM mkt_dm_thread t
                JOIN LATERAL (SELECT sender_id, created_at FROM mkt_dm_message WHERE thread_id = t.id ORDER BY created_at DESC LIMIT 1) m ON true
-              WHERE (t.user_a = $1 OR t.user_b = $1) AND m.sender_id <> $1
+              WHERE (t.user_a = $1 OR t.user_b = $1) AND t.vendor_id IS NULL AND m.sender_id <> $1
                 AND ((CASE WHEN t.user_a = $1 THEN t.a_last_read_at ELSE t.b_last_read_at END) IS NULL
                      OR (CASE WHEN t.user_a = $1 THEN t.a_last_read_at ELSE t.b_last_read_at END) < m.created_at)`,
             [userId]

@@ -93,6 +93,9 @@ export async function POST(request, { params }) {
             }
             return NextResponse.json({ ok: true });
         } catch (error) {
+            if (error?.message && !/database|query|column|relation|syntax/i.test(error.message)) {
+                return NextResponse.json({ error: error.message }, { status: 400 });
+            }
             return internalError(error, { event: "marketplace.thread.reply.failure" });
         }
     });

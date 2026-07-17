@@ -85,11 +85,10 @@ export async function getMemberMetrics(buyerId) {
             [buyerId]
         ).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM boss_event WHERE winner_buyer_id = $1`, [buyerId]).catch(() => null),
-        // Messages this member has SENT — friend DMs + their side of store threads.
+        // Messages this member has SENT. Since Phase 2, friend DMs AND their side of vendor/store threads
+        // both live in mkt_dm_message keyed by sender_id, so one count covers everything.
         db.queryOne(
-            `SELECT ((SELECT COUNT(*) FROM mkt_dm_message WHERE sender_id = $1)
-                   + (SELECT COUNT(*) FROM mkt_message msg JOIN mkt_thread th ON th.id = msg.thread_id
-                       WHERE msg.sender = 'buyer' AND th.buyer_id = $1))::int AS n`,
+            `SELECT (SELECT COUNT(*) FROM mkt_dm_message WHERE sender_id = $1)::int AS n`,
             [buyerId]
         ).catch(() => null),
         // How many badges they already hold (drives the meta "collect a lot of badges" badge).

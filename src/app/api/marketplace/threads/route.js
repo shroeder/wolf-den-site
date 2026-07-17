@@ -130,6 +130,10 @@ export async function POST(request) {
             }
             return NextResponse.json({ threadId });
         } catch (error) {
+            // Surface user-facing validation errors (e.g. "shop hasn't set up messaging") as 400, not 500.
+            if (error?.message && !/database|query|column|relation|syntax/i.test(error.message)) {
+                return NextResponse.json({ error: error.message }, { status: 400 });
+            }
             return internalError(error, { event: "marketplace.threads.start.failure" });
         }
     });
