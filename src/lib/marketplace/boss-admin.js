@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
+import { projectBossHp } from "@/lib/marketplace/boss.js";
 import { generateImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
 
 // Store a finished PNG (base64, generated directly on the phone) as the boss art — fast, no OpenAI wait.
@@ -33,7 +34,9 @@ export async function listBossesAdmin() {
 }
 
 export async function createDraftBoss({ name, description, maxHp, rewardsText, ticketDivisor }) {
-    const hp = Math.max(100, Math.floor(Number(maxHp) || 10000));
+    // No HP given → auto-size to the current pack (count + levels) for a ~1-week fight. Explicit value wins.
+    const explicit = Number(maxHp);
+    const hp = explicit > 0 ? Math.max(100, Math.floor(explicit)) : (await projectBossHp({})).hp;
     const div = Math.max(1, Math.floor(Number(ticketDivisor) || 100));
     return db.queryOne(
         `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, rewards_text, ticket_divisor)

@@ -24,6 +24,26 @@ function manualHit(level) {
 }
 const autoPerHour = (level) => 8 + level * 2;
 
+// Expected damage a single member deals PER DAY at a given level: guaranteed passive auto-attacks 24/7
+// plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375).
+function memberDailyDamage(level) {
+    const autoDaily = autoPerHour(level) * 24;
+    const manualExpected = (120 + level * 15) * 1.375;
+    return autoDaily + manualExpected;
+}
+
+// Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level-scaled damage.
+// Assumes everyone lands their daily strike (upper bound), so real fights tend to run a touch longer.
+// Used at create time so HP scales with member count + levels instead of a fixed guess. { hp, members }.
+export async function projectBossHp({ targetDays = 7 } = {}) {
+    const members = await db.query(`SELECT COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
+    const daily = members.reduce((sum, m) => sum + memberDailyDamage(lvl(m.xp)), 0);
+    // Round to a clean-ish number and floor it so a tiny/empty pack still faces a real boss.
+    const raw = Math.max(8000, Math.round(daily * Math.max(1, targetDays)));
+    const hp = Math.round(raw / 500) * 500;
+    return { hp, members: members.length, targetDays };
+}
+
 // Flavor names for the manual ability so the hit feels like a move, not a click.
 const ABILITIES = ["Fang Strike", "Howling Slash", "Pack Fury", "Savage Bite", "Rending Claw", "Alpha Smash", "Moonlit Cleave", "Feral Rush"];
 const CRIT_ABILITIES = ["APEX PREDATOR", "BLOODMOON CRIT", "PACK LEADER'S WRATH", "DEVASTATION"];

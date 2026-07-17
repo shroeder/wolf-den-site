@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
+import { projectBossHp } from "@/lib/marketplace/boss.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -33,6 +34,7 @@ export async function POST(request) {
         try {
             const body = await request.json().catch(() => ({}));
             const action = String(body?.action || "");
+            if (action === "projectHp") return noStore(await projectBossHp({ targetDays: body.days }));
             if (action === "create") return noStore({ boss: await createDraftBoss(body) });
             if (action === "update") return noStore({ boss: await updateDraftBoss(body.bossId, body) });
             if (action === "art") {
