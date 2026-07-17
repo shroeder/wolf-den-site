@@ -18,13 +18,18 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            const q = (new URL(request.url).searchParams.get("q") || "").trim();
+            const params = new URL(request.url).searchParams;
+            const q = (params.get("q") || "").trim();
             if (q.length < 2) return noStore({ items: [] });
+            // inStock=1 (default) restricts to items actually on hand — used by the restock "pay with
+            // product" picker so you can only give inventory you own. Returns qty + price for display.
+            const inStockOnly = params.get("inStock") !== "0";
             const rows = await db
                 .query(
-                    `SELECT variation_id AS id, name, image_url AS "imageUrl", price
+                    `SELECT variation_id AS id, name, image_url AS "imageUrl", price, quantity
                        FROM inventory_feed
                       WHERE image_url IS NOT NULL AND name ILIKE $1
+                        ${inStockOnly ? "AND in_stock = TRUE AND quantity > 0" : ""}
                       ORDER BY (in_stock) DESC, name LIMIT 25`,
                     [`%${q}%`]
                 )
