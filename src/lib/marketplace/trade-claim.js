@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import { db } from "@/lib/db";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { PAYOUT_REWARD_RATE } from "@/lib/marketplace/reward-rates.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 // Trade rewards. A recorded trade mints a single-use claim (QR) the customer scans to bank XP + record
@@ -19,7 +20,9 @@ const TRADE_XP_PER_TOTAL_DOLLAR = 0.15; // trade size is a slight nudge
 export function tradeXp({ topCardValueCents = 0, totalValueCents = 0 } = {}) {
     const top = Math.max(0, Math.round((Number(topCardValueCents) || 0) / 100));
     const total = Math.max(0, Math.round((Number(totalValueCents) || 0) / 100));
-    return TRADE_XP_FLAT + top * TRADE_XP_PER_TOP_DOLLAR + Math.round(total * TRADE_XP_PER_TOTAL_DOLLAR);
+    // A trade is a payout, so the value-driven portion rewards at the discounted rate (flat bit unaffected).
+    const value = top * TRADE_XP_PER_TOP_DOLLAR + total * TRADE_XP_PER_TOTAL_DOLLAR;
+    return TRADE_XP_FLAT + Math.round(value * PAYOUT_REWARD_RATE);
 }
 
 // Compute the reward-relevant stats from a trade's lines. IN lines = cards the customer traded in.

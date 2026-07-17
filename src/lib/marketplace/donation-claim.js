@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import { db } from "@/lib/db";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { DONATION_REWARD_MULTIPLIER } from "@/lib/marketplace/reward-rates.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 // Donation rewards. A recorded donation mints a single-use claim (QR) the donor scans to bank XP +
@@ -16,7 +17,8 @@ const DONATION_XP_PER_DOLLAR = 1;
 
 export function donationXp({ amountCents = 0 } = {}) {
     const dollars = Math.max(0, Math.round((Number(amountCents) || 0) / 100));
-    return DONATION_XP_FLAT + dollars * DONATION_XP_PER_DOLLAR;
+    // A donation is a gift, so the per-dollar reward is boosted slightly as a thank-you (flat bit unaffected).
+    return DONATION_XP_FLAT + Math.round(dollars * DONATION_XP_PER_DOLLAR * DONATION_REWARD_MULTIPLIER);
 }
 
 export async function createDonationClaim({ donationId, amountCents = 0, ttlMinutes = DEFAULT_TTL_MINUTES }) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { createLoyaltyClaim } from "@/lib/marketplace/loyalty-claim.js";
+import { PAYOUT_REWARD_RATE } from "@/lib/marketplace/reward-rates.js";
 import { SITE_URL } from "@/lib/site";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -20,7 +21,8 @@ export async function POST(request) {
         if (authError) return authError;
         try {
             const body = await request.json().catch(() => ({}));
-            const amountCents = Math.round(Math.max(0, Number(body.amount) || 0) * 100);
+            // Restock is a payout (we're buying from the seller), so reward at the discounted payout rate.
+            const amountCents = Math.round(Math.max(0, Number(body.amount) || 0) * 100 * PAYOUT_REWARD_RATE);
             const dedupe = String(body.dedupe || "").trim() || `restock-${Date.now()}`;
             if (amountCents <= 0) return noStore({ error: "missing_amount" }, { status: 400 });
             const paymentRef = `restock-${dedupe}`;
