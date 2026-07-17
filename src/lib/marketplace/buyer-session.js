@@ -55,17 +55,29 @@ export async function createBuyer({ email, password, displayName = null }) {
     if (!isValidBuyerPassword(password)) {
         throw new Error("Password must be at least 8 characters.");
     }
-    const existing = await db.queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1`, [normalized]);
-    if (existing) {
+    const existing = await db.queryOne(`SELECT id, password_hash FROM mkt_buyer WHERE email_normalized = $1`, [normalized]);
+    if (existing && existing.password_hash) {
         throw new Error("An account with that email already exists.");
     }
     const passwordHash = await hashPassword(password);
-    const row = await db.queryOne(
-        `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, email, display_name`,
-        [String(email).trim(), normalized, passwordHash, displayName ? String(displayName).trim().slice(0, 120) : null]
-    );
+    const displayClean = displayName ? String(displayName).trim().slice(0, 120) : null;
+    let row;
+    if (existing) {
+        // Adopt a passwordless (shop-bridged / purchase-linked) account: set the password + re-verify email,
+        // so they can finish signing up instead of hitting "email already exists" with no way in.
+        row = await db.queryOne(
+            `UPDATE mkt_buyer SET password_hash = $2, display_name = COALESCE(display_name, $3), email_verified = FALSE, updated_at = NOW()
+              WHERE id = $1 RETURNING id, email, display_name`,
+            [existing.id, passwordHash, displayClean]
+        );
+    } else {
+        row = await db.queryOne(
+            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, email, display_name`,
+            [String(email).trim(), normalized, passwordHash, displayClean]
+        );
+    }
     // Redeem any in-store/online purchases parked for this email before they had an account — their XP
     // (and Square-customer link) is waiting for them. Best-effort; never blocks signup.
     await claimPendingPurchases(row.id, normalized).catch(() => {});

@@ -39,6 +39,7 @@ export default function SiteHeader() {
     const [mktAvatar, setMktAvatar] = useState(null);
     const [mktName, setMktName] = useState(null);
     const [mktBorder, setMktBorder] = useState("none");
+    const [mktAuthed, setMktAuthed] = useState(false);
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
@@ -51,6 +52,7 @@ export default function SiteHeader() {
             const d = r && r.ok ? await r.json().catch(() => null) : null;
             const b = d?.buyer;
             if (alive && b) {
+                setMktAuthed(true);
                 setMktAvatar(b.avatarUrl || null);
                 setMktName(b.displayLabel || null);
                 setMktBorder(b.border || "none");
@@ -200,20 +202,18 @@ export default function SiteHeader() {
                             {Number(cartCount || 0) > 0 ? <span className="nav-cart-badge">{cartCount > 99 ? "99+" : cartCount}</span> : null}
                         </Link>
                     )}
-                    {paymentsEnabled && cartEnabled && authCustomer ? (
-                        <Link href="/shop/account" className="nav-account" title="Your account (orders, sign out)" aria-label="Your account" onClick={() => setOpen(false)}>
+                    {mktAuthed ? (
+                        <Link href="/marketplace/profile" className="nav-account" title="Your account" aria-label="Your account" onClick={() => setOpen(false)}>
                             {mktAvatar ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img className={`nav-account-avatar nav-account-avatar-img ${borderClass(mktBorder)}`.trim()} src={mktAvatar} alt="Your account" />
                             ) : (
-                                <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName || authCustomer.name, email: authCustomer.email })}</span>
+                                <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName })}</span>
                             )}
                         </Link>
-                    ) : paymentsEnabled && cartEnabled ? (
-                        <Link href="/shop/account" className="pill nav-signin" onClick={() => setOpen(false)}>
-                            {authLoading ? "…" : "Sign In"}
-                        </Link>
-                    ) : null}
+                    ) : (
+                        <Link href="/marketplace/login" className="pill nav-signin" onClick={() => setOpen(false)}>Sign In</Link>
+                    )}
                 </div>
             </div>
             <nav

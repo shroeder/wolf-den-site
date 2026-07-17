@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { accountNeedsPasswordSetup, authenticateBuyer, createBuyerSession, createEmailVerification, createPasswordReset, getAccountLinkedVendorId, logAuthAttempt, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
 import { createVendorSession } from "@/lib/marketplace/vendor-session.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/marketplace/email.js";
+import { bridgeMarketplaceToShop } from "@/lib/marketplace/shop-bridge.js";
 import { authenticateVendor, getVendorById } from "@/lib/marketplace/vendors.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -39,6 +40,8 @@ export async function POST(request) {
                 // uses the returned token). getAuthenticatedVendor falls back to the linked account,
                 // so this one cookie covers both buyer and seller web sessions.
                 await setBuyerSessionCookie(token);
+                // One account: also authorize checkout under the same login (best-effort).
+                await bridgeMarketplaceToShop(account.email).catch(() => {});
                 const vendorId = await getAccountLinkedVendorId(account.id);
                 if (vendorId) {
                     const vendor = await getVendorById(vendorId);
