@@ -1,0 +1,162 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot, itemIcon } from "@/lib/marketplace/items.js";
+
+// The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
+// the owned-item bag, and any charged in-store perks. Tapping a slot opens a picker of fitting items.
+const SLOT_ICON = {
+    main_hand: "⚔️", off_hand: "🛡️", helmet: "🪖", chest: "🥋", belt: "🎗️", boots: "🥾", amulet: "📿", ring1: "💍", ring2: "💍",
+};
+
+function ItemGlyph({ id, className = "" }) {
+    const Icon = itemIcon(itemDef(id)?.icon);
+    return <span className={className}><Icon aria-hidden="true" /></span>;
+}
+
+// Resolve an item def from the loaded list (avoids re-importing ITEMS on the client render path).
+let DEFS = {};
+const itemDef = (id) => DEFS[id] || null;
+
+export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, displayLabel = "Hero", level = 1, backdropUrl = null }) {
+    const [data, setData] = useState(null);
+    const [loaded, setLoaded] = useState(false);
+    const [slot, setSlot] = useState(null); // open picker for this slot
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+
+    const load = useCallback(async () => {
+        const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        if (d) { DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i])); setData(d); }
+        setLoaded(true);
+    }, []);
+    useEffect(() => { load(); }, [load]);
+
+    async function post(body) {
+        setBusy(true); setErr("");
+        try {
+            const r = await fetch("/api/marketplace/inventory", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok) { setErr(d?.error || "Couldn't update."); return; }
+            DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
+            setData(d);
+        } finally { setBusy(false); }
+    }
+
+    function equip(slotKey, itemId) { setSlot(null); post({ slot: slotKey, itemId }); }
+    function unequip(slotKey) { setSlot(null); post({ slot: slotKey, itemId: null }); }
+
+    // Bag click: equip to its slot; rings go to the first free ring slot.
+    function equipFromBag(item) {
+        if (item.slot === "ring") {
+            const target = !data.equipped.ring1 ? "ring1" : (!data.equipped.ring2 && data.equipped.ring1 !== item.id ? "ring2" : "ring1");
+            equip(target, item.id);
+        } else {
+            equip(item.slot, item.id);
+        }
+    }
+
+    if (!loaded) return <p className="muted">Opening your pack…</p>;
+    if (!data) return <p className="muted">Sign in to view your gear.</p>;
+
+    const equipped = data.equipped || {};
+    const stats = data.stats || {};
+    const statEntries = Object.entries(stats).filter(([, v]) => v);
+    const charged = (data.items || []).filter((i) => i.charge);
+
+    return (
+        <div className="equip">
+            <div className="equip-doll" style={backdropUrl ? { backgroundImage: `linear-gradient(rgba(8,6,4,0.55), rgba(8,6,4,0.7)), url(${backdropUrl})` } : undefined}>
+                {EQUIP_SLOTS.map((s) => {
+                    const id = equipped[s.slot];
+                    const def = id ? itemDef(id) : null;
+                    return (
+                        <button type="button" key={s.slot} className={`equip-slot slot-${s.slot}${def ? ` filled rar-${def.rarity}` : ""}`} onClick={() => setSlot(s.slot)} title={def ? def.name : s.label}>
+                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" /> : <span className="equip-slot-empty">{SLOT_ICON[s.slot]}</span>}
+                        </button>
+                    );
+                })}
+                <div className="equip-hero">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={spriteUrl || avatarUrl} alt={displayLabel} />
+                    <span className="equip-hero-lv">Lv {level}</span>
+                </div>
+            </div>
+
+            {/* Live stat total */}
+            <div className="equip-stats card">
+                <h3>⚔️ Combat stats</h3>
+                {statEntries.length ? (
+                    <div className="equip-stat-grid">
+                        {statEntries.map(([k, v]) => (
+                            <span key={k} className="equip-stat"><strong>+{v}{STAT_META[k]?.suffix || ""}</strong> {STAT_META[k]?.label || k}</span>
+                        ))}
+                    </div>
+                ) : <p className="muted" style={{ margin: 0 }}>Equip gear to boost your boss fight — Might, crit, ferocity and more.</p>}
+            </div>
+
+            {/* Slot picker */}
+            {slot ? (
+                <div className="card equip-picker">
+                    <div className="equip-picker-head">
+                        <h3>{EQUIP_SLOTS.find((s) => s.slot === slot)?.label}</h3>
+                        <button type="button" className="pill" onClick={() => setSlot(null)}>Close</button>
+                    </div>
+                    {equipped[slot] ? <button type="button" className="pill" onClick={() => unequip(slot)} disabled={busy}>✕ Unequip {itemDef(equipped[slot])?.name}</button> : null}
+                    <div className="equip-bag-grid">
+                        {(data.items || []).filter((i) => itemFitsSlot(i, slot)).map((i) => (
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equip(slot, i.id)} disabled={busy}>
+                                <ItemGlyph id={i.id} className="equip-card-glyph" />
+                                <span className="equip-card-name">{i.name}</span>
+                                <span className="equip-card-stats">{describeStats(i.stats)}</span>
+                            </button>
+                        ))}
+                        {!(data.items || []).some((i) => itemFitsSlot(i, slot)) ? <p className="muted" style={{ margin: 0 }}>No gear for this slot yet.</p> : null}
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Charged perks */}
+            {charged.length ? (
+                <div className="card">
+                    <h3>🎁 In-store perks</h3>
+                    <p className="muted" style={{ marginTop: 0 }}>Show these to staff at the register to redeem — they&apos;ll use a charge for you.</p>
+                    {charged.map((i) => (
+                        <div key={i.id} className={`equip-perk rar-${i.rarity}`}>
+                            <ItemGlyph id={i.id} className="equip-perk-glyph" />
+                            <div className="equip-perk-body">
+                                <strong>{i.name}</strong>
+                                <span className="muted">{i.charge.rewardLabel}</span>
+                                <span className="equip-perk-state">
+                                    {i.charge.left > 0
+                                        ? (i.charge.available ? `${i.charge.left} charge${i.charge.left === 1 ? "" : "s"} ready ✅` : `On cooldown · ${i.charge.left} left`)
+                                        : "All used up"}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            {/* The bag */}
+            <div className="card">
+                <h3>🎒 Inventory</h3>
+                {(data.items || []).length ? (
+                    <div className="equip-bag-grid">
+                        {(data.items || []).map((i) => (
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equipFromBag(i)} disabled={busy} title={describeStats(i.stats)}>
+                                <ItemGlyph id={i.id} className="equip-card-glyph" />
+                                <span className="equip-card-name">{i.name}</span>
+                                <span className="equip-card-stats">{i.equipped ? "Equipped" : describeStats(i.stats)}</span>
+                            </button>
+                        ))}
+                    </div>
+                ) : <p className="muted" style={{ margin: 0 }}>No items yet — level up, fight the boss, and check back.</p>}
+            </div>
+
+            {err ? <p style={{ color: "#ff6b6b" }}>{err}</p> : null}
+        </div>
+    );
+}
