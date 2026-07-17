@@ -29,10 +29,11 @@ function mapUser(row) {
         border: row.equipped_border || "none",
         frame: row.equipped_frame || "none",
         showcaseSlugs: row.showcase_badge_slugs || null,
+        featuredCollectibleId: row.featured_collectible || null,
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_frame, showcase_badge_slugs";
+const USER_COLS = "id, alias, display_name, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_frame, showcase_badge_slugs, featured_collectible";
 
 // Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
 async function attachBadges(users) {

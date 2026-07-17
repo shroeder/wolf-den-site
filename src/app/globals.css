@@ -6238,6 +6238,17 @@ body.tv-mode .shop-mobile-cart-fab {
     text-decoration: none;
     color: var(--ink);
 }
+/* Active pet — a little companion badge tucked on the avatar's corner. */
+.hero-card-av-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
+.hero-card-pet { position: absolute; right: -4px; bottom: -4px; z-index: 2; }
+.pet-badge {
+    display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+    background: #14141f; border: 1.5px solid rgba(255, 255, 255, 0.2); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.pet-badge-icon { display: flex; font-size: 0.85rem; line-height: 1; }
+.pet-badge-icon svg { width: 1em; height: 1em; }
+.pet-badge.rar-legendary { border-color: rgba(245, 166, 35, 0.7); }
+.pet-badge.rar-mythic { border-color: rgba(90, 255, 175, 0.7); }
 .hero-card-av {
     position: relative;
     flex: 0 0 auto;

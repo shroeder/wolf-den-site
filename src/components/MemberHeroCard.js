@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
+import FeaturedCollectible from "@/components/FeaturedCollectible";
 import UserBadges from "@/components/UserBadges";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { rankForLevel } from "@/lib/marketplace/ranks.js";
@@ -16,7 +17,10 @@ export default function MemberHeroCard({ member, action = null, href = null, com
 
     const identity = (
         <>
-            <AvatarStack avatarUrl={member.avatarUrl} initial={initial} size={48} border={member.border} cosmetics={member.avatarCosmetics} className="hero-card-av-stack" />
+            <span className="hero-card-av-wrap">
+                <AvatarStack avatarUrl={member.avatarUrl} initial={initial} size={48} border={member.border} cosmetics={member.avatarCosmetics} className="hero-card-av-stack" />
+                {member.featuredCollectibleId ? <span className="hero-card-pet"><FeaturedCollectible id={member.featuredCollectibleId} size="icon" /></span> : null}
+            </span>
             <span className="hero-card-body">
                 <span className="hero-card-name">{member.displayLabel}</span>
                 {member.alias ? <span className="hero-card-handle muted">@{member.alias}</span> : null}

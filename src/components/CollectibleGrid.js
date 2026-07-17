@@ -50,14 +50,14 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
     }
 
     if (unlockedOnly && !items.length) {
-        return <p className="muted" style={{ margin: 0 }}>No collectibles unlocked yet — level up to earn loot.</p>;
+        return <p className="muted" style={{ margin: 0 }}>No pets unlocked yet — level up to tame companions.</p>;
     }
 
     return (
         <div>
             <p className="collectible-count muted">
-                🗃️ {unlockedOnly ? unlocked : `${unlocked} / ${all.length}`} collected
-                {selectable ? <span> · tap an unlocked item to feature it</span> : null}
+                🐾 {unlockedOnly ? unlocked : `${unlocked} / ${all.length}`} pets unlocked
+                {selectable ? <span> · tap one to set your companion</span> : null}
             </p>
             <div className="collectible-grid">
                 {items.map((c) => {

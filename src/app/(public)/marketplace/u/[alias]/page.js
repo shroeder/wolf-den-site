@@ -58,8 +58,8 @@ export default async function UserProfilePage({ params }) {
             </section>
 
             <section className="card">
-                <h2 style={{ marginTop: 0 }}>Collection</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Relics, weapons, and beasts {profile.displayLabel} has unlocked by leveling up.</p>
+                <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has unlocked by leveling up.</p>
                 <CollectibleGrid level={profile.level?.level || 1} unlockedOnly />
             </section>
         </div>

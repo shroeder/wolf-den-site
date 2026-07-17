@@ -6,6 +6,14 @@ export default function FeaturedCollectible({ id, size = "md" }) {
     const item = id ? collectibleById(id) : null;
     if (!item) return null;
     const Icon = item.Icon;
+    // icon = compact circular badge (just the pet, no name) — used as a companion on avatars.
+    if (size === "icon") {
+        return (
+            <span className={`pet-badge rar-${item.rarity}`} title={`${item.name} — ${item.hint}`}>
+                <span className="pet-badge-icon" style={{ color: item.color }}><Icon aria-hidden="true" /></span>
+            </span>
+        );
+    }
     return (
         <span className={`featured-collectible rar-${item.rarity} fc-${size}`} title={`${item.name} — ${item.hint}`}>
             <span className="featured-collectible-icon" style={{ color: item.color }}>

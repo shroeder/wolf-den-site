@@ -133,8 +133,8 @@ export default async function ProfileHubPage() {
             </section>
 
             <section className="card">
-                <h2 style={{ marginTop: 0 }}>Collection</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Relics, weapons, and beasts you unlock as you level up. Tap an unlocked one to <strong>feature it</strong> on your card and public profile. These become real, equippable gear down the road.</p>
+                <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Companions you unlock as you level up. Tap one to set your <strong>active pet</strong> — it rides along on your profile and hero cards, and joins you in the boss battle.</p>
                 <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} selectable featuredId={profile?.featuredCollectibleId} />
             </section>
 
