@@ -21,6 +21,7 @@ import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
+import { countIncomingTrades } from "@/lib/marketplace/trade.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -31,6 +32,7 @@ export const metadata = {
 const TILES = [
     { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Join the raid" },
     { href: "/marketplace/inventory", icon: "🎒", label: "Your gear", sub: "Equip items" },
+    { href: "/marketplace/trade", icon: "🔄", label: "Trades", sub: "Swap items & gold" },
     { href: "/marketplace/profile/avatar", icon: "🎨", label: "Your avatar", sub: "Build your look" },
     { href: "/marketplace/friends", icon: "👥", label: "Friends", sub: "Add & message" },
     { href: "/marketplace/inbox", icon: "✉️", label: "Inbox", sub: "All your messages" },
@@ -52,12 +54,13 @@ export default async function ProfileHubPage() {
         );
     }
 
-    const [profile, progress, track, bossSummary, badgeBoard] = await Promise.all([
+    const [profile, progress, track, bossSummary, badgeBoard, tradeCount] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         getRewardsProgress(buyer.id).catch(() => ({})),
         getRewardsTrack(buyer.id).catch(() => null),
         getMyBossSummary(buyer.id).catch(() => null),
         getBadgeBoard(buyer.id).catch(() => null),
+        countIncomingTrades(buyer.id).catch(() => 0),
     ]);
     const level = profile?.level || null;
     // Staff can equip any border regardless of level (matches the server-side bypass).
@@ -94,13 +97,17 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Jump in</h2>
                 <div className="hub-tiles">
-                    {TILES.map((t) => (
-                        <Link key={t.href} href={t.href} className="hub-tile">
-                            <span className="hub-tile-icon" aria-hidden="true">{t.icon}</span>
-                            <span className="hub-tile-label">{t.label}</span>
-                            <span className="hub-tile-sub muted">{t.sub}</span>
-                        </Link>
-                    ))}
+                    {TILES.map((t) => {
+                        const badge = t.href === "/marketplace/trade" && tradeCount > 0 ? tradeCount : null;
+                        return (
+                            <Link key={t.href} href={t.href} className="hub-tile">
+                                {badge ? <span className="hub-tile-badge">{badge}</span> : null}
+                                <span className="hub-tile-icon" aria-hidden="true">{t.icon}</span>
+                                <span className="hub-tile-label">{t.label}</span>
+                                <span className="hub-tile-sub muted">{t.sub}</span>
+                            </Link>
+                        );
+                    })}
                 </div>
             </section>
 

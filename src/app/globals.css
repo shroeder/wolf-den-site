@@ -9462,3 +9462,6 @@ body.tv-mode .shop-mobile-cart-fab {
 .trade-gold { font-weight: 800; color: #ffd75e; }
 .trade-item { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid var(--rar, rgba(255,255,255,0.15)); color: #e7dcc4; }
 .trade-item svg { width: 0.95em; height: 0.95em; color: var(--rar); }
+
+.hub-tile { position: relative; }
+.hub-tile-badge { position: absolute; top: 6px; right: 8px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0443a; color: #fff; font-size: 0.72rem; font-weight: 800; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }

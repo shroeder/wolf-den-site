@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById } from "@/lib/marketplace/items.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
 
@@ -55,7 +56,26 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
          VALUES ($1, $2, $3::jsonb, $4, $5::jsonb, $6, $7) RETURNING id`,
         [fromId, toId, JSON.stringify(oItems), oGold, JSON.stringify(rItems), rGold, note ? String(note).slice(0, 300) : null]
     ).catch(() => null);
+    if (offer) {
+        // Ping the recipient so the offer doesn't sit unseen.
+        const from = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [fromId]).catch(() => null);
+        const label = from?.display_name || from?.alias || "A member";
+        await sendWebPush(toId, {
+            title: "🔄 New trade offer",
+            body: `${label} wants to trade with you.`,
+            url: "/marketplace/trade",
+            tag: `trade-${offer.id}`,
+            data: { type: "trade", offerId: offer.id },
+        }).catch(() => {});
+    }
     return offer ? { ok: true, offerId: offer.id } : { ok: false, error: "failed" };
+}
+
+// Count of the viewer's pending INCOMING offers (for the profile-hub unread badge).
+export async function countIncomingTrades(userId) {
+    if (!userId) return 0;
+    const row = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_trade_offer WHERE to_buyer_id = $1 AND status = 'pending'`, [userId]).catch(() => null);
+    return row?.n || 0;
 }
 
 async function loadPending(offerId) {
