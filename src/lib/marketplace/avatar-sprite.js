@@ -5,6 +5,7 @@ import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
+import { getEquippedGearPhrase } from "@/lib/marketplace/inventory.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
@@ -58,8 +59,8 @@ export function describeAvatar(rawConfig) {
 // identity and redraw it as a full-body game character. The style tokens below are kept IDENTICAL to the
 // boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
 // sprites and bosses look like the same game universe.
-export function buildSpritePrompt(config) {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
+export function buildSpritePrompt(config, gear = "") {
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose, keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
 }
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
@@ -72,7 +73,9 @@ export function pendingSpriteIds(limit = 5) {
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
                 AND avatar_updated_at IS NOT NULL
-                AND (avatar_sprite_url IS NULL OR avatar_updated_at > avatar_sprite_at)
+                AND (avatar_sprite_url IS NULL
+                     OR avatar_updated_at > avatar_sprite_at
+                     OR (equipment_updated_at IS NOT NULL AND equipment_updated_at > avatar_sprite_at))
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_updated_at DESC NULLS LAST
               LIMIT $1`,
             [Math.max(1, Math.min(50, Math.floor(Number(limit) || 5)))]
@@ -124,7 +127,8 @@ export async function setBuyerSprite(buyerId, base64) {
 export async function generateBuyerSprite(buyerId) {
     const row = await db.queryOne(`SELECT avatar_config FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
-    const prompt = buildSpritePrompt(row.avatar_config);
+    const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
+    const prompt = buildSpritePrompt(row.avatar_config, gear);
     const png = await renderAvatarPng(row.avatar_config, 1024);
     const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
     await db.query(

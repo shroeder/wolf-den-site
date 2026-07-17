@@ -50,6 +50,24 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
     return out;
 }
 
+// A natural-language clause describing a member's equipped gear, fed into the hero-sprite prompt so the
+// AI draws them wearing/wielding their loadout. Empty string if nothing equipped.
+export async function getEquippedGearPhrase(buyerId) {
+    const bySlot = await getEquippedIds(buyerId);
+    const items = Object.entries(bySlot).map(([slot, id]) => ({ slot, def: itemById(id) })).filter((x) => x.def);
+    if (!items.length) return "";
+    const parts = [];
+    const weapon = items.find((x) => x.slot === "main_hand");
+    const off = items.find((x) => x.slot === "off_hand");
+    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots"].includes(x.slot)).map((x) => x.def.name);
+    const acc = items.filter((x) => ["ring1", "ring2", "amulet"].includes(x.slot)).map((x) => x.def.name);
+    if (weapon) parts.push(`wielding a ${weapon.def.name}`);
+    if (off) parts.push(`carrying a ${off.def.name}`);
+    if (armor.length) parts.push(`wearing ${armor.join(", ")}`);
+    if (acc.length) parts.push(`adorned with ${acc.join(", ")}`);
+    return parts.length ? `The hero is ${parts.join(", ")} — draw this equipment clearly as worn armor and held weapons.` : "";
+}
+
 // Grant a random not-yet-owned item from a source pool (e.g. a boss-kill drop). Returns the item or null.
 export async function grantRandomDrop(buyerId, { source = "boss_drop" } = {}) {
     const pool = ITEMS.filter((i) => i.source === source);
