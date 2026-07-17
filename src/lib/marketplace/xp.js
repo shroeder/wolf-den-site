@@ -122,7 +122,8 @@ export async function awardXp(buyerId, action, { points = null, dedupeKey = null
         return null; // deduped (or a transient error) — never break the caller
     }
     try {
-        const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts]);
+        // Gold accrues 1:1 with XP (spendable currency for the item shop; doesn't affect level).
+        const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts]);
         // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).
         if (row) {
             const newXp = Number(row.xp) || 0;

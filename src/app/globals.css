@@ -9456,3 +9456,5 @@ body.tv-mode .shop-mobile-cart-fab {
 .equip-perk-glyph svg { width: 1em; height: 1em; }
 .equip-perk-body { display: flex; flex-direction: column; }
 .equip-perk-state { font-size: 0.8rem; font-weight: 700; color: #ffd75e; }
+
+.equip-gold { float: right; font-size: 0.85rem; font-weight: 800; color: #ffd75e; }

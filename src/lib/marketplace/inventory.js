@@ -99,11 +99,13 @@ function chargeState(ownedRow, item) {
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,
 // and total stats.
 export async function getInventory(buyerId) {
-    if (!buyerId) return { items: [], equipped: {}, slots: EQUIP_SLOTS, stats: {} };
-    const [ownedRows, bySlot] = await Promise.all([
+    if (!buyerId) return { items: [], equipped: {}, slots: EQUIP_SLOTS, stats: {}, gold: 0, shop: [] };
+    const [ownedRows, bySlot, goldRow] = await Promise.all([
         db.query(`SELECT item_id, acquired_via, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getEquippedIds(buyerId),
+        db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
+    const ownedIds = new Set(ownedRows.map((r) => r.item_id));
     const equippedIds = new Set(Object.values(bySlot));
     const items = ownedRows
         .map((r) => {
@@ -113,7 +115,28 @@ export async function getInventory(buyerId) {
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
-    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: sumItemStats(Object.values(bySlot)) };
+    const gold = goldRow?.gold || 0;
+    // The gold shop: xp_shop items you don't own yet.
+    const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id)).map((i) => ({
+        id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
+        statsText: sumStatsText(i), cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0),
+    }));
+    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: sumItemStats(Object.values(bySlot)), gold, shop };
+}
+
+const sumStatsText = (item) => Object.entries(item.stats || {}).map(([k, v]) => `+${v} ${k}`).join(" · ");
+
+// Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
+export async function buyItem(buyerId, itemId) {
+    const item = itemById(itemId);
+    if (!item || item.source !== "xp_shop") return { ok: false, error: "not_for_sale" };
+    const cost = Math.max(0, item.xpCost || 0);
+    const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    if (owned) return { ok: false, error: "already_owned" };
+    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
+    if (!row) return { ok: false, error: "not_enough_gold" };
+    await grantItem(buyerId, itemId, "xp_shop");
+    return { ok: true, gold: row.gold };
 }
 
 // ---- Mutations ----

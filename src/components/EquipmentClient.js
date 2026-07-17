@@ -48,6 +48,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
     function equip(slotKey, itemId) { setSlot(null); post({ slot: slotKey, itemId }); }
     function unequip(slotKey) { setSlot(null); post({ slot: slotKey, itemId: null }); }
 
+    async function buy(itemId) {
+        setBusy(true); setErr("");
+        try {
+            const r = await fetch("/api/marketplace/shop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId }) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok) { setErr(d?.error === "not_enough_gold" ? "Not enough gold." : (d?.error || "Couldn't buy.")); return; }
+            DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
+            setData(d);
+        } finally { setBusy(false); }
+    }
+
     // Bag click: equip to its slot; rings go to the first free ring slot.
     function equipFromBag(item) {
         if (item.slot === "ring") {
@@ -87,7 +98,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
 
             {/* Live stat total */}
             <div className="equip-stats card">
-                <h3>⚔️ Combat stats</h3>
+                <h3>⚔️ Combat stats <span className="equip-gold">🪙 {(data.gold || 0).toLocaleString()}</span></h3>
                 {statEntries.length ? (
                     <div className="equip-stat-grid">
                         {statEntries.map(([k, v]) => (
@@ -155,6 +166,26 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                     </div>
                 ) : <p className="muted" style={{ margin: 0 }}>No items yet — level up, fight the boss, and check back.</p>}
             </div>
+
+            {/* Gold shop */}
+            {(data.shop || []).length ? (
+                <div className="card">
+                    <h3>🪙 Shop <span className="equip-gold">{(data.gold || 0).toLocaleString()} gold</span></h3>
+                    <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear.</p>
+                    <div className="equip-bag-grid">
+                        {(data.shop || []).map((i) => {
+                            const Icon = itemIcon(i.icon);
+                            return (
+                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => buy(i.id)} disabled={busy || !i.canAfford} title={i.statsText}>
+                                    <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
+                                    <span className="equip-card-name">{i.name}</span>
+                                    <span className="equip-card-stats">🪙 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : null}
 
             {err ? <p style={{ color: "#ff6b6b" }}>{err}</p> : null}
         </div>
