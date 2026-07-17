@@ -94,7 +94,7 @@ export default function MarketplaceDmClient({ threadId }) {
     const seen = lastMine && thread.otherLastReadAt && new Date(thread.otherLastReadAt) >= new Date(lastMine.createdAt);
 
     return (
-        <>
+        <div className="dm-screen reveal">
             <section className="card dm-topbar">
                 <Link href="/marketplace/inbox" className="dm-back" aria-label="Back to inbox">‹</Link>
                 {c ? (
@@ -194,6 +194,6 @@ export default function MarketplaceDmClient({ threadId }) {
                     </button>
                 </form>
             </section>
-        </>
+        </div>
     );
 }

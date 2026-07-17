@@ -67,7 +67,8 @@ export async function notifyNewDm(recipientId, senderId, threadId, preview, { fi
         await sendWebPush(recipientId, {
             title: `💬 ${await publicLabel(senderId)}`,
             body: preview?.trim() ? preview.trim().slice(0, 140) : "Sent you a message",
-            url: "/marketplace/messages",
+            // Open the actual DM conversation — NOT the vendor messages page (that mismatch was the bug).
+            url: `/marketplace/dm/${threadId}`,
             tag: `dm-${threadId}`,
             data: { type: "dm", threadId },
         });

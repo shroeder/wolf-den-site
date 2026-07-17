@@ -12,9 +12,5 @@ export default async function DmPage({ params }) {
     const { id } = await params;
     const buyer = await getAuthenticatedBuyer();
     if (!buyer) return <MarketplaceLoginClient redirectTo={`/marketplace/dm/${id}`} />;
-    return (
-        <div className="stack reveal">
-            <MarketplaceDmClient threadId={id} />
-        </div>
-    );
+    return <MarketplaceDmClient threadId={id} />;
 }

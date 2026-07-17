@@ -6436,17 +6436,34 @@ body.tv-mode .shop-mobile-cart-fab {
     text-decoration: none;
     color: inherit;
 }
-.dm-thread {
+/* Chat fills the viewport below the header (dvh = shrinks with the mobile keyboard) so the composer
+   pins to the bottom and the browser can't scroll-center the focused input into a void. */
+.dm-screen {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
+    height: calc(100dvh - 96px);
+    min-height: 340px;
+    overflow: hidden;
+}
+.dm-screen > .card { margin: 0; }
+.dm-topbar { flex: 0 0 auto; }
+.dm-thread {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 0.75rem;
 }
 .dm-messages {
+    flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 60vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding-right: 4px;
 }
 .dm-msg {
@@ -6483,10 +6500,17 @@ body.tv-mode .shop-mobile-cart-fab {
 .dm-composer {
     display: flex;
     gap: 8px;
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    padding-top: 4px;
+    background: var(--surface);
 }
 .dm-composer input {
     flex: 1 1 auto;
 }
+/* On the DM screen, let the chat own the full height — no trailing page padding creating a gap/scroll. */
+body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Rich shared-product card inside a DM. */
 .dm-product-card {
     display: flex;
