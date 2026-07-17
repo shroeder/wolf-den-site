@@ -174,6 +174,7 @@ export async function getBossState(buyerId = null) {
     const roster = contributors.map((c) => ({
         id: c.id,
         name: c.display_name || c.alias || "Member",
+        alias: c.alias || null,
         level: lvl(c.xp),
         avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || DEFAULT_AVATAR_URL,
         spriteUrl: c.avatar_sprite_url || defaultSprite || null,

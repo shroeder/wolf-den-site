@@ -9445,3 +9445,8 @@ body.tv-mode .shop-mobile-cart-fab {
 .equip-perk-state { font-size: 0.8rem; font-weight: 700; color: #ffd75e; }
 
 .equip-gold { float: right; font-size: 0.85rem; font-weight: 800; color: #ffd75e; }
+
+/* Public-profile actions + clickable hero chips */
+.profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.herochip.is-link { cursor: pointer; text-decoration: none; color: inherit; transition: transform 0.1s ease, border-color 0.12s ease; }
+.herochip.is-link:hover { transform: translateY(-2px); border-color: rgba(255, 215, 94, 0.55); }

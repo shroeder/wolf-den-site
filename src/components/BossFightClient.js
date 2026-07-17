@@ -170,17 +170,25 @@ export default function BossFightClient() {
                 <div className="boss2-board">
                     <h3>🛡️ Active heroes</h3>
                     <div className="hero-strip">
-                        {roster.slice(0, 12).map((f) => (
-                            <div key={f.id} className={`herochip${f.you ? " is-you" : ""}`} title={`${f.name} · ${f.dmg.toLocaleString()} dmg`}>
-                                <div className="herochip-av">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={f.avatarUrl} alt="" />
-                                    {f.badge ? <span className="herochip-badge" title={f.badge.label}>{f.badge.icon}</span> : null}
-                                </div>
-                                <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>
-                                <span className="herochip-meta">Lv {f.level} · 🎟️ {f.tickets}</span>
-                            </div>
-                        ))}
+                        {roster.slice(0, 12).map((f) => {
+                            const inner = (
+                                <>
+                                    <div className="herochip-av">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={f.avatarUrl} alt="" />
+                                        {f.badge ? <span className="herochip-badge" title={f.badge.label}>{f.badge.icon}</span> : null}
+                                    </div>
+                                    <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>
+                                    <span className="herochip-meta">Lv {f.level} · 🎟️ {f.tickets}</span>
+                                </>
+                            );
+                            const cls = `herochip${f.you ? " is-you" : ""}${f.alias ? " is-link" : ""}`;
+                            return f.alias ? (
+                                <Link key={f.id} href={`/marketplace/u/${f.alias}`} className={cls} title={`Inspect ${f.name}`}>{inner}</Link>
+                            ) : (
+                                <div key={f.id} className={cls} title={`${f.name} · ${f.dmg.toLocaleString()} dmg`}>{inner}</div>
+                            );
+                        })}
                     </div>
                     <p className="muted boss2-note">Damage converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️.</p>
                 </div>
