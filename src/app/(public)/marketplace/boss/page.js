@@ -1,4 +1,5 @@
 import BossFightClient from "@/components/BossFightClient";
+import QuestsClient from "@/components/QuestsClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default function BossPage() {
                 </p>
                 <BossFightClient />
             </section>
+            <QuestsClient />
         </div>
     );
 }

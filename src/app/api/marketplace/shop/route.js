@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { buyItem, getInventory } from "@/lib/marketplace/inventory.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -22,6 +23,7 @@ export async function POST(request) {
             if (!itemId) return noStore({ error: "missing_item" }, { status: 400 });
             const res = await buyItem(buyer.id, itemId);
             if (!res.ok) return noStore({ error: res.error }, { status: 400 });
+            after(() => bumpQuestProgress(buyer.id, "buy", 1));
             return noStore({ ok: true, ...(await getInventory(buyer.id)) });
         } catch (error) {
             return internalError(error, { event: "marketplace.shop.buy.failure" });

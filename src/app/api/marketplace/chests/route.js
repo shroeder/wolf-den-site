@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getChests, openChest } from "@/lib/marketplace/chests.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -33,6 +34,7 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const res = await openChest(buyer.id, String(body?.tier || ""));
             if (!res.ok) return noStore({ error: res.error }, { status: 400 });
+            after(() => bumpQuestProgress(buyer.id, "chest_open", 1));
             return noStore({ ...res, chests: await getChests(buyer.id) });
         } catch (error) {
             return internalError(error, { event: "marketplace.chests.open.failure" });

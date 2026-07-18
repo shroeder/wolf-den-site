@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { attackBoss } from "@/lib/marketplace/boss.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,6 +20,13 @@ export async function POST(request) {
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
             const result = await attackBoss(buyer.id);
             if (result.error === "unauthorized") return noStore(result, { status: 401 });
+            if (result.ok) {
+                after(async () => {
+                    await bumpQuestProgress(buyer.id, "boss_attack", 1);
+                    if (result.crit) await bumpQuestProgress(buyer.id, "crit", 1);
+                    if (result.damage) await bumpQuestProgress(buyer.id, "boss_damage", result.damage);
+                });
+            }
             return noStore(result);
         } catch (error) {
             return internalError(error, { event: "marketplace.boss.attack.failure" });

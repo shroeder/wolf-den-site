@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { equipItem, getInventory, syncLevelItems, unequipItem } from "@/lib/marketplace/inventory.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -35,6 +36,7 @@ export async function POST(request) {
             const slot = String(body?.slot || "").trim();
             if (!slot) return noStore({ error: "missing_slot" }, { status: 400 });
             const inv = body?.itemId ? await equipItem(buyer.id, slot, String(body.itemId)) : await unequipItem(buyer.id, slot);
+            if (body?.itemId) after(() => bumpQuestProgress(buyer.id, "equip", 1));
             return noStore(inv);
         } catch (error) {
             if (error?.message && !/database|query/i.test(error.message)) {
