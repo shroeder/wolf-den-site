@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import {
     adjustInventoryForSale,
@@ -15,6 +15,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
+import { markOrderInventoryAdjusted, recordInventoryRepair } from "@/lib/inventory-feed/repair.js";
 import { sendNewOrderAlertEmail, sendOrderConfirmationEmail } from "@/lib/shop-order-email.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import {
@@ -382,16 +383,20 @@ export async function POST(request) {
             if (updatedOrder.status === "completed") {
                 await clearCartItems(cartId);
 
-                // Decrement Square inventory (IN_STOCK -> SOLD) so an online-purchased card can't be
-                // sold again at the counter. Best-effort: payment is already captured, so a failure here
-                // must not fail the order — we log it for manual reconciliation instead.
+                // Decrement Square inventory (IN_STOCK -> SOLD) so an online-purchased card can't be sold
+                // again at the counter. Payment is already captured, so a failure must not fail the order —
+                // but instead of swallowing it, we record each line to the durable repair queue (so it's
+                // never silently lost) and leave inventory_adjusted_at null so the webhook/retry can finish
+                // it. The key is stable per ORDER so a retry can't double-decrement.
                 try {
-                    await adjustInventoryForSale(cart.items, { idempotencyKey });
+                    await adjustInventoryForSale(cart.items, { idempotencyKey: `order-${updatedOrder.id}` });
+                    await markOrderInventoryAdjusted(updatedOrder.id);
                 } catch (inventoryError) {
-                    logger.warn("shop.checkout.inventory_adjust_failed", {
-                        orderId: updatedOrder.id,
-                        errorMessage: inventoryError instanceof Error ? inventoryError.message : "unknown_error",
-                    });
+                    const msg = inventoryError instanceof Error ? inventoryError.message : "unknown_error";
+                    logger.warn("shop.checkout.inventory_adjust_failed", { orderId: updatedOrder.id, errorMessage: msg });
+                    after(() => Promise.allSettled((cart.items || []).map((it) =>
+                        recordInventoryRepair({ variationId: it.variationId || it.catalogObjectId || it.catalog_object_id, itemName: it.name || it.itemName, quantity: it.quantity || 1, source: "shop_order", reference: updatedOrder.id, error: msg })
+                    )));
                 }
 
                 // Order emails + owner push. Awaited (so the serverless function doesn't terminate first)
