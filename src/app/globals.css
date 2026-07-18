@@ -9384,6 +9384,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-ticket-tix { display: flex; flex-direction: column; align-items: center; font-weight: 900; font-size: 1.5rem; color: #ffd75e; line-height: 1; }
 .boss-ticket-tix small { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #cdbfa6; }
 .boss2-victory-overlay { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.72); }
+
+/* Coin-shower juice when a member sells gear. */
+.coinfx { position: fixed; inset: 0; z-index: 1500; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.coinfx-amount { font-size: clamp(1.7rem, 7vw, 2.7rem); font-weight: 900; color: #ffd75e; text-shadow: 0 2px 10px rgba(0,0,0,0.75), 0 0 24px rgba(255,215,94,0.6); animation: coinfx-amount 1.25s cubic-bezier(0.2, 0.9, 0.2, 1) forwards; }
+.coinfx-coin { position: absolute; left: 50%; top: 50%; font-size: clamp(1.3rem, 4.5vw, 2rem); will-change: transform, opacity; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); animation: coinfx-fly 1.15s cubic-bezier(0.15, 0.7, 0.25, 1) forwards; }
+@keyframes coinfx-amount { 0% { transform: scale(0.3); opacity: 0; } 22% { transform: scale(1.18); opacity: 1; } 68% { transform: scale(1); opacity: 1; } 100% { transform: scale(1) translateY(-26px); opacity: 0; } }
+@keyframes coinfx-fly { 0% { transform: translate(-50%, -50%) scale(0.4) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy))) scale(1) rotate(var(--cr)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .coinfx-coin { display: none; } .coinfx-amount { animation-duration: 0.6s; } }
 .boss2-victory { text-align: center; padding: 28px; }
 .boss2-victory-x { font-size: 4rem; }
 

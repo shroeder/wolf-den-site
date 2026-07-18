@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChestOpener from "@/components/ChestOpener";
 import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot, itemIcon } from "@/lib/marketplace/items.js";
@@ -28,6 +28,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
     const [err, setErr] = useState("");
     const [detailItem, setDetailItem] = useState(null); // inventory item detail sheet (inspect → equip / sell)
     const [sellArmed, setSellArmed] = useState(false); // two-tap sell confirm inside the sheet (no native popup)
+    const [coinBurst, setCoinBurst] = useState(null); // coin-shower juice on a sale
+    const burstKey = useRef(0);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
@@ -65,6 +67,41 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
     function openDetail(item) { setSellArmed(false); setDetailItem(item); }
     function closeDetail() { setDetailItem(null); setSellArmed(false); }
 
+    // A quick, bright "coin" chime via Web Audio (no asset, CSP-safe). Best-effort — silent if blocked.
+    function playCoinSound() {
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            const ctx = new AC();
+            if (ctx.resume) ctx.resume().catch(() => {});
+            [987.77, 1318.51].forEach((freq, i) => { // B5 -> E6, the classic coin blip
+                const t = ctx.currentTime + i * 0.08;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "square";
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.2);
+            });
+            setTimeout(() => ctx.close().catch(() => {}), 500);
+        } catch { /* audio blocked — no problem */ }
+    }
+
+    // Shower of coins bursting outward + a "+N gold" pop when a sale lands.
+    function celebrateCoins(amount) {
+        const coins = Array.from({ length: 22 }, () => {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 80 + Math.random() * 180;
+            return { x: `${Math.round(Math.cos(ang) * dist)}px`, y: `${Math.round(Math.sin(ang) * dist - 40)}px`, r: `${Math.round(Math.random() * 720 - 360)}deg`, d: `${(Math.random() * 0.12).toFixed(2)}s` };
+        });
+        setCoinBurst({ amount, coins, key: burstKey.current++ });
+        playCoinSound();
+        setTimeout(() => setCoinBurst(null), 1300);
+    }
+
     async function doSell(item) {
         if (!item || item.sellValue <= 0) return;
         setBusy(true); setErr("");
@@ -75,6 +112,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
             DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
             setData(d);
             closeDetail();
+            celebrateCoins(d?.sold ?? item.sellValue);
         } finally { setBusy(false); }
     }
 
@@ -254,6 +292,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                             <button type="button" className="pill" onClick={closeDetail} style={{ marginLeft: "auto" }}>Close</button>
                         </div>
                     </div>
+                </div>
+            ) : null}
+
+            {/* Coin-shower juice on a sale. */}
+            {coinBurst ? (
+                <div className="coinfx" key={coinBurst.key} aria-hidden="true">
+                    {coinBurst.coins.map((c, i) => (
+                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>🪙</span>
+                    ))}
+                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 🪙</div>
                 </div>
             ) : null}
 
