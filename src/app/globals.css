@@ -9434,7 +9434,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 .equip-slot:hover { transform: translateY(-1px); border-color: rgba(255, 215, 94, 0.5); }
-.equip-slot.filled { border-color: var(--rar); box-shadow: inset 0 0 0 1px var(--rar), 0 0 12px -3px var(--rar); background: rgba(0, 0, 0, 0.55); }
+.equip-slot.filled { border-color: var(--rar); box-shadow: inset 0 0 0 1px var(--rar), 0 0 12px -3px var(--rar);
+    background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--rar) 30%, transparent), rgba(0, 0, 0, 0.6)); }
 .equip-slot-glyph { font-size: clamp(1.4rem, 6vw, 2rem); color: var(--rar); display: flex; }
 .equip-slot-glyph svg { width: 1em; height: 1em; }
 .equip-slot-empty { font-size: 1.2rem; opacity: 0.3; }
@@ -9463,13 +9464,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .equip-card {
     display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: pointer;
     padding: 10px 6px; border-radius: 12px; font: inherit; color: #e7dcc4;
-    background: rgba(255, 255, 255, 0.04); border: 1.5px solid var(--rar, rgba(255, 255, 255, 0.14));
-    box-shadow: 0 0 10px -5px var(--rar); transition: transform 0.1s ease;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--rar, #888) 18%, transparent), rgba(0, 0, 0, 0.32));
+    border: 1.5px solid color-mix(in srgb, var(--rar, #fff) 60%, transparent);
+    box-shadow: 0 0 12px -5px var(--rar), inset 0 0 16px -12px var(--rar); transition: transform 0.1s ease;
 }
 .equip-card:hover { transform: translateY(-2px); }
 .equip-card.is-equipped { box-shadow: 0 0 0 1px #ffd75e inset, 0 0 12px -4px #ffd75e; }
-.equip-card-glyph { font-size: 1.8rem; color: var(--rar); display: flex; }
-.equip-card-glyph svg { width: 1em; height: 1em; }
+/* Rarity backplate behind the glyph — makes each item read like a loot card. */
+.equip-card-glyph, .equip-perk-glyph {
+    width: 46px; height: 46px; border-radius: 12px; font-size: 1.7rem; color: var(--rar);
+    display: grid; place-items: center; flex: 0 0 auto;
+    background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--rar, #888) 42%, transparent), rgba(0, 0, 0, 0.25));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar, #fff) 55%, transparent), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.equip-card-glyph svg, .equip-perk-glyph svg { width: 1em; height: 1em; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--rar, #fff) 60%, transparent)); }
+/* Legendary + mythic get a brighter frame; mythic gently pulses. */
+.equip-card.rar-legendary, .equip-slot.filled.rar-legendary { box-shadow: 0 0 18px -5px var(--rar), inset 0 0 18px -10px var(--rar); }
+.equip-card.rar-mythic, .equip-slot.filled.rar-mythic { animation: rar-pulse 3s ease-in-out infinite; }
+@keyframes rar-pulse {
+    0%, 100% { box-shadow: 0 0 16px -5px var(--rar), inset 0 0 18px -12px var(--rar); }
+    50% { box-shadow: 0 0 30px -2px var(--rar), inset 0 0 24px -8px var(--rar); }
+}
+@media (prefers-reduced-motion: reduce) { .equip-card.rar-mythic, .equip-slot.filled.rar-mythic { animation: none; } }
 .equip-card-name { font-size: 0.78rem; font-weight: 700; line-height: 1.15; }
 .equip-card-stats { font-size: 0.68rem; color: #b7ab90; line-height: 1.2; }
 
