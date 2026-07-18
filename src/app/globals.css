@@ -9539,6 +9539,33 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .quest-claim { flex: 0 0 auto; padding: 7px 14px; }
 .quest-check { flex: 0 0 auto; color: #7ad07a; font-size: 1.3rem; font-weight: 900; }
 
+/* Claim celebration — flash, coin burst, gold count-up (reuses chest-fade/flash/pop keyframes). */
+.quest-cele { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 24px; overflow: hidden;
+    background: radial-gradient(circle at 50% 44%, rgba(34, 24, 6, 0.86), rgba(3, 2, 6, 0.94)); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); animation: chest-fade 0.2s ease; }
+.quest-cele-flash { position: fixed; inset: -20%; z-index: 1; pointer-events: none;
+    background: radial-gradient(circle at 50% 44%, #fff 0%, #ffd75e 34%, transparent 70%); animation: chest-flash 0.55s ease-out forwards; }
+.quest-cele-inner { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+    animation: chest-pop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1); }
+.quest-cele-badge { font-size: clamp(3rem, 15vw, 4.4rem); line-height: 1; filter: drop-shadow(0 0 18px rgba(122, 208, 122, 0.8)); animation: quest-badge 0.55s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes quest-badge { 0% { transform: scale(0) rotate(-20deg); } 60% { transform: scale(1.2); } 100% { transform: scale(1) rotate(0); } }
+.quest-cele-title { font-weight: 900; font-size: clamp(1.1rem, 5vw, 1.6rem); color: #ffd75e; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.6), 0 0 18px rgba(255,180,60,0.6); }
+.quest-cele-gold { font-weight: 900; font-size: clamp(2.1rem, 9vw, 3.2rem); color: #fff; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 3px 14px #000, 0 0 26px rgba(255,200,80,0.85); }
+.quest-cele-chest { font-weight: 800; font-size: 1rem; color: #ffd75e; }
+.quest-cele-coins { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.quest-coin { position: absolute; left: 50%; top: 42%; width: var(--sz, 10px); height: var(--sz, 10px); border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff3b0, #ffd75e 55%, #c8961e); box-shadow: 0 0 8px rgba(255,200,80,0.85);
+    transform: translate(-50%, -50%); opacity: 0; animation: quest-coin 1.05s cubic-bezier(0.15, 0.7, 0.3, 1) forwards; }
+@keyframes quest-coin {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0deg); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1) rotate(var(--rot)); }
+}
+.quest-cele-inner .button.gold { margin-top: 6px; min-width: 130px; }
+@media (prefers-reduced-motion: reduce) {
+    .quest-cele-flash, .quest-coin, .quest-cele-badge, .quest-cele-inner { animation: none; }
+    .quest-cele-flash, .quest-coin { display: none; }
+}
+
 /* ============ Loot chests + reveal ============ */
 .chest-card { border-color: rgba(255, 215, 94, 0.35); }
 .chest-total { float: right; background: #e0443a; color: #fff; font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 1px 9px; }
