@@ -5,6 +5,7 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { sendBuyerPush } from "@/lib/push/send.js";
 
 // "Currently active heroes" = every member who has built a hero (alias set). A giveaway is a one-time drop
 // to THIS roster only — future signups are not retroactively included, exactly as Luke wants. We snapshot
@@ -14,9 +15,15 @@ async function activeHeroIds() {
     return rows.map((r) => r.id);
 }
 
-// Best-effort push to everyone in the drop (fire-and-forget; failures ignored per-member).
+// Best-effort push to everyone in the drop, on BOTH channels (FCM marketplace app + browser web push)
+// so recipients actually get alerted (fire-and-forget; failures ignored per-member).
 async function pushAll(ids, payload) {
-    await Promise.allSettled(ids.map((id) => sendWebPush(id, payload)));
+    await Promise.allSettled(
+        ids.flatMap((id) => [
+            sendWebPush(id, payload),
+            sendBuyerPush(id, { title: payload.title, body: payload.body, data: payload.data || {} }),
+        ])
+    );
 }
 
 // Give N loot chests of a tier to every active hero. Returns recipient count.
