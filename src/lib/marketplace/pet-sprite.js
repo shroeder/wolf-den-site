@@ -7,7 +7,7 @@ import { generateImage } from "@/lib/marketplace/openai-image.js";
 // Each pet gets ONE shared 2D battle sprite (not per-member) so the member's active pet can fight beside
 // them in the boss scene. Same art universe as the member/boss sprites (transparent, full-body).
 const STYLE =
-    "2D video-game creature companion sprite, full body, cute but fierce, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered, polished RPG game-art style, transparent background, no text, no logo, no watermark, no border.";
+    "2D video-game creature companion sprite, full body, cute but fierce, facing and looking toward the RIGHT side of the image (a right-facing three-quarter view, turned toward the enemy), bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered, polished RPG game-art style, transparent background, no text, no logo, no watermark, no border.";
 
 export function buildPetSpritePrompt(pet) {
     return `${pet.spritePrompt} — a loyal battle companion. ${STYLE}`;
