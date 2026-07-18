@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // ---- Requirements ----
@@ -144,7 +145,7 @@ export async function getInventory(buyerId) {
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def) };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id) };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));

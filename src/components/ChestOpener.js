@@ -162,6 +162,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                             <span className="chest-reward-glyph"><Icon aria-hidden="true" /></span>
                             <div className="chest-reward-name">{reveal.item.name}</div>
                             <div className="chest-reward-sub muted">{reveal.item.slot.replace("_", " ")} · {statLine(reveal.item.stats)}</div>
+                            {reveal.item.signature ? <div className="chest-reward-sig">★ {reveal.item.signature.label} — {reveal.item.signature.desc}</div> : null}
                         </>
                     ) : (
                         <>

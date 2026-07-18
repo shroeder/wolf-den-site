@@ -5,8 +5,9 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
-import { getEquippedStats, getEquippedStatsForMembers, grantRandomDrop } from "@/lib/marketplace/inventory.js";
+import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantRandomDrop } from "@/lib/marketplace/inventory.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
+import { signatureStrikeBonus, signatureForcesCrit, signatureHit } from "@/lib/marketplace/signatures.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
@@ -20,12 +21,12 @@ const lvl = (xp) => levelForXp(xp || 0).level;
 
 // Damage formulas (both scale with level). Equipped-gear stats buff the manual strike: might (+% damage),
 // crit_chance (+% to crit, base 25%), crit_power (+% crit multiplier, base ×2.5).
-function manualHit(level, stats = {}) {
+function manualHit(level, stats = {}, { forceCrit = false } = {}) {
     const base = (120 + level * 15) * (1 + (stats.might || 0) / 100);
     const roll = Math.round(base * (0.85 + Math.random() * 0.3));
     const critProb = Math.min(0.9, 0.25 + (stats.crit_chance || 0) / 100);
     const critMult = 2.5 + (stats.crit_power || 0) / 100;
-    const crit = Math.random() < critProb;
+    const crit = forceCrit || Math.random() < critProb;
     return { damage: crit ? Math.round(roll * critMult) : roll, crit };
 }
 // Passive per-member hourly auto-damage. Sized so the whole pack's combined drain is fast enough that the
@@ -316,15 +317,20 @@ export async function attackBoss(buyerId) {
     const boss = await getActiveBoss();
     if (!boss || boss.hp <= 0 || boss.defeated_at) return { error: "defeated" };
 
-    const stats = await getEquippedStats(buyerId).catch(() => ({}));
-    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0); // gear can grant extra daily strikes
+    const [stats, equippedIds] = await Promise.all([
+        getEquippedStats(buyerId).catch(() => ({})),
+        getEquippedIds(buyerId).catch(() => ({})),
+    ]);
+    // gear can grant extra daily strikes (extra_strike stat + signature items like Belt of Giants)
+    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds);
     const used = await manualAttacksToday(buyerId);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
     const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const swing = manualHit(lvl(me?.xp), stats);
+    const swing = manualHit(lvl(me?.xp), stats, { forceCrit: signatureForcesCrit(equippedIds, used) });
     const buffMult = await activeDamageMult().catch(() => 1);
-    const damage = Math.round(swing.damage * buffMult);
+    const sig = signatureHit(equippedIds, { hitIndex: used, crit: swing.crit });
+    const damage = Math.round(swing.damage * buffMult * sig.mult);
     const crit = swing.crit;
     const ability = pickAbility(crit);
 
@@ -342,7 +348,7 @@ export async function attackBoss(buyerId) {
     const { effectiveHp, autoDps } = defeated
         ? { effectiveHp: 0, autoDps: 0 }
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
-    return { ok: true, damage, crit, ability, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
+    return { ok: true, damage, crit, ability, proc: sig.proc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
 // Passive AUTO-attacks: every registered member's avatar chips away. Run by a background cron; applies the

@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 
@@ -103,7 +104,7 @@ export async function openChest(buyerId, tier) {
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         await grantItem(buyerId, item.id, "chest");
-        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel } };
+        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id) } };
     }
     const gold = DUST[rarity] || 25;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});

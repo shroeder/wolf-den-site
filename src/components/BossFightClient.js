@@ -65,7 +65,7 @@ export default function BossFightClient() {
                 return;
             }
             // Dopamine: name the ability, throw the big number.
-            setBurst({ ability: res.ability, damage: res.damage, crit: res.crit, key: floatId.current++ });
+            setBurst({ ability: res.ability, damage: res.damage, crit: res.crit, proc: res.proc, key: floatId.current++ });
             setTimeout(() => setBurst(null), 1500);
             popDamage(res.damage, res.crit);
             setXpFlash(true);
@@ -101,6 +101,7 @@ export default function BossFightClient() {
                 <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
                 {burst ? (
                     <div className={`boss-burst${burst.crit ? " is-crit" : ""}`} key={burst.key}>
+                        {burst.proc ? <div className="boss-burst-proc">⚡ {burst.proc}!</div> : null}
                         <div className="boss-burst-name">{burst.crit ? "💥 " : ""}{burst.ability}{burst.crit ? " 💥" : ""}</div>
                         <div className="boss-burst-dmg">-{burst.damage.toLocaleString()}</div>
                     </div>

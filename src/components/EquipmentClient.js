@@ -159,10 +159,11 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                 {(data.items || []).length ? (
                     <div className="equip-bag-grid">
                         {(data.items || []).map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equipFromBag(i)} disabled={busy} title={describeStats(i.stats)}>
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equipFromBag(i)} disabled={busy} title={i.signature ? `${i.signature.label}: ${i.signature.desc}` : describeStats(i.stats)}>
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{i.equipped ? "Equipped" : describeStats(i.stats)}</span>
+                                {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
                             </button>
                         ))}
                     </div>
