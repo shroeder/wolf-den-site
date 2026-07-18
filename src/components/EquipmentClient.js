@@ -26,6 +26,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
     const [slot, setSlot] = useState(null); // open picker for this slot
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
+    const [sellMode, setSellMode] = useState(false); // tap-to-sell instead of tap-to-equip
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
@@ -55,6 +56,19 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
             const r = await fetch("/api/marketplace/shop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId }) });
             const d = await r.json().catch(() => null);
             if (!r.ok) { setErr(d?.error === "not_enough_gold" ? "Not enough gold." : (d?.error || "Couldn't buy.")); return; }
+            DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
+            setData(d);
+        } finally { setBusy(false); }
+    }
+
+    async function sell(item) {
+        if (!item || item.sellValue <= 0) return;
+        if (typeof window !== "undefined" && !window.confirm(`Sell ${item.name} for ${item.sellValue} gold? This can't be undone.`)) return;
+        setBusy(true); setErr("");
+        try {
+            const r = await fetch("/api/marketplace/shop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: item.id, action: "sell" }) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok) { setErr(d?.error || "Couldn't sell."); return; }
             DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
             setData(d);
         } finally { setBusy(false); }
@@ -168,16 +182,24 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
 
             {/* The bag */}
             <div className="card">
-                <h3>🎒 Inventory</h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <h3 style={{ margin: 0 }}>🎒 Inventory</h3>
+                    {(data.items || []).some((i) => i.sellValue > 0) ? (
+                        <button type="button" className="pill" onClick={() => setSellMode((s) => !s)} disabled={busy}>{sellMode ? "✓ Done" : "💰 Sell gear"}</button>
+                    ) : null}
+                </div>
+                {sellMode ? <p className="muted" style={{ margin: "6px 0 0" }}>Tap gear to sell it for gold. Worn items unequip automatically. Sold starter gear won&apos;t come back.</p> : null}
                 {(data.items || []).length ? (
                     <div className="equip-bag-grid">
                         {(data.items || []).map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equipFromBag(i)} disabled={busy} title={i.signature ? `${i.signature.label}: ${i.signature.desc}` : describeStats(i.stats)}>
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => (sellMode ? sell(i) : equipFromBag(i))} disabled={busy || (sellMode && i.sellValue <= 0)} title={i.signature ? `${i.signature.label}: ${i.signature.desc}` : describeStats(i.stats)}>
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
-                                {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
-                                {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
+                                {!sellMode && i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
+                                {sellMode && i.sellValue > 0 ? <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#ffd75e" }}>💰 Sell · {i.sellValue}</span> : null}
+                                {sellMode && i.sellValue <= 0 ? <span style={{ fontSize: "0.6rem", color: "#9aa7b5" }}>Not sellable</span> : null}
+                                {!sellMode && i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
                             </button>
                         ))}
                     </div>

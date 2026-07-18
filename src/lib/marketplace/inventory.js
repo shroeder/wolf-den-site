@@ -148,6 +148,11 @@ function chargeState(ownedRow, item) {
     };
 }
 
+// Gold a member gets for selling gear back, by rarity (mirrors the chest "dust" values). Charged perk
+// items hold real-world value, so they can't be sold for gold.
+const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900 };
+export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
+
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,
 // and total stats.
 export async function getInventory(buyerId) {
@@ -163,7 +168,7 @@ export async function getInventory(buyerId) {
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id) };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def) };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
@@ -187,6 +192,25 @@ export async function buyItem(buyerId, itemId) {
     if (!row) return { ok: false, error: "not_enough_gold" };
     await grantItem(buyerId, itemId, "xp_shop");
     return { ok: true, gold: row.gold };
+}
+
+// Sell an owned item back for gold. Unequips it first if worn, credits the rarity sell value, and records
+// the sale so a 'level' item never auto-re-grants itself (which would be an infinite gold farm). Charged
+// real-world-perk items can't be sold.
+export async function sellItem(buyerId, itemId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const item = itemById(itemId);
+    if (!item) return { ok: false, error: "unknown_item" };
+    if (item.charged) return { ok: false, error: "not_sellable" };
+    const value = sellValueOf(item);
+    // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.
+    await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
+    const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING id`, [buyerId, itemId]).catch(() => null);
+    if (!del) return { ok: false, error: "not_owned" };
+    await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, itemId]).catch(() => {});
+    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, value]).catch(() => null);
+    await bumpEquipment(buyerId); // a slot may have emptied — re-gear the sprite
+    return { ok: true, sold: value, gold: row?.gold ?? null };
 }
 
 // ---- Mutations ----
@@ -243,15 +267,17 @@ export async function grantItem(buyerId, itemId, via = "admin") {
 // Auto-grant the level/milestone items a member now qualifies for (source: 'level'). Like pets unlocking.
 export async function syncLevelItems(buyerId) {
     if (!buyerId) return [];
-    const [ctx, ownedRows, metrics] = await Promise.all([
+    const [ctx, ownedRows, metrics, soldRows] = await Promise.all([
         memberContext(buyerId),
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getMemberMetrics(buyerId).catch(() => null),
+        db.query(`SELECT item_id FROM mkt_sold_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
     const owned = new Set(ownedRows.map((r) => r.item_id));
+    const sold = new Set(soldRows.map((r) => r.item_id)); // sold gear stays sold — never auto-re-granted
     const granted = [];
     for (const item of ITEMS) {
-        if (item.source !== "level" || owned.has(item.id)) continue;
+        if (item.source !== "level" || owned.has(item.id) || sold.has(item.id)) continue;
         if (itemLockReason(item, ctx, metrics)) continue;
         const res = await grantItem(buyerId, item.id, "level");
         if (res.granted) granted.push(item);
