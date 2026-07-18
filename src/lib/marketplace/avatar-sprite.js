@@ -5,7 +5,7 @@ import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
-import { getEquippedGearPhrase } from "@/lib/marketplace/inventory.js";
+import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/marketplace/inventory.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 
@@ -60,7 +60,7 @@ export function describeAvatar(rawConfig) {
 // boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
 // sprites and bosses look like the same game universe.
 export function buildSpritePrompt(config, gear = "") {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose shown from a three-quarter view facing to the LEFT (the character's body turned toward the left side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose shown from a three-quarter view facing to the LEFT (the character's body turned toward the left side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL: the character must be oriented facing and looking toward the LEFT side of the image (a left-facing three-quarter view) — NOT facing forward and NOT facing right.`;
 }
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
@@ -95,6 +95,8 @@ export async function listSpritesAdmin() {
               LIMIT 200`
         )
         .catch(() => []);
+    // Gear per member (one query) so the on-phone regenerate draws their equipment too — matching the cron.
+    const gearMap = await getEquippedGearPhrasesForMembers(rows.map((r) => r.id)).catch(() => new Map());
     return rows.map((r) => ({
         buyerId: r.id,
         label: r.display_name || (r.alias ? `@${r.alias}` : "Member"),
@@ -102,7 +104,7 @@ export async function listSpritesAdmin() {
         // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar, bust
         // placed at the top with room below). v bumps when the framing changes (immutable-cached URL).
         avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=2`,
-        prompt: buildSpritePrompt(r.avatar_config),
+        prompt: buildSpritePrompt(r.avatar_config, gearMap.get(r.id) || ""),
         pending: !r.avatar_sprite_url || (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) || !r.avatar_sprite_at,
     }));
 }

@@ -79,9 +79,9 @@ const gearDesc = (def) => {
     return adj ? `${adj} ${def.name}` : def.name;
 };
 
-export async function getEquippedGearPhrase(buyerId) {
-    const bySlot = await getEquippedIds(buyerId);
-    const items = Object.entries(bySlot).map(([slot, id]) => ({ slot, def: itemById(id) })).filter((x) => x.def);
+// Build the gear clause from an equipped { slot: itemId } map (sync — no DB).
+function gearPhraseFromSlots(bySlot) {
+    const items = Object.entries(bySlot || {}).map(([slot, id]) => ({ slot, def: itemById(id) })).filter((x) => x.def);
     if (!items.length) return "";
     const parts = [];
     const weapon = items.find((x) => x.slot === "main_hand");
@@ -92,7 +92,6 @@ export async function getEquippedGearPhrase(buyerId) {
     if (off) parts.push(`carrying a ${gearDesc(off.def)}`);
     if (armor.length) parts.push(`wearing ${armor.join(", ")}`);
     if (acc.length) parts.push(`adorned with ${acc.join(", ")}`);
-    // If they own top-tier gear, tell the model to make the whole hero feel powerful.
     const best = items.some((x) => x.def.rarity === "mythic") ? "mythic" : items.some((x) => x.def.rarity === "legendary") ? "legendary" : null;
     const aura = best === "mythic"
         ? " This is a legendary champion — their gear radiates a brilliant magical aura and glowing energy."
@@ -100,6 +99,25 @@ export async function getEquippedGearPhrase(buyerId) {
         ? " Their finest pieces glow with power."
         : "";
     return parts.length ? `The hero is ${parts.join(", ")} — draw this equipment clearly as worn armor and held weapons.${aura}` : "";
+}
+
+export async function getEquippedGearPhrase(buyerId) {
+    return gearPhraseFromSlots(await getEquippedIds(buyerId));
+}
+
+// Batched: gear phrases for many members in ONE query (used by the admin sprite list so the on-phone
+// regenerate includes each member's equipment, not just the cron path).
+export async function getEquippedGearPhrasesForMembers(buyerIds = []) {
+    const map = new Map();
+    if (!buyerIds.length) return map;
+    const rows = await db.query(`SELECT buyer_id, slot, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1)`, [buyerIds]).catch(() => []);
+    const bySlotByBuyer = new Map();
+    for (const r of rows) {
+        if (!bySlotByBuyer.has(r.buyer_id)) bySlotByBuyer.set(r.buyer_id, {});
+        bySlotByBuyer.get(r.buyer_id)[r.slot] = r.item_id;
+    }
+    for (const [id, bySlot] of bySlotByBuyer) map.set(id, gearPhraseFromSlots(bySlot));
+    return map;
 }
 
 // Grant a random not-yet-owned item from a source pool (e.g. a boss-kill drop). Returns the item or null.
