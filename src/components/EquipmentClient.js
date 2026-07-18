@@ -26,7 +26,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
     const [slot, setSlot] = useState(null); // open picker for this slot
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
-    const [sellMode, setSellMode] = useState(false); // tap-to-sell instead of tap-to-equip
+    const [detailItem, setDetailItem] = useState(null); // inventory item detail sheet (inspect → equip / sell)
+    const [sellArmed, setSellArmed] = useState(false); // two-tap sell confirm inside the sheet (no native popup)
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
@@ -61,9 +62,11 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
         } finally { setBusy(false); }
     }
 
-    async function sell(item) {
+    function openDetail(item) { setSellArmed(false); setDetailItem(item); }
+    function closeDetail() { setDetailItem(null); setSellArmed(false); }
+
+    async function doSell(item) {
         if (!item || item.sellValue <= 0) return;
-        if (typeof window !== "undefined" && !window.confirm(`Sell ${item.name} for ${item.sellValue} gold? This can't be undone.`)) return;
         setBusy(true); setErr("");
         try {
             const r = await fetch("/api/marketplace/shop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: item.id, action: "sell" }) });
@@ -71,6 +74,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
             if (!r.ok) { setErr(d?.error || "Couldn't sell."); return; }
             DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
             setData(d);
+            closeDetail();
         } finally { setBusy(false); }
     }
 
@@ -182,24 +186,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
 
             {/* The bag */}
             <div className="card">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <h3 style={{ margin: 0 }}>🎒 Inventory</h3>
-                    {(data.items || []).some((i) => i.sellValue > 0) ? (
-                        <button type="button" className="pill" onClick={() => setSellMode((s) => !s)} disabled={busy}>{sellMode ? "✓ Done" : "💰 Sell gear"}</button>
-                    ) : null}
-                </div>
-                {sellMode ? <p className="muted" style={{ margin: "6px 0 0" }}>Tap gear to sell it for gold. Worn items unequip automatically. Sold starter gear won&apos;t come back.</p> : null}
+                <h3>🎒 Inventory</h3>
+                <p className="muted" style={{ marginTop: 0 }}>Tap a piece of gear to see what it does — then equip or sell it.</p>
                 {(data.items || []).length ? (
                     <div className="equip-bag-grid">
                         {(data.items || []).map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => (sellMode ? sell(i) : equipFromBag(i))} disabled={busy || (sellMode && i.sellValue <= 0)} title={i.signature ? `${i.signature.label}: ${i.signature.desc}` : describeStats(i.stats)}>
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={describeStats(i.stats)}>
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
-                                {!sellMode && i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
-                                {sellMode && i.sellValue > 0 ? <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#ffd75e" }}>💰 Sell · {i.sellValue}</span> : null}
-                                {sellMode && i.sellValue <= 0 ? <span style={{ fontSize: "0.6rem", color: "#9aa7b5" }}>Not sellable</span> : null}
-                                {!sellMode && i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
+                                {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
+                                {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
                             </button>
                         ))}
                     </div>
@@ -223,6 +220,39 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                                 </button>
                             );
                         })}
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Item detail sheet — inspect, then equip or sell. In-brand modal (no native browser popup). */}
+            {detailItem ? (
+                <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
+                    <div className={`card equip-sheet rar-${detailItem.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                            <ItemGlyph id={detailItem.id} className="equip-card-glyph" />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detailItem.name}</div>
+                                <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detailItem.rarity} · {detailItem.slot.replace("_", " ")}{detailItem.equipped ? " · Equipped ✓" : ""}</div>
+                            </div>
+                        </div>
+                        <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
+                        {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
+                        {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
+                        <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+                            {detailItem.equipped ? (
+                                <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
+                            ) : (
+                                <button type="button" className="button primary" onClick={() => { equipFromBag(detailItem); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
+                            )}
+                            {detailItem.sellValue > 0 ? (
+                                sellArmed ? (
+                                    <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>
+                                ) : (
+                                    <button type="button" className="pill" onClick={() => setSellArmed(true)} disabled={busy}>💰 Sell for {detailItem.sellValue}</button>
+                                )
+                            ) : null}
+                            <button type="button" className="pill" onClick={closeDetail} style={{ marginLeft: "auto" }}>Close</button>
+                        </div>
                     </div>
                 </div>
             ) : null}
