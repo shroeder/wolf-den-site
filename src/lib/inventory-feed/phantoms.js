@@ -45,6 +45,18 @@ export async function listPhantoms(limit = 300) {
         .map((r) => {
             const qty = Number(r.qty) || 0;
             const gone = Math.min(qty, Math.max(1, Number(r.gone) || 1));
+            // The ONLY reliable phantom is a double-count: a single that's inside a mystery bag AND still
+            // showing loose (physically impossible). "Traded away" / "consignment sold" can't account for
+            // restocks (restocks aren't linked to a card), so they're only hints to verify — never proof.
+            const doubleCounted = r.reason === "mystery_packed" && qty <= 1;
+            const confidence = doubleCounted ? "high" : "verify";
+            const confidenceLabel = doubleCounted
+                ? "Double-counted — it's in a mystery bag AND still loose"
+                : r.reason === "traded_out"
+                ? "Verify — we traded this away, but restocks aren't tracked per card, so you may still have copies"
+                : r.reason === "mystery_packed"
+                ? "Verify — packed in a mystery bag (bulk source, may still have loose copies)"
+                : "Verify — consignment sold, but you may still have copies";
             return {
                 variationId: r.variation_id,
                 name: r.name,
@@ -52,12 +64,13 @@ export async function listPhantoms(limit = 300) {
                 price: r.price != null ? Number(r.price) : null,
                 reason: r.reason, // traded_out | mystery_packed | consignment_sold
                 suggestedFixQty: gone,
-                // High confidence = a single (qty 1); bulk sealed needs a human eye (could be partial).
-                confidence: qty <= 1 ? "high" : "review",
+                confidence,
+                confidenceLabel,
                 lastEvent: r.at,
             };
         })
-        .sort((a, b) => (b.price || 0) - (a.price || 0));
+        // Reliable double-counts first, then by value.
+        .sort((a, b) => (a.confidence === b.confidence ? (b.price || 0) - (a.price || 0) : a.confidence === "high" ? -1 : 1));
 }
 
 // Apply a fix: mark `quantity` units of a variation SOLD in Square (IN_STOCK -> SOLD), mirror it in the
