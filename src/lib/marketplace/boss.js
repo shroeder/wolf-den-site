@@ -8,6 +8,7 @@ import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantRandomDrop } from "@/lib/marketplace/inventory.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit } from "@/lib/marketplace/signatures.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
@@ -390,6 +391,10 @@ export async function runBossAutoTick() {
         return `($1, $${params.length - 1}, $${params.length}, 'auto')`;
     });
     await db.query(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ${values.join(", ")}`, params).catch(() => {});
+
+    // Passive auto-damage also counts toward the daily "deal damage to the boss" quest, so it's reachable
+    // (a single manual hit alone never gets there).
+    await Promise.allSettled(rows.map((r) => bumpQuestProgress(r.id, "boss_damage", r.damage)));
 
     const defeated = await markDefeatIfDead(boss.id, hpRow.hp);
     return { applied: total, fighters: rows.length, hp: hpRow.hp, defeated };
