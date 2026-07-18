@@ -7,6 +7,7 @@ import { addChests, CHEST_ORDER, CHEST_TIERS } from "@/lib/marketplace/chests.js
 import { ITEMS, describeStats } from "@/lib/marketplace/items.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { sendBuyerPush } from "@/lib/push/send.js";
+import { recordGift } from "@/lib/marketplace/gifts.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -62,6 +63,7 @@ export async function POST(request) {
                 const def = CHEST_TIERS[tier];
                 if (!def) return noStore({ error: "unknown_tier" }, { status: 400 });
                 await addChests(buyerId, { [tier]: 1 });
+                await recordGift(buyerId, { kind: "chest", title: "🎁 You got a loot chest!", body: `A ${def.label} landed in your stash — open it now!`, icon: def.emoji });
                 after(() => giftNotify(buyerId, `${def.emoji} A gift from The Wolf Den!`, `A ${def.label} just dropped into your stash — tap to rip it open! ✨`, "gift-chest", { type: "gift_chest", tier }));
                 return noStore({ ok: true, kind: "chest", tier });
             }
@@ -69,6 +71,7 @@ export async function POST(request) {
             if (body?.gold) {
                 const amt = Math.max(1, Math.min(100000, Math.floor(Number(body.gold) || 0)));
                 await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
+                await recordGift(buyerId, { kind: "gold", title: "🪙 You got gold!", body: `${amt.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "🪙" });
                 after(() => giftNotify(buyerId, "🪙 A gift from The Wolf Den!", `${amt.toLocaleString()} gold just landed in your purse — spend it in the gear shop! ✨`, "gift-gold", { type: "gift_gold", amount: amt }));
                 return noStore({ ok: true, kind: "gold", amount: amt });
             }
@@ -79,6 +82,7 @@ export async function POST(request) {
             const def = ITEMS.find((i) => i.id === itemId);
             // Only alert on a NEW grant (not a re-grant of something they already own).
             if (res?.granted && def) {
+                await recordGift(buyerId, { kind: "item", title: "🎁 You got new gear!", body: `You received ${RARITY_ARTICLE[def.rarity] || ""}${def.name} — equip it now!`, icon: RARITY_EMOJI[def.rarity] || "🎁", rarity: def.rarity });
                 after(() => giftNotify(
                     buyerId,
                     `${RARITY_EMOJI[def.rarity] || "🎁"} A gift from The Wolf Den!`,

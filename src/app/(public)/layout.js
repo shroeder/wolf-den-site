@@ -1,4 +1,5 @@
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import GiftWatcher from "@/components/GiftWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
 import RewardNudge from "@/components/RewardNudge";
 import SiteHeader from "@/components/SiteHeader";
@@ -16,6 +17,8 @@ export default function PublicLayout({ children }) {
             <SiteFooter />
             {/* Site-wide so a level-up earned while shopping still celebrates, not just on /marketplace. */}
             <LevelUpWatcher />
+            {/* Pops up admin gifts (item/chest/gold) on next visit — reliable even without browser push. */}
+            <GiftWatcher />
             {/* Ever-present social hub (friends + discover + messaging) for signed-in members, every page. */}
             <SocialHub />
             {/* Registers the push service worker + offers to turn on browser notifications (signed-in). */}
