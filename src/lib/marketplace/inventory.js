@@ -14,8 +14,21 @@ async function memberContext(buyerId) {
     return { level: levelForXp(row?.xp || 0).level, badges: new Set(badgeRows.map((r) => r.badge_slug)) };
 }
 
+// Grant gate: drives WHEN level/milestone items are auto-gifted (syncLevelItems). Still uses reqLevel.
 export function itemLockReason(item, ctx, metrics = null) {
     if (item.reqLevel && ctx.level < item.reqLevel) return `Reach Level ${item.reqLevel}`;
+    if (item.reqBadge && !ctx.badges.has(item.reqBadge)) return `Requires the ${item.reqBadge} badge`;
+    if (item.reqMetric && metrics) {
+        const { current, target } = progressForRule(item.reqMetric, item.reqThreshold, metrics);
+        if (current < target) return `Requires ${target} ${item.reqMetric.replace(/_/g, " ")}`;
+    }
+    return null;
+}
+
+// Equip gate: LEVEL no longer restricts equipping — you can use any gear you own, at any level. Only
+// prestige badges + metric milestones still gate (they're earned, not a level wall). Item power now
+// tracks rarity, not level, so early gear from chests/giveaways is usable immediately.
+export function equipLockReason(item, ctx, metrics = null) {
     if (item.reqBadge && !ctx.badges.has(item.reqBadge)) return `Requires the ${item.reqBadge} badge`;
     if (item.reqMetric && metrics) {
         const { current, target } = progressForRule(item.reqMetric, item.reqThreshold, metrics);
@@ -151,11 +164,14 @@ export async function equipItem(buyerId, slot, itemId) {
     if (!itemFitsSlot(item, slot)) throw new Error(`That doesn't go in the ${slot} slot.`);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (!owned) throw new Error("You don't own that item.");
-    // Enforce the item's requirements — you can OWN gear above your level, but not equip it yet.
-    const ctx = await memberContext(buyerId);
-    const metrics = item.reqMetric ? await getMemberMetrics(buyerId).catch(() => null) : null;
-    const lock = itemLockReason(item, ctx, metrics);
-    if (lock) throw new Error(lock + " to equip this.");
+    // Level no longer gates equipping — only earned prestige badges / metric milestones can.
+    const needsGate = item.reqBadge || item.reqMetric;
+    if (needsGate) {
+        const ctx = await memberContext(buyerId);
+        const metrics = item.reqMetric ? await getMemberMetrics(buyerId).catch(() => null) : null;
+        const lock = equipLockReason(item, ctx, metrics);
+        if (lock) throw new Error(lock + " to equip this.");
+    }
     // If it's equipped in the OTHER ring slot, move it (an item can't be in two slots).
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
     await db.query(
