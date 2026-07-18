@@ -9,8 +9,9 @@ import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 
 // Point values per action. Tune freely — they're only read here.
 // Anti-farm: dollars spent are uncapped (real money), everything else is capped via dedupe keys
-// (once-per-entity) and per-action daily caps at the call sites. The grindable actions' daily caps sum
-// under ~50 XP/day, so no amount of busywork moves you fast — only spending does.
+// (once-per-entity) and per-action daily caps at the call sites. Spending is still the fastest track, but
+// the daily boss swing is now a meaningful engagement reward (50 XP + the matching gold) so showing up
+// and fighting actually progresses you.
 // Which rewards milestones a member has completed — drives the "How you earn" checklist. Repeatable
 // ones (spend, event, daily) report whether they've been earned (daily = earned today).
 export async function getRewardsProgress(buyerId) {
@@ -55,7 +56,7 @@ export const XP_ACTIONS = {
     first_friend: 40, // make your first friend
     first_wishlist: 30, // add your first card to your Looking For list
     first_equip: 20, // customize your look — equip a border or background
-    boss_attack: 10, // one swing at the monthly boss (capped by the per-day attack limit)
+    boss_attack: 50, // one swing at the boss (capped by the per-day attack limit) — a meaningful daily reward
     boss_participated: 30, // your avatar took part in a boss that the pack slayed (once per boss)
     boss_won: 150, // won the boss-fight raffle prize (once per boss)
 };
