@@ -65,6 +65,19 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
 
 // A natural-language clause describing a member's equipped gear, fed into the hero-sprite prompt so the
 // AI draws them wearing/wielding their loadout. Empty string if nothing equipped.
+// Rarity flavor fed to the sprite art so higher-tier loot visibly looks more epic on the hero.
+const GEAR_RARITY_ADJ = {
+    common: "",
+    rare: "finely-crafted",
+    epic: "ornate glowing",
+    legendary: "legendary, radiant, intricately-detailed",
+    mythic: "mythic, blazing with otherworldly energy, awe-inspiring",
+};
+const gearDesc = (def) => {
+    const adj = GEAR_RARITY_ADJ[def.rarity] || "";
+    return adj ? `${adj} ${def.name}` : def.name;
+};
+
 export async function getEquippedGearPhrase(buyerId) {
     const bySlot = await getEquippedIds(buyerId);
     const items = Object.entries(bySlot).map(([slot, id]) => ({ slot, def: itemById(id) })).filter((x) => x.def);
@@ -72,13 +85,20 @@ export async function getEquippedGearPhrase(buyerId) {
     const parts = [];
     const weapon = items.find((x) => x.slot === "main_hand");
     const off = items.find((x) => x.slot === "off_hand");
-    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots"].includes(x.slot)).map((x) => x.def.name);
-    const acc = items.filter((x) => ["ring1", "ring2", "amulet"].includes(x.slot)).map((x) => x.def.name);
-    if (weapon) parts.push(`wielding a ${weapon.def.name}`);
-    if (off) parts.push(`carrying a ${off.def.name}`);
+    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots"].includes(x.slot)).map((x) => gearDesc(x.def));
+    const acc = items.filter((x) => ["ring1", "ring2", "amulet"].includes(x.slot)).map((x) => gearDesc(x.def));
+    if (weapon) parts.push(`wielding a ${gearDesc(weapon.def)}`);
+    if (off) parts.push(`carrying a ${gearDesc(off.def)}`);
     if (armor.length) parts.push(`wearing ${armor.join(", ")}`);
     if (acc.length) parts.push(`adorned with ${acc.join(", ")}`);
-    return parts.length ? `The hero is ${parts.join(", ")} — draw this equipment clearly as worn armor and held weapons.` : "";
+    // If they own top-tier gear, tell the model to make the whole hero feel powerful.
+    const best = items.some((x) => x.def.rarity === "mythic") ? "mythic" : items.some((x) => x.def.rarity === "legendary") ? "legendary" : null;
+    const aura = best === "mythic"
+        ? " This is a legendary champion — their gear radiates a brilliant magical aura and glowing energy."
+        : best === "legendary"
+        ? " Their finest pieces glow with power."
+        : "";
+    return parts.length ? `The hero is ${parts.join(", ")} — draw this equipment clearly as worn armor and held weapons.${aura}` : "";
 }
 
 // Grant a random not-yet-owned item from a source pool (e.g. a boss-kill drop). Returns the item or null.
