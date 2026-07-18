@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
@@ -171,12 +171,10 @@ export async function getInventory(buyerId) {
     // The gold shop: xp_shop items you don't own yet.
     const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id)).map((i) => ({
         id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-        statsText: sumStatsText(i), cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0),
+        statsText: describeStats(i.stats), cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0),
     }));
     return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: sumItemStats(Object.values(bySlot)), gold, shop };
 }
-
-const sumStatsText = (item) => Object.entries(item.stats || {}).map(([k, v]) => `+${v} ${k}`).join(" · ");
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
 export async function buyItem(buyerId, itemId) {

@@ -19,13 +19,15 @@ export const EQUIP_SLOTS = [
 ];
 
 // Stat keys → how they read + how they apply in combat. Percent stats are additive % bonuses.
+// Each stat carries a plain-English `desc` (what it does for a player, no jargon) + an icon, so the gear
+// screen can teach what every stat means instead of just showing a number.
 export const STAT_META = {
-    might: { label: "Might", desc: "manual strike damage", suffix: "%" },
-    crit_chance: { label: "Crit Chance", desc: "chance to crit", suffix: "%" },
-    crit_power: { label: "Crit Power", desc: "crit damage", suffix: "%" },
-    ferocity: { label: "Ferocity", desc: "passive auto-DPS", suffix: "%" },
-    fortune: { label: "Fortune", desc: "raffle tickets earned", suffix: "%" },
-    extra_strike: { label: "Extra Strike", desc: "extra daily strikes", suffix: "" },
+    might: { label: "Might", icon: "⚔️", desc: "How hard your big daily attack hits the boss.", suffix: "%" },
+    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often your attack lands a huge critical hit.", suffix: "%" },
+    crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra damage your critical hits deal.", suffix: "%" },
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "Damage your hero deals to the boss automatically, 24/7.", suffix: "%" },
+    fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize.", suffix: "%" },
+    extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra daily attacks on the boss.", suffix: "" },
 };
 
 // Charged-perk reward keys → the real-world thing you hand over in-store.

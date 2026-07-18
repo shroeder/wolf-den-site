@@ -104,11 +104,24 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                 {statEntries.length ? (
                     <div className="equip-stat-grid">
                         {statEntries.map(([k, v]) => (
-                            <span key={k} className="equip-stat"><strong>+{v}{STAT_META[k]?.suffix || ""}</strong> {STAT_META[k]?.label || k}</span>
+                            <span key={k} className="equip-stat" title={STAT_META[k]?.desc || ""}>{STAT_META[k]?.icon || ""} <strong>+{v}{STAT_META[k]?.suffix || ""}</strong> {STAT_META[k]?.label || k}</span>
                         ))}
                     </div>
                 ) : <p className="muted" style={{ margin: 0 }}>Equip gear to boost your boss fight — Might, crit, ferocity and more.</p>}
             </div>
+
+            {/* Plain-English guide — so a player actually knows what each stat does for them. */}
+            <details className="card" style={{ padding: "12px 16px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700 }}>❔ What do these stats do?</summary>
+                <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0", display: "grid", gap: 10 }}>
+                    {Object.entries(STAT_META).map(([k, m]) => (
+                        <li key={k} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                            <strong style={{ minWidth: 120, whiteSpace: "nowrap" }}>{m.icon} {m.label}</strong>
+                            <span className="muted" style={{ fontSize: "0.85rem" }}>{m.desc}</span>
+                        </li>
+                    ))}
+                </ul>
+            </details>
 
             {/* Slot picker */}
             {slot ? (
@@ -162,7 +175,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equipFromBag(i)} disabled={busy} title={i.signature ? `${i.signature.label}: ${i.signature.desc}` : describeStats(i.stats)}>
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
-                                <span className="equip-card-stats">{i.equipped ? "Equipped" : describeStats(i.stats)}</span>
+                                <span className="equip-card-stats">{describeStats(i.stats)}</span>
+                                {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
                             </button>
                         ))}
@@ -182,7 +196,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                                 <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => buy(i.id)} disabled={busy || !i.canAfford} title={i.statsText}>
                                     <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
                                     <span className="equip-card-name">{i.name}</span>
-                                    <span className="equip-card-stats">🪙 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                                    <span className="equip-card-stats">{i.statsText}</span>
+                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                 </button>
                             );
                         })}
