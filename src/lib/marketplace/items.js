@@ -3,6 +3,7 @@
 // live here (source of truth); the DB only tracks ownership/equipped/charges. Keep ids STABLE.
 import {
     GiAncientSword, GiBattleAxe, GiBelt, GiBeltArmor, GiBigDiamondRing, GiBlackBelt, GiBlackKnightHelm, GiBookCover, GiBoots, GiBowArrow, GiBreastplate, GiBroadsword, GiBrutalHelm, GiChainMail, GiCharm, GiCheckedShield, GiCrenelCrown, GiCrescentStaff, GiCrestedHelmet, GiCrossShield, GiCrossbow, GiCrown, GiCrystalBall, GiCrystalWand, GiDiamondRing, GiDragonShield, GiEdgedShield, GiEmeraldNecklace, GiEnergySword, GiEngagementRing, GiExecutionerHood, GiFeatherNecklace, GiFireRing, GiFlangedMace, GiFrozenRing, GiFurBoot, GiGemNecklace, GiGemPendant, GiGreaves, GiHeartNecklace, GiHornedHelm, GiIntricateNecklace, GiLayeredArmor, GiLeatherArmor, GiLeatherBoot, GiMetalBoot, GiMetalPlate, GiOverlordHelm, GiPowerRing, GiQueenCrown, GiRing, GiRobe, GiRoundShield, GiRuneSword, GiScaleMail, GiSickle, GiSkullRing, GiSkullSignet, GiSpellBook, GiSpikedArmor, GiSteeltoeBoots, GiSwirlRing, GiTribalPendant, GiWalkingBoot, GiWarhammer, GiWingedSword, GiWizardStaff,
+    GiPlainDagger, GiDaggers, GiWarPick, GiFireAxe, GiKatana, GiScythe, GiTrident, GiWoodFrame, GiShieldBash, GiCrystalCluster, GiSurroundedShield, GiVibratingShield, GiBarbute, GiVisoredHelm, GiCenturionHelmet, GiLaurelCrown, GiWizardFace, GiChestArmor, GiAbdominalArmor, GiKimono, GiHoodedFigure, GiRunningShoe, GiBootStomp, GiLegArmor, GiFangs, GiPearlNecklace, GiMoon, GiLibra, GiEagleEmblem, GiHolySymbol, GiWolfHead, GiStarFormation, GiDragonHead, GiPrayerBeads, GiRingedBeam,
 } from "react-icons/gi";
 
 // The nine equip slots (rings occupy ring1/ring2). `accepts` = which item.slot fits.
@@ -39,6 +40,7 @@ export const REWARDS = {
 
 const ICONS = {
     GiAncientSword, GiBattleAxe, GiBelt, GiBeltArmor, GiBigDiamondRing, GiBlackBelt, GiBlackKnightHelm, GiBookCover, GiBoots, GiBowArrow, GiBreastplate, GiBroadsword, GiBrutalHelm, GiChainMail, GiCharm, GiCheckedShield, GiCrenelCrown, GiCrescentStaff, GiCrestedHelmet, GiCrossShield, GiCrossbow, GiCrown, GiCrystalBall, GiCrystalWand, GiDiamondRing, GiDragonShield, GiEdgedShield, GiEmeraldNecklace, GiEnergySword, GiEngagementRing, GiExecutionerHood, GiFeatherNecklace, GiFireRing, GiFlangedMace, GiFrozenRing, GiFurBoot, GiGemNecklace, GiGemPendant, GiGreaves, GiHeartNecklace, GiHornedHelm, GiIntricateNecklace, GiLayeredArmor, GiLeatherArmor, GiLeatherBoot, GiMetalBoot, GiMetalPlate, GiOverlordHelm, GiPowerRing, GiQueenCrown, GiRing, GiRobe, GiRoundShield, GiRuneSword, GiScaleMail, GiSickle, GiSkullRing, GiSkullSignet, GiSpellBook, GiSpikedArmor, GiSteeltoeBoots, GiSwirlRing, GiTribalPendant, GiWalkingBoot, GiWarhammer, GiWingedSword, GiWizardStaff,
+    GiPlainDagger, GiDaggers, GiWarPick, GiFireAxe, GiKatana, GiScythe, GiTrident, GiWoodFrame, GiShieldBash, GiCrystalCluster, GiSurroundedShield, GiVibratingShield, GiBarbute, GiVisoredHelm, GiCenturionHelmet, GiLaurelCrown, GiWizardFace, GiChestArmor, GiAbdominalArmor, GiKimono, GiHoodedFigure, GiRunningShoe, GiBootStomp, GiLegArmor, GiFangs, GiPearlNecklace, GiMoon, GiLibra, GiEagleEmblem, GiHolySymbol, GiWolfHead, GiStarFormation, GiDragonHead, GiPrayerBeads, GiRingedBeam,
 };
 export const itemIcon = (name) => ICONS[name] || GiRing;
 
@@ -140,6 +142,63 @@ export const ITEMS = [
     { id: "power_signet", name: "Signet of Power", slot: "ring", rarity: "epic", icon: "GiSkullRing", flavor: "Raw force.", stats: { might: 22 }, reqLevel: 36, source: "chest", sort: 183 },
     { id: "kings_ring", name: "Ring of Kings", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "Worn by rulers.", stats: { might: 14, fortune: 16 }, reqLevel: 64, source: "chest", sort: 184 },
     { id: "infinity_loop", name: "Loop of Infinity", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "No end, no limit.", stats: { might: 16, crit_chance: 8, fortune: 16 }, reqLevel: 98, source: "chest", sort: 185 },
+
+    // ===== EXPANSION LOOT (source: "chest") — more collection variety, every slot + rarity. Flat per-rarity
+    // stat budgets (common 10 · rare 16 · epic 22 · legendary 30 · mythic 40), so these add depth, not power. =====
+    // -- Main hand --
+    { id: "steel_dagger", name: "Steel Dagger", slot: "main_hand", rarity: "common", icon: "GiPlainDagger", flavor: "Quick and quiet.", stats: { crit_chance: 10 }, reqLevel: 4, source: "chest", sort: 200 },
+    { id: "twin_fangs", name: "Twin Fangs", slot: "main_hand", rarity: "rare", icon: "GiDaggers", flavor: "Two edges, twice the trouble.", stats: { might: 6, crit_chance: 10 }, reqLevel: 16, source: "chest", sort: 201 },
+    { id: "war_pick", name: "War Pick", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Finds the gap in any armor.", stats: { might: 15, crit_chance: 7 }, reqLevel: 30, source: "chest", sort: 202 },
+    { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, reqLevel: 34, source: "chest", sort: 203 },
+    { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, reqLevel: 60, source: "chest", sort: 204 },
+    { id: "reapers_scythe", name: "Reaper's Scythe", slot: "main_hand", rarity: "legendary", icon: "GiScythe", flavor: "It only asks once.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 66, source: "chest", sort: 205 },
+    { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, reqLevel: 92, source: "chest", sort: 206 },
+    // -- Off hand --
+    { id: "oak_buckler", name: "Oak Buckler", slot: "off_hand", rarity: "common", icon: "GiWoodFrame", flavor: "Humble but honest.", stats: { ferocity: 10 }, reqLevel: 5, source: "chest", sort: 210 },
+    { id: "spiked_shield", name: "Spiked Shield", slot: "off_hand", rarity: "rare", icon: "GiShieldBash", flavor: "Defense that bites back.", stats: { might: 5, ferocity: 11 }, reqLevel: 20, source: "chest", sort: 211 },
+    { id: "warding_orb", name: "Warding Orb", slot: "off_hand", rarity: "epic", icon: "GiCrystalCluster", flavor: "Hums with old magic.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 32, source: "chest", sort: 212 },
+    { id: "bastion_shield", name: "Bastion Shield", slot: "off_hand", rarity: "legendary", icon: "GiSurroundedShield", flavor: "The wall the pack hides behind.", stats: { might: 10, ferocity: 20 }, reqLevel: 58, source: "chest", sort: 213 },
+    { id: "eternal_aegis", name: "Eternal Aegis", slot: "off_hand", rarity: "mythic", icon: "GiVibratingShield", flavor: "Nothing has ever broken it.", stats: { ferocity: 24, fortune: 16 }, reqLevel: 90, source: "chest", sort: 214 },
+    // -- Helmet --
+    { id: "iron_barbute", name: "Iron Barbute", slot: "helmet", rarity: "common", icon: "GiBarbute", flavor: "Cold to the touch.", stats: { ferocity: 10 }, reqLevel: 4, source: "chest", sort: 220 },
+    { id: "ranger_visor", name: "Ranger's Visor", slot: "helmet", rarity: "rare", icon: "GiVisoredHelm", flavor: "Eyes on the prize.", stats: { crit_chance: 8, ferocity: 8 }, reqLevel: 18, source: "chest", sort: 221 },
+    { id: "centurion_helm", name: "Centurion Helm", slot: "helmet", rarity: "epic", icon: "GiCenturionHelmet", flavor: "Lead from the front.", stats: { might: 15, crit_chance: 7 }, reqLevel: 34, source: "chest", sort: 222 },
+    { id: "wolf_crown", name: "Crown of the Wolf", slot: "helmet", rarity: "legendary", icon: "GiLaurelCrown", flavor: "Worn by the alpha.", stats: { might: 12, fortune: 18 }, reqLevel: 62, source: "chest", sort: 223 },
+    { id: "archmage_visage", name: "Archmage's Visage", slot: "helmet", rarity: "mythic", icon: "GiWizardFace", flavor: "Sees every weakness.", stats: { crit_chance: 16, crit_power: 24 }, reqLevel: 92, source: "chest", sort: 224 },
+    // -- Chest --
+    { id: "padded_vest", name: "Padded Vest", slot: "chest", rarity: "common", icon: "GiChestArmor", flavor: "Better than a T-shirt.", stats: { ferocity: 10 }, reqLevel: 4, source: "chest", sort: 230 },
+    { id: "scaled_cuirass", name: "Scaled Cuirass", slot: "chest", rarity: "rare", icon: "GiAbdominalArmor", flavor: "Layered like a serpent.", stats: { might: 6, ferocity: 10 }, reqLevel: 22, source: "chest", sort: 231 },
+    { id: "warlord_plate", name: "Warlord's Plate", slot: "chest", rarity: "epic", icon: "GiMetalPlate", flavor: "A fortress you can wear.", stats: { might: 9, ferocity: 13 }, reqLevel: 38, source: "chest", sort: 232 },
+    { id: "ronin_kimono", name: "Ronin's Kimono", slot: "chest", rarity: "legendary", icon: "GiKimono", flavor: "Grace and steel.", stats: { might: 10, ferocity: 20 }, reqLevel: 60, source: "chest", sort: 233 },
+    { id: "eternal_shroud", name: "Eternal Shroud", slot: "chest", rarity: "mythic", icon: "GiHoodedFigure", flavor: "Woven from twilight.", stats: { ferocity: 24, fortune: 16 }, reqLevel: 94, source: "chest", sort: 234 },
+    // -- Boots --
+    { id: "traveler_boots", name: "Traveler's Boots", slot: "boots", rarity: "common", icon: "GiRunningShoe", flavor: "Made for the long road.", stats: { ferocity: 10 }, reqLevel: 5, source: "chest", sort: 240 },
+    { id: "stomping_boots", name: "Stomping Boots", slot: "boots", rarity: "rare", icon: "GiBootStomp", flavor: "Feel the ground shake.", stats: { ferocity: 16 }, reqLevel: 22, source: "chest", sort: 241 },
+    { id: "greaves_valor", name: "Greaves of Valor", slot: "boots", rarity: "epic", icon: "GiLegArmor", flavor: "Stand your ground.", stats: { crit_chance: 4, ferocity: 18 }, reqLevel: 36, source: "chest", sort: 242 },
+    { id: "thunderstride", name: "Thunderstride Boots", slot: "boots", rarity: "legendary", icon: "GiMetalBoot", flavor: "Thunder in every step.", stats: { might: 12, ferocity: 18 }, reqLevel: 64, source: "chest", sort: 243 },
+    { id: "voidwalkers", name: "Voidwalkers", slot: "boots", rarity: "mythic", icon: "GiSteeltoeBoots", flavor: "Step between worlds.", stats: { ferocity: 27, fortune: 13 }, reqLevel: 90, source: "chest", sort: 244 },
+    // -- Amulet --
+    { id: "bone_charm", name: "Bone Charm", slot: "amulet", rarity: "common", icon: "GiFangs", flavor: "Rattles with luck.", stats: { fortune: 10 }, reqLevel: 6, source: "chest", sort: 250 },
+    { id: "pearl_strand", name: "Pearl Strand", slot: "amulet", rarity: "common", icon: "GiPearlNecklace", flavor: "Sea-born shimmer.", stats: { fortune: 10 }, reqLevel: 8, source: "chest", sort: 251 },
+    { id: "moonstone_pendant", name: "Moonstone Pendant", slot: "amulet", rarity: "rare", icon: "GiMoon", flavor: "Glows at midnight.", stats: { might: 7, fortune: 9 }, reqLevel: 22, source: "chest", sort: 252 },
+    { id: "balance_amulet", name: "Amulet of Balance", slot: "amulet", rarity: "rare", icon: "GiLibra", flavor: "Weigh every strike.", stats: { crit_chance: 8, crit_power: 8 }, reqLevel: 20, source: "chest", sort: 253 },
+    { id: "eagle_sigil", name: "Eagle Sigil", slot: "amulet", rarity: "epic", icon: "GiEagleEmblem", flavor: "Strike from the sky.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 38, source: "chest", sort: 254 },
+    { id: "blessed_pendant", name: "Blessed Pendant", slot: "amulet", rarity: "epic", icon: "GiHolySymbol", flavor: "A quiet blessing.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 34, source: "chest", sort: 255 },
+    { id: "wolf_totem", name: "Wolf Totem", slot: "amulet", rarity: "legendary", icon: "GiWolfHead", flavor: "The pack runs with you.", stats: { might: 13, crit_power: 17 }, reqLevel: 60, source: "chest", sort: 256 },
+    { id: "star_amulet", name: "Amulet of Stars", slot: "amulet", rarity: "legendary", icon: "GiStarFormation", flavor: "Fortune written in the sky.", stats: { crit_chance: 14, fortune: 16 }, reqLevel: 68, source: "chest", sort: 257 },
+    { id: "dragonheart_sigil", name: "Dragonheart Sigil", slot: "amulet", rarity: "mythic", icon: "GiDragonHead", flavor: "A wyrm's fury, bottled.", stats: { crit_chance: 15, crit_power: 25 }, reqLevel: 95, source: "chest", sort: 258 },
+    // -- Belt --
+    { id: "woven_belt", name: "Woven Belt", slot: "belt", rarity: "common", icon: "GiBeltArmor", flavor: "Simple and sturdy.", stats: { ferocity: 4, fortune: 6 }, reqLevel: 6, source: "chest", sort: 260 },
+    { id: "monk_sash", name: "Monk's Sash", slot: "belt", rarity: "rare", icon: "GiPrayerBeads", flavor: "Focus in every knot.", stats: { crit_chance: 16 }, reqLevel: 22, source: "chest", sort: 261 },
+    { id: "war_girdle", name: "War Girdle", slot: "belt", rarity: "epic", icon: "GiBelt", flavor: "Tighten for battle.", stats: { might: 11, crit_chance: 11 }, reqLevel: 40, source: "chest", sort: 262 },
+    { id: "bear_girdle", name: "Girdle of the Bear", slot: "belt", rarity: "legendary", icon: "GiBlackBelt", flavor: "Endless endurance.", stats: { ferocity: 30 }, reqLevel: 62, source: "chest", sort: 263 },
+    { id: "colossus_belt", name: "Belt of the Colossus", slot: "belt", rarity: "mythic", icon: "GiBeltArmor", flavor: "Raw, unstoppable force.", stats: { might: 40 }, reqLevel: 90, source: "chest", sort: 264 },
+    // -- Rings --
+    { id: "band_valor", name: "Band of Valor", slot: "ring", rarity: "common", icon: "GiRing", flavor: "A soldier's first ring.", stats: { might: 10 }, reqLevel: 6, source: "chest", sort: 270 },
+    { id: "ring_embers", name: "Ring of Embers", slot: "ring", rarity: "rare", icon: "GiFireRing", flavor: "Warm to the touch.", stats: { might: 11, crit_chance: 5 }, reqLevel: 24, source: "chest", sort: 271 },
+    { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, reqLevel: 36, source: "chest", sort: 272 },
+    { id: "ring_titans", name: "Ring of Titans", slot: "ring", rarity: "legendary", icon: "GiPowerRing", flavor: "Power beyond measure.", stats: { might: 16, crit_power: 14 }, reqLevel: 66, source: "chest", sort: 273 },
+    { id: "kings_eternal", name: "Eternal King's Ring", slot: "ring", rarity: "mythic", icon: "GiBigDiamondRing", flavor: "Worn by every ruler who mattered.", stats: { might: 13, fortune: 27 }, reqLevel: 98, source: "chest", sort: 274 },
 ];
 
 export function itemById(id) {
