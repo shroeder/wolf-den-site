@@ -11,6 +11,10 @@ import { withRequestLogging } from "@/lib/server-logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Dopamine dressing for gift pushes — rarity flavor so a mythic drop feels like a mythic drop.
+const RARITY_EMOJI = { common: "⚪", rare: "🔵", epic: "🟣", legendary: "🟠", mythic: "💎" };
+const RARITY_ARTICLE = { rare: "a rare ", epic: "an epic ", legendary: "a legendary ", mythic: "a MYTHIC " };
+
 function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
@@ -50,21 +54,32 @@ export async function POST(request) {
                 const def = CHEST_TIERS[tier];
                 if (!def) return noStore({ error: "unknown_tier" }, { status: 400 });
                 await addChests(buyerId, { [tier]: 1 });
-                after(() => sendWebPush(buyerId, { title: `${def.emoji} A gift for you!`, body: `You received a ${def.label} — open it now!`, url: "/marketplace/equipment", tag: "gift-chest" }).catch(() => {}));
+                after(() => sendWebPush(buyerId, { title: `${def.emoji} A gift from The Wolf Den!`, body: `A ${def.label} just dropped into your stash — tap to rip it open! ✨`, url: "/marketplace/equipment", tag: "gift-chest", data: { type: "gift_chest", tier } }).catch(() => {}));
                 return noStore({ ok: true, kind: "chest", tier });
             }
             // Give gold.
             if (body?.gold) {
                 const amt = Math.max(1, Math.min(100000, Math.floor(Number(body.gold) || 0)));
                 await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
-                after(() => sendWebPush(buyerId, { title: "🪙 A gift for you!", body: `${amt} gold just landed in your purse!`, url: "/marketplace/equipment", tag: "gift-gold" }).catch(() => {}));
+                after(() => sendWebPush(buyerId, { title: "🪙 A gift from The Wolf Den!", body: `${amt.toLocaleString()} gold just landed in your purse — spend it in the gear shop! ✨`, url: "/marketplace/equipment", tag: "gift-gold", data: { type: "gift_gold", amount: amt } }).catch(() => {}));
                 return noStore({ ok: true, kind: "gold", amount: amt });
             }
             // Grant a specific item.
             const itemId = String(body?.itemId || "").trim();
             if (!itemId) return noStore({ error: "missing_params" }, { status: 400 });
             const res = await grantItem(buyerId, itemId, "admin");
-            return noStore(res, { status: res.ok ? 200 : 400 });
+            const def = ITEMS.find((i) => i.id === itemId);
+            // Only alert on a NEW grant (not a re-grant of something they already own).
+            if (res?.granted && def) {
+                after(() => sendWebPush(buyerId, {
+                    title: `${RARITY_EMOJI[def.rarity] || "🎁"} A gift from The Wolf Den!`,
+                    body: `You received ${RARITY_ARTICLE[def.rarity] || ""}${def.name} — tap to equip it! ✨`,
+                    url: "/marketplace/equipment",
+                    tag: "gift-item",
+                    data: { type: "gift_item", itemId },
+                }).catch(() => {}));
+            }
+            return noStore({ ...res, name: def?.name || null, rarity: def?.rarity || null }, { status: res.ok ? 200 : 400 });
         } catch (error) {
             return internalError(error, { event: "admin.items.grant.failure" });
         }

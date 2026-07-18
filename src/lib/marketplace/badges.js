@@ -271,7 +271,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
     const params = term ? [`%${term}%`, lim, off] : [lim, off];
     const rows = await db
         .query(
-            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, avatar_config, avatar_cosmetics, equipped_border, COALESCE(xp, 0) AS xp
+            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, featured_collectible, equipped_border, COALESCE(xp, 0) AS xp
                FROM mkt_buyer
                ${where}
               ORDER BY COALESCE(xp, 0) DESC, created_at DESC
@@ -297,18 +297,26 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
         byBuyer.get(br.buyer_id).push({ slug: br.slug, label: br.label, icon: br.icon || null, color: br.color || null, adminOnly: br.admin_only !== false });
     }
 
-    return rows.map((r) => ({
-        id: r.id,
-        alias: r.alias || null,
-        displayLabel: r.display_name || r.alias || (r.email ? String(r.email).split("@")[0] : "Member"),
-        name: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
-        email: r.email || null,
-        avatarUrl: memberAvatarUrl(r),
-        border: r.equipped_border || "none",
-        level: levelForXp(r.xp || 0).level,
-        xp: Number(r.xp || 0),
-        badges: byBuyer.get(r.id) || [],
-    }));
+    return rows.map((r) => {
+        const av = memberAvatarUrl(r);
+        return {
+            id: r.id,
+            alias: r.alias || null,
+            displayLabel: r.display_name || r.alias || (r.email ? String(r.email).split("@")[0] : "Member"),
+            name: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
+            email: r.email || null,
+            avatarUrl: av,
+            // A PNG variant the admin app (Coil) can render directly — the built avatar endpoint is SVG.
+            avatarPngUrl: av && av.includes("/api/marketplace/avatar?") ? `${av}&format=png` : av,
+            // The AI full-body hero sprite (PNG) — already reflects equipped gear; the richest "hero" image.
+            avatarSpriteUrl: r.avatar_sprite_url || null,
+            featuredCollectibleId: r.featured_collectible || null,
+            border: r.equipped_border || "none",
+            level: levelForXp(r.xp || 0).level,
+            xp: Number(r.xp || 0),
+            badges: byBuyer.get(r.id) || [],
+        };
+    });
 }
 
 // Grant a badge to a member (manual/admin). Records who granted it. Idempotent. On a NEW manual grant,
