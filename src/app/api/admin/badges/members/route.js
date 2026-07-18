@@ -5,6 +5,9 @@ import { db } from "@/lib/db";
 import { backfillBadgeCongrats, listMembersWithBadges } from "@/lib/marketplace/badges.js";
 import { getEquippedStatsForMembers } from "@/lib/marketplace/inventory.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
+import { borderById } from "@/lib/marketplace/borders.js";
+import { frameById } from "@/lib/marketplace/frames.js";
+import { cosmeticById } from "@/lib/marketplace/avatar-cosmetics.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -27,16 +30,25 @@ export async function GET(request) {
             // gold, and the member's active pet sprite. Batched, so it stays cheap across the whole roster.
             if (searchParams.get("gear") && members.length) {
                 const ids = members.map((m) => m.id);
-                const [statsMap, petMap, goldRows] = await Promise.all([
+                const [statsMap, petMap, rows] = await Promise.all([
                     getEquippedStatsForMembers(ids).catch(() => new Map()),
                     getPetSpriteMap().catch(() => ({})),
-                    db.query(`SELECT id, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
+                    db.query(`SELECT id, COALESCE(gold, 0) AS gold, equipped_border, equipped_frame, avatar_cosmetics FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
                 ]);
-                const goldById = new Map(goldRows.map((r) => [r.id, Number(r.gold) || 0]));
+                const byId = new Map(rows.map((r) => [r.id, r]));
+                // A displayable cosmetic (id + label + icon), or null for the default "none".
+                const meta = (def) => (def && def.id !== "none" ? { id: def.id, label: def.label, icon: def.icon || null } : null);
                 for (const m of members) {
+                    const r = byId.get(m.id) || {};
                     m.stats = statsMap.get(m.id) || {};
-                    m.gold = goldById.get(m.id) || 0;
+                    m.gold = Number(r.gold) || 0;
                     m.petSpriteUrl = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]) || null;
+                    // Equipped cosmetics so the admin can SEE a member's border, card frame, and aura effect.
+                    m.border = meta(borderById(r.equipped_border));
+                    m.frame = meta(frameById(r.equipped_frame));
+                    let cos = r.avatar_cosmetics;
+                    if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch { cos = {}; } }
+                    m.aura = meta(cosmeticById(cos && typeof cos === "object" ? cos.aura : null));
                 }
             }
             // Auto-send any pending badge-congrats emails (no manual action needed). Best-effort, off-path.
