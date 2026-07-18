@@ -6,11 +6,12 @@ import { GiSpikedDragonHead } from "react-icons/gi";
 // The 2D side-scrolling battle stage: the boss's own AI background, the boss sprite anchored right, and
 // the pack of member sprites on the left attacking on a staggered loop. Purely presentational — the parent
 // (BossFightClient) owns HP/attack state and passes it down.
-const MAX_FIGHTERS = 10;
+// NO cap on fighters: the whole pack shows up. applyPositions() crowd-packs them so the stage stays
+// readable no matter how many turn out (more fighters → more depth rows + smaller sprites).
 
 export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100 }) {
     const party = useMemo(() => {
-        const real = fighters.filter((f) => f.spriteUrl).slice(0, MAX_FIGHTERS);
+        const real = fighters.filter((f) => f.spriteUrl);
         const out = [...real];
         // Keep the stage populated even before many people have joined.
         let pad = 0;
@@ -83,7 +84,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                             ) : null}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="fighter-sprite" src={f.spriteUrl} alt="" />
-                            {!f.pad && f.name ? <span className="fighter-name">{f.name}</span> : null}
+                            {f.showName ? <span className="fighter-name">{f.name}</span> : null}
                         </div>
                     </div>
                 ))}
@@ -98,22 +99,41 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
     );
 }
 
-// Lay fighters out in two depth rows across the left of the stage.
-function applyPositions(out) {
+// Lay fighters out as a packed crowd on the left ~55% of the stage. Scales to ANY count: more fighters
+// pack into more depth rows and shrink, so nobody marches off the edge or collides with the boss on the
+// right. "You" is pulled to a front-and-center slot so a member always spots themselves in the mob, and
+// name labels drop away once the crowd is too dense to read them.
+const X0 = 4; // left edge of the crowd band (%)
+const X1 = 56; // right edge — the boss owns the space past this
+const MAX_ROWS = 6; // deepest the crowd stacks before it just gets denser per row
+
+function applyPositions(list) {
+    // Put "you" first so it lands in the front row, front-left.
+    const out = [...list].sort((a, b) => (b.you ? 1 : 0) - (a.you ? 1 : 0));
+    const n = out.length;
+    const rows = Math.min(MAX_ROWS, Math.max(1, Math.ceil(n / 6)));
+    const cols = Math.max(1, Math.ceil(n / rows));
+    const colStep = cols > 1 ? (X1 - X0) / (cols - 1) : 0;
+    // Shrink the whole crowd as it grows (√ falloff so small packs stay full-size, mobs stay on-stage).
+    const packScale = Math.max(0.42, Math.min(1, Math.sqrt(14 / Math.max(1, n))));
+    const showNames = n <= 12; // labels get unreadable in a crowd — hide them once it's a mob
     return out.map((f, i) => {
-        const back = i % 2 === 1;
+        const row = i % rows; // 0 = front, higher = further back
+        const col = Math.floor(i / rows);
+        const depth = rows > 1 ? row / (rows - 1) : 0; // 0 (front) .. 1 (back)
         return {
             key: f.id || `f-${i}`,
             spriteUrl: f.spriteUrl,
             petSpriteUrl: f.petSpriteUrl || null,
             name: f.name || null,
+            showName: showNames && !f.pad && Boolean(f.name),
             you: Boolean(f.you),
             pad: Boolean(f.pad),
-            left: 3 + Math.floor(i / 2) * 8.5, // spread across the left third
-            bottom: back ? 20 : 6, // back row sits higher (further away)
-            scale: back ? 0.82 : 1,
-            z: back ? 1 : 3,
-            delay: (i * 0.35).toFixed(2),
+            left: X0 + col * colStep + depth * colStep * 0.35, // stagger back rows for a crowd feel
+            bottom: 5 + depth * 30, // back rows sit higher up-stage (further away)
+            scale: packScale * (1 - depth * 0.22), // and a touch smaller
+            z: (rows - row) + (f.you ? 10 : 0), // front rows on top; you always on top
+            delay: ((i % 10) * 0.32).toFixed(2),
         };
     });
 }

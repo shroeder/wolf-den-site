@@ -31,11 +31,11 @@ export default function EventsPage() {
                     <span className="fnm-cta-eyebrow">🔵 Friday Night Magic</span>
                     <h2 style={{ margin: "2px 0 4px" }}>Register your seat for Friday</h2>
                     <p className="muted" style={{ margin: "0 0 12px" }}>
-                        Playing Magic this Friday? Sign up on Wizards EventLink so we can plan the night — and every
+                        Playing Magic this Friday? Sign up in the Wizards Companion app so we can plan the night — and every
                         registration helps The Wolf Den earn better product allocations from Wizards. 🐺
                     </p>
                     <a className="button primary" href={FNM_EVENTLINK_URL} target="_blank" rel="noreferrer">
-                        Register on EventLink →
+                        Register in the Companion app →
                     </a>
                 </div>
             </section>
@@ -99,7 +99,7 @@ export default function EventsPage() {
                         {event.slug === "friday-night-magic" && (
                             <p style={{ marginTop: "0.75rem" }}>
                                 <a className="button primary" href={FNM_EVENTLINK_URL} target="_blank" rel="noreferrer">
-                                    🔵 Register on EventLink →
+                                    🔵 Register in the Companion app →
                                 </a>
                             </p>
                         )}

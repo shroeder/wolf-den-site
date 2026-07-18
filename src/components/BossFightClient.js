@@ -171,7 +171,7 @@ export default function BossFightClient() {
                 <div className="boss2-board">
                     <h3>🛡️ Active heroes</h3>
                     <div className="hero-strip">
-                        {roster.slice(0, 12).map((f) => {
+                        {roster.map((f) => {
                             const inner = (
                                 <>
                                     <div className="herochip-av">

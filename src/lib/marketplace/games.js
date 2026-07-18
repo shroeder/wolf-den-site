@@ -18,6 +18,6 @@ export function sanitizeGameInterests(list) {
     return GAMES.map((g) => g.id).filter((id) => set.has(id));
 }
 
-// The store's Friday Night Magic sign-up link (Wizards EventLink). Registering here builds the store's
-// standing with Wizards for future product allocations.
-export const FNM_EVENTLINK_URL = "https://eventlink.wizards.com/stores/22745/events";
+// The store's Friday Night Magic sign-up link — the Wizards Companion app, joined via the store's short
+// code. Registering here builds the store's standing with Wizards for future product allocations.
+export const FNM_EVENTLINK_URL = "https://magic.wizards.com/en/products/companion-app?shortCode=YEMZJG7";

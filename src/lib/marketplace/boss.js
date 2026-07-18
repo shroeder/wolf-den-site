@@ -127,7 +127,7 @@ export async function getBossState(buyerId = null) {
                         COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
                    FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
                   WHERE h.boss_id = $1
-                  GROUP BY b.id ORDER BY dmg DESC LIMIT 20`,
+                  GROUP BY b.id ORDER BY dmg DESC`,
                 [boss.id]
             )
             .catch(() => []),
@@ -153,14 +153,16 @@ export async function getBossState(buyerId = null) {
         badgeByBuyer = new Map(brows.map((r) => [r.buyer_id, { icon: r.icon || "🏅", label: r.label }]));
     }
 
-    // Whole-pack fighters for the scene — every registered member, attackers ranked first.
+    // Whole-pack fighters for the scene — EVERY registered member, attackers ranked first. Intentionally
+    // uncapped: the whole pack shows up on the stage (the scene crowd-packs them). Payload scales with the
+    // member count, which is fine for a store-sized roster.
     const members = await db
         .query(
             `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.featured_collectible, COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
                LEFT JOIN boss_hit h ON h.buyer_id = b.id AND h.boss_id = $1
               WHERE b.alias IS NOT NULL
-              GROUP BY b.id ORDER BY dmg DESC, b.xp DESC NULLS LAST LIMIT 14`,
+              GROUP BY b.id ORDER BY dmg DESC, b.xp DESC NULLS LAST`,
             [boss.id]
         )
         .catch(() => []);
