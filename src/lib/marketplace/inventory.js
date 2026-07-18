@@ -25,11 +25,11 @@ export function itemLockReason(item, ctx, metrics = null) {
     return null;
 }
 
-// Equip gate: LEVEL no longer restricts equipping — you can use any gear you own, at any level. Only
-// prestige badges + metric milestones still gate (they're earned, not a level wall). Item power now
-// tracks rarity, not level, so early gear from chests/giveaways is usable immediately.
+// Equip gate: nothing restricts equipping anymore — if you OWN it, you can equip it, at any level.
+// (Level, prestige badges, and metric milestones no longer gate equipping.) Item power tracks rarity,
+// so gear from chests/drops/giveaways is usable immediately. Kept as a hook in case a future item wants
+// a metric milestone; currently no item sets one, so it always returns null.
 export function equipLockReason(item, ctx, metrics = null) {
-    if (item.reqBadge && !ctx.badges.has(item.reqBadge)) return `Requires the ${item.reqBadge} badge`;
     if (item.reqMetric && metrics) {
         const { current, target } = progressForRule(item.reqMetric, item.reqThreshold, metrics);
         if (current < target) return `Requires ${target} ${item.reqMetric.replace(/_/g, " ")}`;
@@ -164,11 +164,10 @@ export async function equipItem(buyerId, slot, itemId) {
     if (!itemFitsSlot(item, slot)) throw new Error(`That doesn't go in the ${slot} slot.`);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (!owned) throw new Error("You don't own that item.");
-    // Level no longer gates equipping — only earned prestige badges / metric milestones can.
-    const needsGate = item.reqBadge || item.reqMetric;
-    if (needsGate) {
+    // Nothing gates equipping anymore — own it, equip it. (Metric-milestone hook kept for future items.)
+    if (item.reqMetric) {
         const ctx = await memberContext(buyerId);
-        const metrics = item.reqMetric ? await getMemberMetrics(buyerId).catch(() => null) : null;
+        const metrics = await getMemberMetrics(buyerId).catch(() => null);
         const lock = equipLockReason(item, ctx, metrics);
         if (lock) throw new Error(lock + " to equip this.");
     }
