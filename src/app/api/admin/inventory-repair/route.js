@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { listOpenRepairs, recordInventoryRepair } from "@/lib/inventory-feed/repair.js";
+import { listOpenRepairs, markRepairResolved, recordInventoryRepair } from "@/lib/inventory-feed/repair.js";
+import { applyPhantomFix, listPhantoms } from "@/lib/inventory-feed/phantoms.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -11,13 +12,14 @@ function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
 
-// GET — open repairs (for the Remediations tab).
+// GET — the Remediations review data: the failed-decrement queue + the reconciler's phantom candidates.
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/admin/inventory-repair", async ({ logger, internalError }) => {
         const authError = verifyAdminApiKey(request, logger);
         if (authError) return authError;
         try {
-            return noStore({ repairs: await listOpenRepairs() });
+            const [repairs, phantoms] = await Promise.all([listOpenRepairs(), listPhantoms()]);
+            return noStore({ repairs, phantoms });
         } catch (error) {
             return internalError(error, { event: "admin.inventory_repair.list.failure" });
         }
@@ -32,6 +34,17 @@ export async function POST(request) {
         if (authError) return authError;
         try {
             const b = await request.json().catch(() => ({}));
+            const action = String(b?.action || "record");
+            // Operator applies a correction: mark the phantom units SOLD in Square (review-gated, destructive).
+            if (action === "fix") {
+                if (!b?.variationId) return noStore({ error: "missing_variation" }, { status: 400 });
+                return noStore(await applyPhantomFix(b.variationId, b.quantity || 1));
+            }
+            // Dismiss a repair-queue row (false positive / handled elsewhere).
+            if (action === "dismiss") {
+                if (b?.repairId) await markRepairResolved(b.repairId, "dismissed");
+                return noStore({ ok: true });
+            }
             if (!b?.source) return noStore({ error: "source_required" }, { status: 400 });
             await recordInventoryRepair({
                 variationId: b.variationId || null,
