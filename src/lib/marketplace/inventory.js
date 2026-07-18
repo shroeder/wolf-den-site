@@ -4,7 +4,15 @@ import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
+import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
+
+// Equipped item stats merged with any active set-bonus stats (the single source combat + the UI read).
+function withSetBonuses(ids) {
+    const total = sumItemStats(ids);
+    for (const [k, v] of Object.entries(setBonusStats(ids))) total[k] = (total[k] || 0) + v;
+    return total;
+}
 
 // ---- Requirements ----
 async function memberContext(buyerId) {
@@ -50,7 +58,7 @@ export async function getEquippedIds(buyerId) {
 export async function getEquippedStats(buyerId) {
     if (!buyerId) return {};
     const bySlot = await getEquippedIds(buyerId);
-    return sumItemStats(Object.values(bySlot));
+    return withSetBonuses(Object.values(bySlot));
 }
 
 // Equipped stats for many members at once (one query) — used by the hourly auto-tick.
@@ -60,7 +68,7 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
     const rows = await db.query(`SELECT buyer_id, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1)`, [buyerIds]).catch(() => []);
     const byBuyer = new Map();
     for (const r of rows) { if (!byBuyer.has(r.buyer_id)) byBuyer.set(r.buyer_id, []); byBuyer.get(r.buyer_id).push(r.item_id); }
-    for (const [id, ids] of byBuyer) out.set(id, sumItemStats(ids));
+    for (const [id, ids] of byBuyer) out.set(id, withSetBonuses(ids));
     return out;
 }
 
@@ -168,7 +176,7 @@ export async function getInventory(buyerId) {
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def) };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: setForItem(def.id)?.name || null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
@@ -178,7 +186,8 @@ export async function getInventory(buyerId) {
         id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
         statsText: describeStats(i.stats), cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0),
     }));
-    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: sumItemStats(Object.values(bySlot)), gold, shop };
+    const equippedList = Object.values(bySlot);
+    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList) };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.

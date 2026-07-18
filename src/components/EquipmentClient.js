@@ -179,6 +179,27 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                 </ul>
             </details>
 
+            {/* Set bonuses */}
+            {(data.setBonuses || []).length ? (
+                <div className="card">
+                    <h3>🧩 Set bonuses</h3>
+                    <p className="muted" style={{ marginTop: 0 }}>Equip matching pieces of a set to unlock bonuses — they stack on top of your gear.</p>
+                    {(data.setBonuses || []).map((s) => (
+                        <div key={s.id} style={{ padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                                <strong>{s.name}</strong>
+                                <span className="muted" style={{ fontSize: "0.8rem" }}>{s.equipped}/{s.total} equipped</span>
+                            </div>
+                            {s.tiers.map((t, i) => (
+                                <div key={i} style={{ fontSize: "0.82rem", marginTop: 3, color: t.active ? "#ffd75e" : "#9aa7b5", fontWeight: t.active ? 700 : 400 }}>
+                                    {t.active ? "✓" : "○"} {t.need}-piece: {describeStats(t.stats)}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
             {/* Slot picker */}
             {slot ? (
                 <div className="card equip-picker">
@@ -276,6 +297,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
+                        {detailItem.setName ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                             {detailItem.equipped ? (
                                 <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
