@@ -50,7 +50,7 @@ export default function ProfileActions({ targetId, targetAlias = null, relation 
             {rel === "outgoing" ? <span className="pill">Friend request sent</span> : null}
             {rel === "incoming" ? <a className="button primary" href="/marketplace/friends">Respond to request</a> : null}
             {rel === "friends" ? <button type="button" className="button primary" onClick={message} disabled={busy}>✉️ Message</button> : null}
-            {targetAlias ? <a className="button gold" href={`/marketplace/trade/new?to=${targetAlias}`}>🔄 Propose trade</a> : null}
+            {targetAlias ? <a className="button gold" href={`/marketplace/trade/new?to=${targetAlias}`}>🤝 Propose trade</a> : null}
             {msg ? <span className="muted" style={{ fontSize: "0.85rem" }}>{msg}</span> : null}
         </div>
     );

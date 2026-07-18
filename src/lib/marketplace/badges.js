@@ -2,8 +2,18 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
+import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+
+// The admin app loads avatars over the network, so it needs an ABSOLUTE url (the built DiceBear avatar is
+// served relative). Prefer the built avatar (what the website shows), fall back to any uploaded one.
+const SITE_ORIGIN = "https://www.wolfdengamingmn.com";
+function memberAvatarUrl(row) {
+    const built = avatarImageUrl(row.avatar_config, row.avatar_cosmetics);
+    if (built) return built.startsWith("/") ? `${SITE_ORIGIN}${built}` : built;
+    return row.avatar_url || null;
+}
 
 // Browser push for a newly-earned badge. Best-effort; `def` carries { slug, label, icon, description }.
 async function pushBadgeEarned(buyerId, def) {
@@ -261,7 +271,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
     const params = term ? [`%${term}%`, lim, off] : [lim, off];
     const rows = await db
         .query(
-            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, equipped_border, COALESCE(xp, 0) AS xp
+            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, avatar_config, avatar_cosmetics, equipped_border, COALESCE(xp, 0) AS xp
                FROM mkt_buyer
                ${where}
               ORDER BY COALESCE(xp, 0) DESC, created_at DESC
@@ -293,7 +303,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
         displayLabel: r.display_name || r.alias || (r.email ? String(r.email).split("@")[0] : "Member"),
         name: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
         email: r.email || null,
-        avatarUrl: r.avatar_url || null,
+        avatarUrl: memberAvatarUrl(r),
         border: r.equipped_border || "none",
         level: levelForXp(r.xp || 0).level,
         xp: Number(r.xp || 0),
