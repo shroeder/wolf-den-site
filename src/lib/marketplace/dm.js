@@ -1,13 +1,12 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { areFriends } from "@/lib/marketplace/friends.js";
 import { getProductCards } from "@/lib/marketplace/product-card.js";
 import { notifyNewDm } from "@/lib/marketplace/social-notify.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
-// User-to-user direct messages between friends. Distinct from the buyer<->vendor mkt_thread system; both
-// are surfaced together in the unified inbox.
+// User-to-user direct messages. Distinct from the buyer<->vendor mkt_thread system; both are surfaced
+// together in the unified inbox.
 
 function pair(a, b) {
     return a < b ? [a, b] : [b, a];
@@ -25,10 +24,10 @@ function mapUser(row) {
     };
 }
 
-// Get (or create) the DM thread between two friends. Friends-only.
+// Get (or create) the DM thread between two members. Open to anyone (like trades) so a member can message
+// any player from their profile — not just friends.
 export async function getOrCreateDmThread(userId, otherId) {
     if (!userId || !otherId || userId === otherId) return { error: "invalid" };
-    if (!(await areFriends(userId, otherId))) return { error: "not_friends" };
     const [a, b] = pair(userId, otherId);
     await db.query(`INSERT INTO mkt_dm_thread (user_a, user_b) VALUES ($1, $2) ON CONFLICT (user_a, user_b) WHERE vendor_id IS NULL DO NOTHING`, [a, b]).catch(() => {});
     const row = await db.queryOne(`SELECT id FROM mkt_dm_thread WHERE user_a = $1 AND user_b = $2 AND vendor_id IS NULL`, [a, b]).catch(() => null);
