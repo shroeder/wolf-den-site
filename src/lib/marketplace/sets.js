@@ -56,6 +56,22 @@ export const ITEM_SETS = [
             { need: 4, stats: { crit_chance: 12, fortune: 18 } },
         ],
     },
+    {
+        id: "frost", name: "Frostbound",
+        items: ["frost_brand", "frost_barrier", "frost_treads", "droplet_ring"],
+        bonuses: [
+            { need: 2, stats: { crit_chance: 6 } },
+            { need: 4, stats: { crit_chance: 8, crit_power: 12 } },
+        ],
+    },
+    {
+        id: "undying", name: "The Undying",
+        items: ["bone_mace", "cultist_hood", "bone_ring", "spectre_locket"],
+        bonuses: [
+            { need: 2, stats: { crit_power: 10 } },
+            { need: 4, stats: { crit_chance: 10, crit_power: 20 } },
+        ],
+    },
 ];
 
 const SET_BY_ITEM = {};
