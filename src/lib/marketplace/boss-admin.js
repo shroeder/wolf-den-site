@@ -49,7 +49,7 @@ export async function createDraftBoss({ name, description, maxHp, rewardsText, t
 export async function generateBossArt(bossId, prompt) {
     const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
     if (!boss) throw new Error("Boss not found");
-    const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. 2D video-game boss art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, dramatic dynamic action pose, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
+    const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. The creature is facing to the LEFT — its body and head turned toward the left side of the frame, toward its attackers. 2D video-game boss art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, dramatic dynamic action pose, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
     const url = await generateImage(full, { size: "1024x1024", pathPrefix: "marketplace/boss" });
     await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, url]);
     return url;
