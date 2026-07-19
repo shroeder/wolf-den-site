@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { generateMissingPetSprites } from "@/lib/marketplace/pet-sprite.js";
+import { generateMissingChestArt } from "@/lib/marketplace/chest-art.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -21,7 +22,9 @@ export async function GET(request) {
                 logger.warn("pet_sprites.unauthorized");
                 return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             }
-            return NextResponse.json({ success: true, ...(await generateMissingPetSprites(3)) });
+            // Auto-fill missing chest art too, so new chest tiers get icons without any manual taps.
+            const chestArt = await generateMissingChestArt(2).catch(() => null);
+            return NextResponse.json({ success: true, ...(await generateMissingPetSprites(3)), chestArt });
         } catch (error) {
             return internalError(error, { event: "pet_sprites.run.failure" });
         }

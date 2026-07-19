@@ -32,9 +32,21 @@ export const CHEST_ART_PROMPTS = {
     mythic:
         "A magical crystalline treasure chest of dark obsidian and glowing emerald-teal crystal, etched arcane runes " +
         "pulsing with energy, floating light motes and a mystical aura. " + STYLE,
+    ascendant:
+        "A transcendent treasure chest wreathed in molten orange-gold fire and embers, its dark metal cracked with " +
+        "glowing lava veins, radiating intense heat and sparks, blazing beyond legendary. " + STYLE,
+    eternal:
+        "A godlike treasure chest radiating impossible prismatic rainbow light that shifts through hot pink, violet " +
+        "and cyan, crackling with divine energy and shimmering aura, the pinnacle of all loot. " + STYLE,
+    celestial:
+        "A cosmic treasure chest seemingly carved from deep space, its surface a swirling nebula of stars and " +
+        "galaxies in deep violet and indigo with glowing constellations and stardust. " + STYLE,
+    primordial:
+        "The ultimate primordial treasure chest of ancient white-gold metal blazing with blinding radiant light, " +
+        "carved with glowing origin runes, an overwhelming divine aura — the source of all treasure. " + STYLE,
 };
 
-export const CHEST_ART_TIERS = ["wooden", "iron", "gold", "mythic"];
+export const CHEST_ART_TIERS = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
 // The stored tier -> image URL map (or {} if none generated yet).
 export async function getChestArt() {
@@ -45,6 +57,20 @@ export async function getChestArt() {
     } catch {
         return {};
     }
+}
+
+// Auto-fill any tiers missing art (run from the art cron so chest icons appear without manual taps). Does
+// a couple per call to stay under the function timeout; returns how many it generated + how many remain.
+export async function generateMissingChestArt(limit = 2) {
+    const have = await getChestArt().catch(() => ({}));
+    const missing = CHEST_ART_TIERS.filter((t) => !have[t]).slice(0, Math.max(1, limit));
+    let done = 0;
+    for (const t of missing) {
+        try { await generateChestArt(t); done += 1; } catch { /* skip; try again next run */ }
+    }
+    const nowHave = await getChestArt().catch(() => ({}));
+    const remaining = CHEST_ART_TIERS.filter((t) => !nowHave[t]).length;
+    return { generated: done, remaining };
 }
 
 // Generate (or regenerate) one tier's chest icon and persist it. Returns the new URL.
