@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
-import { generateImage } from "@/lib/marketplace/openai-image.js";
+import { faceBufferRight, generateImage, storePng } from "@/lib/marketplace/openai-image.js";
 
 // Each pet gets ONE shared 2D battle sprite (not per-member) so the member's active pet can fight beside
 // them in the boss scene. Same art universe as the member/boss sprites (transparent, full-body).
@@ -24,12 +24,44 @@ export async function generatePetSprite(petId) {
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
     const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true });
+    // Freshly generated art is already right-facing, so stamp it oriented — the repair sweep skips it.
     await db.query(
-        `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (pet_id) DO UPDATE SET url = $2, updated_at = NOW()`,
+        `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at, oriented_at) VALUES ($1, $2, NOW(), NOW())
+         ON CONFLICT (pet_id) DO UPDATE SET url = $2, updated_at = NOW(), oriented_at = NOW()`,
         [petId, url]
     );
     return url;
+}
+
+// One-time repair: flip EXISTING pet sprites that face left so they face right, WITHOUT regenerating the
+// art (keeps the exact pets you already like). Resumable — processes un-checked sprites in small batches;
+// call repeatedly until `remaining` is 0. Each sprite is stamped oriented_at whether or not it needed a
+// flip, so it's never re-checked.
+export async function fixPetSpriteOrientations(limit = 6) {
+    const batch = await db
+        .query(`SELECT pet_id, url FROM mkt_pet_sprite WHERE oriented_at IS NULL ORDER BY updated_at ASC LIMIT $1`, [Math.max(1, Math.min(12, limit))])
+        .catch(() => []);
+    const results = [];
+    for (const row of batch) {
+        try {
+            const resp = await fetch(row.url);
+            if (!resp.ok) { results.push({ id: row.pet_id, error: "fetch_failed" }); continue; }
+            const { buffer, flipped } = await faceBufferRight(Buffer.from(await resp.arrayBuffer()));
+            let url = row.url;
+            if (flipped) url = await storePng(buffer, "marketplace/pet");
+            await db.query(`UPDATE mkt_pet_sprite SET url = $2, oriented_at = NOW(), updated_at = NOW() WHERE pet_id = $1`, [row.pet_id, url]);
+            results.push({ id: row.pet_id, flipped, url });
+        } catch (error) {
+            results.push({ id: row.pet_id, error: error?.message || "failed" });
+        }
+    }
+    const remaining = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_pet_sprite WHERE oriented_at IS NULL`).catch(() => null);
+    return {
+        checked: results.length,
+        flipped: results.filter((r) => r.flipped).length,
+        remaining: remaining?.n || 0,
+        results,
+    };
 }
 
 // Which pets have a sprite yet (for the admin view).

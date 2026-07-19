@@ -32,16 +32,31 @@ async function orientFacingRight(buffer, key) {
                 ],
             }),
         });
-        if (!resp.ok) return buffer;
+        if (!resp.ok) return { buffer, flipped: false };
         const data = await resp.json().catch(() => null);
         const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
         if (answer.includes("left") && !answer.includes("right")) {
-            return await sharp(buffer).flop().png().toBuffer();
+            return { buffer: await sharp(buffer).flop().png().toBuffer(), flipped: true };
         }
-        return buffer;
+        return { buffer, flipped: false };
     } catch {
-        return buffer;
+        return { buffer, flipped: false };
     }
+}
+
+// Public: vision-check an already-rendered PNG and mirror it to face right if needed. Returns
+// { buffer, flipped }. Used to repair existing sprites without regenerating the art.
+export async function faceBufferRight(buffer) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) return { buffer, flipped: false };
+    return orientFacingRight(buffer, key);
+}
+
+// Public: store a PNG buffer to Blob and return its URL (same convention as generateImage).
+export async function storePng(buffer, pathPrefix = "marketplace/ai") {
+    const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
+    const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
+    return blob.url;
 }
 
 export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false } = {}) {
@@ -63,7 +78,7 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
 
     let buffer = Buffer.from(b64, "base64");
     // Enforce a consistent right-facing orientation (e.g. pets/companions that fight toward the boss).
-    if (faceRight) buffer = await orientFacingRight(buffer, key);
+    if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;
     const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
     const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
     return blob.url;
