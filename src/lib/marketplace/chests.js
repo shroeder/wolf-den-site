@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
@@ -116,6 +117,7 @@ export async function openChest(buyerId, tier) {
     if (!def) return { ok: false, error: "unknown_tier" };
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
+    await trackActivity(buyerId, "open_chest", { tier });
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
     const cc = CHEST_CONSUMABLES[tier];

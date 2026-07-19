@@ -5,6 +5,7 @@ import { itemById } from "@/lib/marketplace/items.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 
 // The admin app loads avatars over the network, so it needs an ABSOLUTE url (the built DiceBear avatar is
@@ -378,6 +379,7 @@ export async function buyBadge(buyerId, slug) {
     if (!row) return { ok: false, error: "not_enough_gold" };
     await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'purchase') ON CONFLICT DO NOTHING`, [buyerId, slug]).catch(() => {});
     await pushBadgeEarned(buyerId, def).catch(() => {});
+    await trackActivity(buyerId, "buy_badge", { slug, name: def.label });
     return { ok: true, gold: row.gold };
 }
 

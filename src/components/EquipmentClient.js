@@ -65,7 +65,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
         } finally { setBusy(false); }
     }
 
-    function openDetail(item) { setSellArmed(false); setDetailItem(item); }
+    function openDetail(item) {
+        setSellArmed(false); setDetailItem(item);
+        fetch("/api/marketplace/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "inspect_item", meta: { itemId: item.id, name: item.name, shop: Boolean(item.shop) } }) }).catch(() => {});
+    }
     function closeDetail() { setDetailItem(null); setSellArmed(false); }
 
     // A quick, bright "coin" chime via Web Audio (no asset, CSP-safe). Best-effort — silent if blocked.

@@ -3,6 +3,7 @@ import { after, NextResponse } from "next/server";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/db";
 import { backfillBadgeCongrats, listMembersWithBadges } from "@/lib/marketplace/badges.js";
+import { activityCounts } from "@/lib/marketplace/activity.js";
 import { getEquippedStatsForMembers } from "@/lib/marketplace/inventory.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
 import { borderById } from "@/lib/marketplace/borders.js";
@@ -49,6 +50,15 @@ export async function GET(request) {
                     let cos = r.avatar_cosmetics;
                     if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch { cos = {}; } }
                     m.aura = meta(cosmeticById(cos && typeof cos === "object" ? cos.aura : null));
+                }
+            }
+            // Engagement enrichment (?activity=1): 30-day action count + last-active, for most/least-active sorting.
+            if (searchParams.get("activity") && members.length) {
+                const counts = await activityCounts(members.map((m) => m.id), 30).catch(() => new Map());
+                for (const m of members) {
+                    const c = counts.get(m.id);
+                    m.activity30d = c?.count || 0;
+                    m.lastActiveAt = c?.lastAt ? new Date(c.lastAt).toISOString() : null;
                 }
             }
             // Auto-send any pending badge-congrats emails (no manual action needed). Best-effort, off-path.

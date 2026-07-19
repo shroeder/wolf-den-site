@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById } from "@/lib/marketplace/items.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
@@ -67,6 +68,7 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
             tag: `trade-${offer.id}`,
             data: { type: "trade", offerId: offer.id },
         }).catch(() => {});
+        await trackActivity(fromId, "trade_propose", { toId, offerId: offer.id });
     }
     return offer ? { ok: true, offerId: offer.id } : { ok: false, error: "failed" };
 }
@@ -119,6 +121,7 @@ export async function respondTrade(userId, offerId, action) {
     if (o.requested_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [o.from_buyer_id, o.requested_gold]);
     await db.query(`UPDATE mkt_trade_offer SET status='accepted', resolved_at=NOW() WHERE id=$1`, [offerId]);
     await Promise.all([bumpGear(o.from_buyer_id), bumpGear(userId)]);
+    await trackActivity(userId, "trade_accept", { offerId, from: o.from_buyer_id });
     return { ok: true, status: "accepted" };
 }
 

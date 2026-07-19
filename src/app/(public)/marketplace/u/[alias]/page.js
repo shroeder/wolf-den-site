@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
+
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
@@ -72,6 +75,8 @@ export default async function UserProfilePage({ params }) {
         viewer ? friendStatus(viewer.id, profile.id).catch(() => "none") : Promise.resolve(null),
         getInventory(profile.id).catch(() => null),
     ]);
+    // Telemetry: someone inspected another member's profile.
+    if (viewer && viewer.id !== profile.id) after(() => trackActivity(viewer.id, "view_profile", { alias: profile.alias, name: profile.displayLabel }));
 
     return (
         <div className="stack reveal">

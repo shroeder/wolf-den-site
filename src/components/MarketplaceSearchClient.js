@@ -131,6 +131,9 @@ export default function MarketplaceSearchClient() {
             abortRef.current = controller;
             setSearching(true);
 
+            // Telemetry: a real shop search (debounced, ≥2 chars so we don't log every keystroke).
+            if (trimmed.length >= 2) fetch("/api/marketplace/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "shop_search", meta: { q: trimmed.slice(0, 60), game: game || null, kind: kind || null } }) }).catch(() => {});
+
             try {
                 const params = new URLSearchParams();
                 if (trimmed) params.set("q", trimmed);

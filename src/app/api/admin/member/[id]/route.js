@@ -35,6 +35,29 @@ const ACTION_LABEL = {
 };
 const actionLabel = (a) => ACTION_LABEL[a] || String(a || "").replace(/_/g, " ");
 
+// Friendly labels for the granular activity-telemetry events (equipping, viewing profiles, searching, …).
+const ACTIVITY_LABEL = {
+    equip: (m) => `🎽 Equipped ${m?.name || "gear"}`,
+    unequip: (m) => `➖ Unequipped ${m?.slot || "gear"}`,
+    buy_gear: (m) => `🛒 Bought ${m?.name || "gear"}`,
+    sell_gear: (m) => `💰 Sold ${m?.name || "gear"}`,
+    buy_cosmetic: (m) => `🎨 Bought cosmetic${m?.name ? ` ${m.name}` : ""}`,
+    buy_badge: (m) => `🎖️ Bought badge${m?.name ? ` ${m.name}` : ""}`,
+    buy_consumable: (m) => `🧪 Bought ${m?.name || "a consumable"}`,
+    use_consumable: (m) => `🧪 Used ${m?.name || "a consumable"}`,
+    open_chest: (m) => `🎁 Opened a ${m?.tier || ""} chest`.replace("  ", " "),
+    trade_propose: () => "🤝 Proposed a trade",
+    trade_accept: () => "🤝 Accepted a trade",
+    view_profile: (m) => `👀 Viewed ${m?.alias ? `@${m.alias}` : m?.name || "a profile"}`,
+    shop_search: (m) => `🔍 Searched the shop${m?.q ? ` “${m.q}”` : ""}`,
+    inspect_item: (m) => `🔎 Inspected ${m?.name || "an item"}`,
+    browse_shop: () => "🛍️ Browsed the shop",
+    view_boss: () => "⚔️ Viewed the boss",
+    view_leaderboard: () => "🏆 Viewed the leaderboard",
+    view_vendor: () => "🏪 Viewed a shop",
+};
+const activityLabel = (event, meta) => (ACTIVITY_LABEL[event] ? ACTIVITY_LABEL[event](meta) : String(event || "").replace(/_/g, " "));
+
 // Full drill-down on ONE member for the admin app: identity, level/gold, boss + engagement stats, their
 // gear (equipped + owned), badges, and recent in-store redemptions.
 export async function GET(request, { params }) {
@@ -54,8 +77,18 @@ export async function GET(request, { params }) {
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
                 db.query(`SELECT reward_label, redeemed_at FROM mkt_item_redemption WHERE buyer_id = $1 ORDER BY redeemed_at DESC LIMIT 12`, [id]).catch(() => []),
-                db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 60`, [id]).catch(() => []),
+                db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 80`, [id]).catch(() => []),
             ]);
+            // Granular activity telemetry, merged with the XP ledger into one detailed timeline.
+            const activityRows = await db.query(`SELECT event, meta, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
+            const history = [
+                ...(historyRows || []).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: r.created_at })),
+                ...(activityRows || []).map((r) => {
+                    let meta = r.meta;
+                    if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = null; } }
+                    return { label: activityLabel(r.event, meta), points: 0, at: r.created_at };
+                }),
+            ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 120);
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));
             const gear = (inv?.items || []).map((i) => ({ name: i.name, rarity: i.rarity, slot: i.slot, equipped: equippedIds.has(i.id) }));
@@ -78,7 +111,7 @@ export async function GET(request, { params }) {
                 gear,
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
-                history: (historyRows || []).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: iso(r.created_at) })),
+                history: history.map((x) => ({ label: x.label, points: x.points, at: iso(x.at) })),
             }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.member.detail.failure" });

@@ -7,6 +7,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
 import { elitePetForRarity } from "@/lib/marketplace/collectibles.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // Equipped item stats merged with any active set-bonus stats (the single source combat + the UI read).
@@ -236,6 +237,7 @@ export async function buyItem(buyerId, itemId) {
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
     await grantItem(buyerId, itemId, "xp_shop");
+    await trackActivity(buyerId, "buy_gear", { itemId, name: item.name, cost });
     return { ok: true, gold: row.gold };
 }
 
@@ -255,6 +257,7 @@ export async function sellItem(buyerId, itemId) {
     await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, itemId]).catch(() => {});
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, value]).catch(() => null);
     await bumpEquipment(buyerId); // a slot may have emptied — re-gear the sprite
+    await trackActivity(buyerId, "sell_gear", { itemId, name: item.name, value });
     return { ok: true, sold: value, gold: row?.gold ?? null };
 }
 
@@ -285,6 +288,7 @@ export async function equipItem(buyerId, slot, itemId) {
         [buyerId, slot, itemId]
     );
     await bumpEquipment(buyerId);
+    await trackActivity(buyerId, "equip", { itemId, name: item.name, slot });
     return getInventory(buyerId);
 }
 
@@ -292,6 +296,7 @@ export async function unequipItem(buyerId, slot) {
     if (!buyerId) throw new Error("Not signed in.");
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND slot = $2`, [buyerId, slot]).catch(() => {});
     await bumpEquipment(buyerId);
+    await trackActivity(buyerId, "unequip", { slot });
     return getInventory(buyerId);
 }
 
