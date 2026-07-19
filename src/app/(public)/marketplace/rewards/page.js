@@ -43,6 +43,8 @@ export default async function RewardsPage() {
                         <Link href="/marketplace/track" className="btn-gold rewards-hero-primary">Your rewards track →</Link>
                         <div className="rewards-hero-secondary">
                             <Link href="/marketplace/boss" className="pill">⚔️ Boss fight</Link>
+                            <Link href="/marketplace/quests" className="pill">📜 Daily quests</Link>
+                            <Link href="/marketplace/bounties" className="pill">🎯 Bounty board</Link>
                             <Link href="/marketplace/badges" className="pill">🎖️ Badges</Link>
                             <Link href="/marketplace/card" className="pill">🎟️ Loyalty card</Link>
                             <Link href="/marketplace/leaderboard" className="pill">🏆 Leaderboard</Link>

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import BossFightClient from "@/components/BossFightClient";
 import QuestsClient from "@/components/QuestsClient";
 import ViewPing from "@/components/ViewPing";
@@ -25,6 +27,10 @@ export default function BossPage() {
                 <BossFightClient />
             </section>
             <QuestsClient />
+            <section className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <span>🎯 <strong>Need a hand from the pack?</strong> Post a bounty — attach gold, get help in the real world.</span>
+                <Link href="/marketplace/bounties" className="btn-gold">Bounty board →</Link>
+            </section>
         </div>
     );
 }
