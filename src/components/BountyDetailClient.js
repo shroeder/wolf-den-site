@@ -49,8 +49,9 @@ export default function BountyDetailClient({ initial, signedIn }) {
         return false;
     }
 
+    const [confirmCancel, setConfirmCancel] = useState(false);
     const claim = () => act(`/api/marketplace/bounties/${bounty.id}/claim`, { action: bounty.viewerClaimed ? "unclaim" : "claim" });
-    const cancel = () => { if (confirm("Take this bounty down? Your reserved gold is refunded.")) act(`/api/marketplace/bounties/${bounty.id}/cancel`); };
+    const cancel = () => act(`/api/marketplace/bounties/${bounty.id}/cancel`);
     const completeSolo = () => act(`/api/marketplace/bounties/${bounty.id}/complete`, {});
     async function completeGroup() {
         if (!winners.size) { setErr("Pick at least one helper."); return; }
@@ -161,7 +162,14 @@ export default function BountyDetailClient({ initial, signedIn }) {
                                     ✓ Complete & pay {participants[0].alias ? `@${participants[0].alias}` : participants[0].name}
                                 </button>
                             )}
-                            <button type="button" className="btn-ghost" onClick={cancel} disabled={busy}>Take it down (refund)</button>
+                            {confirmCancel ? (
+                                <>
+                                    <button type="button" className="btn-ghost" onClick={cancel} disabled={busy}>Yes, refund my gold</button>
+                                    <button type="button" className="btn-ghost" onClick={() => setConfirmCancel(false)} disabled={busy}>Keep it up</button>
+                                </>
+                            ) : (
+                                <button type="button" className="btn-ghost" onClick={() => setConfirmCancel(true)} disabled={busy}>Take it down (refund)</button>
+                            )}
                         </div>
                     )}
                 </section>

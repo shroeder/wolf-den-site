@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { COLLECTIBLES, collectibleById, petPassive, petActive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 
@@ -42,6 +43,13 @@ export default function PetsClient() {
     const ownedSet = useMemo(() => new Set(state?.ownedIds || []), [state]);
     const tradeableSet = useMemo(() => new Set(state?.tradeableIds || []), [state]);
     const [note, setNote] = useState(null);
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+    const [giving, setGiving] = useState(null); // pet being gifted (opens the gift modal)
+    const [recipient, setRecipient] = useState("");
+    const [modalErr, setModalErr] = useState(null);
+    const [sending, setSending] = useState(false);
+    const [celebrate, setCelebrate] = useState(null); // pet to show a receive/unlock celebration for
 
     const ERRORS = {
         not_enough_gold: "Not enough gold.",
@@ -63,8 +71,7 @@ export default function PetsClient() {
         setBusy(null);
         if (r?.ok && d?.ok) {
             if (act === "equip") { setJustEquipped(petId); setTimeout(() => setJustEquipped(null), 900); }
-            if (act === "share") setNote(`🎁 Sent — ${d.to} can accept your pet copy.`);
-            if (act === "accept") { setJustEquipped(d.petId); setTimeout(() => setJustEquipped(null), 900); setNote("🎉 Pet received!"); }
+            if (act === "accept") setCelebrate(collectibleById(d.petId) || null);
             await load();
             return true;
         }
@@ -72,9 +79,27 @@ export default function PetsClient() {
         return false;
     }
 
-    function giveCopy(petId, petName) {
-        const alias = window.prompt(`Give a COPY of ${petName} to a member (enter their @handle).\n\nHeads up: after they accept, both your pet and their copy can never be traded again.`);
-        if (alias && alias.trim()) action(petId, "share", { toAlias: alias.trim() });
+    function openGive(pet) {
+        setGiving(pet);
+        setRecipient("");
+        setModalErr(null);
+    }
+
+    async function sendGift() {
+        const alias = recipient.trim();
+        if (!alias) { setModalErr("Enter a member's @handle."); return; }
+        setSending(true);
+        setModalErr(null);
+        const r = await fetch("/api/marketplace/pets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "share", petId: giving.id, toAlias: alias }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        setSending(false);
+        if (r?.ok && d?.ok) {
+            setGiving(null);
+            setNote(`🎁 Gift sent — ${d.to} can accept your copy of ${giving.name}.`);
+            await load();
+        } else {
+            setModalErr(ERRORS[d?.error] || "Couldn't send that gift.");
+        }
     }
 
     const pets = useMemo(() => {
@@ -170,7 +195,7 @@ export default function PetsClient() {
                                             <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "equip")} disabled={busy === pet.id}>{busy === pet.id ? "…" : "Equip"}</button>
                                         )}
                                         {tradeableSet.has(pet.id) ? (
-                                            <button type="button" className="pet-give" onClick={() => giveCopy(pet.id, pet.name)} disabled={busy === pet.id}>🎁 Give a copy</button>
+                                            <button type="button" className="pet-give" onClick={() => openGive(pet)} disabled={busy === pet.id}>🎁 Give a copy</button>
                                         ) : (
                                             <span className="pet-traded" title="Already traded once — locked">🔒 traded</span>
                                         )}
@@ -195,6 +220,44 @@ export default function PetsClient() {
                     <Link href="/marketplace/quests" className="pill">📜 Quests</Link>
                 </div>
             </section>
+
+            {/* Give-a-copy modal — a proper in-app dialog, not a browser prompt. */}
+            {mounted && giving ? createPortal(
+                <div className="petx-overlay" onClick={() => !sending && setGiving(null)}>
+                    <div className={`petx-modal rarity-${giving.rarity}`} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="petx-close" aria-label="Close" onClick={() => setGiving(null)}>×</button>
+                        <div className="petx-hero">
+                            <span className="petx-hero-glow" />
+                            <span className="petx-hero-icon" style={{ color: giving.color }}>{giving.Icon ? <giving.Icon /> : "🐾"}</span>
+                        </div>
+                        <h2 className="petx-title">Give a copy of {giving.name}</h2>
+                        <p className="petx-sub">Send a copy to another member — <strong>you keep yours</strong>.</p>
+                        <div className="petx-warn">🔒 Once they accept, <strong>both</strong> your pet and their copy can never be traded again.</div>
+                        <label className="petx-label" htmlFor="petx-to">Send to</label>
+                        <input id="petx-to" className="petx-input" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="@handle" autoComplete="off" autoFocus onKeyDown={(e) => e.key === "Enter" && sendGift()} />
+                        {modalErr ? <p className="petx-err">{modalErr}</p> : null}
+                        <div className="petx-actions">
+                            <button type="button" className="btn-ghost" onClick={() => setGiving(null)} disabled={sending}>Cancel</button>
+                            <button type="button" className="btn-gold" onClick={sendGift} disabled={sending || !recipient.trim()}>{sending ? "Sending…" : "🎁 Send gift"}</button>
+                        </div>
+                    </div>
+                </div>, document.body) : null}
+
+            {/* Receive/unlock celebration. */}
+            {mounted && celebrate ? createPortal(
+                <div className="petx-overlay petx-celebrate" onClick={() => setCelebrate(null)}>
+                    <div className={`petx-cele rarity-${celebrate.rarity}`} onClick={(e) => e.stopPropagation()}>
+                        <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
+                        <div className="petx-hero petx-hero-big">
+                            <span className="petx-hero-glow" />
+                            <span className="petx-hero-icon" style={{ color: celebrate.color }}>{celebrate.Icon ? <celebrate.Icon /> : "🐾"}</span>
+                        </div>
+                        <div className="petx-cele-tag">New pet!</div>
+                        <h2 className="petx-title">{celebrate.name}</h2>
+                        <p className="petx-sub">{celebrate.rarity} companion added to your collection.</p>
+                        <button type="button" className="btn-gold" onClick={() => setCelebrate(null)}>Awesome</button>
+                    </div>
+                </div>, document.body) : null}
         </div>
     );
 }

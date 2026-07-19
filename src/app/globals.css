@@ -9652,6 +9652,40 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .pet-give { background: none; border: none; color: #8fb8ff; font-size: 0.68rem; cursor: pointer; padding: 0; margin-top: 2px; }
 .pet-give:hover { text-decoration: underline; }
 .pet-traded { font-size: 0.64rem; color: #6a7078; margin-top: 2px; }
+
+/* Pet gift modal + receive celebration — proper in-app dialogs (no browser prompts). */
+.petx-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(6,7,10,0.72); backdrop-filter: blur(4px); animation: petxFade 0.2s ease; }
+@keyframes petxFade { from { opacity: 0; } to { opacity: 1; } }
+.petx-modal, .petx-cele { position: relative; width: 100%; max-width: 380px; background: linear-gradient(180deg, #1b1e26, #12141a); border: 1px solid #2a2f37; border-radius: 20px; padding: 24px 20px 20px; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.55); animation: petxPop 0.28s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes petxPop { 0% { transform: translateY(12px) scale(0.94); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+.petx-close { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #9a93a6; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.petx-hero { position: relative; width: 108px; height: 108px; margin: 4px auto 12px; display: flex; align-items: center; justify-content: center; }
+.petx-hero-big { width: 132px; height: 132px; }
+.petx-hero-icon { font-size: 4.4rem; position: relative; z-index: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); animation: petxFloat 3s ease-in-out infinite; }
+.petx-hero-big .petx-hero-icon { font-size: 5.6rem; }
+@keyframes petxFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.petx-hero-glow { position: absolute; inset: -12%; border-radius: 50%; background: radial-gradient(circle, var(--glow, #ffd75e) 0%, transparent 68%); opacity: 0.5; animation: petxPulse 2.4s ease-in-out infinite; }
+@keyframes petxPulse { 0%,100% { transform: scale(0.9); opacity: 0.4; } 50% { transform: scale(1.12); opacity: 0.65; } }
+.petx-modal.rarity-common, .petx-cele.rarity-common { --glow: #9aa0a6; }
+.petx-modal.rarity-rare, .petx-cele.rarity-rare { --glow: #4aa3ff; }
+.petx-modal.rarity-epic, .petx-cele.rarity-epic { --glow: #b76bff; }
+.petx-modal.rarity-legendary, .petx-cele.rarity-legendary { --glow: #ffb020; }
+.petx-modal.rarity-mythic, .petx-cele.rarity-mythic { --glow: #33e0a1; }
+.petx-modal.rarity-ascendant, .petx-cele.rarity-ascendant { --glow: #ff7a3c; }
+.petx-modal.rarity-eternal, .petx-cele.rarity-eternal { --glow: #ff5cc8; }
+.petx-title { margin: 4px 0 2px; font-size: 1.25rem; }
+.petx-sub { margin: 0 0 12px; color: #9a93a6; font-size: 0.88rem; }
+.petx-warn { background: rgba(255,215,94,0.1); border: 1px solid rgba(255,215,94,0.35); color: #ffe8a8; border-radius: 12px; padding: 10px 12px; font-size: 0.8rem; margin-bottom: 14px; }
+.petx-label { display: block; text-align: left; font-size: 0.78rem; font-weight: 700; color: #cbd2da; margin-bottom: 4px; }
+.petx-input { width: 100%; padding: 12px 14px; border-radius: 12px; background: #0e1015; border: 1px solid #3a3f47; color: #fff; font-size: 1rem; }
+.petx-input:focus { outline: none; border-color: var(--glow, #ffd75e); }
+.petx-err { color: #ff8a8a; font-size: 0.82rem; margin: 8px 0 0; }
+.petx-actions { display: flex; gap: 10px; margin-top: 16px; }
+.petx-actions button { flex: 1; padding: 12px; }
+.petx-cele-tag { display: inline-block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #0e1015; background: var(--glow, #ffd75e); padding: 3px 12px; border-radius: 999px; margin-bottom: 4px; }
+.petx-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 20px; }
+.petx-confetti span { position: absolute; top: -10%; left: calc((var(--i) + 1) * 6.5%); font-size: 1rem; animation: petxFall 1.6s ease-in forwards; animation-delay: calc(var(--i) * 0.06s); opacity: 0; }
+@keyframes petxFall { 0% { transform: translateY(-20px) rotate(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(320px) rotate(320deg); opacity: 0; } }
 .quest-claim { flex: 0 0 auto; padding: 7px 14px; }
 .quest-check { flex: 0 0 auto; color: #7ad07a; font-size: 1.3rem; font-weight: 900; }
 
