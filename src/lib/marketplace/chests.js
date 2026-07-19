@@ -5,6 +5,7 @@ import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { maybeGrantChestPet } from "@/lib/marketplace/pet-drops.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
@@ -118,6 +119,10 @@ export async function openChest(buyerId, tier) {
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
     await trackActivity(buyerId, "open_chest", { tier });
+
+    // A chance at a companion PET from this chest tier — the standout reveal.
+    const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);
+    if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop };
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
     const cc = CHEST_CONSUMABLES[tier];

@@ -16,6 +16,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
+import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -322,6 +323,8 @@ async function finalizeBossKill(bossId) {
     // XP: everyone who fought earns participation; the damage champion gets a bonus (deduped per boss).
     for (const p of pool) await awardXp(p.id, "boss_participated", { dedupeKey: `boss_participated:${bossId}:${p.id}` }).catch(() => {});
     if (top1) await awardXp(top1.id, "boss_won", { dedupeKey: `boss_won:${bossId}` }).catch(() => {});
+    // The damage champion has a strong chance at a rare boss-only pet companion.
+    if (top1) await maybeGrantBossPet(top1.id).catch(() => {});
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
 
     // IN-GAME CHASE GEAR + a drop-only badge → the #1 damage dealer (their skill reward).

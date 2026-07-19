@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { itemIcon } from "@/lib/marketplace/items.js";
+import { collectibleById } from "@/lib/marketplace/collectibles";
 import ChestIcon from "@/components/ChestIcon";
 
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
@@ -15,6 +16,7 @@ const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "etern
 
 function rarityOf(reveal) {
     if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
+    if (reveal?.pet) return reveal.pet.rarity || "rare";
     return reveal?.item?.rarity || reveal?.rarity || "common";
 }
 
@@ -123,7 +125,9 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     const big = BIG_RARITIES.has(rarity);
     const isItem = Boolean(reveal?.item);
     const isConsumable = Boolean(reveal?.consumable);
+    const isPet = Boolean(reveal?.pet);
     const Icon = isItem ? itemIcon(reveal.item.icon) : null;
+    const PetIcon = isPet ? collectibleById(reveal.pet.id)?.Icon : null;
 
     const particles = useMemo(() => {
         const n = PARTICLE_COUNT[rarity] || 16;
@@ -158,8 +162,14 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     ))}
                 </div>
                 <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
-                    <span className="chest-rarity-tag">{isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : (RARITY_LABEL[rarity] || rarity)}</span>
-                    {isItem ? (
+                    <span className="chest-rarity-tag">{isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
+                    {isPet ? (
+                        <>
+                            <span className="chest-reward-glyph" style={{ color: reveal.pet.color }}>{PetIcon ? <PetIcon aria-hidden="true" /> : "🐾"}</span>
+                            <div className="chest-reward-name">{reveal.pet.name}</div>
+                            <div className="chest-reward-sub muted">New pet companion!{reveal.pet.hint ? ` ${reveal.pet.hint}` : ""}</div>
+                        </>
+                    ) : isItem ? (
                         <>
                             <span className="chest-reward-glyph"><Icon aria-hidden="true" /></span>
                             <div className="chest-reward-name">{reveal.item.name}</div>
