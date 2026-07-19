@@ -40,19 +40,41 @@ export default function PetsClient() {
     useEffect(() => { load(); }, []);
 
     const ownedSet = useMemo(() => new Set(state?.ownedIds || []), [state]);
+    const tradeableSet = useMemo(() => new Set(state?.tradeableIds || []), [state]);
+    const [note, setNote] = useState(null);
 
-    async function action(petId, act) {
-        setBusy(petId);
+    const ERRORS = {
+        not_enough_gold: "Not enough gold.",
+        already_owned: "You already own that pet.",
+        not_owned: "You don't own that pet yet.",
+        not_tradeable: "That pet has already been traded once — it can't be traded again.",
+        recipient_not_found: "No member with that @handle.",
+        cannot_share_self: "You can't give a pet to yourself.",
+        already_pending: "You've already offered this pet to them.",
+        not_pending: "That gift is no longer available.",
+    };
+
+    async function action(petId, act, extra) {
+        setBusy(petId || act);
         setErr(null);
-        const r = await fetch("/api/marketplace/pets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: act, petId }) }).catch(() => null);
+        setNote(null);
+        const r = await fetch("/api/marketplace/pets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: act, petId, ...extra }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
         setBusy(null);
         if (r?.ok && d?.ok) {
             if (act === "equip") { setJustEquipped(petId); setTimeout(() => setJustEquipped(null), 900); }
+            if (act === "share") setNote(`🎁 Sent — ${d.to} can accept your pet copy.`);
+            if (act === "accept") { setJustEquipped(d.petId); setTimeout(() => setJustEquipped(null), 900); setNote("🎉 Pet received!"); }
             await load();
-        } else {
-            setErr({ not_enough_gold: "Not enough gold.", already_owned: "You already own that pet.", not_owned: "You don't own that pet yet." }[d?.error] || "Something went wrong.");
+            return true;
         }
+        setErr(ERRORS[d?.error] || "Something went wrong.");
+        return false;
+    }
+
+    function giveCopy(petId, petName) {
+        const alias = window.prompt(`Give a COPY of ${petName} to a member (enter their @handle).\n\nHeads up: after they accept, both your pet and their copy can never be traded again.`);
+        if (alias && alias.trim()) action(petId, "share", { toAlias: alias.trim() });
     }
 
     const pets = useMemo(() => {
@@ -93,6 +115,23 @@ export default function PetsClient() {
                 ) : null}
             </section>
 
+            {state?.incoming?.length ? (
+                <section className="card" style={{ borderColor: "#ffd75e" }}>
+                    <h3 style={{ marginTop: 0 }}>🎁 Pet gifts for you</h3>
+                    <div className="stack" style={{ gap: 8 }}>
+                        {state.incoming.map((g) => (
+                            <div key={g.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                                <span><strong>{g.from}</strong> wants to give you <strong>{g.petName}</strong>.</span>
+                                <span style={{ display: "flex", gap: 8 }}>
+                                    <button type="button" className="btn-gold pet-btn" onClick={() => action(null, "accept", { shareId: g.id })} disabled={busy === "accept"}>Accept</button>
+                                    <button type="button" className="btn-ghost pet-btn" onClick={() => action(null, "decline", { shareId: g.id })} disabled={busy === "accept"}>Decline</button>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
+
             <div className="bounty-filters">
                 {SOURCES.map((s) => (
                     <button type="button" key={s.id} className={`pill${filter === s.id ? " is-active" : ""}`} onClick={() => setFilter(s.id)}>{s.label}</button>
@@ -100,6 +139,7 @@ export default function PetsClient() {
             </div>
 
             {err ? <p style={{ color: "#e66" }}>{err}</p> : null}
+            {note ? <p style={{ color: "#7ad07a" }}>{note}</p> : null}
 
             {!state ? (
                 <section className="card"><p className="muted" style={{ margin: 0 }}>Loading pets…</p></section>
@@ -123,11 +163,18 @@ export default function PetsClient() {
                                     <span title="Stronger buff while this pet is equipped">Equip: +{active.value}% {statText(active)}</span>
                                 </div>
                                 {owned ? (
-                                    isFeatured ? (
-                                        <button type="button" className="btn-ghost pet-btn" onClick={() => action(pet.id, "unequip")} disabled={busy === pet.id}>Unequip</button>
-                                    ) : (
-                                        <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "equip")} disabled={busy === pet.id}>{busy === pet.id ? "…" : "Equip"}</button>
-                                    )
+                                    <>
+                                        {isFeatured ? (
+                                            <button type="button" className="btn-ghost pet-btn" onClick={() => action(pet.id, "unequip")} disabled={busy === pet.id}>Unequip</button>
+                                        ) : (
+                                            <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "equip")} disabled={busy === pet.id}>{busy === pet.id ? "…" : "Equip"}</button>
+                                        )}
+                                        {tradeableSet.has(pet.id) ? (
+                                            <button type="button" className="pet-give" onClick={() => giveCopy(pet.id, pet.name)} disabled={busy === pet.id}>🎁 Give a copy</button>
+                                        ) : (
+                                            <span className="pet-traded" title="Already traded once — locked">🔒 traded</span>
+                                        )}
+                                    </>
                                 ) : pet.source === "shop" ? (
                                     <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "buy")} disabled={!canBuy || busy === pet.id}>
                                         {busy === pet.id ? "…" : `Buy · 🪙 ${petPrice(pet).toLocaleString()}`}

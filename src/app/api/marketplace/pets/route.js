@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { petsState, equipPet, unequipPet, buyPet } from "@/lib/marketplace/pets.js";
+import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare } from "@/lib/marketplace/pets.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/pets", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
-            const state = await petsState(buyer?.id || null);
+            const state = await petsState(buyer?.id || null, { sync: true });
             return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.pets.state.failure" });
@@ -30,6 +30,9 @@ export async function POST(request) {
             let res;
             if (b?.action === "unequip") res = await unequipPet(buyer.id);
             else if (b?.action === "buy") res = await buyPet(buyer.id, String(b?.petId || ""));
+            else if (b?.action === "share") res = await sharePet(buyer.id, String(b?.petId || ""), String(b?.toAlias || ""));
+            else if (b?.action === "accept") res = await acceptShare(String(b?.shareId || ""), buyer.id);
+            else if (b?.action === "decline") res = await declineShare(String(b?.shareId || ""), buyer.id);
             else res = await equipPet(buyer.id, String(b?.petId || ""));
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });

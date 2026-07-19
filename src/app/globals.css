@@ -9649,6 +9649,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .pet-featured-badge { position: absolute; top: 6px; right: 6px; font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
 .pet-card.just-equipped { animation: petPop 0.5s ease; }
 @keyframes petPop { 0% { transform: scale(1); } 40% { transform: scale(1.09); } 100% { transform: scale(1); } }
+.pet-give { background: none; border: none; color: #8fb8ff; font-size: 0.68rem; cursor: pointer; padding: 0; margin-top: 2px; }
+.pet-give:hover { text-decoration: underline; }
+.pet-traded { font-size: 0.64rem; color: #6a7078; margin-top: 2px; }
 .quest-claim { flex: 0 0 auto; padding: 7px 14px; }
 .quest-check { flex: 0 0 auto; color: #7ad07a; font-size: 1.3rem; font-weight: 900; }
 

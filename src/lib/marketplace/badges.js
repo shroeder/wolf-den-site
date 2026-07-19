@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById } from "@/lib/marketplace/items.js";
+import { COLLECTIBLES, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
@@ -73,7 +74,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -110,6 +111,8 @@ export async function getMemberMetrics(buyerId) {
         // Bounty board: bounties posted + bounties fulfilled (won) — drive the bounty badges.
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_bounty WHERE creator_id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_bounty_claim WHERE buyer_id = $1 AND is_winner = TRUE`, [buyerId]).catch(() => null),
+        // Explicitly-granted pets (shop/chest/boss/achievement/elite/trade) — level pets are added below.
+        db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
     ]);
 
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
@@ -129,6 +132,9 @@ export async function getMemberMetrics(buyerId) {
 
     const tenureDays = buyer?.created_at ? Math.floor((Date.now() - new Date(buyer.created_at).getTime()) / 86400000) : 0;
     const levelObj = levelForXp(xp);
+    // Pets owned = level-unlocked + explicitly-granted.
+    const grantedPets = new Set((grantedPetRows || []).map((r) => r.ref));
+    const petsOwned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, levelObj.level, { owned: grantedPets })).length;
 
     return {
         xp,
@@ -159,6 +165,7 @@ export async function getMemberMetrics(buyerId) {
         eternalItems,
         bountiesPosted: bountyPostRow?.n || 0,
         bountiesWon: bountyWinRow?.n || 0,
+        petsOwned,
     };
 }
 
@@ -192,6 +199,7 @@ export function progressForRule(rule, threshold, m) {
         case "eternal_items": return { current: m.eternalItems, target: t };
         case "bounties_posted": return { current: m.bountiesPosted, target: t };
         case "bounties_won": return { current: m.bountiesWon, target: t };
+        case "pets_owned": return { current: m.petsOwned, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }
