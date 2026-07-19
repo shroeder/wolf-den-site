@@ -9408,6 +9408,35 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .rar-epic { --rar: #a855f7; }
 .rar-legendary { --rar: #f5a623; }
 .rar-mythic { --rar: #5affaf; }
+.rar-ascendant { --rar: #ff7a3c; }
+.rar-eternal { --rar: #ff5cc8; }
+
+/* ===== ELITE TIERS — over-the-top so an Ascendant/Eternal drop feels earth-shattering ===== */
+/* Gear cards / slots blaze harder than mythic; Eternal cycles a prismatic aura. */
+.equip-card.rar-ascendant, .equip-slot.filled.rar-ascendant { animation: rar-pulse 2s ease-in-out infinite; box-shadow: 0 0 16px -2px #ff7a3c, inset 0 0 12px -4px #ff7a3c; border-color: #ff7a3c !important; }
+.equip-card.rar-eternal, .equip-slot.filled.rar-eternal { animation: rar-eternal 2.6s linear infinite; border-color: #ff5cc8 !important; }
+@keyframes rar-eternal {
+    0%   { box-shadow: 0 0 16px -1px #ff5cc8, inset 0 0 12px -4px #ff5cc8; }
+    33%  { box-shadow: 0 0 20px 0 #8b6cff, inset 0 0 14px -3px #8b6cff; }
+    66%  { box-shadow: 0 0 20px 0 #4ad6ff, inset 0 0 14px -3px #4ad6ff; }
+    100% { box-shadow: 0 0 16px -1px #ff5cc8, inset 0 0 12px -4px #ff5cc8; }
+}
+/* Chest reveal: elite rewards get a monster halo; Eternal shifts through the prism + shimmers its name. */
+.chest-reward.rar-ascendant { filter: drop-shadow(0 0 20px rgba(255, 122, 60, 0.75)); }
+.chest-reward.rar-ascendant .chest-reward-glyph { animation: elite-throb 1.6s ease-in-out infinite; }
+.chest-reward.rar-eternal { animation: chest-eternal 2.6s linear infinite; }
+.chest-reward.rar-eternal .chest-reward-name { background: linear-gradient(90deg, #ff5cc8, #8b6cff, #4ad6ff, #ff5cc8); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: elite-prism 3s linear infinite; }
+@keyframes chest-eternal {
+    0%, 100% { filter: drop-shadow(0 0 24px rgba(255, 92, 200, 0.85)); }
+    33%      { filter: drop-shadow(0 0 30px rgba(139, 108, 255, 0.9)); }
+    66%      { filter: drop-shadow(0 0 30px rgba(74, 214, 255, 0.9)); }
+}
+@keyframes elite-prism { to { background-position: 300% 0; } }
+@keyframes elite-throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) {
+    .equip-card.rar-ascendant, .equip-slot.filled.rar-ascendant, .equip-card.rar-eternal, .equip-slot.filled.rar-eternal,
+    .chest-reward.rar-eternal, .chest-reward.rar-ascendant .chest-reward-glyph, .chest-reward.rar-eternal .chest-reward-name { animation: none; }
+}
 
 .equip { display: flex; flex-direction: column; gap: 14px; }
 

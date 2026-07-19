@@ -134,6 +134,13 @@ export async function sendBossDefeatedEmail(email, { bossName, winnerLabel = "",
     const resend = getResendClient();
     const hi = name ? `Hey ${name},` : "Hey there,";
     const bossUrl = `${baseUrl()}/marketplace/boss`;
+    // Physical-prize terms — shown to the winner so expectations are clear (no shipping, held 1 week).
+    const prizeDisclaimer = prizeName
+        ? `<p style="font-size:12px;line-height:1.5;color:#8a8a8a;border-top:1px solid #eee;margin-top:16px;padding-top:12px;">
+               <strong>Prize terms:</strong> this is a <strong>physical, in-store prize only</strong> — it has no cash value and cannot be shipped.
+               We'll hold it at the counter for you for <strong>1 week (7 days)</strong> from today; if it isn't picked up by then, the prize is forfeited.
+               Bring your account so we can verify the win. 🐺</p>`
+        : "";
     const prizeBlock = prizeName
         ? `<div style="text-align:center;padding:18px;margin:14px 0;border:1px solid #e6c76b;border-radius:14px;background:#fff8e6;">
                ${prizeImageUrl ? `<img src="${prizeImageUrl}" alt="${prizeName}" style="max-width:120px;max-height:120px;object-fit:contain;" />` : ""}
@@ -149,7 +156,7 @@ export async function sendBossDefeatedEmail(email, { bossName, winnerLabel = "",
             <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;">
                 <p>${hi}</p>
                 ${isWinner
-                    ? `<p><strong>Congratulations — you won the raffle!</strong> The pack took down <strong>${bossName}</strong> and your ticket was drawn.</p>${prizeBlock}<p>Come by The Wolf Den to claim your prize. 🐺</p>`
+                    ? `<p><strong>Congratulations — you won the raffle!</strong> The pack took down <strong>${bossName}</strong> and your ticket was drawn.</p>${prizeBlock}<p>Come by The Wolf Den to claim your prize. 🐺</p>${prizeDisclaimer}`
                     : `<p>The whole pack just brought down <strong>${bossName}</strong>! ${winnerLabel ? `The raffle winner is <strong>${winnerLabel}</strong>.` : ""}</p>${prizeBlock}<p>Thanks for fighting — everyone who took part earned XP.</p>`}
                 <p><a href="${bossUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">See the final battle stats →</a></p>
             </div>

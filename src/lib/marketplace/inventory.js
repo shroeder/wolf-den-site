@@ -96,24 +96,29 @@ function gearPhraseFromSlots(bySlot) {
     const parts = [];
     const weapon = items.find((x) => x.slot === "main_hand");
     const off = items.find((x) => x.slot === "off_hand");
-    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots", "back"].includes(x.slot)).map((x) => gearDesc(x.def));
+    const back = items.find((x) => x.slot === "back");
+    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots"].includes(x.slot)).map((x) => gearDesc(x.def));
     const acc = items.filter((x) => ["ring1", "ring2", "amulet"].includes(x.slot)).map((x) => gearDesc(x.def));
     if (weapon) parts.push(`wielding a ${gearDesc(weapon.def)}`);
     if (off) parts.push(`carrying a ${gearDesc(off.def)}`);
     if (armor.length) parts.push(`wearing ${armor.join(", ")}`);
+    if (back) parts.push(`a ${gearDesc(back.def)} flowing dramatically from their back`);
     if (acc.length) parts.push(`adorned with ${acc.join(", ")}`);
     const rank = { legendary: 1, mythic: 2, ascendant: 3, eternal: 4 };
     const best = items.reduce((b, x) => (rank[x.def.rarity] > (rank[b] || 0) ? x.def.rarity : b), null);
     const aura = best === "eternal"
-        ? " This is a godlike, eternal champion — their gear blazes with impossible prismatic light and reality bends around them."
+        ? " This is a GODLIKE, eternal champion — their gear blazes with impossible prismatic rainbow light, radiant energy pours off them, and reality bends and warps around their silhouette."
         : best === "ascendant"
-        ? " This is an ascendant hero — their gear is wreathed in molten, transcendent light."
+        ? " This is an ASCENDANT hero — their gear is wreathed in molten orange-gold light and transcendent fire, clearly beyond legendary."
         : best === "mythic"
-        ? " This is a legendary champion — their gear radiates a brilliant magical aura and glowing energy."
+        ? " This is a legendary champion — their gear radiates a brilliant teal magical aura and glowing energy."
         : best === "legendary"
-        ? " Their finest pieces glow with power."
+        ? " Their finest pieces glow with golden power."
         : "";
-    return parts.length ? `The hero is ${parts.join(", ")} — draw this equipment clearly as worn armor and held weapons.${aura}` : "";
+    // Powers: signature / charged (elite) gear visibly crackles with magical energy, so the art reads "strong".
+    const powered = items.some((x) => signatureFor(x.def.id) || x.def.charged);
+    const powerClause = powered ? " Their most powerful pieces crackle with visible arcane energy — glowing runes, sparks, and magical light trailing off the gear." : "";
+    return parts.length ? `The hero is ${parts.join(", ")} — draw every piece of equipment clearly as worn armor, a flowing cape, and held weapons, matching each item's rarity and power.${aura}${powerClause}` : "";
 }
 
 export async function getEquippedGearPhrase(buyerId) {
