@@ -17,7 +17,7 @@ import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
-import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
+import { getPetCombatBonus, getPackPetMultipliers } from "@/lib/marketplace/pet-combat.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -42,19 +42,23 @@ function manualHit(level, stats = {}, { forceCrit = false } = {}) {
 const autoPerHour = (level, stats = {}) => Math.round((250 + level * 50) * (1 + (stats.ferocity || 0) / 100));
 
 // Expected damage a single member deals PER DAY at a given level: guaranteed passive auto-attacks 24/7
-// plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375).
-function memberDailyDamage(level) {
+// plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375). petMult inflates
+// the MANUAL portion by the member's pet power so boss HP is sized with pets in mind.
+function memberDailyDamage(level, petMult = 1) {
     const autoDaily = autoPerHour(level) * 24;
-    const manualExpected = (120 + level * 15) * 1.375;
+    const manualExpected = (120 + level * 15) * 1.375 * petMult;
     return autoDaily + manualExpected;
 }
 
-// Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level-scaled damage.
+// Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level- AND pet-scaled damage.
 // Assumes everyone lands their daily strike (upper bound), so real fights tend to run a touch longer.
-// Used at create time so HP scales with member count + levels instead of a fixed guess. { hp, members }.
+// Used at create time so HP scales with member count + levels + pets instead of a fixed guess. { hp, members }.
 export async function projectBossHp({ targetDays = 7 } = {}) {
-    const members = await db.query(`SELECT COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
-    const daily = members.reduce((sum, m) => sum + memberDailyDamage(lvl(m.xp)), 0);
+    const [members, petMults] = await Promise.all([
+        db.query(`SELECT id, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []),
+        getPackPetMultipliers().catch(() => new Map()),
+    ]);
+    const daily = members.reduce((sum, m) => sum + memberDailyDamage(lvl(m.xp), petMults.get(m.id) || 1), 0);
     // Round to a clean-ish number and floor it so a tiny/empty pack still faces a real boss.
     const raw = Math.max(8000, Math.round(daily * Math.max(1, targetDays)));
     const hp = Math.round(raw / 500) * 500;
