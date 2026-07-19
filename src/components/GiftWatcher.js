@@ -6,6 +6,9 @@ import Link from "next/link";
 // Rarity glow colors (match the chest reveal), so a mythic gift pops harder than a common one.
 const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0" };
 
+// CTA wording per gift kind — you open a chest, spend gold, equip gear, view a boss result.
+const CTA_LABEL = { chest: "Open it →", gold: "Spend it →", item: "Equip it →", boss: "See it →" };
+
 // Pops up gifts an admin sent (item / chest / gold) the next time the member opens the site. Reliable and
 // permission-free — the reward is recorded server-side, so this never depends on browser push being on.
 // Reuses the level-up overlay styling. Shows one at a time, marks each seen so it never replays.
@@ -66,7 +69,7 @@ export default function GiftWatcher() {
                 <div className="levelup-title">{current.title}</div>
                 <div className="levelup-sub">{current.body}</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16, flexWrap: "wrap" }}>
-                    <Link href={current.url || "/marketplace/inventory"} className="button gold" onClick={dismiss}>Open it →</Link>
+                    <Link href={current.url || "/marketplace/inventory"} className="button gold" onClick={dismiss}>{CTA_LABEL[current.kind] || "Open it →"}</Link>
                     <button type="button" className="pill" onClick={dismiss}>Later</button>
                 </div>
             </div>
