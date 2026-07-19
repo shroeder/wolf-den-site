@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { createBounty, listBounties } from "@/lib/marketplace/bounties.js";
+import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,7 +20,13 @@ export async function GET(request) {
                 mine: searchParams.get("mine") === "1",
                 buyerId: buyer?.id || null,
             });
-            return NextResponse.json({ bounties, gold: buyer?.gold ?? null }, { headers: { "Cache-Control": "no-store" } });
+            // getAuthenticatedBuyer() doesn't carry gold — read the live balance.
+            let gold = null;
+            if (buyer) {
+                const g = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);
+                gold = g?.gold ?? 0;
+            }
+            return NextResponse.json({ bounties, gold }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.bounties.list.failure" });
         }

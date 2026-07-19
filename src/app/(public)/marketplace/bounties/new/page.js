@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import BountyComposer from "@/components/BountyComposer";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,11 @@ export default async function NewBountyPage() {
             </div>
         );
     }
+    // getAuthenticatedBuyer() doesn't carry gold — read the live balance so the composer's check is correct.
+    const row = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);
     return (
         <div className="stack reveal">
-            <BountyComposer gold={buyer.gold ?? 0} />
+            <BountyComposer gold={row?.gold ?? 0} />
         </div>
     );
 }
