@@ -21,17 +21,14 @@ export default async function MarketplaceMessagesPage({ searchParams }) {
             : "/marketplace/messages";
         return <MarketplaceLoginClient redirectTo={redirectTo} />;
     }
-    // App Links open the marketplace app for this URL; this page is only the browser fallback (no app).
-    // If this specific thread is the user's VENDOR side (a buyer contacted their shop), send them to
-    // the portal Inbox. Buyer-side conversations (them contacting another shop) stay here.
+    // Messaging is unified: buyer<->vendor conversations now use the same first-class DM chat as friend
+    // DMs. Route this thread to the right surface — the buyer side into the good DM UI, the vendor's own
+    // side to the seller portal Inbox. The bare list (no ?thread) stays here as a legacy fallback.
     if (thread) {
         const vendorId = await getAccountLinkedVendorId(buyer.id);
-        if (vendorId) {
-            const side = await threadParticipantSide(thread, { buyerId: buyer.id, vendorId });
-            if (side === "vendor") {
-                redirect("/marketplace/portal?tab=messages");
-            }
-        }
+        const part = await threadParticipantSide(thread, { buyerId: buyer.id, vendorId: vendorId || null });
+        if (part?.side === "vendor") redirect("/marketplace/portal?tab=messages");
+        if (part?.side === "buyer") redirect(`/marketplace/dm/${thread}`);
     }
     return <MarketplaceMessagesClient buyerName={buyer.displayName} />;
 }

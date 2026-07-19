@@ -46,7 +46,7 @@ export async function GET() {
                     preview: t.lastPreview,
                     at: t.lastMessageAt,
                     unread: t.unread,
-                    href: `/marketplace/messages?thread=${t.id}`,
+                    href: `/marketplace/dm/${t.id}`,
                     tag: "Shop",
                 })),
                 ...vendorThreads.map((t) => ({

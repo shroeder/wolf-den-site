@@ -36,7 +36,7 @@ export async function getOrCreateDmThread(userId, otherId) {
 
 export async function postDmMessage(threadId, senderId, body, catalogProductId = null) {
     const t = await db
-        .queryOne(`SELECT user_a, user_b, last_message_at, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1 AND vendor_id IS NULL`, [threadId])
+        .queryOne(`SELECT user_a, user_b, last_message_at, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId])
         .catch(() => null);
     if (!t || (t.user_a !== senderId && t.user_b !== senderId)) return { error: "forbidden" };
     const text = String(body || "").trim().slice(0, 4000);
@@ -98,15 +98,24 @@ export async function listDmThreads(userId) {
 // Load a DM thread the user is in, its messages, reactions, presence + typing of the other person,
 // and mark it read. Powers the first-class conversation view.
 export async function getDmThread(threadId, userId) {
-    const t = await db.queryOne(`SELECT id, user_a, user_b, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1 AND vendor_id IS NULL`, [threadId]).catch(() => null);
+    const t = await db.queryOne(`SELECT id, user_a, user_b, vendor_id, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
     if (!t || (t.user_a !== userId && t.user_b !== userId)) return null;
     const otherId = t.user_a === userId ? t.user_b : t.user_a;
     const otherLastReadAt = t.user_a === otherId ? t.a_last_read_at : t.b_last_read_at;
     const otherRow = await db
         .queryOne(`SELECT id, alias, first_name, last_name, display_name, avatar_url, xp, equipped_border, last_seen_at FROM mkt_buyer WHERE id = $1`, [otherId])
         .catch(() => null);
-    const other = mapUser(otherRow);
-    const otherOnline = otherRow?.last_seen_at ? Date.now() - new Date(otherRow.last_seen_at).getTime() < 2 * 60 * 1000 : false;
+    let other = mapUser(otherRow);
+    let otherOnline = otherRow?.last_seen_at ? Date.now() - new Date(otherRow.last_seen_at).getTime() < 2 * 60 * 1000 : false;
+    // Vendor thread: when the viewer is the BUYER side, show the counterpart as the SHOP (name, logo, link
+    // to its storefront) instead of the owner's personal account. The vendor's own side sees the buyer.
+    if (t.vendor_id) {
+        const v = await db.queryOne(`SELECT id, account_id, display_name, logo_url FROM mkt_vendor WHERE id = $1`, [t.vendor_id]).catch(() => null);
+        if (v && v.account_id !== userId) {
+            other = { id: null, alias: null, displayLabel: v.display_name || "Shop", avatarUrl: v.logo_url || null, level: null, vendorId: v.id, isShop: true };
+            otherOnline = false;
+        }
+    }
 
     const typingRow = await db.queryOne(`SELECT updated_at FROM mkt_dm_typing WHERE thread_id = $1 AND buyer_id = $2`, [threadId, otherId]).catch(() => null);
     const otherTyping = typingRow?.updated_at ? Date.now() - new Date(typingRow.updated_at).getTime() < 6000 : false;
@@ -157,7 +166,7 @@ export async function getDmThread(threadId, userId) {
 
 // Verify the user is a participant of the thread. Returns the thread row or null.
 async function threadForUser(threadId, userId) {
-    const t = await db.queryOne(`SELECT user_a, user_b FROM mkt_dm_thread WHERE id = $1 AND vendor_id IS NULL`, [threadId]).catch(() => null);
+    const t = await db.queryOne(`SELECT user_a, user_b FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null);
     if (!t || (t.user_a !== userId && t.user_b !== userId)) return null;
     return t;
 }

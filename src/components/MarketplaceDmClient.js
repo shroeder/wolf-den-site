@@ -98,7 +98,7 @@ export default function MarketplaceDmClient({ threadId }) {
             <section className="card dm-topbar">
                 <Link href="/marketplace/inbox" className="dm-back" aria-label="Back to inbox">‹</Link>
                 {c ? (
-                    <Link href={c.alias ? `/marketplace/u/${c.alias}` : "#"} className="dm-peer">
+                    <Link href={c.vendorId ? `/marketplace/vendor/${c.vendorId}` : c.alias ? `/marketplace/u/${c.alias}` : "#"} className="dm-peer">
                         <span className={`dm-peer-av ${borderClass(c.border)}`.trim()}>
                             {c.avatarUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -110,7 +110,7 @@ export default function MarketplaceDmClient({ threadId }) {
                         <span className="dm-peer-meta">
                             <strong>{c.displayLabel}</strong>
                             <span className="dm-peer-status muted">
-                                {thread.otherTyping ? "typing…" : thread.otherOnline ? <><span className="dm-online-dot" /> Online</> : c.alias ? `@${c.alias}` : "Offline"}
+                                {c.isShop ? "🏪 Shop" : thread.otherTyping ? "typing…" : thread.otherOnline ? <><span className="dm-online-dot" /> Online</> : c.alias ? `@${c.alias}` : "Offline"}
                             </span>
                         </span>
                     </Link>
