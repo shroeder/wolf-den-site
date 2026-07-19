@@ -332,6 +332,40 @@ export const ITEMS = [
     { id: "premium_signet", name: "Premium Signet", slot: "ring", rarity: "legendary", icon: "GiFireRing", flavor: "For the discerning collector.", stats: { might: 8, fortune: 8 }, reqLevel: 35, source: "admin", charged: true, charges: 1, cooldownDays: 60, chargeReward: "free_pack_25", chargeRewardLabel: REWARDS.free_pack_25, sort: 511 },
     { id: "patrons_crown", name: "Patron's Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "The house bows to you.", stats: { might: 8, fortune: 8 }, reqLevel: 40, source: "admin", charged: true, charges: 1, cooldownDays: 90, chargeReward: "discount_15_over_150", chargeRewardLabel: REWARDS.discount_15_over_150, sort: 512 },
     { id: "founders_ring", name: "Founder's Ring", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "First among the pack.", stats: { might: 8, crit_chance: 8 }, reqLevel: 40, source: "admin", charged: true, charges: 2, cooldownDays: 60, chargeReward: "buy2get1_singles", chargeRewardLabel: REWARDS.buy2get1_singles, sort: 513 },
+
+    // ===== GOLD SHOP GEAR (source: "xp_shop") — buyable with gold across the full price ladder, a real
+    // gold sink. Budget-neutral stats (no power creep); the top tier carries a signature for prestige. =====
+    // -- Low end (250–800 gold) --
+    { id: "gs_bronze_buckler", name: "Bronze Buckler", slot: "off_hand", rarity: "common", icon: "GiRoundShield", flavor: "A first line of defense.", stats: { ferocity: 10 }, reqLevel: 4, source: "xp_shop", xpCost: 250, sort: 600 },
+    { id: "gs_swift_ring", name: "Swift Ring", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "A quick little band.", stats: { might: 10 }, reqLevel: 5, source: "xp_shop", xpCost: 350, sort: 601 },
+    { id: "gs_traveler_cloak", name: "Traveler's Cloak", slot: "chest", rarity: "common", icon: "GiCape", flavor: "Road-worn and warm.", stats: { ferocity: 10 }, reqLevel: 5, source: "xp_shop", xpCost: 400, sort: 602 },
+    { id: "gs_apprentice_wand", name: "Apprentice Wand", slot: "main_hand", rarity: "rare", icon: "GiCrystalWand", flavor: "Every mage starts here.", stats: { might: 11, crit_chance: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 550, sort: 603 },
+    { id: "gs_lucky_coin", name: "Lucky Coin Amulet", slot: "amulet", rarity: "rare", icon: "GiGems", flavor: "Heads, you win.", stats: { fortune: 16 }, reqLevel: 10, source: "xp_shop", xpCost: 800, sort: 604 },
+    // -- Medium (1,500–4,000 gold) --
+    { id: "gs_battlemage_staff", name: "Battlemage Staff", slot: "main_hand", rarity: "epic", icon: "GiWizardStaff", flavor: "Bonk and blast.", stats: { might: 12, fortune: 10 }, reqLevel: 20, source: "xp_shop", xpCost: 2800, sort: 610 },
+    { id: "gs_guardian_shield", name: "Guardian Shield", slot: "off_hand", rarity: "epic", icon: "GiCrossShield", flavor: "Hold fast.", stats: { might: 9, ferocity: 13 }, reqLevel: 22, source: "xp_shop", xpCost: 2400, sort: 611 },
+    { id: "gs_valor_crown", name: "Crown of Valor", slot: "helmet", rarity: "epic", icon: "GiCrestedHelmet", flavor: "Lead by example.", stats: { might: 15, crit_chance: 7 }, reqLevel: 24, source: "xp_shop", xpCost: 3000, sort: 612 },
+    { id: "gs_battle_plate", name: "Battle Plate", slot: "chest", rarity: "epic", icon: "GiMetalPlate", flavor: "A wall you can wear.", stats: { might: 9, ferocity: 13 }, reqLevel: 26, source: "xp_shop", xpCost: 3200, sort: 613 },
+    { id: "gs_fortune_amulet", name: "Fortune's Amulet", slot: "amulet", rarity: "epic", icon: "GiEmeraldNecklace", flavor: "Luck, worn proudly.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 22, source: "xp_shop", xpCost: 2600, sort: 614 },
+    { id: "gs_power_band", name: "Power Band", slot: "ring", rarity: "epic", icon: "GiSkullRing", flavor: "Raw force on your finger.", stats: { might: 22 }, reqLevel: 28, source: "xp_shop", xpCost: 3500, sort: 615 },
+    // -- High (10,000–18,000 gold) --
+    { id: "gs_runeblade", name: "Runeblade", slot: "main_hand", rarity: "legendary", icon: "GiRuneSword", flavor: "Etched to bite deeper.", stats: { might: 16, crit_power: 14 }, reqLevel: 40, source: "xp_shop", xpCost: 12000, sort: 620 },
+    { id: "gs_aegis", name: "Aegis of the Pack", slot: "off_hand", rarity: "legendary", icon: "GiCrossShield", flavor: "Nothing gets through.", stats: { might: 9, ferocity: 21 }, reqLevel: 42, source: "xp_shop", xpCost: 11000, sort: 621 },
+    { id: "gs_warlord_crown", name: "Warlord's Crown", slot: "helmet", rarity: "legendary", icon: "GiCrown", flavor: "Rule the arena.", stats: { might: 12, fortune: 18 }, reqLevel: 46, source: "xp_shop", xpCost: 14000, sort: 622 },
+    { id: "gs_dragonhide", name: "Dragonhide Armor", slot: "chest", rarity: "legendary", icon: "GiSpikedArmor", flavor: "Scaled and unburnt.", stats: { might: 10, ferocity: 20 }, reqLevel: 50, source: "xp_shop", xpCost: 15000, sort: 623 },
+    { id: "gs_champion_amulet", name: "Champion's Amulet", slot: "amulet", rarity: "legendary", icon: "GiTribalPendant", flavor: "Proof you showed up.", stats: { might: 13, crit_power: 17 }, reqLevel: 48, source: "xp_shop", xpCost: 13000, sort: 624 },
+    { id: "gs_royal_signet", name: "Royal Signet", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "Worn by rulers.", stats: { might: 14, fortune: 16 }, reqLevel: 50, source: "xp_shop", xpCost: 16000, sort: 625 },
+    // -- Super high (60,000–90,000 gold) --
+    { id: "gs_worldedge", name: "Worldedge Blade", slot: "main_hand", rarity: "mythic", icon: "GiEnergySword", flavor: "The horizon splits before it.", stats: { might: 24, crit_power: 16 }, reqLevel: 70, source: "xp_shop", xpCost: 80000, sort: 630 },
+    { id: "gs_titan_aegis", name: "Titan's Aegis", slot: "off_hand", rarity: "mythic", icon: "GiCrossShield", flavor: "Immovable.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 68, source: "xp_shop", xpCost: 60000, sort: 631 },
+    { id: "gs_god_helm", name: "Godforged Helm", slot: "helmet", rarity: "mythic", icon: "GiOverlordHelm", flavor: "Rule with iron.", stats: { crit_chance: 16, crit_power: 24 }, reqLevel: 70, source: "xp_shop", xpCost: 75000, sort: 632 },
+    { id: "gs_celestial_plate", name: "Celestial Plate", slot: "chest", rarity: "mythic", icon: "GiLayeredArmor", flavor: "Woven from starlight.", stats: { ferocity: 24, fortune: 16 }, reqLevel: 72, source: "xp_shop", xpCost: 70000, sort: 633 },
+    { id: "gs_eternity_amulet", name: "Amulet of Eternity", slot: "amulet", rarity: "mythic", icon: "GiGemNecklace", flavor: "Sees every weakness.", stats: { crit_chance: 16, crit_power: 24 }, reqLevel: 74, source: "xp_shop", xpCost: 85000, sort: 634 },
+    // -- Super super high (250,000–600,000 gold) — signature prestige gear --
+    { id: "gs_excalibur", name: "Excalibur", slot: "main_hand", rarity: "mythic", icon: "GiEnergySword", flavor: "The sword that names a king.", stats: { might: 24, crit_power: 16 }, reqLevel: 90, source: "xp_shop", xpCost: 250000, sort: 640 },
+    { id: "gs_worldbreaker", name: "Worldbreaker", slot: "main_hand", rarity: "mythic", icon: "GiBattleAxe", flavor: "Cleaves the heavens.", stats: { might: 21, crit_chance: 8, crit_power: 11 }, reqLevel: 100, source: "xp_shop", xpCost: 400000, sort: 641 },
+    { id: "gs_sovereign_crown", name: "Sovereign Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "The whole pack bows.", stats: { might: 13, fortune: 27 }, reqLevel: 90, source: "xp_shop", xpCost: 300000, sort: 642 },
+    { id: "gs_omnipotence_ring", name: "Ring of Omnipotence", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "All power, one finger.", stats: { might: 16, crit_chance: 8, fortune: 16 }, reqLevel: 100, source: "xp_shop", xpCost: 600000, sort: 643 },
 ];
 
 export function itemById(id) {

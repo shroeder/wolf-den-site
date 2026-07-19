@@ -45,6 +45,11 @@ export const ITEM_SIGNATURES = {
     deadeye_mask: { label: "Deadeye", desc: "Your critical hits strike TWICE.", critMult: 2 },
     elephant_totem: { label: "Unstoppable", desc: "20% chance on each hit to double damage.", eruptChance: 0.2, eruptMult: 2 },
     spectre_locket: { label: "Haunt", desc: "Your critical hits strike TWICE.", critMult: 2 },
+    // --- Gold-shop prestige gear ---
+    gs_worldedge: { label: "World's Edge", desc: "25% chance on each hit to erupt for double damage.", eruptChance: 0.25, eruptMult: 2 },
+    gs_excalibur: { label: "Sword of Kings", desc: "Your first attack each day strikes for TRIPLE.", firstHitMult: 3 },
+    gs_worldbreaker: { label: "Worldbreaker", desc: "Your critical hits strike TWICE.", critMult: 2 },
+    gs_omnipotence_ring: { label: "Omnipotence", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
 };
 
 const SIG_MULT_CAP = 3; // no single hit can be boosted past 3× by signatures (crit is separate + also bounded)
