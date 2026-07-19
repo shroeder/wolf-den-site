@@ -303,7 +303,16 @@ export default function PetsClient() {
                                 {petRealWorld(p) ? (
                                     <div className="petx-ability petx-realworld">
                                         <div className="petx-ability-head">🎁 Real-world perk</div>
-                                        <div className="petx-ability-body">{petRealWorld(p)}</div>
+                                        <div className="petx-ability-body">
+                                            {petRealWorld(p)}
+                                            {owned ? (() => {
+                                                const rw = state?.realWorld?.[p.id];
+                                                if (!rw) return null;
+                                                return rw.available
+                                                    ? <div style={{ marginTop: 6, color: "#7ad07a", fontWeight: 700 }}>✅ Ready — ask staff to redeem it in-store.</div>
+                                                    : <div style={{ marginTop: 6, color: "#9a93a6" }}>⏳ Redeemed — available again {rw.cooldownUntil ? new Date(rw.cooldownUntil).toLocaleDateString() : "next month"}.</div>;
+                                            })() : null}
+                                        </div>
                                     </div>
                                 ) : null}
                             </div>

@@ -4,6 +4,7 @@ import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/db";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { describeStats } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
@@ -76,12 +77,13 @@ export async function GET(request, { params }) {
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
                 db.query(`SELECT reward_label, redeemed_at FROM mkt_item_redemption WHERE buyer_id = $1 ORDER BY redeemed_at DESC LIMIT 12`, [id]).catch(() => []),
                 db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 80`, [id]).catch(() => []),
+                memberPetPerks(id).catch(() => []),
             ]);
             // Granular activity telemetry, merged with the XP ledger into one detailed timeline.
             const activityRows = await db.query(`SELECT event, meta, path, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
@@ -124,6 +126,7 @@ export async function GET(request, { params }) {
                 gear,
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
+                petPerks: (petPerks || []).map((p) => ({ petId: p.petId, name: p.name, reward: p.reward, available: p.available, cooldownUntil: p.cooldownUntil })),
                 history: history.map((x) => ({ label: x.label, points: x.points, at: iso(x.at) })),
             }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {

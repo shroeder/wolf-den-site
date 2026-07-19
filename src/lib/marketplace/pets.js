@@ -5,6 +5,7 @@ import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 const nameOf = (r) => r?.display_name || r?.alias || "Member";
@@ -48,10 +49,11 @@ export async function syncPetAchievements(buyerId) {
 export async function petsState(buyerId, { sync = false } = {}) {
     if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [] };
     if (sync) await syncPetAchievements(buyerId).catch(() => {});
-    const [buyer, rows, incoming] = await Promise.all([
+    const [buyer, rows, incoming, realWorld] = await Promise.all([
         db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT ref, tradeable FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
         incomingShares(buyerId).catch(() => []),
+        memberPetPerks(buyerId).catch(() => []),
     ]);
     const level = levelForXp(buyer?.xp || 0).level;
     const granted = new Set(rows.map((r) => r.ref));
@@ -67,7 +69,9 @@ export async function petsState(buyerId, { sync = false } = {}) {
         // Tradeable unless an explicit unlock row has locked it (level pets with no row are still tradeable).
         if (!lockedRefs.has(pet.id)) tradeableIds.push(pet.id);
     }
-    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming };
+    // Real-world perk redemption state, keyed by pet id, for owned marquee pets.
+    const realWorldByPet = Object.fromEntries((realWorld || []).map((r) => [r.petId, { reward: r.reward, available: r.available, cooldownUntil: r.cooldownUntil }]));
+    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet };
 }
 
 export async function equipPet(buyerId, petId) {
