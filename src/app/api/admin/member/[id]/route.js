@@ -4,6 +4,7 @@ import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/db";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { describeStats } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -91,7 +92,16 @@ export async function GET(request, { params }) {
             ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 120);
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));
-            const gear = (inv?.items || []).map((i) => ({ name: i.name, rarity: i.rarity, slot: i.slot, equipped: equippedIds.has(i.id) }));
+            const gear = (inv?.items || []).map((i) => ({
+                id: i.id,
+                name: i.name,
+                rarity: i.rarity,
+                slot: i.slot,
+                equipped: equippedIds.has(i.id),
+                stats: describeStats(i.stats),
+                signature: i.signature ? `${i.signature.label}: ${i.signature.desc}` : null,
+                flavor: i.flavor || null,
+            }));
 
             return NextResponse.json({
                 profile: {
