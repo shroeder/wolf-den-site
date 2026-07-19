@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
+import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossChaseItem, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
 import { projectBossHp } from "@/lib/marketplace/boss.js";
 import { activateBuff, endBuff, getActiveBuff, BUFF_PRESETS } from "@/lib/marketplace/boss-buff.js";
 import { giveawayChest, giveawayGold, giveawayItem } from "@/lib/marketplace/giveaway.js";
@@ -67,6 +67,10 @@ export async function POST(request) {
             if (action === "setPrize") {
                 if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });
                 return noStore(await setBossPrize(body.bossId, { name: body.prizeName, imageUrl: body.prizeImageUrl, squareId: body.prizeSquareId }));
+            }
+            if (action === "setChaseItem") {
+                if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });
+                return noStore(await setBossChaseItem(body.bossId, body.itemId || null));
             }
             if (action === "claimPrize") {
                 if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });

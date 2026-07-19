@@ -5,6 +5,7 @@ import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { projectBossHp } from "@/lib/marketplace/boss.js";
+import { itemById } from "@/lib/marketplace/items.js";
 import { generateImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
 
 // Store a finished PNG (base64, generated directly on the phone) as the boss art — fast, no OpenAI wait.
@@ -153,6 +154,16 @@ export async function setBossPrize(bossId, { name, imageUrl, squareId } = {}) {
         [bossId, name ? String(name).slice(0, 200) : null, imageUrl || null, squareId || null]
     );
     return { ok: true, prizeName: name || null, prizeImageUrl: imageUrl || null };
+}
+
+// Set (or clear) the hand-picked IN-GAME chase item awarded to the #1 damage dealer. Pass a valid item
+// id, or null-ish to clear.
+export async function setBossChaseItem(bossId, itemId) {
+    const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    const id = itemId && itemById(itemId) ? itemId : null;
+    await db.query(`UPDATE boss_event SET chase_item_id = $2 WHERE id = $1`, [bossId, id]);
+    return { ok: true, chaseItemId: id, chaseItemName: id ? itemById(id).name : null };
 }
 
 // Owner hands the raffle prize to the winner — mark it claimed so it drops off the "to hand out" list.

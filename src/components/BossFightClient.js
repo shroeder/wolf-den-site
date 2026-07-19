@@ -7,6 +7,8 @@ import BossBattleScene from "@/components/BossBattleScene";
 
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
+const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0" };
+
 export default function BossFightClient() {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
@@ -102,6 +104,21 @@ export default function BossFightClient() {
                 </div>
             ) : null}
 
+            {(boss.prize || boss.chaseItem) ? (
+                <div className="boss-chase" style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,215,94,0.4)", background: "radial-gradient(120% 120% at 0% 0%, rgba(255,215,94,0.18), transparent 60%)", marginBottom: 8 }}>
+                    {boss.prize?.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={boss.prize.imageUrl} alt={boss.prize.name} style={{ width: 60, height: 60, objectFit: "contain", borderRadius: 10, background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
+                    ) : <span style={{ fontSize: "2.2rem" }} aria-hidden="true">🏆</span>}
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#ffd75e", textTransform: "uppercase", letterSpacing: "0.05em" }}>🏆 Top damage wins</div>
+                        {boss.prize ? <div style={{ fontWeight: 800, fontSize: "1rem" }}>{boss.prize.name}</div> : null}
+                        {boss.chaseItem ? <div style={{ fontSize: "0.85rem", fontWeight: 700, color: RARITY_TXT[boss.chaseItem.rarity] || "#8fd8ff" }}>+ {boss.chaseItem.name} (in-game gear)</div> : null}
+                        <div className="muted" style={{ fontSize: "0.78rem" }}>Deal the most damage to claim it.</div>
+                    </div>
+                </div>
+            ) : null}
+
             <div className="boss-stage-wrap">
                 <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
                 {burst ? (
@@ -113,19 +130,14 @@ export default function BossFightClient() {
                 ) : null}
             </div>
 
-            {boss.prize ? (
-                <div className="boss-prize">
-                    {boss.prize.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="boss-prize-img" src={boss.prize.imageUrl} alt={boss.prize.name} />
-                    ) : null}
-                    <div className="boss-prize-body">
-                        <span className="boss-prize-eyebrow">🎟️ This week&apos;s raffle prize</span>
-                        <span className="boss-prize-name">{boss.prize.name}</span>
-                        <span className="muted">Every point of damage earns tickets toward the draw — {boss.ticketDivisor} dmg per ticket.</span>
-                    </div>
+            <div className="card" style={{ padding: "12px 14px" }}>
+                <h3 style={{ margin: "0 0 8px" }}>🏆 Rewards</h3>
+                <div style={{ display: "grid", gap: 6, fontSize: "0.88rem" }}>
+                    <div><strong>🥇 #1 damage</strong> — {boss.prize ? boss.prize.name : "the top prize"}{boss.chaseItem ? ` + ${boss.chaseItem.name}` : ""} + a 💎 mythic chest</div>
+                    <div><strong>🥈🥉 Top 3</strong> — a 🪙 gold loot chest each</div>
+                    <div><strong>⚔️ Everyone who fights</strong> — XP toward your level</div>
                 </div>
-            ) : null}
+            </div>
             {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             {boss.defeated ? (
