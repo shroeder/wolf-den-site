@@ -90,7 +90,7 @@ export default async function UserProfilePage({ params }) {
                 <ProfileActions targetId={profile.id} targetAlias={profile.alias} relation={relation} signedIn={Boolean(viewer)} />
             </section>
 
-            <PublicGear inventory={inventory} displayLabel={profile.displayLabel} />
+            <PublicGear inventory={inventory} displayLabel={profile.displayLabel} canTrade={Boolean(viewer && viewer.id !== profile.id)} targetId={profile.id} />
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>

@@ -1,4 +1,5 @@
 import { EQUIP_SLOTS, STAT_META, itemById, itemIcon } from "@/lib/marketplace/items.js";
+import GearTradeComposer from "@/components/GearTradeComposer";
 
 // Read-only view of a member's equipped loadout + owned items + combat-stat total, for their public
 // profile (so others can see their gear and, later, propose trades). Presentational.
@@ -14,10 +15,11 @@ function ItemChip({ id, equipped = false }) {
     );
 }
 
-export default function PublicGear({ inventory, displayLabel = "This member" }) {
+export default function PublicGear({ inventory, displayLabel = "This member", canTrade = false, targetId = null }) {
     const equipped = inventory?.equipped || {};
     const equippedIds = EQUIP_SLOTS.map((s) => equipped[s.slot]).filter(Boolean);
     const items = inventory?.items || [];
+    const nonEquipped = items.filter((i) => !i.equipped);
     const stats = inventory?.stats || {};
     const statEntries = Object.entries(stats).filter(([, v]) => v);
     if (!equippedIds.length && !items.length) return null;
@@ -38,7 +40,9 @@ export default function PublicGear({ inventory, displayLabel = "This member" }) 
                     <div className="equip-bag-grid">{equippedIds.map((id) => <ItemChip key={id} id={id} equipped />)}</div>
                 </>
             ) : null}
-            {items.length ? (
+            {canTrade && nonEquipped.length ? (
+                <GearTradeComposer targetId={targetId} targetLabel={displayLabel} items={nonEquipped.map((i) => ({ id: i.id, name: i.name, rarity: i.rarity, slot: i.slot, icon: i.icon }))} />
+            ) : items.length ? (
                 <>
                     <p className="muted" style={{ margin: "12px 0 6px" }}>Inventory ({items.length})</p>
                     <div className="equip-bag-grid">{items.map((i) => <ItemChip key={i.id} id={i.id} equipped={i.equipped} />)}</div>
