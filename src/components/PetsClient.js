@@ -25,6 +25,22 @@ function statText(s) {
     return `${m.icon} ${m.label}`;
 }
 
+// What each passive stat actually does, for the detail modal.
+const STAT_EFFECT = {
+    might: "Boosts your boss attack damage.",
+    crit_chance: "Raises your chance to land a critical hit.",
+    crit_power: "Increases your critical-hit damage.",
+    ferocity: "Adds ferocious power to your strike.",
+    fortune: "More raffle tickets toward the weekly boss prize.",
+    xp_gain: "Earn more XP from everything you do.",
+    gold_find: "Find more gold from chests and sales.",
+};
+
+const SOURCE_LABEL = {
+    level: "🎮 Leveling reward", shop: "🛒 Shop", achievement: "🏅 Achievement",
+    chest: "🎁 Chest drop", boss: "⚔️ Boss drop", elite: "🌟 Elite",
+};
+
 // The dedicated Pets page: every pet, clearly owned vs. locked, with how to unlock each, its passive (owned)
 // and active (equipped) buffs, and equip / buy actions.
 export default function PetsClient() {
@@ -51,6 +67,7 @@ export default function PetsClient() {
     const [modalErr, setModalErr] = useState(null);
     const [sending, setSending] = useState(false);
     const [celebrate, setCelebrate] = useState(null); // pet to show a receive/unlock celebration for
+    const [detail, setDetail] = useState(null); // pet whose detail modal is open
 
     const ERRORS = {
         not_enough_gold: "Not enough gold.",
@@ -185,38 +202,22 @@ export default function PetsClient() {
                         const passive = petPassive(pet);
                         const perk = petPerk(pet);
                         const Icon = pet.Icon;
-                        const canBuy = pet.source === "shop" && !owned && state.signedIn && state.gold >= petPrice(pet);
                         return (
-                            <div key={pet.id} className={`pet-card rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
+                            <button type="button" key={pet.id} onClick={() => setDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
                                 <div className="pet-icon" style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
                                 <div className="pet-buffs">
-                                    <span title="Bonus just for owning this pet (stacks with your whole collection)">Own: +{passive.value} {statText(passive)}</span>
-                                    <span className="pet-perk" title={perk.desc}>{perk.icon} {perk.name}</span>
+                                    <span>Own: +{passive.value} {statText(passive)}</span>
+                                    <span className="pet-perk">{perk.icon} {perk.name}</span>
                                 </div>
                                 {owned ? (
-                                    <>
-                                        {isFeatured ? (
-                                            <button type="button" className="btn-ghost pet-btn" onClick={() => action(pet.id, "unequip")} disabled={busy === pet.id}>Unequip</button>
-                                        ) : (
-                                            <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "equip")} disabled={busy === pet.id}>{busy === pet.id ? "…" : "Equip"}</button>
-                                        )}
-                                        {tradeableSet.has(pet.id) ? (
-                                            <button type="button" className="pet-give" onClick={() => openGive(pet)} disabled={busy === pet.id}>🎁 Give a copy</button>
-                                        ) : (
-                                            <span className="pet-traded" title="Already traded once — locked">🔒 traded</span>
-                                        )}
-                                    </>
-                                ) : pet.source === "shop" ? (
-                                    <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "buy")} disabled={!canBuy || busy === pet.id}>
-                                        {busy === pet.id ? "…" : `Buy · 💰 ${petPrice(pet).toLocaleString()}`}
-                                    </button>
+                                    <span className="pet-status-owned">✓ Owned{isFeatured ? " · Equipped" : ""}</span>
                                 ) : (
                                     <div className="pet-locked">🔒 {petUnlockText(pet)}</div>
                                 )}
-                            </div>
+                            </button>
                         );
                     })}
                 </div>
@@ -267,6 +268,66 @@ export default function PetsClient() {
                         <button type="button" className="btn-gold" onClick={() => setCelebrate(null)}>Awesome</button>
                     </div>
                 </div>, document.body) : null}
+
+            {/* Pet detail modal — full display + abilities + actions (equip / buy / give). */}
+            {mounted && detail ? (() => {
+                const p = detail;
+                const owned = ownedSet.has(p.id);
+                const isFeatured = state?.featured === p.id;
+                const tradeable = tradeableSet.has(p.id);
+                const passive = petPassive(p);
+                const perk = petPerk(p);
+                const price = petPrice(p);
+                const canBuy = p.source === "shop" && !owned && state?.signedIn && state.gold >= price;
+                return createPortal(
+                    <div className="petx-overlay" onClick={() => setDetail(null)}>
+                        <div className={`petx-modal petx-detail rarity-${p.rarity}`} onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className="petx-close" aria-label="Close" onClick={() => setDetail(null)}>×</button>
+                            <div className="petx-hero petx-hero-big">
+                                <span className="petx-hero-glow" />
+                                <span className="petx-hero-icon" style={{ color: p.color }}>{p.Icon ? <p.Icon /> : "🐾"}</span>
+                            </div>
+                            <div className="petx-cele-tag">{p.rarity}</div>
+                            <h2 className="petx-title">{p.name}</h2>
+                            <p className="petx-sub">{p.hint || SOURCE_LABEL[p.source] || ""}</p>
+
+                            <div className="petx-abilities">
+                                <div className="petx-ability">
+                                    <div className="petx-ability-head">🐾 Passive <span className="muted">· always active while owned</span></div>
+                                    <div className="petx-ability-body"><strong>+{passive.value} {statText(passive)}</strong> — {STAT_EFFECT[passive.stat] || ""} <span className="muted">Stacks with your whole collection.</span></div>
+                                </div>
+                                <div className="petx-ability">
+                                    <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped</span></div>
+                                    <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
+                                </div>
+                            </div>
+
+                            <div className="petx-status">
+                                {owned ? <span className="petx-owned">✓ You own this pet{isFeatured ? " · equipped" : ""}</span> : <span className="petx-lockrow">🔒 {SOURCE_LABEL[p.source] || "Unlock"}: {petUnlockText(p)}</span>}
+                            </div>
+
+                            {err ? <p className="petx-err">{err}</p> : null}
+                            <div className="petx-actions">
+                                {owned ? (
+                                    <>
+                                        {isFeatured
+                                            ? <button type="button" className="btn-ghost" onClick={() => action(p.id, "unequip")} disabled={busy === p.id}>Unequip</button>
+                                            : <button type="button" className="btn-gold" onClick={() => action(p.id, "equip")} disabled={busy === p.id}>{busy === p.id ? "…" : "⭐ Equip"}</button>}
+                                        {tradeable
+                                            ? <button type="button" className="btn-ghost" onClick={() => { setDetail(null); openGive(p); }}>🎁 Give a copy</button>
+                                            : <button type="button" className="btn-ghost" disabled title="Already traded once">🔒 Traded</button>}
+                                    </>
+                                ) : p.source === "shop" ? (
+                                    <button type="button" className="btn-gold" onClick={() => action(p.id, "buy")} disabled={!canBuy || busy === p.id} style={{ width: "100%" }}>
+                                        {busy === p.id ? "…" : canBuy ? `Unlock · 💰 ${price.toLocaleString()}` : `Need 💰 ${price.toLocaleString()}`}
+                                    </button>
+                                ) : (
+                                    <button type="button" className="btn-ghost" disabled style={{ width: "100%" }}>🔒 {petUnlockText(p)}</button>
+                                )}
+                            </div>
+                        </div>
+                    </div>, document.body);
+            })() : null}
         </div>
     );
 }

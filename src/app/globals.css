@@ -9647,6 +9647,19 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .pet-card.rarity-eternal { border-color: rgba(255,92,200,0.4); }
 .pet-buffs { display: flex; flex-direction: column; gap: 2px; font-size: 0.72rem; color: #cbd2da; }
 .pet-perk { color: #ffd75e; font-weight: 700; }
+.pet-card-btn { cursor: pointer; font: inherit; color: inherit; width: 100%; }
+.pet-card-btn:hover { transform: translateY(-2px); border-color: rgba(255,215,94,0.5); }
+.pet-status-owned { font-size: 0.72rem; font-weight: 700; color: #7ad07a; margin-top: 2px; }
+
+/* Pet detail modal */
+.petx-detail { max-width: 400px; }
+.petx-abilities { text-align: left; display: flex; flex-direction: column; gap: 8px; margin: 14px 0 10px; }
+.petx-ability { background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; border-radius: 12px; padding: 10px 12px; }
+.petx-ability-head { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #cbd2da; margin-bottom: 3px; }
+.petx-ability-body { font-size: 0.84rem; color: #e7dcc4; line-height: 1.35; }
+.petx-status { margin-bottom: 12px; font-size: 0.82rem; }
+.petx-owned { color: #7ad07a; font-weight: 800; }
+.petx-lockrow { color: #9a93a6; font-weight: 700; }
 .pet-locked { font-size: 0.74rem; color: #9a93a6; margin-top: 2px; }
 .pet-btn { margin-top: 4px; padding: 6px 12px; font-size: 0.8rem; }
 .pet-featured-badge { position: absolute; top: 6px; right: 6px; font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
