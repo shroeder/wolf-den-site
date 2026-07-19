@@ -24,7 +24,8 @@ export async function GET(request) {
             }
             // Auto-fill missing chest art too, so new chest tiers get icons without any manual taps.
             const chestArt = await generateMissingChestArt(2).catch(() => null);
-            return NextResponse.json({ success: true, ...(await generateMissingPetSprites(3)), chestArt });
+            // 8 pets/night backfills a new roster over a few nights, then no-ops (shared sprites — bounded).
+            return NextResponse.json({ success: true, ...(await generateMissingPetSprites(8)), chestArt });
         } catch (error) {
             return internalError(error, { event: "pet_sprites.run.failure" });
         }

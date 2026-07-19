@@ -13,7 +13,9 @@ function isAuthorized(request) {
     return (request.headers.get("authorization") || "") === `Bearer ${expected}`;
 }
 
-// Daily: draw a small batch of new/changed avatar sprites (2D game-art characters).
+// NIGHTLY: draw a batch of new/appearance-changed avatar sprites (2D game-art characters). Cost control —
+// runs once a day (see vercel.json), only for members whose avatar APPEARANCE changed (not gear swaps), and
+// caps the batch so one run stays under the function's 5-minute limit (~12 images at ~20-25s each).
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/jobs/avatar-sprites", async ({ logger, internalError }) => {
         try {
@@ -21,7 +23,7 @@ export async function GET(request) {
                 logger.warn("avatar_sprites.unauthorized");
                 return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             }
-            const result = await runAvatarSpriteJob(4);
+            const result = await runAvatarSpriteJob(12);
             return NextResponse.json({ success: true, ...result });
         } catch (error) {
             return internalError(error, { event: "avatar_sprites.run.failure" });

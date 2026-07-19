@@ -57,11 +57,11 @@
         },
         {
             "path": "/api/jobs/avatar-sprites",
-            "schedule": "*/15 * * * *"
+            "schedule": "0 4 * * *"
         },
         {
             "path": "/api/jobs/pet-sprites",
-            "schedule": "*/15 * * * *"
+            "schedule": "20 4 * * *"
         },
         {
             "path": "/api/jobs/leaderboard-badges",

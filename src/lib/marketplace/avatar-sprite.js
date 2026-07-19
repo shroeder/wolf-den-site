@@ -66,7 +66,10 @@ export function buildSpritePrompt(config, gear = "") {
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
 export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
 
-// Buyers whose sprite is missing or stale (avatar changed since it was last drawn). Oldest/never first.
+// Buyers whose sprite is missing or stale. NOTE: we intentionally regenerate only when the AVATAR'S
+// APPEARANCE changes — NOT on gear swaps — to control OpenAI cost (a sprite regen is an image generation,
+// and gear changes are frequent + a minor visual detail). The sprite still draws whatever gear is equipped
+// at the moment it IS regenerated. Oldest/never first.
 export function pendingSpriteIds(limit = 5) {
     return db
         .query(
@@ -74,8 +77,7 @@ export function pendingSpriteIds(limit = 5) {
               WHERE avatar_config IS NOT NULL
                 AND avatar_updated_at IS NOT NULL
                 AND (avatar_sprite_url IS NULL
-                     OR avatar_updated_at > avatar_sprite_at
-                     OR (equipment_updated_at IS NOT NULL AND equipment_updated_at > avatar_sprite_at))
+                     OR avatar_updated_at > avatar_sprite_at)
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_updated_at DESC NULLS LAST
               LIMIT $1`,
             [Math.max(1, Math.min(50, Math.floor(Number(limit) || 5)))]
