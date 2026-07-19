@@ -50,13 +50,9 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const config = body?.config ? sanitizeAvatarConfig(body.config) : null;
             const profile = await setAvatarConfig(buyer.id, config);
-            // Redraw their attacking boss-sprite right now (after the response) so their new look is in the
-            // fight within seconds — instead of waiting for the nightly sprite job. Best-effort.
-            if (config) {
-                after(async () => {
-                    await generateBuyerSprite(buyer.id).catch(() => {});
-                });
-            }
+            // NOTE: we intentionally do NOT generate the sprite here. setAvatarConfig bumps avatar_updated_at,
+            // so the NIGHTLY sprite cron redraws it — keeping OpenAI image generation to once/night, not on
+            // every avatar save. (New/changed looks reflect in the boss fight after the next nightly run.)
             return noStore({ profile });
         } catch (error) {
             return internalError(error, { event: "marketplace.avatar.save.failure" });
