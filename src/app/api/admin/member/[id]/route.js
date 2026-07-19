@@ -5,6 +5,10 @@ import { db } from "@/lib/db";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
+import { petsState } from "@/lib/marketplace/pets.js";
+import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { describeStats } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
@@ -72,19 +76,24 @@ export async function GET(request, { params }) {
         try {
             const { id } = await params;
             const row = await db.queryOne(
-                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, created_at, last_seen_at FROM mkt_buyer WHERE id = $1`,
+                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, created_at, last_seen_at, avatar_sprite_url, equipped_border, featured_collectible FROM mkt_buyer WHERE id = $1`,
                 [id]
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows, petPerks] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
                 db.query(`SELECT reward_label, redeemed_at FROM mkt_item_redemption WHERE buyer_id = $1 ORDER BY redeemed_at DESC LIMIT 12`, [id]).catch(() => []),
                 db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 80`, [id]).catch(() => []),
                 memberPetPerks(id).catch(() => []),
+                petsState(id).catch(() => null),
+                getPetSpriteMap().catch(() => ({})),
             ]);
+            // Hero-card visuals + a featured-pet + pets summary.
+            const featuredPet = row.featured_collectible ? collectibleById(row.featured_collectible) : null;
+            const petSpriteUrl = (row.featured_collectible && petSprites[row.featured_collectible]) || null;
             // Granular activity telemetry, merged with the XP ledger into one detailed timeline.
             const activityRows = await db.query(`SELECT event, meta, path, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
             const history = [
@@ -120,10 +129,20 @@ export async function GET(request, { params }) {
                     gold: row.gold,
                     createdAt: iso(row.created_at),
                     lastSeenAt: iso(row.last_seen_at),
+                    // Hero-card visuals.
+                    spriteUrl: row.avatar_sprite_url || null,
+                    border: row.equipped_border && row.equipped_border !== "none" ? row.equipped_border : null,
+                    petSpriteUrl,
+                    profileUrl: row.alias ? `/marketplace/u/${row.alias}` : null,
                 },
                 boss: { damage: metrics.bossDamage || 0, hits: metrics.bossHits || 0, fought: metrics.bossesFought || 0, won: metrics.bossesWon || 0 },
                 activity: { spend: metrics.spend || 0, events: metrics.events || 0, activeDays: metrics.activeDays || 0, friends: metrics.friends || 0, messages: metrics.messages || 0, tenureDays: metrics.tenureDays || 0, eliteItems: metrics.eliteItems || 0 },
                 gear,
+                pets: {
+                    owned: pets?.ownedIds?.length || 0,
+                    featured: featuredPet ? { id: featuredPet.id, name: featuredPet.name, rarity: featuredPet.rarity, spriteUrl: petSpriteUrl } : null,
+                },
+                chestTiers: CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji })),
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
                 petPerks: (petPerks || []).map((p) => ({ petId: p.petId, name: p.name, reward: p.reward, available: p.available, cooldownUntil: p.cooldownUntil })),
