@@ -6,7 +6,7 @@ import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
-import { addChests } from "@/lib/marketplace/chests.js";
+import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
@@ -272,7 +272,23 @@ async function markDefeatIfDead(bossId, hp, defeatedBy = null) {
     return true;
 }
 
-// Ticket-weighted raffle draw + rewards + the big "boss slain" announcement. Runs exactly once per boss.
+// Weighted random pick from a pool. weightFn returns each entry's weight; returns null if all weights ≤ 0.
+function weightedDraw(pool, weightFn) {
+    const weights = pool.map(weightFn);
+    const total = weights.reduce((s, w) => s + Math.max(0, w), 0);
+    if (total <= 0) return null;
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+        r -= Math.max(0, weights[i]);
+        if (r < 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+}
+
+// Rewards + the big "boss slain" announcement. Runs exactly once per boss. Three separate axes:
+//   • REAL-WORLD PRIZE  → a ticket-weighted LOTTERY across everyone who fought (tickets = damage/divisor).
+//   • IN-GAME CHASE GEAR → the #1 damage dealer (skill reward).
+//   • LOOT CHESTS       → EVERYONE rolls a chance; more contribution = higher chance + a slightly better tier.
 async function finalizeBossKill(bossId) {
     const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
     if (!boss) return;
@@ -282,57 +298,68 @@ async function finalizeBossKill(bossId) {
         .query(`SELECT buyer_id, SUM(damage)::int AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
         .catch(() => []);
     const pool = parts.map((p) => ({ id: p.buyer_id, dmg: p.dmg, tickets: Math.floor(p.dmg / divisor) }));
-
-    // Rewards are deterministic by DAMAGE rank now: #1 wins the chase, top 3 each get a chest.
     const ranked = pool.slice().sort((a, b) => b.dmg - a.dmg);
-    const rankById = new Map(ranked.map((p, i) => [p.id, i]));
     const top1 = ranked[0] || null;
+    const topDmg = top1?.dmg || 1;
 
-    // The #1 damage dealer is the "winner" — claims the real Square prize (existing claim + email flow).
-    if (top1) {
-        await db.query(`UPDATE boss_event SET winner_buyer_id = $2, winner_tickets = $3, winner_drawn_at = NOW() WHERE id = $1`, [bossId, top1.id, top1.tickets]).catch(() => {});
+    // REAL-WORLD PRIZE — ticket-weighted lottery (fallback to damage-weighted if nobody cleared a ticket).
+    // Only drawn when there's an actual prize to hand out. This person becomes the claim/announcement winner.
+    let raffleWinner = null;
+    if (pool.length && boss.prize_name) {
+        const totalTickets = pool.reduce((s, p) => s + p.tickets, 0);
+        raffleWinner = weightedDraw(pool, totalTickets > 0 ? (p) => p.tickets : (p) => p.dmg);
+        if (raffleWinner) {
+            await db.query(`UPDATE boss_event SET winner_buyer_id = $2, winner_tickets = $3, winner_drawn_at = NOW() WHERE id = $1`, [bossId, raffleWinner.id, raffleWinner.tickets]).catch(() => {});
+        }
     }
 
-    // XP: everyone who fought earns participation; #1 gets a bonus (deduped per boss).
+    // XP: everyone who fought earns participation; the damage champion gets a bonus (deduped per boss).
     for (const p of pool) await awardXp(p.id, "boss_participated", { dedupeKey: `boss_participated:${bossId}:${p.id}` }).catch(() => {});
     if (top1) await awardXp(top1.id, "boss_won", { dedupeKey: `boss_won:${bossId}` }).catch(() => {});
-    // Milestone badges (raid veteran/warlord/legend; champion for #1).
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
 
-    // TIER LOOT: top 3 by damage each get a loot chest (#1 a mythic, #2 & #3 a gold).
-    for (let i = 0; i < Math.min(3, ranked.length); i++) {
-        await addChests(ranked[i].id, { [i === 0 ? "mythic" : "gold"]: 1 }).catch(() => {});
-    }
-    // #1 also gets the hand-picked IN-GAME chase item, if the admin set one.
+    // IN-GAME CHASE GEAR + a drop-only badge → the #1 damage dealer (their skill reward).
     let chaseItem = null;
     if (top1 && boss.chase_item_id) {
         chaseItem = itemById(boss.chase_item_id);
         if (chaseItem) await grantItem(top1.id, chaseItem.id, "boss_reward").catch(() => {});
     }
-    // #1 also earns a random drop-only "Boss Relic"-class badge — a permanent brag from the kill.
     const top1Badge = top1 ? await grantRandomDropBadge(top1.id).catch(() => null) : null;
 
-    // Pack-wide celebration pop-up for EVERYONE who fought — #1 gets the "you topped it" version.
+    // LOOT CHESTS — everyone who fought rolls a chance. Contribution (damage vs. the top dealer) drives the
+    // odds (min 20% → guaranteed for #1) and gives a slight thumb on the scale toward a better tier.
+    const chestByBuyer = new Map();
     for (const p of pool) {
-        const rank = rankById.get(p.id);
-        const isTop = rank === 0;
-        await recordGift(p.id, {
-            kind: "boss",
-            title: isTop ? "🥇 You topped the boss!" : "☠️ Boss slain!",
-            body: isTop
-                ? `You dealt the most damage!${chaseItem ? ` You won ${chaseItem.name}.` : ""}${top1Badge ? ` You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.` : ""}${boss.prize_name ? ` Come claim ${boss.prize_name} in-store.` : ""} A mythic chest is in your stash.`.trim()
-                : rank < 3
-                    ? `The pack took down ${boss.name}! You placed top 3 — a gold chest is in your stash. See the final stats →`
-                    : `The whole pack took down ${boss.name}! See the final stats →`,
-            icon: isTop ? "🥇" : "🏆",
-            url: "/marketplace/boss",
-        }).catch(() => {});
+        const ratio = Math.max(0, Math.min(1, p.dmg / topDmg));
+        if (Math.random() >= 0.2 + ratio * 0.8) continue; // didn't roll a chest this time
+        const q = Math.random() * 0.75 + ratio * 0.25;
+        const tier = q >= 0.93 ? "mythic" : q >= 0.75 ? "gold" : q >= 0.45 ? "iron" : "wooden";
+        chestByBuyer.set(p.id, tier);
+        await addChests(p.id, { [tier]: 1 }).catch(() => {});
     }
 
+    // Pack-wide celebration pop-up — personalized to what each member actually won.
+    for (const p of pool) {
+        const isTop = top1 && p.id === top1.id;
+        const isRaffle = raffleWinner && p.id === raffleWinner.id;
+        const chestTier = chestByBuyer.get(p.id) || null;
+        const bits = [];
+        if (isTop) bits.push(chaseItem ? `🥇 You dealt the most damage and won ${chaseItem.name}!` : `🥇 You dealt the most damage!`);
+        if (isRaffle && boss.prize_name) bits.push(`🎟️ You won the raffle — come claim ${boss.prize_name} in-store!`);
+        if (chestTier) { const c = CHEST_TIERS[chestTier]; bits.push(`${c.emoji} ${c.label} landed in your stash — open it!`); }
+        if (isTop && top1Badge) bits.push(`You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.`);
+        if (!bits.length) bits.push(`The whole pack took down ${boss.name}! See the final stats →`);
+        const title = isRaffle && boss.prize_name ? "🎟️ You won the raffle!" : isTop ? "🥇 You topped the boss!" : chestTier ? "🎁 Boss loot!" : "☠️ Boss slain!";
+        const icon = isRaffle && boss.prize_name ? "🎟️" : isTop ? "🥇" : chestTier ? "🎁" : "🏆";
+        await recordGift(p.id, { kind: "boss", title, body: bits.join(" "), icon, url: "/marketplace/boss" }).catch(() => {});
+    }
+
+    // Headline the announcement with the prize (raffle) winner if there was one, else the damage champion.
+    const hero = raffleWinner || top1;
     let winnerInfo = null;
-    if (top1) {
-        const w = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [top1.id]).catch(() => null);
-        winnerInfo = { buyerId: top1.id, label: w?.display_name || w?.alias || "A member" };
+    if (hero) {
+        const w = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [hero.id]).catch(() => null);
+        winnerInfo = { buyerId: hero.id, label: w?.display_name || w?.alias || "A member" };
     }
     await broadcastBossDefeated(boss, winnerInfo).catch(() => {});
 }
