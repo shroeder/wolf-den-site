@@ -39,7 +39,7 @@ export default function ProfileActions({ targetId, targetAlias = null, relation 
                 method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toUserId: targetId }),
             });
             const d = await r.json().catch(() => ({}));
-            if (r.ok && d?.threadId) router.push(`/marketplace/inbox?thread=${d.threadId}`);
+            if (r.ok && d?.threadId) router.push(`/marketplace/dm/${d.threadId}`);
             else setMsg(d?.error || "Couldn't open chat.");
         } finally { setBusy(false); }
     }
