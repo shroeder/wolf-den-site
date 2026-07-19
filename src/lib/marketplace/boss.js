@@ -128,6 +128,19 @@ async function manualAttacksToday(buyerId) {
     return row?.n || 0;
 }
 
+// Distinct members who've landed a MANUAL hit on this boss today (store-local day) — drives the first_blood pet perk.
+async function hittersToday(bossId) {
+    const row = await db
+        .queryOne(
+            `SELECT COUNT(DISTINCT buyer_id)::int AS n FROM boss_hit
+              WHERE boss_id = $1 AND kind = 'manual'
+                AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date`,
+            [bossId]
+        )
+        .catch(() => null);
+    return row?.n || 0;
+}
+
 // Full state for the boss screen: boss HP, contributors (with sprites + tickets), the pack of fighters,
 // the viewer's own stats (damage + tickets + swings left). Roster carries mini avatar + top badge so the
 // UI can show who's who at a glance.
@@ -436,12 +449,16 @@ export async function attackBoss(buyerId) {
     // Global admin buff × the member's own active damage potions.
     const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1));
     const sig = signatureHit(equippedIds, { hitIndex: used, crit: swing.crit });
-    // Equipped-pet proc: a big first strike of the day, and/or a chance to "erupt" for bonus damage.
+    // Equipped-pet procs — the "cool mechanics": first-hit burst, erupt, chain (strike twice), execute
+    // (big damage on a low-HP boss), and first-blood (bonus for hitting early).
     const pp = petBonus?.proc || {};
     let petMult = 1;
     let petProc = null;
     if (used === 0 && pp.firstHitMult) { petMult *= pp.firstHitMult; petProc = "first_hit"; }
-    if (pp.eruptChance && Math.random() < pp.eruptChance) { petMult *= pp.eruptMult || 1; petProc = "erupt"; }
+    if (pp.eruptChance && Math.random() < pp.eruptChance) { petMult *= pp.eruptMult || 1; petProc = petProc || "erupt"; }
+    if (pp.chainChance && Math.random() < pp.chainChance) { petMult *= 2; petProc = petProc || "chain"; }
+    if (pp.executePct && boss.max_hp && boss.hp <= boss.max_hp * 0.3) { petMult *= 1 + pp.executePct; petProc = petProc || "execute"; }
+    if (pp.firstBloodPct && (await hittersToday(boss.id)) < 3) { petMult *= 1 + pp.firstBloodPct; petProc = petProc || "first_blood"; }
     const damage = Math.round(swing.damage * buffMult * sig.mult * petMult);
     const crit = swing.crit;
     const ability = pickAbility(crit);

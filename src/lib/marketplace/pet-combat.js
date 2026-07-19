@@ -32,11 +32,14 @@ export function manualStatMultiplier(stats = {}) {
     return mightMult * critFactor * strikes;
 }
 
-// Pure: extra multiplier from equipped-pet procs (erupt chance + first-hit, amortized over the day's strikes).
+// Pure: extra multiplier from equipped-pet procs, amortized over the day's strikes, for boss sizing.
 export function procMultiplier(proc = {}, strikes = 1) {
     const eruptFactor = proc.eruptChance ? 1 + proc.eruptChance * ((proc.eruptMult || 1) - 1) : 1;
     const firstHit = proc.firstHitMult ? 1 + (proc.firstHitMult - 1) / Math.max(1, strikes) : 1;
-    return eruptFactor * firstHit;
+    const chain = proc.chainChance ? 1 + proc.chainChance : 1;              // chance to double a strike
+    const execute = proc.executePct ? 1 + proc.executePct * 0.2 : 1;        // only the low-HP tail of the fight
+    const firstBlood = proc.firstBloodPct ? 1 + proc.firstBloodPct * 0.12 : 1; // occasional (early attackers)
+    return eruptFactor * firstHit * chain * execute * firstBlood;
 }
 
 // Batch (2 queries): each member's raw pet bonus (stats + proc) → Map<buyerId, {stats, proc}>. For boss sizing.

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { COLLECTIBLES, collectibleById, petPassive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
-import { petPerk } from "@/lib/marketplace/pet-perks";
+import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 
 const SOURCES = [
     { id: "", label: "All" },
@@ -300,6 +300,12 @@ export default function PetsClient() {
                                     <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped</span></div>
                                     <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
                                 </div>
+                                {petRealWorld(p) ? (
+                                    <div className="petx-ability petx-realworld">
+                                        <div className="petx-ability-head">🎁 Real-world perk</div>
+                                        <div className="petx-ability-body">{petRealWorld(p)}</div>
+                                    </div>
+                                ) : null}
                             </div>
 
                             <div className="petx-status">

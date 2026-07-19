@@ -9660,6 +9660,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petx-status { margin-bottom: 12px; font-size: 0.82rem; }
 .petx-owned { color: #7ad07a; font-weight: 800; }
 .petx-lockrow { color: #9a93a6; font-weight: 700; }
+.petx-realworld { background: rgba(255,215,94,0.1); border-color: rgba(255,215,94,0.4); }
+.petx-realworld .petx-ability-head { color: #ffd75e; }
 .pet-locked { font-size: 0.74rem; color: #9a93a6; margin-top: 2px; }
 .pet-btn { margin-top: 4px; padding: 6px 12px; font-size: 0.8rem; }
 .pet-featured-badge { position: absolute; top: 6px; right: 6px; font-size: 0.62rem; font-weight: 800; color: #ffd75e; }

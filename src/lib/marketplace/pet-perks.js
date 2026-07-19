@@ -10,6 +10,10 @@ const ERUPT_BY_RARITY = {
     common: { chance: 0.08, mult: 1.5 }, rare: { chance: 0.1, mult: 1.6 }, epic: { chance: 0.12, mult: 1.8 },
     legendary: { chance: 0.15, mult: 2.0 }, mythic: { chance: 0.18, mult: 2.3 }, ascendant: { chance: 0.2, mult: 2.6 }, eternal: { chance: 0.25, mult: 3.0 },
 };
+// Cool mechanics (not stat sticks): chance to strike twice; big damage on a low-HP boss; bonus for hitting early.
+const CHAIN_BY_RARITY = { common: 0.08, rare: 0.1, epic: 0.15, legendary: 0.2, mythic: 0.28, ascendant: 0.35, eternal: 0.45 };
+const EXECUTE_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.3, legendary: 0.45, mythic: 0.65, ascendant: 0.85, eternal: 1.1 };
+const FIRSTBLOOD_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.35, legendary: 0.5, mythic: 0.7, ascendant: 0.9, eternal: 1.2 };
 
 // Perk mechanic → how it reads. STAT/econ perks add to the buff totals; proc perks fire on your strike.
 export const PERK_META = {
@@ -21,6 +25,9 @@ export const PERK_META = {
     extra_strike: { icon: "⚡", kind: "strike" },
     first_hit: { icon: "🗡️", kind: "proc" },
     erupt: { icon: "🌋", kind: "proc" },
+    chain_strike: { icon: "🌀", kind: "proc" },
+    execute: { icon: "☠️", kind: "proc" },
+    first_blood: { icon: "🩸", kind: "proc" },
     xp_gain: { icon: "✨", kind: "econ" },
     gold_find: { icon: "💰", kind: "econ" },
 };
@@ -35,10 +42,10 @@ export const PET_PERKS = {
     serpent: { name: "Venom Fang", key: "crit_power" }, fawn: { name: "Gentle Grace", key: "fortune" }, bat: { name: "Echolocate", key: "crit_chance" },
     scorpion: { name: "Stinger", key: "crit_power" }, tiger_cub: { name: "Ambush", key: "first_hit" }, seahorse: { name: "Tidal Charm", key: "fortune" },
     eagle: { name: "Keen Eye", key: "crit_chance" }, lion_cub: { name: "Lion's Roar", key: "might" }, gorilla: { name: "Ground Pound", key: "ferocity" },
-    croc: { name: "Death Roll", key: "crit_power" }, hydra: { name: "Regrowth", key: "ferocity" }, griffin: { name: "Sky Dive", key: "first_hit" },
+    croc: { name: "Death Roll", key: "crit_power" }, hydra: { name: "Hydra Heads", key: "chain_strike" }, griffin: { name: "Sky Dive", key: "first_hit" },
     unicorn: { name: "Wish Granted", key: "fortune" }, dragon_whelp: { name: "Ember Burst", key: "erupt" }, pegasus: { name: "Tailwind", key: "xp_gain" },
-    baby_rex: { name: "Apex Bite", key: "crit_power" }, sky_whale: { name: "Cloud Blessing", key: "fortune" }, chameleon: { name: "Prismatic Shift", key: "crit_chance" },
-    elder_dragon: { name: "Cataclysm", key: "erupt" },
+    baby_rex: { name: "Apex Bite", key: "execute" }, sky_whale: { name: "Cloud Blessing", key: "fortune" }, chameleon: { name: "Prismatic Shift", key: "crit_chance" },
+    elder_dragon: { name: "Cataclysm", key: "execute" },
     // Shop
     penguin: { name: "Cold Cash", key: "gold_find" }, hedgehog: { name: "Spiny Luck", key: "fortune" }, sheep: { name: "Golden Fleece", key: "gold_find" },
     crab: { name: "Pincer", key: "crit_power" }, turtle: { name: "Shell Slam", key: "ferocity" }, parrot: { name: "Mimic", key: "xp_gain" },
@@ -52,12 +59,12 @@ export const PET_PERKS = {
     tropical_fish: { name: "Reef Shine", key: "fortune" }, axolotl: { name: "Regenerate", key: "xp_gain" }, butterfly: { name: "Lucky Flutter", key: "fortune" },
     squid: { name: "Ink Ambush", key: "crit_chance" }, jellyfish: { name: "Sting Surge", key: "crit_power" }, octopus: { name: "Eight Arms", key: "extra_strike" },
     // Boss
-    vulture: { name: "Circling Death", key: "crit_chance" }, minotaur: { name: "Charge", key: "might" }, centaur: { name: "Volley", key: "crit_chance" },
-    imp: { name: "Hellfire", key: "erupt" }, polar_bear: { name: "Frozen Might", key: "might" }, mammoth: { name: "Trample", key: "ferocity" },
-    wyvern: { name: "Dive Bomb", key: "first_hit" }, sea_serpent: { name: "Tidal Wrath", key: "ferocity" }, fairy: { name: "Fairy Dust", key: "fortune" },
-    kraken: { name: "Tentacle Flurry", key: "extra_strike" },
+    vulture: { name: "Circling Death", key: "crit_chance" }, minotaur: { name: "Charge", key: "first_blood" }, centaur: { name: "Volley", key: "crit_chance" },
+    imp: { name: "Hellfire", key: "erupt" }, polar_bear: { name: "Frozen Might", key: "might" }, mammoth: { name: "Trample", key: "execute" },
+    wyvern: { name: "Dive Bomb", key: "first_hit" }, sea_serpent: { name: "Tidal Wrath", key: "chain_strike" }, fairy: { name: "Fairy Dust", key: "fortune" },
+    kraken: { name: "Tentacle Flurry", key: "chain_strike" },
     // Elite
-    molten_phoenix: { name: "Rebirth Flame", key: "erupt" }, eternal_wolf: { name: "Spirit Howl", key: "might" }, bounty_hound: { name: "On the Hunt", key: "fortune" },
+    molten_phoenix: { name: "Rebirth Flame", key: "execute" }, eternal_wolf: { name: "Spirit Howl", key: "chain_strike" }, bounty_hound: { name: "On the Hunt", key: "fortune" },
 };
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.
@@ -65,6 +72,9 @@ export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return EXTRA_STRIKE_BY_RARITY[rarity] || 1;
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
     if (key === "erupt") return ERUPT_BY_RARITY[rarity] || ERUPT_BY_RARITY.epic;
+    if (key === "chain_strike") return CHAIN_BY_RARITY[rarity] || 0.1;
+    if (key === "execute") return EXECUTE_BY_RARITY[rarity] || 0.3;
+    if (key === "first_blood") return FIRSTBLOOD_BY_RARITY[rarity] || 0.3;
     return PET_ACTIVE_BY_RARITY[rarity] || 3;
 }
 
@@ -78,6 +88,9 @@ function perkDesc(key, v) {
         case "extra_strike": return `+${v} boss attack${v > 1 ? "s" : ""} per day`;
         case "first_hit": return `Your first strike each day deals ×${v} damage`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
+        case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
+        case "execute": return `+${Math.round(v * 100)}% damage when the boss is below 30% HP`;
+        case "first_blood": return `+${Math.round(v * 100)}% damage if you're among the first 3 to hit the boss today`;
         case "xp_gain": return `+${v}% XP gained`;
         case "gold_find": return `+${v}% gold found`;
         default: return "";
@@ -91,6 +104,15 @@ export function petPerk(pet) {
     const meta = PERK_META[def.key] || { icon: "🐾" };
     return { name: def.name, key: def.key, icon: meta.icon, value, desc: perkDesc(def.key, value) };
 }
+
+// A handful of marquee pets carry a REAL-WORLD store perk (honor/staff-honored, like the charged-item
+// rewards). Placeholder benefits — confirm the exact reward + policy with the owner before promoting.
+export const PET_REAL_WORLD = {
+    eternal_wolf: "Founder's Companion — show this pet in-store for 10% off one single purchase each month.",
+    molten_phoenix: "Phoenix Patron — claim one free common booster pack each month, in-store.",
+    bounty_hound: "On the Hunt — priority (front-of-line) on trade-in appraisals.",
+};
+export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 
 // Combine a member's whole menagerie into combat/economy bonuses. PURE — feed it owned pet objects + the
 // equipped pet. Passives (all owned) stack; the equipped pet adds its signature perk on top.
@@ -111,6 +133,9 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null) {
         const v = petPerkValue(equippedPet.rarity, def.key);
         if (def.key === "first_hit") proc.firstHitMult = v;
         else if (def.key === "erupt") { proc.eruptChance = v.chance; proc.eruptMult = v.mult; }
+        else if (def.key === "chain_strike") proc.chainChance = v;
+        else if (def.key === "execute") proc.executePct = v;
+        else if (def.key === "first_blood") proc.firstBloodPct = v;
         else add(def.key, v);
     }
     return { stats, economy, proc };
