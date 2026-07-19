@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CLIENT_EVENTS, trackActivity, recordVisitor } from "@/lib/marketplace/activity.js";
+import { CLIENT_EVENTS, trackActivity, recordVisitor, recordPreciseGeo } from "@/lib/marketplace/activity.js";
 import { contextFromHeaders } from "@/lib/marketplace/request-context.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -33,9 +33,14 @@ export async function POST(request) {
                 referrer: cl.referrer ? String(cl.referrer).slice(0, 300) : null,
                 connection: cl.connection ? String(cl.connection).slice(0, 20) : null,
             };
+            const attr = b?.attr && typeof b.attr === "object" ? b.attr : null;
             await trackActivity(buyer?.id || null, event, meta, { path, anonId, ctx });
-            // Freshen the per-visitor rollup off the response path.
-            if (anonId) after(() => recordVisitor({ anonId, buyerId: buyer?.id || null, ctx, path }));
+            // Freshen the per-visitor rollup (device/geo + first-touch attribution) off the response path.
+            if (anonId) after(() => recordVisitor({ anonId, buyerId: buyer?.id || null, ctx, path, attr }));
+            // Opt-in precise geolocation (native permission granted) — store the exact coordinates.
+            if (anonId && event === "share_location" && b?.geo && typeof b.geo === "object") {
+                after(() => recordPreciseGeo({ anonId, buyerId: buyer?.id || null, lat: b.geo.lat, lng: b.geo.lng, accuracy: b.geo.accuracy }));
+            }
             return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.track.failure" });

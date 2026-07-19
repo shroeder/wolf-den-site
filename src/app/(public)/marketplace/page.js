@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 
+import LocationOptIn from "@/components/LocationOptIn";
 import MarketplaceLiveStats from "@/components/MarketplaceLiveStats";
 import MarketplaceSearchClient from "@/components/MarketplaceSearchClient";
 import ViewPing from "@/components/ViewPing";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getMarketplaceLiveStats } from "@/lib/marketplace/search.js";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +19,15 @@ export const metadata = {
 };
 
 export default async function MarketplacePage() {
-    const stats = await getMarketplaceLiveStats().catch(() => null);
+    const [stats, buyer] = await Promise.all([
+        getMarketplaceLiveStats().catch(() => null),
+        getAuthenticatedBuyer().catch(() => null),
+    ]);
 
     return (
         <>
             <ViewPing event="browse_shop" />
+            {buyer ? <LocationOptIn /> : null}
             {stats ? <MarketplaceLiveStats {...stats} /> : null}
             <Suspense fallback={null}>
                 <MarketplaceSearchClient />

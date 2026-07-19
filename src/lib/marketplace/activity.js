@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 export const CLIENT_EVENTS = new Set([
     "page_view", "view_profile", "shop_search", "shop_filter", "inspect_item",
     "view_boss", "view_leaderboard", "browse_shop", "view_vendor", "view_inventory",
+    "share_location",
 ]);
 
 // Pull the eight scalar context columns + a JSONB blob for the rest out of a device/geo context object.
@@ -48,17 +49,22 @@ export async function trackActivity(buyerId, event, meta = null, { path = null, 
         .catch(() => {});
 }
 
-// Roll up one row per visitor (keyed by anon_id — every browser has one, member or not). first_seen +
-// landing_path + referrer are first-touch (set on insert only); device/geo/last_seen/events keep freshening.
-export async function recordVisitor({ anonId, buyerId = null, ctx = null, path = null } = {}) {
+// Roll up one row per visitor (keyed by anon_id — every browser has one, member or not). first_seen,
+// landing_path, referrer + all attribution are FIRST-TOUCH (set on insert only, never overwritten);
+// device/geo/last_seen/events keep freshening.
+export async function recordVisitor({ anonId, buyerId = null, ctx = null, path = null, attr = null } = {}) {
     if (!anonId) return;
     const c = ctx || {};
+    const a = attr || {};
+    const s = (v) => (v ? String(v).slice(0, 120) : null);
     await db
         .query(
             `INSERT INTO mkt_visitor
                 (anon_id, buyer_id, first_seen, last_seen, events, ip, user_agent, device, browser, os,
-                 country, region, city, latitude, longitude, timezone, lang, screen, landing_path, referrer)
-             VALUES ($1,$2,NOW(),NOW(),1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                 country, region, city, latitude, longitude, timezone, lang, screen, landing_path, referrer,
+                 utm_source, utm_medium, utm_campaign, utm_term, utm_content, click_id, source_kind)
+             VALUES ($1,$2,NOW(),NOW(),1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+                     $18,$19,$20,$21,$22,$23,$24)
              ON CONFLICT (anon_id) DO UPDATE SET
                 last_seen = NOW(),
                 events    = mkt_visitor.events + 1,
@@ -81,8 +87,24 @@ export async function recordVisitor({ anonId, buyerId = null, ctx = null, path =
                 c.ip || null, c.userAgent || null, c.device || null, c.browser || null, c.os || null,
                 c.country || null, c.region || null, c.city || null, c.latitude || null, c.longitude || null,
                 c.timezone || null, c.lang || null, c.screen || null,
-                path ? String(path).slice(0, 200) : null, c.referrer || null,
+                path ? String(path).slice(0, 200) : null, s(a.referrer) || c.referrer || null,
+                s(a.utm_source), s(a.utm_medium), s(a.utm_campaign), s(a.utm_term), s(a.utm_content),
+                s(a.click_id), s(a.source_kind),
             ]
+        )
+        .catch(() => {});
+}
+
+// Store precise, opt-in browser geolocation on the visitor (far more accurate than IP geo). Latest wins.
+export async function recordPreciseGeo({ anonId, buyerId = null, lat = null, lng = null, accuracy = null } = {}) {
+    if (!anonId || lat == null || lng == null) return;
+    await db
+        .query(
+            `UPDATE mkt_visitor
+                SET geo_lat = $2, geo_lng = $3, geo_accuracy = $4, geo_at = NOW(),
+                    buyer_id = COALESCE($5, buyer_id)
+              WHERE anon_id = $1`,
+            [String(anonId).slice(0, 48), Number(lat), Number(lng), accuracy != null ? Number(accuracy) : null, buyerId || null]
         )
         .catch(() => {});
 }
@@ -93,6 +115,7 @@ export async function recentVisitors({ limit = 100 } = {}) {
         .query(
             `SELECT v.anon_id, v.buyer_id, v.first_seen, v.last_seen, v.events, v.ip, v.device, v.browser, v.os,
                     v.country, v.region, v.city, v.timezone, v.lang, v.screen, v.landing_path, v.referrer,
+                    v.utm_source, v.utm_campaign, v.source_kind, v.geo_lat, v.geo_lng, v.geo_accuracy,
                     b.display_name, b.alias
                FROM mkt_visitor v LEFT JOIN mkt_buyer b ON b.id = v.buyer_id
               ORDER BY v.last_seen DESC LIMIT $1`,
@@ -119,6 +142,10 @@ export async function recentVisitors({ limit = 100 } = {}) {
         screen: r.screen || null,
         landing: r.landing_path || null,
         referrer: r.referrer || null,
+        source: r.utm_source || null,
+        campaign: r.utm_campaign || null,
+        sourceKind: r.source_kind || null,
+        preciseGeo: r.geo_lat != null && r.geo_lng != null ? { lat: r.geo_lat, lng: r.geo_lng, accuracy: r.geo_accuracy } : null,
     }));
 }
 
@@ -147,7 +174,7 @@ export async function activityCounts(buyerIds, days = 30) {
 // Site-wide telemetry dashboard: recent live feed + engagement reports over a window (hours).
 export async function telemetryDashboard({ hours = 24, feedLimit = 120 } = {}) {
     const win = `${Math.max(1, Math.min(720, Number(hours) || 24))} hours`;
-    const [feed, topEvents, topPages, totals, hourly, devices, countries, cities] = await Promise.all([
+    const [feed, topEvents, topPages, totals, hourly, devices, countries, cities, sourceKinds, topSources, campaigns] = await Promise.all([
         db.query(
             `SELECT a.event, a.path, a.meta, a.created_at, a.anon_id, a.device, a.browser, a.os,
                     a.country, a.region, a.city, b.display_name, b.alias
@@ -172,6 +199,10 @@ export async function telemetryDashboard({ hours = 24, feedLimit = 120 } = {}) {
         db.query(`SELECT device, COUNT(*)::int AS n FROM mkt_activity_event WHERE device IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY device ORDER BY n DESC`, [win]).catch(() => []),
         db.query(`SELECT country, COUNT(*)::int AS n FROM mkt_activity_event WHERE country IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
         db.query(`SELECT city, region, country, COUNT(*)::int AS n FROM mkt_activity_event WHERE city IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY city, region, country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
+        // Acquisition: how visitors seen in the window first arrived (first-touch attribution on the rollup).
+        db.query(`SELECT COALESCE(NULLIF(source_kind,''), 'direct') AS kind, COUNT(*)::int AS n FROM mkt_visitor WHERE last_seen > NOW() - $1::interval GROUP BY kind ORDER BY n DESC`, [win]).catch(() => []),
+        db.query(`SELECT COALESCE(NULLIF(utm_source,''), NULLIF(referrer,''), 'direct') AS src, COUNT(*)::int AS n FROM mkt_visitor WHERE last_seen > NOW() - $1::interval GROUP BY src ORDER BY n DESC LIMIT 12`, [win]).catch(() => []),
+        db.query(`SELECT utm_campaign AS campaign, COUNT(*)::int AS n FROM mkt_visitor WHERE utm_campaign IS NOT NULL AND last_seen > NOW() - $1::interval GROUP BY campaign ORDER BY n DESC LIMIT 10`, [win]).catch(() => []),
     ]);
     return {
         feed: feed.map((r) => {
@@ -192,5 +223,8 @@ export async function telemetryDashboard({ hours = 24, feedLimit = 120 } = {}) {
         devices: devices.map((r) => ({ device: r.device, n: r.n })),
         topCountries: countries.map((r) => ({ country: r.country, n: r.n })),
         topCities: cities.map((r) => ({ city: [r.city, r.region, r.country].filter(Boolean).join(", "), n: r.n })),
+        sourceKinds: sourceKinds.map((r) => ({ kind: r.kind, n: r.n })),
+        topSources: topSources.map((r) => ({ source: r.src, n: r.n })),
+        campaigns: campaigns.map((r) => ({ campaign: r.campaign, n: r.n })),
     };
 }
