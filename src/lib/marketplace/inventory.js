@@ -140,6 +140,21 @@ export async function grantRandomDrop(buyerId, { source = "boss_drop" } = {}) {
     return res.granted ? pick : null;
 }
 
+// Grant a random EARNABLE real-world perk the member doesn't already own (used by play rewards, e.g. a
+// boss win). Only items flagged `earnable` are eligible — the owner still redeems any charge in-store, so
+// real payout stays controlled. Returns the item (with charges) or null if they own them all.
+export async function grantRandomEarnablePerk(buyerId) {
+    if (!buyerId) return null;
+    const pool = ITEMS.filter((i) => i.charged && i.earnable);
+    if (!pool.length) return null;
+    const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
+    const candidates = pool.filter((i) => !owned.has(i.id));
+    if (!candidates.length) return null;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const res = await grantItem(buyerId, pick.id, "boss_reward");
+    return res.granted ? pick : null;
+}
+
 // Availability of a charged item's next use (charges left + cooldown elapsed).
 function chargeState(ownedRow, item) {
     if (!item?.charged) return null;
@@ -344,4 +359,26 @@ export async function listUsableItems({ q = "" } = {}) {
         byBuyer.get(r.buyer_id).items.push({ itemId: def.id, name: def.name, ...chargeState(r, def) });
     }
     return [...byBuyer.values()];
+}
+
+// Admin cost dashboard: real-world perk redemptions over the last `days`, as a total, a per-reward
+// breakdown, and the most recent redemptions (who + what + when). Reads the mkt_item_redemption log.
+export async function redemptionSummary({ days = 30 } = {}) {
+    const d = Math.max(1, Math.min(365, Math.floor(Number(days) || 30)));
+    const [byReward, recent] = await Promise.all([
+        db.query(
+            `SELECT COALESCE(reward_label, reward, 'Perk') AS label, COUNT(*)::int AS n
+               FROM mkt_item_redemption
+              WHERE redeemed_at >= NOW() - ($1::int || ' days')::interval
+              GROUP BY 1 ORDER BY n DESC`,
+            [d]
+        ).catch(() => []),
+        db.query(
+            `SELECT COALESCE(r.reward_label, r.reward, 'Perk') AS label, r.redeemed_at,
+                    COALESCE(b.display_name, b.alias, b.first_name, 'Member') AS member
+               FROM mkt_item_redemption r JOIN mkt_buyer b ON b.id = r.buyer_id
+              ORDER BY r.redeemed_at DESC LIMIT 15`
+        ).catch(() => []),
+    ]);
+    return { days: d, total: byReward.reduce((s, r) => s + r.n, 0), byReward, recent };
 }

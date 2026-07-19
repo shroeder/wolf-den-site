@@ -5,7 +5,8 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
-import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantRandomDrop } from "@/lib/marketplace/inventory.js";
+import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantRandomDrop, grantRandomEarnablePerk } from "@/lib/marketplace/inventory.js";
+import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit } from "@/lib/marketplace/signatures.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -304,6 +305,12 @@ async function finalizeBossKill(bossId) {
     for (const p of pool) {
         if (winner && p.id === winner.id) continue;
         if (Math.random() < 0.35) await grantRandomDrop(p.id).catch(() => {});
+    }
+    // Real-world reward: the boss winner also earns a redeemable in-store perk (a cheap earnable one — YOU
+    // still redeem it at the register, so payout stays controlled). Nudge them with a gift pop-up.
+    if (winner) {
+        const perk = await grantRandomEarnablePerk(winner.id).catch(() => null);
+        if (perk) await recordGift(winner.id, { kind: "item", title: "🏆 Boss reward!", body: `You earned ${perk.name} — a real in-store perk! Show it at the register to redeem.`, icon: "🎁" }).catch(() => {});
     }
 
     let winnerInfo = null;

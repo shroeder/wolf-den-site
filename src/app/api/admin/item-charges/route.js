@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { listUsableItems, redeemCharge } from "@/lib/marketplace/inventory.js";
+import { listUsableItems, redeemCharge, redemptionSummary } from "@/lib/marketplace/inventory.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -18,7 +18,8 @@ export async function GET(request) {
         if (authError) return authError;
         try {
             const q = new URL(request.url).searchParams.get("q") || "";
-            return noStore({ members: await listUsableItems({ q }) });
+            const [members, summary] = await Promise.all([listUsableItems({ q }), redemptionSummary({ days: 30 })]);
+            return noStore({ members, summary });
         } catch (error) {
             return internalError(error, { event: "admin.item_charges.list.failure" });
         }
