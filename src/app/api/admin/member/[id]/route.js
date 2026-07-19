@@ -13,6 +13,28 @@ export const dynamic = "force-dynamic";
 
 const iso = (d) => (d ? new Date(d).toISOString() : null);
 
+// Friendly labels for the raw XP-event action keys (the member's historical action log).
+const ACTION_LABEL = {
+    message: "💬 Sent a message",
+    wishlist_add: "❤️ Added a card to wishlist",
+    daily_active: "📅 Opened the app",
+    profile_complete: "✅ Completed their profile",
+    purchase_flat: "🛒 Made a purchase",
+    purchase_spend: "🛒 Spent in store",
+    first_purchase: "🛒 First purchase",
+    event_checkin: "🎪 Checked in at an event",
+    discord_link: "🔗 Linked Discord",
+    first_message: "💬 First message",
+    first_friend: "🤝 Made their first friend",
+    first_wishlist: "❤️ First wishlist item",
+    first_equip: "✨ Equipped a cosmetic",
+    boss_attack: "⚔️ Attacked the boss",
+    boss_participated: "🏆 Fought a boss",
+    boss_won: "🥇 Won a boss raffle",
+    consumable: "🧪 Used a consumable",
+};
+const actionLabel = (a) => ACTION_LABEL[a] || String(a || "").replace(/_/g, " ");
+
 // Full drill-down on ONE member for the admin app: identity, level/gold, boss + engagement stats, their
 // gear (equipped + owned), badges, and recent in-store redemptions.
 export async function GET(request, { params }) {
@@ -27,11 +49,12 @@ export async function GET(request, { params }) {
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
                 db.query(`SELECT reward_label, redeemed_at FROM mkt_item_redemption WHERE buyer_id = $1 ORDER BY redeemed_at DESC LIMIT 12`, [id]).catch(() => []),
+                db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 60`, [id]).catch(() => []),
             ]);
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));
@@ -55,6 +78,7 @@ export async function GET(request, { params }) {
                 gear,
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
+                history: (historyRows || []).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: iso(r.created_at) })),
             }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.member.detail.failure" });
