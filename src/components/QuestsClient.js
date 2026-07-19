@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -51,6 +52,10 @@ export default function QuestsClient() {
                                 <div className="quest-reward">🪙 {q.rewardGold.toLocaleString()}{q.rewardChest ? ` · ${q.rewardChest.emoji} ${q.rewardChest.label}` : ""}</div>
                                 <div className="quest-bar"><span style={{ width: `${pct}%` }} /></div>
                                 <div className="quest-prog">{Math.min(q.progress, q.target).toLocaleString()} / {q.target.toLocaleString()}</div>
+                                {/* Not done yet → a call-to-action link straight to where they complete it. */}
+                                {!q.done && q.area ? (
+                                    <Link href={q.area} className="quest-cta">{q.cta || "Go"} →</Link>
+                                ) : null}
                             </div>
                             {q.claimed ? (
                                 <span className="quest-check" aria-label="Claimed">✓</span>

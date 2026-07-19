@@ -70,16 +70,19 @@ export default function BadgeShopClient() {
                         {b.description ? <span className="badge-tile-desc muted">{b.description}</span> : null}
                         {b.owned ? (
                             <span className="badge-tile-status is-earned">Owned ✓</span>
-                        ) : (
+                        ) : b.canAfford ? (
                             <button
                                 type="button"
                                 className="btn btn-small"
-                                disabled={!b.canAfford || busy === b.slug}
+                                disabled={busy === b.slug}
                                 onClick={() => buy(b.slug, b.label)}
                                 style={{ marginTop: 6 }}
                             >
-                                {busy === b.slug ? "Buying…" : b.canAfford ? `Buy · 🪙 ${b.price.toLocaleString()}` : `🪙 ${b.price.toLocaleString()}`}
+                                {busy === b.slug ? "Buying…" : `Buy · 🪙 ${b.price.toLocaleString()}`}
                             </button>
+                        ) : (
+                            // Unaffordable: muted-gold price text + hint, not a grey disabled pill.
+                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>🪙 {b.price.toLocaleString()} · need more</span>
                         )}
                     </div>
                 ))}

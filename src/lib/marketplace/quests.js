@@ -7,14 +7,15 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 // crit, open chest, equip, buy); completing one grants gold (and sometimes a loot chest). The day's 3
 // quests are a DETERMINISTIC pick per (buyer, day) so rows can be lazily inserted anywhere.
 
+// `area` is the deep-link where the member actually completes the quest, so each row can be a call-to-action.
 export const QUEST_TEMPLATES = [
-    { key: "strike_boss", label: "Attack the boss", metric: "boss_attack", target: 1, gold: 120 },
-    { key: "land_crit", label: "Land a critical hit on the boss", metric: "crit", target: 1, gold: 150 },
-    { key: "deal_damage", label: "Deal 5,000 damage to the boss", metric: "boss_damage", target: 5000, gold: 220 },
-    { key: "open_chest", label: "Open a loot chest", metric: "chest_open", target: 1, gold: 150 },
-    { key: "open_two_chests", label: "Open 2 loot chests", metric: "chest_open", target: 2, gold: 260, chest: "wooden" },
-    { key: "equip_gear", label: "Equip or swap a piece of gear", metric: "equip", target: 1, gold: 110 },
-    { key: "gold_shop", label: "Buy anything from the gold shop", metric: "buy", target: 1, gold: 120 },
+    { key: "strike_boss", label: "Attack the boss", metric: "boss_attack", target: 1, gold: 120, area: "/marketplace/boss", cta: "Fight the boss" },
+    { key: "land_crit", label: "Land a critical hit on the boss", metric: "crit", target: 1, gold: 150, area: "/marketplace/boss", cta: "Fight the boss" },
+    { key: "deal_damage", label: "Deal 5,000 damage to the boss", metric: "boss_damage", target: 5000, gold: 220, area: "/marketplace/boss", cta: "Fight the boss" },
+    { key: "open_chest", label: "Open a loot chest", metric: "chest_open", target: 1, gold: 150, area: "/marketplace/inventory", cta: "Open chests" },
+    { key: "open_two_chests", label: "Open 2 loot chests", metric: "chest_open", target: 2, gold: 260, chest: "wooden", area: "/marketplace/inventory", cta: "Open chests" },
+    { key: "equip_gear", label: "Equip or swap a piece of gear", metric: "equip", target: 1, gold: 110, area: "/marketplace/inventory", cta: "Go to gear" },
+    { key: "gold_shop", label: "Buy anything from the gold shop", metric: "buy", target: 1, gold: 120, area: "/marketplace/inventory", cta: "Open the shop" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
@@ -90,6 +91,8 @@ export async function getDailyQuests(buyerId) {
                 claimed: Boolean(r.claimed_at),
                 rewardGold: r.reward_gold,
                 rewardChest: chest ? { tier: r.reward_chest, label: chest.label, emoji: chest.emoji } : null,
+                area: t.area || null,
+                cta: t.cta || null,
             };
         })
         .filter(Boolean)
