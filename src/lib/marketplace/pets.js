@@ -58,15 +58,16 @@ export async function petsState(buyerId, { sync = false } = {}) {
     const lockedRefs = new Set(rows.filter((r) => r.tradeable === false).map((r) => r.ref));
     const ownedIds = [];
     const tradeableIds = [];
-    let passiveTotal = 0;
+    const passiveTotals = {}; // stat -> summed passive across all owned pets
     for (const pet of COLLECTIBLES) {
         if (!isCollectibleUnlocked(pet, level, { owned: granted })) continue;
         ownedIds.push(pet.id);
-        passiveTotal += petPassive(pet).value;
+        const p = petPassive(pet);
+        passiveTotals[p.stat] = (passiveTotals[p.stat] || 0) + p.value;
         // Tradeable unless an explicit unlock row has locked it (level pets with no row are still tradeable).
         if (!lockedRefs.has(pet.id)) tradeableIds.push(pet.id);
     }
-    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotal, signedIn: true, incoming };
+    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming };
 }
 
 export async function equipPet(buyerId, petId) {

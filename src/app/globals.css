@@ -9622,6 +9622,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 /* Pets */
 .pets-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 0.88rem; }
+.pets-passives { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.pet-passive-chip { font-size: 0.76rem; font-weight: 700; color: #cbd2da; background: rgba(255,255,255,0.05); border: 1px solid #2a2f37; border-radius: 999px; padding: 3px 10px; }
 .pets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .pet-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 14px 10px; border-radius: 14px; background: #17191f; border: 1px solid #2a2f37; }
 .pet-card.is-locked { opacity: 0.6; }

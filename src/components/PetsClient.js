@@ -118,6 +118,7 @@ export default function PetsClient() {
 
     const featured = state?.featured ? collectibleById(state.featured) : null;
     const ownedCount = state?.ownedIds?.length || 0;
+    const passiveEntries = Object.entries(state?.passiveTotals || {}).sort((a, b) => b[1] - a[1]);
 
     return (
         <div className="stack reveal">
@@ -132,11 +133,18 @@ export default function PetsClient() {
                     {state?.signedIn ? <span className="pill">🪙 {state.gold.toLocaleString()}</span> : null}
                 </div>
                 {state ? (
-                    <div className="pets-summary">
-                        <span><strong>{ownedCount}</strong> / {COLLECTIBLES.length} pets</span>
-                        <span>🍀 <strong>+{state.passiveTotal}</strong> Fortune passive</span>
-                        {featured ? <span>★ Equipped: <strong>{featured.name}</strong> ({statText(petActive(featured))} +{petActive(featured).value}%)</span> : <span className="muted">No pet equipped</span>}
-                    </div>
+                    <>
+                        <div className="pets-summary">
+                            <span><strong>{ownedCount}</strong> / {COLLECTIBLES.length} pets</span>
+                            {featured ? <span>★ Equipped: <strong>{featured.name}</strong> ({statText(petActive(featured))} +{petActive(featured).value}%)</span> : <span className="muted">No pet equipped</span>}
+                        </div>
+                        {passiveEntries.length ? (
+                            <div className="pets-passives">
+                                <span className="muted" style={{ fontSize: "0.8rem" }}>Menagerie passive bonuses:</span>
+                                {passiveEntries.map(([stat, val]) => <span key={stat} className="pet-passive-chip">{statText({ stat })} +{val}</span>)}
+                            </div>
+                        ) : null}
+                    </>
                 ) : null}
             </section>
 

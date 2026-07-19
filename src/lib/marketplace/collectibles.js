@@ -16,6 +16,31 @@ import {
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
 export const PET_PASSIVE_BY_RARITY = { common: 1, rare: 2, epic: 4, legendary: 6, mythic: 9, ascendant: 13, eternal: 18 };
+
+// Each pet's PASSIVE stat is its own (distinct from its active) so every pet feels unique — collecting a
+// varied menagerie shapes a varied account bonus rather than a stack of the same stat.
+export const PET_PASSIVE_STAT = {
+    // Level
+    bunny: "gold_find", frog: "fortune", chick: "xp_gain", kitten: "fortune", fox_kit: "gold_find",
+    wolf_pup: "ferocity", owl: "fortune", bear_cub: "crit_power", raven: "crit_chance", serpent: "crit_power",
+    fawn: "xp_gain", bat: "ferocity", scorpion: "might", tiger_cub: "crit_chance", seahorse: "gold_find",
+    eagle: "might", lion_cub: "ferocity", gorilla: "crit_power", croc: "ferocity", hydra: "crit_power",
+    griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "fortune", baby_rex: "might",
+    sky_whale: "xp_gain", chameleon: "fortune", elder_dragon: "crit_power",
+    // Shop
+    penguin: "fortune", hedgehog: "gold_find", sheep: "xp_gain", crab: "might", turtle: "might",
+    parrot: "fortune", dolphin: "xp_gain", monkey: "gold_find", panda: "fortune", kangaroo: "crit_power",
+    // Achievement
+    ladybug: "gold_find", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
+    flamingo: "xp_gain", toucan: "gold_find",
+    // Chest
+    tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
+    // Boss
+    vulture: "might", minotaur: "ferocity", centaur: "might", imp: "crit_chance", polar_bear: "ferocity",
+    mammoth: "might", wyvern: "crit_power", sea_serpent: "crit_chance", fairy: "xp_gain", kraken: "ferocity",
+    // Elite
+    molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
+};
 // Active buff strength when a pet is EQUIPPED/featured, by rarity (percent).
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
 // Default shop price by rarity (a shop pet may override with its own `price`).
@@ -124,9 +149,9 @@ export function collectibleById(id) {
     return BY_ID[id] || null;
 }
 
-// Passive bonus this pet adds just by being OWNED (all owned pets stack). Always Fortune.
+// Passive bonus this pet adds just by being OWNED (all owned pets stack) — its own themed stat.
 export function petPassive(pet) {
-    return { stat: "fortune", value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
+    return { stat: PET_PASSIVE_STAT[pet.id] || pet.activeStat || "fortune", value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
 }
 
 // Active buff this pet grants when EQUIPPED/featured — its themed stat, scaled by rarity.
