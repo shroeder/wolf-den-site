@@ -12,6 +12,7 @@ const navItems = [
     { href: "/shop", label: "Shop" },
     { href: "/marketplace/boss", label: "⚔️ Boss" },
     { href: "/marketplace/quests", label: "📜 Quests" },
+    { href: "/marketplace/bounties", label: "🎯 Bounties" },
     { href: "/marketplace/rewards", label: "🏆 Rewards" },
     { href: "/looking-for", label: "Looking For" },
     { href: "/marketplace", label: "Marketplace" },

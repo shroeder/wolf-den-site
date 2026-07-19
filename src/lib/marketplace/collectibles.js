@@ -43,6 +43,9 @@ export const COLLECTIBLES = [
     // item: any Ascendant item unlocks the Molten Phoenix; any Eternal item unlocks the Eternal Wolf Spirit.
     { id: "molten_phoenix", name: "Molten Phoenix", Icon: GiDragonSpiral, color: "#ff7a3c", level: 999, rarity: "ascendant", eliteOnly: true, unlockRarity: "ascendant", hint: "Reborn from Ascendant fire", spritePrompt: "a blazing molten phoenix wreathed in orange-gold fire and embers, radiating heat" },
     { id: "eternal_wolf", name: "Eternal Wolf Spirit", Icon: GiSpectre, color: "#ff5cc8", level: 999, rarity: "eternal", eliteOnly: true, unlockRarity: "eternal", hint: "Bound to an Eternal relic", spritePrompt: "a majestic ghostly wolf spirit glowing with impossible prismatic rainbow light, ethereal and translucent" },
+    // Bounty Board reward — granted for fulfilling 10 community bounties (see bounty-rewards.js). Elite-only
+    // (no level unlock, no rarity trigger); handed out directly via mkt_cosmetic_unlock.
+    { id: "bounty_hound", name: "Bounty Hound", Icon: GiWolfHead, color: "#ffd75e", level: 999, rarity: "legendary", eliteOnly: true, hint: "Earned by fulfilling 10 bounties", spritePrompt: "a loyal rugged hound wearing a bounty hunter's bandana, alert and ready for the hunt" },
 ];
 
 // The elite pet unlocked by obtaining an item of a given top rarity (or null).

@@ -505,6 +505,8 @@ export const ITEMS = [
     // -- Eternal (the pinnacle — 1-year cooldowns) --
     { id: "eternal_wolf_crown", name: "Eternal Wolf Crown", slot: "helmet", rarity: "eternal", icon: "GiWolfHead", flavor: "The Den remembers only a handful who wore it.", stats: { might: 25, crit_chance: 20, crit_power: 30 }, reqLevel: 95, source: "elite", charged: true, charges: 1, cooldownDays: 365, chargeReward: "elite_box_120", chargeRewardLabel: REWARDS.elite_box_120, sort: 910 },
     { id: "eternal_infinity", name: "Band of Eternity", slot: "ring", rarity: "eternal", icon: "GiEngagementRing", flavor: "No beginning. No end. No equal.", stats: { might: 25, crit_chance: 15, crit_power: 25, fortune: 10 }, reqLevel: 100, source: "elite", charged: true, charges: 1, cooldownDays: 365, chargeReward: "elite_grail", chargeRewardLabel: REWARDS.elite_grail, sort: 911 },
+    // -- Bounty Board reward (granted for fulfilling 3 community bounties — see bounty-rewards.js) --
+    { id: "bounty_hunters_mark", name: "Bounty Hunter's Mark", slot: "amulet", rarity: "legendary", icon: "GiWolfHead", flavor: "Proof you show up for the pack.", stats: { fortune: 15, might: 8 }, reqLevel: 1, source: "bounty_reward", sort: 920 },
 ];
 
 export function itemById(id) {

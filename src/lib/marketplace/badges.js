@@ -73,7 +73,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -107,6 +107,9 @@ export async function getMemberMetrics(buyerId) {
         ).catch(() => null),
         // How many badges they already hold (drives the meta "collect a lot of badges" badge).
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => null),
+        // Bounty board: bounties posted + bounties fulfilled (won) — drive the bounty badges.
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_bounty WHERE creator_id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_bounty_claim WHERE buyer_id = $1 AND is_winner = TRUE`, [buyerId]).catch(() => null),
     ]);
 
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
@@ -154,6 +157,8 @@ export async function getMemberMetrics(buyerId) {
         bossesWon: bossWonRow?.n || 0,
         eliteItems,
         eternalItems,
+        bountiesPosted: bountyPostRow?.n || 0,
+        bountiesWon: bountyWinRow?.n || 0,
     };
 }
 
@@ -185,6 +190,8 @@ export function progressForRule(rule, threshold, m) {
         case "bosses_won": return { current: m.bossesWon, target: t };
         case "elite_items": return { current: m.eliteItems, target: t };
         case "eternal_items": return { current: m.eternalItems, target: t };
+        case "bounties_posted": return { current: m.bountiesPosted, target: t };
+        case "bounties_won": return { current: m.bountiesWon, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }

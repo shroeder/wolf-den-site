@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 export const CLIENT_EVENTS = new Set([
     "page_view", "view_profile", "shop_search", "shop_filter", "inspect_item",
     "view_boss", "view_leaderboard", "browse_shop", "view_vendor", "view_inventory",
-    "share_location",
+    "share_location", "view_bounties",
 ]);
 
 // Pull the eight scalar context columns + a JSONB blob for the rest out of a device/geo context object.

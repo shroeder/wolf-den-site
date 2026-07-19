@@ -59,6 +59,10 @@ export const XP_ACTIONS = {
     boss_attack: 50, // one swing at the boss (capped by the per-day attack limit) — a meaningful daily reward
     boss_participated: 30, // your avatar took part in a boss that the pack slayed (once per boss)
     boss_won: 150, // won the boss-fight raffle prize (once per boss)
+    // Bounty board (each deduped once per bounty — see bounties.js).
+    bounty_post: 15, // posting a bounty on the board
+    bounty_win: 40, // fulfilling a bounty for the community (per win)
+    bounty_complete: 20, // marking your own bounty complete (creator)
 };
 
 // Award a one-time onboarding milestone. dedupe on (action, buyerId) so it can only ever fire once.

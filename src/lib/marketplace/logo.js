@@ -76,3 +76,24 @@ export async function uploadEventImage(file) {
     });
     return blob.url;
 }
+
+// Bounty attachment image — same raster-only rules, stored under a separate prefix. Returns the blob URL.
+export async function uploadBountyImage(file) {
+    if (!file || typeof file.arrayBuffer !== "function") {
+        throw new Error("No image file was provided.");
+    }
+    const type = (file.type || "").toLowerCase();
+    const ext = ALLOWED_TYPES.get(type);
+    if (!ext) {
+        throw new Error("Image must be a PNG, JPG, or WEBP.");
+    }
+    if (file.size > MAX_BYTES) {
+        throw new Error("Image must be under 8 MB.");
+    }
+    const blob = await put(`marketplace/bounties/bounty.${ext}`, file, {
+        access: "public",
+        addRandomSuffix: true,
+        contentType: type,
+    });
+    return blob.url;
+}

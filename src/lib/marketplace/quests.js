@@ -16,6 +16,8 @@ export const QUEST_TEMPLATES = [
     { key: "open_two_chests", label: "Open 2 loot chests", metric: "chest_open", target: 2, gold: 260, chest: "wooden", area: "/marketplace/inventory", cta: "Open chests" },
     { key: "equip_gear", label: "Equip or swap a piece of gear", metric: "equip", target: 1, gold: 110, area: "/marketplace/inventory", cta: "Go to gear" },
     { key: "gold_shop", label: "Buy anything from the gold shop", metric: "buy", target: 1, gold: 120, area: "/marketplace/inventory", cta: "Open the shop" },
+    { key: "post_bounty", label: "Post a bounty on the board", metric: "bounty_post", target: 1, gold: 130, area: "/marketplace/bounties/new", cta: "Post a bounty" },
+    { key: "take_bounty", label: "Take on a community bounty", metric: "bounty_claim", target: 1, gold: 120, area: "/marketplace/bounties", cta: "Browse bounties" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
