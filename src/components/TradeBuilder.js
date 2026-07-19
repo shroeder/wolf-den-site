@@ -57,7 +57,7 @@ export default function TradeBuilder({ me, them, preselectWant = null }) {
                     <h2 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}>
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ffd75e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
                         <span style={{ color: "#ffd75e" }}>You give</span>
-                        <span className="equip-gold" style={{ marginLeft: "auto" }}>🪙 {(me.gold || 0).toLocaleString()}</span>
+                        <span className="equip-gold" style={{ marginLeft: "auto" }}>💰 {(me.gold || 0).toLocaleString()}</span>
                     </h2>
                     <label className="cart-field cart-field-full"><span>Gold to give</span>
                         <input type="number" min="0" value={giveGold} onChange={(e) => setGiveGold(e.target.value)} placeholder="0" />

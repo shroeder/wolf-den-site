@@ -64,11 +64,11 @@ export default function BackgroundPicker({ current = "none", level = 1, unlockAl
                             title={b.unlocked ? b.label : (forSale ? `Buy for ${price.toLocaleString()} gold` : `Unlocks at Level ${b.level}`)}
                         >
                             <span className={`bg-swatch-scene${b.id !== "none" ? ` bg-scene bg-${b.id}` : ""}`}>
-                                {!b.unlocked ? <span className="bg-swatch-lock" aria-hidden="true">{forSale ? "🪙" : "🔒"}</span> : null}
+                                {!b.unlocked ? <span className="bg-swatch-lock" aria-hidden="true">{forSale ? "💰" : "🔒"}</span> : null}
                             </span>
                             <span className="bg-swatch-label">{b.label}</span>
                             <span className="bg-swatch-sub muted">
-                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (forSale ? `🪙 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${b.level}`)}
+                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (forSale ? `💰 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${b.level}`)}
                             </span>
                         </button>
                     );

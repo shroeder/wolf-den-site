@@ -22,7 +22,7 @@ export const PERK_META = {
     first_hit: { icon: "🗡️", kind: "proc" },
     erupt: { icon: "🌋", kind: "proc" },
     xp_gain: { icon: "✨", kind: "econ" },
-    gold_find: { icon: "🪙", kind: "econ" },
+    gold_find: { icon: "💰", kind: "econ" },
 };
 
 // petId → { name, key }. The NAME is the flavor; the KEY is the mechanic. (Passive stat lives in

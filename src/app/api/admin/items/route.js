@@ -77,8 +77,8 @@ export async function POST(request) {
             if (body?.gold) {
                 const amt = Math.max(1, Math.min(100000, Math.floor(Number(body.gold) || 0)));
                 await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
-                await recordGift(buyerId, { kind: "gold", title: "🪙 You got gold!", body: `${amt.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "🪙" });
-                after(() => giftNotify(buyerId, "🪙 A gift from The Wolf Den!", `${amt.toLocaleString()} gold just landed in your purse — spend it in the gear shop! ✨`, "gift-gold", { type: "gift_gold", amount: amt }));
+                await recordGift(buyerId, { kind: "gold", title: "💰 You got gold!", body: `${amt.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "💰" });
+                after(() => giftNotify(buyerId, "💰 A gift from The Wolf Den!", `${amt.toLocaleString()} gold just landed in your purse — spend it in the gear shop! ✨`, "gift-gold", { type: "gift_gold", amount: amt }));
                 return noStore({ ok: true, kind: "gold", amount: amt });
             }
             // Grant a specific item.

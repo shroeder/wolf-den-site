@@ -14,7 +14,7 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 export const CHEST_TIERS = {
     wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 68, rare: 27, epic: 5 } },
     iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 34, rare: 42, epic: 21, legendary: 3 } },
-    gold: { label: "Gold Chest", emoji: "🪙", color: "#ffd75e", weights: { rare: 30, epic: 47, legendary: 20, mythic: 3 } },
+    gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 30, epic: 47, legendary: 20, mythic: 3 } },
     mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 36, legendary: 48, mythic: 16 } },
     // Elite chests — the ONLY source of Ascendant/Eternal gear. Never from level-ups; awarded for elite
     // boss performance (tiny chance) or by the owner. Each opens to a guaranteed elite-tier item.

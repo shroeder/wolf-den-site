@@ -57,7 +57,7 @@ export default function BadgeShopClient() {
     return (
         <div>
             <p className="muted" style={{ marginTop: 0 }}>
-                Pure flex — spend your gold on a prestige badge. You&apos;ve got <strong>🪙 {(state?.gold || 0).toLocaleString()}</strong>.
+                Pure flex — spend your gold on a prestige badge. You&apos;ve got <strong>💰 {(state?.gold || 0).toLocaleString()}</strong>.
             </p>
             {msg ? (
                 <p className={msg.ok ? "" : "muted"} style={{ marginTop: 0, color: msg.ok ? "var(--accent, #37e0a1)" : undefined }}>{msg.text}</p>
@@ -78,11 +78,11 @@ export default function BadgeShopClient() {
                                 onClick={() => buy(b.slug, b.label)}
                                 style={{ marginTop: 6 }}
                             >
-                                {busy === b.slug ? "Buying…" : `Buy · 🪙 ${b.price.toLocaleString()}`}
+                                {busy === b.slug ? "Buying…" : `Buy · 💰 ${b.price.toLocaleString()}`}
                             </button>
                         ) : (
                             // Unaffordable: muted-gold price text + hint, not a grey disabled pill.
-                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>🪙 {b.price.toLocaleString()} · need more</span>
+                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>💰 {b.price.toLocaleString()} · need more</span>
                         )}
                     </div>
                 ))}

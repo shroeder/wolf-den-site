@@ -88,7 +88,7 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                             <span className="collectible-icon" style={c.unlocked ? { color: c.color } : undefined}>
                                 <Icon aria-hidden="true" />
                             </span>
-                            <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? `🪙 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
+                            <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? `💰 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
                             {isFeatured ? <span className="collectible-star" aria-hidden="true">★</span> : null}
                         </button>
                     );

@@ -185,7 +185,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         </>
                     ) : (
                         <>
-                            <span className="chest-reward-glyph">🪙</span>
+                            <span className="chest-reward-glyph">💰</span>
                             <div className="chest-reward-name">+{reveal?.gold} gold</div>
                             <div className="chest-reward-sub muted">You already own that gear — take the dust!</div>
                         </>

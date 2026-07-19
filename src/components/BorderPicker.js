@@ -71,11 +71,11 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
                                 ) : (
                                     <span aria-hidden="true">{initial}</span>
                                 )}
-                                {!b.unlocked ? <span className="border-swatch-lock" aria-hidden="true">{forSale ? "🪙" : "🔒"}</span> : null}
+                                {!b.unlocked ? <span className="border-swatch-lock" aria-hidden="true">{forSale ? "💰" : "🔒"}</span> : null}
                             </span>
                             <span className="border-swatch-label">{b.label}</span>
                             <span className="border-swatch-sub muted">
-                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : (forSale ? `🪙 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${b.level}`))}
+                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : (forSale ? `💰 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${b.level}`))}
                             </span>
                         </button>
                     );

@@ -130,13 +130,13 @@ export default function BountyComposer({ gold = 0 }) {
                     <label className="bounty-field-label" htmlFor="b-amt">Reward (your gold)</label>
                     <input id="b-amt" type="number" inputMode="numeric" min={MIN_BOUNTY} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={`${MIN_BOUNTY}+`} />
                     <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.8rem" }}>
-                        🪙 You have {gold.toLocaleString()} gold{amt > 0 ? ` · reserving ${amt.toLocaleString()}` : ""}.
+                        💰 You have {gold.toLocaleString()} gold{amt > 0 ? ` · reserving ${amt.toLocaleString()}` : ""}.
                     </p>
                 </div>
 
                 {err ? <p style={{ color: "#e66", margin: 0 }}>{err}</p> : null}
                 <button type="submit" className="btn-gold" disabled={busy || uploading} style={{ width: "100%" }}>
-                    {busy ? "Posting…" : `Post bounty${amt >= MIN_BOUNTY ? ` · reserve 🪙 ${amt.toLocaleString()}` : ""}`}
+                    {busy ? "Posting…" : `Post bounty${amt >= MIN_BOUNTY ? ` · reserve 💰 ${amt.toLocaleString()}` : ""}`}
                 </button>
             </form>
         </section>

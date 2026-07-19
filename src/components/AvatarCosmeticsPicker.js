@@ -85,7 +85,7 @@ export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "
                                             title={c.unlocked ? `${c.label} — ${c.hint}` : (forSale ? `Buy for ${price.toLocaleString()} gold` : `Unlocks at Level ${c.level}`)}
                                         >
                                             <span aria-hidden="true">{c.icon}</span> {c.label}
-                                            {!c.unlocked ? <span className="cos-chip-lock"> · {forSale ? `🪙 ${price.toLocaleString()}` : `Lv ${c.level}`}</span> : null}
+                                            {!c.unlocked ? <span className="cos-chip-lock"> · {forSale ? `💰 ${price.toLocaleString()}` : `Lv ${c.level}`}</span> : null}
                                         </button>
                                     );
                                 })}

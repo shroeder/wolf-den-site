@@ -71,10 +71,10 @@ export async function giveawayGold({ amount = 100 } = {}) {
     const ids = await activeHeroIds();
     for (const id of ids) {
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [id, gold]).catch(() => {});
-        await recordGift(id, { kind: "gold", title: "🪙 Free gold!", body: `${gold.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "🪙" });
+        await recordGift(id, { kind: "gold", title: "💰 Free gold!", body: `${gold.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "💰" });
     }
     await pushAll(ids, {
-        title: "🪙 Free gold!",
+        title: "💰 Free gold!",
         body: `${gold} gold just dropped into your purse — spend it in the gear shop!`,
         url: "/marketplace/inventory",
         tag: "giveaway-gold",

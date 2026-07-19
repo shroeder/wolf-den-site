@@ -65,11 +65,11 @@ export default function FramePicker({ current = "none", level = 1, unlockAll = f
                         >
                             <span className={`bg-swatch-scene frame-swatch${f.id !== "none" ? ` frame frame-${f.id}` : ""}`}>
                                 <span className="frame-swatch-mark" aria-hidden="true">{f.icon}</span>
-                                {!f.unlocked ? <span className="bg-swatch-lock" aria-hidden="true">{forSale ? "🪙" : "🔒"}</span> : null}
+                                {!f.unlocked ? <span className="bg-swatch-lock" aria-hidden="true">{forSale ? "💰" : "🔒"}</span> : null}
                             </span>
                             <span className="bg-swatch-label">{f.label}</span>
                             <span className="bg-swatch-sub muted">
-                                {f.unlocked ? (isSel ? "Equipped ✓" : f.hint) : (f.requiresBadges ? f.lockLabel : (forSale ? `🪙 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${f.level}`))}
+                                {f.unlocked ? (isSel ? "Equipped ✓" : f.hint) : (f.requiresBadges ? f.lockLabel : (forSale ? `💰 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${f.level}`))}
                             </span>
                         </button>
                     );

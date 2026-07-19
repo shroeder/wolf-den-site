@@ -131,7 +131,7 @@ export default function PetsClient() {
                             Collect companions from leveling, the shop, achievements, chests, and boss drops. <strong>Every pet you own</strong> adds a passive Fortune bonus that stacks — <strong>equip one</strong> for a stronger active buff.
                         </p>
                     </div>
-                    {state?.signedIn ? <span className="pill">🪙 {state.gold.toLocaleString()}</span> : null}
+                    {state?.signedIn ? <span className="pill">💰 {state.gold.toLocaleString()}</span> : null}
                 </div>
                 {state ? (
                     <>
@@ -211,7 +211,7 @@ export default function PetsClient() {
                                     </>
                                 ) : pet.source === "shop" ? (
                                     <button type="button" className="btn-gold pet-btn" onClick={() => action(pet.id, "buy")} disabled={!canBuy || busy === pet.id}>
-                                        {busy === pet.id ? "…" : `Buy · 🪙 ${petPrice(pet).toLocaleString()}`}
+                                        {busy === pet.id ? "…" : `Buy · 💰 ${petPrice(pet).toLocaleString()}`}
                                     </button>
                                 ) : (
                                     <div className="pet-locked">🔒 {petUnlockText(pet)}</div>

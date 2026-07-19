@@ -49,7 +49,7 @@ export default function QuestsClient() {
                         <div key={q.key} className={`quest${q.claimed ? " is-claimed" : ""}${q.done && !q.claimed ? " is-ready" : ""}`}>
                             <div className="quest-main">
                                 <div className="quest-label">{q.label}</div>
-                                <div className="quest-reward">🪙 {q.rewardGold.toLocaleString()}{q.rewardChest ? ` · ${q.rewardChest.emoji} ${q.rewardChest.label}` : ""}</div>
+                                <div className="quest-reward">💰 {q.rewardGold.toLocaleString()}{q.rewardChest ? ` · ${q.rewardChest.emoji} ${q.rewardChest.label}` : ""}</div>
                                 <div className="quest-bar"><span style={{ width: `${pct}%` }} /></div>
                                 <div className="quest-prog">{Math.min(q.progress, q.target).toLocaleString()} / {q.target.toLocaleString()}</div>
                                 {/* Not done yet → a call-to-action link straight to where they complete it. */}
@@ -115,7 +115,7 @@ function QuestReward({ reward, onClose }) {
                 </div>
                 <div className="quest-cele-badge">✅</div>
                 <div className="quest-cele-title">Quest Complete!</div>
-                <div className="quest-cele-gold">🪙 +{shown.toLocaleString()}</div>
+                <div className="quest-cele-gold">💰 +{shown.toLocaleString()}</div>
                 {reward.chest ? <div className="quest-cele-chest">{reward.chest.emoji} {reward.chest.label}!</div> : null}
                 <button type="button" className="button gold" onClick={onClose}>Nice!</button>
             </div>

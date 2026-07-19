@@ -49,7 +49,7 @@ export default async function BadgesPage() {
             </section>
 
             <section className="card">
-                <h2 style={{ marginTop: 0 }}>🪙 Badge shop</h2>
+                <h2 style={{ marginTop: 0 }}>💰 Badge shop</h2>
                 <BadgeShopClient />
             </section>
 
@@ -70,7 +70,7 @@ export default async function BadgesPage() {
                                     <span className="badge-tile-status muted">{b.progress.current.toLocaleString()} / {b.progress.target.toLocaleString()}</span>
                                 </span>
                             ) : b.goldPrice != null ? (
-                                <span className="badge-tile-status muted">🪙 {b.goldPrice.toLocaleString()} · in shop</span>
+                                <span className="badge-tile-status muted">💰 {b.goldPrice.toLocaleString()} · in shop</span>
                             ) : b.dropOnly ? (
                                 <span className="badge-tile-status muted">Drop only 🎁</span>
                             ) : (

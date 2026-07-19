@@ -49,7 +49,7 @@ export default function BountyBoardClient() {
                     </div>
                     <Link href="/marketplace/bounties/new" className="btn-gold">+ Post a bounty</Link>
                 </div>
-                {gold != null ? <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.85rem" }}>🪙 You have {gold.toLocaleString()} gold to put on bounties.</p> : null}
+                {gold != null ? <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.85rem" }}>💰 You have {gold.toLocaleString()} gold to put on bounties.</p> : null}
             </section>
 
             <div className="bounty-filters">
@@ -81,7 +81,7 @@ export default function BountyBoardClient() {
                             {b.images?.length ? <img src={b.images[0]} alt="" className="bounty-card-img" /> : null}
                             {b.description ? <div className="bounty-card-desc muted">{b.description}</div> : null}
                             <div className="bounty-card-foot">
-                                <span className="bounty-reward">🪙 {b.reward.toLocaleString()}</span>
+                                <span className="bounty-reward">💰 {b.reward.toLocaleString()}</span>
                                 <span className="muted">{b.claimCount} on it · {expiresIn(b.expiresAt)}</span>
                             </div>
                             <div className="bounty-card-creator muted">

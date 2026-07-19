@@ -54,7 +54,7 @@ export const PET_STAT_META = {
     ferocity: { label: "Ferocity", icon: "🔥" },
     fortune: { label: "Fortune", icon: "🍀" },
     xp_gain: { label: "XP Gain", icon: "✨" },
-    gold_find: { label: "Gold Find", icon: "🪙" },
+    gold_find: { label: "Gold Find", icon: "💰" },
 };
 
 const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal", celestial: "Celestial", primordial: "Primordial" };

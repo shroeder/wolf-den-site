@@ -125,7 +125,7 @@ export default function ConsumablesClient() {
                 </div>
             ) : null}
 
-            <h3 style={{ margin: "6px 0" }}>🪙 Shop</h3>
+            <h3 style={{ margin: "6px 0" }}>💰 Shop</h3>
             <div className="badge-board">
                 {(state.shop || []).map((i) => (
                     <div key={i.id} className="badge-tile">
@@ -134,12 +134,12 @@ export default function ConsumablesClient() {
                         <span className="badge-tile-desc muted">{KIND_LABEL[i.kind] || ""} · {i.desc}</span>
                         {i.canAfford ? (
                             <button type="button" className="btn btn-small" disabled={busy === `buy:${i.id}`} onClick={() => post({ id: i.id, action: "buy" }, `buy:${i.id}`)} style={{ marginTop: 6 }}>
-                                {busy === `buy:${i.id}` ? "Buying…" : `Buy · 🪙 ${i.price.toLocaleString()}`}
+                                {busy === `buy:${i.id}` ? "Buying…" : `Buy · 💰 ${i.price.toLocaleString()}`}
                             </button>
                         ) : (
                             // Unaffordable: muted-gold price text with a hint, matching the gear shop — no grey
                             // disabled pill (which read like highlighted text).
-                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>🪙 {i.price.toLocaleString()} · need more</span>
+                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>💰 {i.price.toLocaleString()} · need more</span>
                         )}
                     </div>
                 ))}

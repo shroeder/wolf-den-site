@@ -8,7 +8,7 @@ function Side({ label, items, gold }) {
     if (!items.length && !gold) return <span className="muted">nothing</span>;
     return (
         <span className="trade-side">
-            {gold ? <span className="trade-gold">🪙 {gold.toLocaleString()}</span> : null}
+            {gold ? <span className="trade-gold">💰 {gold.toLocaleString()}</span> : null}
             {items.map((it) => {
                 const Icon = itemIcon(it.icon);
                 return <span key={it.id} className={`trade-item rar-${it.rarity}`} title={it.name}><Icon aria-hidden="true" /> {it.name}</span>;

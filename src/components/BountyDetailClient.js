@@ -84,7 +84,7 @@ export default function BountyDetailClient({ initial, signedIn }) {
                     {isOpen ? ` · ${expiresIn(bounty.expiresAt)}` : ""}
                 </p>
 
-                <div className="bounty-reward-big">🪙 {bounty.reward.toLocaleString()} <span className="muted" style={{ fontSize: "0.7em", fontWeight: 600 }}>reserved reward</span></div>
+                <div className="bounty-reward-big">💰 {bounty.reward.toLocaleString()} <span className="muted" style={{ fontSize: "0.7em", fontWeight: 600 }}>reserved reward</span></div>
 
                 {bounty.description ? <p style={{ whiteSpace: "pre-wrap", marginTop: 10 }}>{bounty.description}</p> : null}
 
@@ -108,7 +108,7 @@ export default function BountyDetailClient({ initial, signedIn }) {
                             <div key={p.id} className={`bounty-person${p.isWinner ? " is-winner" : ""}`}>
                                 {p.spriteUrl ? <img src={p.spriteUrl} alt="" /> : <span className="bounty-person-fallback">{(p.name || "?").slice(0, 1)}</span>}
                                 <span>{p.alias ? `@${p.alias}` : p.name}</span>
-                                {p.isWinner ? <span className="bounty-payout">🪙 {p.payout.toLocaleString()}</span> : null}
+                                {p.isWinner ? <span className="bounty-payout">💰 {p.payout.toLocaleString()}</span> : null}
                             </div>
                         ))}
                     </div>

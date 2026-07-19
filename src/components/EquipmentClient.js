@@ -161,7 +161,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
 
             {/* Live stat total */}
             <div className="equip-stats card">
-                <h3>⚔️ Combat stats <span className="equip-gold">🪙 {(data.gold || 0).toLocaleString()}</span></h3>
+                <h3>⚔️ Combat stats <span className="equip-gold">💰 {(data.gold || 0).toLocaleString()}</span></h3>
                 {statEntries.length ? (
                     <div className="equip-stat-grid">
                         {statEntries.map(([k, v]) => (
@@ -271,7 +271,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
             {/* Gold shop */}
             {(data.shop || []).length ? (
                 <div className="card">
-                    <h3>🪙 Shop <span className="equip-gold">{(data.gold || 0).toLocaleString()} gold</span></h3>
+                    <h3>💰 Shop <span className="equip-gold">{(data.gold || 0).toLocaleString()} gold</span></h3>
                     <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear.</p>
                     <div className="equip-bag-grid">
                         {(data.shop || []).map((i) => {
@@ -282,7 +282,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                                     <span className="equip-card-name">{i.name}</span>
                                     <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
                                     <span className="equip-card-stats">{i.statsText}</span>
-                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>💰 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                 </button>
                             );
                         })}
@@ -305,11 +305,11 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setName ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p> : null}
-                        {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {(detailItem.cost || 0).toLocaleString()} gold{detailItem.canAfford ? "" : " · not enough"}</p> : null}
+                        {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>💰 {(detailItem.cost || 0).toLocaleString()} gold{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                             {detailItem.shop ? (
                                 <button type="button" className="button gold" onClick={() => { buy(detailItem.id); closeDetail(); }} disabled={busy || !detailItem.canAfford}>
-                                    🪙 {detailItem.canAfford ? `Buy for ${(detailItem.cost || 0).toLocaleString()}` : `${(detailItem.cost || 0).toLocaleString()} · need more`}
+                                    💰 {detailItem.canAfford ? `Buy for ${(detailItem.cost || 0).toLocaleString()}` : `${(detailItem.cost || 0).toLocaleString()} · need more`}
                                 </button>
                             ) : detailItem.equipped ? (
                                 <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
@@ -318,7 +318,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                             )}
                             {!detailItem.shop && detailItem.sellValue > 0 ? (
                                 sellArmed ? (
-                                    <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>
+                                    <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 💰 {detailItem.sellValue}</button>
                                 ) : (
                                     <button type="button" className="pill" onClick={() => setSellArmed(true)} disabled={busy}>💰 Sell for {detailItem.sellValue}</button>
                                 )
@@ -333,9 +333,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
             {coinBurst ? createPortal((
                 <div className="coinfx" key={coinBurst.key} aria-hidden="true">
                     {coinBurst.coins.map((c, i) => (
-                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>🪙</span>
+                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>💰</span>
                     ))}
-                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 🪙</div>
+                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 💰</div>
                 </div>
             ), document.body) : null}
 

@@ -101,7 +101,7 @@ export default function BossFightClient() {
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
             {you ? (
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
-                    <a href="/marketplace/inventory" style={{ fontWeight: 800, color: "#ffd75e", background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.38)", borderRadius: 999, padding: "3px 14px", fontSize: "0.9rem", textDecoration: "none" }}>🪙 {(you.gold || 0).toLocaleString()} gold · shop →</a>
+                    <a href="/marketplace/inventory" style={{ fontWeight: 800, color: "#ffd75e", background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.38)", borderRadius: 999, padding: "3px 14px", fontSize: "0.9rem", textDecoration: "none" }}>💰 {(you.gold || 0).toLocaleString()} gold · shop →</a>
                 </div>
             ) : null}
 
