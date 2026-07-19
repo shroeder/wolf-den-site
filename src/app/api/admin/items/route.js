@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_ORDER, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { ITEMS, describeStats } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { sendBuyerPush } from "@/lib/push/send.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
@@ -34,10 +35,15 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            const items = ITEMS.map((i) => ({
-                id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, reqLevel: i.reqLevel,
-                stats: describeStats(i.stats), charged: Boolean(i.charged), chargeRewardLabel: i.chargeRewardLabel || null, source: i.source,
-            }));
+            const items = ITEMS.map((i) => {
+                const sig = signatureFor(i.id);
+                return {
+                    id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, reqLevel: i.reqLevel,
+                    stats: describeStats(i.stats), charged: Boolean(i.charged), chargeRewardLabel: i.chargeRewardLabel || null,
+                    charges: i.charges || null, cooldownDays: i.cooldownDays || null, source: i.source,
+                    signature: sig ? `${sig.label}: ${sig.desc}` : null,
+                };
+            });
             const chestTiers = CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji }));
             return noStore({ items, chestTiers });
         } catch (error) {
