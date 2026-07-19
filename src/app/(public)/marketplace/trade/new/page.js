@@ -26,7 +26,9 @@ export default async function NewTradePage({ searchParams }) {
         <div className="stack reveal">
             <section className="card" style={{ background: "radial-gradient(120% 150% at 0% 0%, rgba(93,124,255,0.20), transparent 62%)", borderColor: "rgba(93,124,255,0.45)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <span style={{ fontSize: "2.1rem", flexShrink: 0 }} aria-hidden="true">🔄</span>
+                    <span style={{ flexShrink: 0, display: "grid", placeItems: "center", width: 46, height: 46, borderRadius: 12, background: "rgba(255,215,94,0.14)", border: "1px solid rgba(255,215,94,0.4)" }} aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#ffd75e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+                    </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <h1 style={{ margin: 0, fontSize: "1.4rem" }}>Propose a trade</h1>
                         <p className="muted" style={{ margin: "3px 0 0", fontSize: "0.95rem" }}>with <Link href={`/marketplace/u/${target.alias}`} style={{ color: "#ffd75e", fontWeight: 800, textDecoration: "none" }}>{target.displayLabel}</Link></p>
