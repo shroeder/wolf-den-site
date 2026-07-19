@@ -72,7 +72,7 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                 {items.map((c) => {
                     const Icon = c.Icon;
                     const isFeatured = featured === c.id && c.unlocked;
-                    const forSale = !c.unlocked && !unlockedOnly;
+                    const forSale = !c.unlocked && !unlockedOnly && !c.eliteOnly;
                     const price = forSale ? cosmeticPrice("pet", c.level) : 0;
                     const canAfford = gold >= price;
                     const clickable = (selectable && c.unlocked) || (forSale && canAfford);
@@ -83,12 +83,12 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                             onClick={() => onTap(c, forSale, price)}
                             disabled={busy || !clickable}
                             className={`collectible rar-${c.rarity} ${c.unlocked ? "is-unlocked" : "is-locked"}${isFeatured ? " is-featured" : ""}${clickable ? " is-clickable" : ""}`}
-                            title={c.unlocked ? `${c.name} — ${c.hint}${selectable ? (isFeatured ? " · featured (tap to remove)" : " · tap to feature") : ""}` : (forSale ? `${c.name} · buy for ${price.toLocaleString()} gold` : `${c.name} · unlocks at Level ${c.level}`)}
+                            title={c.unlocked ? `${c.name} — ${c.hint}${selectable ? (isFeatured ? " · featured (tap to remove)" : " · tap to feature") : ""}` : c.eliteOnly ? `${c.name} · ${c.hint} — unlocked only by obtaining a top-rarity (${c.rarity}) item` : (forSale ? `${c.name} · buy for ${price.toLocaleString()} gold` : `${c.name} · unlocks at Level ${c.level}`)}
                         >
                             <span className="collectible-icon" style={c.unlocked ? { color: c.color } : undefined}>
                                 <Icon aria-hidden="true" />
                             </span>
-                            <span className="collectible-name">{c.unlocked ? c.name : (forSale ? `🪙 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
+                            <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? `🪙 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
                             {isFeatured ? <span className="collectible-star" aria-hidden="true">★</span> : null}
                         </button>
                     );

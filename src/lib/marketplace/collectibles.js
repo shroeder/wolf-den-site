@@ -6,7 +6,7 @@ import {
     GiRabbit, GiFrog, GiChicken, GiCat, GiFox, GiWolfHead, GiOwl, GiBearFace, GiRaven, GiSnake, GiDeer,
     GiBat, GiScorpion, GiTigerHead, GiSeahorse, GiEagleEmblem, GiLion, GiGorilla, GiCrocJaws, GiHydra,
     GiGriffinSymbol, GiUnicorn, GiSpikedDragonHead, GiPegasus, GiDinosaurRex, GiWhaleTail, GiChameleonGlyph,
-    GiDragonHead,
+    GiDragonHead, GiDragonSpiral, GiSpectre,
 } from "react-icons/gi";
 
 // spritePrompt = the creature descriptor fed to the AI when generating each pet's battle sprite.
@@ -39,7 +39,16 @@ export const COLLECTIBLES = [
     { id: "sky_whale", name: "Sky Whale", Icon: GiWhaleTail, color: "#5a9bff", level: 84, rarity: "mythic", hint: "Swims the clouds", spritePrompt: "a majestic floating sky whale with cloud wisps" },
     { id: "chameleon", name: "Prismatic Chameleon", Icon: GiChameleonGlyph, color: "#b45aff", level: 90, rarity: "mythic", hint: "Every color at once", spritePrompt: "a colour-shifting rainbow prismatic chameleon" },
     { id: "elder_dragon", name: "Elder Dragon", Icon: GiDragonHead, color: "#ff5a7a", level: 100, rarity: "mythic", hint: "The apex companion", spritePrompt: "a legendary majestic elder dragon" },
+    // ELITE pets — NOT unlockable by level (level 999). The only way to get them is to obtain a top-rarity
+    // item: any Ascendant item unlocks the Molten Phoenix; any Eternal item unlocks the Eternal Wolf Spirit.
+    { id: "molten_phoenix", name: "Molten Phoenix", Icon: GiDragonSpiral, color: "#ff7a3c", level: 999, rarity: "ascendant", eliteOnly: true, unlockRarity: "ascendant", hint: "Reborn from Ascendant fire", spritePrompt: "a blazing molten phoenix wreathed in orange-gold fire and embers, radiating heat" },
+    { id: "eternal_wolf", name: "Eternal Wolf Spirit", Icon: GiSpectre, color: "#ff5cc8", level: 999, rarity: "eternal", eliteOnly: true, unlockRarity: "eternal", hint: "Bound to an Eternal relic", spritePrompt: "a majestic ghostly wolf spirit glowing with impossible prismatic rainbow light, ethereal and translucent" },
 ];
+
+// The elite pet unlocked by obtaining an item of a given top rarity (or null).
+export function elitePetForRarity(rarity) {
+    return COLLECTIBLES.find((c) => c.eliteOnly && c.unlockRarity === rarity) || null;
+}
 
 export function collectibleById(id) {
     return COLLECTIBLES.find((c) => c.id === id) || null;

@@ -25,7 +25,7 @@ function buyableDef(category, ref) {
     const c = CATS[category];
     if (!c) return null;
     const def = c.list.find((i) => i.id === ref);
-    if (!def || def.id === "none" || def.requiresBadges) return null;
+    if (!def || def.id === "none" || def.requiresBadges || def.eliteOnly) return null;
     return def;
 }
 

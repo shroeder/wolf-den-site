@@ -1,10 +1,12 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { getMemberMetrics, progressForRule } from "@/lib/marketplace/badges.js";
+import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
+import { elitePetForRarity } from "@/lib/marketplace/collectibles.js";
+import { recordGift } from "@/lib/marketplace/gifts.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // Equipped item stats merged with any active set-bonus stats (the single source combat + the UI read).
@@ -304,7 +306,22 @@ export async function grantItem(buyerId, itemId, via = "admin") {
             [buyerId, itemId, via, item.charged ? item.charges : 0]
         )
         .catch(() => []);
-    return { ok: true, granted: rows.length > 0 };
+    const granted = rows.length > 0;
+    // Getting a NEW top-rarity item unlocks its elite pet + re-checks the Ascendant/Eternal badges.
+    if (granted && (item.rarity === "ascendant" || item.rarity === "eternal")) await onEliteItemGained(buyerId, item).catch(() => {});
+    return { ok: true, granted };
+}
+
+// Elite-item side effects: unlock the matching pet (via the cosmetic-unlock store) + sync elite badges.
+async function onEliteItemGained(buyerId, item) {
+    const pet = elitePetForRarity(item.rarity);
+    if (pet) {
+        const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, pet.id]).catch(() => []);
+        if (ins.length) {
+            await recordGift(buyerId, { kind: "item", title: "🐾 Legendary companion unlocked!", body: `Your ${item.rarity} gear awakened the ${pet.name} — equip it from your collectibles!`, icon: "🐾", url: "/marketplace/profile" }).catch(() => {});
+        }
+    }
+    await syncEarnedBadges(buyerId).catch(() => {});
 }
 
 // Auto-grant the level/milestone items a member now qualifies for (source: 'level'). Like pets unlocking.

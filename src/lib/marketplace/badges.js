@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { itemById } from "@/lib/marketplace/items.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
@@ -107,6 +108,16 @@ export async function getMemberMetrics(buyerId) {
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => null),
     ]);
 
+    // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
+    const ownedItemRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    let eliteItems = 0, eternalItems = 0;
+    for (const r of ownedItemRows) {
+        const d = itemById(r.item_id);
+        if (!d) continue;
+        if (d.rarity === "ascendant" || d.rarity === "eternal") eliteItems++;
+        if (d.rarity === "eternal") eternalItems++;
+    }
+
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
     const allMilestones = ["spend", "first_purchase", "event_checkin", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
     // Onboarding completionist: every one-time getting-started task done (the EARN checklist's one-timers).
@@ -140,6 +151,8 @@ export async function getMemberMetrics(buyerId) {
         bossDamage: bossRow?.dmg || 0,
         bossesFought: bossRow?.bosses || 0,
         bossesWon: bossWonRow?.n || 0,
+        eliteItems,
+        eternalItems,
     };
 }
 
@@ -169,6 +182,8 @@ export function progressForRule(rule, threshold, m) {
         case "boss_damage": return { current: m.bossDamage, target: t };
         case "bosses_fought": return { current: m.bossesFought, target: t };
         case "bosses_won": return { current: m.bossesWon, target: t };
+        case "elite_items": return { current: m.eliteItems, target: t };
+        case "eternal_items": return { current: m.eternalItems, target: t };
         default: return { current: 0, target: t || 1 };
     }
 }

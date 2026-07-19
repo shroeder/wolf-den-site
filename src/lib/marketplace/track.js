@@ -37,6 +37,8 @@ function progressLabel(rule, current, target) {
         case "donation_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} donated`;
         case "boss_hits": return `${current} / ${target} boss hits`;
         case "boss_damage": return `${current.toLocaleString()} / ${target.toLocaleString()} boss dmg`;
+        case "elite_items": return `${current} / ${target} elite item${target === 1 ? "" : "s"}`;
+        case "eternal_items": return `${current} / ${target} Eternal relic${target === 1 ? "" : "s"}`;
         default: return `${current} / ${target}`;
     }
 }
