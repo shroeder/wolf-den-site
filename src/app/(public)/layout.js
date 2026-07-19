@@ -5,6 +5,7 @@ import RewardNudge from "@/components/RewardNudge";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import SocialHub from "@/components/SocialHub";
+import TrafficBeacon from "@/components/TrafficBeacon";
 import WebPushManager from "@/components/WebPushManager";
 
 export default function PublicLayout({ children }) {
@@ -23,6 +24,8 @@ export default function PublicLayout({ children }) {
             <SocialHub />
             {/* Registers the push service worker + offers to turn on browser notifications (signed-in). */}
             <WebPushManager />
+            {/* Logs a page_view for every visitor (incl. anonymous) — powers the admin traffic telemetry. */}
+            <TrafficBeacon />
         </>
     );
 }
