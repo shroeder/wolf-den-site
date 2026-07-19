@@ -323,8 +323,10 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
 // emails the member a congratulations (best-effort).
 export async function grantBadge(buyerId, slug, awardedBy = "admin") {
     if (!buyerId || !slug) return { ok: false, error: "missing_params" };
-    const def = await db.queryOne(`SELECT slug, label, icon, description FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
+    const def = await db.queryOne(`SELECT slug, label, icon, description, auto_rule FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
     if (!def) return { ok: false, error: "unknown_badge" };
+    // Auto-earned badges (level/spend/leaderboard-place/etc.) are never hand-assignable by an admin.
+    if (awardedBy === "admin" && def.auto_rule) return { ok: false, error: "auto_earned" };
     const inserted = await db
         .query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, slug, awardedBy])
         .catch(() => []);
