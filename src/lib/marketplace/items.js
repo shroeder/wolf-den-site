@@ -33,11 +33,24 @@ export const STAT_META = {
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra daily attacks on the boss.", suffix: "" },
 };
 
-// Charged-perk reward keys → the real-world thing you hand over in-store.
+// Charged-perk reward keys → the real-world thing you hand over in-store. Redeemed via the admin app
+// (Items & Gear), each use burns a charge and starts the item's cooldown. Keep keys STABLE (redemptions
+// are logged by key).
 export const REWARDS = {
-    free_pack_10: "Free Pokémon booster pack (up to $10)",
-    discount_10_over_100: "10% off a purchase over $100",
     free_single_5: "Free single card (up to $5)",
+    free_pack_10: "Free booster pack (up to $10)",
+    free_pack_25: "Free premium pack (up to $25)",
+    discount_5_any: "5% off any purchase",
+    discount_10_over_100: "10% off a purchase over $100",
+    discount_15_over_150: "15% off a purchase over $150",
+    free_sleeves: "Free pack of card sleeves",
+    free_deckbox: "Free deck box",
+    free_drink: "Free drink from the cooler",
+    free_event_entry: "Free entry to a Friday event",
+    free_grab_bag: "Free mystery grab bag",
+    free_playmat: "Free playmat",
+    trade_bonus_10: "+10% bonus on your next trade-in",
+    buy2get1_singles: "Buy 2 get 1 free on singles",
 };
 
 const ICONS = {
@@ -301,6 +314,24 @@ export const ITEMS = [
     // -- Rings --
     { id: "bone_ring", name: "Bone Ring", slot: "ring", rarity: "common", icon: "GiFangedSkull", flavor: "A grim little band.", stats: { might: 10 }, reqLevel: 5, source: "chest", sort: 470 },
     { id: "droplet_ring", name: "Droplet Ring", slot: "ring", rarity: "rare", icon: "GiDropletSplash", flavor: "A bead of pure luck.", stats: { fortune: 16 }, reqLevel: 20, source: "chest", sort: 471 },
+
+    // ===== REAL-WORLD PERK ITEMS (source: "admin", charged) — the owner hands these out; they never drop
+    // from loot. Redeemed in-store via the admin app (burns a charge + starts the cooldown). Modest stats:
+    // the perk is the prize. Reuse existing icons to stay build-safe. =====
+    { id: "coppers_token", name: "Copper Patron Token", slot: "amulet", rarity: "common", icon: "GiCharm", flavor: "Good for a cold one.", stats: { fortune: 8 }, reqLevel: 5, source: "admin", charged: true, charges: 3, cooldownDays: 14, chargeReward: "free_drink", chargeRewardLabel: REWARDS.free_drink, sort: 500 },
+    { id: "sleeve_charm", name: "Sleeve Charm", slot: "amulet", rarity: "common", icon: "GiGemPendant", flavor: "Protect your cards.", stats: { ferocity: 8 }, reqLevel: 5, source: "admin", charged: true, charges: 2, cooldownDays: 30, chargeReward: "free_sleeves", chargeRewardLabel: REWARDS.free_sleeves, sort: 501 },
+    { id: "singles_signet", name: "Singles Signet", slot: "ring", rarity: "rare", icon: "GiSwirlRing", flavor: "One for the collection.", stats: { might: 6, fortune: 6 }, reqLevel: 10, source: "admin", charged: true, charges: 3, cooldownDays: 30, chargeReward: "free_single_5", chargeRewardLabel: REWARDS.free_single_5, sort: 502 },
+    { id: "deckbox_charm", name: "Deckbox Charm", slot: "amulet", rarity: "rare", icon: "GiFeatherNecklace", flavor: "A home for your deck.", stats: { ferocity: 12 }, reqLevel: 12, source: "admin", charged: true, charges: 1, cooldownDays: 30, chargeReward: "free_deckbox", chargeRewardLabel: REWARDS.free_deckbox, sort: 503 },
+    { id: "event_pass", name: "Friday Night Pass", slot: "amulet", rarity: "rare", icon: "GiPrayerBeads", flavor: "See you at the table.", stats: { fortune: 12 }, reqLevel: 12, source: "admin", charged: true, charges: 2, cooldownDays: 30, chargeReward: "free_event_entry", chargeRewardLabel: REWARDS.free_event_entry, sort: 504 },
+    { id: "patrons_band", name: "Patron's Band", slot: "ring", rarity: "epic", icon: "GiPowerRing", flavor: "A friend of the house.", stats: { might: 6, fortune: 8 }, reqLevel: 15, source: "admin", charged: true, charges: 2, cooldownDays: 30, chargeReward: "free_pack_10", chargeRewardLabel: REWARDS.free_pack_10, sort: 505 },
+    { id: "bargainers_signet", name: "Bargainer's Signet", slot: "ring", rarity: "epic", icon: "GiDiamondRing", flavor: "Every little bit helps.", stats: { fortune: 14 }, reqLevel: 18, source: "admin", charged: true, charges: 3, cooldownDays: 30, chargeReward: "discount_5_any", chargeRewardLabel: REWARDS.discount_5_any, sort: 506 },
+    { id: "grabbag_charm", name: "Lucky Grab Charm", slot: "amulet", rarity: "epic", icon: "GiEmeraldNecklace", flavor: "You never know.", stats: { fortune: 14 }, reqLevel: 20, source: "admin", charged: true, charges: 1, cooldownDays: 45, chargeReward: "free_grab_bag", chargeRewardLabel: REWARDS.free_grab_bag, sort: 507 },
+    { id: "traders_charm", name: "Trader's Charm", slot: "amulet", rarity: "epic", icon: "GiIntricateNecklace", flavor: "Deal from strength.", stats: { fortune: 14 }, reqLevel: 22, source: "admin", charged: true, charges: 3, cooldownDays: 30, chargeReward: "trade_bonus_10", chargeRewardLabel: REWARDS.trade_bonus_10, sort: 508 },
+    { id: "highroller_ring", name: "High Roller's Ring", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "Spend big, save big.", stats: { fortune: 16 }, reqLevel: 30, source: "admin", charged: true, charges: 1, cooldownDays: 45, chargeReward: "discount_10_over_100", chargeRewardLabel: REWARDS.discount_10_over_100, sort: 509 },
+    { id: "playmat_medallion", name: "Playmat Medallion", slot: "amulet", rarity: "legendary", icon: "GiTribalPendant", flavor: "Play in style.", stats: { ferocity: 16 }, reqLevel: 30, source: "admin", charged: true, charges: 1, cooldownDays: 60, chargeReward: "free_playmat", chargeRewardLabel: REWARDS.free_playmat, sort: 510 },
+    { id: "premium_signet", name: "Premium Signet", slot: "ring", rarity: "legendary", icon: "GiFireRing", flavor: "For the discerning collector.", stats: { might: 8, fortune: 8 }, reqLevel: 35, source: "admin", charged: true, charges: 1, cooldownDays: 60, chargeReward: "free_pack_25", chargeRewardLabel: REWARDS.free_pack_25, sort: 511 },
+    { id: "patrons_crown", name: "Patron's Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "The house bows to you.", stats: { might: 8, fortune: 8 }, reqLevel: 40, source: "admin", charged: true, charges: 1, cooldownDays: 90, chargeReward: "discount_15_over_150", chargeRewardLabel: REWARDS.discount_15_over_150, sort: 512 },
+    { id: "founders_ring", name: "Founder's Ring", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "First among the pack.", stats: { might: 8, crit_chance: 8 }, reqLevel: 40, source: "admin", charged: true, charges: 2, cooldownDays: 60, chargeReward: "buy2get1_singles", chargeRewardLabel: REWARDS.buy2get1_singles, sort: 513 },
 ];
 
 export function itemById(id) {
