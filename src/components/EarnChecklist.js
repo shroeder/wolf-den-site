@@ -5,7 +5,7 @@ import Link from "next/link";
 // ones show their earned state. Shared by /marketplace/rewards and the profile hub.
 // `repeatable` items can be earned again, so their "done" reads as an ongoing state, not a finish line.
 export const EARN = [
-    { key: "spend", icon: "🛒", label: "Every $1 spent", points: "+1 XP", note: "in-store & online", href: "/shop", cta: "Shop now →", doneNote: "You're earning on purchases", repeatable: true },
+    { key: "spend", icon: "🛒", label: "Every $1 spent", points: "+5 XP", note: "in-store & online", href: "/shop", cta: "Shop now →", doneNote: "You're earning on purchases", repeatable: true },
     { key: "first_purchase", icon: "⭐", label: "Your first purchase", points: "+100 XP", note: "one-time bonus", href: "/shop", cta: "Make a purchase →" },
     { key: "event_checkin", icon: "📅", label: "Check in at an event", points: "+50 XP", note: "each event", href: "/events", cta: "See events →", doneNote: "Checked in before", repeatable: true },
     { key: "discord_link", icon: "💬", label: "Link your Discord", points: "+50 XP", note: "join the server", href: "/api/marketplace/discord/start", cta: "Link Discord →" },

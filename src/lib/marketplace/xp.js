@@ -73,7 +73,7 @@ export async function awardOnce(buyerId, action, meta = null) {
 }
 
 // Dollars spent → XP (uncapped). Used by the purchase/POS hook.
-export const SPEND_XP_PER_DOLLAR = 1;
+export const SPEND_XP_PER_DOLLAR = 5;
 
 // Level curve: cumulative XP to REACH level L is 50*(L-1)*L → L1=0, L2=100, L3=300, L4=600, L5=1000…
 // Gentle early, steeper later. Returns level + progress toward the next.
