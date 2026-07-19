@@ -17,7 +17,7 @@ import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
-import { getPetCombatBonus, getPackPetMultipliers } from "@/lib/marketplace/pet-combat.js";
+import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -41,24 +41,38 @@ function manualHit(level, stats = {}, { forceCrit = false } = {}) {
 // fight still lasts the target days — the numbers are just bigger and the counter feels alive).
 const autoPerHour = (level, stats = {}) => Math.round((250 + level * 50) * (1 + (stats.ferocity || 0) / 100));
 
-// Expected damage a single member deals PER DAY at a given level: guaranteed passive auto-attacks 24/7
-// plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375). petMult inflates
-// the MANUAL portion by the member's pet power so boss HP is sized with pets in mind.
-function memberDailyDamage(level, petMult = 1) {
-    const autoDaily = autoPerHour(level) * 24;
-    const manualExpected = (120 + level * 15) * 1.375 * petMult;
+// Expected damage a single member deals PER DAY: passive auto-attacks 24/7 (gear Ferocity boosts these)
+// plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375). manualMult inflates
+// the MANUAL portion by the member's gear + pet power so boss HP is sized off the pack's FULL power.
+function memberDailyDamage(level, manualMult = 1, gearStats = {}) {
+    const autoDaily = autoPerHour(level, gearStats) * 24;
+    const manualExpected = (120 + level * 15) * 1.375 * manualMult;
     return autoDaily + manualExpected;
 }
 
-// Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level- AND pet-scaled damage.
+// Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level + GEAR + PET power.
 // Assumes everyone lands their daily strike (upper bound), so real fights tend to run a touch longer.
-// Used at create time so HP scales with member count + levels + pets instead of a fixed guess. { hp, members }.
+// Used at create time so HP scales with the pack's real strength instead of a fixed guess. { hp, members }.
 export async function projectBossHp({ targetDays = 7 } = {}) {
-    const [members, petMults] = await Promise.all([
-        db.query(`SELECT id, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []),
-        getPackPetMultipliers().catch(() => new Map()),
+    const members = await db.query(`SELECT id, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
+    const [gearStats, petBonuses] = await Promise.all([
+        getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map()),
+        getPackPetBonuses().catch(() => new Map()),
     ]);
-    const daily = members.reduce((sum, m) => sum + memberDailyDamage(lvl(m.xp), petMults.get(m.id) || 1), 0);
+    const daily = members.reduce((sum, m) => {
+        const g = gearStats.get(m.id) || {};
+        const pb = petBonuses.get(m.id) || { stats: {}, proc: {} };
+        const ps = pb.stats || {};
+        // Combine gear + pet stats for the manual strike (pet Ferocity folds into Might, as in attackBoss).
+        const combined = {
+            might: (g.might || 0) + (ps.might || 0) + (ps.ferocity || 0),
+            crit_chance: (g.crit_chance || 0) + (ps.crit_chance || 0),
+            crit_power: (g.crit_power || 0) + (ps.crit_power || 0),
+            extra_strike: (g.extra_strike || 0) + (ps.extra_strike || 0),
+        };
+        const manualMult = manualStatMultiplier(combined) * procMultiplier(pb.proc, 1 + combined.extra_strike);
+        return sum + memberDailyDamage(lvl(m.xp), manualMult, g);
+    }, 0);
     // Round to a clean-ish number and floor it so a tiny/empty pack still faces a real boss.
     const raw = Math.max(8000, Math.round(daily * Math.max(1, targetDays)));
     const hp = Math.round(raw / 500) * 500;

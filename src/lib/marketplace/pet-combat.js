@@ -20,24 +20,27 @@ export async function getPetCombatBonus(buyerId) {
     return combinePetBonuses(owned, equipped);
 }
 
-// How much a member's pets multiply their EXPECTED manual daily damage — used to size the boss so pet power
-// is baked into HP. Mirrors attackBoss: pet Might+Ferocity → damage %, crit chance/power, extra strikes,
-// and the erupt/first-hit procs. Baselined against the 25%/×2.5 crit already assumed in memberDailyDamage.
-export function petManualMultiplier(bonus) {
-    const s = bonus?.stats || {};
-    const proc = bonus?.proc || {};
-    const mightMult = 1 + ((s.might || 0) + (s.ferocity || 0)) / 100;
-    const p = Math.min(0.9, 0.25 + (s.crit_chance || 0) / 100);
-    const m = 2.5 + (s.crit_power || 0) / 100;
+// Pure: manual-damage multiplier from a combined stats object (Might, Crit chance/power, Extra strike),
+// baselined against the 25%/×2.5 crit already in memberDailyDamage. Ferocity is NOT included here — GEAR
+// ferocity is 24/7 auto-damage; callers fold PET ferocity into Might before calling.
+export function manualStatMultiplier(stats = {}) {
+    const mightMult = 1 + (stats.might || 0) / 100;
+    const p = Math.min(0.9, 0.25 + (stats.crit_chance || 0) / 100);
+    const m = 2.5 + (stats.crit_power || 0) / 100;
     const critFactor = ((1 - p) + p * m) / 1.375;
-    const strikes = 1 + (s.extra_strike || 0);
-    const eruptFactor = proc.eruptChance ? 1 + proc.eruptChance * ((proc.eruptMult || 1) - 1) : 1;
-    const firstHit = proc.firstHitMult ? 1 + (proc.firstHitMult - 1) / strikes : 1;
-    return mightMult * critFactor * strikes * eruptFactor * firstHit;
+    const strikes = 1 + (stats.extra_strike || 0);
+    return mightMult * critFactor * strikes;
 }
 
-// Batch (2 queries): each member's pet manual-damage multiplier → Map<buyerId, mult>. For boss sizing.
-export async function getPackPetMultipliers() {
+// Pure: extra multiplier from equipped-pet procs (erupt chance + first-hit, amortized over the day's strikes).
+export function procMultiplier(proc = {}, strikes = 1) {
+    const eruptFactor = proc.eruptChance ? 1 + proc.eruptChance * ((proc.eruptMult || 1) - 1) : 1;
+    const firstHit = proc.firstHitMult ? 1 + (proc.firstHitMult - 1) / Math.max(1, strikes) : 1;
+    return eruptFactor * firstHit;
+}
+
+// Batch (2 queries): each member's raw pet bonus (stats + proc) → Map<buyerId, {stats, proc}>. For boss sizing.
+export async function getPackPetBonuses() {
     const [members, unlocks] = await Promise.all([
         db.query(`SELECT id, COALESCE(xp, 0) AS xp, featured_collectible FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []),
         db.query(`SELECT buyer_id, ref FROM mkt_cosmetic_unlock WHERE category = 'pet'`).catch(() => []),
@@ -53,7 +56,7 @@ export async function getPackPetMultipliers() {
         const granted = byBuyer.get(mem.id) || new Set();
         const owned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, level, { owned: granted }));
         const equipped = mem.featured_collectible ? collectibleById(mem.featured_collectible) : null;
-        out.set(mem.id, petManualMultiplier(combinePetBonuses(owned, equipped)));
+        out.set(mem.id, combinePetBonuses(owned, equipped));
     }
     return out;
 }
