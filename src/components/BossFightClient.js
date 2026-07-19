@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import BossBattleScene from "@/components/BossBattleScene";
+import { itemIcon } from "@/lib/marketplace/items.js";
 
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
@@ -130,12 +131,44 @@ export default function BossFightClient() {
                 ) : null}
             </div>
 
-            <div className="card" style={{ padding: "12px 14px" }}>
-                <h3 style={{ margin: "0 0 8px" }}>🏆 Rewards</h3>
-                <div style={{ display: "grid", gap: 6, fontSize: "0.88rem" }}>
-                    <div><strong>🥇 #1 damage</strong> — {boss.prize ? boss.prize.name : "the top prize"}{boss.chaseItem ? ` + ${boss.chaseItem.name}` : ""} + a 💎 mythic chest</div>
-                    <div><strong>🥈🥉 Top 3</strong> — a 🪙 gold loot chest each</div>
-                    <div><strong>⚔️ Everyone who fights</strong> — XP toward your level</div>
+            <div className="card" style={{ padding: 14 }}>
+                <h3 style={{ margin: "0 0 12px" }}>🏆 What you&apos;re fighting for</h3>
+                <div style={{ display: "grid", gap: 10 }}>
+                    {/* #1 — the chase */}
+                    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,215,94,0.45)", background: "radial-gradient(140% 140% at 0% 0%, rgba(255,215,94,0.18), transparent 62%)" }}>
+                        <span style={{ fontSize: "1.9rem", flexShrink: 0 }} aria-hidden="true">🥇</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#ffd75e", letterSpacing: "0.05em" }}>#1 DAMAGE — THE CHASE</div>
+                            <div style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.25 }}>{boss.prize ? boss.prize.name : "The grand prize"}</div>
+                            {boss.chaseItem ? <div style={{ fontSize: "0.82rem", fontWeight: 700, color: RARITY_TXT[boss.chaseItem.rarity] || "#8fd8ff" }}>+ {boss.chaseItem.name} (in-game gear)</div> : null}
+                            <div className="muted" style={{ fontSize: "0.76rem" }}>+ a mythic loot chest 💎</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                            {boss.prize?.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={boss.prize.imageUrl} alt={boss.prize.name} style={{ width: 54, height: 54, objectFit: "contain", borderRadius: 10, background: "rgba(255,255,255,0.07)" }} />
+                            ) : <span style={{ fontSize: "2.4rem" }} aria-hidden="true">🎁</span>}
+                            {boss.chaseItem ? (() => { const Gi = itemIcon(boss.chaseItem.icon); return <span style={{ width: 42, height: 42, display: "grid", placeItems: "center", fontSize: 30, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: RARITY_TXT[boss.chaseItem.rarity] || "#fff" }}><Gi aria-hidden="true" /></span>; })() : null}
+                        </div>
+                    </div>
+                    {/* Top 3 */}
+                    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
+                        <span style={{ fontSize: "1.5rem", flexShrink: 0 }} aria-hidden="true">🥈🥉</span>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>TOP 3 DAMAGE</div>
+                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>A gold loot chest each</div>
+                        </div>
+                        <span style={{ fontSize: "2.2rem", flexShrink: 0 }} aria-hidden="true">🪙</span>
+                    </div>
+                    {/* Everyone */}
+                    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
+                        <span style={{ fontSize: "1.5rem", flexShrink: 0 }} aria-hidden="true">⚔️</span>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>EVERYONE WHO FIGHTS</div>
+                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>XP toward your level</div>
+                        </div>
+                        <span style={{ fontSize: "2rem", flexShrink: 0 }} aria-hidden="true">⭐</span>
+                    </div>
                 </div>
             </div>
             {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
