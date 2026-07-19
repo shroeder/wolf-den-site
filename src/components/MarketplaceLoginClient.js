@@ -15,6 +15,8 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [displayName, setDisplayName] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
@@ -36,6 +38,8 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
         const passVal = String(els.password?.value ?? password ?? "");
         const codeVal = String(els.code?.value ?? code ?? "").trim();
         const nameVal = String(els.fullname?.value ?? displayName ?? "").trim();
+        const firstVal = String(els.firstname?.value ?? firstName ?? "").trim();
+        const lastVal = String(els.lastname?.value ?? lastName ?? "").trim();
         // Keep state in sync so the follow-up verify step (and the UI) use the same values.
         if (emailVal !== email) setEmail(emailVal);
         setBusy(true);
@@ -53,7 +57,8 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                     setError(d.error || "Sign in failed.");
                 }
             } else if (mode === "register") {
-                const { ok, d } = await post("/api/marketplace/auth/register", { email: emailVal, password: passVal, displayName: nameVal });
+                if (!firstVal || !lastVal) { setError("Enter your first and last name."); setBusy(false); return; }
+                const { ok, d } = await post("/api/marketplace/auth/register", { email: emailVal, password: passVal, displayName: nameVal, firstName: firstVal, lastName: lastVal });
                 if (ok) {
                     setMode("verify");
                     setInfo("We emailed you a 6-digit code.");
@@ -96,7 +101,13 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                     ) : (
                         <>
                             {mode === "register" ? (
-                                <input name="fullname" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
+                                <>
+                                    <div style={{ display: "flex", gap: 10 }}>
+                                        <input name="firstname" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" required style={{ flex: 1 }} />
+                                        <input name="lastname" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" required style={{ flex: 1 }} />
+                                    </div>
+                                    <input name="fullname" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" />
+                                </>
                             ) : null}
                             <input type="email" name="username" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
                             <input type="password" name="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} required />

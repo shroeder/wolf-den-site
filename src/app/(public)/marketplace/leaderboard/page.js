@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import ViewPing from "@/components/ViewPing";
+
 import { getLeaderboard } from "@/lib/marketplace/profile.js";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +16,7 @@ export default async function LeaderboardPage() {
 
     return (
         <div className="stack reveal">
+            <ViewPing event="view_leaderboard" />
             <section className="card hero-accent">
                 <h1>Leaderboard</h1>
                 <p className="muted">Top members by lifetime XP. Earn XP by shopping, checking in at events, and being active.</p>

@@ -48,7 +48,7 @@ function mapBuyer(row) {
 }
 
 // Register a new buyer. Throws on duplicate email / invalid input.
-export async function createBuyer({ email, password, displayName = null }) {
+export async function createBuyer({ email, password, displayName = null, firstName = null, lastName = null }) {
     const normalized = normalizeEmail(email);
     if (!isValidBuyerEmail(email)) {
         throw new Error("Enter a valid email address.");
@@ -56,27 +56,36 @@ export async function createBuyer({ email, password, displayName = null }) {
     if (!isValidBuyerPassword(password)) {
         throw new Error("Password must be at least 8 characters.");
     }
+    // Real first + last name are required at signup (for the owner's records; the public @handle stays separate).
+    const firstClean = firstName ? String(firstName).trim().slice(0, 60) : "";
+    const lastClean = lastName ? String(lastName).trim().slice(0, 60) : "";
+    if (!firstClean || !lastClean) {
+        throw new Error("Enter your first and last name.");
+    }
     const existing = await db.queryOne(`SELECT id, password_hash FROM mkt_buyer WHERE email_normalized = $1`, [normalized]);
     if (existing && existing.password_hash) {
         throw new Error("An account with that email already exists.");
     }
     const passwordHash = await hashPassword(password);
-    const displayClean = displayName ? String(displayName).trim().slice(0, 120) : null;
+    // Display name is optional — fall back to the first name so nobody is a nameless account.
+    const displayClean = (displayName ? String(displayName).trim().slice(0, 120) : "") || firstClean;
     let row;
     if (existing) {
         // Adopt a passwordless (shop-bridged / purchase-linked) account: set the password + re-verify email,
         // so they can finish signing up instead of hitting "email already exists" with no way in.
         row = await db.queryOne(
-            `UPDATE mkt_buyer SET password_hash = $2, display_name = COALESCE(display_name, $3), email_verified = FALSE, updated_at = NOW()
+            `UPDATE mkt_buyer SET password_hash = $2, display_name = COALESCE(display_name, $3),
+                    first_name = COALESCE(first_name, $4), last_name = COALESCE(last_name, $5),
+                    email_verified = FALSE, updated_at = NOW()
               WHERE id = $1 RETURNING id, email, display_name`,
-            [existing.id, passwordHash, displayClean]
+            [existing.id, passwordHash, displayClean, firstClean, lastClean]
         );
     } else {
         row = await db.queryOne(
-            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name, first_name, last_name)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id, email, display_name`,
-            [String(email).trim(), normalized, passwordHash, displayClean]
+            [String(email).trim(), normalized, passwordHash, displayClean, firstClean, lastClean]
         );
     }
     // Redeem any in-store/online purchases parked for this email before they had an account — their XP

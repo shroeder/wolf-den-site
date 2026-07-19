@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import MarketplaceLiveStats from "@/components/MarketplaceLiveStats";
 import MarketplaceSearchClient from "@/components/MarketplaceSearchClient";
+import ViewPing from "@/components/ViewPing";
 import { getMarketplaceLiveStats } from "@/lib/marketplace/search.js";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function MarketplacePage() {
 
     return (
         <>
+            <ViewPing event="browse_shop" />
             {stats ? <MarketplaceLiveStats {...stats} /> : null}
             <Suspense fallback={null}>
                 <MarketplaceSearchClient />

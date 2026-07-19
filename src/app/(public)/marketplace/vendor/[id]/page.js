@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import ViewPing from "@/components/ViewPing";
 import VendorStorefrontListings from "@/components/VendorStorefrontListings";
 import { getMarketplaceAdmin } from "@/lib/admin-app/web-session";
 import { getVendorStorefront } from "@/lib/marketplace/search.js";
@@ -68,6 +69,7 @@ export default async function VendorStorefrontPage({ params }) {
 
     return (
         <div className="stack reveal">
+            <ViewPing event="view_vendor" meta={{ vendorId: id }} />
             <section className="card">
                 <p className="mkt-breadcrumb">
                     <Link href="/marketplace/vendors">← All vendors</Link>

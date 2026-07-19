@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import ChestOpener from "@/components/ChestOpener";
+import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot, itemIcon } from "@/lib/marketplace/items.js";
 
 // The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
@@ -67,7 +68,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
 
     function openDetail(item) {
         setSellArmed(false); setDetailItem(item);
-        fetch("/api/marketplace/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "inspect_item", meta: { itemId: item.id, name: item.name, shop: Boolean(item.shop) } }) }).catch(() => {});
+        trackClient("inspect_item", { itemId: item.id, name: item.name, shop: Boolean(item.shop) });
     }
     function closeDetail() { setDetailItem(null); setSellArmed(false); }
 

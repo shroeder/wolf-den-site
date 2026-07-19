@@ -17,6 +17,8 @@ export async function POST(request) {
                     email: body.email,
                     password: body.password,
                     displayName: body.displayName ?? null,
+                    firstName: body.firstName ?? null,
+                    lastName: body.lastName ?? null,
                 });
                 const verification = await createEmailVerification(buyer.email);
                 if (verification) {

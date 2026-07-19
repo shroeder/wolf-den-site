@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import ConsumablesClient from "@/components/ConsumablesClient";
 import EquipmentClient from "@/components/EquipmentClient";
+import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
@@ -32,6 +33,7 @@ export default async function InventoryPage() {
 
     return (
         <div className="stack reveal">
+            <ViewPing event="view_inventory" />
             <section className="card">
                 <h1 style={{ marginTop: 0 }}>⚔️ Your Gear</h1>
                 <p className="muted" style={{ marginTop: 0 }}>

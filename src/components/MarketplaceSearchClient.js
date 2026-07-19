@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import ThemedSelect from "@/components/ThemedSelect";
+import { trackClient } from "@/lib/marketplace/track-client";
 
 const DEFAULT_GAMES = [{ id: "", label: "All games" }];
 
@@ -118,6 +119,13 @@ export default function MarketplaceSearchClient() {
         };
     }, []);
 
+    // Telemetry: which filters people apply (game / listing kind) — fired on change, not on initial mount.
+    const filterReady = useRef(false);
+    useEffect(() => {
+        if (!filterReady.current) { filterReady.current = true; return; }
+        trackClient("shop_filter", { game: game || null, kind: kind || null });
+    }, [game, kind]);
+
     // Debounced search. Empty query returns the most-stocked items so the grid is never blank.
     useEffect(() => {
         const trimmed = query.trim();
@@ -132,7 +140,7 @@ export default function MarketplaceSearchClient() {
             setSearching(true);
 
             // Telemetry: a real shop search (debounced, ≥2 chars so we don't log every keystroke).
-            if (trimmed.length >= 2) fetch("/api/marketplace/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "shop_search", meta: { q: trimmed.slice(0, 60), game: game || null, kind: kind || null } }) }).catch(() => {});
+            if (trimmed.length >= 2) trackClient("shop_search", { q: trimmed.slice(0, 60), game: game || null, kind: kind || null });
 
             try {
                 const params = new URLSearchParams();

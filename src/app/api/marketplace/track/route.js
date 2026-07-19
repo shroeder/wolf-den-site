@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CLIENT_EVENTS, trackActivity } from "@/lib/marketplace/activity.js";
+import { CLIENT_EVENTS, trackActivity, recordVisitor } from "@/lib/marketplace/activity.js";
+import { contextFromHeaders } from "@/lib/marketplace/request-context.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// POST — log a client-side activity event. Body: { event, meta?, path?, anonId? }. Only whitelisted client
-// events are accepted. Works for ANONYMOUS visitors too (page_view/traffic) via anonId, so admins see full
-// minute-to-minute traffic, not just logged-in members.
+// POST — log a client-side activity event. Body: { event, meta?, path?, anonId?, client? }. Only whitelisted
+// client events are accepted. Works for ANONYMOUS visitors too (page_view/traffic) via anonId, and enriches
+// each event with device + geo context (edge headers for country/city/IP/UA, client body for screen/lang/tz).
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/track", async ({ internalError }) => {
         try {
@@ -19,7 +20,22 @@ export async function POST(request) {
             if (!CLIENT_EVENTS.has(event)) return NextResponse.json({ ok: true });
             const path = b?.path ? String(b.path) : null;
             const anonId = b?.anonId ? String(b.anonId) : null;
-            await trackActivity(buyer?.id || null, event, b?.meta && typeof b.meta === "object" ? b.meta : null, { path, anonId });
+            const meta = b?.meta && typeof b.meta === "object" ? b.meta : null;
+            // Device/geo/IP/UA from edge headers, plus the client-only signals the server can't see.
+            const hdr = contextFromHeaders(request.headers);
+            const cl = b?.client && typeof b.client === "object" ? b.client : {};
+            const ctx = {
+                ...hdr,
+                timezone: (cl.tz && String(cl.tz).slice(0, 60)) || hdr.timezone || null,
+                lang: cl.lang ? String(cl.lang).slice(0, 20) : null,
+                screen: cl.screen ? String(cl.screen).slice(0, 20) : null,
+                viewport: cl.viewport ? String(cl.viewport).slice(0, 20) : null,
+                referrer: cl.referrer ? String(cl.referrer).slice(0, 300) : null,
+                connection: cl.connection ? String(cl.connection).slice(0, 20) : null,
+            };
+            await trackActivity(buyer?.id || null, event, meta, { path, anonId, ctx });
+            // Freshen the per-visitor rollup off the response path.
+            if (anonId) after(() => recordVisitor({ anonId, buyerId: buyer?.id || null, ctx, path }));
             return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.track.failure" });
