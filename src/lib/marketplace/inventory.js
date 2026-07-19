@@ -174,6 +174,9 @@ function chargeState(ownedRow, item) {
 // Gold a member gets for selling gear back, by rarity (mirrors the chest "dust" values). Charged perk
 // items hold real-world value, so they can't be sold for gold.
 const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900 };
+// Power ordering for the shop so it reads as one clean worst→best ladder (the catalog itself is grouped
+// by when items were added, which otherwise makes the shop restart at "worst" every batch).
+const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,
@@ -197,11 +200,14 @@ export async function getInventory(buyerId) {
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
     const gold = goldRow?.gold || 0;
     // The gold shop: xp_shop items you don't own yet.
-    const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id)).map((i) => ({
-        id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-        stats: i.stats, statsText: describeStats(i.stats), signature: signatureFor(i.id),
-        cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0), shop: true,
-    }));
+    const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id))
+        .map((i) => ({
+            id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
+            stats: i.stats, statsText: describeStats(i.stats), signature: signatureFor(i.id),
+            cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0), shop: true,
+        }))
+        // One clean progression: rarity, then price, then level — no more "worst again" as you scroll.
+        .sort((a, z) => (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[z.rarity] ?? 9) || a.cost - z.cost || (a.reqLevel || 0) - (z.reqLevel || 0));
     const equippedList = Object.values(bySlot);
     return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList) };
 }
