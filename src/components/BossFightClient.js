@@ -105,21 +105,6 @@ export default function BossFightClient() {
                 </div>
             ) : null}
 
-            {(boss.prize || boss.chaseItem) ? (
-                <div className="boss-chase" style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,215,94,0.4)", background: "radial-gradient(120% 120% at 0% 0%, rgba(255,215,94,0.18), transparent 60%)", marginBottom: 8 }}>
-                    {boss.prize?.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={boss.prize.imageUrl} alt={boss.prize.name} style={{ width: 60, height: 60, objectFit: "contain", borderRadius: 10, background: "rgba(255,255,255,0.06)", flexShrink: 0 }} />
-                    ) : <span style={{ fontSize: "2.2rem" }} aria-hidden="true">{boss.prize ? "🎟️" : "⚔️"}</span>}
-                    <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#ffd75e", textTransform: "uppercase", letterSpacing: "0.05em" }}>{boss.prize ? "🎟️ Grand raffle prize" : "🥇 Top damage wins"}</div>
-                        <div style={{ fontWeight: 800, fontSize: "1rem" }}>{boss.prize ? boss.prize.name : boss.chaseItem.name}</div>
-                        {boss.prize && boss.chaseItem ? <div style={{ fontSize: "0.85rem", fontWeight: 700, color: RARITY_TXT[boss.chaseItem.rarity] || "#8fd8ff" }}>#1 damage also wins {boss.chaseItem.name} (in-game gear)</div> : null}
-                        <div className="muted" style={{ fontSize: "0.78rem" }}>{boss.prize ? "Won by lottery — every hit earns a ticket, so fight more for better odds." : "Deal the most damage to earn it."}</div>
-                    </div>
-                </div>
-            ) : null}
-
             <div className="boss-stage-wrap">
                 <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
                 {burst ? (
@@ -130,50 +115,6 @@ export default function BossFightClient() {
                     </div>
                 ) : null}
             </div>
-
-            <div className="card" style={{ padding: 14 }}>
-                <h3 style={{ margin: "0 0 12px" }}>🏆 What you&apos;re fighting for</h3>
-                <div style={{ display: "grid", gap: 10 }}>
-                    {/* Raffle prize — real-world, ticket lottery */}
-                    {boss.prize ? (
-                        <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,215,94,0.45)", background: "radial-gradient(140% 140% at 0% 0%, rgba(255,215,94,0.18), transparent 62%)" }}>
-                            <span style={{ fontSize: "1.9rem", flexShrink: 0 }} aria-hidden="true">🎟️</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#ffd75e", letterSpacing: "0.05em" }}>RAFFLE PRIZE · TICKET LOTTERY</div>
-                                <div style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.25 }}>{boss.prize.name}</div>
-                                <div className="muted" style={{ fontSize: "0.76rem" }}>Every point of damage earns a ticket — more tickets, better odds to win.</div>
-                            </div>
-                            {boss.prize.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={boss.prize.imageUrl} alt={boss.prize.name} style={{ width: 54, height: 54, objectFit: "contain", borderRadius: 10, background: "rgba(255,255,255,0.07)", flexShrink: 0 }} />
-                            ) : <span style={{ fontSize: "2.4rem", flexShrink: 0 }} aria-hidden="true">🎁</span>}
-                        </div>
-                    ) : null}
-                    {/* #1 damage — in-game chase gear */}
-                    {boss.chaseItem ? (
-                        <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.03)" }}>
-                            <span style={{ fontSize: "1.6rem", flexShrink: 0 }} aria-hidden="true">🥇</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>#1 DAMAGE</div>
-                                <div style={{ fontWeight: 800, fontSize: "0.95rem" }}><span style={{ color: RARITY_TXT[boss.chaseItem.rarity] || "#fff" }}>{boss.chaseItem.name}</span> <span className="muted" style={{ fontWeight: 700 }}>· in-game gear</span></div>
-                                <div className="muted" style={{ fontSize: "0.76rem" }}>The top damage dealer earns it.</div>
-                            </div>
-                            {(() => { const Gi = itemIcon(boss.chaseItem.icon); return <span style={{ width: 42, height: 42, display: "grid", placeItems: "center", fontSize: 30, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: RARITY_TXT[boss.chaseItem.rarity] || "#fff", flexShrink: 0 }}><Gi aria-hidden="true" /></span>; })()}
-                        </div>
-                    ) : null}
-                    {/* Everyone — chest chance + XP */}
-                    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
-                        <span style={{ fontSize: "1.5rem", flexShrink: 0 }} aria-hidden="true">🎁</span>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>EVERYONE WHO FIGHTS</div>
-                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>A shot at a loot chest + XP</div>
-                            <div className="muted" style={{ fontSize: "0.76rem" }}>Fight harder for a better chance — and a better chest.</div>
-                        </div>
-                        <span style={{ fontSize: "2rem", flexShrink: 0 }} aria-hidden="true">⭐</span>
-                    </div>
-                </div>
-            </div>
-            {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             {boss.defeated ? (
                 <div className="boss-defeated">
@@ -218,6 +159,50 @@ export default function BossFightClient() {
                     ) : null}
                 </div>
             )}
+
+            <div className="card" style={{ padding: 14 }}>
+                <h3 style={{ margin: "0 0 12px" }}>🏆 What you&apos;re fighting for</h3>
+                <div style={{ display: "grid", gap: 10 }}>
+                    {/* Raffle prize — real-world, ticket lottery */}
+                    {boss.prize ? (
+                        <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,215,94,0.45)", background: "radial-gradient(140% 140% at 0% 0%, rgba(255,215,94,0.18), transparent 62%)" }}>
+                            <span style={{ fontSize: "1.9rem", flexShrink: 0 }} aria-hidden="true">🎟️</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#ffd75e", letterSpacing: "0.05em" }}>RAFFLE PRIZE · TICKET LOTTERY</div>
+                                <div style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.25 }}>{boss.prize.name}</div>
+                                <div className="muted" style={{ fontSize: "0.76rem" }}>Every point of damage earns a ticket — more tickets, better odds to win.</div>
+                            </div>
+                            {boss.prize.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={boss.prize.imageUrl} alt={boss.prize.name} style={{ width: 54, height: 54, objectFit: "contain", borderRadius: 10, background: "rgba(255,255,255,0.07)", flexShrink: 0 }} />
+                            ) : <span style={{ fontSize: "2.4rem", flexShrink: 0 }} aria-hidden="true">🎁</span>}
+                        </div>
+                    ) : null}
+                    {/* #1 damage — in-game chase gear */}
+                    {boss.chaseItem ? (
+                        <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.03)" }}>
+                            <span style={{ fontSize: "1.6rem", flexShrink: 0 }} aria-hidden="true">🥇</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>#1 DAMAGE</div>
+                                <div style={{ fontWeight: 800, fontSize: "0.95rem" }}><span style={{ color: RARITY_TXT[boss.chaseItem.rarity] || "#fff" }}>{boss.chaseItem.name}</span> <span className="muted" style={{ fontWeight: 700 }}>· in-game gear</span></div>
+                                <div className="muted" style={{ fontSize: "0.76rem" }}>The top damage dealer earns it.</div>
+                            </div>
+                            {(() => { const Gi = itemIcon(boss.chaseItem.icon); return <span style={{ width: 42, height: 42, display: "grid", placeItems: "center", fontSize: 30, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: RARITY_TXT[boss.chaseItem.rarity] || "#fff", flexShrink: 0 }}><Gi aria-hidden="true" /></span>; })()}
+                        </div>
+                    ) : null}
+                    {/* Everyone — chest chance + XP */}
+                    <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
+                        <span style={{ fontSize: "1.5rem", flexShrink: 0 }} aria-hidden="true">🎁</span>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>EVERYONE WHO FIGHTS</div>
+                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>A shot at a loot chest + XP</div>
+                            <div className="muted" style={{ fontSize: "0.76rem" }}>Fight harder for a better chance — and a better chest.</div>
+                        </div>
+                        <span style={{ fontSize: "2rem", flexShrink: 0 }} aria-hidden="true">⭐</span>
+                    </div>
+                </div>
+            </div>
+            {boss.rewards ? <div className="boss2-rewards">🎁 {boss.rewards}</div> : null}
 
             {roster.length ? (
                 <div className="boss2-board">

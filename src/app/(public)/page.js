@@ -54,6 +54,22 @@ export default async function HomePage() {
                 </div>
             </section>
 
+            <section className="card just-in-cta" style={{ borderColor: "rgba(224, 68, 58, 0.5)", background: "radial-gradient(120% 140% at 0% 0%, rgba(224,68,58,0.16), transparent 60%)" }}>
+                <div className="just-in-cta-copy">
+                    <p className="eyebrow">⚔️ Weekly Boss</p>
+                    <h2>Join the pack and slay this week&apos;s boss</h2>
+                    <p>Gear up your hero, deal damage all week, and win real Wolf Den prizes — a physical raffle prize, in-game loot, and a loot chest for everyone who fights.</p>
+                </div>
+                <div className="just-in-cta-actions">
+                    <Link className="button primary" href="/marketplace/boss">
+                        Fight the Boss
+                    </Link>
+                    <Link className="button" href="/marketplace">
+                        Enter the Marketplace
+                    </Link>
+                </div>
+            </section>
+
             <RewardsCallout />
 
             <section className="hero card hero-split">
