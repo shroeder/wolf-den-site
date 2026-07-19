@@ -66,7 +66,7 @@ export default function GiftWatcher() {
                 <div className="levelup-title">{current.title}</div>
                 <div className="levelup-sub">{current.body}</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16, flexWrap: "wrap" }}>
-                    <Link href={current.url || "/marketplace/equipment"} className="button gold" onClick={dismiss}>Open it →</Link>
+                    <Link href={current.url || "/marketplace/inventory"} className="button gold" onClick={dismiss}>Open it →</Link>
                     <button type="button" className="pill" onClick={dismiss}>Later</button>
                 </div>
             </div>

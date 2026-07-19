@@ -22,7 +22,7 @@ const RARITY_ARTICLE = { rare: "a rare ", epic: "an epic ", legendary: "a legend
 // and friend requests) AND browser web push. Fire-and-forget; a missing channel just no-ops.
 function giftNotify(buyerId, title, body, tag, data) {
     sendBuyerPush(buyerId, { title, body, data }).catch(() => {});
-    sendWebPush(buyerId, { title, body, url: "/marketplace/equipment", tag, data }).catch(() => {});
+    sendWebPush(buyerId, { title, body, url: "/marketplace/inventory", tag, data }).catch(() => {});
 }
 
 function noStore(body, init = {}) {

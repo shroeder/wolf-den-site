@@ -7,13 +7,13 @@ import { db } from "@/lib/db";
 
 // Record a gift so the recipient sees a pop-up on their next visit. Best-effort — never throws into the
 // gift action itself.
-export async function recordGift(buyerId, { kind, title, body, icon = null, rarity = null, url = "/marketplace/equipment" } = {}) {
+export async function recordGift(buyerId, { kind, title, body, icon = null, rarity = null, url = "/marketplace/inventory" } = {}) {
     if (!buyerId || !kind) return;
     await db
         .query(
             `INSERT INTO mkt_pending_gift (buyer_id, kind, title, body, icon, rarity, url)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [buyerId, kind, String(title || "").slice(0, 120), String(body || "").slice(0, 240), icon, rarity, url || "/marketplace/equipment"]
+            [buyerId, kind, String(title || "").slice(0, 120), String(body || "").slice(0, 240), icon, rarity, url || "/marketplace/inventory"]
         )
         .catch(() => {});
 }

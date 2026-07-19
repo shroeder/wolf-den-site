@@ -40,7 +40,7 @@ export async function giveawayChest({ tier = "wooden", count = 1 } = {}) {
     await pushAll(ids, {
         title: `${def.emoji} Free loot!`,
         body: n > 1 ? `${n}× ${def.label} just landed in your stash — open them now!` : `A ${def.label} just landed in your stash — open it now!`,
-        url: "/marketplace/equipment",
+        url: "/marketplace/inventory",
         tag: "giveaway-chest",
     });
     return { ok: true, kind: "chest", tier, count: n, recipients: ids.length };
@@ -59,7 +59,7 @@ export async function giveawayItem({ itemId } = {}) {
     await pushAll(ids, {
         title: `${item.icon || "🎁"} Free gear!`,
         body: `You received ${item.name}${lvl} — check your inventory!`,
-        url: "/marketplace/equipment",
+        url: "/marketplace/inventory",
         tag: "giveaway-item",
     });
     return { ok: true, kind: "item", itemId: item.id, name: item.name, recipients: ids.length };
@@ -76,7 +76,7 @@ export async function giveawayGold({ amount = 100 } = {}) {
     await pushAll(ids, {
         title: "🪙 Free gold!",
         body: `${gold} gold just dropped into your purse — spend it in the gear shop!`,
-        url: "/marketplace/equipment",
+        url: "/marketplace/inventory",
         tag: "giveaway-gold",
     });
     return { ok: true, kind: "gold", amount: gold, recipients: ids.length };
