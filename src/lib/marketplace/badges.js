@@ -45,6 +45,8 @@ function mapBadge(row) {
         secret: row.secret === true,
         autoRule: row.auto_rule || null,
         autoThreshold: row.auto_threshold != null ? Number(row.auto_threshold) : null,
+        goldPrice: row.gold_price != null ? Number(row.gold_price) : null,
+        dropOnly: row.drop_only === true,
         sortOrder: Number(row.sort_order || 100),
     };
 }
@@ -52,7 +54,7 @@ function mapBadge(row) {
 // All badge definitions, ordered for display.
 export async function listBadges() {
     const rows = await db
-        .query(`SELECT slug, label, description, icon, color, admin_only, secret, auto_rule, auto_threshold, sort_order FROM mkt_badge ORDER BY sort_order ASC, label ASC`)
+        .query(`SELECT slug, label, description, icon, color, admin_only, secret, auto_rule, auto_threshold, gold_price, drop_only, sort_order FROM mkt_badge ORDER BY sort_order ASC, label ASC`)
         .catch(() => []);
     return rows.map(mapBadge);
 }
@@ -190,7 +192,7 @@ export async function getBadgeBoard(buyerId) {
             const t = Math.max(1, target);
             progress = { current: Math.max(0, Math.min(current, t)), target: t, pct: Math.max(0, Math.min(100, Math.round((current / t) * 100))) };
         }
-        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), earned, progress };
+        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly, earned, progress };
     });
     // Next = closest unearned UNLOCKABLE badge by progress (admin-assigned ones can't be "earned" by progress).
     const next = badges
@@ -323,10 +325,10 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
 // emails the member a congratulations (best-effort).
 export async function grantBadge(buyerId, slug, awardedBy = "admin") {
     if (!buyerId || !slug) return { ok: false, error: "missing_params" };
-    const def = await db.queryOne(`SELECT slug, label, icon, description, auto_rule FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
+    const def = await db.queryOne(`SELECT slug, label, icon, description, auto_rule, gold_price, drop_only FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
     if (!def) return { ok: false, error: "unknown_badge" };
-    // Auto-earned badges (level/spend/leaderboard-place/etc.) are never hand-assignable by an admin.
-    if (awardedBy === "admin" && def.auto_rule) return { ok: false, error: "auto_earned" };
+    // Only curated (admin_only) badges are hand-assignable — auto / purchasable / drop badges are earned.
+    if (awardedBy === "admin" && (def.auto_rule || def.gold_price != null || def.drop_only)) return { ok: false, error: "not_assignable" };
     const inserted = await db
         .query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, slug, awardedBy])
         .catch(() => []);
@@ -334,6 +336,48 @@ export async function grantBadge(buyerId, slug, awardedBy = "admin") {
     if (isNew && awardedBy !== "system") await sendBadgeCongrats(buyerId, def).catch(() => {});
     if (isNew) await pushBadgeEarned(buyerId, def);
     return { ok: true, isNew };
+}
+
+// Gold-priced badges for the badge shop, with the member's gold + owned/afford state.
+export async function listBadgeShop(buyerId) {
+    const [held, goldRow, rows] = await Promise.all([
+        buyerId ? heldSlugs(buyerId) : Promise.resolve(new Set()),
+        buyerId ? db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null) : Promise.resolve(null),
+        db.query(`SELECT slug, label, description, icon, color, gold_price FROM mkt_badge WHERE gold_price IS NOT NULL ORDER BY gold_price ASC`).catch(() => []),
+    ]);
+    const gold = goldRow?.gold || 0;
+    return {
+        gold,
+        badges: rows.map((r) => ({ slug: r.slug, label: r.label, description: r.description, icon: r.icon, color: r.color, price: r.gold_price, owned: held.has(r.slug), canAfford: gold >= r.gold_price })),
+    };
+}
+
+// Buy a gold-priced badge. Atomic gold deduction + grant. Returns { ok, gold } or an error key.
+export async function buyBadge(buyerId, slug) {
+    if (!buyerId || !slug) return { ok: false, error: "missing_params" };
+    const def = await db.queryOne(`SELECT slug, label, icon, description, gold_price FROM mkt_badge WHERE slug = $1`, [slug]).catch(() => null);
+    if (!def || def.gold_price == null) return { ok: false, error: "not_for_sale" };
+    const owned = await db.queryOne(`SELECT 1 FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug = $2`, [buyerId, slug]).catch(() => null);
+    if (owned) return { ok: false, error: "already_owned" };
+    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, def.gold_price]).catch(() => null);
+    if (!row) return { ok: false, error: "not_enough_gold" };
+    await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'purchase') ON CONFLICT DO NOTHING`, [buyerId, slug]).catch(() => {});
+    await pushBadgeEarned(buyerId, def).catch(() => {});
+    return { ok: true, gold: row.gold };
+}
+
+// Grant a random un-owned DROP-ONLY badge (used by loot-chest opens + boss kills). Returns it or null.
+export async function grantRandomDropBadge(buyerId) {
+    if (!buyerId) return null;
+    const rows = await db.query(`SELECT slug, label, icon, description FROM mkt_badge WHERE drop_only = TRUE`).catch(() => []);
+    if (!rows.length) return null;
+    const held = await heldSlugs(buyerId);
+    const pool = rows.filter((r) => !held.has(r.slug));
+    if (!pool.length) return null;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const ins = await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'drop') ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, pick.slug]).catch(() => []);
+    if (ins.length) { await pushBadgeEarned(buyerId, pick).catch(() => {}); return pick; }
+    return null;
 }
 
 // Email a member a congrats for a badge, then mark it emailed so the auto-backfill never re-sends it.

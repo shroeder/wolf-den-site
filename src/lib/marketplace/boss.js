@@ -12,7 +12,7 @@ import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit } from "@/lib/marketplace/signatures.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 
@@ -309,6 +309,8 @@ async function finalizeBossKill(bossId) {
         chaseItem = itemById(boss.chase_item_id);
         if (chaseItem) await grantItem(top1.id, chaseItem.id, "boss_reward").catch(() => {});
     }
+    // #1 also earns a random drop-only "Boss Relic"-class badge — a permanent brag from the kill.
+    if (top1) await grantRandomDropBadge(top1.id).catch(() => {});
 
     // Pack-wide celebration pop-up for EVERYONE who fought — #1 gets the "you topped it" version.
     for (const p of pool) {

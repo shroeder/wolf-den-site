@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import BadgeShopClient from "@/components/BadgeShopClient";
 import NextBadgeNudge from "@/components/NextBadgeNudge";
 import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import { getBadgeBoard } from "@/lib/marketplace/badges.js";
@@ -48,6 +49,11 @@ export default async function BadgesPage() {
             </section>
 
             <section className="card">
+                <h2 style={{ marginTop: 0 }}>🪙 Badge shop</h2>
+                <BadgeShopClient />
+            </section>
+
+            <section className="card">
                 <h2 style={{ marginTop: 0 }}>All badges</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Everything you can earn — with your progress toward the ones you haven&apos;t yet.</p>
                 <div className="badge-board">
@@ -63,6 +69,10 @@ export default async function BadgesPage() {
                                     <span className="badge-tile-bar"><span style={{ width: `${b.progress.pct}%` }} /></span>
                                     <span className="badge-tile-status muted">{b.progress.current.toLocaleString()} / {b.progress.target.toLocaleString()}</span>
                                 </span>
+                            ) : b.goldPrice != null ? (
+                                <span className="badge-tile-status muted">🪙 {b.goldPrice.toLocaleString()} · in shop</span>
+                            ) : b.dropOnly ? (
+                                <span className="badge-tile-status muted">Drop only 🎁</span>
                             ) : (
                                 <span className="badge-tile-status muted">{b.adminOnly ? "Awarded by staff" : "Locked"}</span>
                             )}
