@@ -17,6 +17,7 @@ import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
+import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -392,11 +393,22 @@ export async function attackBoss(buyerId) {
     const boss = await getActiveBoss();
     if (!boss || boss.hp <= 0 || boss.defeated_at) return { error: "defeated" };
 
-    const [stats, equippedIds] = await Promise.all([
+    const [gearStats, equippedIds, petBonus] = await Promise.all([
         getEquippedStats(buyerId).catch(() => ({})),
         getEquippedIds(buyerId).catch(() => ({})),
+        getPetCombatBonus(buyerId).catch(() => ({ stats: {}, proc: {} })),
     ]);
-    // Extra daily strikes come from gear (extra_strike stat + signatures) AND used consumables (potions).
+    // Merge pet bonuses into the strike stats. Pet Ferocity adds to strike power (Might) rather than 24/7
+    // auto-damage, so a companion's power is felt on your daily hit.
+    const ps = petBonus?.stats || {};
+    const stats = {
+        ...gearStats,
+        might: (gearStats.might || 0) + (ps.might || 0) + (ps.ferocity || 0),
+        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0),
+        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0),
+        extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0),
+    };
+    // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
     const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds) + (await memberBonusStrikes(buyerId).catch(() => 0));
     const used = await manualAttacksToday(buyerId);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
@@ -406,7 +418,13 @@ export async function attackBoss(buyerId) {
     // Global admin buff × the member's own active damage potions.
     const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1));
     const sig = signatureHit(equippedIds, { hitIndex: used, crit: swing.crit });
-    const damage = Math.round(swing.damage * buffMult * sig.mult);
+    // Equipped-pet proc: a big first strike of the day, and/or a chance to "erupt" for bonus damage.
+    const pp = petBonus?.proc || {};
+    let petMult = 1;
+    let petProc = null;
+    if (used === 0 && pp.firstHitMult) { petMult *= pp.firstHitMult; petProc = "first_hit"; }
+    if (pp.eruptChance && Math.random() < pp.eruptChance) { petMult *= pp.eruptMult || 1; petProc = "erupt"; }
+    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult);
     const crit = swing.crit;
     const ability = pickAbility(crit);
 
@@ -424,7 +442,7 @@ export async function attackBoss(buyerId) {
     const { effectiveHp, autoDps } = defeated
         ? { effectiveHp: 0, autoDps: 0 }
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
-    return { ok: true, damage, crit, ability, proc: sig.proc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
+    return { ok: true, damage, crit, ability, proc: sig.proc || petProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
 // Passive AUTO-attacks: every registered member's avatar chips away. Run by a background cron; applies the

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { COLLECTIBLES, collectibleById, petPassive, petActive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
+import { COLLECTIBLES, collectibleById, petPassive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
+import { petPerk } from "@/lib/marketplace/pet-perks";
 
 const SOURCES = [
     { id: "", label: "All" },
@@ -136,7 +137,7 @@ export default function PetsClient() {
                     <>
                         <div className="pets-summary">
                             <span><strong>{ownedCount}</strong> / {COLLECTIBLES.length} pets</span>
-                            {featured ? <span>★ Equipped: <strong>{featured.name}</strong> ({statText(petActive(featured))} +{petActive(featured).value}%)</span> : <span className="muted">No pet equipped</span>}
+                            {featured ? <span>★ Equipped: <strong>{featured.name}</strong> — {petPerk(featured).icon} {petPerk(featured).name} <span className="muted">({petPerk(featured).desc})</span></span> : <span className="muted">No pet equipped</span>}
                         </div>
                         {passiveEntries.length ? (
                             <div className="pets-passives">
@@ -182,7 +183,7 @@ export default function PetsClient() {
                         const owned = ownedSet.has(pet.id);
                         const isFeatured = state.featured === pet.id;
                         const passive = petPassive(pet);
-                        const active = petActive(pet);
+                        const perk = petPerk(pet);
                         const Icon = pet.Icon;
                         const canBuy = pet.source === "shop" && !owned && state.signedIn && state.gold >= petPrice(pet);
                         return (
@@ -192,8 +193,8 @@ export default function PetsClient() {
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
                                 <div className="pet-buffs">
-                                    <span title="Bonus just for owning this pet (stacks with your others)">Own: +{passive.value} {statText(passive)}</span>
-                                    <span title="Stronger buff while this pet is equipped">Equip: +{active.value}% {statText(active)}</span>
+                                    <span title="Bonus just for owning this pet (stacks with your whole collection)">Own: +{passive.value} {statText(passive)}</span>
+                                    <span className="pet-perk" title={perk.desc}>{perk.icon} {perk.name}</span>
                                 </div>
                                 {owned ? (
                                     <>
