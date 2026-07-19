@@ -42,6 +42,7 @@ export async function GET(request) {
                     stats: describeStats(i.stats), charged: Boolean(i.charged), chargeRewardLabel: i.chargeRewardLabel || null,
                     charges: i.charges || null, cooldownDays: i.cooldownDays || null, source: i.source,
                     signature: sig ? `${sig.label}: ${sig.desc}` : null,
+                    flavor: i.flavor || null,
                 };
             });
             const chestTiers = CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji }));
