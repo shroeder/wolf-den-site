@@ -12,7 +12,7 @@ export const metadata = { title: "Propose a trade | Wolf Den", robots: { index: 
 const strip = (inv) => (inv?.items || []).map((i) => ({ id: i.id, name: i.name, rarity: i.rarity, icon: i.icon }));
 
 export default async function NewTradePage({ searchParams }) {
-    const { to } = await searchParams;
+    const { to, want } = await searchParams;
     const me = await getAuthenticatedBuyer().catch(() => null);
     if (!me) {
         return <div className="stack reveal"><section className="card"><p className="muted">Sign in to propose a trade.</p><Link href="/marketplace/login" className="button primary">Sign in</Link></section></div>;
@@ -24,13 +24,20 @@ export default async function NewTradePage({ searchParams }) {
 
     return (
         <div className="stack reveal">
-            <section className="card">
-                <h1 style={{ marginTop: 0 }}>🔄 Propose a trade</h1>
-                <p className="muted" style={{ marginTop: 0 }}>with <Link href={`/marketplace/u/${target.alias}`} className="pill">{target.displayLabel}</Link> · <Link href="/marketplace/trade" className="pill">Your offers →</Link></p>
+            <section className="card" style={{ background: "radial-gradient(120% 150% at 0% 0%, rgba(93,124,255,0.20), transparent 62%)", borderColor: "rgba(93,124,255,0.45)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <span style={{ fontSize: "2.1rem", flexShrink: 0 }} aria-hidden="true">🔄</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <h1 style={{ margin: 0, fontSize: "1.4rem" }}>Propose a trade</h1>
+                        <p className="muted" style={{ margin: "3px 0 0", fontSize: "0.95rem" }}>with <Link href={`/marketplace/u/${target.alias}`} style={{ color: "#ffd75e", fontWeight: 800, textDecoration: "none" }}>{target.displayLabel}</Link></p>
+                    </div>
+                    <Link href="/marketplace/trade" className="pill" style={{ flexShrink: 0 }}>Your offers →</Link>
+                </div>
             </section>
             <TradeBuilder
                 me={{ items: strip(myInv), gold: myInv?.gold || 0 }}
                 them={{ id: target.id, label: target.displayLabel, alias: target.alias, items: strip(theirInv) }}
+                preselectWant={want || null}
             />
         </div>
     );

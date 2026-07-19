@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import ConsumablesClient from "@/components/ConsumablesClient";
 import EquipmentClient from "@/components/EquipmentClient";
-import GearTradesInbox from "@/components/GearTradesInbox";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
@@ -39,8 +38,6 @@ export default async function InventoryPage() {
                     Equip items to buff your boss fight. Some gear also carries in-store perks. <Link href="/marketplace/boss" className="pill">⚔️ Boss</Link>
                 </p>
             </section>
-
-            <GearTradesInbox />
 
             <EquipmentClient
                 avatarUrl={profile?.avatarUrl}

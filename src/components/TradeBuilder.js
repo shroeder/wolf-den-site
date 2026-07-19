@@ -17,10 +17,10 @@ function ItemToggle({ item, on, onClick }) {
 }
 
 // Build a trade: pick items + gold YOU give, and items + gold you want from THEM.
-export default function TradeBuilder({ me, them }) {
+export default function TradeBuilder({ me, them, preselectWant = null }) {
     const router = useRouter();
     const [give, setGive] = useState(new Set());
-    const [get, setGet] = useState(new Set());
+    const [get, setGet] = useState(() => (preselectWant && them.items.some((i) => i.id === preselectWant) ? new Set([preselectWant]) : new Set()));
     const [giveGold, setGiveGold] = useState("");
     const [getGold, setGetGold] = useState("");
     const [note, setNote] = useState("");
@@ -53,8 +53,8 @@ export default function TradeBuilder({ me, them }) {
     return (
         <div className="stack">
             <div className="grid two-col">
-                <section className="card">
-                    <h2 style={{ marginTop: 0 }}>You give <span className="equip-gold">🪙 {(me.gold || 0).toLocaleString()}</span></h2>
+                <section className="card" style={{ borderColor: "rgba(224,68,58,0.35)" }}>
+                    <h2 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: "#ff7a6a" }}>📤 You give</span> <span className="equip-gold" style={{ marginLeft: "auto" }}>🪙 {(me.gold || 0).toLocaleString()}</span></h2>
                     <label className="cart-field cart-field-full"><span>Gold to give</span>
                         <input type="number" min="0" value={giveGold} onChange={(e) => setGiveGold(e.target.value)} placeholder="0" />
                     </label>
@@ -63,8 +63,8 @@ export default function TradeBuilder({ me, them }) {
                             : <p className="muted" style={{ margin: 0 }}>You have no items to give.</p>}
                     </div>
                 </section>
-                <section className="card">
-                    <h2 style={{ marginTop: 0 }}>You get — from {them.label}</h2>
+                <section className="card" style={{ borderColor: "rgba(55,224,161,0.35)" }}>
+                    <h2 style={{ marginTop: 0 }}><span style={{ color: "#37e0a1" }}>📥 You get</span> <span className="muted" style={{ fontSize: "0.85rem", fontWeight: 600 }}>from {them.label}</span></h2>
                     <label className="cart-field cart-field-full"><span>Gold to request</span>
                         <input type="number" min="0" value={getGold} onChange={(e) => setGetGold(e.target.value)} placeholder="0" />
                     </label>
@@ -75,12 +75,22 @@ export default function TradeBuilder({ me, them }) {
                 </section>
             </div>
             <section className="card">
-                <label className="cart-field cart-field-full"><span>Note (optional)</span>
-                    <input type="text" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="Say something…" />
+                <label style={{ display: "block", marginBottom: 12 }}>
+                    <span style={{ fontWeight: 800, fontSize: "0.82rem", color: "#cdbfa6", letterSpacing: "0.03em" }}>💬 ADD A NOTE (OPTIONAL)</span>
+                    <input type="text" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="Say something…"
+                        style={{ width: "100%", marginTop: 8, padding: "13px 15px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.14)", color: "#fff", fontSize: "0.98rem" }} />
                 </label>
-                {err ? <p style={{ color: "#ff6b6b" }}>{err}</p> : null}
-                <button type="button" className="button primary" onClick={propose} disabled={busy || empty}>
-                    {busy ? "Sending…" : `🔄 Send trade offer to ${them.label}`}
+                {err ? <p style={{ color: "#ff6b6b", fontWeight: 700 }}>{err}</p> : null}
+                <button type="button" onClick={propose} disabled={busy || empty}
+                    style={{
+                        width: "100%", padding: "15px", borderRadius: 999, border: "none",
+                        fontWeight: 900, fontSize: "1.05rem", cursor: empty || busy ? "not-allowed" : "pointer",
+                        background: empty || busy ? "rgba(255,255,255,0.1)" : "linear-gradient(90deg, #ffe08a, #ffb52e)",
+                        color: empty || busy ? "#7a7a7a" : "#1a1206",
+                        boxShadow: empty || busy ? "none" : "0 8px 24px -8px rgba(255,183,46,0.7)",
+                        transition: "transform 0.08s ease",
+                    }}>
+                    {busy ? "Sending…" : empty ? "Add something to trade first" : `🔄 Send trade offer to ${them.label}`}
                 </button>
             </section>
         </div>

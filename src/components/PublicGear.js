@@ -1,5 +1,4 @@
 import { EQUIP_SLOTS, STAT_META, itemById, itemIcon } from "@/lib/marketplace/items.js";
-import GearTradeComposer from "@/components/GearTradeComposer";
 
 // Read-only view of a member's equipped loadout + owned items + combat-stat total, for their public
 // profile (so others can see their gear and, later, propose trades). Presentational.
@@ -15,11 +14,12 @@ function ItemChip({ id, equipped = false }) {
     );
 }
 
-export default function PublicGear({ inventory, displayLabel = "This member", canTrade = false, targetId = null }) {
+export default function PublicGear({ inventory, displayLabel = "This member", canTrade = false, targetAlias = null }) {
     const equipped = inventory?.equipped || {};
     const equippedIds = EQUIP_SLOTS.map((s) => equipped[s.slot]).filter(Boolean);
     const items = inventory?.items || [];
     const nonEquipped = items.filter((i) => !i.equipped);
+    const tradeable = canTrade && targetAlias && nonEquipped.length;
     const stats = inventory?.stats || {};
     const statEntries = Object.entries(stats).filter(([, v]) => v);
     if (!equippedIds.length && !items.length) return null;
@@ -40,8 +40,22 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
                     <div className="equip-bag-grid">{equippedIds.map((id) => <ItemChip key={id} id={id} equipped />)}</div>
                 </>
             ) : null}
-            {canTrade && nonEquipped.length ? (
-                <GearTradeComposer targetId={targetId} targetLabel={displayLabel} items={nonEquipped.map((i) => ({ id: i.id, name: i.name, rarity: i.rarity, slot: i.slot, icon: i.icon }))} />
+            {tradeable ? (
+                <>
+                    <p className="muted" style={{ margin: "12px 0 6px" }}>Inventory ({nonEquipped.length}) · tap an item to propose a trade for it</p>
+                    <div className="equip-bag-grid">
+                        {nonEquipped.map((i) => {
+                            const Icon = itemIcon(i.icon);
+                            return (
+                                <a key={i.id} href={`/marketplace/trade/new?to=${encodeURIComponent(targetAlias)}&want=${encodeURIComponent(i.id)}`} className={`equip-card rar-${i.rarity} is-clickable`} style={{ textDecoration: "none" }} title={`Propose a trade for ${i.name}`}>
+                                    <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
+                                    <span className="equip-card-name">{i.name}</span>
+                                    <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>🤝 Trade</span>
+                                </a>
+                            );
+                        })}
+                    </div>
+                </>
             ) : items.length ? (
                 <>
                     <p className="muted" style={{ margin: "12px 0 6px" }}>Inventory ({items.length})</p>
