@@ -22,9 +22,29 @@ export async function generateMetadata({ params }) {
     const { alias } = await params;
     const profile = await getPublicProfileByAlias(alias).catch(() => null);
     if (!profile) return { title: "Member | Wolf Den Marketplace" };
+    const lvl = profile.level?.level ?? profile.level ?? 1;
+    const badgeCount = (profile.badges || []).length;
+    const label = `${profile.displayLabel}${profile.alias ? ` (@${profile.alias})` : ""}`;
+    // Share-friendly blurb. The 1200×630 hero card comes from opengraph-image.js and is auto-attached to
+    // both the OpenGraph and Twitter tags — so a shared profile link renders a rich preview.
+    const description = `Level ${lvl} at The Wolf Den${badgeCount ? ` · ${badgeCount} badge${badgeCount === 1 ? "" : "s"} earned` : ""}. Check out their gear, loadout, and rank in the pack.`;
+    const url = `/marketplace/u/${profile.alias}`;
     return {
-        title: `${profile.displayLabel}${profile.alias ? ` (@${profile.alias})` : ""} | Wolf Den Marketplace`,
-        alternates: { canonical: `/marketplace/u/${profile.alias}` },
+        title: `${label} | Wolf Den Marketplace`,
+        description,
+        alternates: { canonical: url },
+        openGraph: {
+            type: "profile",
+            title: `${label} · Level ${lvl}`,
+            description,
+            url,
+            siteName: "The Wolf Den",
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: `${label} · Level ${lvl}`,
+            description,
+        },
     };
 }
 
