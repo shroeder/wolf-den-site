@@ -34,6 +34,7 @@ const TILES = [
     { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Join the raid" },
     { href: "/marketplace/quests", icon: "📜", label: "Daily Quests", sub: "Earn gold daily" },
     { href: "/marketplace/bounties", icon: "🎯", label: "Bounty Board", sub: "Post & claim" },
+    { href: "/marketplace/pets", icon: "🐾", label: "Pets", sub: "Collect & equip" },
     { href: "/marketplace/inventory", icon: "🎒", label: "Your gear", sub: "Equip items" },
     { href: "/marketplace/trade", icon: "🤝", label: "Trades", sub: "Swap items & gold" },
     { href: "/marketplace/profile/avatar", icon: "🎨", label: "Your avatar", sub: "Build your look" },

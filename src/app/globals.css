@@ -9619,6 +9619,36 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .bounty-person.is-winner { color: #ffd75e; font-weight: 700; }
 .bounty-payout { margin-left: auto; font-weight: 800; color: #ffd75e; }
 .bounty-winner-check { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
+
+/* Pets */
+.pets-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 0.88rem; }
+.pets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.pet-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 14px 10px; border-radius: 14px; background: #17191f; border: 1px solid #2a2f37; }
+.pet-card.is-locked { opacity: 0.6; }
+.pet-card.is-featured { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e, 0 0 18px rgba(255,215,94,0.25); }
+.pet-icon { font-size: 2.6rem; line-height: 1; }
+.pet-card.is-locked .pet-icon { filter: grayscale(0.85); }
+.pet-name { font-weight: 800; font-size: 0.92rem; }
+.pet-rarity { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+.pet-card.rarity-common .pet-rarity { color: #9aa0a6; }
+.pet-card.rarity-rare .pet-rarity { color: #4aa3ff; }
+.pet-card.rarity-epic .pet-rarity { color: #b76bff; }
+.pet-card.rarity-legendary .pet-rarity { color: #ffb020; }
+.pet-card.rarity-mythic .pet-rarity { color: #33e0a1; }
+.pet-card.rarity-ascendant .pet-rarity { color: #ff7a3c; }
+.pet-card.rarity-eternal .pet-rarity { color: #ff5cc8; }
+.pet-card.rarity-rare { border-color: rgba(74,163,255,0.3); }
+.pet-card.rarity-epic { border-color: rgba(183,107,255,0.3); }
+.pet-card.rarity-legendary { border-color: rgba(255,176,32,0.35); }
+.pet-card.rarity-mythic { border-color: rgba(51,224,161,0.35); }
+.pet-card.rarity-ascendant { border-color: rgba(255,122,60,0.4); }
+.pet-card.rarity-eternal { border-color: rgba(255,92,200,0.4); }
+.pet-buffs { display: flex; flex-direction: column; gap: 2px; font-size: 0.72rem; color: #cbd2da; }
+.pet-locked { font-size: 0.74rem; color: #9a93a6; margin-top: 2px; }
+.pet-btn { margin-top: 4px; padding: 6px 12px; font-size: 0.8rem; }
+.pet-featured-badge { position: absolute; top: 6px; right: 6px; font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
+.pet-card.just-equipped { animation: petPop 0.5s ease; }
+@keyframes petPop { 0% { transform: scale(1); } 40% { transform: scale(1.09); } 100% { transform: scale(1); } }
 .quest-claim { flex: 0 0 auto; padding: 7px 14px; }
 .quest-check { flex: 0 0 auto; color: #7ad07a; font-size: 1.3rem; font-weight: 900; }
 
