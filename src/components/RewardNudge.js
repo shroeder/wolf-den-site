@@ -47,7 +47,7 @@ export default function RewardNudge() {
     return (
         <>
             {!data.maxed && data.label ? (
-                <Link href="/marketplace/track" className="reward-nudge" aria-label={`Next unlock: ${data.label} at level ${data.unlockLevel}`}>
+                <Link href="/marketplace/quests" className="reward-nudge" aria-label={`Next unlock: ${data.label} at level ${data.unlockLevel} — do your daily quests to earn XP`}>
                     <span className="reward-nudge-gift" aria-hidden="true">🎁</span>
                     <span className="reward-nudge-main">
                         <span className="reward-nudge-label">
