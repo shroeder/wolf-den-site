@@ -272,7 +272,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                         {(data.shop || []).map((i) => {
                             const Icon = itemIcon(i.icon);
                             return (
-                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => buy(i.id)} disabled={busy || !i.canAfford} title={i.statsText}>
+                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={i.statsText}>
                                     <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
                                     <span className="equip-card-name">{i.name}</span>
                                     <span className="equip-card-stats">{i.statsText}</span>
@@ -289,7 +289,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                 <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
                     <div className={`card equip-sheet rar-${detailItem.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                            <ItemGlyph id={detailItem.id} className="equip-card-glyph" />
+                            {(() => { const GlyphIcon = itemIcon(detailItem.icon); return <span className="equip-card-glyph"><GlyphIcon aria-hidden="true" /></span>; })()}
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detailItem.name}</div>
                                 <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detailItem.rarity} · {detailItem.slot.replace("_", " ")}{detailItem.equipped ? " · Equipped ✓" : ""}</div>
@@ -299,13 +299,18 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setName ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p> : null}
+                        {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {(detailItem.cost || 0).toLocaleString()} gold{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-                            {detailItem.equipped ? (
+                            {detailItem.shop ? (
+                                <button type="button" className="button gold" onClick={() => { buy(detailItem.id); closeDetail(); }} disabled={busy || !detailItem.canAfford}>
+                                    🪙 {detailItem.canAfford ? `Buy for ${(detailItem.cost || 0).toLocaleString()}` : `${(detailItem.cost || 0).toLocaleString()} · need more`}
+                                </button>
+                            ) : detailItem.equipped ? (
                                 <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
                             ) : (
                                 <button type="button" className="button primary" onClick={() => { equipFromBag(detailItem); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
                             )}
-                            {detailItem.sellValue > 0 ? (
+                            {!detailItem.shop && detailItem.sellValue > 0 ? (
                                 sellArmed ? (
                                     <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>
                                 ) : (

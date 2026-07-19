@@ -199,7 +199,8 @@ export async function getInventory(buyerId) {
     // The gold shop: xp_shop items you don't own yet.
     const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id)).map((i) => ({
         id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-        statsText: describeStats(i.stats), cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0),
+        stats: i.stats, statsText: describeStats(i.stats), signature: signatureFor(i.id),
+        cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0), shop: true,
     }));
     const equippedList = Object.values(bySlot);
     return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList) };

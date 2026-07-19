@@ -366,6 +366,43 @@ export const ITEMS = [
     { id: "gs_worldbreaker", name: "Worldbreaker", slot: "main_hand", rarity: "mythic", icon: "GiBattleAxe", flavor: "Cleaves the heavens.", stats: { might: 21, crit_chance: 8, crit_power: 11 }, reqLevel: 100, source: "xp_shop", xpCost: 400000, sort: 641 },
     { id: "gs_sovereign_crown", name: "Sovereign Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "The whole pack bows.", stats: { might: 13, fortune: 27 }, reqLevel: 90, source: "xp_shop", xpCost: 300000, sort: 642 },
     { id: "gs_omnipotence_ring", name: "Ring of Omnipotence", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "All power, one finger.", stats: { might: 16, crit_chance: 8, fortune: 16 }, reqLevel: 100, source: "xp_shop", xpCost: 600000, sort: 643 },
+
+    // ===== GOLD SHOP GEAR — WAVE 2 (source: "xp_shop") — more to buy across every tier. =====
+    // -- Low (400–900 gold) --
+    { id: "gs2_short_sword", name: "Short Sword", slot: "main_hand", rarity: "common", icon: "GiBroadsword", flavor: "Reliable steel.", stats: { might: 10 }, reqLevel: 4, source: "xp_shop", xpCost: 400, sort: 700 },
+    { id: "gs2_wood_shield", name: "Wooden Shield", slot: "off_hand", rarity: "common", icon: "GiCheckedShield", flavor: "Better than nothing.", stats: { ferocity: 10 }, reqLevel: 4, source: "xp_shop", xpCost: 450, sort: 701 },
+    { id: "gs2_leather_helm", name: "Leather Helm", slot: "helmet", rarity: "common", icon: "GiCrestedHelmet", flavor: "Keeps the rain off.", stats: { ferocity: 10 }, reqLevel: 4, source: "xp_shop", xpCost: 400, sort: 702 },
+    { id: "gs2_cloth_robe", name: "Cloth Robe", slot: "chest", rarity: "common", icon: "GiRobe", flavor: "Light and airy.", stats: { ferocity: 10 }, reqLevel: 4, source: "xp_shop", xpCost: 450, sort: 703 },
+    { id: "gs2_worn_ring", name: "Worn Ring", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "A humble band.", stats: { might: 10 }, reqLevel: 5, source: "xp_shop", xpCost: 500, sort: 704 },
+    { id: "gs2_hunters_charm", name: "Hunter's Charm", slot: "amulet", rarity: "rare", icon: "GiFeatherNecklace", flavor: "Lady luck's favor.", stats: { fortune: 16 }, reqLevel: 10, source: "xp_shop", xpCost: 900, sort: 705 },
+    // -- Medium (2,400–3,600 gold) --
+    { id: "gs2_flame_sword", name: "Flame Sword", slot: "main_hand", rarity: "epic", icon: "GiFireSilhouette", flavor: "Burns as it bites.", stats: { might: 22 }, reqLevel: 20, source: "xp_shop", xpCost: 2600, sort: 710 },
+    { id: "gs2_ward_orb", name: "Ward Orb", slot: "off_hand", rarity: "epic", icon: "GiCrystalBall", flavor: "A steady shield of magic.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 22, source: "xp_shop", xpCost: 2400, sort: 711 },
+    { id: "gs2_knight_helm", name: "Knight's Helm", slot: "helmet", rarity: "epic", icon: "GiBlackKnightHelm", flavor: "Built for the front line.", stats: { might: 15, crit_chance: 7 }, reqLevel: 24, source: "xp_shop", xpCost: 3000, sort: 712 },
+    { id: "gs2_scale_cuirass", name: "Scale Cuirass", slot: "chest", rarity: "epic", icon: "GiScaleMail", flavor: "Layered like a dragon.", stats: { might: 9, ferocity: 13 }, reqLevel: 26, source: "xp_shop", xpCost: 3200, sort: 713 },
+    { id: "gs2_war_belt", name: "War Belt", slot: "belt", rarity: "epic", icon: "GiBeltArmor", flavor: "Cinch it for battle.", stats: { might: 11, crit_chance: 11 }, reqLevel: 28, source: "xp_shop", xpCost: 2800, sort: 714 },
+    { id: "gs2_swift_greaves", name: "Swift Greaves", slot: "boots", rarity: "epic", icon: "GiGreaves", flavor: "Blink and miss them.", stats: { crit_chance: 4, ferocity: 18 }, reqLevel: 26, source: "xp_shop", xpCost: 2600, sort: 715 },
+    { id: "gs2_gem_amulet", name: "Gemmed Amulet", slot: "amulet", rarity: "epic", icon: "GiGemPendant", flavor: "Anger, focused.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 28, source: "xp_shop", xpCost: 3400, sort: 716 },
+    { id: "gs2_might_ring", name: "Ring of Might", slot: "ring", rarity: "epic", icon: "GiPowerRing", flavor: "Raw force.", stats: { might: 22 }, reqLevel: 28, source: "xp_shop", xpCost: 3600, sort: 717 },
+    // -- High (11,000–16,000 gold) --
+    { id: "gs2_rune_greatsword", name: "Rune Greatsword", slot: "main_hand", rarity: "legendary", icon: "GiRuneSword", flavor: "Etched to bite deeper.", stats: { might: 16, crit_power: 14 }, reqLevel: 40, source: "xp_shop", xpCost: 12000, sort: 720 },
+    { id: "gs2_dragon_ward", name: "Dragon Ward", slot: "off_hand", rarity: "legendary", icon: "GiDragonShield", flavor: "Scaled defense.", stats: { might: 9, ferocity: 21 }, reqLevel: 42, source: "xp_shop", xpCost: 11000, sort: 721 },
+    { id: "gs2_horned_crown", name: "Horned Crown", slot: "helmet", rarity: "legendary", icon: "GiHornedHelm", flavor: "Intimidation, mostly.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 46, source: "xp_shop", xpCost: 14000, sort: 722 },
+    { id: "gs2_plate_of_kings", name: "Plate of Kings", slot: "chest", rarity: "legendary", icon: "GiLayeredArmor", flavor: "Immovable.", stats: { might: 10, ferocity: 20 }, reqLevel: 50, source: "xp_shop", xpCost: 15000, sort: 723 },
+    { id: "gs2_titan_belt", name: "Titan Belt", slot: "belt", rarity: "legendary", icon: "GiBlackBelt", flavor: "Strength of ten.", stats: { ferocity: 30 }, reqLevel: 48, source: "xp_shop", xpCost: 13000, sort: 724 },
+    { id: "gs2_swift_striders", name: "Swift Striders", slot: "boots", rarity: "legendary", icon: "GiMetalBoot", flavor: "Thunder in every step.", stats: { might: 12, ferocity: 18 }, reqLevel: 50, source: "xp_shop", xpCost: 13500, sort: 725 },
+    { id: "gs2_heart_amulet", name: "Heart Amulet", slot: "amulet", rarity: "legendary", icon: "GiHeartNecklace", flavor: "The pack beats within.", stats: { might: 13, crit_power: 17 }, reqLevel: 48, source: "xp_shop", xpCost: 14000, sort: 726 },
+    { id: "gs2_kings_band", name: "King's Band", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "Worn by rulers.", stats: { might: 14, fortune: 16 }, reqLevel: 50, source: "xp_shop", xpCost: 16000, sort: 727 },
+    // -- Super (60,000–85,000 gold) --
+    { id: "gs2_energy_blade", name: "Energy Blade", slot: "main_hand", rarity: "mythic", icon: "GiEnergySword", flavor: "Crackling with power.", stats: { might: 24, crit_power: 16 }, reqLevel: 70, source: "xp_shop", xpCost: 80000, sort: 730 },
+    { id: "gs2_void_ward", name: "Void Ward", slot: "off_hand", rarity: "mythic", icon: "GiVortex", flavor: "It devours all it touches.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 68, source: "xp_shop", xpCost: 60000, sort: 731 },
+    { id: "gs2_crown_supreme", name: "Crown Supreme", slot: "helmet", rarity: "mythic", icon: "GiCrenelCrown", flavor: "Blessed by the old ones.", stats: { crit_chance: 16, crit_power: 24 }, reqLevel: 70, source: "xp_shop", xpCost: 75000, sort: 732 },
+    { id: "gs2_star_plate", name: "Star Plate", slot: "chest", rarity: "mythic", icon: "GiLayeredArmor", flavor: "Hammered from a fallen star.", stats: { ferocity: 24, fortune: 16 }, reqLevel: 72, source: "xp_shop", xpCost: 70000, sort: 733 },
+    { id: "gs2_cosmic_amulet", name: "Cosmic Amulet", slot: "amulet", rarity: "mythic", icon: "GiGalaxy", flavor: "A universe on a string.", stats: { crit_chance: 16, crit_power: 24 }, reqLevel: 74, source: "xp_shop", xpCost: 85000, sort: 734 },
+    // -- Super super (280,000–700,000 gold) — signature prestige --
+    { id: "gs2_dragon_god", name: "Blade of the Dragon God", slot: "main_hand", rarity: "mythic", icon: "GiWingedSword", flavor: "Forged in a wyrm's heart.", stats: { might: 24, crit_power: 16 }, reqLevel: 90, source: "xp_shop", xpCost: 280000, sort: 740 },
+    { id: "gs2_apex_crown", name: "Apex Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "Wear your status.", stats: { might: 13, fortune: 27 }, reqLevel: 95, source: "xp_shop", xpCost: 350000, sort: 741 },
+    { id: "gs2_infinity_ring", name: "Ring of Infinity", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "No end, no limit.", stats: { might: 16, crit_chance: 8, fortune: 16 }, reqLevel: 100, source: "xp_shop", xpCost: 700000, sort: 742 },
 ];
 
 export function itemById(id) {

@@ -50,6 +50,8 @@ export const ITEM_SIGNATURES = {
     gs_excalibur: { label: "Sword of Kings", desc: "Your first attack each day strikes for TRIPLE.", firstHitMult: 3 },
     gs_worldbreaker: { label: "Worldbreaker", desc: "Your critical hits strike TWICE.", critMult: 2 },
     gs_omnipotence_ring: { label: "Omnipotence", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
+    gs2_dragon_god: { label: "Dragon God", desc: "25% chance on each hit to erupt for double damage.", eruptChance: 0.25, eruptMult: 2 },
+    gs2_infinity_ring: { label: "Infinity", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
 };
 
 const SIG_MULT_CAP = 3; // no single hit can be boosted past 3× by signatures (crit is separate + also bounded)
