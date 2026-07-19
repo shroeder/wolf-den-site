@@ -10,6 +10,7 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
+import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit } from "@/lib/marketplace/signatures.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges.js";
@@ -211,12 +212,17 @@ export async function getBossState(buyerId = null) {
     let you = null;
     if (buyerId) {
         const used = await manualAttacksToday(buyerId);
-        const myStats = await getEquippedStats(buyerId).catch(() => ({}));
-        const dailyCap = DAILY_ATTACKS + (myStats.extra_strike || 0);
+        const [myStats, myIds, bonusStrikes, boosts] = await Promise.all([
+            getEquippedStats(buyerId).catch(() => ({})),
+            getEquippedIds(buyerId).catch(() => ({})),
+            memberBonusStrikes(buyerId).catch(() => 0),
+            activeBoosts(buyerId).catch(() => []),
+        ]);
+        const dailyCap = DAILY_ATTACKS + (myStats.extra_strike || 0) + signatureStrikeBonus(myIds) + bonusStrikes;
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
         const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0 };
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0, boosts };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -385,14 +391,15 @@ export async function attackBoss(buyerId) {
         getEquippedStats(buyerId).catch(() => ({})),
         getEquippedIds(buyerId).catch(() => ({})),
     ]);
-    // gear can grant extra daily strikes (extra_strike stat + signature items like Belt of Giants)
-    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds);
+    // Extra daily strikes come from gear (extra_strike stat + signatures) AND used consumables (potions).
+    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds) + (await memberBonusStrikes(buyerId).catch(() => 0));
     const used = await manualAttacksToday(buyerId);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
     const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const swing = manualHit(lvl(me?.xp), stats, { forceCrit: signatureForcesCrit(equippedIds, used) });
-    const buffMult = await activeDamageMult().catch(() => 1);
+    // Global admin buff × the member's own active damage potions.
+    const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1));
     const sig = signatureHit(equippedIds, { hitIndex: used, crit: swing.crit });
     const damage = Math.round(swing.damage * buffMult * sig.mult);
     const crit = swing.crit;

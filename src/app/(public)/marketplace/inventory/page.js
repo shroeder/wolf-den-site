@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import ConsumablesClient from "@/components/ConsumablesClient";
 import EquipmentClient from "@/components/EquipmentClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -45,6 +46,8 @@ export default async function InventoryPage() {
                 level={profile?.level?.level || 1}
                 backdropUrl={backdropUrl || null}
             />
+
+            <ConsumablesClient />
         </div>
     );
 }
