@@ -251,9 +251,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                 {(data.items || []).length ? (
                     <div className="equip-bag-grid">
                         {(data.items || []).map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={describeStats(i.stats)}>
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${describeStats(i.stats)}`}>
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
+                                <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
@@ -272,9 +273,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                         {(data.shop || []).map((i) => {
                             const Icon = itemIcon(i.icon);
                             return (
-                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={i.statsText}>
+                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${i.statsText}`}>
                                     <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
                                     <span className="equip-card-name">{i.name}</span>
+                                    <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
                                     <span className="equip-card-stats">{i.statsText}</span>
                                     <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                 </button>
