@@ -338,6 +338,16 @@ async function finalizeBossKill(bossId) {
         await addChests(p.id, { [tier]: 1 }).catch(() => {});
     }
 
+    // ELITE CHEST — the #1 damage dealer gets a tiny shot at the rarest loot in the game (Ascendant/Eternal
+    // gear: top-end stats + a real-world reward). Deliberately harsh: ~8% Ascendant, ~2% Eternal.
+    let eliteChest = null;
+    if (top1) {
+        const r = Math.random();
+        if (r < 0.02) eliteChest = "eternal";
+        else if (r < 0.10) eliteChest = "ascendant";
+        if (eliteChest) await addChests(top1.id, { [eliteChest]: 1 }).catch(() => {});
+    }
+
     // Pack-wide celebration pop-up — personalized to what each member actually won.
     for (const p of pool) {
         const isTop = top1 && p.id === top1.id;
@@ -345,6 +355,7 @@ async function finalizeBossKill(bossId) {
         const chestTier = chestByBuyer.get(p.id) || null;
         const bits = [];
         if (isTop) bits.push(chaseItem ? `🥇 You dealt the most damage and won ${chaseItem.name}!` : `🥇 You dealt the most damage!`);
+        if (isTop && eliteChest) bits.push(eliteChest === "eternal" ? "👑 An ETERNAL chest dropped — the rarest loot in the Den!" : "🌟 An ASCENDANT chest dropped — incredibly rare!");
         if (isRaffle && boss.prize_name) bits.push(`🎟️ You won the raffle — come claim ${boss.prize_name} in-store!`);
         if (chestTier) { const c = CHEST_TIERS[chestTier]; bits.push(`${c.emoji} ${c.label} landed in your stash — open it!`); }
         if (isTop && top1Badge) bits.push(`You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.`);

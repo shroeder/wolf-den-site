@@ -13,14 +13,22 @@ export const CHEST_TIERS = {
     iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 34, rare: 42, epic: 21, legendary: 3 } },
     gold: { label: "Gold Chest", emoji: "🪙", color: "#ffd75e", weights: { rare: 30, epic: 47, legendary: 20, mythic: 3 } },
     mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 36, legendary: 48, mythic: 16 } },
+    // Elite chests — the ONLY source of Ascendant/Eternal gear. Never from level-ups; awarded for elite
+    // boss performance (tiny chance) or by the owner. Each opens to a guaranteed elite-tier item.
+    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { ascendant: 100 } },
+    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { eternal: 100 } },
 };
-export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic"];
+export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal"];
 
 // Gold consolation ("dust") when you already own every eligible item of the rolled rarity.
-const DUST = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900 };
+const DUST = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 3000, eternal: 8000 };
 
 // Items a chest can produce (all non-charged loot gear). Charged/perk + level/shop items stay off the table.
 const CHEST_POOL = ITEMS.filter((i) => (i.source === "chest" || i.source === "boss_drop") && !i.charged);
+// Elite pool — the Ascendant/Eternal gear (charged, so it's excluded from the normal pool above). Only
+// reachable by opening an elite chest.
+const ELITE_POOL = ITEMS.filter((i) => i.source === "elite");
+const ELITE_TIERS = new Set(["ascendant", "eternal"]);
 
 function tierForLevel(level) {
     if (level >= 45) return "mythic";
@@ -98,13 +106,15 @@ export async function openChest(buyerId, tier) {
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const owned = new Set(ownedRows.map((r) => r.item_id));
     const rarity = rollRarity(def.weights);
+    // Elite chests draw from the elite (charged) pool; everything else from the normal loot pool.
+    const pool = ELITE_TIERS.has(tier) ? ELITE_POOL : CHEST_POOL;
     // Prefer the rolled rarity; if you own them all, widen to any un-owned pool item before falling to dust.
-    let candidates = CHEST_POOL.filter((i) => i.rarity === rarity && !owned.has(i.id));
-    if (!candidates.length) candidates = CHEST_POOL.filter((i) => !owned.has(i.id));
+    let candidates = pool.filter((i) => i.rarity === rarity && !owned.has(i.id));
+    if (!candidates.length) candidates = pool.filter((i) => !owned.has(i.id));
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
-        await grantItem(buyerId, item.id, "chest");
-        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id) } };
+        await grantItem(buyerId, item.id, ELITE_TIERS.has(tier) ? "elite" : "chest");
+        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
     }
     const gold = DUST[rarity] || 25;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});

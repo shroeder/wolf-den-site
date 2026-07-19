@@ -85,6 +85,11 @@ export const REWARDS = {
     first_restock_pick: "First pick at the next restock",
     reserved_seat: "A reserved seat at any event this month",
     wall_of_champions: "Your name on the Wall of Champions for a month",
+    // ELITE rewards — reserved for Ascendant/Eternal gear. Gated behind the rarest drops in the game and
+    // long (up to 1-year) cooldowns, so they can be genuinely big while still value-capped.
+    elite_credit_100: "$100 store credit",
+    elite_box_120: "Free sealed booster box (up to $120)",
+    elite_grail: "One 'grail' card of your choice (up to $150), on the house",
 };
 
 const ICONS = {
@@ -489,6 +494,17 @@ export const ITEMS = [
     { id: "gilded_mantle", name: "Gilded Mantle", slot: "back", rarity: "epic", icon: "GiCondorEmblem", flavor: "Wealth worn well.", stats: { might: 12, fortune: 10 }, reqLevel: 26, source: "xp_shop", xpCost: 3200, sort: 821 },
     { id: "celestial_cloak", name: "Celestial Cloak", slot: "back", rarity: "legendary", icon: "GiCurlyWing", flavor: "Cut from the night sky.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 46, source: "xp_shop", xpCost: 14000, sort: 822 },
     { id: "void_shroud", name: "Void Shroud", slot: "back", rarity: "mythic", icon: "GiFalconMoon", flavor: "It drinks the light.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 90, source: "xp_shop", xpCost: 90000, sort: 823 },
+
+    // ===== ELITE TIERS (source: "elite") — the two rarities ABOVE mythic. Extremely harsh to earn (only
+    // from Ascendant/Eternal loot chests, awarded for elite boss performance or by the owner). Each is a
+    // top-end stat block AND a signature AND a charged REAL-WORLD reward with a long cooldown. =====
+    // -- Ascendant --
+    { id: "ascendant_crown", name: "Ascendant Crown", slot: "helmet", rarity: "ascendant", icon: "GiCrenelCrown", flavor: "Worn by those who rose past legend.", stats: { might: 20, crit_chance: 15, crit_power: 20 }, reqLevel: 80, source: "elite", charged: true, charges: 2, cooldownDays: 180, chargeReward: "elite_credit_100", chargeRewardLabel: REWARDS.elite_credit_100, sort: 900 },
+    { id: "ascendant_blade", name: "Ascendant Blade", slot: "main_hand", rarity: "ascendant", icon: "GiEnergySword", flavor: "It hums with a light that shouldn't exist.", stats: { might: 35, crit_power: 20 }, reqLevel: 82, source: "elite", charged: true, charges: 2, cooldownDays: 180, chargeReward: "free_bundle_30", chargeRewardLabel: REWARDS.free_bundle_30, sort: 901 },
+    { id: "ascendant_aegis", name: "Ascendant Aegis", slot: "off_hand", rarity: "ascendant", icon: "GiCheckedShield", flavor: "Nothing has ever broken it.", stats: { ferocity: 35, fortune: 20 }, reqLevel: 84, source: "elite", charged: true, charges: 3, cooldownDays: 120, chargeReward: "free_pack_25", chargeRewardLabel: REWARDS.free_pack_25, sort: 902 },
+    // -- Eternal (the pinnacle — 1-year cooldowns) --
+    { id: "eternal_wolf_crown", name: "Eternal Wolf Crown", slot: "helmet", rarity: "eternal", icon: "GiWolfHead", flavor: "The Den remembers only a handful who wore it.", stats: { might: 25, crit_chance: 20, crit_power: 30 }, reqLevel: 95, source: "elite", charged: true, charges: 1, cooldownDays: 365, chargeReward: "elite_box_120", chargeRewardLabel: REWARDS.elite_box_120, sort: 910 },
+    { id: "eternal_infinity", name: "Band of Eternity", slot: "ring", rarity: "eternal", icon: "GiEngagementRing", flavor: "No beginning. No end. No equal.", stats: { might: 25, crit_chance: 15, crit_power: 25, fortune: 10 }, reqLevel: 100, source: "elite", charged: true, charges: 1, cooldownDays: 365, chargeReward: "elite_grail", chargeRewardLabel: REWARDS.elite_grail, sort: 911 },
 ];
 
 export function itemById(id) {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 // Rarity glow colors (match the chest reveal), so a mythic gift pops harder than a common one.
-const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0" };
+const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 
 // CTA wording per gift kind — you open a chest, spend gold, equip gear, view a boss result.
 const CTA_LABEL = { chest: "Open it →", gold: "Spend it →", item: "Equip it →", boss: "See it →" };

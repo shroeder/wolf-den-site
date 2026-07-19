@@ -15,8 +15,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Dopamine dressing for gift pushes — rarity flavor so a mythic drop feels like a mythic drop.
-const RARITY_EMOJI = { common: "⚪", rare: "🔵", epic: "🟣", legendary: "🟠", mythic: "💎" };
-const RARITY_ARTICLE = { rare: "a rare ", epic: "an epic ", legendary: "a legendary ", mythic: "a MYTHIC " };
+const RARITY_EMOJI = { common: "⚪", rare: "🔵", epic: "🟣", legendary: "🟠", mythic: "💎", ascendant: "🌟", eternal: "👑" };
+const RARITY_ARTICLE = { rare: "a rare ", epic: "an epic ", legendary: "a legendary ", mythic: "a MYTHIC ", ascendant: "an ASCENDANT ", eternal: "an ETERNAL " };
 
 // Alert the recipient on BOTH channels: FCM to the marketplace app (the configured/live one — same as DMs
 // and friend requests) AND browser web push. Fire-and-forget; a missing channel just no-ops.

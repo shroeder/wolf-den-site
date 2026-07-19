@@ -81,6 +81,8 @@ const GEAR_RARITY_ADJ = {
     epic: "ornate glowing",
     legendary: "legendary, radiant, intricately-detailed",
     mythic: "mythic, blazing with otherworldly energy, awe-inspiring",
+    ascendant: "ascendant, wreathed in molten light, transcendent",
+    eternal: "eternal, radiating impossible prismatic power, godlike",
 };
 const gearDesc = (def) => {
     const adj = GEAR_RARITY_ADJ[def.rarity] || "";
@@ -100,8 +102,13 @@ function gearPhraseFromSlots(bySlot) {
     if (off) parts.push(`carrying a ${gearDesc(off.def)}`);
     if (armor.length) parts.push(`wearing ${armor.join(", ")}`);
     if (acc.length) parts.push(`adorned with ${acc.join(", ")}`);
-    const best = items.some((x) => x.def.rarity === "mythic") ? "mythic" : items.some((x) => x.def.rarity === "legendary") ? "legendary" : null;
-    const aura = best === "mythic"
+    const rank = { legendary: 1, mythic: 2, ascendant: 3, eternal: 4 };
+    const best = items.reduce((b, x) => (rank[x.def.rarity] > (rank[b] || 0) ? x.def.rarity : b), null);
+    const aura = best === "eternal"
+        ? " This is a godlike, eternal champion — their gear blazes with impossible prismatic light and reality bends around them."
+        : best === "ascendant"
+        ? " This is an ascendant hero — their gear is wreathed in molten, transcendent light."
+        : best === "mythic"
         ? " This is a legendary champion — their gear radiates a brilliant magical aura and glowing energy."
         : best === "legendary"
         ? " Their finest pieces glow with power."
@@ -173,10 +180,10 @@ function chargeState(ownedRow, item) {
 
 // Gold a member gets for selling gear back, by rarity (mirrors the chest "dust" values). Charged perk
 // items hold real-world value, so they can't be sold for gold.
-const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900 };
+const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 2500, eternal: 6000 };
 // Power ordering for the shop so it reads as one clean worst→best ladder (the catalog itself is grouped
 // by when items were added, which otherwise makes the shop restart at "worst" every batch).
-const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
+const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,

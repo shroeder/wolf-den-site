@@ -7,6 +7,8 @@ const PALETTES = {
     iron: { lidA: "#c6d0da", lidB: "#7c8894", bodyA: "#aab4bf", bodyB: "#69737e", band: "#333b43", metal: "#dfe6ec", metalD: "#8b95a0", gem: null, plank: "#525b64" },
     gold: { lidA: "#ffe79a", lidB: "#e0ac33", bodyA: "#ffd66b", bodyB: "#cf9a25", band: "#9a6f1c", metal: "#fff3c4", metalD: "#c79320", gem: "#ff5c8a", plank: "#b9861f" },
     mythic: { lidA: "#8bffd7", lidB: "#1f6d63", bodyA: "#2a8f86", bodyB: "#123f4a", band: "#0c2733", metal: "#b8fff0", metalD: "#2f9d8c", gem: "#b48bff", plank: "#1b5a5a" },
+    ascendant: { lidA: "#ffb37a", lidB: "#d1521a", bodyA: "#ff8a3d", bodyB: "#a8380f", band: "#5c1e08", metal: "#ffd9b0", metalD: "#c9541f", gem: "#fff2a8", plank: "#7a2c0e" },
+    eternal: { lidA: "#ff9ee6", lidB: "#c31a9a", bodyA: "#ff5cc8", bodyB: "#8f0e78", band: "#450a3c", metal: "#ffd6f4", metalD: "#c92fa8", gem: "#a8f0ff", plank: "#6a1257" },
 };
 
 export default function ChestIcon({ tier = "wooden", className = "", size }) {

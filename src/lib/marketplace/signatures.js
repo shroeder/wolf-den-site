@@ -140,6 +140,12 @@ export const ITEM_SIGNATURES = {
     gs2_swift_striders: { label: "Swiftstride", desc: "Grants +1 boss attack every day.", extraStrikes: 1 },
     gs2_heart_amulet: { label: "Packheart", desc: "Your first attack each day strikes for DOUBLE.", firstHitMult: 2 },
     gs2_kings_band: { label: "Crown Jewel", desc: "Your first attack each day is a GUARANTEED critical.", firstHitCrit: true },
+    // --- ELITE tiers (Ascendant / Eternal) — the strongest signatures in the game ---
+    ascendant_crown: { label: "Ascension", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
+    ascendant_blade: { label: "Worldrender", desc: "30% chance on each hit to ERUPT for TRIPLE damage.", eruptChance: 0.3, eruptMult: 3 },
+    ascendant_aegis: { label: "Unbreakable", desc: "Your critical hits strike TWICE.", critMult: 2 },
+    eternal_wolf_crown: { label: "Apex Predator", desc: "Your first attack each day is a GUARANTEED critical AND strikes for TRIPLE.", firstHitMult: 3, firstHitCrit: true },
+    eternal_infinity: { label: "Infinite", desc: "A GUARANTEED critical first strike, crits strike TWICE, and +1 boss attack every day.", firstHitCrit: true, critMult: 2, extraStrikes: 1 },
 };
 
 const SIG_MULT_CAP = 3; // no single hit can be boosted past 3× by signatures (crit is separate + also bounded)
