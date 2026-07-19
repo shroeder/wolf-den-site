@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import ChestOpener from "@/components/ChestOpener";
 import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot, itemIcon } from "@/lib/marketplace/items.js";
@@ -284,7 +285,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
             ) : null}
 
             {/* Item detail sheet — inspect, then equip or sell. In-brand modal (no native browser popup). */}
-            {detailItem ? (
+            {detailItem ? createPortal((
                 <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
                     <div className={`card equip-sheet rar-${detailItem.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -315,17 +316,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                         </div>
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
 
             {/* Coin-shower juice on a sale. */}
-            {coinBurst ? (
+            {coinBurst ? createPortal((
                 <div className="coinfx" key={coinBurst.key} aria-hidden="true">
                     {coinBurst.coins.map((c, i) => (
                         <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>🪙</span>
                     ))}
                     <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 🪙</div>
                 </div>
-            ) : null}
+            ), document.body) : null}
 
             {err ? <p style={{ color: "#ff6b6b" }}>{err}</p> : null}
         </div>
