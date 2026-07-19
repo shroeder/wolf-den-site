@@ -45,10 +45,10 @@ export function collectibleById(id) {
     return COLLECTIBLES.find((c) => c.id === id) || null;
 }
 
-export function isCollectibleUnlocked(item, level, { unlockAll = false } = {}) {
-    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= item.level;
+export function isCollectibleUnlocked(item, level, { unlockAll = false, owned = null } = {}) {
+    return (owned && owned.has(item.id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= item.level;
 }
 
-export function collectiblesForLevel(level, { unlockAll = false } = {}) {
-    return COLLECTIBLES.map((c) => ({ ...c, unlocked: isCollectibleUnlocked(c, level, { unlockAll }) }));
+export function collectiblesForLevel(level, { unlockAll = false, owned = null } = {}) {
+    return COLLECTIBLES.map((c) => ({ ...c, unlocked: isCollectibleUnlocked(c, level, { unlockAll, owned }) }));
 }

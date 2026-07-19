@@ -20,6 +20,7 @@ import { getBadgeBoard } from "@/lib/marketplace/badges.js";
 import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
+import { getStoreState } from "@/lib/marketplace/store.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
 import { countIncomingTrades } from "@/lib/marketplace/trade.js";
 
@@ -54,13 +55,14 @@ export default async function ProfileHubPage() {
         );
     }
 
-    const [profile, progress, track, bossSummary, badgeBoard, tradeCount] = await Promise.all([
+    const [profile, progress, track, bossSummary, badgeBoard, tradeCount, store] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         getRewardsProgress(buyer.id).catch(() => ({})),
         getRewardsTrack(buyer.id).catch(() => null),
         getMyBossSummary(buyer.id).catch(() => null),
         getBadgeBoard(buyer.id).catch(() => null),
         countIncomingTrades(buyer.id).catch(() => 0),
+        getStoreState(buyer.id).catch(() => ({ gold: 0, purchased: { pet: [], border: [], frame: [], cosmetic: [] } })),
     ]);
     const level = profile?.level || null;
     // Staff can equip any border regardless of level (matches the server-side bypass).
@@ -116,8 +118,8 @@ export default async function ProfileHubPage() {
             <RewardsTrackPreview track={track} />
 
             <section className="card">
-                <h2 style={{ marginTop: 0 }}>Profile border</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Cosmetic frames you unlock by leveling up. Tap one you&apos;ve earned to wear it.</p>
+                <h2 style={{ marginTop: 0 }}>Profile border <span className="muted" style={{ fontWeight: 600, fontSize: "0.85rem" }}>· 🪙 {store.gold.toLocaleString()} gold</span></h2>
+                <p className="muted" style={{ marginTop: 0 }}>Cosmetic frames you unlock by leveling up — tap one you&apos;ve earned to wear it, or tap a locked one to buy it early with gold.</p>
                 <BorderPicker
                     current={profile?.border}
                     level={level?.level || 1}
@@ -125,6 +127,8 @@ export default async function ProfileHubPage() {
                     displayLabel={profile?.displayLabel}
                     unlockAll={isStaff}
                     badges={(profile?.badges || []).map((b) => b.slug)}
+                    owned={store.purchased.border}
+                    gold={store.gold}
                 />
             </section>
 
@@ -137,13 +141,13 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Profile frame</h2>
                 <p className="muted" style={{ marginTop: 0 }}>A textured border that hugs your card&apos;s edge — unlock more by leveling up.</p>
-                <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} badges={(profile?.badges || []).map((b) => b.slug)} />
+                <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} badges={(profile?.badges || []).map((b) => b.slug)} owned={store.purchased.frame} gold={store.gold} />
             </section>
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Companions you unlock as you level up. Tap one to set your <strong>active pet</strong> — it rides along on your profile and hero cards, and joins you in the boss battle.</p>
-                <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} selectable featuredId={profile?.featuredCollectibleId} />
+                <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} selectable featuredId={profile?.featuredCollectibleId} owned={store.purchased.pet} gold={store.gold} />
             </section>
 
             <section className="card">

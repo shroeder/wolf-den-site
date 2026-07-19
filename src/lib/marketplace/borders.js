@@ -43,10 +43,10 @@ export function borderById(id) {
 
 // True if a member has unlocked this border. Role borders require the badge; level borders the level
 // (or `unlockAll`, the staff bypass — which does NOT unlock role borders).
-export function isBorderUnlocked(id, level, { badges = [], unlockAll = false } = {}) {
+export function isBorderUnlocked(id, level, { badges = [], unlockAll = false, owned = null } = {}) {
     const b = borderById(id);
     if (b.requiresBadges) return b.requiresBadges.some((s) => badges.includes(s));
-    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= b.level;
+    return (owned && owned.has(b.id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= b.level;
 }
 
 // The class(es) to hang on an avatar container so it renders the frame. Empty for the default/none.
@@ -55,6 +55,6 @@ export function borderClass(id) {
 }
 
 // The catalog annotated with unlocked state for the picker.
-export function bordersForLevel(level, { unlockAll = false, badges = [] } = {}) {
-    return BORDERS.map((b) => ({ ...b, unlocked: isBorderUnlocked(b.id, level, { badges, unlockAll }) }));
+export function bordersForLevel(level, { unlockAll = false, badges = [], owned = null } = {}) {
+    return BORDERS.map((b) => ({ ...b, unlocked: isBorderUnlocked(b.id, level, { badges, unlockAll, owned }) }));
 }

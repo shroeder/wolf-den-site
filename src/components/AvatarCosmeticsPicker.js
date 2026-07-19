@@ -5,45 +5,47 @@ import { useMemo, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
 import { avatarImageUrl, COSMETIC_SLOTS, cosmeticsForSlotWithLock } from "@/lib/marketplace/avatar-cosmetics.js";
+import { cosmeticPrice } from "@/lib/marketplace/cosmetic-price.js";
 
 const SLOT_LABELS = { headwear: "Headwear", aura: "Aura" };
 
-// Equip avatar cosmetics per slot onto the member's portrait, with a live preview. Native cosmetics
-// (hats) are drawn into the avatar image; auras layer on via AvatarStack. POSTs each change.
-export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "?", level = 1, unlockAll = false, badges = [], current = {} }) {
+// Equip avatar cosmetics (auras) per slot, or BUY a locked one early with gold (tap it). Native cosmetics
+// draw into the avatar image; auras layer on via AvatarStack.
+export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "?", level = 1, unlockAll = false, badges = [], current = {}, owned = [], gold = 0 }) {
     const router = useRouter();
     const [equipped, setEquipped] = useState(() => ({ ...current }));
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
+    const ownedSet = new Set(owned);
     const previewUrl = useMemo(() => avatarImageUrl(avatarConfig, equipped), [avatarConfig, equipped]);
 
     async function commit(slot, nextId) {
         if (busy) return;
         const prev = equipped;
         setEquipped({ ...equipped, [slot]: nextId });
-        setBusy(true);
-        setErr("");
+        setBusy(true); setErr("");
         try {
-            const r = await fetch("/api/marketplace/avatar-cosmetic", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ slot, id: nextId }),
-            });
+            const r = await fetch("/api/marketplace/avatar-cosmetic", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slot, id: nextId }) });
             const d = await r.json().catch(() => null);
             if (!r.ok) throw new Error(d?.error || "Could not equip that.");
             router.refresh();
         } catch (e) {
             setEquipped(prev);
             setErr(e?.message || "Could not equip that.");
-        } finally {
-            setBusy(false);
-        }
+        } finally { setBusy(false); }
     }
 
-    // Tapping the equipped item again removes it; tapping "None" clears the slot.
-    function choose(slot, id, unlocked) {
-        if (!unlocked) return;
-        commit(slot, equipped[slot] === id ? null : id);
+    async function buy(id) {
+        if (busy) return;
+        setBusy(true); setErr("");
+        try {
+            const r = await fetch("/api/marketplace/cosmetic-shop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ category: "cosmetic", ref: id }) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok) throw new Error(d?.error === "not_enough_gold" ? "Not enough gold." : (d?.error || "Couldn't buy that."));
+            router.refresh();
+        } catch (e) {
+            setErr(e?.message || "Couldn't buy that.");
+        } finally { setBusy(false); }
     }
 
     return (
@@ -53,7 +55,7 @@ export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "
             </div>
             <div className="cos-slots">
                 {COSMETIC_SLOTS.map((slot) => {
-                    const items = cosmeticsForSlotWithLock(slot, level, { badges, unlockAll });
+                    const items = cosmeticsForSlotWithLock(slot, level, { badges, unlockAll, owned: ownedSet });
                     return (
                         <div className="cos-slot" key={slot}>
                             <span className="cos-slot-label">{SLOT_LABELS[slot]}</span>
@@ -68,20 +70,25 @@ export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "
                                 >
                                     None
                                 </button>
-                                {items.map((c) => (
-                                    <button
-                                        key={c.id}
-                                        type="button"
-                                        className={`cos-chip${equipped[slot] === c.id ? " is-selected" : ""}${!c.unlocked ? " is-locked" : ""}`}
-                                        disabled={busy || !c.unlocked}
-                                        onClick={() => choose(slot, c.id, c.unlocked)}
-                                        aria-pressed={equipped[slot] === c.id}
-                                        title={c.unlocked ? `${c.label} — ${c.hint}` : `Unlocks at Level ${c.level}`}
-                                    >
-                                        <span aria-hidden="true">{c.icon}</span> {c.label}
-                                        {!c.unlocked ? <span className="cos-chip-lock"> · Lv {c.level}</span> : null}
-                                    </button>
-                                ))}
+                                {items.map((c) => {
+                                    const forSale = !c.unlocked && !c.requiresBadges;
+                                    const price = forSale ? cosmeticPrice("cosmetic", c.level) : 0;
+                                    const canAfford = gold >= price;
+                                    return (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            className={`cos-chip${equipped[slot] === c.id ? " is-selected" : ""}${!c.unlocked ? " is-locked" : ""}`}
+                                            disabled={busy || (!c.unlocked && (!forSale || !canAfford))}
+                                            onClick={() => (c.unlocked ? commit(slot, equipped[slot] === c.id ? null : c.id) : (forSale && canAfford ? buy(c.id) : null))}
+                                            aria-pressed={equipped[slot] === c.id}
+                                            title={c.unlocked ? `${c.label} — ${c.hint}` : (forSale ? `Buy for ${price.toLocaleString()} gold` : `Unlocks at Level ${c.level}`)}
+                                        >
+                                            <span aria-hidden="true">{c.icon}</span> {c.label}
+                                            {!c.unlocked ? <span className="cos-chip-lock"> · {forSale ? `🪙 ${price.toLocaleString()}` : `Lv ${c.level}`}</span> : null}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     );

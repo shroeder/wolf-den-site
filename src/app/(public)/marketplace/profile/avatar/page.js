@@ -5,6 +5,7 @@ import AvatarBuilder from "@/components/AvatarBuilder";
 import AvatarCosmeticsPicker from "@/components/AvatarCosmeticsPicker";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
+import { getStoreState } from "@/lib/marketplace/store.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -17,7 +18,10 @@ export default async function AvatarStudioPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/profile/avatar");
 
-    const profile = await getProfile(buyer.id).catch(() => null);
+    const [profile, store] = await Promise.all([
+        getProfile(buyer.id).catch(() => null),
+        getStoreState(buyer.id).catch(() => ({ gold: 0, purchased: { pet: [], border: [], frame: [], cosmetic: [] } })),
+    ]);
     const level = profile?.level || null;
     const isStaff = (profile?.badges || []).some((b) => ["owner", "site_admin", "staff"].includes(b.slug));
 
@@ -41,6 +45,8 @@ export default async function AvatarStudioPage() {
                     unlockAll={isStaff}
                     badges={(profile?.badges || []).map((b) => b.slug)}
                     current={profile?.avatarCosmetics || {}}
+                    owned={store.purchased.cosmetic}
+                    gold={store.gold}
                 />
             </section>
         </div>

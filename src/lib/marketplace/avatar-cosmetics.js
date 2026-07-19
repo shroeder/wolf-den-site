@@ -28,14 +28,14 @@ export function cosmeticsForSlot(slot) {
     return AVATAR_COSMETICS.filter((c) => c.slot === slot);
 }
 
-export function isCosmeticUnlocked(cosmetic, level, { badges = [], unlockAll = false } = {}) {
+export function isCosmeticUnlocked(cosmetic, level, { badges = [], unlockAll = false, owned = null } = {}) {
     if (!cosmetic) return false;
     if (cosmetic.requiresBadges) return cosmetic.requiresBadges.some((s) => badges.includes(s));
-    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= cosmetic.level;
+    return (owned && owned.has(cosmetic.id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= cosmetic.level;
 }
 
-export function cosmeticsForSlotWithLock(slot, level, { badges = [], unlockAll = false } = {}) {
-    return cosmeticsForSlot(slot).map((c) => ({ ...c, unlocked: isCosmeticUnlocked(c, level, { badges, unlockAll }) }));
+export function cosmeticsForSlotWithLock(slot, level, { badges = [], unlockAll = false, owned = null } = {}) {
+    return cosmeticsForSlot(slot).map((c) => ({ ...c, unlocked: isCosmeticUnlocked(c, level, { badges, unlockAll, owned }) }));
 }
 
 // Keep only valid slot->id pairs; anything unknown becomes null (unequipped).

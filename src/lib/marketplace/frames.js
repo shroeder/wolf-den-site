@@ -31,10 +31,10 @@ export function frameById(id) {
 
 // Role frames require the badge; level frames the level (or `unlockAll`, the staff bypass — which does
 // NOT unlock role frames).
-export function isFrameUnlocked(id, level, { badges = [], unlockAll = false } = {}) {
+export function isFrameUnlocked(id, level, { badges = [], unlockAll = false, owned = null } = {}) {
     const f = frameById(id);
     if (f.requiresBadges) return f.requiresBadges.some((s) => badges.includes(s));
-    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= f.level;
+    return (owned && owned.has(f.id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= f.level;
 }
 
 // The class(es) to hang on the card container so it draws the inset frame. Empty for the default/none.
@@ -42,6 +42,6 @@ export function frameClass(id) {
     return id && id !== "none" ? `frame frame-${id}` : "";
 }
 
-export function framesForLevel(level, { unlockAll = false, badges = [] } = {}) {
-    return FRAMES.map((f) => ({ ...f, unlocked: isFrameUnlocked(f.id, level, { badges, unlockAll }) }));
+export function framesForLevel(level, { unlockAll = false, badges = [], owned = null } = {}) {
+    return FRAMES.map((f) => ({ ...f, unlocked: isFrameUnlocked(f.id, level, { badges, unlockAll, owned }) }));
 }

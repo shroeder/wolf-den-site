@@ -11,6 +11,7 @@ import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-displa
 import { DEFAULT_AVATAR_URL, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { avatarImageUrl, COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
+import { purchasedSet } from "@/lib/marketplace/store.js";
 
 // First-class user profiles built on mkt_buyer (the unified account). Name, a unique public @handle
 // (alias), an avatar, and admin-curated badges. Levels/XP arrive in a later phase.
@@ -177,7 +178,8 @@ export async function equipBorder(buyerId, borderId) {
     const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const badges = badgeRows.map((r) => r.badge_slug);
     const unlockAll = badges.some((s) => ["owner", "site_admin", "staff"].includes(s));
-    if (border.id !== "none" && !isBorderUnlocked(border.id, level, { badges, unlockAll })) {
+    const owned = await purchasedSet(buyerId, "border");
+    if (border.id !== "none" && !isBorderUnlocked(border.id, level, { badges, unlockAll, owned })) {
         throw new Error(border.requiresBadges ? `That frame is ${border.lockLabel || "role"}-exclusive.` : `That border unlocks at Level ${border.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_border = $2, updated_at = NOW() WHERE id = $1`, [buyerId, border.id === "none" ? null : border.id]);
@@ -220,7 +222,8 @@ export async function equipFrame(buyerId, frameId) {
     const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const badges = badgeRows.map((r) => r.badge_slug);
     const unlockAll = badges.some((s) => ["owner", "site_admin", "staff"].includes(s));
-    if (frame.id !== "none" && !isFrameUnlocked(frame.id, level, { badges, unlockAll })) {
+    const owned = await purchasedSet(buyerId, "frame");
+    if (frame.id !== "none" && !isFrameUnlocked(frame.id, level, { badges, unlockAll, owned })) {
         throw new Error(frame.requiresBadges ? `That frame is ${frame.lockLabel || "role"}-exclusive.` : `That frame unlocks at Level ${frame.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_frame = $2, updated_at = NOW() WHERE id = $1`, [buyerId, frame.id === "none" ? null : frame.id]);
@@ -255,7 +258,8 @@ export async function equipAvatarCosmetic(buyerId, slot, id) {
         const level = levelForXp(row?.xp || 0).level;
         const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
         const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
-        if (!isCosmeticUnlocked(cosmetic, level, { unlockAll })) throw new Error(`That unlocks at Level ${cosmetic.level}.`);
+        const owned = await purchasedSet(buyerId, "cosmetic");
+        if (!isCosmeticUnlocked(cosmetic, level, { unlockAll, owned })) throw new Error(`That unlocks at Level ${cosmetic.level}.`);
     }
     const next = { ...current, [slot]: id || null };
     await db.query(`UPDATE mkt_buyer SET avatar_cosmetics = $2::jsonb, updated_at = NOW() WHERE id = $1`, [buyerId, JSON.stringify(next)]);
@@ -287,7 +291,8 @@ export async function setFeaturedCollectible(buyerId, id) {
         if (!item) throw new Error("Unknown collectible.");
         const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]);
         const level = levelForXp(row?.xp || 0).level;
-        if (!isCollectibleUnlocked(item, level)) throw new Error(`Reach Level ${item.level} to feature ${item.name}.`);
+        const owned = await purchasedSet(buyerId, "pet");
+        if (!isCollectibleUnlocked(item, level, { owned })) throw new Error(`Reach Level ${item.level} to feature ${item.name}.`);
         toStore = item.id;
     }
     await db.query(`UPDATE mkt_buyer SET featured_collectible = $2, updated_at = NOW() WHERE id = $1`, [buyerId, toStore]);
