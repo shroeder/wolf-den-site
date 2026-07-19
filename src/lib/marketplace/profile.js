@@ -205,7 +205,8 @@ export async function equipBackground(buyerId, backgroundId) {
     const level = levelForXp(row?.xp || 0).level;
     const badgeRows = await db.query(`SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
-    if (bg.id !== "none" && !isBackgroundUnlocked(bg.id, level, { unlockAll })) {
+    const owned = await purchasedSet(buyerId, "background");
+    if (bg.id !== "none" && !isBackgroundUnlocked(bg.id, level, { unlockAll, owned })) {
         throw new Error(`That background unlocks at Level ${bg.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_background = $2, updated_at = NOW() WHERE id = $1`, [buyerId, bg.id === "none" ? null : bg.id]);

@@ -21,8 +21,8 @@ export function backgroundById(id) {
     return BACKGROUNDS.find((b) => b.id === id) || BACKGROUNDS[0];
 }
 
-export function isBackgroundUnlocked(id, level, { unlockAll = false } = {}) {
-    return unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= backgroundById(id).level;
+export function isBackgroundUnlocked(id, level, { unlockAll = false, owned = null } = {}) {
+    return (owned && owned.has(id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= backgroundById(id).level;
 }
 
 // The class(es) to hang on the hero container so it renders the scene. Empty for the default/none.
@@ -30,6 +30,6 @@ export function backgroundClass(id) {
     return id && id !== "none" ? `bg-scene bg-${id}` : "";
 }
 
-export function backgroundsForLevel(level, { unlockAll = false } = {}) {
-    return BACKGROUNDS.map((b) => ({ ...b, unlocked: isBackgroundUnlocked(b.id, level, { unlockAll }) }));
+export function backgroundsForLevel(level, { unlockAll = false, owned = null } = {}) {
+    return BACKGROUNDS.map((b) => ({ ...b, unlocked: isBackgroundUnlocked(b.id, level, { unlockAll, owned }) }));
 }

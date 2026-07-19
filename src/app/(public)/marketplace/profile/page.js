@@ -135,7 +135,7 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Profile background</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Scenes you unlock by leveling up — they show behind your profile hero.</p>
-                <BackgroundPicker current={profile?.background} level={level?.level || 1} unlockAll={isStaff} />
+                <BackgroundPicker current={profile?.background} level={level?.level || 1} unlockAll={isStaff} owned={store.purchased.background} gold={store.gold} />
             </section>
 
             <section className="card">

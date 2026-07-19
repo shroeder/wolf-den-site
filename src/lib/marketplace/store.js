@@ -5,6 +5,7 @@ import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { BORDERS } from "@/lib/marketplace/borders.js";
 import { FRAMES } from "@/lib/marketplace/frames.js";
 import { AVATAR_COSMETICS } from "@/lib/marketplace/avatar-cosmetics.js";
+import { BACKGROUNDS } from "@/lib/marketplace/backgrounds.js";
 import { cosmeticPrice } from "@/lib/marketplace/cosmetic-price.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
@@ -16,6 +17,7 @@ const CATS = {
     border: { list: BORDERS },
     frame: { list: FRAMES },
     cosmetic: { list: AVATAR_COSMETICS },
+    background: { list: BACKGROUNDS },
 };
 
 // A catalog def that's actually for sale (real id, not "none", not role/badge-gated), or null.
@@ -29,7 +31,7 @@ function buyableDef(category, ref) {
 
 // Purchased-with-gold unlocks grouped by category → Set of ids (for the equip validators).
 export async function getPurchasedCosmetics(buyerId) {
-    const out = { pet: new Set(), border: new Set(), frame: new Set(), cosmetic: new Set() };
+    const out = { pet: new Set(), border: new Set(), frame: new Set(), cosmetic: new Set(), background: new Set() };
     if (!buyerId) return out;
     const rows = await db.query(`SELECT category, ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     for (const r of rows) if (out[r.category]) out[r.category].add(r.ref);
@@ -45,13 +47,13 @@ export async function purchasedSet(buyerId, category) {
 
 // Serializable store state for the profile/avatar pages: gold + purchased ids per category (arrays).
 export async function getStoreState(buyerId) {
-    const empty = { pet: [], border: [], frame: [], cosmetic: [] };
+    const empty = { pet: [], border: [], frame: [], cosmetic: [], background: [] };
     if (!buyerId) return { gold: 0, purchased: empty };
     const [goldRow, rows] = await Promise.all([
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT category, ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
-    const purchased = { pet: [], border: [], frame: [], cosmetic: [] };
+    const purchased = { pet: [], border: [], frame: [], cosmetic: [], background: [] };
     for (const r of rows) if (purchased[r.category]) purchased[r.category].push(r.ref);
     return { gold: goldRow?.gold || 0, purchased };
 }

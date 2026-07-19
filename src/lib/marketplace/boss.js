@@ -213,7 +213,8 @@ export async function getBossState(buyerId = null) {
         const dailyCap = DAILY_ATTACKS + (myStats.extra_strike || 0);
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) };
+        const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0 };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
