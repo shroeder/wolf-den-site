@@ -6,6 +6,7 @@ import {
     GiPlainDagger, GiDaggers, GiWarPick, GiFireAxe, GiKatana, GiScythe, GiTrident, GiWoodFrame, GiShieldBash, GiCrystalCluster, GiSurroundedShield, GiVibratingShield, GiBarbute, GiVisoredHelm, GiCenturionHelmet, GiLaurelCrown, GiWizardFace, GiChestArmor, GiAbdominalArmor, GiKimono, GiHoodedFigure, GiRunningShoe, GiBootStomp, GiLegArmor, GiFangs, GiPearlNecklace, GiMoon, GiLibra, GiEagleEmblem, GiHolySymbol, GiWolfHead, GiStarFormation, GiDragonHead, GiPrayerBeads, GiRingedBeam,
     GiHatchet, GiBoomerang, GiCleaver, GiChakram, GiWarAxe, GiWaveStrike, GiFlatHammer, GiEyeShield, GiHeraldicSun, GiConcentrationOrb, GiSpikedShield, GiVortex, GiSpartanHelmet, GiDwarfHelmet, GiWarBonnet, GiCowled, GiArmorVest, GiCape, GiSpikedShoulderArmor, GiCapeArmor, GiBootKick, GiWingfoot, GiEmerald, GiGems, GiCutDiamond, GiAnkh, GiPentacle, GiRaven, GiBearFace, GiSnakeTotem, GiGalaxy, GiSunbeams, GiFireGem, GiBeamsAura,
     GiBoneMace, GiRelicBlade, GiIceBolt, GiWingedScepter, GiFireSilhouette, GiMeteorImpact, GiFireShield, GiIceGolem, GiFloatingCrystal, GiWorld, GiHood, GiHelmetHeadShot, GiHeavyHelm, GiCultist, GiDeadEye, GiPirateCoat, GiRaggedWound, GiHeartInside, GiSpring, GiSnowflake2, GiCometSpark, GiOwl, GiFox, GiTigerHead, GiLotus, GiElephant, GiSpectre, GiOakLeaf, GiWaterDrop, GiFangedSkull, GiDropletSplash,
+    GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
 } from "react-icons/gi";
 
 // The nine equip slots (rings occupy ring1/ring2). `accepts` = which item.slot fits.
@@ -16,6 +17,7 @@ export const EQUIP_SLOTS = [
     { slot: "chest", label: "Chest", accepts: "chest" },
     { slot: "belt", label: "Belt", accepts: "belt" },
     { slot: "boots", label: "Boots", accepts: "boots" },
+    { slot: "back", label: "Back", accepts: "back" },
     { slot: "amulet", label: "Amulet", accepts: "amulet" },
     { slot: "ring1", label: "Ring", accepts: "ring" },
     { slot: "ring2", label: "Ring", accepts: "ring" },
@@ -90,6 +92,7 @@ const ICONS = {
     GiPlainDagger, GiDaggers, GiWarPick, GiFireAxe, GiKatana, GiScythe, GiTrident, GiWoodFrame, GiShieldBash, GiCrystalCluster, GiSurroundedShield, GiVibratingShield, GiBarbute, GiVisoredHelm, GiCenturionHelmet, GiLaurelCrown, GiWizardFace, GiChestArmor, GiAbdominalArmor, GiKimono, GiHoodedFigure, GiRunningShoe, GiBootStomp, GiLegArmor, GiFangs, GiPearlNecklace, GiMoon, GiLibra, GiEagleEmblem, GiHolySymbol, GiWolfHead, GiStarFormation, GiDragonHead, GiPrayerBeads, GiRingedBeam,
     GiHatchet, GiBoomerang, GiCleaver, GiChakram, GiWarAxe, GiWaveStrike, GiFlatHammer, GiEyeShield, GiHeraldicSun, GiConcentrationOrb, GiSpikedShield, GiVortex, GiSpartanHelmet, GiDwarfHelmet, GiWarBonnet, GiCowled, GiArmorVest, GiCape, GiSpikedShoulderArmor, GiCapeArmor, GiBootKick, GiWingfoot, GiEmerald, GiGems, GiCutDiamond, GiAnkh, GiPentacle, GiRaven, GiBearFace, GiSnakeTotem, GiGalaxy, GiSunbeams, GiFireGem, GiBeamsAura,
     GiBoneMace, GiRelicBlade, GiIceBolt, GiWingedScepter, GiFireSilhouette, GiMeteorImpact, GiFireShield, GiIceGolem, GiFloatingCrystal, GiWorld, GiHood, GiHelmetHeadShot, GiHeavyHelm, GiCultist, GiDeadEye, GiPirateCoat, GiRaggedWound, GiHeartInside, GiSpring, GiSnowflake2, GiCometSpark, GiOwl, GiFox, GiTigerHead, GiLotus, GiElephant, GiSpectre, GiOakLeaf, GiWaterDrop, GiFangedSkull, GiDropletSplash,
+    GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
 };
 export const itemIcon = (name) => ICONS[name] || GiRing;
 
@@ -464,6 +467,28 @@ export const ITEMS = [
     { id: "gs2_dragon_god", name: "Blade of the Dragon God", slot: "main_hand", rarity: "mythic", icon: "GiWingedSword", flavor: "Forged in a wyrm's heart.", stats: { might: 24, crit_power: 16 }, reqLevel: 90, source: "xp_shop", xpCost: 280000, sort: 740 },
     { id: "gs2_apex_crown", name: "Apex Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "Wear your status.", stats: { might: 13, fortune: 27 }, reqLevel: 95, source: "xp_shop", xpCost: 350000, sort: 741 },
     { id: "gs2_infinity_ring", name: "Ring of Infinity", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "No end, no limit.", stats: { might: 16, crit_chance: 8, fortune: 16 }, reqLevel: 100, source: "xp_shop", xpCost: 700000, sort: 742 },
+
+    // ===== BACK slot (capes, cloaks, mantles, wings) — earned the same ways as the rest of the wardrobe:
+    // level unlocks, loot-chest & boss drops, and the gold shop. Several carry signatures or a lopsided
+    // "identity" stat line so they play differently, not just bigger. =====
+    // -- Level unlocks --
+    { id: "wanderers_cloak", name: "Wanderer's Cloak", slot: "back", rarity: "common", icon: "GiCape", flavor: "Patched for the long road.", stats: { fortune: 10 }, reqLevel: 3, source: "level", sort: 800 },
+    { id: "scouts_mantle", name: "Scout's Mantle", slot: "back", rarity: "common", icon: "GiCowled", flavor: "Blend into the tree line.", stats: { crit_chance: 6, ferocity: 4 }, reqLevel: 6, source: "level", sort: 801 },
+    { id: "hunters_cloak", name: "Hunter's Cloak", slot: "back", rarity: "rare", icon: "GiFeatheredWing", flavor: "Silent on the approach.", stats: { crit_chance: 8, ferocity: 8 }, reqLevel: 14, source: "level", sort: 802 },
+    { id: "guardian_mantle", name: "Guardian's Mantle", slot: "back", rarity: "rare", icon: "GiShoulderArmor", flavor: "Shoulders that carry the pack.", stats: { might: 10, fortune: 6 }, reqLevel: 18, source: "level", sort: 803 },
+    // -- Loot-chest & boss drops --
+    { id: "raven_cloak", name: "Raven Cloak", slot: "back", rarity: "rare", icon: "GiRaven", flavor: "Feathered in shadow.", stats: { ferocity: 10, crit_chance: 6 }, reqLevel: 16, source: "chest", sort: 810 },
+    { id: "warbanner_cape", name: "Warbanner Cape", slot: "back", rarity: "epic", icon: "GiCapeArmor", flavor: "Rally to it.", stats: { might: 22 }, reqLevel: 24, source: "boss_drop", sort: 811 },
+    { id: "shadow_shroud", name: "Shadow Shroud", slot: "back", rarity: "epic", icon: "GiHood", flavor: "The dark moves with you.", stats: { crit_chance: 8, crit_power: 14 }, reqLevel: 26, source: "chest", sort: 812 },
+    { id: "berserkers_hide", name: "Berserker's Hide", slot: "back", rarity: "epic", icon: "GiRaggedWound", flavor: "All fury, no finesse.", stats: { might: 22 }, reqLevel: 28, source: "chest", sort: 813 },
+    { id: "phoenix_mantle", name: "Phoenix Mantle", slot: "back", rarity: "legendary", icon: "GiFluffyWing", flavor: "Ash today, fire tomorrow.", stats: { ferocity: 18, might: 12 }, reqLevel: 44, source: "boss_drop", sort: 814 },
+    { id: "wings_of_dawn", name: "Wings of Dawn", slot: "back", rarity: "legendary", icon: "GiAngelWings", flavor: "First light, given form.", stats: { fortune: 15, crit_chance: 15 }, reqLevel: 48, source: "chest", sort: 815 },
+    { id: "oblivion_wings", name: "Wings of Oblivion", slot: "back", rarity: "mythic", icon: "GiBatwingEmblem", flavor: "They blot out the sun.", stats: { ferocity: 25, crit_power: 15 }, reqLevel: 92, source: "chest", sort: 816 },
+    // -- Gold shop --
+    { id: "merchants_cape", name: "Merchant's Cape", slot: "back", rarity: "rare", icon: "GiWingCloak", flavor: "Lined with lucky coin.", stats: { fortune: 16 }, reqLevel: 10, source: "xp_shop", xpCost: 1400, sort: 820 },
+    { id: "gilded_mantle", name: "Gilded Mantle", slot: "back", rarity: "epic", icon: "GiCondorEmblem", flavor: "Wealth worn well.", stats: { might: 12, fortune: 10 }, reqLevel: 26, source: "xp_shop", xpCost: 3200, sort: 821 },
+    { id: "celestial_cloak", name: "Celestial Cloak", slot: "back", rarity: "legendary", icon: "GiCurlyWing", flavor: "Cut from the night sky.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 46, source: "xp_shop", xpCost: 14000, sort: 822 },
+    { id: "void_shroud", name: "Void Shroud", slot: "back", rarity: "mythic", icon: "GiFalconMoon", flavor: "It drinks the light.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 90, source: "xp_shop", xpCost: 90000, sort: 823 },
 ];
 
 export function itemById(id) {

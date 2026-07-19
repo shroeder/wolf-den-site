@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { borderClass } from "@/lib/marketplace/borders.js";
+import AvatarStack from "@/components/AvatarStack";
 
 const REACTIONS = ["❤️", "👍", "😂", "🔥", "😮", "😢"];
 
@@ -99,14 +99,14 @@ export default function MarketplaceDmClient({ threadId }) {
                 <Link href="/marketplace/inbox" className="dm-back" aria-label="Back to inbox">‹</Link>
                 {c ? (
                     <Link href={c.vendorId ? `/marketplace/vendor/${c.vendorId}` : c.alias ? `/marketplace/u/${c.alias}` : "#"} className="dm-peer">
-                        <span className={`dm-peer-av ${borderClass(c.border)}`.trim()}>
-                            {c.avatarUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={c.avatarUrl} alt="" />
-                            ) : (
-                                <span>{(c.displayLabel || "?").slice(0, 1).toUpperCase()}</span>
-                            )}
-                        </span>
+                        <AvatarStack
+                            className="dm-peer-av"
+                            avatarUrl={c.avatarUrl}
+                            initial={(c.displayLabel || "?").slice(0, 1).toUpperCase()}
+                            size={44}
+                            border={c.border || "none"}
+                            cosmetics={c.avatarCosmetics}
+                        />
                         <span className="dm-peer-meta">
                             <strong>{c.displayLabel}</strong>
                             <span className="dm-peer-status muted">

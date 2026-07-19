@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getProductCards } from "@/lib/marketplace/product-card.js";
 import { notifyNewDm } from "@/lib/marketplace/social-notify.js";
+import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
+import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // User-to-user direct messages. Distinct from the buyer<->vendor mkt_thread system; both are surfaced
@@ -19,7 +21,11 @@ function mapUser(row) {
         alias: row.alias || null,
         // Public label — never the real first/last name (private). Handle / chosen display name only.
         displayLabel: row.display_name || row.alias || "Member",
-        avatarUrl: row.avatar_url || null,
+        // Prefer the member's BUILT avatar (with baked cosmetics) — same as the hero card — then a photo.
+        avatarUrl: avatarImageUrl(row.avatar_config, row.avatar_cosmetics) || row.avatar_url || DEFAULT_AVATAR_URL,
+        // Cosmetics (auras/effects/headwear/pet) + equipped border so the chat avatar renders their full look.
+        avatarCosmetics: row.avatar_cosmetics || null,
+        border: row.equipped_border || "none",
         level: levelForXp(row.xp || 0).level,
     };
 }
@@ -67,7 +73,7 @@ export async function listDmThreads(userId) {
         .query(
             `SELECT t.id, t.user_a, t.user_b, t.last_message_at, t.a_last_read_at, t.b_last_read_at,
                     m.body AS last_body, m.sender_id AS last_sender, m.catalog_product_id AS last_product,
-                    ob.id AS ob_id, ob.alias, ob.first_name, ob.last_name, ob.display_name, ob.avatar_url, ob.xp
+                    ob.id AS ob_id, ob.alias, ob.first_name, ob.last_name, ob.display_name, ob.avatar_url, ob.avatar_config, ob.avatar_cosmetics, ob.equipped_border, ob.xp
                FROM mkt_dm_thread t
                JOIN mkt_buyer ob ON ob.id = CASE WHEN t.user_a = $1 THEN t.user_b ELSE t.user_a END
                LEFT JOIN LATERAL (
@@ -86,7 +92,8 @@ export async function listDmThreads(userId) {
             id: r.id,
             counterpart: mapUser({
                 id: r.ob_id, alias: r.alias, first_name: r.first_name, last_name: r.last_name,
-                display_name: r.display_name, avatar_url: r.avatar_url, xp: r.xp,
+                display_name: r.display_name, avatar_url: r.avatar_url, avatar_config: r.avatar_config,
+                avatar_cosmetics: r.avatar_cosmetics, equipped_border: r.equipped_border, xp: r.xp,
             }),
             lastPreview: r.last_body || (r.last_product ? "Shared a card" : null),
             lastMessageAt: r.last_message_at,
@@ -103,7 +110,7 @@ export async function getDmThread(threadId, userId) {
     const otherId = t.user_a === userId ? t.user_b : t.user_a;
     const otherLastReadAt = t.user_a === otherId ? t.a_last_read_at : t.b_last_read_at;
     const otherRow = await db
-        .queryOne(`SELECT id, alias, first_name, last_name, display_name, avatar_url, xp, equipped_border, last_seen_at FROM mkt_buyer WHERE id = $1`, [otherId])
+        .queryOne(`SELECT id, alias, first_name, last_name, display_name, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, last_seen_at FROM mkt_buyer WHERE id = $1`, [otherId])
         .catch(() => null);
     let other = mapUser(otherRow);
     let otherOnline = otherRow?.last_seen_at ? Date.now() - new Date(otherRow.last_seen_at).getTime() < 2 * 60 * 1000 : false;

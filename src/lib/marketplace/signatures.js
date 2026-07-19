@@ -52,6 +52,18 @@ export const ITEM_SIGNATURES = {
     gs_omnipotence_ring: { label: "Omnipotence", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
     gs2_dragon_god: { label: "Dragon God", desc: "25% chance on each hit to erupt for double damage.", eruptChance: 0.25, eruptMult: 2 },
     gs2_infinity_ring: { label: "Infinity", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
+    // --- Back slot (capes / wings) ---
+    shadow_shroud: { label: "Ambush", desc: "Your first attack each day is a GUARANTEED critical.", firstHitCrit: true },
+    phoenix_mantle: { label: "Rebirth", desc: "20% chance on each hit to erupt for double damage.", eruptChance: 0.2, eruptMult: 2 },
+    wings_of_dawn: { label: "Daybreak", desc: "Your first attack each day strikes for DOUBLE.", firstHitMult: 2 },
+    oblivion_wings: { label: "Nightfall", desc: "Your critical hits strike TWICE.", critMult: 2 },
+    celestial_cloak: { label: "Starfall", desc: "25% chance on each hit to erupt for double damage.", eruptChance: 0.25, eruptMult: 2 },
+    void_shroud: { label: "Eclipse", desc: "Your first attack each day is a GUARANTEED critical, and crits strike TWICE.", firstHitCrit: true, critMult: 2 },
+    // --- Signatures added to existing marquee mythics so they play differently, not just bigger ---
+    starforged_mail: { label: "Stardust", desc: "20% chance on each hit to erupt for double damage.", eruptChance: 0.2, eruptMult: 2 },
+    gs2_energy_blade: { label: "Overcharge", desc: "Your critical hits strike TWICE.", critMult: 2 },
+    gs2_star_plate: { label: "Supernova", desc: "Your first attack each day strikes for TRIPLE.", firstHitMult: 3 },
+    gs2_crown_supreme: { label: "Coronation", desc: "Your first attack each day is a GUARANTEED critical.", firstHitCrit: true },
 };
 
 const SIG_MULT_CAP = 3; // no single hit can be boosted past 3× by signatures (crit is separate + also bounded)

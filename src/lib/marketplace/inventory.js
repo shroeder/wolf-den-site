@@ -94,7 +94,7 @@ function gearPhraseFromSlots(bySlot) {
     const parts = [];
     const weapon = items.find((x) => x.slot === "main_hand");
     const off = items.find((x) => x.slot === "off_hand");
-    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots"].includes(x.slot)).map((x) => gearDesc(x.def));
+    const armor = items.filter((x) => ["helmet", "chest", "belt", "boots", "back"].includes(x.slot)).map((x) => gearDesc(x.def));
     const acc = items.filter((x) => ["ring1", "ring2", "amulet"].includes(x.slot)).map((x) => gearDesc(x.def));
     if (weapon) parts.push(`wielding a ${gearDesc(weapon.def)}`);
     if (off) parts.push(`carrying a ${gearDesc(off.def)}`);
