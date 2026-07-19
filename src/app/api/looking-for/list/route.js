@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { awardOnce } from "@/lib/marketplace/xp.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import {
     MAX_WATCHLIST_QUANTITY,
@@ -67,6 +69,11 @@ export async function POST(request) {
             if (result.status === "not_found") {
                 return NextResponse.json({ error: "Card not found." }, { status: 404 });
             }
+
+            // If a signed-in marketplace member added this, credit their one-time "first Looking For card"
+            // onboarding milestone (the rewards checklist links here, so adding a card completes it).
+            const buyer = await getAuthenticatedBuyer().catch(() => null);
+            if (buyer) await awardOnce(buyer.id, "first_wishlist", { cardId }).catch(() => {});
 
             return NextResponse.json(await buildListResponse(watcher), { status: 201 });
         } catch (error) {
