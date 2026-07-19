@@ -32,7 +32,8 @@ export async function POST(request) {
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
             const id = String(body?.id || "").trim();
-            const res = body?.action === "use" ? await useConsumable(buyer.id, id) : await buyConsumable(buyer.id, id);
+            const target = body?.targetItemId ? String(body.targetItemId).trim() : null;
+            const res = body?.action === "use" ? await useConsumable(buyer.id, id, target) : await buyConsumable(buyer.id, id);
             if (!res.ok) return noStore(res, { status: 400 });
             return noStore({ ...res, stash: await listConsumables(buyer.id) });
         } catch (error) {

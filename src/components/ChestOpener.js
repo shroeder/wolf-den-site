@@ -14,6 +14,7 @@ const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 
 const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "eternal"]);
 
 function rarityOf(reveal) {
+    if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
     return reveal?.item?.rarity || reveal?.rarity || "common";
 }
 
@@ -121,6 +122,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     const color = RARITY_COLOR[rarity] || RARITY_COLOR.common;
     const big = BIG_RARITIES.has(rarity);
     const isItem = Boolean(reveal?.item);
+    const isConsumable = Boolean(reveal?.consumable);
     const Icon = isItem ? itemIcon(reveal.item.icon) : null;
 
     const particles = useMemo(() => {
@@ -156,7 +158,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     ))}
                 </div>
                 <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
-                    <span className="chest-rarity-tag">{RARITY_LABEL[rarity] || rarity}</span>
+                    <span className="chest-rarity-tag">{isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : (RARITY_LABEL[rarity] || rarity)}</span>
                     {isItem ? (
                         <>
                             <span className="chest-reward-glyph"><Icon aria-hidden="true" /></span>
@@ -164,6 +166,12 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                             <div className="chest-reward-sub muted">{reveal.item.slot.replace("_", " ")} · {statLine(reveal.item.stats)}</div>
                             {reveal.item.signature ? <div className="chest-reward-sig">★ {reveal.item.signature.label} — {reveal.item.signature.desc}</div> : null}
                             {reveal.item.chargeReward ? <div className="chest-reward-sig" style={{ color: "#ffd75e" }}>🎁 Real-world reward: {reveal.item.chargeReward}</div> : null}
+                        </>
+                    ) : isConsumable ? (
+                        <>
+                            <span className="chest-reward-glyph" style={{ fontSize: "clamp(3rem, 16vw, 4.6rem)" }}>{reveal.consumable.emoji}</span>
+                            <div className="chest-reward-name">{reveal.consumable.name}</div>
+                            <div className="chest-reward-sub muted">{reveal.consumable.desc}</div>
                         </>
                     ) : (
                         <>

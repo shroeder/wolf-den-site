@@ -2,13 +2,16 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { itemById } from "@/lib/marketplace/items.js";
 
-// CONSUMABLES — one-shot boosts you buy with gold and use from your stash (not equipped). Three flavors:
-// potions (temporary boss buffs), scrolls (instant XP), and magic stones (boss buffs, a bit cheaper/shorter).
-// Effect types the boss fight understands:
-//   xp      → instant XP
-//   strikes → +N boss attacks TODAY (expires at end of day)
-//   damage  → ×mult boss damage for `hours` (applies to your manual strikes)
+// CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
+// Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
+// chests. Effect types the boss fight / gear system understand:
+//   xp             → instant XP
+//   strikes        → +N boss attacks TODAY (expires end of day)
+//   damage         → ×mult boss damage for `hours` (your manual strikes)
+//   recharge       → refill ALL charges on a chosen charged item (target)
+//   reset_cooldown → clear the cooldown on a chosen charged item that still has a charge (target)
 export const CONSUMABLES = {
     scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP.", price: 1500, effect: { type: "xp", amount: 500 } },
     scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP.", price: 5000, effect: { type: "xp", amount: 2000 } },
@@ -18,27 +21,28 @@ export const CONSUMABLES = {
     pot_fury: { name: "Bottled Fury", emoji: "🔥", kind: "potion", desc: "TRIPLE your boss damage for 6 hours.", price: 6500, effect: { type: "damage", mult: 3, hours: 6 } },
     stone_ember: { name: "Ember Stone", emoji: "🔴", kind: "stone", desc: "DOUBLE your boss damage for 12 hours.", price: 3500, effect: { type: "damage", mult: 2, hours: 12 } },
     stone_storm: { name: "Storm Crystal", emoji: "🔷", kind: "stone", desc: "Gain +3 boss attacks today.", price: 2000, effect: { type: "strikes", amount: 3 } },
+    // ULTRA relics — no gold price (drop only from the highest chests). Applied to a charged item you pick.
+    elixir_renewal: { name: "Elixir of Renewal", emoji: "⚗️", kind: "relic", price: null, target: "recharge", desc: "Fully RECHARGE all charges on one of your charged items.", effect: { type: "recharge" } },
+    sands_of_time: { name: "Sands of Time", emoji: "⏳", kind: "relic", price: null, target: "cooldown", desc: "Instantly RESET the cooldown on a charged item that still has a charge left.", effect: { type: "reset_cooldown" } },
 };
 
-const CONSUMABLE_ORDER = ["scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm"];
+// Buyable order (shop). Relics are intentionally excluded — they're chest-only.
+const SHOP_ORDER = ["scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm"];
 
 // --- Boss-fight hooks (read by boss.js) -------------------------------------------------------------
 
-// Product of active 'damage' boost multipliers for a member (1 = none). Applied to their manual strikes.
 export async function memberDamageMult(buyerId) {
     if (!buyerId) return 1;
     const rows = await db.query(`SELECT magnitude FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'damage' AND expires_at > NOW()`, [buyerId]).catch(() => []);
     return rows.reduce((m, r) => m * (Number(r.magnitude) || 1), 1);
 }
 
-// Sum of active 'strikes' boosts (extra boss attacks available today).
 export async function memberBonusStrikes(buyerId) {
     if (!buyerId) return 0;
     const row = await db.queryOne(`SELECT COALESCE(SUM(magnitude), 0)::int AS n FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'strikes' AND expires_at > NOW()`, [buyerId]).catch(() => null);
     return row?.n || 0;
 }
 
-// Active boosts for display (a small banner on the boss/inventory screens).
 export async function activeBoosts(buyerId) {
     if (!buyerId) return [];
     const rows = await db.query(`SELECT kind, magnitude, expires_at FROM mkt_user_boost WHERE buyer_id = $1 AND expires_at > NOW() ORDER BY expires_at ASC`, [buyerId]).catch(() => []);
@@ -53,59 +57,96 @@ export async function activeBoosts(buyerId) {
 // --- Stash + shop -----------------------------------------------------------------------------------
 
 export async function listConsumables(buyerId) {
-    if (!buyerId) return { gold: 0, items: [], active: [] };
-    const [goldRow, ownRows, active] = await Promise.all([
+    if (!buyerId) return { gold: 0, shop: [], stash: [], chargedItems: [], active: [] };
+    const [goldRow, ownRows, chargedRows, active] = await Promise.all([
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
+        db.query(`SELECT item_id, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         activeBoosts(buyerId),
     ]);
     const gold = goldRow?.gold || 0;
-    const owned = Object.fromEntries(ownRows.map((r) => [r.consumable_id, r.count]));
-    const items = CONSUMABLE_ORDER.filter((id) => CONSUMABLES[id]).map((id) => {
+    const shop = SHOP_ORDER.filter((id) => CONSUMABLES[id]?.price != null).map((id) => {
         const c = CONSUMABLES[id];
-        return { id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, price: c.price, owned: owned[id] || 0, canAfford: gold >= c.price };
+        return { id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, price: c.price, canAfford: gold >= c.price };
     });
-    return { gold, items, active };
+    const stash = ownRows.map((r) => {
+        const c = CONSUMABLES[r.consumable_id];
+        if (!c) return null;
+        return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, count: r.count, target: c.target || null };
+    }).filter(Boolean);
+    // The member's charged gear, for the recharge / cooldown-reset target pickers.
+    const now = Date.now();
+    const chargedItems = chargedRows.map((r) => {
+        const def = itemById(r.item_id);
+        if (!def?.charged) return null;
+        const left = Math.max(0, r.charges_left ?? 0);
+        const cd = Math.max(0, def.cooldownDays || 0);
+        const readyAt = r.last_charge_at ? new Date(r.last_charge_at).getTime() + cd * 86400000 : 0;
+        const onCooldown = left > 0 && readyAt > now;
+        return { id: def.id, name: def.name, icon: def.icon, rarity: def.rarity, chargesLeft: left, maxCharges: def.charges || 0, full: left >= (def.charges || 0), onCooldown, cooldownUntil: onCooldown ? new Date(readyAt).toISOString() : null };
+    }).filter(Boolean);
+    return { gold, shop, stash, chargedItems, active };
 }
 
-// Buy one with gold (atomic deduction). Returns { ok, gold } or an error key.
+// Grant a consumable (chest drop / owner). Best-effort.
+export async function grantConsumable(buyerId, id, n = 1) {
+    if (!buyerId || !CONSUMABLES[id]) return;
+    await db.query(
+        `INSERT INTO mkt_user_consumable (buyer_id, consumable_id, count) VALUES ($1, $2, $3)
+         ON CONFLICT (buyer_id, consumable_id) DO UPDATE SET count = mkt_user_consumable.count + $3`,
+        [buyerId, id, n]
+    ).catch(() => {});
+}
+
 export async function buyConsumable(buyerId, id) {
     const c = CONSUMABLES[id];
-    if (!buyerId || !c) return { ok: false, error: "unknown" };
+    if (!buyerId || !c || c.price == null) return { ok: false, error: "not_for_sale" };
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, c.price]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
-    await db.query(
-        `INSERT INTO mkt_user_consumable (buyer_id, consumable_id, count) VALUES ($1, $2, 1)
-         ON CONFLICT (buyer_id, consumable_id) DO UPDATE SET count = mkt_user_consumable.count + 1`,
-        [buyerId, id]
-    ).catch(() => {});
+    await grantConsumable(buyerId, id, 1);
     return { ok: true, gold: row.gold };
 }
 
-// Use one from the stash (atomic decrement) and apply its effect. Returns a result the UI can celebrate.
-export async function useConsumable(buyerId, id) {
+// Use one from the stash. Targeted relics (recharge / reset) take a charged item id; validated BEFORE the
+// consumable is spent so a bad target never wastes it.
+export async function useConsumable(buyerId, id, targetItemId = null) {
     const c = CONSUMABLES[id];
     if (!buyerId || !c) return { ok: false, error: "unknown" };
+    const e = c.effect;
+
+    if (e.type === "recharge" || e.type === "reset_cooldown") {
+        const def = itemById(targetItemId);
+        if (!def?.charged) return { ok: false, error: "bad_target" };
+        const row = await db.queryOne(`SELECT charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, targetItemId]).catch(() => null);
+        if (!row) return { ok: false, error: "target_not_owned" };
+        if (e.type === "recharge") {
+            if ((row.charges_left ?? 0) >= (def.charges || 0)) return { ok: false, error: "already_full" };
+        } else {
+            const cd = Math.max(0, def.cooldownDays || 0);
+            const readyAt = row.last_charge_at ? new Date(row.last_charge_at).getTime() + cd * 86400000 : 0;
+            if (!((row.charges_left ?? 0) > 0 && readyAt > Date.now())) return { ok: false, error: "not_on_cooldown" };
+        }
+        const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
+        if (!dec) return { ok: false, error: "none_owned" };
+        if (e.type === "recharge") {
+            await db.query(`UPDATE mkt_user_item SET charges_left = $3 WHERE buyer_id = $1 AND item_id = $2`, [buyerId, targetItemId, def.charges || 0]).catch(() => {});
+            return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied: `${def.name} fully recharged — ${def.charges} charges` };
+        }
+        await db.query(`UPDATE mkt_user_item SET last_charge_at = NULL WHERE buyer_id = $1 AND item_id = $2`, [buyerId, targetItemId]).catch(() => {});
+        return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied: `${def.name} cooldown reset — ready to redeem now` };
+    }
+
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
     if (!dec) return { ok: false, error: "none_owned" };
-
-    const e = c.effect;
     let applied = "";
     if (e.type === "xp") {
         await awardXp(buyerId, "consumable", { points: e.amount, meta: { consumable: id } }).catch(() => {});
         applied = `+${e.amount.toLocaleString()} XP`;
     } else if (e.type === "strikes") {
-        // Extra boss attacks that last until end of the day (matches the daily-attack reset).
-        await db.query(
-            `INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'strikes', $2, date_trunc('day', NOW()) + interval '1 day')`,
-            [buyerId, e.amount]
-        ).catch(() => {});
+        await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'strikes', $2, date_trunc('day', NOW()) + interval '1 day')`, [buyerId, e.amount]).catch(() => {});
         applied = `+${e.amount} boss attacks today`;
     } else if (e.type === "damage") {
-        await db.query(
-            `INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`,
-            [buyerId, e.mult, String(e.hours)]
-        ).catch(() => {});
+        await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, e.mult, String(e.hours)]).catch(() => {});
         applied = `${e.mult}× boss damage for ${e.hours}h`;
     }
     return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied };

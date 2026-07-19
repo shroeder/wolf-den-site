@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
+import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
@@ -17,18 +18,31 @@ export const CHEST_TIERS = {
     // boss performance (tiny chance) or by the owner. Each opens to a guaranteed elite-tier item.
     ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { ascendant: 100 } },
     eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { eternal: 100 } },
+    // The two rarest chests in the game — top-tier gear PLUS the best shot at ultra-rare relic consumables.
+    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { ascendant: 55, eternal: 45 } },
+    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { eternal: 100 } },
 };
-export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal"];
+export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
 // Gold consolation ("dust") when you already own every eligible item of the rolled rarity.
-const DUST = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 3000, eternal: 8000 };
+const DUST = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 3000, eternal: 8000, celestial: 15000, primordial: 40000 };
 
 // Items a chest can produce (all non-charged loot gear). Charged/perk + level/shop items stay off the table.
 const CHEST_POOL = ITEMS.filter((i) => (i.source === "chest" || i.source === "boss_drop") && !i.charged);
 // Elite pool — the Ascendant/Eternal gear (charged, so it's excluded from the normal pool above). Only
 // reachable by opening an elite chest.
 const ELITE_POOL = ITEMS.filter((i) => i.source === "elite");
-const ELITE_TIERS = new Set(["ascendant", "eternal"]);
+const ELITE_TIERS = new Set(["ascendant", "eternal", "celestial", "primordial"]);
+
+// Chance a high-tier chest yields a CONSUMABLE instead of gear (+ which pool). The ultra relics
+// (Elixir of Renewal / Sands of Time) only appear from Eternal chests and up.
+const CHEST_CONSUMABLES = {
+    mythic: { chance: 0.08, pool: ["pot_berserker", "stone_ember", "pot_secondwind"] },
+    ascendant: { chance: 0.18, pool: ["pot_fury", "pot_berserker", "stone_storm", "scroll_ancient"] },
+    eternal: { chance: 0.3, pool: ["pot_fury", "scroll_ancient", "elixir_renewal", "sands_of_time"] },
+    celestial: { chance: 0.55, pool: ["elixir_renewal", "sands_of_time", "pot_fury", "scroll_ancient"] },
+    primordial: { chance: 0.75, pool: ["elixir_renewal", "sands_of_time"] },
+};
 
 function tierForLevel(level) {
     if (level >= 45) return "mythic";
@@ -102,6 +116,15 @@ export async function openChest(buyerId, tier) {
     if (!def) return { ok: false, error: "unknown_tier" };
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
+
+    // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
+    const cc = CHEST_CONSUMABLES[tier];
+    if (cc && Math.random() < cc.chance) {
+        const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
+        await grantConsumable(buyerId, cid);
+        const c = CONSUMABLES[cid];
+        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+    }
 
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const owned = new Set(ownedRows.map((r) => r.item_id));
