@@ -40,7 +40,9 @@ export default function TradeClaimClient({ token, claim }) {
     if (state.status === "loading") {
         return (
             <div className="stack" style={{ textAlign: "center", gap: 8 }}>
-                <div style={{ fontSize: "2rem" }}>🔄</div>
+                <div style={{ display: "flex", justifyContent: "center" }} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#ffd75e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+                </div>
                 <p className="muted">Banking your trade rewards…</p>
             </div>
         );

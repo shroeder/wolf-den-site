@@ -33,7 +33,7 @@ export const metadata = {
 const TILES = [
     { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Join the raid" },
     { href: "/marketplace/inventory", icon: "🎒", label: "Your gear", sub: "Equip items" },
-    { href: "/marketplace/trade", icon: "🔄", label: "Trades", sub: "Swap items & gold" },
+    { href: "/marketplace/trade", icon: "🤝", label: "Trades", sub: "Swap items & gold" },
     { href: "/marketplace/profile/avatar", icon: "🎨", label: "Your avatar", sub: "Build your look" },
     { href: "/marketplace/friends", icon: "👥", label: "Friends", sub: "Add & message" },
     { href: "/marketplace/inbox", icon: "✉️", label: "Inbox", sub: "All your messages" },

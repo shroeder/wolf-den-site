@@ -61,7 +61,7 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
         const from = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [fromId]).catch(() => null);
         const label = from?.display_name || from?.alias || "A member";
         await sendWebPush(toId, {
-            title: "🔄 New trade offer",
+            title: "🤝 New trade offer",
             body: `${label} wants to trade with you.`,
             url: "/marketplace/trade",
             tag: `trade-${offer.id}`,
