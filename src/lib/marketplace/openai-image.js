@@ -1,13 +1,50 @@
 import "server-only";
 
 import { put } from "@vercel/blob";
+import sharp from "sharp";
 
 // AI art generation via OpenAI's image model (gpt-image-1), stored to Vercel Blob. Reuses the same
 // OPENAI_API_KEY the site already uses for product matching. Admin-only callers (cost control).
 const IMAGES_URL = "https://api.openai.com/v1/images/generations";
 const IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium" } = {}) {
+// gpt-image-1 has a strong bias to draw creatures facing LEFT and ignores "face right" in the prompt. So
+// after generating, we ask a cheap vision model which way it's facing and horizontally mirror (sharp.flop)
+// when it came out left. Best-effort: any failure returns the image unchanged rather than blocking art.
+async function orientFacingRight(buffer, key) {
+    try {
+        const dataUrl = `data:image/png;base64,${buffer.toString("base64")}`;
+        const resp = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                max_tokens: 3,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: "Which horizontal direction is this creature's head/face pointing? Reply with exactly one word: left or right." },
+                            { type: "image_url", image_url: { url: dataUrl } },
+                        ],
+                    },
+                ],
+            }),
+        });
+        if (!resp.ok) return buffer;
+        const data = await resp.json().catch(() => null);
+        const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
+        if (answer.includes("left") && !answer.includes("right")) {
+            return await sharp(buffer).flop().png().toBuffer();
+        }
+        return buffer;
+    } catch {
+        return buffer;
+    }
+}
+
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -24,7 +61,9 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) throw new Error("OpenAI returned no image");
 
-    const buffer = Buffer.from(b64, "base64");
+    let buffer = Buffer.from(b64, "base64");
+    // Enforce a consistent right-facing orientation (e.g. pets/companions that fight toward the boss).
+    if (faceRight) buffer = await orientFacingRight(buffer, key);
     const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
     const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
     return blob.url;

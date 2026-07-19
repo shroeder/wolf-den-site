@@ -23,7 +23,7 @@ export async function getPetSpriteMap() {
 export async function generatePetSprite(petId) {
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
-    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet" });
+    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true });
     await db.query(
         `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at) VALUES ($1, $2, NOW())
          ON CONFLICT (pet_id) DO UPDATE SET url = $2, updated_at = NOW()`,
