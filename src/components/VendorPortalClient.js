@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import MarketplaceDemandMap from "@/components/MarketplaceDemandMap";
 import ThemedSelect from "@/components/ThemedSelect";
@@ -1855,14 +1855,29 @@ function VendorFulfillmentEditor({ vendor, onChanged }) {
     );
 }
 
+const THREAD_REACTIONS = ["❤️", "👍", "😂", "🔥", "😮", "😢"];
+function msgTime(iso) { try { return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); } catch { return ""; } }
+function msgSameDay(a, b) { const x = new Date(a), y = new Date(b); return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate(); }
+function msgDay(iso) {
+    const d = new Date(iso), now = new Date();
+    const s = (v) => new Date(v.getFullYear(), v.getMonth(), v.getDate()).getTime();
+    const diff = Math.round((s(now) - s(d)) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
 function MessagesPanel() {
     const [threads, setThreads] = useState(null);
     const [openId, setOpenId] = useState(null);
     const [convo, setConvo] = useState(null);
     const [reply, setReply] = useState("");
     const [busy, setBusy] = useState(false);
+    const [pickerFor, setPickerFor] = useState(null);
+    const endRef = useRef(null);
+    const lastTypingRef = useRef(0);
 
-    async function loadThreads() {
+    const loadThreads = useCallback(async () => {
         try {
             const res = await fetch("/api/marketplace/threads?role=vendor", { cache: "no-store" });
             const d = await res.json();
@@ -1870,42 +1885,67 @@ function MessagesPanel() {
         } catch {
             setThreads([]);
         }
-    }
-    useEffect(() => {
-        let active = true;
-        fetch("/api/marketplace/threads?role=vendor", { cache: "no-store" })
-            .then((r) => r.json())
-            .then((d) => { if (active) setThreads(Array.isArray(d.threads) ? d.threads : []); })
-            .catch(() => { if (active) setThreads([]); });
-        return () => { active = false; };
     }, []);
+    useEffect(() => { loadThreads(); }, [loadThreads]);
 
-    async function openThread(id) {
-        setOpenId(id);
-        setConvo(null);
+    const loadConvo = useCallback(async (id) => {
+        if (!id) return;
         try {
             const res = await fetch(`/api/marketplace/threads/${id}`, { cache: "no-store" });
-            setConvo(await res.json());
+            if (res.ok) setConvo(await res.json());
         } catch {
-            setConvo({ messages: [] });
+            /* keep the last good copy */
         }
-        loadThreads();
+    }, []);
+
+    // Live: poll the open conversation for new messages, the buyer's typing, and reactions.
+    useEffect(() => {
+        if (!openId) return;
+        loadConvo(openId);
+        const t = setInterval(() => loadConvo(openId), 3000);
+        return () => clearInterval(t);
+    }, [openId, loadConvo]);
+
+    useEffect(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [convo?.messages?.length, convo?.otherTyping]);
+
+    function openThread(id) { setOpenId(id); setConvo(null); setPickerFor(null); loadThreads(); }
+
+    function pingTyping() {
+        const now = Date.now();
+        if (now - lastTypingRef.current < 2500) return;
+        lastTypingRef.current = now;
+        fetch(`/api/marketplace/threads/${openId}/typing`, { method: "POST" }).catch(() => {});
     }
 
-    async function send() {
-        if (!reply.trim()) return;
+    async function send(e) {
+        e?.preventDefault?.();
+        const body = reply.trim();
+        if (!body || busy) return;
         setBusy(true);
+        setReply("");
         try {
             await fetch(`/api/marketplace/threads/${openId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: reply.trim() }),
+                body: JSON.stringify({ message: body }),
             });
-            setReply("");
-            await openThread(openId);
+            await loadConvo(openId);
+            loadThreads();
         } finally {
             setBusy(false);
         }
+    }
+
+    async function react(messageId, emoji) {
+        setPickerFor(null);
+        await fetch(`/api/marketplace/threads/${openId}/react`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageId, emoji }),
+        }).catch(() => {});
+        await loadConvo(openId);
     }
 
     if (threads != null && threads.length === 0) {
@@ -1919,6 +1959,10 @@ function MessagesPanel() {
             </section>
         );
     }
+
+    const messages = convo?.messages || [];
+    const lastMine = [...messages].reverse().find((m) => m.mine);
+    const seen = lastMine && convo?.otherLastReadAt && new Date(convo.otherLastReadAt) >= new Date(lastMine.createdAt);
 
     return (
         <section className="card">
@@ -1941,43 +1985,89 @@ function MessagesPanel() {
                     ))}
                 </ul>
             ) : (
-                <div className="stack" style={{ gap: 10 }}>
-                    <button type="button" className="pill" style={{ alignSelf: "flex-start" }} onClick={() => { setOpenId(null); setConvo(null); }}>
-                        ← All messages
-                    </button>
+                <div className="dm-screen" style={{ marginTop: 4 }}>
+                    <div className="dm-topbar" style={{ padding: "0 0 8px", background: "none", border: "none", boxShadow: "none" }}>
+                        <button type="button" className="dm-back" aria-label="Back to all messages" onClick={() => { setOpenId(null); setConvo(null); }}>‹</button>
+                        <span className="dm-peer" style={{ cursor: "default" }}>
+                            <span className="dm-peer-av">
+                                {convo?.counterpart?.avatarUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={convo.counterpart.avatarUrl} alt="" />
+                                ) : (
+                                    <span>{(convo?.counterpart?.name || convo?.thread?.counterpartName || "?").slice(0, 1).toUpperCase()}</span>
+                                )}
+                            </span>
+                            <span className="dm-peer-meta">
+                                <strong>{convo?.counterpart?.name || convo?.thread?.counterpartName || "Conversation"}</strong>
+                                <span className="dm-peer-status muted">{convo?.otherTyping ? "typing…" : convo?.thread?.subject ? `Re: ${convo.thread.subject}` : "Buyer"}</span>
+                            </span>
+                        </span>
+                    </div>
+
                     {convo == null ? (
                         <p className="muted">Loading…</p>
                     ) : (
-                        <>
-                            <strong>{convo.thread?.counterpartName || "Conversation"}</strong>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto", padding: "4px 0" }}>
-                                {(convo.messages || []).map((m) => (
-                                    <div
-                                        key={m.id}
-                                        style={{
-                                            alignSelf: m.mine ? "flex-end" : "flex-start",
-                                            background: m.mine ? "#D4AF37" : "#2a2a2a",
-                                            color: m.mine ? "#111" : "#eee",
-                                            padding: "8px 12px",
-                                            borderRadius: 12,
-                                            maxWidth: "80%",
-                                        }}
-                                    >
-                                        {m.body}
-                                    </div>
-                                ))}
+                        <div className="dm-thread" style={{ background: "none", border: "none", boxShadow: "none", padding: 0 }}>
+                            <div className="dm-messages" style={{ maxHeight: 360 }} onClick={() => setPickerFor(null)}>
+                                {messages.map((m, i) => {
+                                    const prev = messages[i - 1];
+                                    const showDay = !prev || !msgSameDay(prev.createdAt, m.createdAt);
+                                    const grouped = prev && prev.mine === m.mine && msgSameDay(prev.createdAt, m.createdAt) && new Date(m.createdAt) - new Date(prev.createdAt) < 4 * 60 * 1000 && !showDay;
+                                    return (
+                                        <div key={m.id}>
+                                            {showDay ? <div className="dm-day"><span>{msgDay(m.createdAt)}</span></div> : null}
+                                            <div className={`dm-row${m.mine ? " mine" : ""}${grouped ? " grouped" : ""}`}>
+                                                <div className="dm-bubble-wrap">
+                                                    {m.body ? (
+                                                        <button
+                                                            type="button"
+                                                            className="dm-bubble"
+                                                            onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === m.id ? null : m.id); }}
+                                                            title="Tap to react"
+                                                        >
+                                                            {m.body}
+                                                        </button>
+                                                    ) : null}
+                                                    {pickerFor === m.id ? (
+                                                        <div className="dm-react-picker" onClick={(e) => e.stopPropagation()}>
+                                                            {THREAD_REACTIONS.map((emoji) => (
+                                                                <button type="button" key={emoji} onClick={() => react(m.id, emoji)}>{emoji}</button>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                    {m.reactions?.length ? (
+                                                        <div className="dm-reactions">
+                                                            {m.reactions.map((r) => (
+                                                                <button type="button" key={r.emoji} className={`dm-reaction${r.mine ? " mine" : ""}`} onClick={(e) => { e.stopPropagation(); react(m.id, r.emoji); }}>
+                                                                    {r.emoji} {r.count > 1 ? r.count : ""}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                    <span className="dm-time">{msgTime(m.createdAt)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {convo?.otherTyping ? (
+                                    <div className="dm-row"><div className="dm-bubble dm-typing"><span></span><span></span><span></span></div></div>
+                                ) : null}
+                                {seen ? <div className="dm-seen muted">Seen</div> : null}
+                                <div ref={endRef} />
                             </div>
-                            <div style={{ display: "flex", gap: 8 }}>
+                            <form onSubmit={send} className="dm-composer">
                                 <input
                                     value={reply}
-                                    onChange={(e) => setReply(e.target.value)}
+                                    onChange={(e) => { setReply(e.target.value); pingTyping(); }}
                                     placeholder="Reply…"
-                                    style={{ flex: 1 }}
-                                    onKeyDown={(e) => { if (e.key === "Enter" && !busy) send(); }}
+                                    autoComplete="off"
                                 />
-                                <button type="button" className="pill" disabled={busy} onClick={send}>{busy ? "…" : "Send"}</button>
-                            </div>
-                        </>
+                                <button className="dm-send" disabled={busy || !reply.trim()} aria-label="Send">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 20.5v-6l8-2.5-8-2.5v-6l19 8.5z" /></svg>
+                                </button>
+                            </form>
+                        </div>
                     )}
                 </div>
             )}

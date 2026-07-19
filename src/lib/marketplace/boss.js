@@ -310,7 +310,7 @@ async function finalizeBossKill(bossId) {
         if (chaseItem) await grantItem(top1.id, chaseItem.id, "boss_reward").catch(() => {});
     }
     // #1 also earns a random drop-only "Boss Relic"-class badge — a permanent brag from the kill.
-    if (top1) await grantRandomDropBadge(top1.id).catch(() => {});
+    const top1Badge = top1 ? await grantRandomDropBadge(top1.id).catch(() => null) : null;
 
     // Pack-wide celebration pop-up for EVERYONE who fought — #1 gets the "you topped it" version.
     for (const p of pool) {
@@ -320,7 +320,7 @@ async function finalizeBossKill(bossId) {
             kind: "boss",
             title: isTop ? "🥇 You topped the boss!" : "☠️ Boss slain!",
             body: isTop
-                ? `You dealt the most damage!${chaseItem ? ` You won ${chaseItem.name}.` : ""}${boss.prize_name ? ` Come claim ${boss.prize_name} in-store.` : ""} A mythic chest is in your stash.`.trim()
+                ? `You dealt the most damage!${chaseItem ? ` You won ${chaseItem.name}.` : ""}${top1Badge ? ` You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.` : ""}${boss.prize_name ? ` Come claim ${boss.prize_name} in-store.` : ""} A mythic chest is in your stash.`.trim()
                 : rank < 3
                     ? `The pack took down ${boss.name}! You placed top 3 — a gold chest is in your stash. See the final stats →`
                     : `The whole pack took down ${boss.name}! See the final stats →`,

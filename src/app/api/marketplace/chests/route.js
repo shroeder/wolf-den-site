@@ -36,9 +36,10 @@ export async function POST(request) {
             const res = await openChest(buyer.id, String(body?.tier || ""));
             if (!res.ok) return noStore({ error: res.error }, { status: 400 });
             after(() => bumpQuestProgress(buyer.id, "chest_open", 1));
-            // Rare bonus: a small chance a chest also coughs up a drop-only badge.
-            if (Math.random() < 0.04) after(() => grantRandomDropBadge(buyer.id).catch(() => {}));
-            return noStore({ ...res, chests: await getChests(buyer.id) });
+            // Rare bonus: a small chance a chest also coughs up a drop-only badge — return it so the
+            // reveal can celebrate it inline (grant is cheap; awaited so it rides the same response).
+            const badgeDrop = Math.random() < 0.04 ? await grantRandomDropBadge(buyer.id).catch(() => null) : null;
+            return noStore({ ...res, badgeDrop, chests: await getChests(buyer.id) });
         } catch (error) {
             return internalError(error, { event: "marketplace.chests.open.failure" });
         }

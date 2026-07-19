@@ -166,34 +166,83 @@ export async function listThreadsForVendor(vendorId) {
     return rows.map((r) => mapThreadRow(r, "vendor"));
 }
 
-// Load a thread the viewer participates in, its messages, and mark it read for that side.
+// Load a thread the viewer participates in, its messages, reactions, the other side's typing + read
+// receipt, and mark it read for that side. Rich enough to power a first-class conversation view on
+// EITHER side — the buyer's DM UI and the vendor portal both read the same shared DM tables.
 export async function getThreadForViewer(threadId, { buyerId = null, vendorId = null }) {
     const t = await loadVendorThread(threadId);
     if (!t) return null;
     const side = buyerId && t.buyer_member === buyerId ? "buyer" : vendorId && t.vendor_id === vendorId ? "vendor" : null;
     if (!side) return null; // not a participant
 
-    const buyerName = await db.queryOne(`SELECT display_name FROM mkt_buyer WHERE id = $1`, [t.buyer_member]).catch(() => null);
-    t.buyer_name = buyerName?.display_name || "Member";
+    const buyer = await db.queryOne(`SELECT display_name, avatar_url FROM mkt_buyer WHERE id = $1`, [t.buyer_member]).catch(() => null);
+    t.buyer_name = buyer?.display_name || "Member";
 
     const rows = await db.query(`SELECT id, sender_id, body, created_at FROM mkt_dm_message WHERE thread_id = $1 ORDER BY created_at ASC`, [threadId]);
     const last = rows[rows.length - 1];
     t.last_body = last?.body || null;
     t.last_sender_id = last?.sender_id || null;
 
-    // Mark read up to now for the viewing side.
     const viewerMember = side === "buyer" ? t.buyer_member : t.vendor_account;
+    const otherMember = side === "buyer" ? t.vendor_account : t.buyer_member;
+
+    // The other side's typing state + read receipt (read the columns BEFORE we stamp our own).
+    const otherLastReadAt = otherMember === t.user_a ? t.a_last_read_at : t.b_last_read_at;
+    const typingRow = await db.queryOne(`SELECT updated_at FROM mkt_dm_typing WHERE thread_id = $1 AND buyer_id = $2`, [threadId, otherMember]).catch(() => null);
+    const otherTyping = typingRow?.updated_at ? Date.now() - new Date(typingRow.updated_at).getTime() < 6000 : false;
+
+    // Reactions across the thread, grouped per message with a "mine" flag for the viewer.
+    const ids = rows.map((m) => m.id);
+    const reactRows = ids.length
+        ? await db.query(`SELECT message_id, emoji, buyer_id FROM mkt_dm_reaction WHERE message_id = ANY($1)`, [ids]).catch(() => [])
+        : [];
+    const reactByMsg = new Map();
+    for (const rr of reactRows) {
+        if (!reactByMsg.has(rr.message_id)) reactByMsg.set(rr.message_id, new Map());
+        const em = reactByMsg.get(rr.message_id);
+        const cur = em.get(rr.emoji) || { emoji: rr.emoji, count: 0, mine: false };
+        cur.count += 1;
+        if (rr.buyer_id === viewerMember) cur.mine = true;
+        em.set(rr.emoji, cur);
+    }
+
+    // Mark read up to now for the viewing side.
     const readCol = viewerMember === t.user_a ? "a_last_read_at" : "b_last_read_at";
     await db.query(`UPDATE mkt_dm_thread SET ${readCol} = NOW() WHERE id = $1`, [threadId]);
 
     return {
         side,
         thread: mapThreadRow(t, side),
+        counterpart: {
+            name: side === "buyer" ? t.vendor_name : t.buyer_name,
+            avatarUrl: side === "buyer" ? null : buyer?.avatar_url || null,
+            vendorId: side === "buyer" ? t.vendor_id : null,
+            isShop: side === "buyer",
+        },
+        otherTyping,
+        otherLastReadAt,
         messages: rows.map((m) => {
             const s = m.sender_id === t.vendor_account ? "vendor" : "buyer";
-            return { id: m.id, sender: s, body: m.body, createdAt: m.created_at, mine: s === side };
+            return {
+                id: m.id,
+                sender: s,
+                body: m.body,
+                createdAt: m.created_at,
+                mine: s === side,
+                reactions: reactByMsg.has(m.id) ? Array.from(reactByMsg.get(m.id).values()) : [],
+            };
         }),
     };
+}
+
+// Resolve the viewer's member id for a vendor thread (for typing/reaction writes into the shared DM
+// tables). Returns { side, viewerMemberId } or null if the caller isn't a participant.
+export async function vendorThreadViewer(threadId, { buyerId = null, vendorId = null }) {
+    const t = await loadVendorThread(threadId);
+    if (!t) return null;
+    if (buyerId && t.buyer_member === buyerId) return { side: "buyer", viewerMemberId: t.buyer_member };
+    if (vendorId && t.vendor_id === vendorId) return { side: "vendor", viewerMemberId: t.vendor_account };
+    return null;
 }
 
 export async function threadParticipantSide(threadId, { buyerId = null, vendorId = null }) {

@@ -172,6 +172,15 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         </>
                     )}
                 </div>
+                {reveal?.badgeDrop ? (
+                    <div className="chest-badge-drop" role="status">
+                        <span className="chest-badge-drop-icon" aria-hidden="true">{reveal.badgeDrop.icon || "🏅"}</span>
+                        <span className="chest-badge-drop-text">
+                            <strong>Rare badge drop!</strong>
+                            <span>{reveal.badgeDrop.label}</span>
+                        </span>
+                    </div>
+                ) : null}
             </div>
             <div className="chest-modal-actions">
                 {onAgain ? <button type="button" className="button gold" onClick={onAgain}>Open another</button> : null}
