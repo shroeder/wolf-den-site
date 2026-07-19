@@ -57,7 +57,10 @@ const ACTIVITY_LABEL = {
     view_leaderboard: () => "🏆 Viewed the leaderboard",
     view_vendor: () => "🏪 Viewed a shop",
 };
-const activityLabel = (event, meta) => (ACTIVITY_LABEL[event] ? ACTIVITY_LABEL[event](meta) : String(event || "").replace(/_/g, " "));
+const activityLabel = (event, meta, path) => {
+    if (event === "page_view") return `📄 Viewed ${path || "a page"}`;
+    return ACTIVITY_LABEL[event] ? ACTIVITY_LABEL[event](meta) : String(event || "").replace(/_/g, " ");
+};
 
 // Full drill-down on ONE member for the admin app: identity, level/gold, boss + engagement stats, their
 // gear (equipped + owned), badges, and recent in-store redemptions.
@@ -81,13 +84,13 @@ export async function GET(request, { params }) {
                 db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 80`, [id]).catch(() => []),
             ]);
             // Granular activity telemetry, merged with the XP ledger into one detailed timeline.
-            const activityRows = await db.query(`SELECT event, meta, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
+            const activityRows = await db.query(`SELECT event, meta, path, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
             const history = [
                 ...(historyRows || []).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: r.created_at })),
                 ...(activityRows || []).map((r) => {
                     let meta = r.meta;
                     if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = null; } }
-                    return { label: activityLabel(r.event, meta), points: 0, at: r.created_at };
+                    return { label: activityLabel(r.event, meta, r.path), points: 0, at: r.created_at };
                 }),
             ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 120);
 

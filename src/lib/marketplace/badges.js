@@ -289,7 +289,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
     const params = term ? [`%${term}%`, lim, off] : [lim, off];
     const rows = await db
         .query(
-            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, featured_collectible, equipped_border, COALESCE(xp, 0) AS xp
+            `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, featured_collectible, equipped_border, COALESCE(xp, 0) AS xp, last_seen_at
                FROM mkt_buyer
                ${where}
               ORDER BY COALESCE(xp, 0) DESC, created_at DESC
@@ -332,6 +332,9 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } =
             border: r.equipped_border || "none",
             level: levelForXp(r.xp || 0).level,
             xp: Number(r.xp || 0),
+            // Last-seen recency: a real signal every member has, used as the active-sort tiebreak while
+            // 30-day telemetry is still filling in.
+            lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at).toISOString() : null,
             badges: byBuyer.get(r.id) || [],
         };
     });
