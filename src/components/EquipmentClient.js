@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import ChestOpener from "@/components/ChestOpener";
+import ItemArt from "@/components/ItemArt";
 import { trackClient } from "@/lib/marketplace/track-client";
-import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot, itemIcon } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot } from "@/lib/marketplace/items.js";
 
 // The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
 // the owned-item bag, and any charged in-store perks. Tapping a slot opens a picker of fitting items.
@@ -14,8 +15,7 @@ const SLOT_ICON = {
 };
 
 function ItemGlyph({ id, className = "" }) {
-    const Icon = itemIcon(itemDef(id)?.icon);
-    return <span className={className}><Icon aria-hidden="true" /></span>;
+    return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} />;
 }
 
 // Resolve an item def from the loaded list (avoids re-importing ITEMS on the client render path).
@@ -277,10 +277,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     {data.coupon ? <div className="shop-coupon">🎟️ {data.coupon.pct}% off coupon active — auto-applies to a gear pick ≤ {data.coupon.max.toLocaleString()} gold</div> : null}
                     <div className="equip-bag-grid">
                         {(data.shop || []).map((i) => {
-                            const Icon = itemIcon(i.icon);
                             return (
                                 <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${i.statsText}`}>
-                                    <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
+                                    <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
                                     <span className="equip-card-name">{i.name}</span>
                                     <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
                                     <span className="equip-card-stats">{i.statsText}</span>
@@ -297,7 +296,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
                     <div className={`card equip-sheet rar-${detailItem.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                            {(() => { const GlyphIcon = itemIcon(detailItem.icon); return <span className="equip-card-glyph"><GlyphIcon aria-hidden="true" /></span>; })()}
+                            <ItemArt id={detailItem.id} icon={detailItem.icon} className="equip-card-glyph" />
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detailItem.name}</div>
                                 <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detailItem.rarity} · {detailItem.slot.replace("_", " ")}{detailItem.equipped ? " · Equipped ✓" : ""}</div>

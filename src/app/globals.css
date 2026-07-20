@@ -9521,6 +9521,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar, #fff) 55%, transparent), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 .equip-card-glyph svg, .equip-perk-glyph svg { width: 1em; height: 1em; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--rar, #fff) 60%, transparent)); }
+/* AI item sprites (ItemArt) drop into the same glyph boxes as the react-icons. Sized by em so they scale
+   with the box's font-size just like the svg glyph did; a hair larger than 1em to offset the sprite's
+   transparent padding, and a drop-shadow so the die-cut art reads on the rarity backplate. */
+.item-art { display: grid; place-items: center; }
+.item-art-img { width: 1.55em; height: 1.55em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)); }
 /* Legendary + mythic get a brighter frame; mythic gently pulses. */
 .equip-card.rar-legendary, .equip-slot.filled.rar-legendary { box-shadow: 0 0 18px -5px var(--rar), inset 0 0 18px -10px var(--rar); }
 .equip-card.rar-mythic, .equip-slot.filled.rar-mythic { animation: rar-pulse 3s ease-in-out infinite; }

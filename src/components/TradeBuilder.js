@@ -3,13 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { itemIcon } from "@/lib/marketplace/items.js";
+import ItemArt from "@/components/ItemArt";
 
 function ItemToggle({ item, on, onClick }) {
-    const Icon = itemIcon(item.icon);
     return (
         <button type="button" className={`equip-card rar-${item.rarity}${on ? " is-equipped" : ""}`} onClick={onClick}>
-            <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
+            <ItemArt id={item.id} icon={item.icon} className="equip-card-glyph" />
             <span className="equip-card-name">{item.name}</span>
             <span className="equip-card-stats">{on ? "✓ in trade" : "tap to add"}</span>
         </button>

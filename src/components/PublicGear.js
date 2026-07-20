@@ -1,14 +1,14 @@
-import { EQUIP_SLOTS, STAT_META, itemById, itemIcon } from "@/lib/marketplace/items.js";
+import ItemArt from "@/components/ItemArt";
+import { EQUIP_SLOTS, STAT_META, itemById } from "@/lib/marketplace/items.js";
 
 // Read-only view of a member's equipped loadout + owned items + combat-stat total, for their public
 // profile (so others can see their gear and, later, propose trades). Presentational.
 function ItemChip({ id, equipped = false }) {
     const def = itemById(id);
     if (!def) return null;
-    const Icon = itemIcon(def.icon);
     return (
         <span className={`equip-card rar-${def.rarity}${equipped ? " is-equipped" : ""}`} title={def.name}>
-            <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
+            <ItemArt id={def.id} icon={def.icon} className="equip-card-glyph" />
             <span className="equip-card-name">{def.name}</span>
         </span>
     );
@@ -45,10 +45,9 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
                     <p className="muted" style={{ margin: "12px 0 6px" }}>Inventory ({nonEquipped.length}) · tap an item to propose a trade for it</p>
                     <div className="equip-bag-grid">
                         {nonEquipped.map((i) => {
-                            const Icon = itemIcon(i.icon);
                             return (
                                 <a key={i.id} href={`/marketplace/trade/new?to=${encodeURIComponent(targetAlias)}&want=${encodeURIComponent(i.id)}`} className={`equip-card rar-${i.rarity} is-clickable`} style={{ textDecoration: "none" }} title={`Propose a trade for ${i.name}`}>
-                                    <span className="equip-card-glyph"><Icon aria-hidden="true" /></span>
+                                    <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
                                     <span className="equip-card-name">{i.name}</span>
                                     <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>🤝 Trade</span>
                                 </a>

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_ORDER, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { ITEMS, describeStats } from "@/lib/marketplace/items.js";
+import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { COLLECTIBLES, collectibleById } from "@/lib/marketplace/collectibles.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
@@ -36,6 +37,7 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
+            const spriteMap = await itemSpriteMap();
             const items = ITEMS.map((i) => {
                 const sig = signatureFor(i.id);
                 return {
@@ -44,6 +46,7 @@ export async function GET(request) {
                     charges: i.charges || null, cooldownDays: i.cooldownDays || null, source: i.source,
                     signature: sig ? `${sig.label}: ${sig.desc}` : null,
                     flavor: i.flavor || null,
+                    sprite: spriteMap[i.id] || null,
                 };
             });
             const chestTiers = CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji }));

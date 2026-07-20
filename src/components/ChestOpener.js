@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { itemIcon } from "@/lib/marketplace/items.js";
+import ItemArt from "@/components/ItemArt";
 import { collectibleById } from "@/lib/marketplace/collectibles";
 import ChestIcon from "@/components/ChestIcon";
 
@@ -126,7 +126,6 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     const isItem = Boolean(reveal?.item);
     const isConsumable = Boolean(reveal?.consumable);
     const isPet = Boolean(reveal?.pet);
-    const Icon = isItem ? itemIcon(reveal.item.icon) : null;
     const PetIcon = isPet ? collectibleById(reveal.pet.id)?.Icon : null;
 
     const particles = useMemo(() => {
@@ -171,7 +170,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         </>
                     ) : isItem ? (
                         <>
-                            <span className="chest-reward-glyph"><Icon aria-hidden="true" /></span>
+                            <ItemArt id={reveal.item.id} icon={reveal.item.icon} className="chest-reward-glyph" />
                             <div className="chest-reward-name">{reveal.item.name}</div>
                             <div className="chest-reward-sub muted">{reveal.item.slot.replace("_", " ")} · {statLine(reveal.item.stats)}</div>
                             {reveal.item.signature ? <div className="chest-reward-sig">★ {reveal.item.signature.label} — {reveal.item.signature.desc}</div> : null}
