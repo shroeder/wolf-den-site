@@ -2,6 +2,10 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
+
+// Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
+const ALL_QUESTS_XP = 300;
 
 // Daily quests — 3 rotating bounties per member per day. Progress is bumped from action hooks (attack,
 // crit, open chest, equip, buy); completing one grants gold (and sometimes a loot chest). The day's 3
@@ -119,9 +123,15 @@ export async function claimQuest(buyerId, questKey) {
     if (!row) return { ok: false, error: "not_claimable" };
     if (row.reward_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, row.reward_gold]).catch(() => {});
     if (row.reward_chest) await addChests(buyerId, { [row.reward_chest]: 1 }).catch(() => {});
-    // Clearing ALL of today's quests earns a bonus spin token.
+    // Clearing ALL of today's quests earns a bonus spin token + a chunk of bonus XP (deduped per day).
     let bonusSpin = false;
+    let bonusXp = 0;
     const left = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2 AND claimed_at IS NULL`, [buyerId, day]).catch(() => null);
-    if (left && left.n === 0) { await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {}); bonusSpin = true; }
-    return { ok: true, gold: row.reward_gold, chest: row.reward_chest, bonusSpin };
+    if (left && left.n === 0) {
+        await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {});
+        bonusSpin = true;
+        await awardXp(buyerId, "quests_cleared", { points: ALL_QUESTS_XP, dedupeKey: `quests_cleared:${day}` }).catch(() => {});
+        bonusXp = ALL_QUESTS_XP;
+    }
+    return { ok: true, gold: row.reward_gold, chest: row.reward_chest, bonusSpin, bonusXp };
 }

@@ -163,8 +163,14 @@ export async function sharePet(fromId, petId, toAlias) {
     const to = await resolveByAlias(toAlias);
     if (!to) return { ok: false, error: "recipient_not_found" };
     if (to.id === fromId) return { ok: false, error: "cannot_share_self" };
-    const dupe = await db.queryOne(`SELECT 1 FROM mkt_pet_share WHERE pet_id = $1 AND from_buyer_id = $2 AND to_buyer_id = $3 AND status = 'pending'`, [petId, fromId, to.id]).catch(() => null);
-    if (dupe) return { ok: false, error: "already_pending" };
+    // Anti-dupe: only ONE pending gift of a given pet at a time (across ALL recipients). Without this you
+    // could fire off offers to many people while the pet is still tradeable, then have them all accept and
+    // mint a copy each. One pending → it locks on the first accept → it can only ever be gifted once.
+    const pending = await db.queryOne(`SELECT 1 FROM mkt_pet_share WHERE pet_id = $1 AND from_buyer_id = $2 AND status = 'pending'`, [petId, fromId]).catch(() => null);
+    if (pending) return { ok: false, error: "already_pending" };
+    // Don't gift a pet to someone who already owns it (nothing to gain, and a wasted offer).
+    const toState = await petsState(to.id).catch(() => null);
+    if (toState?.ownedIds?.includes(petId)) return { ok: false, error: "recipient_has_pet" };
     await db.query(`INSERT INTO mkt_pet_share (pet_id, from_buyer_id, to_buyer_id) VALUES ($1, $2, $3)`, [petId, fromId, to.id]).catch(() => {});
     await trackActivity(fromId, "pet_share_offer", { petId, to: to.id });
     return { ok: true, to: nameOf(to) };

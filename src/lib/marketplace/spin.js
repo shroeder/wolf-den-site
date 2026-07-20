@@ -135,10 +135,13 @@ const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 export async function getSpinState(buyerId) {
     if (!buyerId) return { signedIn: false };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const level = levelForXp(row?.xp || 0).level;
     const wheel = wheelForLevel(level);
     const freeAvailable = asDay(row?.free_spin_day) !== today();
+    // Extra-spin price escalates 1000, 2000, 3000… per store-day (resets at midnight Central).
+    const boughtToday = asDay(row?.spin_buys_day) === today() ? (row?.spin_buys_count || 0) : 0;
+    const tokenCost = nextSpinCost(boughtToday);
     const next = WHEELS.find((w) => w.minLevel > level);
     return {
         signedIn: true,
@@ -146,7 +149,8 @@ export async function getSpinState(buyerId) {
         tokens: row?.tokens || 0,
         spinCount: row?.spin_count || 0,
         freeAvailable,
-        tokenCost: SPIN_TOKEN_COST,
+        tokenCost,
+        extraSpinsToday: boughtToday,
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
             return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
@@ -184,10 +188,27 @@ export async function doSpin(buyerId) {
     return { ok: true, prizeIndex: idx, prize: prizeOut, ...(await getSpinState(buyerId)) };
 }
 
-// Buy one extra spin token with gold.
+// The gold cost of the NEXT extra spin today: 1000 for the first, +1000 each additional, reset at the
+// store-local midnight. `boughtToday` = extra spins already bought this store-day.
+const SPIN_BUY_STEP = 1000;
+const nextSpinCost = (boughtToday) => (Math.max(0, boughtToday) + 1) * SPIN_BUY_STEP;
+
+// Buy one extra spin token with gold. Cost escalates per day (atomic — one UPDATE computes cost + counter).
 export async function buySpinToken(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, spin_tokens = spin_tokens + 1 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, SPIN_TOKEN_COST]).catch(() => null);
+    const paid = await db
+        .queryOne(
+            `UPDATE mkt_buyer SET
+                gold = gold - (CASE WHEN spin_buys_day = $2::date THEN spin_buys_count + 1 ELSE 1 END) * ${SPIN_BUY_STEP},
+                spin_tokens = spin_tokens + 1,
+                spin_buys_count = CASE WHEN spin_buys_day = $2::date THEN spin_buys_count + 1 ELSE 1 END,
+                spin_buys_day = $2::date
+              WHERE id = $1
+                AND gold >= (CASE WHEN spin_buys_day = $2::date THEN spin_buys_count + 1 ELSE 1 END) * ${SPIN_BUY_STEP}
+              RETURNING gold`,
+            [buyerId, today()]
+        )
+        .catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold" };
     return { ok: true, ...(await getSpinState(buyerId)) };
 }

@@ -29,7 +29,7 @@ export default function QuestsClient() {
         }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         if (d?.ok) {
-            setReward({ gold: d.gold ?? q?.rewardGold ?? 0, chest: q?.rewardChest || null });
+            setReward({ gold: d.gold ?? q?.rewardGold ?? 0, chest: q?.rewardChest || null, bonusXp: d.bonusXp || 0, bonusSpin: Boolean(d.bonusSpin) });
             await load();
         }
         setBusy(false);
@@ -117,6 +117,11 @@ function QuestReward({ reward, onClose }) {
                 <div className="quest-cele-title">Quest Complete!</div>
                 <div className="quest-cele-gold">💰 +{shown.toLocaleString()}</div>
                 {reward.chest ? <div className="quest-cele-chest">{reward.chest.emoji} {reward.chest.label}!</div> : null}
+                {reward.bonusXp || reward.bonusSpin ? (
+                    <div className="quest-cele-chest" style={{ color: "#ffd75e" }}>
+                        🎉 All quests cleared!{reward.bonusXp ? ` +${reward.bonusXp} XP` : ""}{reward.bonusSpin ? " · 🎡 free spin" : ""}
+                    </div>
+                ) : null}
                 <button type="button" className="button gold" onClick={onClose}>Nice!</button>
             </div>
         </div>

@@ -175,7 +175,8 @@ export default function PetsClient() {
         not_tradeable: "That pet has already been traded once — it can't be traded again.",
         recipient_not_found: "No member with that @handle.",
         cannot_share_self: "You can't give a pet to yourself.",
-        already_pending: "You've already offered this pet to them.",
+        already_pending: "You already have a pending gift of this pet — wait for it to be accepted or declined first.",
+        recipient_has_pet: "They already have that pet.",
         not_pending: "That gift is no longer available.",
     };
 
