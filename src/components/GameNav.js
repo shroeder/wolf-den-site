@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // In-game menu bar: a horizontal, scrollable strip of the game areas, shown at the top of every game page
 // so you can hop Boss → Spin → Pets → Gear etc. without going back to the hub. Mounted once in the
@@ -23,17 +24,34 @@ const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${hre
 
 export default function GameNav() {
     const pathname = usePathname() || "";
-    // Only render inside the game (any of the areas above, incl. their sub-routes like /boss/recap/…).
-    if (!LINKS.some((l) => isOn(pathname, l.href))) return null;
+    const inGame = LINKS.some((l) => isOn(pathname, l.href));
+    // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
+    // each in-game navigation so the count drops as soon as you open them.
+    const [chests, setChests] = useState(0);
+    useEffect(() => {
+        if (!inGame) return undefined;
+        let alive = true;
+        fetch("/api/marketplace/chests", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); })
+            .catch(() => {});
+        return () => { alive = false; };
+    }, [inGame, pathname]);
+
+    if (!inGame) return null;
 
     return (
         <nav className="game-nav" aria-label="Game menu">
             <div className="game-nav-scroll">
-                {LINKS.map((l) => (
-                    <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}`}>
-                        <span aria-hidden="true">{l.emoji}</span> {l.label}
-                    </Link>
-                ))}
+                {LINKS.map((l) => {
+                    const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
+                    return (
+                        <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}`}>
+                            <span aria-hidden="true">{l.emoji}</span> {l.label}
+                            {badge ? <span className="game-nav-badge" title={`${badge} chest${badge === 1 ? "" : "s"} to open`}>{badge}</span> : null}
+                        </Link>
+                    );
+                })}
             </div>
         </nav>
     );

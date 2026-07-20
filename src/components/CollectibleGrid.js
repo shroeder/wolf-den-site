@@ -71,7 +71,6 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
             </p>
             <div className="collectible-grid">
                 {items.map((c) => {
-                    const Icon = c.Icon;
                     const isFeatured = featured === c.id && c.unlocked;
                     const forSale = !c.unlocked && !unlockedOnly && !c.eliteOnly;
                     const price = forSale ? cosmeticPrice("pet", c.level) : 0;
@@ -87,7 +86,7 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                             title={c.unlocked ? `${c.name} — ${c.hint}${selectable ? (isFeatured ? " · featured (tap to remove)" : " · tap to feature") : ""}` : c.eliteOnly ? `${c.name} · ${c.hint} — unlocked only by obtaining a top-rarity (${c.rarity}) item` : (forSale ? `${c.name} · buy for ${price.toLocaleString()} gold` : `${c.name} · unlocks at Level ${c.level}`)}
                         >
                             <span className="collectible-icon" style={c.unlocked ? { color: c.color } : undefined}>
-                                {c.unlocked ? <PetArt id={c.id} /> : <Icon aria-hidden="true" />}
+                                <PetArt id={c.id} />
                             </span>
                             <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? `💰 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
                             {isFeatured ? <span className="collectible-star" aria-hidden="true">★</span> : null}

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { collectibleById } from "@/lib/marketplace/collectibles";
+import ItemArt from "@/components/ItemArt";
+import PetArt from "@/components/PetArt";
+import { itemById } from "@/lib/marketplace/items";
 
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 
@@ -14,15 +16,11 @@ function fmtCountdown(secs) {
     return h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
 }
 
-// Visual for a deal by kind: pet icon, consumable emoji, or a rarity gem for gear.
+// Visual for a deal by kind: pet sprite, gear sprite, or a consumable emoji (sprite fallbacks to glyph).
 function DealArt({ deal }) {
-    if (deal.kind === "pet") {
-        const pet = collectibleById(deal.id);
-        const Icon = pet?.Icon;
-        return <span className="deal-art" style={{ color: pet?.color || "#ffd75e" }}>{Icon ? <Icon /> : "🐾"}</span>;
-    }
+    if (deal.kind === "pet") return <PetArt id={deal.id} className="deal-art" />;
     if (deal.kind === "consumable") return <span className="deal-art">{deal.emoji || "🧪"}</span>;
-    return <span className="deal-art" style={{ color: RARITY_COLOR[deal.rarity] || "#ffd75e" }}>◆</span>;
+    return <ItemArt id={deal.id} icon={deal.icon || itemById(deal.id)?.icon} className="deal-art" />;
 }
 
 export default function DailyDeals() {

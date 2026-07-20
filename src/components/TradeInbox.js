@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { itemIcon } from "@/lib/marketplace/items.js";
+import ItemArt from "@/components/ItemArt";
 
 function Side({ label, items, gold }) {
     if (!items.length && !gold) return <span className="muted">nothing</span>;
     return (
         <span className="trade-side">
             {gold ? <span className="trade-gold">💰 {gold.toLocaleString()}</span> : null}
-            {items.map((it) => {
-                const Icon = itemIcon(it.icon);
-                return <span key={it.id} className={`trade-item rar-${it.rarity}`} title={it.name}><Icon aria-hidden="true" /> {it.name}</span>;
-            })}
+            {items.map((it) => (
+                <span key={it.id} className={`trade-item rar-${it.rarity}`} title={it.name}><ItemArt id={it.id} icon={it.icon} className="trade-item-art" /> {it.name}</span>
+            ))}
         </span>
     );
 }

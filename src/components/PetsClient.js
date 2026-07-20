@@ -519,7 +519,7 @@ export default function PetsClient() {
                             return (
                                 <div className="petx-hero petx-hero-big">
                                     <span className="petx-hero-glow" />
-                                    <span className="petx-hero-icon" data-petlvl={levelUp.to} style={{ color: levelUp.pet.color }}>{levelUp.pet.Icon ? <levelUp.pet.Icon /> : "🐾"}</span>
+                                    <span className="petx-hero-icon" data-petlvl={levelUp.to} style={{ color: levelUp.pet.color }}><PetArt id={levelUp.pet.id} /></span>
                                 </div>
                             );
                         })()}

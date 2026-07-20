@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import ItemArt from "@/components/ItemArt";
-import { collectibleById } from "@/lib/marketplace/collectibles";
+import PetArt from "@/components/PetArt";
 import ChestIcon from "@/components/ChestIcon";
 
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
@@ -126,7 +126,6 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     const isItem = Boolean(reveal?.item);
     const isConsumable = Boolean(reveal?.consumable);
     const isPet = Boolean(reveal?.pet);
-    const PetIcon = isPet ? collectibleById(reveal.pet.id)?.Icon : null;
 
     const particles = useMemo(() => {
         const n = PARTICLE_COUNT[rarity] || 16;
@@ -164,7 +163,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     <span className="chest-rarity-tag">{isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
                     {isPet ? (
                         <>
-                            <span className="chest-reward-glyph" style={{ color: reveal.pet.color }}>{PetIcon ? <PetIcon aria-hidden="true" /> : "🐾"}</span>
+                            <PetArt id={reveal.pet.id} className="chest-reward-glyph" />
                             <div className="chest-reward-name">{reveal.pet.name}</div>
                             <div className="chest-reward-sub muted">New pet companion!{reveal.pet.hint ? ` ${reveal.pet.hint}` : ""}</div>
                         </>
