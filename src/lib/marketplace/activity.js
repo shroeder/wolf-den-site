@@ -172,23 +172,31 @@ export async function activityCounts(buyerIds, days = 30) {
 }
 
 // Site-wide telemetry dashboard: recent live feed + engagement reports over a window (hours).
-export async function telemetryDashboard({ hours = 24, feedLimit = 120 } = {}) {
+// audience filters everything to signed-in members, anonymous visitors, or all traffic — the admin app's
+// Activity screen toggles between them. Also returns a per-person rollup (people) for the chosen audience.
+export async function telemetryDashboard({ hours = 24, feedLimit = 120, audience = "all" } = {}) {
     const win = `${Math.max(1, Math.min(720, Number(hours) || 24))} hours`;
-    const [feed, topEvents, topPages, totals, hourly, devices, countries, cities, sourceKinds, topSources, campaigns] = await Promise.all([
+    // Audience clause on mkt_activity_event (whitelisted → safe to inline). `A` = with the `a.` feed alias.
+    const aud = audience === "members" ? " AND buyer_id IS NOT NULL" : audience === "anon" ? " AND buyer_id IS NULL" : "";
+    const audA = audience === "members" ? " AND a.buyer_id IS NOT NULL" : audience === "anon" ? " AND a.buyer_id IS NULL" : "";
+    const wantMembers = audience !== "anon";
+    const wantAnon = audience !== "members";
+    const [feed, topEvents, topPages, totals, hourly, devices, countries, cities, sourceKinds, topSources, campaigns, memberPeople, anonPeople] = await Promise.all([
         db.query(
-            `SELECT a.event, a.path, a.meta, a.created_at, a.anon_id, a.device, a.browser, a.os,
+            `SELECT a.event, a.path, a.meta, a.created_at, a.buyer_id, a.anon_id, a.device, a.browser, a.os,
                     a.country, a.region, a.city, b.display_name, b.alias
                FROM mkt_activity_event a LEFT JOIN mkt_buyer b ON b.id = a.buyer_id
+              WHERE a.created_at > NOW() - $2::interval${audA}
               ORDER BY a.created_at DESC LIMIT $1`,
-            [Math.min(300, feedLimit)]
+            [Math.min(300, feedLimit), win]
         ).catch(() => []),
-        db.query(`SELECT event, COUNT(*)::int AS n FROM mkt_activity_event WHERE created_at > NOW() - $1::interval GROUP BY event ORDER BY n DESC LIMIT 25`, [win]).catch(() => []),
-        db.query(`SELECT path, COUNT(*)::int AS n FROM mkt_activity_event WHERE event = 'page_view' AND path IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY path ORDER BY n DESC LIMIT 25`, [win]).catch(() => []),
+        db.query(`SELECT event, COUNT(*)::int AS n FROM mkt_activity_event WHERE created_at > NOW() - $1::interval${aud} GROUP BY event ORDER BY n DESC LIMIT 25`, [win]).catch(() => []),
+        db.query(`SELECT path, COUNT(*)::int AS n FROM mkt_activity_event WHERE event = 'page_view' AND path IS NOT NULL AND created_at > NOW() - $1::interval${aud} GROUP BY path ORDER BY n DESC LIMIT 25`, [win]).catch(() => []),
         db.queryOne(
             `SELECT COUNT(*)::int AS events,
                     COUNT(DISTINCT buyer_id)::int AS users,
                     COUNT(DISTINCT anon_id) FILTER (WHERE buyer_id IS NULL)::int AS anons
-               FROM mkt_activity_event WHERE created_at > NOW() - $1::interval`,
+               FROM mkt_activity_event WHERE created_at > NOW() - $1::interval${aud}`,
             [win]
         ).catch(() => null),
         db.query(
@@ -196,13 +204,34 @@ export async function telemetryDashboard({ hours = 24, feedLimit = 120 } = {}) {
                FROM mkt_activity_event WHERE created_at > NOW() - interval '24 hours'
               GROUP BY 1 ORDER BY 1`
         ).catch(() => []),
-        db.query(`SELECT device, COUNT(*)::int AS n FROM mkt_activity_event WHERE device IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY device ORDER BY n DESC`, [win]).catch(() => []),
-        db.query(`SELECT country, COUNT(*)::int AS n FROM mkt_activity_event WHERE country IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
-        db.query(`SELECT city, region, country, COUNT(*)::int AS n FROM mkt_activity_event WHERE city IS NOT NULL AND created_at > NOW() - $1::interval GROUP BY city, region, country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
+        db.query(`SELECT device, COUNT(*)::int AS n FROM mkt_activity_event WHERE device IS NOT NULL AND created_at > NOW() - $1::interval${aud} GROUP BY device ORDER BY n DESC`, [win]).catch(() => []),
+        db.query(`SELECT country, COUNT(*)::int AS n FROM mkt_activity_event WHERE country IS NOT NULL AND created_at > NOW() - $1::interval${aud} GROUP BY country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
+        db.query(`SELECT city, region, country, COUNT(*)::int AS n FROM mkt_activity_event WHERE city IS NOT NULL AND created_at > NOW() - $1::interval${aud} GROUP BY city, region, country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
         // Acquisition: how visitors seen in the window first arrived (first-touch attribution on the rollup).
         db.query(`SELECT COALESCE(NULLIF(source_kind,''), 'direct') AS kind, COUNT(*)::int AS n FROM mkt_visitor WHERE last_seen > NOW() - $1::interval GROUP BY kind ORDER BY n DESC`, [win]).catch(() => []),
         db.query(`SELECT COALESCE(NULLIF(utm_source,''), NULLIF(referrer,''), 'direct') AS src, COUNT(*)::int AS n FROM mkt_visitor WHERE last_seen > NOW() - $1::interval GROUP BY src ORDER BY n DESC LIMIT 12`, [win]).catch(() => []),
         db.query(`SELECT utm_campaign AS campaign, COUNT(*)::int AS n FROM mkt_visitor WHERE utm_campaign IS NOT NULL AND last_seen > NOW() - $1::interval GROUP BY campaign ORDER BY n DESC LIMIT 10`, [win]).catch(() => []),
+        // Per-person rollup: one row per member with their event count / last-seen (drill-in by id).
+        wantMembers
+            ? db.query(
+                  `SELECT b.id, b.display_name, b.alias, COUNT(*)::int AS n, MAX(a.created_at) AS last_at
+                     FROM mkt_activity_event a JOIN mkt_buyer b ON b.id = a.buyer_id
+                    WHERE a.created_at > NOW() - $1::interval
+                    GROUP BY b.id ORDER BY n DESC LIMIT 60`,
+                  [win]
+              ).catch(() => [])
+            : Promise.resolve([]),
+        // Per-person rollup: one row per anonymous visitor (keyed by anon_id) with device / place.
+        wantAnon
+            ? db.query(
+                  `SELECT anon_id, COUNT(*)::int AS n, MAX(created_at) AS last_at,
+                          MAX(device) AS device, MAX(city) AS city, MAX(region) AS region, MAX(country) AS country
+                     FROM mkt_activity_event
+                    WHERE buyer_id IS NULL AND anon_id IS NOT NULL AND created_at > NOW() - $1::interval
+                    GROUP BY anon_id ORDER BY n DESC LIMIT 60`,
+                  [win]
+              ).catch(() => [])
+            : Promise.resolve([]),
     ]);
     return {
         feed: feed.map((r) => {
@@ -226,5 +255,16 @@ export async function telemetryDashboard({ hours = 24, feedLimit = 120 } = {}) {
         sourceKinds: sourceKinds.map((r) => ({ kind: r.kind, n: r.n })),
         topSources: topSources.map((r) => ({ source: r.src, n: r.n })),
         campaigns: campaigns.map((r) => ({ campaign: r.campaign, n: r.n })),
+        audience,
+        people: {
+            members: memberPeople.map((r) => ({ id: r.id, name: r.display_name || r.alias || "Member", alias: r.alias || null, n: r.n, lastAt: r.last_at })),
+            anon: anonPeople.map((r) => ({
+                anonId: r.anon_id,
+                n: r.n,
+                lastAt: r.last_at,
+                device: r.device || null,
+                place: [r.city, r.region, r.country].filter(Boolean).join(", ") || null,
+            })),
+        },
     };
 }

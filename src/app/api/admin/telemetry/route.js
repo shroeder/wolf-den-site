@@ -21,7 +21,9 @@ export async function GET(request) {
                 return NextResponse.json({ visitors }, { headers: { "Cache-Control": "no-store" } });
             }
             const hours = Number(searchParams.get("hours")) || 24;
-            const data = await telemetryDashboard({ hours });
+            const aud = searchParams.get("audience");
+            const audience = aud === "members" || aud === "anon" ? aud : "all";
+            const data = await telemetryDashboard({ hours, audience });
             return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.telemetry.failure" });
