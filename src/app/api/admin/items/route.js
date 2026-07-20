@@ -8,6 +8,7 @@ import { ITEMS, describeStats } from "@/lib/marketplace/items.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { COLLECTIBLES, collectibleById } from "@/lib/marketplace/collectibles.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { sendBuyerPush } from "@/lib/push/send.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
@@ -71,6 +72,16 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const buyerId = String(body?.buyerId || "").trim();
             if (!buyerId) return noStore({ error: "missing_buyer" }, { status: 400 });
+
+            // Credit mystery-bag purchases (sold in-store, so staff attribute them to a member here) + an
+            // optional "big hit" flag. Drives the mystery-bag badges (Grab Bagger / Big Hit / Bag Fiend / Legend).
+            if (body?.mysteryBag || body?.bigHit) {
+                const n = Math.max(0, Math.min(200, Math.floor(Number(body.mysteryBag) || 0)));
+                if (n > 0) await db.query(`UPDATE mkt_buyer SET mystery_bags_bought = COALESCE(mystery_bags_bought, 0) + $2 WHERE id = $1`, [buyerId, n]).catch(() => {});
+                if (body.bigHit) await db.query(`UPDATE mkt_buyer SET mystery_big_hit = TRUE WHERE id = $1`, [buyerId]).catch(() => {});
+                const granted = await syncEarnedBadges(buyerId).catch(() => []);
+                return noStore({ ok: true, kind: "mysteryBag", credited: n, bigHit: Boolean(body.bigHit), badges: granted.map((b) => b.slug) });
+            }
 
             // Give a single loot chest.
             if (body?.chest) {
