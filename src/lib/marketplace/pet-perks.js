@@ -115,8 +115,9 @@ export const PET_REAL_WORLD = {
 export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 
 // Combine a member's whole menagerie into combat/economy bonuses. PURE — feed it owned pet objects + the
-// equipped pet. Passives (all owned) stack; the equipped pet adds its signature perk on top.
-export function combinePetBonuses(ownedPets = [], equippedPet = null) {
+// equipped pet. Passives (all owned) stack, each SCALED by that pet's level (levelByPet[id], default 1 →
+// Lv1 ×1 … Lv5 ×5); the equipped pet adds its signature perk on top (procs are NOT level-scaled).
+export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}) {
     const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
@@ -126,7 +127,8 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null) {
     };
     for (const pet of ownedPets) {
         const p = petPassive(pet);
-        add(p.stat, p.value);
+        const lvl = Math.max(1, Number(levelByPet[pet.id]) || 1);
+        add(p.stat, p.value * lvl);
     }
     if (equippedPet) {
         const def = PET_PERKS[equippedPet.id] || { key: equippedPet.activeStat || "fortune" };

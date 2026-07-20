@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
+import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -150,6 +151,8 @@ export async function awardXp(buyerId, action, { points = null, dedupeKey = null
     } catch {
         // Ledger row exists; total will self-heal on the next recompute if we ever add one.
     }
+    // The member's EQUIPPED pet earns a share of this XP (25%); no-op if nothing's equipped.
+    await creditEquippedPetXp(buyerId, pts).catch(() => {});
     return pts;
 }
 

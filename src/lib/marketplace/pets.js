@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
+import { getPetXpMap, petLevelInfo, accrueEquippedPetTrickle, startPetTrickleClock } from "@/lib/marketplace/pet-level.js";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
@@ -47,31 +48,40 @@ export async function syncPetAchievements(buyerId) {
 // The member's full pet state. With { sync: true } it first grants any due achievement pets (used on page
 // load); action paths skip the sync to stay cheap.
 export async function petsState(buyerId, { sync = false } = {}) {
-    if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [] };
-    if (sync) await syncPetAchievements(buyerId).catch(() => {});
-    const [buyer, rows, incoming, realWorld] = await Promise.all([
+    if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [], petLevels: {} };
+    if (sync) {
+        await syncPetAchievements(buyerId).catch(() => {});
+        // Settle the equipped pet's time-trickle so the level shown on the page is current (lazy, no cron).
+        await accrueEquippedPetTrickle(buyerId).catch(() => {});
+    }
+    const [buyer, rows, incoming, realWorld, petXp] = await Promise.all([
         db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT ref, tradeable FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
         incomingShares(buyerId).catch(() => []),
         memberPetPerks(buyerId).catch(() => []),
+        getPetXpMap(buyerId).catch(() => ({})),
     ]);
     const level = levelForXp(buyer?.xp || 0).level;
     const granted = new Set(rows.map((r) => r.ref));
     const lockedRefs = new Set(rows.filter((r) => r.tradeable === false).map((r) => r.ref));
     const ownedIds = [];
     const tradeableIds = [];
-    const passiveTotals = {}; // stat -> summed passive across all owned pets
+    const passiveTotals = {}; // stat -> summed passive across all owned pets (each scaled by its pet level)
+    const petLevels = {}; // pet_id -> { level, xp, into, span, next, maxed, stat, base, value } for owned pets
     for (const pet of COLLECTIBLES) {
         if (!isCollectibleUnlocked(pet, level, { owned: granted })) continue;
         ownedIds.push(pet.id);
         const p = petPassive(pet);
-        passiveTotals[p.stat] = (passiveTotals[p.stat] || 0) + p.value;
+        const info = petLevelInfo(petXp[pet.id] || 0);
+        // Passive scales with the pet's level (Lv1 ×1 … Lv5 ×5).
+        passiveTotals[p.stat] = (passiveTotals[p.stat] || 0) + p.value * info.level;
+        petLevels[pet.id] = { level: info.level, xp: info.xp, into: info.into, span: info.span, next: info.next, maxed: info.maxed, stat: p.stat, base: p.value, value: p.value * info.level };
         // Tradeable unless an explicit unlock row has locked it (level pets with no row are still tradeable).
         if (!lockedRefs.has(pet.id)) tradeableIds.push(pet.id);
     }
     // Real-world perk redemption state, keyed by pet id, for owned marquee pets.
     const realWorldByPet = Object.fromEntries((realWorld || []).map((r) => [r.petId, { reward: r.reward, available: r.available, cooldownUntil: r.cooldownUntil }]));
-    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet };
+    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet, petLevels };
 }
 
 export async function equipPet(buyerId, petId) {
@@ -80,7 +90,10 @@ export async function equipPet(buyerId, petId) {
     if (!pet) return { ok: false, error: "not_found" };
     const state = await petsState(buyerId);
     if (!state.ownedIds.includes(petId)) return { ok: false, error: "not_owned" };
+    // Settle the currently-equipped pet's trickle before swapping, then start the new pet's clock.
+    await accrueEquippedPetTrickle(buyerId).catch(() => {});
     await db.query(`UPDATE mkt_buyer SET featured_collectible = $2, updated_at = NOW() WHERE id = $1`, [buyerId, petId]).catch(() => {});
+    await startPetTrickleClock(buyerId, petId).catch(() => {});
     await bumpQuestProgress(buyerId, "equip", 1).catch(() => {});
     await trackActivity(buyerId, "equip_pet", { petId });
     return { ok: true };
@@ -88,6 +101,8 @@ export async function equipPet(buyerId, petId) {
 
 export async function unequipPet(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+    // Settle the equipped pet's trickle before it stops accruing.
+    await accrueEquippedPetTrickle(buyerId).catch(() => {});
     await db.query(`UPDATE mkt_buyer SET featured_collectible = NULL, updated_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
     return { ok: true };
 }

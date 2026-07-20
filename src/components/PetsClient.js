@@ -202,14 +202,16 @@ export default function PetsClient() {
                         const passive = petPassive(pet);
                         const perk = petPerk(pet);
                         const Icon = pet.Icon;
+                        const lvl = owned ? state.petLevels?.[pet.id] : null;
                         return (
                             <button type="button" key={pet.id} onClick={() => setDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
+                                {lvl ? <span className="pet-level-badge">Lv {lvl.level}</span> : null}
                                 <div className="pet-icon" style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
                                 <div className="pet-buffs">
-                                    <span>Own: +{passive.value} {statText(passive)}</span>
+                                    <span>Own: +{lvl ? lvl.value : passive.value} {statText(passive)}</span>
                                     <span className="pet-perk">{perk.icon} {perk.name}</span>
                                 </div>
                                 {owned ? (
@@ -279,6 +281,8 @@ export default function PetsClient() {
                 const perk = petPerk(p);
                 const price = petPrice(p);
                 const canBuy = p.source === "shop" && !owned && state?.signedIn && state.gold >= price;
+                const lvl = owned ? state?.petLevels?.[p.id] : null;
+                const pct = lvl && !lvl.maxed && lvl.span > 0 ? Math.round((lvl.into / lvl.span) * 100) : 100;
                 return createPortal(
                     <div className="petx-overlay" onClick={() => setDetail(null)}>
                         <div className={`petx-modal petx-detail rarity-${p.rarity}`} onClick={(e) => e.stopPropagation()}>
@@ -291,10 +295,29 @@ export default function PetsClient() {
                             <h2 className="petx-title">{p.name}</h2>
                             <p className="petx-sub">{p.hint || SOURCE_LABEL[p.source] || ""}</p>
 
+                            {lvl ? (
+                                <div className="petx-level">
+                                    <div className="petx-level-head">
+                                        <strong>Level {lvl.level}<span className="muted"> / 5</span></strong>
+                                        <span className="muted">{lvl.maxed ? "MAX" : `${lvl.into} / ${lvl.span} XP`}</span>
+                                    </div>
+                                    <div className="petx-level-bar"><span style={{ width: `${pct}%` }} /></div>
+                                    <div className="muted" style={{ fontSize: "0.78rem", marginTop: 4 }}>
+                                        {isFeatured
+                                            ? "Equipped — earns 25% of your XP + a little over time."
+                                            : "Equip this pet to level it up (25% of your XP + a trickle over time)."}
+                                    </div>
+                                </div>
+                            ) : null}
+
                             <div className="petx-abilities">
                                 <div className="petx-ability">
                                     <div className="petx-ability-head">🐾 Passive <span className="muted">· always active while owned</span></div>
-                                    <div className="petx-ability-body"><strong>+{passive.value} {statText(passive)}</strong> — {STAT_EFFECT[passive.stat] || ""} <span className="muted">Stacks with your whole collection.</span></div>
+                                    <div className="petx-ability-body">
+                                        <strong>+{lvl ? lvl.value : passive.value} {statText(passive)}</strong>
+                                        {lvl && !lvl.maxed ? <span className="muted"> → +{passive.value * (lvl.level + 1)} at Lv {lvl.level + 1}</span> : null}
+                                        {" "}— {STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales up to ×5 as this pet levels. Stacks with your whole collection.</span>
+                                    </div>
                                 </div>
                                 <div className="petx-ability">
                                     <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped</span></div>

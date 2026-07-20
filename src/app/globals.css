@@ -9665,6 +9665,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .pet-locked { font-size: 0.74rem; color: #9a93a6; margin-top: 2px; }
 .pet-btn { margin-top: 4px; padding: 6px 12px; font-size: 0.8rem; }
 .pet-featured-badge { position: absolute; top: 6px; right: 6px; font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
+.pet-level-badge { position: absolute; top: 6px; left: 6px; font-size: 0.6rem; font-weight: 800; color: #0f0f12; background: #ffd75e; border-radius: 999px; padding: 1px 7px; }
+/* Pet level bar in the detail modal */
+.petx-level { text-align: left; background: rgba(255,215,94,0.08); border: 1px solid rgba(255,215,94,0.35); border-radius: 12px; padding: 10px 12px; margin: 12px 0 4px; }
+.petx-level-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.9rem; color: #ffe9a8; margin-bottom: 6px; }
+.petx-level-bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.petx-level-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffd75e, #ff9a6a); transition: width 0.4s ease; }
 .pet-card.just-equipped { animation: petPop 0.5s ease; }
 @keyframes petPop { 0% { transform: scale(1); } 40% { transform: scale(1.09); } 100% { transform: scale(1); } }
 .pet-give { background: none; border: none; color: #8fb8ff; font-size: 0.68rem; cursor: pointer; padding: 0; margin-top: 2px; }

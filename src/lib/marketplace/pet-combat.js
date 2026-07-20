@@ -4,20 +4,22 @@ import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
 import { combinePetBonuses } from "@/lib/marketplace/pet-perks.js";
+import { getPetXpMap, getPetXpForBuyers, levelsFromXpMap } from "@/lib/marketplace/pet-level.js";
 
 // A member's pet combat/economy bonus: passive stats from every OWNED pet + the equipped pet's signature
 // perk. Dependency-light (db + collectibles + pet-perks) so boss.js can use it without an import cycle.
 export async function getPetCombatBonus(buyerId) {
     if (!buyerId) return { stats: {}, economy: {}, proc: {} };
-    const [buyer, rows] = await Promise.all([
+    const [buyer, rows, petXp] = await Promise.all([
         db.queryOne(`SELECT COALESCE(xp,0) AS xp, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
+        getPetXpMap(buyerId).catch(() => ({})),
     ]);
     const level = levelForXp(buyer?.xp || 0).level;
     const granted = new Set(rows.map((r) => r.ref));
     const owned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, level, { owned: granted }));
     const equipped = buyer?.featured_collectible ? collectibleById(buyer.featured_collectible) : null;
-    return combinePetBonuses(owned, equipped);
+    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp));
 }
 
 // Pure: manual-damage multiplier from a combined stats object (Might, Crit chance/power, Extra strike),
@@ -44,9 +46,10 @@ export function procMultiplier(proc = {}, strikes = 1) {
 
 // Batch (2 queries): each member's raw pet bonus (stats + proc) → Map<buyerId, {stats, proc}>. For boss sizing.
 export async function getPackPetBonuses() {
-    const [members, unlocks] = await Promise.all([
+    const [members, unlocks, petXpByBuyer] = await Promise.all([
         db.query(`SELECT id, COALESCE(xp, 0) AS xp, featured_collectible FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []),
         db.query(`SELECT buyer_id, ref FROM mkt_cosmetic_unlock WHERE category = 'pet'`).catch(() => []),
+        getPetXpForBuyers().catch(() => new Map()),
     ]);
     const byBuyer = new Map();
     for (const u of unlocks) {
@@ -59,7 +62,7 @@ export async function getPackPetBonuses() {
         const granted = byBuyer.get(mem.id) || new Set();
         const owned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, level, { owned: granted }));
         const equipped = mem.featured_collectible ? collectibleById(mem.featured_collectible) : null;
-        out.set(mem.id, combinePetBonuses(owned, equipped));
+        out.set(mem.id, combinePetBonuses(owned, equipped, levelsFromXpMap(petXpByBuyer.get(mem.id) || {})));
     }
     return out;
 }
