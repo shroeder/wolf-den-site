@@ -52,6 +52,43 @@ export async function faceBufferRight(buffer) {
     return orientFacingRight(buffer, key);
 }
 
+// Public: DETECT which way a rendered sprite faces WITHOUT modifying the image. Returns "left" | "right" |
+// "unknown". Used to set a flip flag we apply at render time (instead of re-storing a mirrored image).
+export async function detectFacing(bufferOrUrl) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) return "unknown";
+    try {
+        let dataUrl;
+        if (typeof bufferOrUrl === "string") {
+            const resp = await fetch(bufferOrUrl);
+            if (!resp.ok) return "unknown";
+            dataUrl = `data:image/png;base64,${Buffer.from(await resp.arrayBuffer()).toString("base64")}`;
+        } else {
+            dataUrl = `data:image/png;base64,${bufferOrUrl.toString("base64")}`;
+        }
+        const resp = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                max_tokens: 3,
+                messages: [{ role: "user", content: [
+                    { type: "text", text: "Which horizontal direction is this character/creature's head and body facing? Reply with exactly one word: left or right." },
+                    { type: "image_url", image_url: { url: dataUrl } },
+                ] }],
+            }),
+        });
+        if (!resp.ok) return "unknown";
+        const data = await resp.json().catch(() => null);
+        const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
+        if (answer.includes("left") && !answer.includes("right")) return "left";
+        if (answer.includes("right") && !answer.includes("left")) return "right";
+        return "unknown";
+    } catch {
+        return "unknown";
+    }
+}
+
 // Public: store a PNG buffer to Blob and return its URL (same convention as generateImage).
 export async function storePng(buffer, pathPrefix = "marketplace/ai") {
     const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;

@@ -6,7 +6,7 @@ import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { petsState } from "@/lib/marketplace/pets.js";
-import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
+import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { describeStats } from "@/lib/marketplace/items.js";
@@ -76,7 +76,7 @@ export async function GET(request, { params }) {
         try {
             const { id } = await params;
             const row = await db.queryOne(
-                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, created_at, last_seen_at, avatar_sprite_url, equipped_border, featured_collectible FROM mkt_buyer WHERE id = $1`,
+                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, created_at, last_seen_at, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = $1`,
                 [id]
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -89,11 +89,12 @@ export async function GET(request, { params }) {
                 db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 80`, [id]).catch(() => []),
                 memberPetPerks(id).catch(() => []),
                 petsState(id).catch(() => null),
-                getPetSpriteMap().catch(() => ({})),
+                getPetSpriteData().catch(() => ({})),
             ]);
             // Hero-card visuals + a featured-pet + pets summary.
             const featuredPet = row.featured_collectible ? collectibleById(row.featured_collectible) : null;
-            const petSpriteUrl = (row.featured_collectible && petSprites[row.featured_collectible]) || null;
+            const petSpriteUrl = (row.featured_collectible && petSprites[row.featured_collectible]?.url) || null;
+            const petSpriteFlip = (row.featured_collectible && petSprites[row.featured_collectible]?.flip) || false;
             // Granular activity telemetry, merged with the XP ledger into one detailed timeline.
             const activityRows = await db.query(`SELECT event, meta, path, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
             const history = [
@@ -131,8 +132,10 @@ export async function GET(request, { params }) {
                     lastSeenAt: iso(row.last_seen_at),
                     // Hero-card visuals.
                     spriteUrl: row.avatar_sprite_url || null,
+                    spriteFlip: row.avatar_sprite_url ? row.avatar_sprite_flip === true : false,
                     border: row.equipped_border && row.equipped_border !== "none" ? row.equipped_border : null,
                     petSpriteUrl,
+                    petSpriteFlip,
                     profileUrl: row.alias ? `/marketplace/u/${row.alias}` : null,
                 },
                 boss: { damage: metrics.bossDamage || 0, hits: metrics.bossHits || 0, fought: metrics.bossesFought || 0, won: metrics.bossesWon || 0 },
@@ -140,7 +143,7 @@ export async function GET(request, { params }) {
                 gear,
                 pets: {
                     owned: pets?.ownedIds?.length || 0,
-                    featured: featuredPet ? { id: featuredPet.id, name: featuredPet.name, rarity: featuredPet.rarity, spriteUrl: petSpriteUrl } : null,
+                    featured: featuredPet ? { id: featuredPet.id, name: featuredPet.name, rarity: featuredPet.rarity, spriteUrl: petSpriteUrl, spriteFlip: petSpriteFlip } : null,
                 },
                 chestTiers: CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji })),
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),

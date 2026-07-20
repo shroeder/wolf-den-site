@@ -22,7 +22,7 @@ function ItemGlyph({ id, className = "" }) {
 let DEFS = {};
 const itemDef = (id) => DEFS[id] || null;
 
-export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, displayLabel = "Hero", level = 1, backdropUrl = null }) {
+export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null }) {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [slot, setSlot] = useState(null); // open picker for this slot
@@ -154,7 +154,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, di
                 })}
                 <div className="equip-hero">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={spriteUrl || avatarUrl} alt={displayLabel} />
+                    {/* Mirror only the sprite (not the head-on avatar fallback) when flagged backwards. */}
+                    <img src={spriteUrl || avatarUrl} alt={displayLabel} style={spriteUrl && spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
                     <span className="equip-hero-lv">Lv {level}</span>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generateMissingPetSprites } from "@/lib/marketplace/pet-sprite.js";
+import { generateMissingPetSprites, detectPetSpriteFacings } from "@/lib/marketplace/pet-sprite.js";
 import { generateMissingChestArt } from "@/lib/marketplace/chest-art.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -25,7 +25,10 @@ export async function GET(request) {
             // Auto-fill missing chest art too, so new chest tiers get icons without any manual taps.
             const chestArt = await generateMissingChestArt(2).catch(() => null);
             // 8 pets/night backfills a new roster over a few nights, then no-ops (shared sprites — bounded).
-            return NextResponse.json({ success: true, ...(await generateMissingPetSprites(8)), chestArt });
+            const gen = await generateMissingPetSprites(8);
+            // AI facing read-pass: mark left-facing sprites so they render mirrored (right-facing).
+            const facing = await detectPetSpriteFacings(8).catch(() => null);
+            return NextResponse.json({ success: true, ...gen, facing, chestArt });
         } catch (error) {
             return internalError(error, { event: "pet_sprites.run.failure" });
         }

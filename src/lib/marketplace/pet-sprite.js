@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
-import { faceBufferRight, generateImage, storePng } from "@/lib/marketplace/openai-image.js";
+import { faceBufferRight, generateImage, storePng, detectFacing } from "@/lib/marketplace/openai-image.js";
 
 // Each pet gets ONE shared 2D battle sprite (not per-member) so the member's active pet can fight beside
 // them in the boss scene. Same art universe as the member/boss sprites (transparent, full-body).
@@ -19,6 +19,36 @@ export async function getPetSpriteMap() {
     return Object.fromEntries(rows.map((r) => [r.pet_id, r.url]));
 }
 
+// Map of pet_id -> { url, flip }. flip=true means the sprite faces the wrong way and should be mirrored at
+// render time (scaleX(-1)). Used everywhere a pet sprite is shown so they all face right.
+export async function getPetSpriteData() {
+    const rows = await db.query(`SELECT pet_id, url, flip FROM mkt_pet_sprite`).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.pet_id, { url: r.url, flip: r.flip === true }]));
+}
+
+// Owner override: hand-set a pet sprite's flip flag (marks it checked so the AI pass won't overwrite it).
+export async function setPetSpriteFlip(petId, flip) {
+    await db.query(`UPDATE mkt_pet_sprite SET flip = $2, facing_checked_at = NOW() WHERE pet_id = $1`, [petId, Boolean(flip)]).catch(() => {});
+    return { ok: true };
+}
+
+// AI read-pass: for pets whose sprite hasn't been facing-checked, look at the stored art and set flip=true
+// if it faces LEFT (we want everyone facing right, toward the boss). Doesn't touch the image. Small batches.
+export async function detectPetSpriteFacings(limit = 6) {
+    const rows = await db
+        .query(`SELECT pet_id, url FROM mkt_pet_sprite WHERE facing_checked_at IS NULL AND url IS NOT NULL ORDER BY updated_at ASC LIMIT $1`, [Math.max(1, Math.min(12, limit))])
+        .catch(() => []);
+    const results = [];
+    for (const r of rows) {
+        const facing = await detectFacing(r.url).catch(() => "unknown");
+        const flip = facing === "left";
+        await db.query(`UPDATE mkt_pet_sprite SET flip = $2, facing_checked_at = NOW() WHERE pet_id = $1`, [r.pet_id, flip]).catch(() => {});
+        results.push({ id: r.pet_id, facing, flip });
+    }
+    const remaining = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_pet_sprite WHERE facing_checked_at IS NULL AND url IS NOT NULL`).catch(() => null);
+    return { checked: results.length, flipped: results.filter((r) => r.flip).length, remaining: remaining?.n || 0, results };
+}
+
 // Generate (or regenerate) one pet's sprite and store it.
 export async function generatePetSprite(petId) {
     const pet = COLLECTIBLES.find((p) => p.id === petId);
@@ -27,7 +57,7 @@ export async function generatePetSprite(petId) {
     // Freshly generated art is already right-facing, so stamp it oriented — the repair sweep skips it.
     await db.query(
         `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at, oriented_at) VALUES ($1, $2, NOW(), NOW())
-         ON CONFLICT (pet_id) DO UPDATE SET url = $2, updated_at = NOW(), oriented_at = NOW()`,
+         ON CONFLICT (pet_id) DO UPDATE SET url = $2, updated_at = NOW(), oriented_at = NOW(), flip = FALSE, facing_checked_at = NULL`,
         [petId, url]
     );
     return url;
@@ -66,11 +96,11 @@ export async function fixPetSpriteOrientations(limit = 6) {
 
 // Which pets have a sprite yet (for the admin view).
 export async function petSpriteStatus() {
-    const have = await getPetSpriteMap();
+    const have = await getPetSpriteData();
     return {
         total: COLLECTIBLES.length,
         done: COLLECTIBLES.filter((p) => have[p.id]).length,
-        pets: COLLECTIBLES.map((p) => ({ id: p.id, name: p.name, level: p.level, rarity: p.rarity, url: have[p.id] || null })),
+        pets: COLLECTIBLES.map((p) => ({ id: p.id, name: p.name, level: p.level, rarity: p.rarity, url: have[p.id]?.url || null, flip: have[p.id]?.flip || false })),
     };
 }
 

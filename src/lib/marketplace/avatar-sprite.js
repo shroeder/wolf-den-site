@@ -4,7 +4,7 @@ import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings.js";
-import { editImage } from "@/lib/marketplace/openai-image.js";
+import { editImage, detectFacing } from "@/lib/marketplace/openai-image.js";
 import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/marketplace/inventory.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
@@ -90,7 +90,8 @@ export function pendingSpriteIds(limit = 5) {
 export async function listSpritesAdmin() {
     const rows = await db
         .query(
-            `SELECT id, display_name, alias, avatar_config, avatar_sprite_url, avatar_sprite_at, avatar_updated_at
+            `SELECT id, display_name, alias, avatar_config, avatar_sprite_url, avatar_sprite_at, avatar_updated_at,
+                    avatar_sprite_flip, avatar_facing_checked_at
                FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
               ORDER BY (avatar_sprite_url IS NULL) DESC, avatar_updated_at DESC NULLS LAST
@@ -103,12 +104,51 @@ export async function listSpritesAdmin() {
         buyerId: r.id,
         label: r.display_name || (r.alias ? `@${r.alias}` : "Member"),
         spriteUrl: r.avatar_sprite_url || null,
+        // flip mirrors a backwards sprite at render time; facingChecked = the AI pass has already looked.
+        flip: r.avatar_sprite_flip === true,
+        facingChecked: Boolean(r.avatar_facing_checked_at),
         // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar, bust
         // placed at the top with room below). v bumps when the framing changes (immutable-cached URL).
         avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=2`,
         prompt: buildSpritePrompt(r.avatar_config, gearMap.get(r.id) || ""),
         pending: !r.avatar_sprite_url || (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) || !r.avatar_sprite_at,
     }));
+}
+
+// Owner override: hand-set a member sprite's flip flag (marks it checked so the AI pass won't overwrite it).
+export async function setBuyerSpriteFlip(buyerId, flip) {
+    await db
+        .query(`UPDATE mkt_buyer SET avatar_sprite_flip = $2, avatar_facing_checked_at = NOW() WHERE id = $1`, [buyerId, Boolean(flip)])
+        .catch(() => {});
+    return { ok: true };
+}
+
+// AI read-pass: for members whose sprite hasn't been facing-checked, look at the stored art and set
+// flip=true if it faces LEFT (we want everyone facing right, toward the boss). Doesn't touch the image.
+// Small batches; resumable via avatar_facing_checked_at. Same shape as the pet detect pass.
+export async function detectBuyerSpriteFacings(limit = 6) {
+    const rows = await db
+        .query(
+            `SELECT id, avatar_sprite_url FROM mkt_buyer
+              WHERE avatar_facing_checked_at IS NULL AND avatar_sprite_url IS NOT NULL
+              ORDER BY avatar_sprite_at ASC NULLS FIRST
+              LIMIT $1`,
+            [Math.max(1, Math.min(12, limit))]
+        )
+        .catch(() => []);
+    const results = [];
+    for (const r of rows) {
+        const facing = await detectFacing(r.avatar_sprite_url).catch(() => "unknown");
+        const flip = facing === "left";
+        await db
+            .query(`UPDATE mkt_buyer SET avatar_sprite_flip = $2, avatar_facing_checked_at = NOW() WHERE id = $1`, [r.id, flip])
+            .catch(() => {});
+        results.push({ id: r.id, facing, flip });
+    }
+    const remaining = await db
+        .queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE avatar_facing_checked_at IS NULL AND avatar_sprite_url IS NOT NULL`)
+        .catch(() => null);
+    return { checked: results.length, flipped: results.filter((r) => r.flip).length, remaining: remaining?.n || 0, results };
 }
 
 // Store a finished PNG (base64, generated on the phone) as a member's sprite. Fast, no OpenAI wait.
@@ -119,8 +159,10 @@ export async function setBuyerSprite(buyerId, base64) {
     const buffer = Buffer.from(clean, "base64");
     if (!buffer.length) throw new Error("Empty image");
     const blob = await put(`marketplace/sprite/${buyerId}-${Date.now()}.png`, buffer, { access: "public", contentType: "image/png" });
+    // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
     await db.query(
-        `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3 WHERE id = $1`,
+        `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
+                              avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL WHERE id = $1`,
         [buyerId, blob.url, buildSpritePrompt(row.avatar_config)]
     );
     return blob.url;
@@ -135,8 +177,10 @@ export async function generateBuyerSprite(buyerId) {
     const prompt = buildSpritePrompt(row.avatar_config, gear);
     const png = await renderAvatarPng(row.avatar_config, 1024);
     const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
+    // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
     await db.query(
-        `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3 WHERE id = $1`,
+        `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
+                              avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL WHERE id = $1`,
         [buyerId, url, prompt]
     );
     return url;

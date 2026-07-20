@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runAvatarSpriteJob } from "@/lib/marketplace/avatar-sprite.js";
+import { runAvatarSpriteJob, detectBuyerSpriteFacings } from "@/lib/marketplace/avatar-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -24,7 +24,9 @@ export async function GET(request) {
                 return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             }
             const result = await runAvatarSpriteJob(12);
-            return NextResponse.json({ success: true, ...result });
+            // AI facing read-pass: mark left-facing sprites so they render mirrored (right-facing).
+            const facing = await detectBuyerSpriteFacings(12).catch(() => null);
+            return NextResponse.json({ success: true, ...result, facing });
         } catch (error) {
             return internalError(error, { event: "avatar_sprites.run.failure" });
         }

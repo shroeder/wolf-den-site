@@ -80,10 +80,10 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                         <div className="fighter-lunge" style={{ animationDelay: `${f.delay}s` }}>
                             {f.petSpriteUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img className="fighter-pet" src={f.petSpriteUrl} alt="" />
+                                <img className="fighter-pet" src={f.petSpriteUrl} alt="" style={f.petSpriteFlip ? { transform: "scaleX(-1)" } : undefined} />
                             ) : null}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className="fighter-sprite" src={f.spriteUrl} alt="" />
+                            <img className="fighter-sprite" src={f.spriteUrl} alt="" style={f.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
                             {f.showName ? <span className="fighter-name">{f.name}</span> : null}
                         </div>
                     </div>
@@ -124,7 +124,9 @@ function applyPositions(list) {
         return {
             key: f.id || `f-${i}`,
             spriteUrl: f.spriteUrl,
+            spriteFlip: Boolean(f.spriteFlip),
             petSpriteUrl: f.petSpriteUrl || null,
+            petSpriteFlip: Boolean(f.petSpriteFlip),
             name: f.name || null,
             showName: showNames && !f.pad && Boolean(f.name),
             you: Boolean(f.you),

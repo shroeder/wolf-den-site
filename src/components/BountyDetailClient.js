@@ -106,7 +106,7 @@ export default function BountyDetailClient({ initial, signedIn }) {
                     <div className="bounty-people">
                         {participants.map((p) => (
                             <div key={p.id} className={`bounty-person${p.isWinner ? " is-winner" : ""}`}>
-                                {p.spriteUrl ? <img src={p.spriteUrl} alt="" /> : <span className="bounty-person-fallback">{(p.name || "?").slice(0, 1)}</span>}
+                                {p.spriteUrl ? <img src={p.spriteUrl} alt="" style={p.spriteFlip ? { transform: "scaleX(-1)" } : undefined} /> : <span className="bounty-person-fallback">{(p.name || "?").slice(0, 1)}</span>}
                                 <span>{p.alias ? `@${p.alias}` : p.name}</span>
                                 {p.isWinner ? <span className="bounty-payout">💰 {p.payout.toLocaleString()}</span> : null}
                             </div>

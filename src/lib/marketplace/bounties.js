@@ -230,7 +230,7 @@ export async function getBountyDetail(bountyId, viewerId = null) {
     const detail = shapeBounty(r, viewerId);
     const claims = await db
         .query(
-            `SELECT k.buyer_id, k.claimed_at, k.is_winner, k.payout, m.display_name, m.alias, m.email, m.avatar_sprite_url
+            `SELECT k.buyer_id, k.claimed_at, k.is_winner, k.payout, m.display_name, m.alias, m.email, m.avatar_sprite_url, m.avatar_sprite_flip
                FROM mkt_bounty_claim k JOIN mkt_buyer m ON m.id = k.buyer_id
               WHERE k.bounty_id = $1 ORDER BY k.claimed_at ASC`,
             [bountyId]
@@ -241,6 +241,7 @@ export async function getBountyDetail(bountyId, viewerId = null) {
         name: nameOf(c),
         alias: c.alias || null,
         spriteUrl: c.avatar_sprite_url || null,
+        spriteFlip: c.avatar_sprite_url ? c.avatar_sprite_flip === true : false,
         claimedAt: c.claimed_at ? new Date(c.claimed_at).toISOString() : null,
         isWinner: c.is_winner === true,
         payout: c.payout || 0,

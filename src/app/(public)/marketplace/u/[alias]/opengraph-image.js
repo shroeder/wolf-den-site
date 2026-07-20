@@ -38,9 +38,9 @@ export default async function Image({ params }) {
         );
     }
 
-    const sprite = usableSprite(
-        (await db.queryOne(`SELECT avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [profile.id]).catch(() => null))?.avatar_sprite_url
-    );
+    const spriteRow = await db.queryOne(`SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [profile.id]).catch(() => null);
+    const sprite = usableSprite(spriteRow?.avatar_sprite_url);
+    const spriteFlip = sprite ? spriteRow?.avatar_sprite_flip === true : false;
     const name = profile.displayLabel || "Member";
     const handle = profile.alias ? `@${profile.alias}` : "";
     const lvl = profile.level?.level ?? profile.level ?? 1;
@@ -84,7 +84,7 @@ export default async function Image({ params }) {
                     >
                         {sprite ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={sprite} width={260} height={260} style={{ objectFit: "cover" }} alt="" />
+                            <img src={sprite} width={260} height={260} style={{ objectFit: "cover", transform: spriteFlip ? "scaleX(-1)" : undefined }} alt="" />
                         ) : (
                             <div style={{ display: "flex", fontSize: 150, fontWeight: 900, color: GOLD }}>{initial}</div>
                         )}

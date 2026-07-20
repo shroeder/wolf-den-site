@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { DEFAULT_SPRITE_AVATAR_PATH, DEFAULT_SPRITE_PROMPT, generateBuyerSprite, generateDefaultSprite, getDefaultSpriteUrl, listSpritesAdmin, setBuyerSprite, setDefaultSpriteFromImage } from "@/lib/marketplace/avatar-sprite.js";
+import { DEFAULT_SPRITE_AVATAR_PATH, DEFAULT_SPRITE_PROMPT, generateBuyerSprite, generateDefaultSprite, getDefaultSpriteUrl, listSpritesAdmin, setBuyerSprite, setBuyerSpriteFlip, detectBuyerSpriteFacings, setDefaultSpriteFromImage } from "@/lib/marketplace/avatar-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -44,7 +44,11 @@ export async function POST(request) {
                 return noStore({ defaultSpriteUrl: await setDefaultSpriteFromImage(body.image) });
             }
             if (action === "generateDefaultSprite") return noStore({ defaultSpriteUrl: await generateDefaultSprite() });
+            // AI read-pass: mark left-facing sprites so they render mirrored (a few per call; call until remaining=0).
+            if (action === "detectFacing") return noStore(await detectBuyerSpriteFacings(Number(body?.limit) || 6));
             if (!body.buyerId) return noStore({ error: "missing_buyer" }, { status: 400 });
+            // Owner hand-toggles a member's render flip.
+            if (action === "setFlip") return noStore(await setBuyerSpriteFlip(String(body.buyerId), Boolean(body.flip)));
             if (action === "setSprite") {
                 if (!body.image) return noStore({ error: "missing_image" }, { status: 400 });
                 return noStore({ spriteUrl: await setBuyerSprite(body.buyerId, body.image) });

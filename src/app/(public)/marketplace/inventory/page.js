@@ -27,7 +27,7 @@ export default async function InventoryPage() {
 
     const [profile, spriteRow, backdropUrl] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
-        db.queryOne(`SELECT avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null),
+        db.queryOne(`SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null),
         getSetting("equip_backdrop_url").catch(() => null),
     ]);
 
@@ -44,6 +44,7 @@ export default async function InventoryPage() {
             <EquipmentClient
                 avatarUrl={profile?.avatarUrl}
                 spriteUrl={spriteRow?.avatar_sprite_url || null}
+                spriteFlip={spriteRow?.avatar_sprite_url ? spriteRow?.avatar_sprite_flip === true : false}
                 displayLabel={profile?.displayLabel || "Hero"}
                 level={profile?.level?.level || 1}
                 backdropUrl={backdropUrl || null}

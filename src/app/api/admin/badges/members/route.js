@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { backfillBadgeCongrats, listMembersWithBadges } from "@/lib/marketplace/badges.js";
 import { activityCounts } from "@/lib/marketplace/activity.js";
 import { getEquippedStatsForMembers } from "@/lib/marketplace/inventory.js";
-import { getPetSpriteMap } from "@/lib/marketplace/pet-sprite.js";
+import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { borderById } from "@/lib/marketplace/borders.js";
 import { frameById } from "@/lib/marketplace/frames.js";
 import { cosmeticById } from "@/lib/marketplace/avatar-cosmetics.js";
@@ -33,7 +33,7 @@ export async function GET(request) {
                 const ids = members.map((m) => m.id);
                 const [statsMap, petMap, rows] = await Promise.all([
                     getEquippedStatsForMembers(ids).catch(() => new Map()),
-                    getPetSpriteMap().catch(() => ({})),
+                    getPetSpriteData().catch(() => ({})),
                     db.query(`SELECT id, COALESCE(gold, 0) AS gold, equipped_border, equipped_frame, equipped_background, avatar_cosmetics FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
                 ]);
                 const byId = new Map(rows.map((r) => [r.id, r]));
@@ -43,7 +43,8 @@ export async function GET(request) {
                     const r = byId.get(m.id) || {};
                     m.stats = statsMap.get(m.id) || {};
                     m.gold = Number(r.gold) || 0;
-                    m.petSpriteUrl = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]) || null;
+                    m.petSpriteUrl = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]?.url) || null;
+                    m.petSpriteFlip = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]?.flip) || false;
                     // Equipped cosmetics so the admin can SEE a member's border, card frame, and aura effect.
                     m.border = meta(borderById(r.equipped_border));
                     m.frame = meta(frameById(r.equipped_frame));
