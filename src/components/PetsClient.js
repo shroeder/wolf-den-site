@@ -270,7 +270,7 @@ export default function PetsClient() {
                             <button type="button" key={pet.id} onClick={() => setDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
                                 {lvl ? <span className="pet-level-badge"><Stars level={lvl.level} /></span> : null}
-                                <div className="pet-icon" style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
+                                <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
                                 <div className="pet-buffs">
@@ -373,7 +373,7 @@ export default function PetsClient() {
                             <button type="button" className="petx-close" aria-label="Close" onClick={() => setDetail(null)}>×</button>
                             <div className="petx-hero petx-hero-big">
                                 <span className="petx-hero-glow" />
-                                <span className="petx-hero-icon" style={{ color: p.color }}>{p.Icon ? <p.Icon /> : "🐾"}</span>
+                                <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}>{p.Icon ? <p.Icon /> : "🐾"}</span>
                             </div>
                             <div className="petx-cele-tag">{p.rarity}</div>
                             <h2 className="petx-title">{p.name}</h2>

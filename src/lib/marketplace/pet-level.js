@@ -62,24 +62,57 @@ export function levelsFromXpMap(xpMap = {}) {
     return out;
 }
 
-// Credit the member's EQUIPPED pet its share of an XP award. Best-effort; capped at PET_MAX_XP. Called from
-// awardXp so every XP the member earns trickles into their active pet.
-export async function creditEquippedPetXp(buyerId, memberXp) {
-    if (!buyerId) return;
-    const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE);
-    if (share <= 0) return;
+// Add a FLAT amount of XP to the member's equipped pet (capped). Returns { ok, petId, xp, level, leveled }
+// or { ok: false }. Used by pet-feed consumables (full amount) and, via creditEquippedPetXp, the XP share.
+export async function addEquippedPetXp(buyerId, amount) {
+    const add = Math.round(Number(amount) || 0);
+    if (!buyerId || add <= 0) return { ok: false };
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const petId = buyer?.featured_collectible;
-    if (!petId) return;
-    await db
-        .query(
+    if (!petId) return { ok: false, error: "no_pet_equipped" };
+    const before = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+    const prevLevel = petLevelForXp(before?.xp || 0);
+    const row = await db
+        .queryOne(
             `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at)
              VALUES ($1, $2, LEAST($3, ${PET_MAX_XP}), NOW(), NOW())
              ON CONFLICT (buyer_id, pet_id)
-             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3, ${PET_MAX_XP}), updated_at = NOW()`,
-            [buyerId, petId, share]
+             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3, ${PET_MAX_XP}), updated_at = NOW()
+             RETURNING xp`,
+            [buyerId, petId, add]
+        )
+        .catch(() => null);
+    const xp = row?.xp ?? (before?.xp || 0) + add;
+    const level = petLevelForXp(xp);
+    return { ok: true, petId, xp, level, leveled: level > prevLevel };
+}
+
+// Instantly bump the equipped pet to the start of its next level (for a rare "instant level" consumable).
+export async function levelUpEquippedPet(buyerId) {
+    if (!buyerId) return { ok: false };
+    const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const petId = buyer?.featured_collectible;
+    if (!petId) return { ok: false, error: "no_pet_equipped" };
+    const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+    const level = petLevelForXp(row?.xp || 0);
+    if (level >= PET_MAX_LEVEL) return { ok: false, error: "already_max", petId, level };
+    const targetXp = PET_LEVEL_THRESHOLDS[level]; // xp needed to reach the next level
+    await db
+        .query(
+            `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())
+             ON CONFLICT (buyer_id, pet_id) DO UPDATE SET xp = GREATEST(mkt_pet_level.xp, $3), updated_at = NOW()`,
+            [buyerId, petId, targetXp]
         )
         .catch(() => {});
+    return { ok: true, petId, level: level + 1, leveled: true };
+}
+
+// Credit the member's EQUIPPED pet its share (25%) of an XP award. Best-effort. Called from awardXp so every
+// XP the member earns trickles into their active pet.
+export async function creditEquippedPetXp(buyerId, memberXp) {
+    const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE);
+    if (share <= 0) return;
+    await addEquippedPetXp(buyerId, share).catch(() => {});
 }
 
 // Lazy time-trickle for the equipped pet: add PET_TRICKLE_PER_DAY worth of XP for the time elapsed since the

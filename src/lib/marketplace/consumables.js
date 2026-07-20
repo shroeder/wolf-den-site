@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { itemById } from "@/lib/marketplace/items.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { addEquippedPetXp, levelUpEquippedPet } from "@/lib/marketplace/pet-level.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
@@ -13,6 +15,8 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 //   damage         → ×mult boss damage for `hours` (your manual strikes)
 //   recharge       → refill ALL charges on a chosen charged item (target)
 //   reset_cooldown → clear the cooldown on a chosen charged item that still has a charge (target)
+//   pet_xp         → feed the EQUIPPED pet a flat amount of pet-XP (levels it toward Lv5)
+//   pet_level      → instantly bump the equipped pet up one level
 export const CONSUMABLES = {
     scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP.", price: 1500, effect: { type: "xp", amount: 500 } },
     scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP.", price: 5000, effect: { type: "xp", amount: 2000 } },
@@ -25,10 +29,25 @@ export const CONSUMABLES = {
     // ULTRA relics — no gold price (drop only from the highest chests). Applied to a charged item you pick.
     elixir_renewal: { name: "Elixir of Renewal", emoji: "⚗️", kind: "relic", price: null, target: "recharge", desc: "Fully RECHARGE all charges on one of your charged items.", effect: { type: "recharge" } },
     sands_of_time: { name: "Sands of Time", emoji: "⏳", kind: "relic", price: null, target: "cooldown", desc: "Instantly RESET the cooldown on a charged item that still has a charge left.", effect: { type: "reset_cooldown" } },
+    // PET TREATS — feed your EQUIPPED pet to level it up. Six buyable tiers + four drop-only.
+    treat_bone: { name: "Pet Treat", emoji: "🦴", kind: "treat", desc: "Feed your equipped pet +25 pet XP.", price: 400, effect: { type: "pet_xp", amount: 25 } },
+    treat_snack: { name: "Hearty Snack", emoji: "🍖", kind: "treat", desc: "Feed your equipped pet +75 pet XP.", price: 1000, effect: { type: "pet_xp", amount: 75 } },
+    treat_toy: { name: "Chew Toy", emoji: "🧸", kind: "treat", desc: "Feed your equipped pet +150 pet XP.", price: 1800, effect: { type: "pet_xp", amount: 150 } },
+    treat_feast: { name: "Pet Feast", emoji: "🍲", kind: "treat", desc: "Feed your equipped pet +300 pet XP.", price: 3200, effect: { type: "pet_xp", amount: 300 } },
+    treat_golden: { name: "Golden Bone", emoji: "✨", kind: "treat", desc: "Feed your equipped pet +600 pet XP.", price: 6000, effect: { type: "pet_xp", amount: 600 } },
+    treat_kibble: { name: "Legendary Kibble", emoji: "🥩", kind: "treat", desc: "Feed your equipped pet +1,200 pet XP.", price: 10000, effect: { type: "pet_xp", amount: 1200 } },
+    // Drop-only pet treats (chests / boss).
+    treat_wild: { name: "Wild Rations", emoji: "🌿", kind: "treat", price: null, desc: "Feed your equipped pet +400 pet XP.", effect: { type: "pet_xp", amount: 400 } },
+    treat_marrow: { name: "Ancient Marrow", emoji: "🍥", kind: "treat", price: null, desc: "Feed your equipped pet +800 pet XP.", effect: { type: "pet_xp", amount: 800 } },
+    treat_mythic: { name: "Mythic Morsel", emoji: "💎", kind: "treat", price: null, desc: "Feed your equipped pet +1,500 pet XP.", effect: { type: "pet_xp", amount: 1500 } },
+    treat_ambrosia: { name: "Ambrosia", emoji: "🍯", kind: "treat", price: null, desc: "Instantly LEVEL UP your equipped pet.", effect: { type: "pet_level" } },
 };
 
-// Buyable order (shop). Relics are intentionally excluded — they're chest-only.
-const SHOP_ORDER = ["scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm"];
+// Buyable order (shop). Relics + drop-only treats are intentionally excluded — they're chest/boss-only.
+const SHOP_ORDER = [
+    "scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm",
+    "treat_bone", "treat_snack", "treat_toy", "treat_feast", "treat_golden", "treat_kibble",
+];
 
 // --- Boss-fight hooks (read by boss.js) -------------------------------------------------------------
 
@@ -137,6 +156,27 @@ export async function useConsumable(buyerId, id, targetItemId = null) {
         }
         await db.query(`UPDATE mkt_user_item SET last_charge_at = NULL WHERE buyer_id = $1 AND item_id = $2`, [buyerId, targetItemId]).catch(() => {});
         return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied: `${def.name} cooldown reset — ready to redeem now` };
+    }
+
+    // Pet treats feed the EQUIPPED pet — validate one's equipped BEFORE spending so a treat is never wasted.
+    if (e.type === "pet_xp" || e.type === "pet_level") {
+        const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        const petId = buyer?.featured_collectible;
+        if (!petId) return { ok: false, error: "no_pet_equipped" };
+        const petName = collectibleById(petId)?.name || "your pet";
+        const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
+        if (!dec) return { ok: false, error: "none_owned" };
+        let res;
+        if (e.type === "pet_level") {
+            res = await levelUpEquippedPet(buyerId).catch(() => ({ ok: false }));
+        } else {
+            res = await addEquippedPetXp(buyerId, e.amount).catch(() => ({ ok: false }));
+        }
+        await trackActivity(buyerId, "use_consumable", { id, name: c.name, petId }).catch(() => {});
+        const applied = e.type === "pet_level"
+            ? (res?.ok ? `${petName} leveled up to Lv ${res.level}! ⬆️` : `${petName} is already max level`)
+            : `+${e.amount.toLocaleString()} pet XP to ${petName}${res?.leveled ? ` — Lv ${res.level}! ⬆️` : ""}`;
+        return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied };
     }
 
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);

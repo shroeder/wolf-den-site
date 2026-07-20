@@ -2,7 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById } from "@/lib/marketplace/items.js";
-import { COLLECTIBLES, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
+import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
@@ -74,7 +75,7 @@ export async function getMemberMetrics(buyerId) {
     const buyer = await db.queryOne(`SELECT xp, created_at FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
-    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows] = await Promise.all([
+    const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows, petLevelRows] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
@@ -113,6 +114,8 @@ export async function getMemberMetrics(buyerId) {
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_bounty_claim WHERE buyer_id = $1 AND is_winner = TRUE`, [buyerId]).catch(() => null),
         // Explicitly-granted pets (shop/chest/boss/achievement/elite/trade) — level pets are added below.
         db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
+        // Per-pet leveling XP, for pet-level milestone badges + leveling achievement pets.
+        db.query(`SELECT pet_id, xp FROM mkt_pet_level WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
 
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
@@ -135,6 +138,14 @@ export async function getMemberMetrics(buyerId) {
     // Pets owned = level-unlocked + explicitly-granted.
     const grantedPets = new Set((grantedPetRows || []).map((r) => r.ref));
     const petsOwned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, levelObj.level, { owned: grantedPets })).length;
+    // Pet-leveling milestones: highest single-pet level, # maxed (Lv5), total levels gained, and whether any
+    // maxed pet is legendary-or-higher (for the Radiant Phoenix unlock).
+    const LEGENDARY_PLUS = new Set(["legendary", "mythic", "ascendant", "eternal"]);
+    const petLevelValues = (petLevelRows || []).map((r) => petLevelForXp(r.xp));
+    const maxPetLevel = petLevelValues.length ? Math.max(...petLevelValues) : 1;
+    const petsMaxed = petLevelValues.filter((lv) => lv >= 5).length;
+    const petLevelsTotal = petLevelValues.reduce((sum, lv) => sum + Math.max(0, lv - 1), 0);
+    const maxedLegendaryPlus = (petLevelRows || []).some((r) => petLevelForXp(r.xp) >= 5 && LEGENDARY_PLUS.has(collectibleById(r.pet_id)?.rarity));
 
     return {
         xp,
@@ -166,6 +177,10 @@ export async function getMemberMetrics(buyerId) {
         bountiesPosted: bountyPostRow?.n || 0,
         bountiesWon: bountyWinRow?.n || 0,
         petsOwned,
+        maxPetLevel,
+        petsMaxed,
+        petLevelsTotal,
+        maxedLegendaryPlus,
     };
 }
 
@@ -200,6 +215,9 @@ export function progressForRule(rule, threshold, m) {
         case "bounties_posted": return { current: m.bountiesPosted, target: t };
         case "bounties_won": return { current: m.bountiesWon, target: t };
         case "pets_owned": return { current: m.petsOwned, target: t };
+        case "pet_level_reached": return { current: m.maxPetLevel, target: t }; // highest level on any single pet
+        case "pets_maxed": return { current: m.petsMaxed, target: t }; // # of pets at Lv5
+        case "pet_levels_total": return { current: m.petLevelsTotal, target: t }; // total levels gained across pets
         default: return { current: 0, target: t || 1 };
     }
 }

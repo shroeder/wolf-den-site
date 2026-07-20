@@ -38,6 +38,7 @@ export default function ConsumablesClient() {
                     not_enough_gold: "Not enough gold.", none_owned: "You don't have any of those.",
                     already_full: "That item's charges are already full.", not_on_cooldown: "That item isn't on cooldown.",
                     bad_target: "Pick a charged item.", target_not_owned: "You don't own that item.",
+                    no_pet_equipped: "Equip a pet first — treats feed your active pet.",
                 };
                 setMsg({ ok: false, text: errs[data.error] || "Couldn't do that right now." });
             }

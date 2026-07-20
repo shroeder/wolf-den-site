@@ -9685,6 +9685,36 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petx-tier.is-current { background: rgba(255,215,94,0.16); color: #ffe9a8; font-weight: 800; }
 .petx-tier.is-current .petx-tier-stars { color: #ffd75e; }
 .petx-tier.is-locked .petx-tier-stars { color: rgba(255,255,255,0.18); }
+/* Escalating per-level flair on the pet icon (cards + modal hero). Higher level = cooler. */
+.pet-icon, .petx-hero-icon { position: relative; transition: filter 0.3s ease; }
+.pet-icon[data-petlvl="2"], .petx-hero-icon[data-petlvl="2"] { filter: drop-shadow(0 0 5px rgba(255,215,94,0.45)); }
+.pet-icon[data-petlvl="3"], .petx-hero-icon[data-petlvl="3"] { filter: drop-shadow(0 0 8px rgba(255,215,94,0.6)); }
+.pet-icon[data-petlvl="4"], .petx-hero-icon[data-petlvl="4"] { filter: drop-shadow(0 0 11px rgba(255,180,74,0.75)); }
+.pet-icon[data-petlvl="5"], .petx-hero-icon[data-petlvl="5"] { filter: drop-shadow(0 0 14px rgba(255,180,74,0.95)); animation: petAuraPulse 2.2s ease-in-out infinite; }
+@keyframes petAuraPulse {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(255,180,74,0.7)); }
+    50% { filter: drop-shadow(0 0 18px rgba(255,120,60,1)); }
+}
+/* Sparkles: Lv4 one drifting spark, Lv5 two. Pseudo-elements float around the icon. */
+.pet-icon[data-petlvl="4"]::after, .pet-icon[data-petlvl="5"]::after,
+.petx-hero-icon[data-petlvl="4"]::after, .petx-hero-icon[data-petlvl="5"]::after {
+    content: "✨"; position: absolute; top: -6px; right: -8px; font-size: 0.7em; pointer-events: none;
+    animation: petSparkle 1.8s ease-in-out infinite;
+}
+.pet-icon[data-petlvl="5"]::before, .petx-hero-icon[data-petlvl="5"]::before {
+    content: "⭐"; position: absolute; bottom: -4px; left: -8px; font-size: 0.55em; pointer-events: none;
+    animation: petSparkle 2.3s ease-in-out infinite 0.6s;
+}
+@keyframes petSparkle {
+    0%, 100% { opacity: 0; transform: translateY(2px) scale(0.6); }
+    50% { opacity: 1; transform: translateY(-4px) scale(1); }
+}
+/* A Lv3+ gold ring behind the card icon. */
+.pet-icon[data-petlvl="3"], .pet-icon[data-petlvl="4"], .pet-icon[data-petlvl="5"] { border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,215,94,0.35); }
+@media (prefers-reduced-motion: reduce) {
+    .pet-icon[data-petlvl="5"], .petx-hero-icon[data-petlvl="5"] { animation: none; }
+    .pet-icon::after, .pet-icon::before, .petx-hero-icon::after, .petx-hero-icon::before { animation: none; opacity: 0.85; }
+}
 /* Level-up celebration flourish */
 .petx-levelup .petx-cele-tag { background: linear-gradient(90deg,#ffd75e,#ff9a6a); color: #0f0f12; }
 .petx-levelup .pet-stars { margin: 6px 0 10px; justify-content: center; display: flex; }

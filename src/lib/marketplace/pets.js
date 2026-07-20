@@ -20,6 +20,10 @@ const ACHIEVEMENT_PET_RULES = {
     raccoon: (m) => m.tradeCount >= 5,
     flamingo: (m) => m.friends >= 10,
     toucan: (m) => m.bountiesWon >= 3,
+    // Pet-LEVELING achievement pets.
+    spirit_fox: (m) => (m.petLevelsTotal || 0) >= 10,
+    runebound_drake: (m) => (m.petsMaxed || 0) >= 5,
+    radiant_phoenix: (m) => Boolean(m.maxedLegendaryPlus),
 };
 
 // Grant any achievement pets the member has newly qualified for. Best-effort; returns newly-granted ids.

@@ -111,6 +111,10 @@ export const COLLECTIBLES = [
     { id: "raccoon", name: "Raccoon", Icon: GiRaccoonHead, color: "#8794a3", rarity: "epic", source: "achievement", activeStat: "crit_chance", achievement: "Complete 5 trades", spritePrompt: "a clever masked raccoon" },
     { id: "flamingo", name: "Flamingo", Icon: GiFlamingo, color: "#ff5fa2", rarity: "epic", source: "achievement", activeStat: "fortune", achievement: "Make 10 friends", spritePrompt: "an elegant pink flamingo" },
     { id: "toucan", name: "Toucan", Icon: GiToucan, color: "#ff8c42", rarity: "epic", source: "achievement", activeStat: "fortune", achievement: "Fulfill 3 community bounties", spritePrompt: "a bright big-billed toucan" },
+    // Pet-LEVELING achievement pets — earned by leveling your companions (see ACHIEVEMENT_PET_RULES).
+    { id: "spirit_fox", name: "Spirit Fox", Icon: GiSpectre, color: "#8fd3ff", rarity: "legendary", source: "achievement", activeStat: "xp_gain", achievement: "Gain 10 total pet levels", spritePrompt: "a glowing ethereal nine-tailed spirit fox wreathed in soft blue flame" },
+    { id: "runebound_drake", name: "Runebound Drake", Icon: GiDragonHead, color: "#7a9bff", rarity: "mythic", source: "achievement", activeStat: "ferocity", achievement: "Max 5 pets to Lv 5", spritePrompt: "a majestic rune-etched drake crackling with arcane blue energy" },
+    { id: "radiant_phoenix", name: "Radiant Phoenix", Icon: GiDragonSpiral, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "ferocity", achievement: "Max a Legendary-or-higher pet to Lv 5", spritePrompt: "a radiant golden phoenix reborn in brilliant blazing light" },
 
     // ── Rare-chest drops ───────────────────────────────────────────────────────────────────────────
     { id: "tropical_fish", name: "Reef Fish", Icon: GiTropicalFish, color: "#5ad0d0", rarity: "common", source: "chest", chestTier: "wooden", activeStat: "fortune", hint: "A flash of color", spritePrompt: "a bright tropical reef fish" },
