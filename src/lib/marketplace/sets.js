@@ -82,10 +82,13 @@ export function setsForWeakness(key) {
     return key ? ITEM_SETS.filter((s) => s.weakness === key).map((s) => s.name) : [];
 }
 
-// Count equipped pieces per set id from a list of equipped item ids.
+// Count equipped pieces per set id. Accepts either an array of item ids OR the {slot → item_id} object
+// that getEquippedIds() returns (matching signatures.js's `ids()` normalizer) — passing the object bare
+// to `for…of` threw "not iterable", which broke setCombatMult/setCapstoneStrikeBonus in the attack path.
 function equippedCounts(equippedIds) {
+    const list = Array.isArray(equippedIds) ? equippedIds : Object.values(equippedIds || {});
     const counts = new Map();
-    for (const id of equippedIds || []) {
+    for (const id of list) {
         const set = SET_BY_ITEM[id];
         if (set) counts.set(set.id, (counts.get(set.id) || 0) + 1);
     }

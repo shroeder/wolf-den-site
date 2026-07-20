@@ -234,7 +234,7 @@ export async function getBossState(buyerId = null) {
     const members = await db
         .query(
             `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
-                    (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
+                    (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
                     COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
                LEFT JOIN boss_hit h ON h.buyer_id = b.id AND h.boss_id = $1
