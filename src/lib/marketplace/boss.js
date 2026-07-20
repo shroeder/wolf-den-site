@@ -126,14 +126,16 @@ export async function getActiveBoss() {
         .catch(() => null);
 }
 
-// Manual swings used today (auto ticks don't count against the daily limit).
-async function manualAttacksToday(buyerId) {
+// Manual swings used today AGAINST THE CURRENT BOSS (auto ticks don't count against the daily limit).
+// Scoped to bossId so a freshly-spawned boss grants a fresh daily attack even if the pack already killed one
+// earlier the same day — players asked to be able to swing again when a new boss appears.
+async function manualAttacksToday(buyerId, bossId) {
     const row = await db
         .queryOne(
             `SELECT COUNT(*)::int AS n FROM boss_hit
-              WHERE buyer_id = $1 AND kind = 'manual'
+              WHERE buyer_id = $1 AND kind = 'manual' AND boss_id = $2
                 AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date`,
-            [buyerId]
+            [buyerId, bossId]
         )
         .catch(() => null);
     return row?.n || 0;
@@ -302,7 +304,7 @@ export async function getBossState(buyerId = null) {
 
     let you = null;
     if (buyerId) {
-        const used = await manualAttacksToday(buyerId);
+        const used = await manualAttacksToday(buyerId, boss.id);
         const [myStats, myIds, bonusStrikes, boosts] = await Promise.all([
             getEquippedStats(buyerId).catch(() => ({})),
             getEquippedIds(buyerId).catch(() => ({})),
@@ -659,7 +661,7 @@ export async function attackBoss(buyerId) {
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
     const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds) + setCapstoneStrikeBonus(equippedIds) + (await memberBonusStrikes(buyerId).catch(() => 0));
-    const used = await manualAttacksToday(buyerId);
+    const used = await manualAttacksToday(buyerId, boss.id);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
     const me = await db.queryOne(`SELECT xp, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);

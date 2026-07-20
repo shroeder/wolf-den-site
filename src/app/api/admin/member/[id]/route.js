@@ -146,6 +146,20 @@ export async function GET(request, { params }) {
                 pets: {
                     owned: pets?.ownedIds?.length || 0,
                     featured: featuredPet ? { id: featuredPet.id, name: featuredPet.name, rarity: featuredPet.rarity, spriteUrl: petSpriteUrl, spriteFlip: petSpriteFlip } : null,
+                    // Full owned-pet list so the admin can inspect every companion (sprite + rarity + level).
+                    list: (pets?.ownedIds || []).map((pid) => {
+                        const def = collectibleById(pid);
+                        const sp = petSprites[pid];
+                        return {
+                            id: pid,
+                            name: def?.name || pid,
+                            rarity: def?.rarity || null,
+                            source: def?.source || null,
+                            level: pets?.petLevels?.[pid]?.level || 1,
+                            spriteUrl: sp?.url || null,
+                            spriteFlip: sp?.flip || false,
+                        };
+                    }),
                 },
                 chestTiers: CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji })),
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
