@@ -6,6 +6,7 @@ import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { weaknessMult, weaknessInfo } from "@/lib/marketplace/boss-weakness.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById } from "@/lib/marketplace/items.js";
@@ -329,6 +330,7 @@ export async function getBossState(buyerId = null) {
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
             buff: buff ? { label: buff.label, emoji: buff.emoji, damageMult: buff.damageMult, expiresAt: buff.expiresAt } : null,
+            weakness: weaknessInfo(boss.weakness),
             winner,
         },
         roster,
@@ -494,7 +496,7 @@ export async function attackBoss(buyerId) {
     const used = await manualAttacksToday(buyerId);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
-    const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const me = await db.queryOne(`SELECT xp, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const swing = manualHit(lvl(me?.xp), stats, { forceCrit: signatureForcesCrit(equippedIds, used) });
     // Context the conditional/streak/social signatures need + the global admin buff, damage potions, and the
     // server-wide Warbanner aura.
@@ -522,7 +524,13 @@ export async function attackBoss(buyerId) {
     if (pp.chainChance && Math.random() < pp.chainChance) { petMult *= 2; petProc = petProc || "chain"; }
     if (pp.executePct && boss.max_hp && boss.hp <= boss.max_hp * 0.3) { petMult *= 1 + pp.executePct; petProc = petProc || "execute"; }
     if (pp.firstBloodPct && (await hittersToday(boss.id)) < 3) { petMult *= 1 + pp.firstBloodPct; petProc = petProc || "first_blood"; }
-    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult) + (onHit.bonusDamage || 0);
+    // This week's boss WEAKNESS amplifies a specific playstyle (crit / first-strike / finisher / pet / pack / burst).
+    const burstProc = /ERUPT|OVERCHARGE/i.test(sig.proc || "") || petProc === "erupt";
+    const wMult = weaknessMult(boss.weakness, {
+        crit: swing.crit, firstHit: used === 0, bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1,
+        hasPet: Boolean(me?.featured_collectible), hittersToday: todayHitters, burstProc,
+    });
+    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult * wMult) + (onHit.bonusDamage || 0);
     const crit = swing.crit;
     const ability = pickAbility(crit);
 

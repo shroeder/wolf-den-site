@@ -59,6 +59,12 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                         <span className="battle-buff-mult">×{boss.buff.damageMult}</span>
                     </div>
                 ) : null}
+                {boss.weakness ? (
+                    <div className="battle-weakness" title={boss.weakness.desc}>
+                        <span className="battle-buff-emoji">{boss.weakness.emoji}</span>
+                        <span className="battle-buff-label">Weak: {boss.weakness.label}</span>
+                    </div>
+                ) : null}
             </div>
 
             <div className={`battle-boss${hit ? " is-hit" : ""}`}>

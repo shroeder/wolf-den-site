@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
+import { pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { projectBossHp } from "@/lib/marketplace/boss.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { generateImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
@@ -40,9 +41,9 @@ export async function createDraftBoss({ name, description, maxHp, rewardsText, t
     const hp = explicit > 0 ? Math.max(100, Math.floor(explicit)) : (await projectBossHp({})).hp;
     const div = Math.max(1, Math.floor(Number(ticketDivisor) || 100));
     return db.queryOne(
-        `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, rewards_text, ticket_divisor)
-         VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5) RETURNING *`,
-        [String(name || "Boss").slice(0, 80), hp, description ? String(description).slice(0, 600) : null, rewardsText ? String(rewardsText).slice(0, 400) : null, div]
+        `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, rewards_text, ticket_divisor, weakness)
+         VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5, $6) RETURNING *`,
+        [String(name || "Boss").slice(0, 80), hp, description ? String(description).slice(0, 600) : null, rewardsText ? String(rewardsText).slice(0, 400) : null, div, pickWeakness()]
     );
 }
 
