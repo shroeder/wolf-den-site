@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import BossFightClient from "@/components/BossFightClient";
+import HappyHour from "@/components/HappyHour";
 import QuestsClient from "@/components/QuestsClient";
 import ViewPing from "@/components/ViewPing";
 
@@ -18,14 +19,14 @@ export default function BossPage() {
         <div className="stack reveal">
             <ViewPing event="view_boss" />
             <section className="card">
-                <h1 style={{ marginTop: 0 }}>⚔️ Weekly Boss</h1>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    The whole pack chips away at one shared boss all week. Everyone gets <strong>one swing a day</strong> — land
-                    your hit to earn XP and raffle tickets for the giveaway. Its HP is real and shared across all members: drop
-                    in daily and help finish it off.
+                <h1 style={{ marginTop: 0, marginBottom: 4 }}>⚔️ Weekly Boss</h1>
+                <p className="muted" style={{ margin: "0 0 10px", fontSize: "0.82rem" }}>
+                    One shared boss all week · <strong>one swing a day</strong> for XP + raffle tickets. Drop in daily to help finish it.
                 </p>
                 <BossFightClient />
             </section>
+            {/* The community donate/rally widget lives here (boss page only) — compact so it doesn't hog space. */}
+            <HappyHour compact />
             <QuestsClient />
             <section className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <span>🎯 <strong>Need a hand from the pack?</strong> Post a bounty — attach gold, get help in the real world.</span>

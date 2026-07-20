@@ -1,6 +1,7 @@
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import GiftWatcher from "@/components/GiftWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
+import LocationPrompt from "@/components/LocationPrompt";
 import RewardNudge from "@/components/RewardNudge";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -26,6 +27,8 @@ export default function PublicLayout({ children }) {
             <WebPushManager />
             {/* Logs a page_view for every visitor (incl. anonymous) — powers the admin traffic telemetry. */}
             <TrafficBeacon />
+            {/* Asks every visitor for location (once/session) to power "near you" features — not just the map. */}
+            <LocationPrompt />
         </>
     );
 }

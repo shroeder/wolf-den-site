@@ -9746,6 +9746,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .set-capstone.active { color: #ffe9a8; border-color: #ffd75e; }
 /* Happy Hour banner */
 .hh-card { border: 1px solid rgba(255,90,150,0.5); background: linear-gradient(180deg, rgba(255,90,150,0.1), transparent 65%); }
+/* Compact variant — used on the boss page only, where the donate/rally widget lives now (kept off every
+   other marketplace page). Tighter padding + smaller donate row so it stops hogging premium space. */
+.hh-card.hh-compact { padding: 12px 14px; }
+.hh-card.hh-compact .hh-donate { margin-top: 8px; }
+.hh-card.hh-compact .hh-meter { margin-top: 6px; }
 .hh-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .hh-title { font-weight: 900; font-size: 1.05rem; }
 .hh-mult { color: #ff5a9a; font-weight: 900; }

@@ -11,7 +11,7 @@ function fmtLeft(secs) {
 
 // Global banner shown while a Happy Hour is live: the current multiplier, a countdown, a donation meter to
 // the next breakpoint, and a "donate gold to push it higher" control. Self-hides when no event is active.
-export default function HappyHour() {
+export default function HappyHour({ compact = false }) {
     const [st, setSt] = useState(null);
     const [secs, setSecs] = useState(0);
     const [amount, setAmount] = useState("");
@@ -66,7 +66,7 @@ export default function HappyHour() {
         const r = st.rally || { pool: 0, trigger: 15000, remaining: 15000 };
         const rpct = Math.min(100, Math.round((r.pool / r.trigger) * 100));
         return (
-            <section className="card hh-card hh-rally">
+            <section className={`card hh-card hh-rally${compact ? " hh-compact" : ""}`}>
                 <div className="hh-head">
                     <div className="hh-title">🐺 Rally the pack</div>
                     <span className="hh-timer">summons Happy Hour</span>
@@ -74,7 +74,7 @@ export default function HappyHour() {
                 <div className="hh-meter"><span style={{ width: `${rpct}%` }} /></div>
                 <div className="hh-meter-label">🪙 {r.pool.toLocaleString()} / {r.trigger.toLocaleString()} — donate {r.remaining.toLocaleString()} more to <strong>trigger a Happy Hour</strong></div>
                 <div className="hh-donate">
-                    <span className="muted" style={{ fontSize: "0.78rem" }}>Chip in gold to summon a ×XP &amp; gold event for everyone:</span>
+                    {compact ? null : <span className="muted" style={{ fontSize: "0.78rem" }}>Chip in gold to summon a ×XP &amp; gold event for everyone:</span>}
                     {donateRow}
                     {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"}>{msg.text}</span> : null}
                 </div>
@@ -88,7 +88,7 @@ export default function HappyHour() {
     const pct = next ? Math.min(100, Math.round((into / span) * 100)) : 100;
 
     return (
-        <section className="card hh-card">
+        <section className={`card hh-card${compact ? " hh-compact" : ""}`}>
             <div className="hh-head">
                 <div className="hh-title">⏰ Happy Hour <span className="hh-mult">×{st.multiplier} XP &amp; gold</span></div>
                 <span className="hh-timer">{fmtLeft(secs)} left</span>
@@ -102,7 +102,7 @@ export default function HappyHour() {
                 <div className="hh-meter-label">🔥 MAXED at ×{st.multiplier}! The pack went all in.</div>
             )}
             <div className="hh-donate">
-                <span className="muted" style={{ fontSize: "0.78rem" }}>Donate to strengthen it{st.myDonation ? ` · you've given ${st.myDonation.toLocaleString()}` : ""}{st.nextReward ? ` · reward at ${st.nextReward.toLocaleString()}` : ""}:</span>
+                {compact ? null : <span className="muted" style={{ fontSize: "0.78rem" }}>Donate to strengthen it{st.myDonation ? ` · you've given ${st.myDonation.toLocaleString()}` : ""}{st.nextReward ? ` · reward at ${st.nextReward.toLocaleString()}` : ""}:</span>}
                 {donateRow}
                 {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"}>{msg.text}</span> : null}
             </div>

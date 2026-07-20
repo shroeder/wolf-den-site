@@ -73,6 +73,9 @@ export default function BossFightClient() {
             popDamage(res.damage, res.crit);
             setXpFlash(true);
             setTimeout(() => setXpFlash(false), 1400);
+            // Let the site-wide watchers react live: refresh the reward nudge + fire a level-up celebration
+            // the instant this hit tips you over, instead of only on the next page load.
+            if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-xp-updated"));
             const divisor = data.boss.ticketDivisor || 100;
             setData((d) => {
                 const dmg = (d.you?.dmg || 0) + res.damage;
