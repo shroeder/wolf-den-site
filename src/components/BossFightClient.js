@@ -105,16 +105,6 @@ export default function BossFightClient() {
     return (
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
-            {boss.weakness ? (
-                <div className="boss-weakness-tip" style={{ borderColor: `${boss.weakness.color}66` }}>
-                    {boss.weakness.emoji} <strong>Weak to {boss.weakness.label}:</strong> gear with a {boss.weakness.label} affinity hits harder this week.
-                    {you?.element ? (
-                        you.element.matches > 0
-                            ? <> · <strong style={{ color: boss.weakness.color }}>Your {you.element.matches} {boss.weakness.emoji} {you.element.matches === 1 ? "piece" : "pieces"}: +{you.element.bonusPct}% damage.</strong></>
-                            : <> · <a href="/marketplace/inventory" style={{ color: "#8fd8ff" }}>Equip {boss.weakness.emoji} {boss.weakness.label} gear for a bonus →</a></>
-                    ) : null}
-                </div>
-            ) : null}
             {you ? (
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
                     <a href="/marketplace/inventory" style={{ fontWeight: 800, color: "#ffd75e", background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.38)", borderRadius: 999, padding: "3px 14px", fontSize: "0.9rem", textDecoration: "none" }}>💰 {(you.gold || 0).toLocaleString()} gold · shop →</a>
@@ -122,7 +112,7 @@ export default function BossFightClient() {
             ) : null}
 
             <div className="boss-stage-wrap">
-                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} />
+                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} />
                 {burst ? (
                     <div className={`boss-burst${burst.crit ? " is-crit" : ""}`} key={burst.key}>
                         {burst.proc ? <div className="boss-burst-proc">⚡ {burst.proc}!</div> : null}

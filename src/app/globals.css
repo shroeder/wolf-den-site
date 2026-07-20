@@ -9225,10 +9225,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 /* ---- 2D side-scrolling battle stage ---- */
 .battle {
-    position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 480px;
+    position: relative; width: 100%; aspect-ratio: 4 / 3.4; max-height: 620px;
     border-radius: 18px; overflow: hidden; border: 1px solid rgba(224, 68, 40, 0.32);
     background: linear-gradient(160deg, #1c0e0b, #0b0a10);
 }
+/* Roomier on wide screens where a very tall stage would waste space. */
+@media (min-width: 720px) { .battle { aspect-ratio: 16 / 10; } }
 .battle-bg {
     position: absolute; inset: -4% -6%; background-size: cover; background-position: center;
     background-repeat: no-repeat; animation: battle-pan 26s ease-in-out infinite alternate;
@@ -9244,7 +9246,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .battle-hp { font-size: clamp(0.7rem, 2.4vw, 0.85rem); font-weight: 700; color: #ffd0b8; text-shadow: 0 1px 3px #000; }
 .battle-weakness { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 3px 11px; border-radius: 999px;
     background: rgba(120,180,255,0.18); border: 1px solid rgba(120,180,255,0.5); color: #cfe4ff; font-weight: 800;
-    font-size: clamp(0.65rem, 2.4vw, 0.82rem); }
+    font-size: clamp(0.65rem, 2.4vw, 0.82rem); max-width: 92%; }
+.battle-weakness.has-bonus { background: rgba(255,215,94,0.2); border-color: rgba(255,215,94,0.6); color: #ffe9a8; }
 .boss-weakness-tip { text-align: center; margin: 0 auto 8px; max-width: 520px; font-size: 0.82rem; color: #cfe4ff;
     background: rgba(120,180,255,0.1); border: 1px solid rgba(120,180,255,0.35); border-radius: 10px; padding: 6px 12px; }
 .boss-chase-art { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; font-size: 30px; border-radius: 10px; background: rgba(255,255,255,0.06); }

@@ -9,7 +9,7 @@ import { GiSpikedDragonHead } from "react-icons/gi";
 // NO cap on fighters: the whole pack shows up. applyPositions() crowd-packs them so the stage stays
 // readable no matter how many turn out (more fighters → more depth rows + smaller sprites).
 
-export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100 }) {
+export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null }) {
     const party = useMemo(() => {
         const real = fighters.filter((f) => f.spriteUrl);
         const out = [...real];
@@ -60,9 +60,12 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                     </div>
                 ) : null}
                 {boss.weakness ? (
-                    <div className="battle-weakness" title={boss.weakness.desc}>
+                    <div className={`battle-weakness${youElement?.matches > 0 ? " has-bonus" : ""}`} title={boss.weakness.desc}>
                         <span className="battle-buff-emoji">{boss.weakness.emoji}</span>
-                        <span className="battle-buff-label">Weak: {boss.weakness.label}</span>
+                        <span className="battle-buff-label">
+                            Weak: {boss.weakness.label}
+                            {youElement ? (youElement.matches > 0 ? ` · your +${youElement.bonusPct}%` : " · equip it for a bonus") : ""}
+                        </span>
                     </div>
                 ) : null}
             </div>
