@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
-import { activeXpMultiplier } from "@/lib/marketplace/happy-hour.js";
+import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.

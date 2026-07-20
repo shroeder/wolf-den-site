@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getHappyHourState, donateToHappyHour } from "@/lib/marketplace/happy-hour.js";
+import { getHappyHourState } from "@/lib/marketplace/happy-hour-core.js";
+import { donateToHappyHour } from "@/lib/marketplace/happy-hour.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";

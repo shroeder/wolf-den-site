@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { getHappyHourState, startHappyHour, endHappyHour, addToHappyHourPool } from "@/lib/marketplace/happy-hour.js";
+import { getHappyHourState, startHappyHour, endHappyHour, addToHappyHourPool } from "@/lib/marketplace/happy-hour-core.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";

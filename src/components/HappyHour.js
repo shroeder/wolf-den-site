@@ -40,11 +40,48 @@ export default function HappyHour() {
         const r = await fetch("/api/marketplace/happy-hour", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: amt }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
         setBusy(false);
-        if (d?.ok) { setSt(d); setAmount(""); setMsg({ ok: true, text: `Donated ${amt.toLocaleString()}! Now ×${d.multiplier}.` }); }
-        else setMsg({ ok: false, text: d?.error === "not_enough_gold" ? "Not enough gold." : "Couldn't donate." });
+        if (d?.ok) {
+            setSt(d); setAmount("");
+            if (d.triggered) setMsg({ ok: true, text: "🎉 You summoned Happy Hour!" });
+            else if (d.rewards?.length) setMsg({ ok: true, text: `Donation reward: ${d.rewards.join(", ")}!` });
+            else if (d.active) setMsg({ ok: true, text: `Donated ${amt.toLocaleString()}! Now ×${d.multiplier}.` });
+            else setMsg({ ok: true, text: `Donated ${amt.toLocaleString()} to the rally!` });
+            if (d.active) setSecs(d.endsInSecs || secs);
+        } else setMsg({ ok: false, text: d?.error === "not_enough_gold" ? "Not enough gold." : "Couldn't donate." });
     }
 
-    if (!st?.active) return null;
+    if (!st) return null;
+    const gold = st.gold || 0;
+    const donateRow = (
+        <div className="hh-donate-row">
+            <button type="button" className="hh-quick" onClick={() => donate(500)} disabled={busy || gold < 500}>+500</button>
+            <button type="button" className="hh-quick" onClick={() => donate(2000)} disabled={busy || gold < 2000}>+2k</button>
+            <input className="hh-input" inputMode="numeric" placeholder="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} />
+            <button type="button" className="hh-give" onClick={() => donate()} disabled={busy || !Number(amount)}>Donate</button>
+        </div>
+    );
+
+    // No live event → the RALLY meter: donate to summon a Happy Hour.
+    if (!st.active) {
+        const r = st.rally || { pool: 0, trigger: 15000, remaining: 15000 };
+        const rpct = Math.min(100, Math.round((r.pool / r.trigger) * 100));
+        return (
+            <section className="card hh-card hh-rally">
+                <div className="hh-head">
+                    <div className="hh-title">🐺 Rally the pack</div>
+                    <span className="hh-timer">summons Happy Hour</span>
+                </div>
+                <div className="hh-meter"><span style={{ width: `${rpct}%` }} /></div>
+                <div className="hh-meter-label">🪙 {r.pool.toLocaleString()} / {r.trigger.toLocaleString()} — donate {r.remaining.toLocaleString()} more to <strong>trigger a Happy Hour</strong></div>
+                <div className="hh-donate">
+                    <span className="muted" style={{ fontSize: "0.78rem" }}>Chip in gold to summon a ×XP &amp; gold event for everyone:</span>
+                    {donateRow}
+                    {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"}>{msg.text}</span> : null}
+                </div>
+            </section>
+        );
+    }
+
     const next = st.next;
     const span = next ? next.at - next.from : 1;
     const into = next ? Math.max(0, st.pool - next.from) : 1;
@@ -65,13 +102,8 @@ export default function HappyHour() {
                 <div className="hh-meter-label">🔥 MAXED at ×{st.multiplier}! The pack went all in.</div>
             )}
             <div className="hh-donate">
-                <span className="muted" style={{ fontSize: "0.78rem" }}>Donate gold to strengthen it{st.myDonation ? ` · you've given ${st.myDonation.toLocaleString()}` : ""}:</span>
-                <div className="hh-donate-row">
-                    <button type="button" className="hh-quick" onClick={() => donate(500)} disabled={busy || st.gold < 500}>+500</button>
-                    <button type="button" className="hh-quick" onClick={() => donate(2000)} disabled={busy || st.gold < 2000}>+2k</button>
-                    <input className="hh-input" inputMode="numeric" placeholder="amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} />
-                    <button type="button" className="hh-give" onClick={() => donate()} disabled={busy || !Number(amount)}>Donate</button>
-                </div>
+                <span className="muted" style={{ fontSize: "0.78rem" }}>Donate to strengthen it{st.myDonation ? ` · you've given ${st.myDonation.toLocaleString()}` : ""}{st.nextReward ? ` · reward at ${st.nextReward.toLocaleString()}` : ""}:</span>
+                {donateRow}
                 {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"}>{msg.text}</span> : null}
             </div>
         </section>
