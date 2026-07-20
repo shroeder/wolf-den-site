@@ -9019,6 +9019,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .collectible-star { position: absolute; top: 4px; right: 6px; color: #ffd75e; font-size: 0.8rem; line-height: 1; }
 .collectible-icon { font-size: 2.1rem; line-height: 1; display: flex; }
 .collectible-icon svg { width: 1em; height: 1em; }
+/* Pet AI battle sprites (PetArt) drop into the same icon boxes as the react-icons glyphs. Sized by em so
+   they scale with each box's font-size (pet card, hero, avatar badge, featured chip) just like the glyph. */
+.pet-art { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.pet-art-img { width: 1.4em; height: 1.4em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.45)); }
 .collectible-name { font-size: 0.68rem; font-weight: 600; color: #cdbfa6; line-height: 1.2; }
 .collectible.is-locked { opacity: 0.45; }
 .collectible.is-locked .collectible-icon { color: #5b6472; }

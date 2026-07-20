@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import PetArt from "@/components/PetArt";
 import { collectiblesForLevel } from "@/lib/marketplace/collectibles.js";
 import { cosmeticPrice } from "@/lib/marketplace/cosmetic-price.js";
 
@@ -86,7 +87,7 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                             title={c.unlocked ? `${c.name} — ${c.hint}${selectable ? (isFeatured ? " · featured (tap to remove)" : " · tap to feature") : ""}` : c.eliteOnly ? `${c.name} · ${c.hint} — unlocked only by obtaining a top-rarity (${c.rarity}) item` : (forSale ? `${c.name} · buy for ${price.toLocaleString()} gold` : `${c.name} · unlocks at Level ${c.level}`)}
                         >
                             <span className="collectible-icon" style={c.unlocked ? { color: c.color } : undefined}>
-                                <Icon aria-hidden="true" />
+                                {c.unlocked ? <PetArt id={c.id} /> : <Icon aria-hidden="true" />}
                             </span>
                             <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? `💰 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
                             {isFeatured ? <span className="collectible-star" aria-hidden="true">★</span> : null}

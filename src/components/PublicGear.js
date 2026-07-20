@@ -1,28 +1,36 @@
-import ItemArt from "@/components/ItemArt";
-import { EQUIP_SLOTS, STAT_META, itemById } from "@/lib/marketplace/items.js";
+import InspectableGear from "@/components/InspectableGear";
+import { EQUIP_SLOTS, STAT_META, itemById, describeStats } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
+import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
 // Read-only view of a member's equipped loadout + owned items + combat-stat total, for their public
-// profile (so others can see their gear and, later, propose trades). Presentational.
-function ItemChip({ id, equipped = false }) {
-    const def = itemById(id);
-    if (!def) return null;
-    return (
-        <span className={`equip-card rar-${def.rarity}${equipped ? " is-equipped" : ""}`} title={def.name}>
-            <ItemArt id={def.id} icon={def.icon} className="equip-card-glyph" />
-            <span className="equip-card-name">{def.name}</span>
-        </span>
-    );
+// profile. Prepares each item's inspect data (stats/signature/element/flavor) server-side and hands it to
+// the client <InspectableGear> so visitors can tap any piece to inspect it (and trade for un-equipped ones).
+function prep(id, equipped) {
+    const d = itemById(id);
+    if (!d) return null;
+    const sig = signatureFor(id);
+    const el = itemElement(id);
+    return {
+        id, name: d.name, rarity: d.rarity, slot: d.slot, icon: d.icon,
+        statsText: describeStats(d.stats),
+        signature: sig ? { label: sig.label, desc: sig.desc } : null,
+        element: el && ELEMENTS[el] ? { label: ELEMENTS[el].label, emoji: ELEMENTS[el].emoji, color: ELEMENTS[el].color } : null,
+        flavor: d.flavor || null,
+        equipped: Boolean(equipped),
+    };
 }
 
 export default function PublicGear({ inventory, displayLabel = "This member", canTrade = false, targetAlias = null }) {
     const equipped = inventory?.equipped || {};
     const equippedIds = EQUIP_SLOTS.map((s) => equipped[s.slot]).filter(Boolean);
     const items = inventory?.items || [];
-    const nonEquipped = items.filter((i) => !i.equipped);
-    const tradeable = canTrade && targetAlias && nonEquipped.length;
+    if (!equippedIds.length && !items.length) return null;
+
+    const equippedData = equippedIds.map((id) => prep(id, true)).filter(Boolean);
+    const inventoryData = items.filter((i) => !i.equipped).map((i) => prep(i.id, false)).filter(Boolean);
     const stats = inventory?.stats || {};
     const statEntries = Object.entries(stats).filter(([, v]) => v);
-    if (!equippedIds.length && !items.length) return null;
 
     return (
         <section className="card">
@@ -34,33 +42,7 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
                     ))}
                 </div>
             ) : null}
-            {equippedIds.length ? (
-                <>
-                    <p className="muted" style={{ margin: "0 0 6px" }}>Equipped</p>
-                    <div className="equip-bag-grid">{equippedIds.map((id) => <ItemChip key={id} id={id} equipped />)}</div>
-                </>
-            ) : null}
-            {tradeable ? (
-                <>
-                    <p className="muted" style={{ margin: "12px 0 6px" }}>Inventory ({nonEquipped.length}) · tap an item to propose a trade for it</p>
-                    <div className="equip-bag-grid">
-                        {nonEquipped.map((i) => {
-                            return (
-                                <a key={i.id} href={`/marketplace/trade/new?to=${encodeURIComponent(targetAlias)}&want=${encodeURIComponent(i.id)}`} className={`equip-card rar-${i.rarity} is-clickable`} style={{ textDecoration: "none" }} title={`Propose a trade for ${i.name}`}>
-                                    <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
-                                    <span className="equip-card-name">{i.name}</span>
-                                    <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>🤝 Trade</span>
-                                </a>
-                            );
-                        })}
-                    </div>
-                </>
-            ) : items.length ? (
-                <>
-                    <p className="muted" style={{ margin: "12px 0 6px" }}>Inventory ({items.length})</p>
-                    <div className="equip-bag-grid">{items.map((i) => <ItemChip key={i.id} id={i.id} equipped={i.equipped} />)}</div>
-                </>
-            ) : null}
+            <InspectableGear equipped={equippedData} inventory={inventoryData} canTrade={canTrade} targetAlias={targetAlias} />
         </section>
     );
 }

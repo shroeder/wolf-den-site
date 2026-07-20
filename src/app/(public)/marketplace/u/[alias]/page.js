@@ -16,6 +16,7 @@ import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { petsState } from "@/lib/marketplace/pets.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const runtime = "nodejs";
@@ -71,9 +72,10 @@ export default async function UserProfilePage({ params }) {
 
     // Viewer context (for the Add friend / Message actions) + the member's gear to inspect.
     const viewer = await getAuthenticatedBuyer().catch(() => null);
-    const [relation, inventory] = await Promise.all([
+    const [relation, inventory, pets] = await Promise.all([
         viewer ? friendStatus(viewer.id, profile.id).catch(() => "none") : Promise.resolve(null),
         getInventory(profile.id).catch(() => null),
+        petsState(profile.id).catch(() => ({ ownedIds: [] })),
     ]);
     // Telemetry: someone inspected another member's profile.
     if (viewer && viewer.id !== profile.id) after(() => trackActivity(viewer.id, "view_profile", { alias: profile.alias, name: profile.displayLabel }));
@@ -99,8 +101,8 @@ export default async function UserProfilePage({ params }) {
 
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has unlocked by leveling up.</p>
-                <CollectibleGrid level={profile.level?.level || 1} unlockedOnly />
+                <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has collected — from leveling, chests, the boss, and the shop.</p>
+                <CollectibleGrid level={profile.level?.level || 1} owned={pets.ownedIds || []} unlockedOnly />
             </section>
         </div>
     );

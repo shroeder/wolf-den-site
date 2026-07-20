@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
+import PetArt from "@/components/PetArt";
 import { COLLECTIBLES, collectibleById, petPassive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 
@@ -263,7 +264,7 @@ export default function PetsClient() {
                 <div className={`petx-detail-card rarity-${p.rarity}`}>
                     <div className="petx-hero petx-hero-big">
                         <span className="petx-hero-glow" />
-                        <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}>{p.Icon ? <p.Icon /> : "🐾"}</span>
+                        <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}><PetArt id={p.id} /></span>
                     </div>
                     <div className="petx-cele-tag">{p.rarity}</div>
                     <h2 className="petx-title">{p.name}</h2>
@@ -441,7 +442,7 @@ export default function PetsClient() {
                             <button type="button" key={pet.id} onClick={() => openDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
                                 {lvl ? <span className="pet-level-badge"><Stars level={lvl.level} /></span> : null}
-                                <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
+                                <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}><PetArt id={pet.id} /></div>
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
                                 <div className="pet-buffs">
@@ -478,7 +479,7 @@ export default function PetsClient() {
                         <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
                         <div className="petx-hero petx-hero-big">
                             <span className="petx-hero-glow" />
-                            <span className="petx-hero-icon" style={{ color: celebrate.color }}>{celebrate.Icon ? <celebrate.Icon /> : "🐾"}</span>
+                            <span className="petx-hero-icon" style={{ color: celebrate.color }}><PetArt id={celebrate.id} /></span>
                         </div>
                         <div className="petx-cele-tag">New pet!</div>
                         <h2 className="petx-title">{celebrate.name}</h2>
