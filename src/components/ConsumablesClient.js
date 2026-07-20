@@ -17,6 +17,7 @@ export default function ConsumablesClient() {
     const [msg, setMsg] = useState(null);
     const [picking, setPicking] = useState(null); // a stash item awaiting a charged-gear target
     const [petCele, setPetCele] = useState(null); // { petId, petName, level, rarity, maxed } — level-up dopamine
+    const [open, setOpen] = useState(false); // collapsed by default so it doesn't push the page down
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
 
@@ -81,8 +82,12 @@ export default function ConsumablesClient() {
 
     return (
         <section className="card">
-            <h2 style={{ marginTop: 0 }}>🧪 Consumables <span className="equip-gold">{(state.gold || 0).toLocaleString()} gold</span></h2>
-            <p className="muted" style={{ marginTop: 0 }}>One-shot boosts you use yourself. Potions &amp; stones buff the boss fight; scrolls give XP; relics restore charged gear.</p>
+            <button type="button" className="collapse-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+                <span>🧪 Consumables <span className="equip-gold">{(state.gold || 0).toLocaleString()} gold</span>{stash.length ? <span className="collapse-count">{stash.length} in stash</span> : null}</span>
+                <span className="collapse-chevron">{open ? "▾" : "▸"}</span>
+            </button>
+            {!open ? null : (<>
+            <p className="muted" style={{ marginTop: 8 }}>One-shot boosts you use yourself. Potions &amp; stones buff the boss fight; scrolls give XP; relics restore charged gear.</p>
 
             {active.length ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
@@ -157,6 +162,7 @@ export default function ConsumablesClient() {
                 ))}
             </div>
             <p className="muted" style={{ fontSize: "0.8rem", marginBottom: 0 }}>⚗️ Relics (Elixir of Renewal, Sands of Time) can&apos;t be bought — they only drop from the rarest chests.</p>
+            </>)}
             {mounted && petCele ? createPortal((
                 <div className="petfeed-cele" onClick={() => setPetCele(null)}>
                     <div className="petfeed-flash" />

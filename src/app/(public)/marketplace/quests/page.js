@@ -23,7 +23,6 @@ export default async function QuestsPage() {
                 <p className="muted" style={{ marginTop: 0 }}>
                     Three fresh bounties every day — complete them for gold and loot. They reset at midnight.
                 </p>
-                <Link href="/marketplace/boss" className="pill">⚔️ Boss fight</Link>
             </section>
             {buyer ? (
                 <QuestsClient />

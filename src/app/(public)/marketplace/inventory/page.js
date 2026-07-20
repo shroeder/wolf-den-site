@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import ConsumablesClient from "@/components/ConsumablesClient";
 import DailyDeals from "@/components/DailyDeals";
 import EquipmentClient from "@/components/EquipmentClient";
@@ -38,11 +36,13 @@ export default async function InventoryPage() {
             <section className="card">
                 <h1 style={{ marginTop: 0 }}>⚔️ Your Gear</h1>
                 <p className="muted" style={{ marginTop: 0 }}>
-                    Equip items to buff your boss fight. Some gear also carries in-store perks. <Link href="/marketplace/boss" className="pill">⚔️ Boss</Link>
+                    Equip items to buff your boss fight. Some gear also carries in-store perks.
                 </p>
             </section>
 
             <DailyDeals />
+
+            <ConsumablesClient />
 
             <EquipmentClient
                 avatarUrl={profile?.avatarUrl}
@@ -53,7 +53,6 @@ export default async function InventoryPage() {
                 backdropUrl={backdropUrl || null}
             />
 
-            <ConsumablesClient />
         </div>
     );
 }
