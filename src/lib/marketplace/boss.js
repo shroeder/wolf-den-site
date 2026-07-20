@@ -343,6 +343,52 @@ export async function getBossState(buyerId = null) {
     };
 }
 
+// Final recap for a specific (usually ended) boss — powers the "see final stats" page linked from the
+// defeat notifications, since the live boss page has already ROTATED to the next boss by then.
+export async function getBossRecap(bossId, buyerId = null) {
+    const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
+    if (!boss) return null;
+    const divisor = Math.max(1, boss.ticket_divisor || 100);
+    const rows = await db
+        .query(
+            `SELECT b.id, b.display_name, b.alias, b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.xp,
+                    SUM(h.damage)::int AS dmg, COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
+               FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+              WHERE h.boss_id = $1 GROUP BY b.id HAVING SUM(h.damage) > 0 ORDER BY dmg DESC`,
+            [bossId]
+        )
+        .catch(() => []);
+    const totalDamage = rows.reduce((s, r) => s + (r.dmg || 0), 0);
+    const leaderboard = rows.slice(0, 15).map((r, i) => ({
+        rank: i + 1,
+        name: r.display_name || r.alias || "Member",
+        alias: r.alias || null,
+        avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || DEFAULT_AVATAR_URL,
+        level: lvl(r.xp),
+        dmg: r.dmg,
+        tickets: Math.floor(r.dmg / divisor),
+        you: Boolean(buyerId && r.id === buyerId),
+    }));
+    let winner = null;
+    if (boss.winner_buyer_id) {
+        const w = await db.queryOne(`SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics FROM mkt_buyer WHERE id = $1`, [boss.winner_buyer_id]).catch(() => null);
+        if (w) winner = { name: w.display_name || w.alias || "Member", avatarUrl: avatarImageUrl(w.avatar_config, w.avatar_cosmetics) || w.avatar_url || DEFAULT_AVATAR_URL, tickets: boss.winner_tickets || 0, you: Boolean(buyerId && buyerId === boss.winner_buyer_id) };
+    }
+    let mine = null;
+    if (buyerId) {
+        const idx = rows.findIndex((r) => r.id === buyerId);
+        if (idx >= 0) { const r = rows[idx]; mine = { rank: idx + 1, dmg: r.dmg, tickets: Math.floor(r.dmg / divisor), hits: r.hits }; }
+    }
+    return {
+        boss: { id: boss.id, name: boss.name, imageUrl: boss.image_url || null, maxHp: boss.max_hp, defeatedAt: boss.defeated_at, weakness: weaknessInfo(boss.weakness), prize: boss.prize_name ? { name: boss.prize_name, imageUrl: boss.prize_image_url || null } : null },
+        totalDamage,
+        fighters: rows.length,
+        leaderboard,
+        winner,
+        mine,
+    };
+}
+
 // The viewer's current-boss tickets/damage for other surfaces (e.g. the profile). Null if no active boss.
 export async function getMyBossSummary(buyerId) {
     if (!buyerId) return null;
@@ -460,7 +506,7 @@ async function finalizeBossKill(bossId) {
         if (!bits.length) bits.push(`The whole pack took down ${boss.name}! See the final stats →`);
         const title = isRaffle && boss.prize_name ? "🎟️ You won the raffle!" : isTop ? "🥇 You topped the boss!" : chestTier ? "🎁 Boss loot!" : "☠️ Boss slain!";
         const icon = isRaffle && boss.prize_name ? "🎟️" : isTop ? "🥇" : chestTier ? "🎁" : "🏆";
-        await recordGift(p.id, { kind: "boss", title, body: bits.join(" "), icon, url: "/marketplace/boss" }).catch(() => {});
+        await recordGift(p.id, { kind: "boss", title, body: bits.join(" "), icon, url: `/marketplace/boss/recap/${bossId}` }).catch(() => {});
     }
 
     // Headline the announcement with the prize (raffle) winner if there was one, else the damage champion.

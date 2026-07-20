@@ -9394,6 +9394,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-ticket-tix small { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #cdbfa6; }
 .boss2-victory-overlay { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.72); }
 
+/* Boss RECAP page — final battle stats for a defeated boss (linked from the defeat notifications). */
+.boss-recap-hero { text-align: center; background: radial-gradient(120% 120% at 50% 0%, rgba(255,90,90,0.14), transparent 60%); }
+.boss-recap-slain { display: inline-block; font-weight: 900; letter-spacing: 0.12em; font-size: 0.8rem; color: #ff8a8a; border: 1px solid rgba(255,90,90,0.5); border-radius: 999px; padding: 2px 12px; }
+.boss-recap-img { width: min(220px, 60%); border-radius: 14px; margin: 12px auto 0; display: block; filter: grayscale(0.35) brightness(0.8); }
+.boss-recap-stats { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; margin-top: 14px; }
+.boss-recap-stats > div { display: flex; flex-direction: column; }
+.brs-num { font-size: 1.3rem; font-weight: 900; color: #ffd75e; }
+.brs-lbl { font-size: 0.72rem; color: #9aa0a6; text-transform: uppercase; letter-spacing: 0.04em; }
+.boss-recap-winner { border-color: rgba(255,215,94,0.45); }
+.brw-row { display: flex; align-items: center; gap: 12px; }
+.brw-av { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid #ffd75e; }
+.brw-name { font-weight: 900; font-size: 1.05rem; }
+.boss-recap-claim { color: #7ad07a; font-weight: 800; margin: 8px 0 0; }
+.boss-recap-mine { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.95rem; }
+.boss-recap-lb { display: flex; flex-direction: column; gap: 4px; }
+.brlb-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; }
+.brlb-row.is-you { background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
+.brlb-rank { width: 30px; text-align: center; font-weight: 800; flex-shrink: 0; }
+.brlb-av { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.brlb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 0.9rem; }
+.brlb-dmg { font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+
 /* Coin-shower juice when a member sells gear. */
 .coinfx { position: fixed; inset: 0; z-index: 1500; pointer-events: none; display: flex; align-items: center; justify-content: center; }
 .coinfx-amount { font-size: clamp(1.7rem, 7vw, 2.7rem); font-weight: 900; color: #ffd75e; text-shadow: 0 2px 10px rgba(0,0,0,0.75), 0 0 24px rgba(255,215,94,0.6); animation: coinfx-amount 1.25s cubic-bezier(0.2, 0.9, 0.2, 1) forwards; }

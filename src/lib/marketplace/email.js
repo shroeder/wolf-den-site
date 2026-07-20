@@ -128,12 +128,13 @@ export async function sendBadgeAwardedEmail(email, { label, icon = "", descripti
 }
 
 // Sent to every member when the weekly boss is slain. Winners get the "come claim your prize" version.
-export async function sendBossDefeatedEmail(email, { bossName, winnerLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
+export async function sendBossDefeatedEmail(email, { bossId = "", bossName, winnerLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
     if (!email) return false;
     if (!process.env.RESEND_API_KEY) return false;
     const resend = getResendClient();
     const hi = name ? `Hey ${name},` : "Hey there,";
-    const bossUrl = `${baseUrl()}/marketplace/boss`;
+    // Link to the final RECAP for this specific boss (the live boss page has already rotated to the next one).
+    const bossUrl = bossId ? `${baseUrl()}/marketplace/boss/recap/${bossId}` : `${baseUrl()}/marketplace/boss`;
     // Physical-prize terms — shown to the winner so expectations are clear (no shipping, held 1 week).
     const prizeDisclaimer = prizeName
         ? `<p style="font-size:12px;line-height:1.5;color:#8a8a8a;border-top:1px solid #eee;margin-top:16px;padding-top:12px;">

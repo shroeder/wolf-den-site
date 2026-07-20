@@ -30,13 +30,14 @@ export async function broadcastBossDefeated(boss, winner) {
             : `The pack brought down ${boss.name}! See the final stats →`;
 
     await postDiscordDefeated(boss, winnerLabel).catch(() => {});
-    await broadcastWebPush({ title, body, url: "/marketplace/boss", tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
+    await broadcastWebPush({ title, body, url: `/marketplace/boss/recap/${boss.id}`, tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
     await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss_defeated" } }).catch(() => {});
 
     // Email every member (winner gets the "come claim" version).
     const members = await db.query(`SELECT id, email, display_name FROM mkt_buyer WHERE email IS NOT NULL AND email_verified = TRUE`).catch(() => []);
     for (const m of members) {
         await sendBossDefeatedEmail(m.email, {
+            bossId: boss.id,
             bossName: boss.name,
             winnerLabel,
             prizeName: prize,
@@ -53,7 +54,7 @@ async function postDiscordDefeated(boss, winnerLabel) {
     const embed = {
         title: `☠️ ${boss.name} defeated!`,
         description: `The whole pack brought it down.${winnerLabel ? `\n\n🎟️ **Raffle winner:** ${winnerLabel}` : ""}${boss.prize_name ? `\n🏆 **Prize:** ${boss.prize_name}` : ""}\n\nSee the final battle stats →`,
-        url: new URL("/marketplace/boss", SITE_URL).toString(),
+        url: new URL(`/marketplace/boss/recap/${boss.id}`, SITE_URL).toString(),
         color: 0xffcf40,
         image: boss.image_url ? { url: boss.image_url } : undefined,
         thumbnail: boss.prize_image_url ? { url: boss.prize_image_url } : undefined,
