@@ -41,6 +41,45 @@ const SOURCE_LABEL = {
     chest: "🎁 Chest drop", boss: "⚔️ Boss drop", elite: "🌟 Elite",
 };
 
+// A 1–5 star meter for a pet's level (filled = reached).
+function Stars({ level = 1, max = 5, className = "" }) {
+    return (
+        <span className={`pet-stars ${className}`} role="img" aria-label={`Level ${level} of ${max}`}>
+            {Array.from({ length: max }, (_, i) => (
+                <span key={i} className={i < level ? "on" : "off"}>★</span>
+            ))}
+        </span>
+    );
+}
+
+// A short, self-contained "level up!" chime via the Web Audio API (no asset — CSP-safe). Best-effort;
+// browsers may block audio without a prior user gesture (e.g. on page load), which is fine.
+function playLevelUpChime() {
+    try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const now = ctx.currentTime;
+        // A bright rising arpeggio (C5–E5–G5–C6) — a classic "reward" flourish.
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.value = freq;
+            const t = now + i * 0.09;
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.3);
+        });
+        setTimeout(() => ctx.close().catch(() => {}), 1200);
+    } catch {
+        /* audio unavailable — no-op */
+    }
+}
+
 // The dedicated Pets page: every pet, clearly owned vs. locked, with how to unlock each, its passive (owned)
 // and active (equipped) buffs, and equip / buy actions.
 export default function PetsClient() {
@@ -49,11 +88,35 @@ export default function PetsClient() {
     const [busy, setBusy] = useState(null);
     const [err, setErr] = useState(null);
     const [justEquipped, setJustEquipped] = useState(null);
+    const [levelUp, setLevelUp] = useState(null); // { pet, to } — a pet that leveled up since last visit
+
+    // Detect pets that gained a level since the member last looked (covers levels earned while away via the
+    // XP-share/trickle) → fire a dopamine celebration + chime. Seen levels are remembered per pet locally.
+    function detectLevelUps(d) {
+        if (!d?.petLevels || typeof window === "undefined") return;
+        let seen = {};
+        try { seen = JSON.parse(localStorage.getItem("wd_pet_levels_seen") || "{}"); } catch { seen = {}; }
+        const gained = [];
+        const now = {};
+        for (const [pid, info] of Object.entries(d.petLevels)) {
+            now[pid] = info.level;
+            const prev = Number.isFinite(seen[pid]) ? seen[pid] : 1;
+            if (info.level > prev) gained.push({ petId: pid, to: info.level });
+        }
+        try { localStorage.setItem("wd_pet_levels_seen", JSON.stringify(now)); } catch { /* ignore */ }
+        if (gained.length) {
+            const top = gained.sort((a, b) => b.to - a.to)[0];
+            const pet = collectibleById(top.petId);
+            if (pet) { setLevelUp({ pet, to: top.to }); playLevelUpChime(); }
+        }
+    }
 
     async function load() {
         const r = await fetch("/api/marketplace/pets", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
-        if (d) setState(d);
+        if (!d) return;
+        detectLevelUps(d);
+        setState(d);
     }
     useEffect(() => { load(); }, []);
 
@@ -206,7 +269,7 @@ export default function PetsClient() {
                         return (
                             <button type="button" key={pet.id} onClick={() => setDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
-                                {lvl ? <span className="pet-level-badge">Lv {lvl.level}</span> : null}
+                                {lvl ? <span className="pet-level-badge"><Stars level={lvl.level} /></span> : null}
                                 <div className="pet-icon" style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
@@ -271,6 +334,27 @@ export default function PetsClient() {
                     </div>
                 </div>, document.body) : null}
 
+            {/* Level-up celebration — fires when a pet gained a level since the member last looked. */}
+            {mounted && levelUp ? createPortal(
+                <div className="petx-overlay petx-celebrate" onClick={() => setLevelUp(null)}>
+                    <div className={`petx-cele petx-levelup rarity-${levelUp.pet.rarity}`} onClick={(e) => e.stopPropagation()}>
+                        <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 16 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
+                        <div className="petx-hero petx-hero-big">
+                            <span className="petx-hero-glow" />
+                            <span className="petx-hero-icon" style={{ color: levelUp.pet.color }}>{levelUp.pet.Icon ? <levelUp.pet.Icon /> : "🐾"}</span>
+                        </div>
+                        <div className="petx-cele-tag">⬆️ Level up!</div>
+                        <h2 className="petx-title">{levelUp.pet.name} reached Lv {levelUp.to}</h2>
+                        <Stars level={levelUp.to} className="lg" />
+                        {(() => {
+                            const info = state?.petLevels?.[levelUp.pet.id];
+                            if (!info) return null;
+                            return <p className="petx-sub">Passive now <strong>+{info.value} {statText({ stat: info.stat })}</strong>{levelUp.to >= 5 ? " — MAX level! 🏆" : ""}</p>;
+                        })()}
+                        <button type="button" className="btn-gold" onClick={() => setLevelUp(null)}>Nice!</button>
+                    </div>
+                </div>, document.body) : null}
+
             {/* Pet detail modal — full display + abilities + actions (equip / buy / give). */}
             {mounted && detail ? (() => {
                 const p = detail;
@@ -298,11 +382,20 @@ export default function PetsClient() {
                             {lvl ? (
                                 <div className="petx-level">
                                     <div className="petx-level-head">
-                                        <strong>Level {lvl.level}<span className="muted"> / 5</span></strong>
+                                        <span><Stars level={lvl.level} className="lg" /> <strong className="muted" style={{ fontSize: "0.8rem" }}>Lv {lvl.level}/5</strong></span>
                                         <span className="muted">{lvl.maxed ? "MAX" : `${lvl.into} / ${lvl.span} XP`}</span>
                                     </div>
                                     <div className="petx-level-bar"><span style={{ width: `${pct}%` }} /></div>
-                                    <div className="muted" style={{ fontSize: "0.78rem", marginTop: 4 }}>
+                                    {/* Every star's bonus, so it's clear what each level is worth. */}
+                                    <div className="petx-tiers">
+                                        {[1, 2, 3, 4, 5].map((n) => (
+                                            <div key={n} className={`petx-tier${n === lvl.level ? " is-current" : ""}${n < lvl.level ? " is-done" : ""}${n > lvl.level ? " is-locked" : ""}`}>
+                                                <span className="petx-tier-stars">{"★".repeat(n)}</span>
+                                                <span className="petx-tier-val">+{lvl.base * n} {statText(passive)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="muted" style={{ fontSize: "0.78rem", marginTop: 6 }}>
                                         {isFeatured
                                             ? "Equipped — earns 25% of your XP + a little over time."
                                             : "Equip this pet to level it up (25% of your XP + a trickle over time)."}
