@@ -12,7 +12,7 @@ import { itemById } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
-import { signatureStrikeBonus, signatureForcesCrit, signatureHit } from "@/lib/marketplace/signatures.js";
+import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem } from "@/lib/marketplace/signatures.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
@@ -140,6 +140,37 @@ async function hittersToday(bossId) {
         )
         .catch(() => null);
     return row?.n || 0;
+}
+
+// Consecutive days (ending today or yesterday) this member landed a manual boss hit — powers Bloodlust gear.
+async function attackStreakDays(buyerId) {
+    const rows = await db
+        .query(
+            `SELECT DISTINCT (created_at AT TIME ZONE 'America/Chicago')::date AS d
+               FROM boss_hit WHERE buyer_id = $1 AND kind = 'manual'
+               ORDER BY d DESC LIMIT 90`,
+            [buyerId]
+        )
+        .catch(() => []);
+    if (!rows.length) return 0;
+    const today = new Date(new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago" }));
+    const days = rows.map((r) => new Date(r.d).toISOString().slice(0, 10));
+    let streak = 0;
+    const cursor = new Date(today);
+    // Allow the chain to start today OR yesterday (so a not-yet-attacked-today streak still counts).
+    const has = (dt) => days.includes(dt.toISOString().slice(0, 10));
+    if (!has(cursor)) cursor.setDate(cursor.getDate() - 1);
+    while (has(cursor)) { streak += 1; cursor.setDate(cursor.getDate() - 1); }
+    return streak;
+}
+
+// Global WARBANNER aura: sum the warbanner bonus of every currently-equipped banner across the whole pack
+// (multiple bearers stack), capped so it's a rally, not a runaway. Returns a damage multiplier ≥ 1.
+async function packWarbannerAura() {
+    const rows = await db.query(`SELECT item_id, COUNT(*)::int AS n FROM mkt_user_equipment GROUP BY item_id`).catch(() => []);
+    let aura = 0;
+    for (const r of rows) aura += warbannerBonusForItem(r.item_id) * (Number(r.n) || 0);
+    return 1 + Math.min(0.2, aura); // hard cap +20%
 }
 
 // Full state for the boss screen: boss HP, contributors (with sprites + tickets), the pack of fighters,
@@ -447,13 +478,15 @@ export async function attackBoss(buyerId) {
         getPetCombatBonus(buyerId).catch(() => ({ stats: {}, proc: {} })),
     ]);
     // Merge pet bonuses into the strike stats. Pet Ferocity adds to strike power (Might) rather than 24/7
-    // auto-damage, so a companion's power is felt on your daily hit.
+    // auto-damage, so a companion's power is felt on your daily hit. A Beastbond signature amplifies the
+    // pet's contribution to the strike.
+    const bb = beastbondMult(equippedIds);
     const ps = petBonus?.stats || {};
     const stats = {
         ...gearStats,
-        might: (gearStats.might || 0) + (ps.might || 0) + (ps.ferocity || 0),
-        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0),
-        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0),
+        might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb,
+        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb,
+        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb,
         extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0),
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
@@ -463,9 +496,22 @@ export async function attackBoss(buyerId) {
 
     const me = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const swing = manualHit(lvl(me?.xp), stats, { forceCrit: signatureForcesCrit(equippedIds, used) });
-    // Global admin buff × the member's own active damage potions.
-    const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1));
-    const sig = signatureHit(equippedIds, { hitIndex: used, crit: swing.crit });
+    // Context the conditional/streak/social signatures need + the global admin buff, damage potions, and the
+    // server-wide Warbanner aura.
+    const [streakDays, todayHitters, warAura] = await Promise.all([
+        attackStreakDays(buyerId).catch(() => 0),
+        hittersToday(boss.id).catch(() => 1),
+        packWarbannerAura().catch(() => 1),
+    ]);
+    const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1)) * warAura;
+    const divisor = boss.ticket_divisor || 100;
+    const sig = signatureHit(equippedIds, {
+        hitIndex: used, crit: swing.crit,
+        bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1, bossMaxHp: boss.max_hp || 0,
+        streakDays, hittersToday: todayHitters,
+    });
+    // Non-damage signature rewards: Scholar XP, Prospector gold, Lucky-Strike bonus tickets (as bonus damage).
+    const onHit = signatureOnHit(equippedIds, { crit: swing.crit, divisor });
     // Equipped-pet procs — the "cool mechanics": first-hit burst, erupt, chain (strike twice), execute
     // (big damage on a low-HP boss), and first-blood (bonus for hitting early).
     const pp = petBonus?.proc || {};
@@ -476,7 +522,7 @@ export async function attackBoss(buyerId) {
     if (pp.chainChance && Math.random() < pp.chainChance) { petMult *= 2; petProc = petProc || "chain"; }
     if (pp.executePct && boss.max_hp && boss.hp <= boss.max_hp * 0.3) { petMult *= 1 + pp.executePct; petProc = petProc || "execute"; }
     if (pp.firstBloodPct && (await hittersToday(boss.id)) < 3) { petMult *= 1 + pp.firstBloodPct; petProc = petProc || "first_blood"; }
-    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult);
+    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult) + (onHit.bonusDamage || 0);
     const crit = swing.crit;
     const ability = pickAbility(crit);
 
@@ -485,6 +531,9 @@ export async function attackBoss(buyerId) {
 
     const hit = await db.queryOne(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'manual') RETURNING id`, [boss.id, buyerId, damage]);
     await awardXp(buyerId, "boss_attack", { dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${Date.now()}`}` }).catch(() => {});
+    // Signature rewards: Scholar XP + Prospector gold on this hit.
+    if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
+    if (onHit.gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, onHit.gold]).catch(() => {});
 
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});
