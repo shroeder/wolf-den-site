@@ -9783,8 +9783,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .spin-legend-emoji { font-size: 0.95rem; flex: 0 0 auto; }
 .spin-legend-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spin-legend-odds { color: #8a9099; font-weight: 700; font-size: 0.7rem; flex: 0 0 auto; }
+/* Jackpot + mini span the full width so their (longer) prize labels are legible and stand out. */
+.spin-legend-item.tier-jackpot, .spin-legend-item.tier-mini { grid-column: 1 / -1; padding: 6px 10px; }
 .spin-legend-item.tier-jackpot { border-color: rgba(255,215,94,0.55); background: rgba(255,215,94,0.1); }
 .spin-legend-item.tier-jackpot .spin-legend-label { color: #ffd75e; font-weight: 800; }
+.spin-legend-item.tier-jackpot .spin-legend-emoji { font-size: 1.15rem; }
 .spin-legend-item.tier-mini { border-color: rgba(201,155,255,0.5); background: rgba(176,97,255,0.1); }
 .spin-legend-item.tier-mini .spin-legend-label { color: #c99bff; font-weight: 800; }
 .spin-legend-item.tier-rare { border-color: rgba(92,224,192,0.35); }
