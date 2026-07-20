@@ -20,47 +20,58 @@ const PITY = 20; // guaranteed rare within this many spins
 const COUPON_PCT = 50;
 const COUPON_MAX = 4000;
 
+// Every wheel is 12 segments and carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a
+// rare thrill (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side.
 const WHEELS = [
     {
         id: "bronze", name: "Bronze Wheel", minLevel: 1,
         prizes: [
             { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
-            { label: "Pet Treat", emoji: "🦴", weight: 18, kind: "treat", treat: "treat_bone" },
-            { label: "200 XP", emoji: "⭐", weight: 16, kind: "xp", amount: 200 },
-            { label: "250 gold", emoji: "💰", weight: 14, kind: "gold", amount: 250 },
+            { label: "200 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 200 },
+            { label: "Pet Treat", emoji: "🦴", weight: 16, kind: "treat", treat: "treat_bone" },
+            { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
-            { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, kind: "chest", tier: "wooden" },
-            { label: "500 gold", emoji: "🤑", weight: 4, rare: true, kind: "gold", amount: 500 },
-            { label: "50% Coupon", emoji: "🎫", weight: 2, rare: true, kind: "coupon" },
+            { label: "500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 500 },
+            { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            { label: "500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 500 },
+            { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
+            { label: "MINI JACKPOT", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 1500 },
+            { label: "Random Pet", emoji: "🐾", weight: 2, rare: true, tier: "rare", kind: "pet" },
+            { label: "JACKPOT", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 5000 },
         ],
     },
     {
         id: "silver", name: "Silver Wheel", minLevel: 20,
         prizes: [
             { label: "250 gold", emoji: "🪙", weight: 26, kind: "gold", amount: 250 },
-            { label: "Hearty Snack", emoji: "🍖", weight: 16, kind: "treat", treat: "treat_snack" },
-            { label: "500 XP", emoji: "⭐", weight: 14, kind: "xp", amount: 500 },
-            { label: "500 gold", emoji: "💰", weight: 14, kind: "gold", amount: 500 },
+            { label: "500 XP", emoji: "⭐", weight: 16, kind: "xp", amount: 500 },
+            { label: "Hearty Snack", emoji: "🍖", weight: 14, kind: "treat", treat: "treat_snack" },
+            { label: "500 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 500 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
-            { label: "Iron Chest", emoji: "⚙️", weight: 8, rare: true, kind: "chest", tier: "iron" },
-            { label: "1,000 gold", emoji: "🤑", weight: 6, rare: true, kind: "gold", amount: 1000 },
-            { label: "Random Pet", emoji: "🐾", weight: 3, rare: true, kind: "pet" },
-            { label: "50% Coupon", emoji: "🎫", weight: 3, rare: true, kind: "coupon" },
+            { label: "1,000 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 1000 },
+            { label: "Iron Chest", emoji: "⚙️", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "iron" },
+            { label: "1,000 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1000 },
+            { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
+            { label: "MINI JACKPOT", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 3000 },
+            { label: "Random Pet", emoji: "🐾", weight: 2, rare: true, tier: "rare", kind: "pet" },
+            { label: "JACKPOT", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 10000 },
         ],
     },
     {
         id: "gold", name: "Gold Wheel", minLevel: 50,
         prizes: [
             { label: "500 gold", emoji: "🪙", weight: 24, kind: "gold", amount: 500 },
+            { label: "1,000 XP", emoji: "⭐", weight: 14, kind: "xp", amount: 1000 },
             { label: "Chew Toy", emoji: "🧸", weight: 12, kind: "treat", treat: "treat_toy" },
-            { label: "1,000 XP", emoji: "⭐", weight: 12, kind: "xp", amount: 1000 },
-            { label: "1,000 gold", emoji: "💰", weight: 14, kind: "gold", amount: 1000 },
+            { label: "1,000 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 1000 },
             { label: "+2 Spins", emoji: "🎟️", weight: 10, kind: "token", n: 2 },
-            { label: "Gold Chest", emoji: "🟨", weight: 8, rare: true, kind: "chest", tier: "gold" },
-            { label: "2,500 gold", emoji: "🤑", weight: 6, rare: true, kind: "gold", amount: 2500 },
-            { label: "Random Pet", emoji: "🐾", weight: 4, rare: true, kind: "pet" },
-            { label: "🎰 JACKPOT", emoji: "💎", weight: 2, rare: true, kind: "jackpot", amount: 5000 },
-            { label: "50% Coupon", emoji: "🎫", weight: 4, rare: true, kind: "coupon" },
+            { label: "2,500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 2500 },
+            { label: "Gold Chest", emoji: "🧰", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
+            { label: "2,500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 2500 },
+            { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
+            { label: "MINI JACKPOT", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 6000 },
+            { label: "Random Pet", emoji: "🐾", weight: 3, rare: true, tier: "rare", kind: "pet" },
+            { label: "JACKPOT", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 20000 },
         ],
     },
 ];
@@ -88,14 +99,15 @@ async function grantPrize(buyerId, prize) {
         const amt = Math.round(prize.amount * (prize.kind === "gold" ? hh : 1)); // jackpot is already huge; don't HH-stack it
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
         if (prize.kind === "jackpot") await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
-        return { emoji: prize.emoji, text: `${amt.toLocaleString()} gold${prize.kind === "jackpot" ? " — JACKPOT! 💎" : ""}` };
+        const tag = prize.kind === "jackpot" ? " — JACKPOT! 💎" : prize.mini ? " — MINI JACKPOT! 🎰" : "";
+        return { emoji: prize.emoji, text: `${amt.toLocaleString()} gold${tag}` };
     }
     if (prize.kind === "xp") {
         await awardXp(buyerId, "spin_reward", { points: prize.amount }).catch(() => {});
         return { emoji: prize.emoji, text: `${prize.amount.toLocaleString()} XP` };
     }
     if (prize.kind === "treat") { await grantConsumable(buyerId, prize.treat, 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
-    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tier]: 1 }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
     if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% shop coupon` }; }
     if (prize.kind === "token") { await grantSpinTokens(buyerId, prize.n || 1); return { emoji: prize.emoji, text: `+${prize.n || 1} spin` }; }
     if (prize.kind === "pet") {
@@ -135,7 +147,10 @@ export async function getSpinState(buyerId) {
         spinCount: row?.spin_count || 0,
         freeAvailable,
         tokenCost: SPIN_TOKEN_COST,
-        wheel: { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare) })) },
+        wheel: (() => {
+            const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
+            return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
+        })(),
         nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
         canSpin: freeAvailable || (row?.tokens || 0) > 0,
     };
@@ -165,7 +180,8 @@ export async function doSpin(buyerId) {
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
-    return { ok: true, prizeIndex: idx, prize: display, ...(await getSpinState(buyerId)) };
+    const prizeOut = { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal"), jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare) };
+    return { ok: true, prizeIndex: idx, prize: prizeOut, ...(await getSpinState(buyerId)) };
 }
 
 // Buy one extra spin token with gold.

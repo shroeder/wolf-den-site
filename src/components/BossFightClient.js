@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import BossBattleScene from "@/components/BossBattleScene";
-import { itemIcon } from "@/lib/marketplace/items.js";
+import ItemArt from "@/components/ItemArt";
 
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
@@ -200,7 +200,7 @@ export default function BossFightClient() {
                                 <div style={{ fontWeight: 800, fontSize: "0.95rem" }}><span style={{ color: RARITY_TXT[boss.chaseItem.rarity] || "#fff" }}>{boss.chaseItem.name}</span> <span className="muted" style={{ fontWeight: 700 }}>· in-game gear</span></div>
                                 <div className="muted" style={{ fontSize: "0.76rem" }}>The top damage dealer earns it.</div>
                             </div>
-                            {(() => { const Gi = itemIcon(boss.chaseItem.icon); return <span style={{ width: 42, height: 42, display: "grid", placeItems: "center", fontSize: 30, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: RARITY_TXT[boss.chaseItem.rarity] || "#fff", flexShrink: 0 }}><Gi aria-hidden="true" /></span>; })()}
+                            <ItemArt id={boss.chaseItem.id} icon={boss.chaseItem.icon} className="boss-chase-art" />
                         </div>
                     ) : null}
                     {/* Everyone — chest chance + XP */}

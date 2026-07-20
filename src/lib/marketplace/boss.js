@@ -328,7 +328,7 @@ export async function getBossState(buyerId = null) {
             backgroundUrl: boss.background_url || null,
             rewards: boss.rewards_text || null,
             prize: boss.prize_name ? { name: boss.prize_name, imageUrl: boss.prize_image_url || null } : null,
-            chaseItem: (boss.chase_item_id && itemById(boss.chase_item_id)) ? { name: itemById(boss.chase_item_id).name, rarity: itemById(boss.chase_item_id).rarity, icon: itemById(boss.chase_item_id).icon } : null,
+            chaseItem: (boss.chase_item_id && itemById(boss.chase_item_id)) ? { id: boss.chase_item_id, name: itemById(boss.chase_item_id).name, rarity: itemById(boss.chase_item_id).rarity, icon: itemById(boss.chase_item_id).icon } : null,
             ticketDivisor: divisor,
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
