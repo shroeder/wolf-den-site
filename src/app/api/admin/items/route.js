@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_ORDER, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { ITEMS, describeStats } from "@/lib/marketplace/items.js";
+import { COLLECTIBLES, collectibleById } from "@/lib/marketplace/collectibles.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { sendBuyerPush } from "@/lib/push/send.js";
@@ -46,7 +47,11 @@ export async function GET(request) {
                 };
             });
             const chestTiers = CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji }));
-            return noStore({ items, chestTiers });
+            // Pet catalog for the per-member "grant a pet" picker (sorted worst → best by unlock level).
+            const pets = [...COLLECTIBLES]
+                .sort((a, b) => (a.level || 0) - (b.level || 0))
+                .map((p) => ({ id: p.id, name: p.name, rarity: p.rarity, level: p.level || null }));
+            return noStore({ items, chestTiers, pets });
         } catch (error) {
             return internalError(error, { event: "admin.items.list.failure" });
         }
@@ -81,6 +86,19 @@ export async function POST(request) {
                 await recordGift(buyerId, { kind: "gold", title: "💰 You got gold!", body: `${amt.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "💰" });
                 after(() => giftNotify(buyerId, "💰 A gift from The Wolf Den!", `${amt.toLocaleString()} gold just landed in your purse — spend it in the gear shop! ✨`, "gift-gold", { type: "gift_gold", amount: amt }));
                 return noStore({ ok: true, kind: "gold", amount: amt });
+            }
+            // Grant a specific pet (unlock it for this member, like buying/earning one).
+            if (body?.petId) {
+                const pet = collectibleById(String(body.petId));
+                if (!pet) return noStore({ error: "unknown_pet" }, { status: 400 });
+                const existing = await db
+                    .queryOne(`SELECT 1 FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND ref = $2`, [buyerId, pet.id])
+                    .catch(() => null);
+                if (existing) return noStore({ ok: true, kind: "pet", petId: pet.id, name: pet.name, alreadyOwned: true });
+                await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, pet.id]).catch(() => {});
+                await recordGift(buyerId, { kind: "pet", title: "🐾 You got a pet!", body: `${pet.name} joined your pack — equip it from your Pets!`, icon: "🐾", rarity: pet.rarity });
+                after(() => giftNotify(buyerId, "🐾 A gift from The Wolf Den!", `${pet.name} just joined your pack — tap to make it your companion! ✨`, "gift-pet", { type: "gift_pet", petId: pet.id }));
+                return noStore({ ok: true, kind: "pet", petId: pet.id, name: pet.name });
             }
             // Grant a specific item.
             const itemId = String(body?.itemId || "").trim();
