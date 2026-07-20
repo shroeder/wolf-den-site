@@ -9715,6 +9715,23 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     .pet-icon[data-petlvl="5"], .petx-hero-icon[data-petlvl="5"] { animation: none; }
     .pet-icon::after, .pet-icon::before, .petx-hero-icon::after, .petx-hero-icon::before { animation: none; opacity: 0.85; }
 }
+/* Evolution reveal: old sprite flashes out, new evolved sprite bursts in (Pokémon-style). */
+.petx-evo { position: relative; width: 168px; height: 168px; margin: 0 auto; animation: petEvoPop 2s ease both; }
+.petx-evo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.petx-evo-old { animation: evoOldOut 2s ease both; }
+.petx-evo-new { opacity: 0; animation: evoNewIn 2s ease both; filter: drop-shadow(0 0 14px rgba(255,200,90,0.9)); }
+.petx-evo .petx-evo-new:only-child { opacity: 1; animation: none; } /* static (no old form) case */
+.petx-evo-flash { position: absolute; inset: -20% ; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,230,160,0.5) 40%, transparent 70%);
+    opacity: 0; animation: evoFlash 2s ease both; }
+@keyframes evoOldOut { 0%, 52% { opacity: 1; } 60% { opacity: 0.15; } 66% { opacity: 0.6; } 72% { opacity: 0.1; } 100% { opacity: 0; } }
+@keyframes evoNewIn { 0%, 66% { opacity: 0; } 76% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes evoFlash { 0%, 55% { opacity: 0; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes petEvoPop { 0%, 60% { transform: scale(1); } 74% { transform: scale(1.16); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+    .petx-evo, .petx-evo-old, .petx-evo-new, .petx-evo-flash { animation: none; }
+    .petx-evo-old { opacity: 0; } .petx-evo-new { opacity: 1; }
+}
 /* Level-up celebration flourish */
 .petx-levelup .petx-cele-tag { background: linear-gradient(90deg,#ffd75e,#ff9a6a); color: #0f0f12; }
 .petx-levelup .pet-stars { margin: 6px 0 10px; justify-content: center; display: flex; }

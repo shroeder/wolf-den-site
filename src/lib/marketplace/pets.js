@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
 import { getPetXpMap, petLevelInfo, accrueEquippedPetTrickle, startPetTrickleClock } from "@/lib/marketplace/pet-level.js";
+import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
@@ -85,7 +86,21 @@ export async function petsState(buyerId, { sync = false } = {}) {
     }
     // Real-world perk redemption state, keyed by pet id, for owned marquee pets.
     const realWorldByPet = Object.fromEntries((realWorld || []).map((r) => [r.petId, { reward: r.reward, available: r.available, cooldownUntil: r.cooldownUntil }]));
-    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet, petLevels };
+    // The battle-sprite art for each owned pet at each level 1–5 (resolved: highest evolved sprite ≤ level,
+    // else base). Powers the pets-page sprite display + the level-up "evolution" reveal. Only on page loads.
+    const petSprites = {};
+    if (sync) {
+        const [base, levelArt] = await Promise.all([getPetSpriteData().catch(() => ({})), getPetSpriteLevelData().catch(() => ({}))]);
+        for (const petId of ownedIds) {
+            const perLevel = {};
+            for (let n = 1; n <= 5; n += 1) {
+                const a = pickPetSpriteForLevel(base[petId], levelArt[petId], n);
+                perLevel[n] = a?.url ? { url: a.url, flip: a.flip === true } : null;
+            }
+            petSprites[petId] = perLevel;
+        }
+    }
+    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet, petLevels, petSprites };
 }
 
 export async function equipPet(buyerId, petId) {

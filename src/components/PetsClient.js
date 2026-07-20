@@ -101,13 +101,15 @@ export default function PetsClient() {
         for (const [pid, info] of Object.entries(d.petLevels)) {
             now[pid] = info.level;
             const prev = Number.isFinite(seen[pid]) ? seen[pid] : 1;
-            if (info.level > prev) gained.push({ petId: pid, to: info.level });
+            if (info.level > prev) gained.push({ petId: pid, from: prev, to: info.level });
         }
         try { localStorage.setItem("wd_pet_levels_seen", JSON.stringify(now)); } catch { /* ignore */ }
         if (gained.length) {
             const top = gained.sort((a, b) => b.to - a.to)[0];
             const pet = collectibleById(top.petId);
-            if (pet) { setLevelUp({ pet, to: top.to }); playLevelUpChime(); }
+            // Sprite art at the old + new level, for the evolution reveal (may be null if not generated yet).
+            const sprites = d.petSprites?.[top.petId] || {};
+            if (pet) { setLevelUp({ pet, from: top.from, to: top.to, oldArt: sprites[top.from] || null, newArt: sprites[top.to] || null }); playLevelUpChime(); }
         }
     }
 
@@ -339,11 +341,37 @@ export default function PetsClient() {
                 <div className="petx-overlay petx-celebrate" onClick={() => setLevelUp(null)}>
                     <div className={`petx-cele petx-levelup rarity-${levelUp.pet.rarity}`} onClick={(e) => e.stopPropagation()}>
                         <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 16 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
-                        <div className="petx-hero petx-hero-big">
-                            <span className="petx-hero-glow" />
-                            <span className="petx-hero-icon" style={{ color: levelUp.pet.color }}>{levelUp.pet.Icon ? <levelUp.pet.Icon /> : "🐾"}</span>
-                        </div>
-                        <div className="petx-cele-tag">⬆️ Level up!</div>
+                        {(() => {
+                            const oldA = levelUp.oldArt, newA = levelUp.newArt;
+                            const evolves = oldA?.url && newA?.url && oldA.url !== newA.url;
+                            if (evolves) {
+                                // Pokémon-style reveal: old form flashes out, new evolved sprite bursts in.
+                                return (
+                                    <div className="petx-hero petx-hero-big petx-evo">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className="petx-evo-img petx-evo-old" src={oldA.url} alt="" style={oldA.flip ? { transform: "scaleX(-1)" } : undefined} />
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className="petx-evo-img petx-evo-new" src={newA.url} alt="" style={newA.flip ? { transform: "scaleX(-1)" } : undefined} />
+                                        <span className="petx-evo-flash" aria-hidden="true" />
+                                    </div>
+                                );
+                            }
+                            if (newA?.url) {
+                                return (
+                                    <div className="petx-hero petx-hero-big petx-evo">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className="petx-evo-img petx-evo-new" src={newA.url} alt="" style={newA.flip ? { transform: "scaleX(-1)" } : undefined} />
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="petx-hero petx-hero-big">
+                                    <span className="petx-hero-glow" />
+                                    <span className="petx-hero-icon" data-petlvl={levelUp.to} style={{ color: levelUp.pet.color }}>{levelUp.pet.Icon ? <levelUp.pet.Icon /> : "🐾"}</span>
+                                </div>
+                            );
+                        })()}
+                        <div className="petx-cele-tag">{levelUp.oldArt?.url && levelUp.newArt?.url && levelUp.oldArt.url !== levelUp.newArt.url ? "✨ Evolved!" : "⬆️ Level up!"}</div>
                         <h2 className="petx-title">{levelUp.pet.name} reached Lv {levelUp.to}</h2>
                         <Stars level={levelUp.to} className="lg" />
                         {(() => {
