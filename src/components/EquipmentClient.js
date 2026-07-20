@@ -52,6 +52,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [coinBurst, setCoinBurst] = useState(null); // coin-shower juice on a sale
     const burstKey = useRef(0);
     const [chargeClaim, setChargeClaim] = useState(null); // { token, qr, rewardLabel, itemName } — QR to show staff
+    const [buyCele, setBuyCele] = useState(null); // purchase celebration (the item you just bought)
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
@@ -91,7 +92,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     }
     function closeChargeClaim() { setChargeClaim(null); load(); } // reload so a just-scanned charge reflects
 
-    async function buy(itemId) {
+    async function buy(item) {
+        const itemId = typeof item === "string" ? item : item?.id;
         setBusy(true); setErr("");
         try {
             const r = await fetch("/api/marketplace/shop", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId }) });
@@ -99,6 +101,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             if (!r.ok) { setErr(d?.error === "not_enough_gold" ? "Not enough gold." : (d?.error || "Couldn't buy.")); return; }
             DEFS = Object.fromEntries((d.items || []).map((i) => [i.id, i]));
             setData(d);
+            // 🎉 Buy dopamine — celebrate the new gear with a sound + a burst.
+            const bought = (typeof item === "object" && item) || DEFS[itemId] || { id: itemId };
+            playCoinSound();
+            setBuyCele({ id: bought.id, name: bought.name || "New gear", icon: bought.icon, rarity: bought.rarity || "common", key: (burstKey.current += 1) });
         } finally { setBusy(false); }
     }
 
@@ -333,6 +339,19 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             ) : null}
 
             {/* Item detail sheet — inspect, then equip or sell. In-brand modal (no native browser popup). */}
+            {buyCele ? createPortal((
+                <div className="buycele" key={buyCele.key} onClick={() => setBuyCele(null)}>
+                    <div className="buycele-flash" />
+                    <div className={`buycele-card rar-${buyCele.rarity}`} onClick={(e) => e.stopPropagation()}>
+                        <div className="buycele-burst" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>
+                        <ItemArt id={buyCele.id} icon={buyCele.icon} className="buycele-art" />
+                        <div className="buycele-title">✨ Purchased!</div>
+                        <div className="buycele-name">{buyCele.name}</div>
+                        <button type="button" className="button gold" onClick={() => setBuyCele(null)}>Equip it now</button>
+                    </div>
+                </div>
+            ), document.body) : null}
+
             {chargeClaim ? createPortal((
                 <div className="equip-sheet-overlay" onClick={closeChargeClaim} style={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", padding: 20 }}>
                     <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, margin: 0, textAlign: "center" }}>
@@ -366,7 +385,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>💰 {(detailItem.cost || 0).toLocaleString()} gold{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                             {detailItem.shop ? (
-                                <button type="button" className="button gold" onClick={() => { buy(detailItem.id); closeDetail(); }} disabled={busy || !detailItem.canAfford}>
+                                <button type="button" className="button gold" onClick={() => { buy(detailItem); closeDetail(); }} disabled={busy || !detailItem.canAfford}>
                                     💰 {detailItem.canAfford ? `Buy for ${(detailItem.cost || 0).toLocaleString()}` : `${(detailItem.cost || 0).toLocaleString()} · need more`}
                                 </button>
                             ) : detailItem.equipped ? (

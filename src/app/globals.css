@@ -9596,6 +9596,20 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .equip-perk-use { flex: none; padding: 8px 14px; border-radius: 999px; border: none; font-weight: 800; font-size: 0.85rem; cursor: pointer; background: linear-gradient(180deg, #ffd75e, #e5b53c); color: #1a1205; }
 .equip-perk-use:disabled { opacity: 0.5; cursor: default; }
 
+/* Buy-item dopamine celebration */
+.buycele { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); padding: 20px; }
+.buycele-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(255,215,94,0.4), transparent 60%); animation: buyflash 0.55s ease-out forwards; }
+@keyframes buyflash { from { opacity: 1; } to { opacity: 0; } }
+.buycele-card { position: relative; text-align: center; padding: 24px 28px; border-radius: 18px; background: #14161b; border: 2px solid var(--rar, #ffd75e); box-shadow: 0 0 44px color-mix(in srgb, var(--rar, #ffd75e) 55%, transparent); animation: buypop 0.42s cubic-bezier(0.2, 1.4, 0.4, 1); max-width: 320px; width: 100%; }
+@keyframes buypop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.buycele-art { width: 120px; height: 120px; margin: 0 auto 8px; display: block; object-fit: contain; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--rar, #ffd75e) 70%, transparent)); animation: buyfloat 2s ease-in-out infinite; }
+@keyframes buyfloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.buycele-title { font-weight: 900; font-size: 1.3rem; color: #ffd75e; }
+.buycele-name { font-weight: 700; margin: 2px 0 14px; }
+.buycele-burst { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.buycele-burst span { position: absolute; top: 46%; left: 50%; width: 9px; height: 9px; margin: -4px; border-radius: 50%; background: var(--rar, #ffd75e); animation: buyspark 0.75s ease-out forwards; }
+@keyframes buyspark { from { transform: rotate(calc(var(--i) * 22.5deg)) translateY(0); opacity: 1; } to { transform: rotate(calc(var(--i) * 22.5deg)) translateY(-130px); opacity: 0; } }
+
 .equip-gold { float: right; font-size: 0.85rem; font-weight: 800; color: #ffd75e; }
 
 /* Public-profile actions + clickable hero chips */
@@ -9917,6 +9931,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .deal-featured { background: #ffd75e; }
 .deal-art { font-size: 2rem; line-height: 1; display: flex; align-items: center; justify-content: center; height: 40px; }
 .deal-name { font-size: 0.82rem; font-weight: 700; line-height: 1.15; }
+/* Tap-to-inspect on a deal */
+.deal-inspect { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; cursor: pointer; color: inherit; width: 100%; }
+.deal-inspect-hint { font-size: 0.6rem; font-weight: 700; color: #8fb8ff; opacity: 0.85; }
+.deal-sheet-overlay { position: fixed; inset: 0; z-index: 1250; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.78); padding: 20px; }
+.deal-sheet { width: 100%; max-width: 320px; margin: 0; text-align: center; border-width: 2px; }
+.deal-sheet .deal-art { height: 88px; font-size: 4rem; margin-bottom: 4px; }
+.deal-sheet-name { font-weight: 900; font-size: 1.15rem; }
 .deal-price { display: flex; flex-direction: column; align-items: center; gap: 0; }
 .deal-was { font-size: 0.7rem; color: #7c828b; text-decoration: line-through; }
 .deal-now { font-size: 0.92rem; font-weight: 800; color: #ffd75e; }

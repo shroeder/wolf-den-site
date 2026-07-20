@@ -1,11 +1,30 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { ITEMS, itemById } from "@/lib/marketplace/items.js";
+import { ITEMS, itemById, describeStats } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
-import { COLLECTIBLES, collectibleById, petPrice } from "@/lib/marketplace/collectibles.js";
+import { COLLECTIBLES, collectibleById, petPrice, petActive } from "@/lib/marketplace/collectibles.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+
+// A short "what it does" line for a deal, so the shop is inspectable (gear stats / pet buff / consumable effect).
+function dealDescription(d) {
+    if (d.kind === "gear") {
+        const it = itemById(d.id);
+        const stats = describeStats(it?.stats) || "";
+        const sig = signatureFor(d.id);
+        return [it?.slot ? String(it.slot).replace(/_/g, " ") : null, stats, sig ? `★ ${sig.desc || sig.label}` : null].filter(Boolean).join(" · ") || "Gear";
+    }
+    if (d.kind === "pet") {
+        const p = collectibleById(d.id);
+        if (!p) return "A companion pet.";
+        const a = petActive(p);
+        return `Companion · +${a.value}% ${String(a.stat).replace(/_/g, " ")} while equipped`;
+    }
+    if (d.kind === "consumable") return CONSUMABLES[d.id]?.desc || "A one-time consumable.";
+    return "";
+}
 
 // TODAY'S DEALS — a small rotating set of discounted shop items that changes every day at midnight (America/
 // Chicago). The rotation is DETERMINISTIC from the date, so there's no cron and no stored offers: given the
@@ -92,7 +111,7 @@ async function ownedSets(buyerId) {
 export async function getDailyDeals(buyerId) {
     const { dayKey, resetInSecs, resetAt } = dayContext();
     const deals = todaysDeals(dayKey);
-    if (!buyerId) return { deals: deals.map((d) => ({ ...d, canBuy: false })), resetInSecs, resetAt, gold: 0, signedIn: false };
+    if (!buyerId) return { deals: deals.map((d) => ({ ...d, desc: dealDescription(d), canBuy: false })), resetInSecs, resetAt, gold: 0, signedIn: false };
     const [goldRow, claimedRows, owned] = await Promise.all([
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT item_id FROM mkt_daily_deal_purchase WHERE buyer_id = $1 AND day = $2`, [buyerId, dayKey]).catch(() => []),
@@ -108,7 +127,7 @@ export async function getDailyDeals(buyerId) {
         deals: deals.map((d) => {
             const isOwned = (d.kind === "gear" && owned.gear.has(d.id)) || (d.kind === "pet" && owned.pets.has(d.id));
             const isClaimed = claimed.has(d.id);
-            return { ...d, owned: isOwned, claimed: isClaimed, canBuy: !isOwned && !isClaimed && gold >= d.price };
+            return { ...d, desc: dealDescription(d), owned: isOwned, claimed: isClaimed, canBuy: !isOwned && !isClaimed && gold >= d.price };
         }),
     };
 }

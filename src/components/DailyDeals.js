@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
@@ -29,6 +30,9 @@ export default function DailyDeals() {
     const [busy, setBusy] = useState(null);
     const [msg, setMsg] = useState(null);
     const [secs, setSecs] = useState(0);
+    const [inspect, setInspect] = useState(null); // deal being inspected
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
 
     async function load() {
         const r = await fetch("/api/marketplace/deals", { cache: "no-store" }).catch(() => null);
@@ -65,8 +69,11 @@ export default function DailyDeals() {
                 {state.deals.map((d) => (
                     <div key={d.id} className={`deal${d.featured ? " is-featured" : ""}`}>
                         {d.featured ? <span className="deal-badge deal-featured">★ FEATURED</span> : <span className="deal-badge">-{Math.round(d.discount * 100)}%</span>}
-                        <DealArt deal={d} />
-                        <div className="deal-name">{d.name}</div>
+                        <button type="button" className="deal-inspect" onClick={() => setInspect(d)} title="Tap to inspect">
+                            <DealArt deal={d} />
+                            <div className="deal-name">{d.name}</div>
+                            <span className="deal-inspect-hint">ⓘ what it does</span>
+                        </button>
                         <div className="deal-price">
                             <span className="deal-was">🪙 {d.basePrice.toLocaleString()}</span>
                             <span className="deal-now">🪙 {d.price.toLocaleString()}</span>
@@ -83,6 +90,25 @@ export default function DailyDeals() {
                     </div>
                 ))}
             </div>
+            {mounted && inspect ? createPortal((
+                <div className="deal-sheet-overlay" onClick={() => setInspect(null)}>
+                    <div className={`card deal-sheet rar-${inspect.rarity || "common"}`} onClick={(e) => e.stopPropagation()} style={{ borderColor: RARITY_COLOR[inspect.rarity] || "#3a3f47" }}>
+                        <DealArt deal={inspect} />
+                        <div className="deal-sheet-name" style={{ color: RARITY_COLOR[inspect.rarity] || "#fff" }}>{inspect.name}</div>
+                        {inspect.rarity ? <div className="muted" style={{ fontSize: "0.72rem", textTransform: "capitalize", fontWeight: 700 }}>{inspect.rarity} {inspect.kind}</div> : <div className="muted" style={{ fontSize: "0.72rem" }}>{inspect.kind}</div>}
+                        <p style={{ margin: "8px 0 0", fontSize: "0.9rem", fontWeight: 600 }}>{inspect.desc || "—"}</p>
+                        <p className="deal-price" style={{ justifyContent: "center", marginTop: 10 }}>
+                            <span className="deal-was">🪙 {inspect.basePrice.toLocaleString()}</span>
+                            <span className="deal-now">🪙 {inspect.price.toLocaleString()}</span>
+                        </p>
+                        {inspect.owned ? <div className="muted">You own this.</div> : inspect.claimed ? <div className="muted">Claimed today.</div> : (
+                            <button type="button" className="button gold" style={{ marginTop: 8 }} onClick={() => { buy(inspect.id); setInspect(null); }} disabled={!state.signedIn || state.gold < inspect.price}>
+                                {state.gold < inspect.price ? "Need gold" : `Buy · 🪙 ${inspect.price.toLocaleString()}`}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ), document.body) : null}
         </section>
     );
 }
