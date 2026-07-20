@@ -15,9 +15,11 @@ function isAuthorized(request) {
 
 // FREQUENT (every 15 min — see vercel.json): draw a bounded batch of pending avatar sprites (2D game-art
 // characters) — members who are new, changed their avatar's APPEARANCE, or changed their equipped GEAR since
-// the sprite was last drawn (so the loadout stays current). No per-day cap: a backlog drains across ticks and
-// a failed tick just retries next tick. Poison items back off after a few attempts (tracked per member).
-// Steady state (nothing changed) is a cheap no-op — just a COUNT query, no image generation.
+// the sprite was last drawn (so the loadout stays current). Cost is capped by a per-member 24h cooldown: each
+// member is redrawn at most once/day no matter how often they fiddle, so the daily image ceiling ≈ the
+// roster size. The frequent schedule is for RESILIENCE, not extra draws: a backlog drains across ticks, a
+// failed tick retries next tick, and poison items back off after a few attempts (tracked per member).
+// Steady state (nothing eligible) is a cheap no-op — just a COUNT query, no image generation.
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/jobs/avatar-sprites", async ({ logger, internalError }) => {
         try {

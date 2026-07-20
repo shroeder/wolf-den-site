@@ -17,6 +17,13 @@ const DEFAULT_SPRITE_KEY = "default_sprite_url";
 // content-policy rejection, etc.) — it stays visible in the admin list with its error for a manual reroll,
 // but stops burning image-gen budget every tick. A real avatar/gear change resets the counter.
 const MAX_SPRITE_ATTEMPTS = 6;
+
+// Cost cap: a member's sprite is redrawn AT MOST once per this many hours, no matter how many times they
+// change their avatar/gear in between. Changes made inside the window are coalesced into one redraw once it
+// elapses (the sprite draws whatever is equipped at that moment). New members (no sprite yet) skip the
+// cooldown so their first sprite appears promptly; failure retries also skip it (they never set a success
+// timestamp) and are instead bounded by MAX_SPRITE_ATTEMPTS. Ceiling on image cost ≈ roster size / day.
+const REGEN_COOLDOWN_HOURS = 24;
 export const DEFAULT_SPRITE_AVATAR_PATH = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}&format=png&v=2`;
 export const getDefaultSpriteUrl = () => getSetting(DEFAULT_SPRITE_KEY);
 
@@ -71,10 +78,11 @@ export function buildSpritePrompt(config, gear = "") {
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
 export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
 
-// Buyers whose sprite is missing or stale. Redraw when the avatar's APPEARANCE changes OR their equipped
-// GEAR changes — so the sprite always reflects the current loadout (the art prompt includes equipped gear).
-// Oldest/never first. Pass a limit to cap the batch; omit it to return every pending member (the nightly
-// job draws them all — the store roster is small).
+// Buyers whose sprite should be (re)drawn now. Redraw when the avatar's APPEARANCE or equipped GEAR changed
+// since the last draw (the art prompt includes equipped gear) — BUT never more than once per
+// REGEN_COOLDOWN_HOURS per member, so a serial gear-swapper can't run up the image bill. Members with no
+// sprite yet skip the cooldown (draw the first one promptly). Oldest/never first. Pass a limit to cap the
+// batch; omit it to return every eligible member.
 export function pendingSpriteIds(limit = null) {
     const capped = Number.isFinite(Number(limit)) && Number(limit) > 0;
     return db
@@ -83,9 +91,13 @@ export function pendingSpriteIds(limit = null) {
               WHERE avatar_config IS NOT NULL
                 AND avatar_updated_at IS NOT NULL
                 AND avatar_sprite_attempts < ${MAX_SPRITE_ATTEMPTS}
-                AND (avatar_sprite_url IS NULL
-                     OR avatar_updated_at > avatar_sprite_at
-                     OR equipment_updated_at > avatar_sprite_at)
+                AND (
+                    avatar_sprite_url IS NULL
+                    OR (
+                        (avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)
+                        AND (avatar_sprite_at IS NULL OR avatar_sprite_at < NOW() - INTERVAL '${REGEN_COOLDOWN_HOURS} hours')
+                    )
+                )
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_sprite_attempts ASC, avatar_updated_at DESC NULLS LAST
               ${capped ? "LIMIT $1" : ""}`,
             capped ? [Math.floor(Number(limit))] : []
