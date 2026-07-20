@@ -100,7 +100,10 @@ export default function BossFightClient() {
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
             {boss.weakness ? (
-                <div className="boss-weakness-tip">{boss.weakness.emoji} <strong>Weakness — {boss.weakness.label}:</strong> {boss.weakness.desc}</div>
+                <div className="boss-weakness-tip">
+                    {boss.weakness.emoji} <strong>Weakness — {boss.weakness.label}:</strong> {boss.weakness.desc}
+                    {boss.weakness.synergySets?.length ? <> · <a href="/marketplace/sets" style={{ color: "#8fd8ff" }}>🧩 {boss.weakness.synergySets.join(" / ")} set synergizes</a></> : null}
+                </div>
             ) : null}
             {you ? (
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>

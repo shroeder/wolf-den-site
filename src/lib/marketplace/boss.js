@@ -7,6 +7,7 @@ import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { weaknessMult, weaknessInfo } from "@/lib/marketplace/boss-weakness.js";
+import { setCapstoneStrikeBonus, setCombatMult, setsForWeakness } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById } from "@/lib/marketplace/items.js";
@@ -330,7 +331,7 @@ export async function getBossState(buyerId = null) {
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
             buff: buff ? { label: buff.label, emoji: buff.emoji, damageMult: buff.damageMult, expiresAt: buff.expiresAt } : null,
-            weakness: weaknessInfo(boss.weakness),
+            weakness: (() => { const w = weaknessInfo(boss.weakness); return w ? { ...w, synergySets: setsForWeakness(boss.weakness) } : null; })(),
             winner,
         },
         roster,
@@ -492,7 +493,7 @@ export async function attackBoss(buyerId) {
         extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0),
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
-    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds) + (await memberBonusStrikes(buyerId).catch(() => 0));
+    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds) + setCapstoneStrikeBonus(equippedIds) + (await memberBonusStrikes(buyerId).catch(() => 0));
     const used = await manualAttacksToday(buyerId);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
@@ -530,7 +531,12 @@ export async function attackBoss(buyerId) {
         crit: swing.crit, firstHit: used === 0, bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1,
         hasPet: Boolean(me?.featured_collectible), hittersToday: todayHitters, burstProc,
     });
-    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult * wMult) + (onHit.bonusDamage || 0);
+    // Set capstones (full set) + weakness synergy (set affinity matches this week's boss).
+    const setHit = setCombatMult(equippedIds, {
+        crit: swing.crit, hitIndex: used, bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1,
+        bossMaxHp: boss.max_hp || 0, hittersToday: todayHitters, bossWeakness: boss.weakness,
+    });
+    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult * wMult * setHit.mult) + (onHit.bonusDamage || 0);
     const crit = swing.crit;
     const ability = pickAbility(crit);
 
@@ -551,7 +557,7 @@ export async function attackBoss(buyerId) {
     const { effectiveHp, autoDps } = defeated
         ? { effectiveHp: 0, autoDps: 0 }
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
-    return { ok: true, damage, crit, ability, proc: sig.proc || petProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
+    return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
 // Passive AUTO-attacks: every registered member's avatar chips away. Run by a background cron; applies the

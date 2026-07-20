@@ -188,7 +188,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {/* Set bonuses */}
             {(data.setBonuses || []).length ? (
                 <div className="card">
-                    <h3>🧩 Set bonuses</h3>
+                    <h3>🧩 Set bonuses <a href="/marketplace/sets" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff" }}>all sets →</a></h3>
                     <p className="muted" style={{ marginTop: 0 }}>Equip matching pieces of a set to unlock bonuses — they stack on top of your gear.</p>
                     {(data.setBonuses || []).map((s) => (
                         <div key={s.id} style={{ padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
