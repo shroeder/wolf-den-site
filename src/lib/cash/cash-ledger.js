@@ -27,6 +27,27 @@ export async function listCashLedger({ limit = 2000, offset = 0 } = {}) {
     return { rows: rows.map(mapRow), balance };
 }
 
+// RECONCILE cash-on-hand to a physically-counted amount. Audit-safe: instead of overwriting history it
+// inserts ONE visible adjustment row for the exact difference (a "cash over/short" true-up), so the trail
+// stays intact and the running total lands on the real count. Returns { delta, before, after }.
+export async function reconcileCashBalance(target, { occurredOn = null, note = null, createdBy = null } = {}) {
+    const tgt = Number(target);
+    if (target == null || Number.isNaN(tgt)) throw new Error("A numeric target balance is required.");
+    const balRows = await db.query(`SELECT COALESCE(SUM(amount), 0) AS balance FROM cash_ledger`);
+    const before = Number(balRows[0]?.balance ?? 0);
+    const delta = Math.round((tgt - before) * 100) / 100;
+    const on = occurredOn || new Date().toISOString().slice(0, 10);
+    if (delta !== 0) {
+        const desc = `Cash count adjustment → set to $${tgt.toFixed(2)} (physical count)${note ? ` — ${note}` : ""}`;
+        await db.query(
+            `INSERT INTO cash_ledger (occurred_on, description, amount, payment_method, entry_id, source, created_by)
+             VALUES ($1, $2, $3, 'Cash On Hand', NULL, 'reconcile', $4)`,
+            [on, desc, delta, createdBy],
+        );
+    }
+    return { delta, before, after: before + delta };
+}
+
 // Upsert a cash movement. When entryId is set, it REPLACES that ledger entry's row (edit-safe — no
 // blank leftovers). Rows with no entryId (cash-float / hand-entered) always insert fresh.
 export async function upsertCashEntry(input) {

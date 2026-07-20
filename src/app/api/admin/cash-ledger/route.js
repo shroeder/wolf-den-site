@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { listCashLedger, upsertCashEntry, deleteCashEntryByEntryId, deleteCashRow } from "@/lib/cash/cash-ledger.js";
+import { listCashLedger, upsertCashEntry, deleteCashEntryByEntryId, deleteCashRow, reconcileCashBalance } from "@/lib/cash/cash-ledger.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -33,6 +33,16 @@ export async function POST(request) {
         try {
             const body = await request.json().catch(() => null);
             if (!body) return NextResponse.json({ error: "Body required." }, { status: 400 });
+            // Reconcile to a physically-counted balance → inserts one visible "cash count adjustment" row.
+            if (body.action === "reconcile") {
+                try {
+                    const res = await reconcileCashBalance(body.target, { note: body.note, createdBy: body.createdBy });
+                    logger.info("admin.cash.reconcile.success", res);
+                    return NextResponse.json({ ok: true, ...res });
+                } catch (validationError) {
+                    return NextResponse.json({ error: validationError.message }, { status: 400 });
+                }
+            }
             try {
                 const row = await upsertCashEntry(body);
                 logger.info("admin.cash.upsert.success", { id: row.id, entryId: row.entryId });
