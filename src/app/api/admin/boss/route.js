@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossChaseItem, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
+import { claimBossPrize, createDraftBoss, deleteBoss, endBoss, generateBossArt, generateBossBackground, getBossRecapAdmin, listBossesAdmin, releaseBoss, setBossArt, setBossBackground, setBossChaseItem, setBossPrize, updateDraftBoss } from "@/lib/marketplace/boss-admin.js";
 import { projectBossHp } from "@/lib/marketplace/boss.js";
 import { activateBuff, endBuff, getActiveBuff, BUFF_PRESETS } from "@/lib/marketplace/boss-buff.js";
 import { giveawayChest, giveawayGold, giveawayItem } from "@/lib/marketplace/giveaway.js";
@@ -44,6 +44,7 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const action = String(body?.action || "");
             if (action === "projectHp") return noStore(await projectBossHp({ targetDays: body.days }));
+            if (action === "recap") return noStore({ recap: await getBossRecapAdmin(String(body.bossId || "")) });
             if (action === "create") return noStore({ boss: await createDraftBoss(body) });
             if (action === "update") return noStore({ boss: await updateDraftBoss(body.bossId, body) });
             if (action === "art") {

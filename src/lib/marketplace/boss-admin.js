@@ -23,6 +23,68 @@ export async function setBossArt(bossId, base64) {
 
 // Admin-only weekly-boss management: draft -> generate art (retry) -> release (broadcast) -> live -> ended.
 
+// Full admin recap for a (usually dead) boss: how long it took, who's owed the physical prize + whether
+// they've claimed it, the damage leaderboard with tickets, and the per-member reward log (chests/gear/etc.)
+// captured from the defeat gift records.
+export async function getBossRecapAdmin(bossId) {
+    const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
+    if (!boss) return null;
+    const divisor = Math.max(1, boss.ticket_divisor || 100);
+    const rows = await db
+        .query(
+            `SELECT b.id, b.display_name, b.alias, b.email, SUM(h.damage)::int AS dmg,
+                    COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
+               FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+              WHERE h.boss_id = $1 GROUP BY b.id HAVING SUM(h.damage) > 0 ORDER BY dmg DESC`,
+            [bossId]
+        )
+        .catch(() => []);
+    const totalDamage = rows.reduce((s, r) => s + (r.dmg || 0), 0);
+    const leaderboard = rows.map((r, i) => ({
+        rank: i + 1, name: r.display_name || r.alias || "Member", alias: r.alias || null,
+        dmg: r.dmg, tickets: Math.floor(r.dmg / divisor), hits: r.hits,
+    }));
+
+    let winner = null;
+    if (boss.winner_buyer_id) {
+        const w = await db.queryOne(`SELECT display_name, alias, email FROM mkt_buyer WHERE id = $1`, [boss.winner_buyer_id]).catch(() => null);
+        const claimer = boss.prize_claimed_by ? await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [boss.prize_claimed_by]).catch(() => null) : null;
+        winner = {
+            buyerId: boss.winner_buyer_id, name: w?.display_name || w?.alias || "Member", alias: w?.alias || null, email: w?.email || null,
+            tickets: boss.winner_tickets || 0, claimedAt: boss.prize_claimed_at || null, claimedBy: claimer?.display_name || claimer?.alias || null,
+        };
+    }
+    const top = rows[0] || null;
+    const chaseItem = boss.chase_item_id && itemById(boss.chase_item_id) ? itemById(boss.chase_item_id).name : null;
+
+    // Per-member reward log — pulled from the defeat gift records written at finalize (±5 min of defeat).
+    const rewards = boss.defeated_at
+        ? await db
+              .query(
+                  `SELECT b.display_name, b.alias, g.body
+                     FROM mkt_pending_gift g JOIN mkt_buyer b ON b.id = g.buyer_id
+                    WHERE g.kind = 'boss' AND g.created_at BETWEEN $2::timestamptz - interval '5 min' AND $2::timestamptz + interval '5 min'
+                    ORDER BY g.created_at`,
+                  [bossId, boss.defeated_at]
+              )
+              .then((r) => r.map((x) => ({ member: x.display_name || x.alias || "Member", body: x.body })))
+              .catch(() => [])
+        : [];
+
+    const daysToKill = boss.started_at && boss.defeated_at ? Math.round(((new Date(boss.defeated_at) - new Date(boss.started_at)) / 86400000) * 10) / 10 : null;
+
+    return {
+        boss: {
+            id: boss.id, name: boss.name, status: boss.status, maxHp: boss.max_hp,
+            startedAt: boss.started_at, defeatedAt: boss.defeated_at,
+            prizeName: boss.prize_name || null, chaseItem,
+        },
+        daysToKill, totalDamage, fighters: rows.length,
+        winner, topDealer: top ? { name: top.display_name || top.alias || "Member", dmg: top.dmg, chaseItem } : null,
+        leaderboard, rewards,
+    };
+}
+
 export async function listBossesAdmin() {
     return db
         .query(
