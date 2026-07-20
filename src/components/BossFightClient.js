@@ -83,7 +83,7 @@ export default function BossFightClient() {
             });
             if (res.defeated) {
                 setVictory({ name: res.name });
-                setTimeout(() => { setVictory(null); load(); }, 3200);
+                load(); // refresh in the background so the freshly-rotated boss is ready when they close
             } else {
                 load();
             }
@@ -248,11 +248,31 @@ export default function BossFightClient() {
             )}
 
             {victory ? (
-                <div className="boss2-victory-overlay">
-                    <div className="boss2-victory">
+                <div className="boss2-victory-overlay" onClick={() => setVictory(null)}>
+                    <div className="boss2-vic-confetti" aria-hidden="true">
+                        {Array.from({ length: 72 }).map((_, i) => (
+                            <span key={i} style={{ left: `${(i * 89) % 100}%`, animationDelay: `${(i % 12) * 0.08}s`, background: ["#ffd75e", "#ff7ad0", "#5ce0c0", "#8fd8ff", "#ff9f1c"][i % 5] }} />
+                        ))}
+                    </div>
+                    <div className="boss2-victory" onClick={(e) => e.stopPropagation()}>
                         <div className="boss2-victory-x">🏆</div>
-                        <h3>{victory.name} defeated!</h3>
-                        <p className="muted">The pack brought it down. A new challenger will rise soon…</p>
+                        <h3>☠️ {victory.name} slain!</h3>
+                        <p className="muted">The whole pack brought it down!</p>
+                        {(fighters || []).some((f) => f.spriteUrl) ? (
+                            <div className="boss2-vic-heroes">
+                                {(fighters || []).filter((f) => f.spriteUrl).slice(0, 10).map((f, i) => (
+                                    <span key={f.id || i} className="boss2-vic-hero" style={{ animationDelay: `${(i % 5) * 0.12}s` }}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={f.spriteUrl} alt="" style={f.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
+                        <p className="boss2-vic-reward">🎁 You earned a 🎟️ spin token + a shot at loot — check your stash!</p>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                            <Link href="/marketplace/inventory" className="btn-gold">🎒 See your loot</Link>
+                            <button type="button" className="pill" onClick={() => setVictory(null)}>A new boss rises →</button>
+                        </div>
                     </div>
                 </div>
             ) : null}

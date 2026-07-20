@@ -6,7 +6,7 @@ import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
-import { weaknessInfo, elementMult } from "@/lib/marketplace/boss-weakness.js";
+import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -17,7 +17,7 @@ import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/market
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem } from "@/lib/marketplace/signatures.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges.js";
-import { broadcastBossDefeated } from "@/lib/marketplace/boss-broadcast.js";
+import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
@@ -471,6 +471,43 @@ async function finalizeBossKill(bossId) {
         winnerInfo = { buyerId: hero.id, label: w?.display_name || w?.alias || "A member" };
     }
     await broadcastBossDefeated(boss, winnerInfo).catch(() => {});
+    // Keep the fight going: immediately bring the next boss live so the game is never stuck on a 0-HP corpse.
+    await activateNextBoss(boss).catch(() => {});
+}
+
+// Cool procedural names for auto-generated bosses (when no admin-authored draft is waiting).
+const PROC_BOSS_NAMES = [
+    "Grumvok the Ravenous", "Aztheku, Void-Maw", "Skornfang the Unbound", "Verathis, Ashen Wyrm",
+    "Molgrath the Devourer", "Nyxaal, Shadow-Tyrant", "Kaelvorn the Cinderborn", "Threxil, Bone Sovereign",
+    " Vok Ruaghul the Endless", "Sythmara, Storm-Render", "Gholzuk the Ironjaw", "Emberoth, the Waking Ruin",
+];
+
+// Auto-rotate the weekly boss after a kill so play never stalls. Prefer a prepared DRAFT (admin-authored,
+// with art + prize); if none is waiting, generate a procedural boss (HP scaled off the last one + a random
+// element) and bring it live. Art/prize can be filled in later — the boss is fully playable without them.
+async function activateNextBoss(prevBoss) {
+    const live = await db.queryOne(`SELECT id FROM boss_event WHERE status = 'live' AND defeated_at IS NULL LIMIT 1`).catch(() => null);
+    if (live) return; // something is already live — nothing to do
+    let next = await db.queryOne(`SELECT id FROM boss_event WHERE status = 'draft' ORDER BY started_at ASC LIMIT 1`).catch(() => null);
+    if (!next) {
+        const prevHp = prevBoss?.max_hp || (await projectBossHp({}).then((r) => r.hp).catch(() => 500000));
+        const hp = Math.max(100000, Math.round((prevHp * 1.12) / 1000) * 1000); // ~12% tougher each cycle
+        const name = PROC_BOSS_NAMES[Math.floor(Math.random() * PROC_BOSS_NAMES.length)].trim();
+        const div = Math.max(100, Math.round(hp / 7000));
+        next = await db
+            .queryOne(
+                `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, ticket_divisor, weakness)
+                 VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5) RETURNING id`,
+                [name, hp, "A new terror rises to challenge the pack.", div, pickWeakness()]
+            )
+            .catch(() => null);
+    }
+    if (!next) return;
+    await db.query(`UPDATE boss_event SET status = 'ended' WHERE status = 'live' AND id <> $1`, [next.id]).catch(() => {});
+    const boss = await db
+        .queryOne(`UPDATE boss_event SET status = 'live', started_at = NOW(), ends_at = NOW() + interval '7 days', defeated_at = NULL WHERE id = $1 RETURNING *`, [next.id])
+        .catch(() => null);
+    if (boss) await broadcastBoss(boss).catch(() => {});
 }
 
 // The big daily MANUAL ability. Level-scaled, splashy (returns crit + an ability name for the animation).
