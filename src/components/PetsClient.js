@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import MemberHeroCard from "@/components/MemberHeroCard";
 import { COLLECTIBLES, collectibleById, petPassive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 
@@ -127,12 +128,44 @@ export default function PetsClient() {
     const [note, setNote] = useState(null);
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
-    const [giving, setGiving] = useState(null); // pet being gifted (opens the gift modal)
-    const [recipient, setRecipient] = useState("");
     const [modalErr, setModalErr] = useState(null);
     const [sending, setSending] = useState(false);
     const [celebrate, setCelebrate] = useState(null); // pet to show a receive/unlock celebration for
-    const [detail, setDetail] = useState(null); // pet whose detail modal is open
+    const [detail, setDetail] = useState(null); // pet whose detail PAGE is open (in-flow, not a modal)
+    // Give-a-copy: folded into the detail page as an expandable member-search panel (no more @handle typing).
+    const [giveOpen, setGiveOpen] = useState(false);
+    const [memberQuery, setMemberQuery] = useState("");
+    const [memberResults, setMemberResults] = useState([]);
+    const [memberSearching, setMemberSearching] = useState(false);
+
+    // Open a pet as a full page (breadcrumb back), syncing to ?pet=<id> so the browser back button works and
+    // the view is linkable/scrollable — fixes the tall-modal scroll trap.
+    const openDetail = useCallback((pet) => {
+        setDetail(pet);
+        setGiveOpen(false);
+        setErr(null);
+        setNote(null);
+        if (typeof window !== "undefined") {
+            window.history.pushState({ pet: pet.id }, "", `?pet=${encodeURIComponent(pet.id)}`);
+            window.scrollTo(0, 0);
+        }
+    }, []);
+    const closeDetail = useCallback(() => {
+        setDetail(null);
+        setGiveOpen(false);
+        if (typeof window !== "undefined") window.history.pushState({}, "", window.location.pathname);
+    }, []);
+    // Reflect the URL: back/forward (popstate) and the initial ?pet= deep-link both drive which pet is open.
+    useEffect(() => {
+        const fromUrl = () => {
+            const id = new URLSearchParams(window.location.search).get("pet");
+            setDetail(id ? collectibleById(id) || null : null);
+            setGiveOpen(false);
+        };
+        fromUrl();
+        window.addEventListener("popstate", fromUrl);
+        return () => window.removeEventListener("popstate", fromUrl);
+    }, []);
 
     const ERRORS = {
         not_enough_gold: "Not enough gold.",
@@ -162,23 +195,30 @@ export default function PetsClient() {
         return false;
     }
 
-    function openGive(pet) {
-        setGiving(pet);
-        setRecipient("");
-        setModalErr(null);
-    }
+    // Debounced member search for the give-a-copy panel → hero-card results (reuses the SocialHub endpoint,
+    // so you pick a person from their card instead of typing an @handle).
+    useEffect(() => {
+        if (!giveOpen) return undefined;
+        setMemberSearching(true);
+        const t = setTimeout(async () => {
+            const r = await fetch(`/api/marketplace/members?q=${encodeURIComponent(memberQuery.trim())}`, { cache: "no-store" }).catch(() => null);
+            const d = r ? await r.json().catch(() => null) : null;
+            setMemberResults(d?.members || []);
+            setMemberSearching(false);
+        }, 250);
+        return () => clearTimeout(t);
+    }, [giveOpen, memberQuery]);
 
-    async function sendGift() {
-        const alias = recipient.trim();
-        if (!alias) { setModalErr("Enter a member's @handle."); return; }
-        setSending(true);
+    async function sendGiftTo(member) {
+        if (!detail || !member?.alias) return;
+        setSending(member.id);
         setModalErr(null);
-        const r = await fetch("/api/marketplace/pets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "share", petId: giving.id, toAlias: alias }) }).catch(() => null);
+        const r = await fetch("/api/marketplace/pets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "share", petId: detail.id, toAlias: member.alias }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
         setSending(false);
         if (r?.ok && d?.ok) {
-            setGiving(null);
-            setNote(`🎁 Gift sent — ${d.to} can accept your copy of ${giving.name}.`);
+            setGiveOpen(false);
+            setNote(`🎁 Gift sent — ${d.to || member.displayLabel} can accept a fresh Lv 1 copy of ${detail.name}.`);
             await load();
         } else {
             setModalErr(ERRORS[d?.error] || "Couldn't send that gift.");
@@ -203,8 +243,137 @@ export default function PetsClient() {
     const ownedCount = state?.ownedIds?.length || 0;
     const passiveEntries = Object.entries(state?.passiveTotals || {}).sort((a, b) => b[1] - a[1]);
 
+    // The pet detail as a full in-flow page (breadcrumb back + normal scroll), with the give-a-copy flow
+    // folded in as a member SEARCH → hero-card picker (no @handle typing).
+    const renderDetail = () => {
+        const p = detail;
+        const owned = ownedSet.has(p.id);
+        const isFeatured = state?.featured === p.id;
+        const tradeable = tradeableSet.has(p.id);
+        const passive = petPassive(p);
+        const perk = petPerk(p);
+        const price = petPrice(p);
+        const canBuy = p.source === "shop" && !owned && state?.signedIn && state.gold >= price;
+        const lvl = owned ? state?.petLevels?.[p.id] : null;
+        const pct = lvl && !lvl.maxed && lvl.span > 0 ? Math.round((lvl.into / lvl.span) * 100) : 100;
+        return (
+            <div className="petx-page">
+                <button type="button" className="petx-crumb" onClick={closeDetail}>← All pets</button>
+                {note ? <p style={{ color: "#7ad07a", textAlign: "center", margin: 0, fontWeight: 700 }}>{note}</p> : null}
+                <div className={`petx-detail-card rarity-${p.rarity}`}>
+                    <div className="petx-hero petx-hero-big">
+                        <span className="petx-hero-glow" />
+                        <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}>{p.Icon ? <p.Icon /> : "🐾"}</span>
+                    </div>
+                    <div className="petx-cele-tag">{p.rarity}</div>
+                    <h2 className="petx-title">{p.name}</h2>
+                    <p className="petx-sub">{p.hint || SOURCE_LABEL[p.source] || ""}</p>
+
+                    {lvl ? (
+                        <div className="petx-level">
+                            <div className="petx-level-head">
+                                <span><Stars level={lvl.level} className="lg" /> <strong className="muted" style={{ fontSize: "0.8rem" }}>Lv {lvl.level}/5</strong></span>
+                                <span className="muted">{lvl.maxed ? "MAX" : `${lvl.into} / ${lvl.span} XP`}</span>
+                            </div>
+                            <div className="petx-level-bar"><span style={{ width: `${pct}%` }} /></div>
+                            <div className="petx-tiers">
+                                {[1, 2, 3, 4, 5].map((n) => (
+                                    <div key={n} className={`petx-tier${n === lvl.level ? " is-current" : ""}${n < lvl.level ? " is-done" : ""}${n > lvl.level ? " is-locked" : ""}`}>
+                                        <span className="petx-tier-stars">{"★".repeat(n)}</span>
+                                        <span className="petx-tier-val">+{lvl.base * n} {statText(passive)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="muted" style={{ fontSize: "0.78rem", marginTop: 6 }}>
+                                {isFeatured
+                                    ? "Equipped — earns 25% of your XP + a little over time."
+                                    : "Equip this pet to level it up (25% of your XP + a trickle over time)."}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <div className="petx-abilities">
+                        <div className="petx-ability">
+                            <div className="petx-ability-head">🐾 Passive <span className="muted">· always active while owned</span></div>
+                            <div className="petx-ability-body">
+                                <strong>+{lvl ? lvl.value : passive.value} {statText(passive)}</strong>
+                                {lvl && !lvl.maxed ? <span className="muted"> → +{passive.value * (lvl.level + 1)} at Lv {lvl.level + 1}</span> : null}
+                                {" "}— {STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales up to ×5 as this pet levels. Stacks with your whole collection.</span>
+                            </div>
+                        </div>
+                        <div className="petx-ability">
+                            <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped</span></div>
+                            <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
+                        </div>
+                        {petRealWorld(p) ? (
+                            <div className="petx-ability petx-realworld">
+                                <div className="petx-ability-head">🎁 Real-world perk</div>
+                                <div className="petx-ability-body">
+                                    {petRealWorld(p)}
+                                    {owned ? (() => {
+                                        const rw = state?.realWorld?.[p.id];
+                                        if (!rw) return null;
+                                        return rw.available
+                                            ? <div style={{ marginTop: 6, color: "#7ad07a", fontWeight: 700 }}>✅ Ready — ask staff to redeem it in-store.</div>
+                                            : <div style={{ marginTop: 6, color: "#9a93a6" }}>⏳ Redeemed — available again {rw.cooldownUntil ? new Date(rw.cooldownUntil).toLocaleDateString() : "next month"}.</div>;
+                                    })() : null}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="petx-status">
+                        {owned ? <span className="petx-owned">✓ You own this pet{isFeatured ? " · equipped" : ""}</span> : <span className="petx-lockrow">🔒 {SOURCE_LABEL[p.source] || "Unlock"}: {petUnlockText(p)}</span>}
+                    </div>
+
+                    {err ? <p className="petx-err">{err}</p> : null}
+                    <div className="petx-actions">
+                        {owned ? (
+                            <>
+                                {isFeatured
+                                    ? <button type="button" className="btn-ghost" onClick={() => action(p.id, "unequip")} disabled={busy === p.id}>Unequip</button>
+                                    : <button type="button" className="btn-gold" onClick={() => action(p.id, "equip")} disabled={busy === p.id}>{busy === p.id ? "…" : "⭐ Equip"}</button>}
+                                {tradeable
+                                    ? <button type="button" className={`btn-ghost${giveOpen ? " is-active" : ""}`} onClick={() => { setGiveOpen((v) => !v); setModalErr(null); }}>{giveOpen ? "✕ Cancel gift" : "🎁 Give a copy"}</button>
+                                    : <button type="button" className="btn-ghost" disabled title="Already traded once">🔒 Traded</button>}
+                            </>
+                        ) : p.source === "shop" ? (
+                            <button type="button" className="btn-gold" onClick={() => action(p.id, "buy")} disabled={!canBuy || busy === p.id} style={{ width: "100%" }}>
+                                {busy === p.id ? "…" : canBuy ? `Unlock · 💰 ${price.toLocaleString()}` : `Need 💰 ${price.toLocaleString()}`}
+                            </button>
+                        ) : (
+                            <button type="button" className="btn-ghost" disabled style={{ width: "100%" }}>🔒 {petUnlockText(p)}</button>
+                        )}
+                    </div>
+
+                    {owned && tradeable && giveOpen ? (
+                        <div className="petx-give">
+                            <div className="petx-warn">🔒 Once they accept, <strong>both</strong> your pet and their copy can never be traded again. They receive a <strong>fresh Lv&nbsp;1</strong> copy — your leveled pet stays yours.</div>
+                            <label className="petx-label" htmlFor="petx-search">Give to which member?</label>
+                            <input id="petx-search" className="petx-input" value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="Search members by name or @handle…" autoComplete="off" autoFocus />
+                            {modalErr ? <p className="petx-err">{modalErr}</p> : null}
+                            <div className="petx-give-results">
+                                {memberSearching && !memberResults.length ? <p className="muted" style={{ margin: 0 }}>Searching…</p> : null}
+                                {!memberSearching && !memberResults.length ? <p className="muted" style={{ margin: 0 }}>No members found.</p> : null}
+                                {memberResults.map((m) => (
+                                    <MemberHeroCard
+                                        key={m.id}
+                                        member={m}
+                                        compact
+                                        action={<button type="button" className="social-mini-btn is-primary" disabled={sending === m.id} onClick={() => sendGiftTo(m)}>{sending === m.id ? "Sending…" : "🎁 Give"}</button>}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="stack reveal">
+            {!detail && (<>
             <section className="card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                     <div>
@@ -269,7 +438,7 @@ export default function PetsClient() {
                         const Icon = pet.Icon;
                         const lvl = owned ? state.petLevels?.[pet.id] : null;
                         return (
-                            <button type="button" key={pet.id} onClick={() => setDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
+                            <button type="button" key={pet.id} onClick={() => openDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
                                 {lvl ? <span className="pet-level-badge"><Stars level={lvl.level} /></span> : null}
                                 <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}>{Icon ? <Icon /> : "🐾"}</div>
@@ -297,28 +466,10 @@ export default function PetsClient() {
                     <Link href="/marketplace/quests" className="pill">📜 Quests</Link>
                 </div>
             </section>
+            </>)}
 
-            {/* Give-a-copy modal — a proper in-app dialog, not a browser prompt. */}
-            {mounted && giving ? createPortal(
-                <div className="petx-overlay" onClick={() => !sending && setGiving(null)}>
-                    <div className={`petx-modal rarity-${giving.rarity}`} onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="petx-close" aria-label="Close" onClick={() => setGiving(null)}>×</button>
-                        <div className="petx-hero">
-                            <span className="petx-hero-glow" />
-                            <span className="petx-hero-icon" style={{ color: giving.color }}>{giving.Icon ? <giving.Icon /> : "🐾"}</span>
-                        </div>
-                        <h2 className="petx-title">Give a copy of {giving.name}</h2>
-                        <p className="petx-sub">Send a copy to another member — <strong>you keep yours</strong>.</p>
-                        <div className="petx-warn">🔒 Once they accept, <strong>both</strong> your pet and their copy can never be traded again.</div>
-                        <label className="petx-label" htmlFor="petx-to">Send to</label>
-                        <input id="petx-to" className="petx-input" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="@handle" autoComplete="off" autoFocus onKeyDown={(e) => e.key === "Enter" && sendGift()} />
-                        {modalErr ? <p className="petx-err">{modalErr}</p> : null}
-                        <div className="petx-actions">
-                            <button type="button" className="btn-ghost" onClick={() => setGiving(null)} disabled={sending}>Cancel</button>
-                            <button type="button" className="btn-gold" onClick={sendGift} disabled={sending || !recipient.trim()}>{sending ? "Sending…" : "🎁 Send gift"}</button>
-                        </div>
-                    </div>
-                </div>, document.body) : null}
+            {/* Pet detail — a full in-flow PAGE (breadcrumb back), not a modal, so it scrolls normally. */}
+            {mounted && detail ? renderDetail() : null}
 
             {/* Receive/unlock celebration. */}
             {mounted && celebrate ? createPortal(
@@ -383,110 +534,6 @@ export default function PetsClient() {
                     </div>
                 </div>, document.body) : null}
 
-            {/* Pet detail modal — full display + abilities + actions (equip / buy / give). */}
-            {mounted && detail ? (() => {
-                const p = detail;
-                const owned = ownedSet.has(p.id);
-                const isFeatured = state?.featured === p.id;
-                const tradeable = tradeableSet.has(p.id);
-                const passive = petPassive(p);
-                const perk = petPerk(p);
-                const price = petPrice(p);
-                const canBuy = p.source === "shop" && !owned && state?.signedIn && state.gold >= price;
-                const lvl = owned ? state?.petLevels?.[p.id] : null;
-                const pct = lvl && !lvl.maxed && lvl.span > 0 ? Math.round((lvl.into / lvl.span) * 100) : 100;
-                return createPortal(
-                    <div className="petx-overlay" onClick={() => setDetail(null)}>
-                        <div className={`petx-modal petx-detail rarity-${p.rarity}`} onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className="petx-close" aria-label="Close" onClick={() => setDetail(null)}>×</button>
-                            <div className="petx-hero petx-hero-big">
-                                <span className="petx-hero-glow" />
-                                <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}>{p.Icon ? <p.Icon /> : "🐾"}</span>
-                            </div>
-                            <div className="petx-cele-tag">{p.rarity}</div>
-                            <h2 className="petx-title">{p.name}</h2>
-                            <p className="petx-sub">{p.hint || SOURCE_LABEL[p.source] || ""}</p>
-
-                            {lvl ? (
-                                <div className="petx-level">
-                                    <div className="petx-level-head">
-                                        <span><Stars level={lvl.level} className="lg" /> <strong className="muted" style={{ fontSize: "0.8rem" }}>Lv {lvl.level}/5</strong></span>
-                                        <span className="muted">{lvl.maxed ? "MAX" : `${lvl.into} / ${lvl.span} XP`}</span>
-                                    </div>
-                                    <div className="petx-level-bar"><span style={{ width: `${pct}%` }} /></div>
-                                    {/* Every star's bonus, so it's clear what each level is worth. */}
-                                    <div className="petx-tiers">
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                            <div key={n} className={`petx-tier${n === lvl.level ? " is-current" : ""}${n < lvl.level ? " is-done" : ""}${n > lvl.level ? " is-locked" : ""}`}>
-                                                <span className="petx-tier-stars">{"★".repeat(n)}</span>
-                                                <span className="petx-tier-val">+{lvl.base * n} {statText(passive)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="muted" style={{ fontSize: "0.78rem", marginTop: 6 }}>
-                                        {isFeatured
-                                            ? "Equipped — earns 25% of your XP + a little over time."
-                                            : "Equip this pet to level it up (25% of your XP + a trickle over time)."}
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <div className="petx-abilities">
-                                <div className="petx-ability">
-                                    <div className="petx-ability-head">🐾 Passive <span className="muted">· always active while owned</span></div>
-                                    <div className="petx-ability-body">
-                                        <strong>+{lvl ? lvl.value : passive.value} {statText(passive)}</strong>
-                                        {lvl && !lvl.maxed ? <span className="muted"> → +{passive.value * (lvl.level + 1)} at Lv {lvl.level + 1}</span> : null}
-                                        {" "}— {STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales up to ×5 as this pet levels. Stacks with your whole collection.</span>
-                                    </div>
-                                </div>
-                                <div className="petx-ability">
-                                    <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped</span></div>
-                                    <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
-                                </div>
-                                {petRealWorld(p) ? (
-                                    <div className="petx-ability petx-realworld">
-                                        <div className="petx-ability-head">🎁 Real-world perk</div>
-                                        <div className="petx-ability-body">
-                                            {petRealWorld(p)}
-                                            {owned ? (() => {
-                                                const rw = state?.realWorld?.[p.id];
-                                                if (!rw) return null;
-                                                return rw.available
-                                                    ? <div style={{ marginTop: 6, color: "#7ad07a", fontWeight: 700 }}>✅ Ready — ask staff to redeem it in-store.</div>
-                                                    : <div style={{ marginTop: 6, color: "#9a93a6" }}>⏳ Redeemed — available again {rw.cooldownUntil ? new Date(rw.cooldownUntil).toLocaleDateString() : "next month"}.</div>;
-                                            })() : null}
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </div>
-
-                            <div className="petx-status">
-                                {owned ? <span className="petx-owned">✓ You own this pet{isFeatured ? " · equipped" : ""}</span> : <span className="petx-lockrow">🔒 {SOURCE_LABEL[p.source] || "Unlock"}: {petUnlockText(p)}</span>}
-                            </div>
-
-                            {err ? <p className="petx-err">{err}</p> : null}
-                            <div className="petx-actions">
-                                {owned ? (
-                                    <>
-                                        {isFeatured
-                                            ? <button type="button" className="btn-ghost" onClick={() => action(p.id, "unequip")} disabled={busy === p.id}>Unequip</button>
-                                            : <button type="button" className="btn-gold" onClick={() => action(p.id, "equip")} disabled={busy === p.id}>{busy === p.id ? "…" : "⭐ Equip"}</button>}
-                                        {tradeable
-                                            ? <button type="button" className="btn-ghost" onClick={() => { setDetail(null); openGive(p); }}>🎁 Give a copy</button>
-                                            : <button type="button" className="btn-ghost" disabled title="Already traded once">🔒 Traded</button>}
-                                    </>
-                                ) : p.source === "shop" ? (
-                                    <button type="button" className="btn-gold" onClick={() => action(p.id, "buy")} disabled={!canBuy || busy === p.id} style={{ width: "100%" }}>
-                                        {busy === p.id ? "…" : canBuy ? `Unlock · 💰 ${price.toLocaleString()}` : `Need 💰 ${price.toLocaleString()}`}
-                                    </button>
-                                ) : (
-                                    <button type="button" className="btn-ghost" disabled style={{ width: "100%" }}>🔒 {petUnlockText(p)}</button>
-                                )}
-                            </div>
-                        </div>
-                    </div>, document.body);
-            })() : null}
         </div>
     );
 }

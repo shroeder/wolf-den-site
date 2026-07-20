@@ -9663,6 +9663,25 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 /* Pet detail modal */
 .petx-detail { max-width: 400px; }
+
+/* Pet detail rendered as a full in-flow PAGE (breadcrumb back) instead of a modal — scrolls normally,
+   so tall content (level tiers + abilities + the give-a-copy member search) is always reachable. */
+.petx-page { display: flex; flex-direction: column; gap: 12px; }
+.petx-crumb { align-self: flex-start; background: none; border: none; color: #9aa0a6; font-weight: 800; font-size: 0.95rem; cursor: pointer; padding: 4px 2px; }
+.petx-crumb:hover { color: #ffd75e; }
+.petx-detail-card { position: relative; width: 100%; max-width: 560px; margin: 0 auto; background: linear-gradient(180deg, #1b1e26, #12141a); border: 1px solid #2a2f37; border-radius: 20px; padding: 22px 20px 20px; text-align: center; }
+.petx-detail-card.rarity-common { --glow: #9aa0a6; }
+.petx-detail-card.rarity-rare { --glow: #4aa3ff; }
+.petx-detail-card.rarity-epic { --glow: #b76bff; }
+.petx-detail-card.rarity-legendary { --glow: #ffb020; }
+.petx-detail-card.rarity-mythic { --glow: #33e0a1; }
+.petx-detail-card.rarity-ascendant { --glow: #ff7a3c; }
+.petx-detail-card.rarity-eternal { --glow: #ff5cc8; }
+.petx-detail-card { border-color: color-mix(in srgb, var(--glow, #2a2f37) 45%, #2a2f37); box-shadow: 0 0 30px -12px var(--glow, transparent), 0 20px 50px rgba(0,0,0,0.4); }
+/* Give-a-copy panel folded into the detail page: warning + member search → hero-card results. */
+.petx-give { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); text-align: left; }
+.petx-give-results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 60vh; overflow-y: auto; }
+.btn-ghost.is-active { border-color: #ffd75e; color: #ffd75e; }
 .petx-abilities { text-align: left; display: flex; flex-direction: column; gap: 8px; margin: 14px 0 10px; }
 .petx-ability { background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; border-radius: 12px; padding: 10px 12px; }
 .petx-ability-head { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #cbd2da; margin-bottom: 3px; }
