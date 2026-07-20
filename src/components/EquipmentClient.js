@@ -7,6 +7,15 @@ import ChestOpener from "@/components/ChestOpener";
 import ItemArt from "@/components/ItemArt";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
+
+// An item's elemental affinity chip — matters against a boss weak to that element (bonus damage).
+function ElBadge({ id }) {
+    const e = itemElement(id);
+    if (!e) return null;
+    const el = ELEMENTS[e];
+    return <span className="equip-el" title={`${el.label} affinity — bonus damage vs a boss weak to ${el.label}`} style={{ color: el.color }}>{el.emoji} {el.label}</span>;
+}
 
 // The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
 // the owned-item bag, and any charged in-store perks. Tapping a slot opens a picker of fitting items.
@@ -220,6 +229,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
+                                <ElBadge id={i.id} />
                             </button>
                         ))}
                         {!(data.items || []).some((i) => itemFitsSlot(i, slot)) ? <p className="muted" style={{ margin: 0 }}>No gear for this slot yet.</p> : null}
@@ -283,6 +293,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     <span className="equip-card-name">{i.name}</span>
                                     <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
                                     <span className="equip-card-stats">{i.statsText}</span>
+                                    <ElBadge id={i.id} />
                                     <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>💰 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                 </button>
                             );
@@ -300,6 +311,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detailItem.name}</div>
                                 <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detailItem.rarity} · {detailItem.slot.replace("_", " ")}{detailItem.equipped ? " · Equipped ✓" : ""}</div>
+                                <div style={{ marginTop: 2 }}><ElBadge id={detailItem.id} /></div>
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>

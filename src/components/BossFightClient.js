@@ -103,9 +103,13 @@ export default function BossFightClient() {
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
             {boss.weakness ? (
-                <div className="boss-weakness-tip">
-                    {boss.weakness.emoji} <strong>Weakness — {boss.weakness.label}:</strong> {boss.weakness.desc}
-                    {boss.weakness.synergySets?.length ? <> · <a href="/marketplace/sets" style={{ color: "#8fd8ff" }}>🧩 {boss.weakness.synergySets.join(" / ")} set synergizes</a></> : null}
+                <div className="boss-weakness-tip" style={{ borderColor: `${boss.weakness.color}66` }}>
+                    {boss.weakness.emoji} <strong>Weak to {boss.weakness.label}:</strong> gear with a {boss.weakness.label} affinity hits harder this week.
+                    {you?.element ? (
+                        you.element.matches > 0
+                            ? <> · <strong style={{ color: boss.weakness.color }}>Your {you.element.matches} {boss.weakness.emoji} {you.element.matches === 1 ? "piece" : "pieces"}: +{you.element.bonusPct}% damage.</strong></>
+                            : <> · <a href="/marketplace/inventory" style={{ color: "#8fd8ff" }}>Equip {boss.weakness.emoji} {boss.weakness.label} gear for a bonus →</a></>
+                    ) : null}
                 </div>
             ) : null}
             {you ? (

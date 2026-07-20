@@ -9247,6 +9247,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-size: clamp(0.65rem, 2.4vw, 0.82rem); }
 .boss-weakness-tip { text-align: center; margin: 0 auto 8px; max-width: 520px; font-size: 0.82rem; color: #cfe4ff;
     background: rgba(120,180,255,0.1); border: 1px solid rgba(120,180,255,0.35); border-radius: 10px; padding: 6px 12px; }
+/* Elemental affinity chip on gear cards. */
+.equip-el { display: inline-flex; align-items: center; gap: 3px; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.02em;
+    margin-top: 2px; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid currentColor; line-height: 1.5; }
 .battle-buff { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 4px 12px; border-radius: 999px;
     background: linear-gradient(90deg, rgba(255,60,60,0.92), rgba(255,150,40,0.92)); color: #fff; font-weight: 900;
     font-size: clamp(0.7rem, 2.6vw, 0.9rem); letter-spacing: 0.02em; text-shadow: 0 1px 3px rgba(0,0,0,0.5);
