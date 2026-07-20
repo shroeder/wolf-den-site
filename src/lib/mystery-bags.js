@@ -1,8 +1,41 @@
 import "server-only";
 
-import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareOrder } from "@/lib/consignment/square";
+import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareCustomerById, getSquareOrder } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { resolveBuyerId } from "@/lib/marketplace/xp.js";
 import { createServerLogger } from "@/lib/server-logger";
+
+// A pulled card at/above this value (dollars) is a "big hit" — auto-flags the buyer's mystery_big_hit badge.
+const BIG_HIT_DOLLARS = 100;
+
+// Attribute a sold mystery pack to a marketplace member (best-effort): if the Square sale carried a
+// customer we can match to a mkt_buyer, credit one bag bought and, when the pulled card clears the big-hit
+// threshold, flag mystery_big_hit — then re-sync their badges. Walk-in sales with no Square customer can't
+// be attributed (returns quietly). Never throws — attribution must never break sale processing.
+async function attributeMysteryPull({ order, cardId }) {
+    try {
+        const customerId = order?.customer_id || null;
+        if (!customerId) return; // anonymous walk-in — nothing to attribute to
+        const customer = await getSquareCustomerById(customerId).catch(() => null);
+        const buyerId = await resolveBuyerId({
+            squareCustomerId: customerId,
+            email: customer?.email_address || null,
+            phone: customer?.phone_number || null,
+        });
+        if (!buyerId) return; // no matching marketplace account
+        const cardRow = await db.queryOne(`SELECT market_value FROM mystery_bag_cards WHERE id = $1`, [cardId]).catch(() => null);
+        const value = Number(cardRow?.market_value) || 0;
+        await db.query(`UPDATE mkt_buyer SET mystery_bags_bought = COALESCE(mystery_bags_bought, 0) + 1 WHERE id = $1`, [buyerId]).catch(() => {});
+        if (value >= BIG_HIT_DOLLARS) {
+            await db.query(`UPDATE mkt_buyer SET mystery_big_hit = TRUE WHERE id = $1`, [buyerId]).catch(() => {});
+        }
+        await syncEarnedBadges(buyerId).catch(() => {});
+        mysteryLogger.info("mystery_bags.pull.attributed", { buyerId, value, bigHit: value >= BIG_HIT_DOLLARS });
+    } catch (error) {
+        mysteryLogger.warn("mystery_bags.pull.attribution_failed", { reason: error instanceof Error ? error.message : "unknown" });
+    }
+}
 
 const mysteryLogger = createServerLogger({ source: "api", subsystem: "mystery-bags" });
 const ACTIVE_STATUSES = ["active", "reserved"];
@@ -1236,6 +1269,9 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
         }
 
         assignedCount++;
+
+        // Auto-attribute the pull to a member (credits bag + flags a big hit if the card clears $100).
+        await attributeMysteryPull({ order, cardId: card.id });
 
         // Delete the packed Square variation now that the card is sold.
         // The scanned variationId IS the packed variation, so prefer the stored

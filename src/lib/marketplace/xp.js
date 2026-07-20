@@ -170,24 +170,27 @@ export function dailyKey(action, buyerId, scope = "") {
 // (once/order, capped 1/day) + a one-time first-purchase bonus. Also links the account to its Square
 // customer for in-store loyalty later. Dollars are computed from the merchandise subtotal the caller
 // passes (not tax/shipping). Deduped by order id so re-processing an order never double-credits.
-export async function awardPurchaseXp({ email = null, phone = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
-    let id = buyerId;
-    if (!id && squareCustomerId) {
-        const row = await db
-            .queryOne(`SELECT id FROM mkt_buyer WHERE square_customer_id = $1`, [squareCustomerId])
-            .catch(() => null);
-        id = row?.id || null;
+// Resolve a marketplace account from a Square sale's identifiers: prefer the linked Square customer, then
+// a matching email, then phone. Returns a buyer id or null. Shared by loyalty XP and mystery-bag big-hit
+// attribution so both use the exact same matching rules.
+export async function resolveBuyerId({ squareCustomerId = null, email = null, phone = null } = {}) {
+    if (squareCustomerId) {
+        const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE square_customer_id = $1`, [squareCustomerId]).catch(() => null);
+        if (row?.id) return row.id;
     }
-    if (!id && email) {
-        const row = await db
-            .queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1`, [String(email).trim().toLowerCase()])
-            .catch(() => null);
-        id = row?.id || null;
+    if (email) {
+        const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE email_normalized = $1`, [String(email).trim().toLowerCase()]).catch(() => null);
+        if (row?.id) return row.id;
     }
-    if (!id && phone) {
+    if (phone) {
         const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE phone = $1`, [phone]).catch(() => null);
-        id = row?.id || null;
+        if (row?.id) return row.id;
     }
+    return null;
+}
+
+export async function awardPurchaseXp({ email = null, phone = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
+    let id = buyerId || (await resolveBuyerId({ squareCustomerId, email, phone }));
     if (!id) {
         // No marketplace account yet — park the credit by email so it's waiting the moment they register.
         await parkPendingPurchase({ email, amountCents, orderId, squareCustomerId });
