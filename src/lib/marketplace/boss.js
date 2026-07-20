@@ -389,6 +389,50 @@ export async function getBossRecap(bossId, buyerId = null) {
     };
 }
 
+// Per-member boss-defeat celebration: the most recent defeated boss this member FOUGHT but hasn't celebrated
+// yet (so everyone who participated sees the celebration once, not just the finisher). Mirrors the level-up
+// pattern — a light payload for the overlay + a `boss_celebrated_id` marker cleared on ack.
+export async function getPendingBossCelebration(buyerId) {
+    if (!buyerId) return { pending: false };
+    const row = await db
+        .queryOne(
+            `SELECT be.id, be.name, be.winner_buyer_id, be.winner_tickets, be.prize_name, be.ticket_divisor
+               FROM boss_event be
+               JOIN mkt_buyer mb ON mb.id = $1
+              WHERE be.defeated_at IS NOT NULL AND be.defeated_at > NOW() - interval '3 days'
+                AND (mb.boss_celebrated_id IS DISTINCT FROM be.id)
+                AND EXISTS (SELECT 1 FROM boss_hit h WHERE h.boss_id = be.id AND h.buyer_id = $1)
+              ORDER BY be.defeated_at DESC LIMIT 1`,
+            [buyerId]
+        )
+        .catch(() => null);
+    if (!row) return { pending: false };
+    const divisor = Math.max(1, row.ticket_divisor || 100);
+    const [mineRow, heroesRows, winnerRow] = await Promise.all([
+        db.queryOne(`SELECT COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE boss_id = $1 AND buyer_id = $2`, [row.id, buyerId]).catch(() => null),
+        db.query(
+            `SELECT b.avatar_sprite_url, b.avatar_sprite_flip FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+              WHERE h.boss_id = $1 AND b.avatar_sprite_url IS NOT NULL GROUP BY b.id ORDER BY SUM(h.damage) DESC LIMIT 8`,
+            [row.id]
+        ).catch(() => []),
+        row.winner_buyer_id ? db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [row.winner_buyer_id]).catch(() => null) : null,
+    ]);
+    const dmg = mineRow?.dmg || 0;
+    const aheadRow = await db.queryOne(`SELECT COUNT(*)::int AS n FROM (SELECT buyer_id FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > $2) x`, [row.id, dmg]).catch(() => null);
+    return {
+        pending: true,
+        boss: { id: row.id, name: row.name },
+        winner: row.winner_buyer_id ? { name: winnerRow?.display_name || winnerRow?.alias || "A member", you: row.winner_buyer_id === buyerId, tickets: row.winner_tickets || 0, prize: row.prize_name || null } : null,
+        mine: { dmg, tickets: Math.floor(dmg / divisor), rank: (aheadRow?.n || 0) + 1 },
+        heroes: heroesRows.map((h) => ({ url: h.avatar_sprite_url, flip: h.avatar_sprite_flip === true })),
+        recapUrl: `/marketplace/boss/recap/${row.id}`,
+    };
+}
+export async function ackBossCelebration(buyerId, bossId) {
+    if (!buyerId || !bossId) return;
+    await db.query(`UPDATE mkt_buyer SET boss_celebrated_id = $2 WHERE id = $1`, [buyerId, bossId]).catch(() => {});
+}
+
 // The viewer's current-boss tickets/damage for other surfaces (e.g. the profile). Null if no active boss.
 export async function getMyBossSummary(buyerId) {
     if (!buyerId) return null;

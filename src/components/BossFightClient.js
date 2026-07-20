@@ -82,7 +82,10 @@ export default function BossFightClient() {
                 return { ...d, boss: { ...d.boss, hp: res.hp, maxHp: res.maxHp }, you: { ...d.you, attacksLeft: res.attacksLeft, dmg, tickets: Math.floor(dmg / divisor) } };
             });
             if (res.defeated) {
+                const deadBossId = data?.boss?.id;
                 setVictory({ name: res.name });
+                // The finisher already sees this overlay — ack so the site-wide watcher doesn't repeat it for them.
+                if (deadBossId) fetch("/api/marketplace/boss-celebrate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bossId: deadBossId }) }).catch(() => {});
                 load(); // refresh in the background so the freshly-rotated boss is ready when they close
             } else {
                 load();

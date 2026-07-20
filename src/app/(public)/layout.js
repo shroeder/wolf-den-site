@@ -1,4 +1,5 @@
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import BossCelebrationWatcher from "@/components/BossCelebrationWatcher";
 import GiftWatcher from "@/components/GiftWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
 import LocationPrompt from "@/components/LocationPrompt";
@@ -19,6 +20,8 @@ export default function PublicLayout({ children }) {
             <SiteFooter />
             {/* Site-wide so a level-up earned while shopping still celebrates, not just on /marketplace. */}
             <LevelUpWatcher />
+            {/* Every member who fought a boss sees its defeat celebration once, not just the finisher. */}
+            <BossCelebrationWatcher />
             {/* Pops up admin gifts (item/chest/gold) on next visit — reliable even without browser push. */}
             <GiftWatcher />
             {/* Ever-present social hub (friends + discover + messaging) for signed-in members, every page. */}
