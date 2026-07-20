@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
+import { previewShopCoupon, consumeShopCoupon, getShopCoupon } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
 import { elitePetForRarity } from "@/lib/marketplace/collectibles.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
@@ -224,21 +225,25 @@ export async function getInventory(buyerId) {
         // One clean progression: rarity, then price, then level — no more "worst again" as you scroll.
         .sort((a, z) => (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[z.rarity] ?? 9) || a.cost - z.cost || (a.reqLevel || 0) - (z.reqLevel || 0));
     const equippedList = Object.values(bySlot);
-    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList) };
+    const coupon = await getShopCoupon(buyerId).catch(() => null);
+    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), coupon };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
 export async function buyItem(buyerId, itemId) {
     const item = itemById(itemId);
     if (!item || item.source !== "xp_shop") return { ok: false, error: "not_for_sale" };
-    const cost = Math.max(0, item.xpCost || 0);
+    const base = Math.max(0, item.xpCost || 0);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (owned) return { ok: false, error: "already_owned" };
+    const cp = await previewShopCoupon(buyerId, base); // apply a login coupon if one's active
+    const cost = cp.price;
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
+    if (cp.pct > 0) await consumeShopCoupon(buyerId);
     await grantItem(buyerId, itemId, "xp_shop");
-    await trackActivity(buyerId, "buy_gear", { itemId, name: item.name, cost });
-    return { ok: true, gold: row.gold };
+    await trackActivity(buyerId, "buy_gear", { itemId, name: item.name, cost, couponPct: cp.pct || 0 });
+    return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
 }
 
 // Sell an owned item back for gold. Unequips it first if worn, credits the rarity sell value, and records

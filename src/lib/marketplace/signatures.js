@@ -33,6 +33,19 @@ const MAG = {
     warbanner: [0.06, 0.08, 0.12, 0.15], // global damage aura (mythic+ meaningful)
     beastbond: [1.5, 1.75, 2.0, 2.25], //  equipped-pet strike-power multiplier
 };
+// LOGIN procs — "merchant"/utility items that roll a chance for a reward at the daily check-in (not combat).
+// Generative, so chance + value scale with rarity and they're gated to legendary+ (petGamble is self-costing
+// — it destroys the item — so it's allowed anywhere).
+const LOGIN = {
+    goldChance: [0.15, 0.2, 0.25, 0.3],
+    goldAmt: [120, 180, 260, 360],
+    potionChance: [0.1, 0.14, 0.18, 0.22],
+    couponChance: [0.08, 0.1, 0.13, 0.16],
+    gambleChance: [0.03, 0.05, 0.07, 0.1],
+};
+export const COUPON_PCT = 50; //   discount a login coupon grants
+export const COUPON_MAX = 4000; // it only applies to shop items at/under this gold price
+
 const STREAK_PER = 0.04; // per consecutive attack-day
 const PACK_PER = 0.02; //   per distinct ally who attacked today
 const GOLD_CHANCE = 0.12;
@@ -145,7 +158,7 @@ export const ITEM_SIGNATURES = {
 
     // ===== Amulets — fortune / arcane / synergy =====
     dragonheart_sigil: { label: "Dragon's Fury", beastbond: true }, // mythic — heart = pet bond
-    galaxy_pendant: { label: "Cosmic Fortune", goldOnHit: true }, // mythic
+    galaxy_pendant: { label: "Cosmic Fortune", loginGold: true }, // mythic — daily gold on check-in
     wolf_totem: { label: "Pack Tactics", packTactics: true }, // legendary — finally literal!
     bear_fang: { label: "Maul", beastbond: true }, // legendary
     spectre_locket: { label: "Haunt", ticketOnCrit: true }, // mythic
@@ -159,8 +172,8 @@ export const ITEM_SIGNATURES = {
     serpent_coil: { label: "Venomstrike", beastbond: true }, // legendary
     gs_champion_amulet: { label: "Champion's Heart", packTactics: true }, // legendary
     gs2_heart_amulet: { label: "Packheart", beastbond: true }, // legendary
-    playmat_medallion: { label: "Home Turf", goldOnHit: true }, // legendary
-    premium_playmat_medallion: { label: "Grandmaster", xpOnHit: true }, // legendary
+    playmat_medallion: { label: "Home Turf", loginCoupon: true }, // legendary — chance at a shop coupon
+    premium_playmat_medallion: { label: "Grandmaster", loginCoupon: true }, // legendary — chance at a shop coupon
 
     // ===== Rings — luck / prospector / prestige / bursts =====
     eternity_band: { label: "Endless", bloodlust: true }, // mythic
@@ -169,14 +182,14 @@ export const ITEM_SIGNATURES = {
     infinity_loop: { label: "Eternal Loop", bloodlust: true }, // mythic
     kings_eternal: { label: "Everking", warbanner: true }, // mythic
     founders_ring: { label: "Founder's Will", warbanner: true }, // mythic
-    collectors_signet: { label: "Collector", ticketOnCrit: true }, // legendary
+    collectors_signet: { label: "Collector", loginPetGamble: true }, // legendary — gamble a pet (destroys the item)
     kings_ring: { label: "King's Command", packTactics: true }, // legendary
     ring_titans: { label: "Titan Grip", giantSlayer: true }, // legendary
     warlord_ring: { label: "War Banner", packTactics: true }, // legendary
-    highroller_ring: { label: "High Roller", ticketOnCrit: true }, // legendary — luck (highroller gated to myth+)
-    premium_signet: { label: "Prestige", ticketOnCrit: true }, // legendary
-    credit25_ring: { label: "Investor", goldOnHit: true }, // legendary
-    credit50_ring: { label: "Benefactor", goldOnHit: true }, // legendary
+    highroller_ring: { label: "High Roller", loginPetGamble: true }, // legendary — gamble a pet on check-in (destroys item)
+    premium_signet: { label: "Prestige", loginPotion: true }, // legendary — daily gift consumable
+    credit25_ring: { label: "Investor", loginGold: true }, // legendary — daily gold on check-in
+    credit50_ring: { label: "Benefactor", loginPotion: true }, // legendary — daily gift consumable
     gs_royal_signet: { label: "Royal Seal", goldOnHit: true }, // legendary
     gs2_kings_band: { label: "Crown Jewel", ticketOnCrit: true }, // legendary
 
@@ -240,6 +253,20 @@ export function signatureOnHit(equipped, { crit = false, divisor = 100, rand = M
     return { xp, gold, bonusDamage };
 }
 
+// Roll every equipped LOGIN-proc item once (at the daily check-in). Returns the procs that FIRED — the
+// caller (daily-checkin) applies the grants (gold / consumable / pet-gamble that destroys the item / coupon).
+export function rollLoginProcs(equipped, rand = Math.random) {
+    const fired = [];
+    for (const s of sigsOn(equipped)) {
+        const i = tierIdx(s.id);
+        if (s.loginGold && rand() < LOGIN.goldChance[i]) fired.push({ id: s.id, label: s.label, kind: "gold", amount: LOGIN.goldAmt[i] });
+        if (s.loginPotion && rand() < LOGIN.potionChance[i]) fired.push({ id: s.id, label: s.label, kind: "potion" });
+        if (s.loginCoupon && rand() < LOGIN.couponChance[i]) fired.push({ id: s.id, label: s.label, kind: "coupon" });
+        if (s.loginPetGamble && rand() < LOGIN.gambleChance[i]) fired.push({ id: s.id, label: s.label, kind: "petGamble" });
+    }
+    return fired;
+}
+
 // Equipped-pet strike multiplier from a Beastbond signature (1 if none).
 export function beastbondMult(equipped) {
     let m = 1;
@@ -282,5 +309,10 @@ export function signatureFor(itemId) {
     if (s.ticketOnCrit) parts.push("Your critical hits earn a bonus raffle ticket.");
     if (s.beastbond) parts.push(`Your equipped pet's strike power is boosted ×${MAG.beastbond[i]}.`);
     if (s.warbanner && isTop3(itemId)) parts.push(`Buffs EVERY member's boss damage by +${pct(MAG.warbanner[i])} (stacks across the server, capped).`);
+    // Login procs — fire at the daily check-in.
+    if (s.loginGold) parts.push(`${pct(LOGIN.goldChance[i])} chance at your daily check-in to find ${LOGIN.goldAmt[i]} gold.`);
+    if (s.loginPotion) parts.push(`${pct(LOGIN.potionChance[i])} chance at your daily check-in to conjure a random potion.`);
+    if (s.loginCoupon) parts.push(`${pct(LOGIN.couponChance[i])} chance at your daily check-in for a ${COUPON_PCT}%-off shop coupon (items ≤ ${COUPON_MAX} gold).`);
+    if (s.loginPetGamble) parts.push(`${pct(LOGIN.gambleChance[i])} chance at your daily check-in to unlock a random pet — but the item is DESTROYED.`);
     return { label: s.label, desc: parts.join(" ") };
 }

@@ -5,6 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp, levelUpEquippedPet } from "@/lib/marketplace/pet-level.js";
+import { previewShopCoupon, consumeShopCoupon } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
@@ -121,11 +122,13 @@ export async function grantConsumable(buyerId, id, n = 1) {
 export async function buyConsumable(buyerId, id) {
     const c = CONSUMABLES[id];
     if (!buyerId || !c || c.price == null) return { ok: false, error: "not_for_sale" };
-    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, c.price]).catch(() => null);
+    const cp = await previewShopCoupon(buyerId, c.price); // apply a login coupon if one's active
+    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cp.price]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
+    if (cp.pct > 0) await consumeShopCoupon(buyerId);
     await grantConsumable(buyerId, id, 1);
-    await trackActivity(buyerId, "buy_consumable", { id, name: c.name });
-    return { ok: true, gold: row.gold };
+    await trackActivity(buyerId, "buy_consumable", { id, name: c.name, couponPct: cp.pct || 0 });
+    return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
 }
 
 // Use one from the stash. Targeted relics (recharge / reset) take a charged item id; validated BEFORE the

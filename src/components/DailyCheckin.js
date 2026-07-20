@@ -55,6 +55,12 @@ export default function DailyCheckin() {
                 {claimed ? (
                     <>
                         <h2 className="checkin-title">{reward.emoji} +{reward.label}!</h2>
+                        {claimed.logins?.length ? (
+                            <div className="checkin-summary">
+                                <div className="checkin-loot-head">Your gear also triggered:</div>
+                                {claimed.logins.map((l, idx) => <div key={idx} className="checkin-row">{l.emoji} {l.text}</div>)}
+                            </div>
+                        ) : null}
                         <p className="checkin-sub">{claimed.jackpot ? "🎉 Weekly jackpot! Keep the streak alive." : "See you tomorrow to keep the streak going."}</p>
                         <button type="button" className="btn-gold" onClick={() => setOpen(false)}>Sweet!</button>
                     </>

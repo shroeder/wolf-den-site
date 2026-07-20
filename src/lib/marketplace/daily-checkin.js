@@ -7,6 +7,9 @@ import { petLevelInfo } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
+import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signatures.js";
+import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
@@ -76,6 +79,39 @@ export async function getDailyCheckin(buyerId) {
     };
 }
 
+// Roll the member's equipped LOGIN-proc items (once, at check-in) and apply what fired. Returns display rows.
+async function resolveLoginProcs(buyerId) {
+    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
+    const procs = rollLoginProcs(equipped);
+    const out = [];
+    for (const p of procs) {
+        if (p.kind === "gold") {
+            await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, p.amount]).catch(() => {});
+            out.push({ emoji: "🪙", text: `${p.label} found ${p.amount} gold!` });
+        } else if (p.kind === "potion") {
+            const pool = Object.entries(CONSUMABLES).filter(([, c]) => c.price != null);
+            const [pid, c] = pool[Math.floor(Math.random() * pool.length)];
+            await grantConsumable(buyerId, pid, 1).catch(() => {});
+            out.push({ emoji: c.emoji || "🧪", text: `${p.label} conjured ${c.name}!` });
+        } else if (p.kind === "coupon") {
+            await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {});
+            out.push({ emoji: "🎟️", text: `${p.label} — a ${COUPON_PCT}% shop coupon!` });
+        } else if (p.kind === "petGamble") {
+            // Win a random pet you couldn't just get by leveling — but the item is destroyed.
+            const ownedRows = await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
+            const owned = new Set(ownedRows.map((r) => r.ref));
+            const pool = COLLECTIBLES.filter((pt) => pt.source !== "level" && !owned.has(pt.id));
+            if (!pool.length) continue; // nothing to win → don't destroy the item
+            const won = pool[Math.floor(Math.random() * pool.length)];
+            await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});
+            await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, p.id]).catch(() => {});
+            await db.query(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, p.id]).catch(() => {});
+            out.push({ emoji: "🎲", text: `${p.label} shattered → unlocked ${won.name}!` });
+        }
+    }
+    return out;
+}
+
 // POST — claim today's streak reward (advances/resets the streak, grants the reward). Idempotent per day.
 export async function claimDailyCheckin(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
@@ -98,6 +134,8 @@ export async function claimDailyCheckin(buyerId) {
     if (reward.treat && CONSUMABLES[reward.treat]) await grantConsumable(buyerId, reward.treat, 1).catch(() => {});
     if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }).catch(() => {});
     await trackActivity(buyerId, "daily_checkin", { streak: nextStreak }).catch(() => {});
+    // Equipped login-proc items get their once-a-day roll here too.
+    const logins = await resolveLoginProcs(buyerId).catch(() => []);
 
-    return { ok: true, streak: nextStreak, reward: { label: reward.label, emoji: reward.emoji }, jackpot: nextStreak % 7 === 0 };
+    return { ok: true, streak: nextStreak, reward: { label: reward.label, emoji: reward.emoji }, jackpot: nextStreak % 7 === 0, logins };
 }

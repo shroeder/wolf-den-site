@@ -274,6 +274,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 <div className="card">
                     <h3>💰 Shop <span className="equip-gold">{(data.gold || 0).toLocaleString()} gold</span></h3>
                     <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear.</p>
+                    {data.coupon ? <div className="shop-coupon">🎟️ {data.coupon.pct}% off coupon active — auto-applies to a gear pick ≤ {data.coupon.max.toLocaleString()} gold</div> : null}
                     <div className="equip-bag-grid">
                         {(data.shop || []).map((i) => {
                             const Icon = itemIcon(i.icon);
