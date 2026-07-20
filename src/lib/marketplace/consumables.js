@@ -183,10 +183,13 @@ export async function useConsumable(buyerId, id, targetItemId = null) {
             res = await addEquippedPetXp(buyerId, e.amount).catch(() => ({ ok: false }));
         }
         await trackActivity(buyerId, "use_consumable", { id, name: c.name, petId }).catch(() => {});
+        const leveled = e.type === "pet_level" ? Boolean(res?.ok) : Boolean(res?.leveled);
         const applied = e.type === "pet_level"
             ? (res?.ok ? `${petName} leveled up to Lv ${res.level}! ⬆️` : `${petName} is already max level`)
             : `+${e.amount.toLocaleString()} pet XP to ${petName}${res?.leveled ? ` — Lv ${res.level}! ⬆️` : ""}`;
-        return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied };
+        // Structured level-up payload so the client can fire the full celebration (not a tiny text line).
+        const petLevelUp = leveled ? { petId, petName, level: res.level, rarity: collectibleById(petId)?.rarity || "common", maxed: res.level >= 5 } : null;
+        return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied, petLevelUp, petXpGain: e.type === "pet_xp" ? e.amount : null };
     }
 
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);

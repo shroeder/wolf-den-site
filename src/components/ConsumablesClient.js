@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
+import PetArt from "@/components/PetArt";
 
 const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic" };
 
@@ -14,6 +16,9 @@ export default function ConsumablesClient() {
     const [busy, setBusy] = useState("");
     const [msg, setMsg] = useState(null);
     const [picking, setPicking] = useState(null); // a stash item awaiting a charged-gear target
+    const [petCele, setPetCele] = useState(null); // { petId, petName, level, rarity, maxed } — level-up dopamine
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
 
     const load = useCallback(async () => {
         try {
@@ -32,7 +37,13 @@ export default function ConsumablesClient() {
             const res = await fetch("/api/marketplace/consumables", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-                if (body.action === "use") setMsg({ ok: true, text: `${data.emoji || "✨"} ${data.name}: ${data.applied}!` });
+                if (data.petLevelUp) {
+                    // Big celebration instead of a tiny text line.
+                    setPetCele(data.petLevelUp);
+                    setMsg(null);
+                } else if (body.action === "use") {
+                    setMsg({ ok: true, text: `${data.emoji || "✨"} ${data.applied}` });
+                }
                 if (data.stash) setState(data.stash);
             } else {
                 const errs = {
@@ -146,6 +157,20 @@ export default function ConsumablesClient() {
                 ))}
             </div>
             <p className="muted" style={{ fontSize: "0.8rem", marginBottom: 0 }}>⚗️ Relics (Elixir of Renewal, Sands of Time) can&apos;t be bought — they only drop from the rarest chests.</p>
+            {mounted && petCele ? createPortal((
+                <div className="petfeed-cele" onClick={() => setPetCele(null)}>
+                    <div className="petfeed-flash" />
+                    <div className={`petfeed-card rar-${petCele.rarity}`} onClick={(e) => e.stopPropagation()}>
+                        <div className="petfeed-burst" aria-hidden="true">{Array.from({ length: 18 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>
+                        <span className="petfeed-art"><PetArt id={petCele.petId} /></span>
+                        <div className="petfeed-tag">⬆️ Level up!</div>
+                        <div className="petfeed-title">{petCele.petName} reached Lv {petCele.level}</div>
+                        <div className="petfeed-stars">{"★".repeat(petCele.level)}<span style={{ opacity: 0.3 }}>{"★".repeat(Math.max(0, 5 - petCele.level))}</span></div>
+                        {petCele.maxed ? <div className="petfeed-max">MAX LEVEL! 🏆</div> : null}
+                        <button type="button" className="button gold" onClick={() => setPetCele(null)}>Awesome!</button>
+                    </div>
+                </div>
+            ), document.body) : null}
         </section>
     );
 }
