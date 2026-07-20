@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
-import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById } from "@/lib/marketplace/items.js";
@@ -171,8 +172,11 @@ export async function getBossState(buyerId = null) {
         getDefaultSpriteUrl().catch(() => null),
     ]);
     // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
-    // { pet_id: { url, flip } } — flip mirrors a backwards sprite at render time.
-    const petSprites = await getPetSpriteData().catch(() => ({}));
+    // Base (Lv1) art + evolved (Lv2–5) art; each fighter shows the sprite for THEIR pet's level.
+    const [petSprites, petSpriteLevels] = await Promise.all([
+        getPetSpriteData().catch(() => ({})),
+        getPetSpriteLevelData().catch(() => ({})),
+    ]);
 
     // Each contributor's most prestigious badge (lowest sort_order), in one query — so the roster cards
     // can show a badge next to the mini avatar to tell everyone apart.
@@ -196,7 +200,9 @@ export async function getBossState(buyerId = null) {
     // member count, which is fine for a store-sized roster.
     const members = await db
         .query(
-            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible, COALESCE(SUM(h.damage), 0)::int AS dmg
+            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
+                    (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
+                    COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
                LEFT JOIN boss_hit h ON h.buyer_id = b.id AND h.boss_id = $1
               WHERE b.alias IS NOT NULL
@@ -205,16 +211,22 @@ export async function getBossState(buyerId = null) {
         )
         .catch(() => []);
     const fighters = members
-        .map((m) => ({
-            id: m.id,
-            name: m.display_name || m.alias || "Member",
-            spriteUrl: m.avatar_sprite_url || defaultSprite || null,
-            // Only mirror the member's OWN sprite (the shared default sprite already faces right).
-            spriteFlip: m.avatar_sprite_url ? m.avatar_sprite_flip === true : false,
-            petSpriteUrl: (m.featured_collectible && petSprites[m.featured_collectible]?.url) || null,
-            petSpriteFlip: (m.featured_collectible && petSprites[m.featured_collectible]?.flip) || false,
-            you: buyerId && m.id === buyerId,
-        }))
+        .map((m) => {
+            // Show the equipped pet at THIS member's level for that pet (highest evolved sprite ≤ level).
+            const petArt = m.featured_collectible
+                ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible], petLevelForXp(m.featured_pet_xp || 0))
+                : null;
+            return {
+                id: m.id,
+                name: m.display_name || m.alias || "Member",
+                spriteUrl: m.avatar_sprite_url || defaultSprite || null,
+                // Only mirror the member's OWN sprite (the shared default sprite already faces right).
+                spriteFlip: m.avatar_sprite_url ? m.avatar_sprite_flip === true : false,
+                petSpriteUrl: petArt?.url || null,
+                petSpriteFlip: petArt?.flip || false,
+                you: buyerId && m.id === buyerId,
+            };
+        })
         .filter((m) => m.spriteUrl);
 
     const roster = contributors.map((c) => ({

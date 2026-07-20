@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { fixPetSpriteOrientations, generateMissingPetSprites, generatePetSprite, petSpriteStatus, setPetSpriteFlip, detectPetSpriteFacings } from "@/lib/marketplace/pet-sprite.js";
+import { fixPetSpriteOrientations, generateMissingPetSprites, generatePetSprite, petSpriteStatus, setPetSpriteFlip, detectPetSpriteFacings, generateMissingPetSpriteLevels, generatePetSpriteLevel, setPetSpriteLevelFlip, detectPetSpriteLevelFacings, petSpriteLevelStatus } from "@/lib/marketplace/pet-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -18,7 +18,9 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            return noStore(await petSpriteStatus());
+            // ?levels=1 → the per-level (Lv2–5) evolution status; default → the base (Lv1) status.
+            const wantLevels = new URL(request.url).searchParams.get("levels");
+            return noStore(wantLevels ? await petSpriteLevelStatus() : await petSpriteStatus());
         } catch (error) {
             return internalError(error, { event: "admin.pet_sprites.status.failure" });
         }
@@ -48,6 +50,21 @@ export async function POST(request) {
             // AI read-pass: mark left-facing sprites so they render mirrored (a few per call; call until remaining=0).
             if (body?.action === "detectFacing") {
                 return noStore(await detectPetSpriteFacings(Number(body?.limit) || 6));
+            }
+            // ── Per-level (Lv2–5) evolved sprites ──
+            if (body?.action === "oneLevel" && body?.petId && body?.level) {
+                const url = await generatePetSpriteLevel(String(body.petId), Number(body.level));
+                return noStore({ ok: true, petId: body.petId, level: Number(body.level), url });
+            }
+            if (body?.action === "setLevelFlip" && body?.petId && body?.level) {
+                return noStore(await setPetSpriteLevelFlip(String(body.petId), Number(body.level), Boolean(body.flip)));
+            }
+            if (body?.action === "detectLevelFacing") {
+                return noStore(await detectPetSpriteLevelFacings(Number(body?.limit) || 6));
+            }
+            // Bulk-fill missing Lv2–5 sprites (a few per call; loop until remaining=0).
+            if (body?.action === "generateLevels") {
+                return noStore(await generateMissingPetSpriteLevels(Number(body?.limit) || 4));
             }
             return noStore(await generateMissingPetSprites(Number(body?.limit) || 4));
         } catch (error) {
