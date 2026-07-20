@@ -66,21 +66,23 @@ export function buildSpritePrompt(config, gear = "") {
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
 export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
 
-// Buyers whose sprite is missing or stale. NOTE: we intentionally regenerate only when the AVATAR'S
-// APPEARANCE changes — NOT on gear swaps — to control OpenAI cost (a sprite regen is an image generation,
-// and gear changes are frequent + a minor visual detail). The sprite still draws whatever gear is equipped
-// at the moment it IS regenerated. Oldest/never first.
-export function pendingSpriteIds(limit = 5) {
+// Buyers whose sprite is missing or stale. Redraw when the avatar's APPEARANCE changes OR their equipped
+// GEAR changes — so the sprite always reflects the current loadout (the art prompt includes equipped gear).
+// Oldest/never first. Pass a limit to cap the batch; omit it to return every pending member (the nightly
+// job draws them all — the store roster is small).
+export function pendingSpriteIds(limit = null) {
+    const capped = Number.isFinite(Number(limit)) && Number(limit) > 0;
     return db
         .query(
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
                 AND avatar_updated_at IS NOT NULL
                 AND (avatar_sprite_url IS NULL
-                     OR avatar_updated_at > avatar_sprite_at)
+                     OR avatar_updated_at > avatar_sprite_at
+                     OR equipment_updated_at > avatar_sprite_at)
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_updated_at DESC NULLS LAST
-              LIMIT $1`,
-            [Math.max(1, Math.min(50, Math.floor(Number(limit) || 5)))]
+              ${capped ? "LIMIT $1" : ""}`,
+            capped ? [Math.floor(Number(limit))] : []
         )
         .then((rows) => rows.map((r) => r.id))
         .catch(() => []);
@@ -91,7 +93,7 @@ export async function listSpritesAdmin() {
     const rows = await db
         .query(
             `SELECT id, display_name, alias, avatar_config, avatar_sprite_url, avatar_sprite_at, avatar_updated_at,
-                    avatar_sprite_flip, avatar_facing_checked_at
+                    equipment_updated_at, avatar_sprite_flip, avatar_facing_checked_at
                FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
               ORDER BY (avatar_sprite_url IS NULL) DESC, avatar_updated_at DESC NULLS LAST
@@ -111,7 +113,12 @@ export async function listSpritesAdmin() {
         // placed at the top with room below). v bumps when the framing changes (immutable-cached URL).
         avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=2`,
         prompt: buildSpritePrompt(r.avatar_config, gearMap.get(r.id) || ""),
-        pending: !r.avatar_sprite_url || (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) || !r.avatar_sprite_at,
+        // Pending when there's no sprite yet, or the avatar appearance OR equipped gear changed since it was drawn.
+        pending:
+            !r.avatar_sprite_url ||
+            !r.avatar_sprite_at ||
+            (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) ||
+            (r.equipment_updated_at && r.avatar_sprite_at && new Date(r.equipment_updated_at) > new Date(r.avatar_sprite_at)),
     }));
 }
 
@@ -206,12 +213,17 @@ export async function generateDefaultSprite() {
     return url;
 }
 
-// Cron entry point: draw up to `limit` pending sprites. Small batch = cost + time control.
-export async function runAvatarSpriteJob(limit = 4) {
-    const ids = await pendingSpriteIds(limit);
+// Cron entry point: draw ALL pending sprites (missing, appearance-changed, or gear-changed) — no fixed
+// count cap, since the store roster is small. A soft time budget stops gracefully before the serverless
+// function times out; anything left over just gets picked up on the next run (each sprite commits as it
+// finishes, so it's resumable).
+export async function runAvatarSpriteJob({ maxMs = 270000 } = {}) {
+    const ids = await pendingSpriteIds();
+    const startedAt = Date.now();
     let generated = 0;
     const errors = [];
     for (const id of ids) {
+        if (Date.now() - startedAt > maxMs) break; // leave headroom under the function's maxDuration
         try {
             await generateBuyerSprite(id);
             generated += 1;
@@ -219,6 +231,6 @@ export async function runAvatarSpriteJob(limit = 4) {
             errors.push({ buyerId: id, error: error?.message || String(error) });
         }
     }
-    const remaining = (await pendingSpriteIds(50)).length;
+    const remaining = (await pendingSpriteIds()).length;
     return { generated, attempted: ids.length, remaining, errors };
 }
