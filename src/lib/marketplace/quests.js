@@ -19,6 +19,7 @@ export const QUEST_TEMPLATES = [
     { key: "post_bounty", label: "Post a bounty on the board", metric: "bounty_post", target: 1, gold: 130, area: "/marketplace/bounties/new", cta: "Post a bounty" },
     { key: "take_bounty", label: "Take on a community bounty", metric: "bounty_claim", target: 1, gold: 120, area: "/marketplace/bounties", cta: "Browse bounties" },
     { key: "donate_event", label: "Donate 1,000 gold to the pack (Happy Hour / rally)", metric: "donate_event", target: 1000, gold: 200, area: "/marketplace/boss", cta: "Donate gold" },
+    { key: "spin_wheel", label: "Spin the daily wheel", metric: "spin", target: 1, gold: 100, area: "/marketplace/spin", cta: "Spin the wheel" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
@@ -118,5 +119,9 @@ export async function claimQuest(buyerId, questKey) {
     if (!row) return { ok: false, error: "not_claimable" };
     if (row.reward_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, row.reward_gold]).catch(() => {});
     if (row.reward_chest) await addChests(buyerId, { [row.reward_chest]: 1 }).catch(() => {});
-    return { ok: true, gold: row.reward_gold, chest: row.reward_chest };
+    // Clearing ALL of today's quests earns a bonus spin token.
+    let bonusSpin = false;
+    const left = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2 AND claimed_at IS NULL`, [buyerId, day]).catch(() => null);
+    if (left && left.n === 0) { await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {}); bonusSpin = true; }
+    return { ok: true, gold: row.reward_gold, chest: row.reward_chest, bonusSpin };
 }

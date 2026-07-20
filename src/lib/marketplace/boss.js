@@ -405,6 +405,8 @@ async function finalizeBossKill(bossId) {
 
     // XP: everyone who fought earns participation; the damage champion gets a bonus (deduped per boss).
     for (const p of pool) await awardXp(p.id, "boss_participated", { dedupeKey: `boss_participated:${bossId}:${p.id}` }).catch(() => {});
+    // Slaying the boss earns every participant a spin-wheel token.
+    for (const p of pool) await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [p.id]).catch(() => {});
     if (top1) await awardXp(top1.id, "boss_won", { dedupeKey: `boss_won:${bossId}` }).catch(() => {});
     // The damage champion has a strong chance at a rare boss-only pet companion.
     if (top1) await maybeGrantBossPet(top1.id).catch(() => {});

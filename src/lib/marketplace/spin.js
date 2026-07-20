@@ -1,0 +1,175 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
+import { addChests } from "@/lib/marketplace/chests.js";
+import { grantConsumable } from "@/lib/marketplace/consumables.js";
+import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
+
+// DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
+// gold. Your level unlocks better wheels. A pity counter guarantees a rare prize every PITY spins. Gold
+// prizes ride the Happy Hour multiplier. The wheel's prize list is ordered + stable so the UI can rotate to
+// the winning index.
+
+export const SPIN_TOKEN_COST = 400; // gold to buy one extra spin
+const PITY = 20; // guaranteed rare within this many spins
+const COUPON_PCT = 50;
+const COUPON_MAX = 4000;
+
+const WHEELS = [
+    {
+        id: "bronze", name: "Bronze Wheel", minLevel: 1,
+        prizes: [
+            { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
+            { label: "Pet Treat", emoji: "🦴", weight: 18, kind: "treat", treat: "treat_bone" },
+            { label: "200 XP", emoji: "⭐", weight: 16, kind: "xp", amount: 200 },
+            { label: "250 gold", emoji: "💰", weight: 14, kind: "gold", amount: 250 },
+            { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
+            { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, kind: "chest", tier: "wooden" },
+            { label: "500 gold", emoji: "🤑", weight: 4, rare: true, kind: "gold", amount: 500 },
+            { label: "50% Coupon", emoji: "🎫", weight: 2, rare: true, kind: "coupon" },
+        ],
+    },
+    {
+        id: "silver", name: "Silver Wheel", minLevel: 20,
+        prizes: [
+            { label: "250 gold", emoji: "🪙", weight: 26, kind: "gold", amount: 250 },
+            { label: "Hearty Snack", emoji: "🍖", weight: 16, kind: "treat", treat: "treat_snack" },
+            { label: "500 XP", emoji: "⭐", weight: 14, kind: "xp", amount: 500 },
+            { label: "500 gold", emoji: "💰", weight: 14, kind: "gold", amount: 500 },
+            { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
+            { label: "Iron Chest", emoji: "⚙️", weight: 8, rare: true, kind: "chest", tier: "iron" },
+            { label: "1,000 gold", emoji: "🤑", weight: 6, rare: true, kind: "gold", amount: 1000 },
+            { label: "Random Pet", emoji: "🐾", weight: 3, rare: true, kind: "pet" },
+            { label: "50% Coupon", emoji: "🎫", weight: 3, rare: true, kind: "coupon" },
+        ],
+    },
+    {
+        id: "gold", name: "Gold Wheel", minLevel: 50,
+        prizes: [
+            { label: "500 gold", emoji: "🪙", weight: 24, kind: "gold", amount: 500 },
+            { label: "Chew Toy", emoji: "🧸", weight: 12, kind: "treat", treat: "treat_toy" },
+            { label: "1,000 XP", emoji: "⭐", weight: 12, kind: "xp", amount: 1000 },
+            { label: "1,000 gold", emoji: "💰", weight: 14, kind: "gold", amount: 1000 },
+            { label: "+2 Spins", emoji: "🎟️", weight: 10, kind: "token", n: 2 },
+            { label: "Gold Chest", emoji: "🟨", weight: 8, rare: true, kind: "chest", tier: "gold" },
+            { label: "2,500 gold", emoji: "🤑", weight: 6, rare: true, kind: "gold", amount: 2500 },
+            { label: "Random Pet", emoji: "🐾", weight: 4, rare: true, kind: "pet" },
+            { label: "🎰 JACKPOT", emoji: "💎", weight: 2, rare: true, kind: "jackpot", amount: 5000 },
+            { label: "50% Coupon", emoji: "🎫", weight: 4, rare: true, kind: "coupon" },
+        ],
+    },
+];
+
+function wheelForLevel(level) {
+    let w = WHEELS[0];
+    for (const cand of WHEELS) if (level >= cand.minLevel) w = cand;
+    return w;
+}
+
+// Weighted pick of a prize INDEX. forceRare restricts to rare segments (pity).
+function pickIndex(wheel, forceRare, rand = Math.random) {
+    const pool = wheel.prizes.map((p, i) => ({ i, w: forceRare ? (p.rare ? p.weight : 0) : p.weight }));
+    const total = pool.reduce((s, x) => s + x.w, 0);
+    if (total <= 0) return 0;
+    let r = rand() * total;
+    for (const x of pool) { r -= x.w; if (r < 0) return x.i; }
+    return pool[pool.length - 1].i;
+}
+
+// Deliver a prize; returns display { emoji, text }.
+async function grantPrize(buyerId, prize) {
+    const hh = await activeXpMultiplier().catch(() => 1);
+    if (prize.kind === "gold" || prize.kind === "jackpot") {
+        const amt = Math.round(prize.amount * (prize.kind === "gold" ? hh : 1)); // jackpot is already huge; don't HH-stack it
+        await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
+        if (prize.kind === "jackpot") await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+        return { emoji: prize.emoji, text: `${amt.toLocaleString()} gold${prize.kind === "jackpot" ? " — JACKPOT! 💎" : ""}` };
+    }
+    if (prize.kind === "xp") {
+        await awardXp(buyerId, "spin_reward", { points: prize.amount }).catch(() => {});
+        return { emoji: prize.emoji, text: `${prize.amount.toLocaleString()} XP` };
+    }
+    if (prize.kind === "treat") { await grantConsumable(buyerId, prize.treat, 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tier]: 1 }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% shop coupon` }; }
+    if (prize.kind === "token") { await grantSpinTokens(buyerId, prize.n || 1); return { emoji: prize.emoji, text: `+${prize.n || 1} spin` }; }
+    if (prize.kind === "pet") {
+        const owned = new Set((await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => [])).map((r) => r.ref));
+        const pool = COLLECTIBLES.filter((p) => p.source !== "level" && !owned.has(p.id));
+        if (!pool.length) { await db.query(`UPDATE mkt_buyer SET gold = gold + 500 WHERE id = $1`, [buyerId]).catch(() => {}); return { emoji: "🪙", text: "500 gold (all pets owned)" }; }
+        const won = pool[Math.floor(Math.random() * pool.length)];
+        await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});
+        return { emoji: "🐾", text: `${won.name} pet!` };
+    }
+    return { emoji: "✨", text: prize.label };
+}
+
+// Give spin tokens (from quests / boss kills / streaks). Exported for the tie-ins.
+export async function grantSpinTokens(buyerId, n = 1) {
+    if (!buyerId || n <= 0) return;
+    await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + $2 WHERE id = $1`, [buyerId, Math.floor(n)]).catch(() => {});
+}
+
+// Store-day helper.
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const asDay = (v) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(v)) : null);
+
+export async function getSpinState(buyerId) {
+    if (!buyerId) return { signedIn: false };
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day, COALESCE(spin_count,0) AS spin_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const level = levelForXp(row?.xp || 0).level;
+    const wheel = wheelForLevel(level);
+    const freeAvailable = asDay(row?.free_spin_day) !== today();
+    const next = WHEELS.find((w) => w.minLevel > level);
+    return {
+        signedIn: true,
+        gold: row?.gold || 0,
+        tokens: row?.tokens || 0,
+        spinCount: row?.spin_count || 0,
+        freeAvailable,
+        tokenCost: SPIN_TOKEN_COST,
+        wheel: { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare) })) },
+        nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
+        canSpin: freeAvailable || (row?.tokens || 0) > 0,
+    };
+}
+
+// Do a spin (uses the free daily spin first, else a token). Returns the winning segment index + prize.
+export async function doSpin(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day, COALESCE(spins_since_rare,0) AS pity FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!row) return { ok: false, error: "not_signed_in" };
+    const freeAvailable = asDay(row.free_spin_day) !== today();
+    // Consume a spin atomically (free first, else a token).
+    let consumed = null;
+    if (freeAvailable) {
+        consumed = await db.queryOne(`UPDATE mkt_buyer SET free_spin_day = $2::date WHERE id = $1 AND (free_spin_day IS DISTINCT FROM $2::date) RETURNING id`, [buyerId, today()]).catch(() => null);
+    }
+    if (!consumed) {
+        consumed = await db.queryOne(`UPDATE mkt_buyer SET spin_tokens = spin_tokens - 1 WHERE id = $1 AND spin_tokens > 0 RETURNING id`, [buyerId]).catch(() => null);
+        if (!consumed) return { ok: false, error: "no_spins" };
+    }
+    const wheel = wheelForLevel(levelForXp(row.xp).level);
+    const forceRare = row.pity >= PITY - 1;
+    const idx = pickIndex(wheel, forceRare);
+    const prize = wheel.prizes[idx];
+    const display = await grantPrize(buyerId, prize);
+    await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + 1 END WHERE id = $1`, [buyerId, Boolean(prize.rare)]).catch(() => {});
+    await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
+    await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
+    await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
+    return { ok: true, prizeIndex: idx, prize: display, ...(await getSpinState(buyerId)) };
+}
+
+// Buy one extra spin token with gold.
+export async function buySpinToken(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, spin_tokens = spin_tokens + 1 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, SPIN_TOKEN_COST]).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold" };
+    return { ok: true, ...(await getSpinState(buyerId)) };
+}

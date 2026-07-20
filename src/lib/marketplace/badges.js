@@ -72,7 +72,7 @@ async function heldSlugs(buyerId) {
 // Live metrics used to evaluate unlock rules AND to show progress on the rewards track. One buyer, a
 // handful of cheap aggregates. Exported so the track page reuses the exact same numbers the engine grants on.
 export async function getMemberMetrics(buyerId) {
-    const buyer = await db.queryOne(`SELECT xp, created_at, COALESCE(event_gold_donated, 0) AS event_gold_donated FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const buyer = await db.queryOne(`SELECT xp, created_at, COALESCE(event_gold_donated, 0) AS event_gold_donated, COALESCE(spin_count, 0) AS spin_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
     const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows, petLevelRows] = await Promise.all([
@@ -182,6 +182,7 @@ export async function getMemberMetrics(buyerId) {
         petLevelsTotal,
         maxedLegendaryPlus,
         eventDonated: Number(buyer?.event_gold_donated || 0),
+        spinCount: Number(buyer?.spin_count || 0),
     };
 }
 
@@ -220,6 +221,7 @@ export function progressForRule(rule, threshold, m) {
         case "pets_maxed": return { current: m.petsMaxed, target: t }; // # of pets at Lv5
         case "pet_levels_total": return { current: m.petLevelsTotal, target: t }; // total levels gained across pets
         case "event_donated": return { current: m.eventDonated, target: t }; // lifetime gold donated to Happy Hour / rally
+        case "spin_count": return { current: m.spinCount, target: t }; // lifetime wheel spins
         default: return { current: 0, target: t || 1 };
     }
 }
