@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { createBuyer, createEmailVerification } from "@/lib/marketplace/buyer-session.js";
 import { sendVerificationEmail } from "@/lib/marketplace/email.js";
+import { sendAdminPush } from "@/lib/push/send.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -29,6 +30,14 @@ export async function POST(request) {
                     }
                 }
                 logger.info("marketplace.buyer.registered", { buyerId: buyer.id, needsVerification: true });
+                // Ping the owner/admin app that a new member joined (fire-and-forget).
+                const who = buyer.displayName || [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || buyer.email;
+                after(() => sendAdminPush({
+                    title: "🐺 New member joined!",
+                    body: `${who} just signed up in the app.`,
+                    route: "members",
+                    data: { type: "new_member", buyerId: buyer.id },
+                }).catch(() => {}));
                 return NextResponse.json({ ok: true, needsVerification: true, email: buyer.email });
             } catch (validationError) {
                 return NextResponse.json({ error: validationError.message }, { status: 400 });

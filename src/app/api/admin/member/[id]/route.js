@@ -105,6 +105,8 @@ export async function GET(request, { params }) {
                     return { label: activityLabel(r.event, meta, r.path), points: 0, at: r.created_at };
                 }),
             ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 120);
+            // Clean XP-only ledger (no view/telemetry noise) — shows exactly how the member is leveling.
+            const xpLedger = (historyRows || []).filter((r) => Number(r.points)).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: iso(r.created_at) }));
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));
             const gear = (inv?.items || []).map((i) => ({
@@ -150,6 +152,7 @@ export async function GET(request, { params }) {
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
                 petPerks: (petPerks || []).map((p) => ({ petId: p.petId, name: p.name, reward: p.reward, available: p.available, cooldownUntil: p.cooldownUntil })),
                 history: history.map((x) => ({ label: x.label, points: x.points, at: iso(x.at) })),
+                xpLedger,
             }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.member.detail.failure" });
