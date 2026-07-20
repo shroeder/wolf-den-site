@@ -6,8 +6,6 @@ import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
-import { elitePetForRarity } from "@/lib/marketplace/collectibles.js";
-import { recordGift } from "@/lib/marketplace/gifts.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
@@ -326,15 +324,10 @@ export async function grantItem(buyerId, itemId, via = "admin") {
     return { ok: true, granted };
 }
 
-// Elite-item side effects: unlock the matching pet (via the cosmetic-unlock store) + sync elite badges.
+// Elite-item side effects: re-check the Ascendant/Eternal badges. (The apex pets Molten Phoenix / Eternal
+// Wolf Spirit are NO LONGER auto-granted just for owning an elite item — that was far too easy. They now
+// require a hard achievement — an elite relic PLUS boss-raffle wins — see ACHIEVEMENT_PET_RULES in pets.js.)
 async function onEliteItemGained(buyerId, item) {
-    const pet = elitePetForRarity(item.rarity);
-    if (pet) {
-        const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, pet.id]).catch(() => []);
-        if (ins.length) {
-            await recordGift(buyerId, { kind: "item", title: "🐾 Legendary companion unlocked!", body: `Your ${item.rarity} gear awakened the ${pet.name} — equip it from your collectibles!`, icon: "🐾", url: "/marketplace/profile" }).catch(() => {});
-        }
-    }
     await syncEarnedBadges(buyerId).catch(() => {});
 }
 

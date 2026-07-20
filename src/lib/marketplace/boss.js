@@ -510,8 +510,14 @@ async function finalizeBossKill(bossId) {
     // Slaying the boss earns every participant a spin-wheel token.
     for (const p of pool) await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [p.id]).catch(() => {});
     if (top1) await awardXp(top1.id, "boss_won", { dedupeKey: `boss_won:${bossId}` }).catch(() => {});
-    // The damage champion has a strong chance at a rare boss-only pet companion.
-    if (top1) await maybeGrantBossPet(top1.id).catch(() => {});
+    // Boss-only pet companions are now SPREAD across the top 3 dealers, each at a much smaller chance
+    // (was ~60% and guaranteed to #1) — so the reward isn't all on one person and legendaries stay rare.
+    const top3 = ranked.slice(0, 3);
+    const petWinners = new Set();
+    for (const p of top3) {
+        const drop = await maybeGrantBossPet(p.id, { chance: 0.12 }).catch(() => null);
+        if (drop) petWinners.add(p.id);
+    }
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
 
     // IN-GAME CHASE GEAR + a drop-only badge → the #1 damage dealer (their skill reward).
@@ -522,29 +528,20 @@ async function finalizeBossKill(bossId) {
     }
     const top1Badge = top1 ? await grantRandomDropBadge(top1.id).catch(() => null) : null;
 
-    // LOOT CHESTS — everyone who fought rolls a chance. Contribution (damage vs. the top dealer) drives the
-    // odds (min 20% → guaranteed for #1) and gives a slight thumb on the scale toward a better tier.
+    // LOOT CHESTS — a CONSOLATION for the rest of the pack. Anyone who already won something (top damage, the
+    // raffle prize, or a boss pet) is EXCLUDED — no chest piled on top of a real reward — and tiers are capped
+    // at Iron so a chest never out-rewards the prizes. (The old elite Ascendant+ chest for #1 is gone.)
+    const rewardWinners = new Set([top1?.id, raffleWinner?.id, ...petWinners].filter(Boolean));
     const chestByBuyer = new Map();
     for (const p of pool) {
+        if (rewardWinners.has(p.id)) continue; // already got a good reward — no bonus chest
         const ratio = Math.max(0, Math.min(1, p.dmg / topDmg));
         if (Math.random() >= 0.2 + ratio * 0.8) continue; // didn't roll a chest this time
-        const q = Math.random() * 0.75 + ratio * 0.25;
-        const tier = q >= 0.93 ? "mythic" : q >= 0.75 ? "gold" : q >= 0.45 ? "iron" : "wooden";
+        const tier = Math.random() < 0.4 + ratio * 0.3 ? "iron" : "wooden"; // capped at Iron
         chestByBuyer.set(p.id, tier);
         await addChests(p.id, { [tier]: 1 }).catch(() => {});
     }
-
-    // ELITE CHEST — the #1 damage dealer gets a tiny shot at the rarest loot in the game (Ascendant/Eternal
-    // gear: top-end stats + a real-world reward). Deliberately harsh: ~8% Ascendant, ~2% Eternal.
-    let eliteChest = null;
-    if (top1) {
-        const r = Math.random();
-        if (r < 0.005) eliteChest = "primordial";      // ~0.5% — the rarest chest in the game
-        else if (r < 0.02) eliteChest = "eternal";     // ~1.5%
-        else if (r < 0.05) eliteChest = "celestial";   // ~3%
-        else if (r < 0.12) eliteChest = "ascendant";   // ~7%
-        if (eliteChest) await addChests(top1.id, { [eliteChest]: 1 }).catch(() => {});
-    }
+    const eliteChest = null; // elite Ascendant+ boss chest retired — too generous stacked on the #1 dealer
 
     // Pack-wide celebration pop-up — personalized to what each member actually won.
     for (const p of pool) {

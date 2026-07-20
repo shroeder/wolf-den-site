@@ -34,13 +34,19 @@ export async function maybeGrantChestPet(buyerId, openedTier) {
     return grantDrop(buyerId, pet, "chest", { tier: openedTier });
 }
 
-// A boss raffle winner has a strong chance at a rare boss-only pet.
-export async function maybeGrantBossPet(buyerId, { chance = 0.6 } = {}) {
+// A top boss dealer has a SMALL chance at a boss-only pet. Deliberately stingy (was 60% → too many
+// legendaries too fast) and now rolled for the top 3 dealers rather than guaranteed to #1. When it does hit,
+// it's almost always a LEGENDARY boss pet; the two MYTHIC boss pets (Fairy, Kraken) only surface on a rare
+// sub-roll so the rarest companions stay genuinely rare.
+export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     if (!buyerId) return null;
     if (Math.random() > chance) return null;
     const owned = await ownedPetSet(buyerId);
     const eligible = COLLECTIBLES.filter((p) => p.source === "boss" && !owned.has(p.id));
     if (!eligible.length) return null;
-    const pet = eligible[Math.floor(Math.random() * eligible.length)];
+    const legendary = eligible.filter((p) => p.rarity === "legendary");
+    // 90% of drops draw only from legendary boss pets; mythic boss pets need the 10% sub-roll.
+    const pool = legendary.length && Math.random() > 0.1 ? legendary : eligible;
+    const pet = pool[Math.floor(Math.random() * pool.length)];
     return grantDrop(buyerId, pet, "boss", {});
 }

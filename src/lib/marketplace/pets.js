@@ -25,6 +25,10 @@ const ACHIEVEMENT_PET_RULES = {
     spirit_fox: (m) => (m.petLevelsTotal || 0) >= 10,
     runebound_drake: (m) => (m.petsMaxed || 0) >= 5,
     radiant_phoenix: (m) => Boolean(m.maxedLegendaryPlus),
+    // APEX pets (Ascendant / Eternal) — used to unlock for merely OWNING any elite item (far too easy).
+    // Now a hard, distinct feat: an elite relic PLUS proven boss dominance (raffle wins).
+    molten_phoenix: (m) => (m.eliteItems || 0) >= 1 && (m.bossesWon || 0) >= 3, // Ascendant relic + 3 boss wins
+    eternal_wolf: (m) => (m.eternalItems || 0) >= 1 && (m.bossesWon || 0) >= 5, // Eternal relic + 5 boss wins
 };
 
 // Grant any achievement pets the member has newly qualified for. Best-effort; returns newly-granted ids.

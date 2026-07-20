@@ -137,8 +137,8 @@ export const COLLECTIBLES = [
     { id: "kraken", name: "Kraken", Icon: GiKrakenTentacle, color: "#6a4fe0", rarity: "mythic", source: "boss", activeStat: "crit_power", hint: "Release the kraken", spritePrompt: "a monstrous kraken with huge tentacles" },
 
     // ── Elite (NOT level-unlocked) — special triggers ──────────────────────────────────────────────
-    { id: "molten_phoenix", name: "Molten Phoenix", Icon: GiDragonSpiral, color: "#ff7a3c", rarity: "ascendant", source: "elite", eliteOnly: true, unlockRarity: "ascendant", activeStat: "ferocity", hint: "Reborn from Ascendant fire", spritePrompt: "a blazing molten phoenix wreathed in orange-gold fire and embers, radiating heat" },
-    { id: "eternal_wolf", name: "Eternal Wolf Spirit", Icon: GiSpectre, color: "#ff5cc8", rarity: "eternal", source: "elite", eliteOnly: true, unlockRarity: "eternal", activeStat: "might", hint: "Bound to an Eternal relic", spritePrompt: "a majestic ghostly wolf spirit glowing with impossible prismatic rainbow light, ethereal and translucent" },
+    { id: "molten_phoenix", name: "Molten Phoenix", Icon: GiDragonSpiral, color: "#ff7a3c", rarity: "ascendant", source: "elite", eliteOnly: true, unlockRarity: "ascendant", unlockText: "Own an Ascendant+ item & win 3 boss raffles", activeStat: "ferocity", hint: "Reborn from Ascendant fire", spritePrompt: "a blazing molten phoenix wreathed in orange-gold fire and embers, radiating heat" },
+    { id: "eternal_wolf", name: "Eternal Wolf Spirit", Icon: GiSpectre, color: "#ff5cc8", rarity: "eternal", source: "elite", eliteOnly: true, unlockRarity: "eternal", unlockText: "Own an Eternal item & win 5 boss raffles", activeStat: "might", hint: "Bound to an Eternal relic", spritePrompt: "a majestic ghostly wolf spirit glowing with impossible prismatic rainbow light, ethereal and translucent" },
     { id: "bounty_hound", name: "Bounty Hound", Icon: GiWolfHead, color: "#ffd75e", rarity: "legendary", source: "achievement", eliteOnly: true, activeStat: "fortune", achievement: "Fulfill 10 community bounties", spritePrompt: "a loyal rugged hound wearing a bounty hunter's bandana, alert and ready for the hunt" },
 ];
 
@@ -175,7 +175,7 @@ export function petUnlockText(pet) {
         case "chest": return `Found in ${CHEST_LABEL[pet.chestTier] || "rare"}+ chests`;
         case "boss": return "Rare boss-battle drop";
         case "achievement": return pet.achievement || "Earn via an achievement";
-        case "elite": return pet.unlockRarity ? `Own any ${pet.unlockRarity}-tier item` : (pet.hint || "Special unlock");
+        case "elite": return pet.unlockText || (pet.unlockRarity ? `Own any ${pet.unlockRarity}-tier item` : (pet.hint || "Special unlock"));
         default: return pet.hint || "";
     }
 }
