@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import ChestIcon from "@/components/ChestIcon";
@@ -177,7 +178,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         </>
                     ) : isConsumable ? (
                         <>
-                            <span className="chest-reward-glyph" style={{ fontSize: "clamp(3rem, 16vw, 4.6rem)" }}>{reveal.consumable.emoji}</span>
+                            <ConsumableArt id={reveal.consumable.id} emoji={reveal.consumable.emoji} className="chest-reward-glyph" />
                             <div className="chest-reward-name">{reveal.consumable.name}</div>
                             <div className="chest-reward-sub muted">{reveal.consumable.desc}</div>
                         </>

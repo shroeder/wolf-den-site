@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { itemIcon } from "@/lib/marketplace/items.js";
+import ConsumableArt from "@/components/ConsumableArt";
+import ItemArt from "@/components/ItemArt";
 
 const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic" };
 
@@ -88,7 +89,7 @@ export default function ConsumablesClient() {
                     <div className="badge-board" style={{ marginBottom: 14 }}>
                         {stash.map((i) => (
                             <div key={i.id} className={`badge-tile is-earned${i.kind === "relic" ? " rar-eternal" : ""}`}>
-                                <span className="badge-tile-icon" aria-hidden="true">{i.emoji}</span>
+                                <ConsumableArt id={i.id} emoji={i.emoji} className="badge-tile-icon" />
                                 <span className="badge-tile-label">{i.name} ×{i.count}</span>
                                 <span className="badge-tile-desc muted">{i.desc}</span>
                                 <button type="button" className="btn btn-small" disabled={busy === `use:${i.id}`} onClick={() => useItem(i)} style={{ marginTop: 6 }}>
@@ -109,10 +110,9 @@ export default function ConsumablesClient() {
                     {targets.length ? (
                         <div className="badge-board">
                             {targets.map((t) => {
-                                const Gi = itemIcon(t.icon);
                                 return (
                                     <div key={t.id} className={`badge-tile rar-${t.rarity}`}>
-                                        <span className="badge-tile-icon" aria-hidden="true"><Gi /></span>
+                                        <ItemArt id={t.id} icon={t.icon} className="badge-tile-icon" />
                                         <span className="badge-tile-label">{t.name}</span>
                                         <span className="badge-tile-desc muted">{t.chargesLeft}/{t.maxCharges} charges{t.onCooldown ? " · on cooldown" : ""}</span>
                                         <button type="button" className="btn btn-small" disabled={!!busy} onClick={() => applyToTarget(t.id)} style={{ marginTop: 6 }}>Use on this</button>
@@ -130,7 +130,7 @@ export default function ConsumablesClient() {
             <div className="badge-board">
                 {(state.shop || []).map((i) => (
                     <div key={i.id} className="badge-tile">
-                        <span className="badge-tile-icon" aria-hidden="true">{i.emoji}</span>
+                        <ConsumableArt id={i.id} emoji={i.emoji} className="badge-tile-icon" />
                         <span className="badge-tile-label">{i.name}</span>
                         <span className="badge-tile-desc muted">{KIND_LABEL[i.kind] || ""} · {i.desc}</span>
                         {i.canAfford ? (

@@ -9023,6 +9023,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    they scale with each box's font-size (pet card, hero, avatar badge, featured chip) just like the glyph. */
 .pet-art { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .pet-art-img { width: 1.4em; height: 1.4em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.45)); }
+/* Consumable AI sprites (ConsumableArt) — sized by em to match the emoji they replace. */
+.con-art { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.con-art-img { width: 1.45em; height: 1.45em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.45)); }
 /* Small inline gear sprite next to text (trade offers). */
 .trade-item-art { display: inline-flex; vertical-align: middle; }
 .trade-item-art .item-art-img { width: 1.2em; height: 1.2em; }

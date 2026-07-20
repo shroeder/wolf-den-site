@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import { itemById } from "@/lib/marketplace/items";
@@ -19,7 +20,7 @@ function fmtCountdown(secs) {
 // Visual for a deal by kind: pet sprite, gear sprite, or a consumable emoji (sprite fallbacks to glyph).
 function DealArt({ deal }) {
     if (deal.kind === "pet") return <PetArt id={deal.id} className="deal-art" />;
-    if (deal.kind === "consumable") return <span className="deal-art">{deal.emoji || "🧪"}</span>;
+    if (deal.kind === "consumable") return <ConsumableArt id={deal.id} emoji={deal.emoji || "🧪"} className="deal-art" />;
     return <ItemArt id={deal.id} icon={deal.icon || itemById(deal.id)?.icon} className="deal-art" />;
 }
 
