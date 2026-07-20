@@ -9591,8 +9591,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .equip-perk:last-child { border-bottom: none; }
 .equip-perk-glyph { font-size: 1.7rem; color: var(--rar); display: flex; }
 .equip-perk-glyph svg { width: 1em; height: 1em; }
-.equip-perk-body { display: flex; flex-direction: column; }
+.equip-perk-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .equip-perk-state { font-size: 0.8rem; font-weight: 700; color: #ffd75e; }
+.equip-perk-use { flex: none; padding: 8px 14px; border-radius: 999px; border: none; font-weight: 800; font-size: 0.85rem; cursor: pointer; background: linear-gradient(180deg, #ffd75e, #e5b53c); color: #1a1205; }
+.equip-perk-use:disabled { opacity: 0.5; cursor: default; }
 
 .equip-gold { float: right; font-size: 0.85rem; font-weight: 800; color: #ffd75e; }
 

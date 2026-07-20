@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import QRCode from "qrcode";
 
 import ChestOpener from "@/components/ChestOpener";
 import ItemArt from "@/components/ItemArt";
@@ -31,6 +32,15 @@ function ItemGlyph({ id, className = "" }) {
 let DEFS = {};
 const itemDef = (id) => DEFS[id] || null;
 
+// Friendly text for a charge-claim mint failure.
+const chargeErr = (code) => ({
+    no_charges: "No charges left on this perk.",
+    on_cooldown: "This perk is still on cooldown.",
+    not_owned: "You don't own this perk.",
+    not_chargeable: "That item has no in-store charge.",
+    unauthorized: "Please sign in again.",
+}[code] || "Couldn't start that redemption. Try again.");
+
 export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null }) {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
@@ -41,6 +51,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [sellArmed, setSellArmed] = useState(false); // two-tap sell confirm inside the sheet (no native popup)
     const [coinBurst, setCoinBurst] = useState(null); // coin-shower juice on a sale
     const burstKey = useRef(0);
+    const [chargeClaim, setChargeClaim] = useState(null); // { token, qr, rewardLabel, itemName } — QR to show staff
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
@@ -63,6 +74,22 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
 
     function equip(slotKey, itemId) { setSlot(null); post({ slot: slotKey, itemId }); }
     function unequip(slotKey) { setSlot(null); post({ slot: slotKey, itemId: null }); }
+
+    // Member taps a READY in-store perk → mint a claim + show its QR. Staff scan it to actually use the
+    // charge (nothing is burned here). The QR encodes an opaque token behind a scheme prefix the admin app
+    // recognizes, so a random camera just sees harmless text.
+    async function useCharge(item) {
+        setBusy(true); setErr("");
+        try {
+            const r = await fetch("/api/marketplace/item-charge/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: item.id }) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok || !d?.ok) { setErr(chargeErr(d?.error)); return; }
+            const qr = await QRCode.toDataURL(`WDCHG:${d.token}`, { width: 320, margin: 1 }).catch(() => null);
+            setChargeClaim({ token: d.token, qr, rewardLabel: d.rewardLabel || item.charge?.rewardLabel || "Perk", itemName: item.name });
+            trackClient("use_charge", { itemId: item.id, name: item.name });
+        } finally { setBusy(false); }
+    }
+    function closeChargeClaim() { setChargeClaim(null); load(); } // reload so a just-scanned charge reflects
 
     async function buy(itemId) {
         setBusy(true); setErr("");
@@ -241,7 +268,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {charged.length ? (
                 <div className="card">
                     <h3>🎁 In-store perks</h3>
-                    <p className="muted" style={{ marginTop: 0 }}>Show these to staff at the register to redeem — they&apos;ll use a charge for you.</p>
+                    <p className="muted" style={{ marginTop: 0 }}>Tap <strong>Use charge</strong> on a ready perk to get a QR — show it to staff and they&apos;ll scan it to redeem.</p>
                     {charged.map((i) => (
                         <div key={i.id} className={`equip-perk rar-${i.rarity}`}>
                             <ItemGlyph id={i.id} className="equip-perk-glyph" />
@@ -254,6 +281,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                         : "All used up"}
                                 </span>
                             </div>
+                            {i.charge.available ? (
+                                <button type="button" className="equip-perk-use" onClick={() => useCharge(i)} disabled={busy}>Use charge</button>
+                            ) : null}
                         </div>
                     ))}
                 </div>
@@ -303,6 +333,21 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             ) : null}
 
             {/* Item detail sheet — inspect, then equip or sell. In-brand modal (no native browser popup). */}
+            {chargeClaim ? createPortal((
+                <div className="equip-sheet-overlay" onClick={closeChargeClaim} style={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.82)", padding: 20 }}>
+                    <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, margin: 0, textAlign: "center" }}>
+                        <h3 style={{ margin: "0 0 4px" }}>🎁 Show this to staff</h3>
+                        <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.85rem" }}>{chargeClaim.itemName} — staff will scan to redeem your perk.</p>
+                        {chargeClaim.qr ? (
+                            <img src={chargeClaim.qr} alt="Redemption QR code" style={{ width: "100%", maxWidth: 280, aspectRatio: "1", borderRadius: 12, background: "#fff", padding: 10 }} />
+                        ) : <p className="muted">Couldn&apos;t draw the code — tap Use charge again.</p>}
+                        <p style={{ margin: "12px 0 0", fontWeight: 800, color: "#ffd75e" }}>{chargeClaim.rewardLabel}</p>
+                        <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.75rem" }}>Nothing is used until staff scan it. This code expires in a few minutes.</p>
+                        <button type="button" className="btn" onClick={closeChargeClaim} style={{ marginTop: 14, width: "100%" }}>Done</button>
+                    </div>
+                </div>
+            ), document.body) : null}
+
             {detailItem ? createPortal((
                 <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
                     <div className={`card equip-sheet rar-${detailItem.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
