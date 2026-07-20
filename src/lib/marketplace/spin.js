@@ -115,13 +115,15 @@ export async function grantSpinTokens(buyerId, n = 1) {
     await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + $2 WHERE id = $1`, [buyerId, Math.floor(n)]).catch(() => {});
 }
 
-// Store-day helper.
+// Store-day helper. free_spin_day is a SQL DATE — always SELECT it as ::text and compare strings; building
+// a JS Date from it reformats in the process TZ and rolls the day back on Vercel (UTC), which would make
+// the free daily spin look available again on every refresh. (Same fix as daily-checkin.)
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-const asDay = (v) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(v)) : null);
+const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 export async function getSpinState(buyerId) {
     if (!buyerId) return { signedIn: false };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day, COALESCE(spin_count,0) AS spin_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const level = levelForXp(row?.xp || 0).level;
     const wheel = wheelForLevel(level);
     const freeAvailable = asDay(row?.free_spin_day) !== today();
@@ -142,7 +144,7 @@ export async function getSpinState(buyerId) {
 // Do a spin (uses the free daily spin first, else a token). Returns the winning segment index + prize.
 export async function doSpin(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day, COALESCE(spins_since_rare,0) AS pity FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spins_since_rare,0) AS pity FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_signed_in" };
     const freeAvailable = asDay(row.free_spin_day) !== today();
     // Consume a spin atomically (free first, else a token).

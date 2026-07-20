@@ -27,11 +27,15 @@ const STREAK_REWARDS = [
 ];
 const rewardForStreak = (streak) => STREAK_REWARDS[((Math.max(1, streak) - 1) % 7)];
 
-// Store-timezone day helpers (America/Chicago).
+// Store-timezone day helpers (America/Chicago), as "YYYY-MM-DD" strings.
 const dayStr = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 function storeToday() { return dayStr(new Date()); }
 function storeYesterday() { return dayStr(new Date(Date.now() - 86400000)); }
-const asDay = (v) => (v ? dayStr(new Date(v)) : null);
+// IMPORTANT: streak_claimed_day is a SQL DATE. node-postgres parses it into a JS Date at the PROCESS's
+// local-midnight, so on Vercel (UTC) reformatting it in America/Chicago rolls it back a day and "claimed
+// today" never registers. So we always SELECT `streak_claimed_day::text` (already "YYYY-MM-DD" in the DB)
+// and compare strings — never build a JS Date from it. asDay just normalizes an already-"YYYY-MM-DD" value.
+const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 // A short "while you were away" summary — all truthful, computed live.
 async function awaySummary(buyerId) {
@@ -60,7 +64,7 @@ async function awaySummary(buyerId) {
 // GET — the member's check-in state: streak, today's claimable reward, and the away summary.
 export async function getDailyCheckin(buyerId) {
     if (!buyerId) return { signedIn: false, show: false };
-    const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const today = storeToday();
     const lastDay = asDay(row?.streak_claimed_day);
     const claimedToday = lastDay === today;
@@ -118,7 +122,7 @@ async function resolveLoginProcs(buyerId) {
 // POST — claim today's streak reward (advances/resets the streak, grants the reward). Idempotent per day.
 export async function claimDailyCheckin(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const today = storeToday();
     if (asDay(row?.streak_claimed_day) === today) return { ok: false, error: "already_claimed", streak: row.streak };
     const nextStreak = asDay(row?.streak_claimed_day) === storeYesterday() ? (row?.streak || 0) + 1 : 1;
