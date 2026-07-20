@@ -10,12 +10,9 @@ import { useTvMode } from "@/lib/tv-mode-client";
 const navItems = [
     { href: "/about", label: "About" },
     { href: "/shop", label: "Shop" },
-    { href: "/marketplace/boss", label: "⚔️ Boss" },
-    { href: "/marketplace/quests", label: "📜 Quests" },
-    { href: "/marketplace/spin", label: "🎡 Spin" },
-    { href: "/marketplace/bounties", label: "🎯 Bounties" },
-    { href: "/marketplace/pets", label: "🐾 Pets" },
-    { href: "/marketplace/rewards", label: "🏆 Rewards" },
+    // The whole RPG game (boss/spin/pets/gear/quests/…) lives behind ONE entry now, so it stops competing
+    // with real commerce in the nav. Its own dopamine menu is at /marketplace/play.
+    { href: "/marketplace/play", label: "🎮 Game" },
     { href: "/looking-for", label: "Looking For" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/mystery-bags", label: "Mystery Bags" },
