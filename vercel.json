@@ -57,7 +57,7 @@
         },
         {
             "path": "/api/jobs/avatar-sprites",
-            "schedule": "0 4 * * *"
+            "schedule": "*/15 * * * *"
         },
         {
             "path": "/api/jobs/pet-sprites",

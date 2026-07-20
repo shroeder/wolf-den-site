@@ -263,7 +263,11 @@ export async function sellItem(buyerId, itemId) {
 
 // ---- Mutations ----
 async function bumpEquipment(buyerId) {
-    await db.query(`UPDATE mkt_buyer SET equipment_updated_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
+    // Mark gear changed (queues a nightly sprite redraw) and reset the sprite retry counter — a real gear
+    // change earns a fresh retry budget so a previously-stuck sprite gets another shot.
+    await db
+        .query(`UPDATE mkt_buyer SET equipment_updated_at = NOW(), avatar_sprite_attempts = 0, avatar_sprite_error = NULL WHERE id = $1`, [buyerId])
+        .catch(() => {});
 }
 
 export async function equipItem(buyerId, slot, itemId) {

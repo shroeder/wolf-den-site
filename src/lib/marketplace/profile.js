@@ -236,10 +236,13 @@ export async function setAvatarConfig(buyerId, config) {
     if (!buyerId) throw new Error("Not signed in.");
     const clean = config ? sanitizeAvatarConfig(config) : null;
     // Bump avatar_updated_at only when they set/change a built avatar, so the sprite job knows to redraw it.
+    // A real appearance change also resets the sprite retry counter — a new look earns a fresh retry budget.
     await db.query(
         `UPDATE mkt_buyer
             SET avatar_config = $2::jsonb, updated_at = NOW(),
-                avatar_updated_at = CASE WHEN $2 IS NULL THEN avatar_updated_at ELSE NOW() END
+                avatar_updated_at = CASE WHEN $2 IS NULL THEN avatar_updated_at ELSE NOW() END,
+                avatar_sprite_attempts = CASE WHEN $2 IS NULL THEN avatar_sprite_attempts ELSE 0 END,
+                avatar_sprite_error = CASE WHEN $2 IS NULL THEN avatar_sprite_error ELSE NULL END
           WHERE id = $1`,
         [buyerId, clean ? JSON.stringify(clean) : null]
     );

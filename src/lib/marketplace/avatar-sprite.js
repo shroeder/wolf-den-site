@@ -12,6 +12,11 @@ import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, san
 // The ONE shared default sprite used for members who haven't built their own avatar — so we don't spend
 // AI generating a unique sprite for everyone. Generated once from the default avatar, stored in settings.
 const DEFAULT_SPRITE_KEY = "default_sprite_url";
+
+// Give up auto-retrying a member's sprite after this many consecutive failures (bad avatar config,
+// content-policy rejection, etc.) — it stays visible in the admin list with its error for a manual reroll,
+// but stops burning image-gen budget every tick. A real avatar/gear change resets the counter.
+const MAX_SPRITE_ATTEMPTS = 6;
 export const DEFAULT_SPRITE_AVATAR_PATH = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}&format=png&v=2`;
 export const getDefaultSpriteUrl = () => getSetting(DEFAULT_SPRITE_KEY);
 
@@ -77,10 +82,11 @@ export function pendingSpriteIds(limit = null) {
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
                 AND avatar_updated_at IS NOT NULL
+                AND avatar_sprite_attempts < ${MAX_SPRITE_ATTEMPTS}
                 AND (avatar_sprite_url IS NULL
                      OR avatar_updated_at > avatar_sprite_at
                      OR equipment_updated_at > avatar_sprite_at)
-              ORDER BY avatar_sprite_at NULLS FIRST, avatar_updated_at DESC NULLS LAST
+              ORDER BY avatar_sprite_at NULLS FIRST, avatar_sprite_attempts ASC, avatar_updated_at DESC NULLS LAST
               ${capped ? "LIMIT $1" : ""}`,
             capped ? [Math.floor(Number(limit))] : []
         )
@@ -93,7 +99,8 @@ export async function listSpritesAdmin() {
     const rows = await db
         .query(
             `SELECT id, display_name, alias, avatar_config, avatar_sprite_url, avatar_sprite_at, avatar_updated_at,
-                    equipment_updated_at, avatar_sprite_flip, avatar_facing_checked_at
+                    equipment_updated_at, avatar_sprite_flip, avatar_facing_checked_at,
+                    avatar_sprite_attempts, avatar_sprite_error
                FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
               ORDER BY (avatar_sprite_url IS NULL) DESC, avatar_updated_at DESC NULLS LAST
@@ -109,6 +116,10 @@ export async function listSpritesAdmin() {
         // flip mirrors a backwards sprite at render time; facingChecked = the AI pass has already looked.
         flip: r.avatar_sprite_flip === true,
         facingChecked: Boolean(r.avatar_facing_checked_at),
+        // Generation health: attempts so far, the last error, and whether it's given up auto-retrying.
+        attempts: Number(r.avatar_sprite_attempts) || 0,
+        error: r.avatar_sprite_error || null,
+        stuck: (Number(r.avatar_sprite_attempts) || 0) >= MAX_SPRITE_ATTEMPTS,
         // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar, bust
         // placed at the top with room below). v bumps when the framing changes (immutable-cached URL).
         avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=2`,
@@ -169,7 +180,8 @@ export async function setBuyerSprite(buyerId, base64) {
     // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
     await db.query(
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
-                              avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL WHERE id = $1`,
+                              avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL,
+                              avatar_sprite_attempts = 0, avatar_sprite_error = NULL WHERE id = $1`,
         [buyerId, blob.url, buildSpritePrompt(row.avatar_config)]
     );
     return blob.url;
@@ -187,7 +199,8 @@ export async function generateBuyerSprite(buyerId) {
     // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
     await db.query(
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
-                              avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL WHERE id = $1`,
+                              avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL,
+                              avatar_sprite_attempts = 0, avatar_sprite_error = NULL WHERE id = $1`,
         [buyerId, url, prompt]
     );
     return url;
@@ -213,24 +226,44 @@ export async function generateDefaultSprite() {
     return url;
 }
 
-// Cron entry point: draw ALL pending sprites (missing, appearance-changed, or gear-changed) — no fixed
-// count cap, since the store roster is small. A soft time budget stops gracefully before the serverless
-// function times out; anything left over just gets picked up on the next run (each sprite commits as it
-// finishes, so it's resumable).
-export async function runAvatarSpriteJob({ maxMs = 270000 } = {}) {
-    const ids = await pendingSpriteIds();
-    const startedAt = Date.now();
+// Cron entry point: draw a bounded batch of pending sprites (missing, appearance-changed, or gear-changed).
+// There's no per-DAY cap — the job runs on a frequent schedule (see vercel.json), so any backlog drains
+// across ticks and a failed tick simply retries on the next one. Each run stays small enough to finish well
+// under the function timeout (no time-budget guesswork). Per-item failures are recorded so a poison avatar
+// backs off after MAX_SPRITE_ATTEMPTS instead of blocking the batch forever.
+export async function runAvatarSpriteJob({ batch = 8 } = {}) {
+    const ids = await pendingSpriteIds(batch);
     let generated = 0;
     const errors = [];
     for (const id of ids) {
-        if (Date.now() - startedAt > maxMs) break; // leave headroom under the function's maxDuration
         try {
             await generateBuyerSprite(id);
             generated += 1;
         } catch (error) {
-            errors.push({ buyerId: id, error: error?.message || String(error) });
+            const msg = error?.message || String(error);
+            errors.push({ buyerId: id, error: msg });
+            // Count the failure + record the reason so it backs off and the admin can see why.
+            await db
+                .query(
+                    `UPDATE mkt_buyer
+                        SET avatar_sprite_attempts = avatar_sprite_attempts + 1,
+                            avatar_sprite_error = $2,
+                            avatar_sprite_attempt_at = NOW()
+                      WHERE id = $1`,
+                    [id, msg.slice(0, 500)]
+                )
+                .catch(() => {});
         }
     }
+    // Count both what's still drawable and what's stuck (hit the attempt cap), so the run is observable.
     const remaining = (await pendingSpriteIds()).length;
-    return { generated, attempted: ids.length, remaining, errors };
+    const stuck = await db
+        .queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_buyer
+              WHERE avatar_config IS NOT NULL AND avatar_updated_at IS NOT NULL
+                AND avatar_sprite_attempts >= ${MAX_SPRITE_ATTEMPTS}
+                AND (avatar_sprite_url IS NULL OR avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)`
+        )
+        .catch(() => null);
+    return { generated, attempted: ids.length, remaining, stuck: stuck?.n || 0, errors };
 }
