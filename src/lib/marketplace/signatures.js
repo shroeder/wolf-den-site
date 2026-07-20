@@ -186,7 +186,7 @@ export const ITEM_SIGNATURES = {
     kings_ring: { label: "King's Command", packTactics: true }, // legendary
     ring_titans: { label: "Titan Grip", giantSlayer: true }, // legendary
     warlord_ring: { label: "War Banner", packTactics: true }, // legendary
-    highroller_ring: { label: "High Roller", loginPetGamble: true }, // legendary — gamble a pet on check-in (destroys item)
+    highroller_ring: { label: "High Roller", dailySpin: true }, // legendary — a guaranteed extra wheel spin each day
     premium_signet: { label: "Prestige", loginPotion: true }, // legendary — daily gift consumable
     credit25_ring: { label: "Investor", loginGold: true }, // legendary — daily gold on check-in
     credit50_ring: { label: "Benefactor", loginPotion: true }, // legendary — daily gift consumable
@@ -263,6 +263,7 @@ export function rollLoginProcs(equipped, rand = Math.random) {
         if (s.loginPotion && rand() < LOGIN.potionChance[i]) fired.push({ id: s.id, label: s.label, kind: "potion" });
         if (s.loginCoupon && rand() < LOGIN.couponChance[i]) fired.push({ id: s.id, label: s.label, kind: "coupon" });
         if (s.loginPetGamble && rand() < LOGIN.gambleChance[i]) fired.push({ id: s.id, label: s.label, kind: "petGamble" });
+        if (s.dailySpin) fired.push({ id: s.id, label: s.label, kind: "spinToken", amount: 1 }); // guaranteed, not a chance
     }
     return fired;
 }
@@ -314,5 +315,6 @@ export function signatureFor(itemId) {
     if (s.loginPotion) parts.push(`${pct(LOGIN.potionChance[i])} chance at your daily check-in to conjure a random potion.`);
     if (s.loginCoupon) parts.push(`${pct(LOGIN.couponChance[i])} chance at your daily check-in for a ${COUPON_PCT}%-off shop coupon (items ≤ ${COUPON_MAX} gold).`);
     if (s.loginPetGamble) parts.push(`${pct(LOGIN.gambleChance[i])} chance at your daily check-in to unlock a random pet — but the item is DESTROYED.`);
+    if (s.dailySpin) parts.push("Grants +1 daily wheel spin at your check-in.");
     return { label: s.label, desc: parts.join(" ") };
 }

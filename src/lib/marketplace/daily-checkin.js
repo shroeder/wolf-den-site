@@ -93,6 +93,9 @@ async function resolveLoginProcs(buyerId) {
             const [pid, c] = pool[Math.floor(Math.random() * pool.length)];
             await grantConsumable(buyerId, pid, 1).catch(() => {});
             out.push({ emoji: c.emoji || "🧪", text: `${p.label} conjured ${c.name}!` });
+        } else if (p.kind === "spinToken") {
+            await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + $2 WHERE id = $1`, [buyerId, p.amount || 1]).catch(() => {});
+            out.push({ emoji: "🎟️", text: `${p.label} — +${p.amount || 1} wheel spin` });
         } else if (p.kind === "coupon") {
             await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {});
             out.push({ emoji: "🎟️", text: `${p.label} — a ${COUPON_PCT}% shop coupon!` });

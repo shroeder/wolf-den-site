@@ -18,6 +18,8 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 //   reset_cooldown → clear the cooldown on a chosen charged item that still has a charge (target)
 //   pet_xp         → feed the EQUIPPED pet a flat amount of pet-XP (levels it toward Lv5)
 //   pet_level      → instantly bump the equipped pet up one level
+//   spin_token     → grant N daily-wheel spins
+//   spin_reset     → refresh the free daily spin (spin again today)
 export const CONSUMABLES = {
     scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP.", price: 1500, effect: { type: "xp", amount: 500 } },
     scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP.", price: 5000, effect: { type: "xp", amount: 2000 } },
@@ -42,12 +44,17 @@ export const CONSUMABLES = {
     treat_marrow: { name: "Ancient Marrow", emoji: "🍥", kind: "treat", price: null, desc: "Feed your equipped pet +800 pet XP.", effect: { type: "pet_xp", amount: 800 } },
     treat_mythic: { name: "Mythic Morsel", emoji: "💎", kind: "treat", price: null, desc: "Feed your equipped pet +1,500 pet XP.", effect: { type: "pet_xp", amount: 1500 } },
     treat_ambrosia: { name: "Ambrosia", emoji: "🍯", kind: "treat", price: null, desc: "Instantly LEVEL UP your equipped pet.", effect: { type: "pet_level" } },
+    // SPIN charges — feed the daily wheel. Tokens = extra spins; a rewind refreshes your free daily spin.
+    spin_lucky_coin: { name: "Lucky Coin", emoji: "🎟️", kind: "spin", desc: "Gain +2 wheel spins.", price: 1500, effect: { type: "spin_token", amount: 2 } },
+    spin_golden_ticket: { name: "Golden Ticket", emoji: "🎫", kind: "spin", price: null, desc: "Gain +5 wheel spins.", effect: { type: "spin_token", amount: 5 } },
+    spin_rewind: { name: "Wheel Rewind", emoji: "⏪", kind: "spin", price: null, desc: "Refresh your FREE daily spin — spin again now.", effect: { type: "spin_reset" } },
 };
 
 // Buyable order (shop). Relics + drop-only treats are intentionally excluded — they're chest/boss-only.
 const SHOP_ORDER = [
     "scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm",
     "treat_bone", "treat_snack", "treat_toy", "treat_feast", "treat_golden", "treat_kibble",
+    "spin_lucky_coin",
 ];
 
 // --- Boss-fight hooks (read by boss.js) -------------------------------------------------------------
@@ -185,7 +192,13 @@ export async function useConsumable(buyerId, id, targetItemId = null) {
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
     if (!dec) return { ok: false, error: "none_owned" };
     let applied = "";
-    if (e.type === "xp") {
+    if (e.type === "spin_token") {
+        await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + $2 WHERE id = $1`, [buyerId, e.amount]).catch(() => {});
+        applied = `+${e.amount} wheel spin${e.amount > 1 ? "s" : ""}`;
+    } else if (e.type === "spin_reset") {
+        await db.query(`UPDATE mkt_buyer SET free_spin_day = NULL WHERE id = $1`, [buyerId]).catch(() => {});
+        applied = "free daily spin refreshed — spin again!";
+    } else if (e.type === "xp") {
         await awardXp(buyerId, "consumable", { points: e.amount, meta: { consumable: id } }).catch(() => {});
         applied = `+${e.amount.toLocaleString()} XP`;
     } else if (e.type === "strikes") {
