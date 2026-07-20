@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
+import { activeXpMultiplier } from "@/lib/marketplace/happy-hour.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -102,8 +103,10 @@ export function levelForXp(totalXp) {
 //   dailyCap  — at most this many awards of this action per user per (UTC) day.
 export async function awardXp(buyerId, action, { points = null, dedupeKey = null, dailyCap = null, meta = null } = {}) {
     if (!buyerId) return null;
-    const pts = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
-    if (pts <= 0) return null;
+    const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
+    if (base <= 0) return null;
+    // Happy Hour multiplies all XP (which cascades to the 1:1 gold + the equipped pet's 25% share below).
+    const pts = Math.round(base * (await activeXpMultiplier().catch(() => 1)));
 
     // Per-action daily cap: if the user already hit today's limit for this action, skip.
     if (dailyCap != null && dailyCap > 0) {

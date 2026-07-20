@@ -3,11 +3,13 @@
 // in the public layout now so they're present site-wide, not just on /marketplace.)
 
 import DailyCheckin from "@/components/DailyCheckin";
+import HappyHour from "@/components/HappyHour";
 
 export default function MarketplaceLayout({ children }) {
     return (
         <div className="mkt-app">
             <DailyCheckin />
+            <HappyHour />
             {children}
         </div>
     );

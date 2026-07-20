@@ -9690,6 +9690,23 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petx-tier.is-current { background: rgba(255,215,94,0.16); color: #ffe9a8; font-weight: 800; }
 .petx-tier.is-current .petx-tier-stars { color: #ffd75e; }
 .petx-tier.is-locked .petx-tier-stars { color: rgba(255,255,255,0.18); }
+/* Happy Hour banner */
+.hh-card { border: 1px solid rgba(255,90,150,0.5); background: linear-gradient(180deg, rgba(255,90,150,0.1), transparent 65%); }
+.hh-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.hh-title { font-weight: 900; font-size: 1.05rem; }
+.hh-mult { color: #ff5a9a; font-weight: 900; }
+.hh-timer { font-size: 0.78rem; font-weight: 700; color: #ff8ab0; white-space: nowrap; }
+.hh-meter { height: 12px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; margin: 8px 0 4px; }
+.hh-meter > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ff5a9a, #ffd75e); transition: width 0.5s ease; }
+.hh-meter-label { font-size: 0.8rem; color: #cbd2da; }
+.hh-donate { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.hh-donate-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hh-quick, .hh-give { padding: 6px 12px; font-size: 0.82rem; font-weight: 700; border-radius: 999px; border: 1px solid #3a3f47; background: #23262c; color: #ffd75e; cursor: pointer; }
+.hh-give { background: #ff5a9a; color: #12060c; border-color: #ff5a9a; }
+.hh-quick:disabled, .hh-give:disabled { opacity: 0.5; cursor: default; }
+.hh-input { width: 90px; padding: 6px 10px; border-radius: 10px; border: 1px solid #3a3f47; background: #16181e; color: #fff; font-size: 0.85rem; }
+.hh-ok { color: #5affaf; font-size: 0.82rem; font-weight: 700; }
+.hh-err { color: #ff8a8a; font-size: 0.82rem; font-weight: 700; }
 /* Daily check-in / login-streak modal */
 .checkin-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.72); backdrop-filter: blur(3px); }
 .checkin-modal { position: relative; width: 100%; max-width: 360px; text-align: center; padding: 26px 22px 22px; border-radius: 20px; background: radial-gradient(220px 140px at 50% -10%, #2a2312, #14151b 70%); border: 1px solid rgba(255,215,94,0.4); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
