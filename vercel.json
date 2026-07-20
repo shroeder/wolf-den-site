@@ -60,6 +60,10 @@
             "schedule": "*/15 * * * *"
         },
         {
+            "path": "/api/jobs/pet-sprite-levels",
+            "schedule": "*/5 * * * *"
+        },
+        {
             "path": "/api/jobs/leaderboard-badges",
             "schedule": "*/15 * * * *"
         },
