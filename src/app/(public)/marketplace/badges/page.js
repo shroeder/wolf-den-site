@@ -37,8 +37,16 @@ export default async function BadgesPage() {
             <section className="card">
                 <h1 style={{ marginTop: 0 }}>🎖️ Your Badges</h1>
                 <p className="muted" style={{ marginTop: 0 }}>
-                    You&apos;ve earned <strong>{board?.earnedCount || 0}</strong> of {board?.totalCount || 0}. Choose up to 3 to show on your card — your top pick becomes the tab that sticks up on your profile.
+                    You&apos;ve earned <strong>{board?.earnedCount || 0}</strong> of {board?.totalCount || 0}. Each badge grants a little XP + gold — and many add a passive that buffs your daily boss strike. Choose up to 3 to show on your card.
                 </p>
+                {(() => {
+                    const p = board?.passives || {};
+                    const bits = [];
+                    if (p.might) bits.push(`⚔️ +${p.might} Might`);
+                    if (p.crit_chance) bits.push(`🎯 +${p.crit_chance}% Crit Chance`);
+                    if (p.crit_power) bits.push(`💥 +${p.crit_power}% Crit Power`);
+                    return bits.length ? <div className="badge-passive-strip">🎖️ Your badges buff your strike: <strong>{bits.join(" · ")}</strong></div> : null;
+                })()}
                 <NextBadgeNudge next={board?.next} earnedCount={board?.earnedCount || 0} totalCount={board?.totalCount || 0} href="#customize" />
             </section>
 

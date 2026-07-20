@@ -9820,6 +9820,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .game-nav-link.has-badge { border-color: rgba(255,215,94,0.6); color: #ffd75e; }
 .game-nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 999px; background: #ff4d4d; color: #fff; font-size: 0.72rem; font-weight: 900; line-height: 1; box-shadow: 0 0 0 2px rgba(255,77,77,0.25); animation: rar-pulse 2s ease-in-out infinite; }
 
+/* Badge passive summary on the badges hub. */
+.badge-passive-strip { margin: 8px 0 0; padding: 7px 12px; border-radius: 10px; font-size: 0.84rem; color: #ffe9a8;
+    background: rgba(255,215,94,0.1); border: 1px solid rgba(255,215,94,0.35); }
+
 /* THE GAME hub — the single game area's dopamine menu. */
 .game-hub-hero { text-align: center; background: radial-gradient(120% 120% at 50% 0%, rgba(255,215,94,0.12), transparent 60%); }
 .game-hub-stats { margin-top: 12px; }

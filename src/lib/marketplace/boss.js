@@ -16,7 +16,7 @@ import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js"
 import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem } from "@/lib/marketplace/signatures.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { syncEarnedBadges, grantRandomDropBadge } from "@/lib/marketplace/badges.js";
+import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
@@ -606,21 +606,22 @@ export async function attackBoss(buyerId) {
     const boss = await getActiveBoss();
     if (!boss || boss.hp <= 0 || boss.defeated_at) return { error: "defeated" };
 
-    const [gearStats, equippedIds, petBonus] = await Promise.all([
+    const [gearStats, equippedIds, petBonus, badgeStats] = await Promise.all([
         getEquippedStats(buyerId).catch(() => ({})),
         getEquippedIds(buyerId).catch(() => ({})),
         getPetCombatBonus(buyerId).catch(() => ({ stats: {}, proc: {} })),
+        getBadgePassives(buyerId).catch(() => ({})),
     ]);
     // Merge pet bonuses into the strike stats. Pet Ferocity adds to strike power (Might) rather than 24/7
     // auto-damage, so a companion's power is felt on your daily hit. A Beastbond signature amplifies the
-    // pet's contribution to the strike.
+    // pet's contribution to the strike. Earned BADGES add flat Might/Crit passives on top.
     const bb = beastbondMult(equippedIds);
     const ps = petBonus?.stats || {};
     const stats = {
         ...gearStats,
-        might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb,
-        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb,
-        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb,
+        might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb + (badgeStats.might || 0),
+        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (badgeStats.crit_chance || 0),
+        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (badgeStats.crit_power || 0),
         extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0),
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).

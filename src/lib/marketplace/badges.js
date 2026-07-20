@@ -6,7 +6,7 @@ import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/mark
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
-import { getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
+import { awardXp, getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 
@@ -72,7 +72,7 @@ async function heldSlugs(buyerId) {
 // Live metrics used to evaluate unlock rules AND to show progress on the rewards track. One buyer, a
 // handful of cheap aggregates. Exported so the track page reuses the exact same numbers the engine grants on.
 export async function getMemberMetrics(buyerId) {
-    const buyer = await db.queryOne(`SELECT xp, created_at, COALESCE(event_gold_donated, 0) AS event_gold_donated, COALESCE(spin_count, 0) AS spin_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const buyer = await db.queryOne(`SELECT xp, created_at, COALESCE(event_gold_donated, 0) AS event_gold_donated, COALESCE(spin_count, 0) AS spin_count, COALESCE(mystery_bags_bought, 0) AS mystery_bags_bought, COALESCE(mystery_big_hit, FALSE) AS mystery_big_hit FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
     const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows, petLevelRows] = await Promise.all([
@@ -183,7 +183,54 @@ export async function getMemberMetrics(buyerId) {
         maxedLegendaryPlus,
         eventDonated: Number(buyer?.event_gold_donated || 0),
         spinCount: Number(buyer?.spin_count || 0),
+        mysteryBags: Number(buyer?.mystery_bags_bought || 0),
+        mysteryBigHit: Boolean(buyer?.mystery_big_hit),
     };
+}
+
+// Earning a badge grants a little XP + gold, so every unlock feels rewarding (not just cosmetic).
+const BADGE_REWARD_XP = 120;
+const BADGE_REWARD_GOLD = 250;
+async function rewardBadgeEarned(buyerId, slug) {
+    // dedupeKey keys off the slug so re-syncs never double-pay, even though the INSERT is idempotent.
+    await awardXp(buyerId, "badge_earned", { points: BADGE_REWARD_XP, dedupeKey: `badge_reward:${slug}` }).catch(() => {});
+    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, BADGE_REWARD_GOLD]).catch(() => {});
+}
+
+// PASSIVE combat effects per badge — they buff your DAILY BOSS STRIKE (Might / Crit Chance / Crit Power)
+// and stack across every badge you hold, like the pet menagerie. Small on purpose (badges are numerous) but
+// enough that collecting badges is build-relevant. Only mapped badges give a passive; the rest stay prestige.
+const BADGE_PASSIVES = {
+    // Boss prestige → raw power
+    boss_challenger: { might: 1 }, boss_raider: { might: 2 }, boss_slayer: { might: 3 }, boss_veteran: { might: 2 },
+    boss_warlord: { might: 4 }, boss_legend: { might: 6, crit_power: 4 }, boss_champion: { crit_chance: 4 },
+    boss_relic: { might: 3 }, transcendent: { might: 5 }, eternal_bearer: { might: 8, crit_power: 6 },
+    // Trading → power / crit
+    trader: { might: 1 }, deal_maker: { might: 2 }, trader_cards_100: { might: 2 }, trader_cards_500: { might: 4 },
+    trade_value_500: { might: 2 }, trade_value_2k: { might: 3 }, trade_value_10k: { might: 6 },
+    high_roller: { crit_chance: 3 }, whale_trader: { crit_chance: 5 },
+    // Generosity → power
+    first_donation: { might: 1 }, generous_soul: { might: 2 }, benefactor: { might: 4 },
+    // Wealth → power
+    gilded: { might: 3 }, big_baller: { might: 5 }, one_percent: { might: 10, crit_power: 6 },
+    // Meta + lucky drops
+    decorated: { might: 3 }, lucky_find: { crit_chance: 3 }, treasure_hunter: { might: 4 }, mythic_find: { crit_power: 6 },
+    // Mystery-bag badges
+    mystery_first: { might: 1 }, mystery_big_hit: { crit_chance: 4 }, mystery_20: { might: 3 }, mystery_100: { might: 6, crit_power: 4 },
+};
+
+// Sum the passive stats from every badge a member holds. Cheap (one held-slugs read); safe to call in the
+// combat path. Returns e.g. { might: 6, fortune: 5 }.
+export async function getBadgePassives(buyerId) {
+    if (!buyerId) return {};
+    const held = await heldSlugs(buyerId).catch(() => new Set());
+    const total = {};
+    for (const slug of held) {
+        const p = BADGE_PASSIVES[slug];
+        if (!p) continue;
+        for (const [k, v] of Object.entries(p)) total[k] = (total[k] || 0) + v;
+    }
+    return total;
 }
 
 // Current vs. required for a rule — drives the track's progress bars. Booleans read as 0/1.
@@ -222,6 +269,8 @@ export function progressForRule(rule, threshold, m) {
         case "pet_levels_total": return { current: m.petLevelsTotal, target: t }; // total levels gained across pets
         case "event_donated": return { current: m.eventDonated, target: t }; // lifetime gold donated to Happy Hour / rally
         case "spin_count": return { current: m.spinCount, target: t }; // lifetime wheel spins
+        case "mystery_bags": return { current: m.mysteryBags, target: t }; // mystery bags bought from the real store
+        case "mystery_big_hit": return { current: m.mysteryBigHit ? 1 : 0, target: 1 }; // pulled a big hit from a bag
         default: return { current: 0, target: t || 1 };
     }
 }
@@ -234,7 +283,7 @@ function qualifies(rule, threshold, m) {
 // The full badge board for a member: every badge with earned/locked state + progress on the unlockables,
 // plus the single "next badge" (closest unearned unlockable). Powers the Badges hub + the next-badge nudge.
 export async function getBadgeBoard(buyerId) {
-    const [all, held, m] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId)]);
+    const [all, held, m, passives] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId), getBadgePassives(buyerId)]);
     // Secret badges stay hidden until you actually hold one — no locked/mystery slot teasing them.
     const visible = all.filter((b) => !b.secret || held.has(b.slug));
     const badges = visible.map((b) => {
@@ -256,6 +305,7 @@ export async function getBadgeBoard(buyerId) {
         earnedCount: badges.filter((b) => b.earned).length,
         totalCount: badges.length,
         next: next ? { label: next.label, icon: next.icon, color: next.color, ...next.progress } : null,
+        passives, // { might, crit_chance, crit_power } summed from earned badges — buffs your daily boss strike
     };
 }
 
@@ -277,11 +327,11 @@ export async function syncEarnedBadges(buyerId) {
     const earned = candidates.filter((b) => qualifies(b.autoRule, b.autoThreshold, m));
     const granted = [];
     for (const b of earned) {
-        const ok = await db
-            .query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'system') ON CONFLICT DO NOTHING`, [buyerId, b.slug])
-            .then(() => true)
-            .catch(() => false);
-        if (ok) granted.push(b);
+        // RETURNING so we only reward on a genuinely NEW grant (ON CONFLICT → no row → no double reward).
+        const ins = await db
+            .queryOne(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'system') ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, b.slug])
+            .catch(() => null);
+        if (ins) { granted.push(b); await rewardBadgeEarned(buyerId, b.slug); }
     }
     for (const b of granted) await pushBadgeEarned(buyerId, b); // celebrate each newly-earned badge in the browser
     return granted;
