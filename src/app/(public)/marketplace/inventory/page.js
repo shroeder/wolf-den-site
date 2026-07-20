@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import ConsumablesClient from "@/components/ConsumablesClient";
+import DailyDeals from "@/components/DailyDeals";
 import EquipmentClient from "@/components/EquipmentClient";
 import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -40,6 +41,8 @@ export default async function InventoryPage() {
                     Equip items to buff your boss fight. Some gear also carries in-store perks. <Link href="/marketplace/boss" className="pill">⚔️ Boss</Link>
                 </p>
             </section>
+
+            <DailyDeals />
 
             <EquipmentClient
                 avatarUrl={profile?.avatarUrl}
