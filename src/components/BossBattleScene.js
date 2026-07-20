@@ -112,8 +112,8 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
 // pack into more depth rows and shrink, so nobody marches off the edge or collides with the boss on the
 // right. "You" is pulled to a front-and-center slot so a member always spots themselves in the mob, and
 // name labels drop away once the crowd is too dense to read them.
-const X0 = 4; // left edge of the crowd band (%)
-const X1 = 56; // right edge — the boss owns the space past this
+const X0 = 3; // left edge of the crowd band (%)
+const X1 = 52; // right edge — the boss owns the space past this (kept clear of the boss art)
 const MAX_ROWS = 6; // deepest the crowd stacks before it just gets denser per row
 
 function applyPositions(list) {
