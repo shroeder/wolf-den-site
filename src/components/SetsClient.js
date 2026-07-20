@@ -1,0 +1,76 @@
+"use client";
+
+import { useState } from "react";
+import { createPortal } from "react-dom";
+
+import ItemArt from "@/components/ItemArt";
+
+const RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
+const statText = (stats) => Object.entries(stats).map(([k, v]) => `+${v} ${k.replace(/_/g, " ")}`).join(" · ");
+
+// The gear-sets overview: each set as a card with its pieces shown as tappable ART tiles (equipped / owned /
+// locked), the tiered bonuses, and the full-set capstone. Tapping a piece inspects what it does.
+export default function SetsClient({ sets }) {
+    const [inspect, setInspect] = useState(null);
+
+    return (
+        <>
+            {sets.map((s) => {
+                const complete = s.equipped >= s.total;
+                return (
+                    <section key={s.id} className={`card set-card${complete ? " set-complete" : ""}`}>
+                        <div className="set-card-head">
+                            <h2 style={{ margin: 0 }}>{s.name}{complete ? " ✨" : ""}</h2>
+                            <span className="set-count">{s.equipped}/{s.total} equipped{s.owned > s.equipped ? ` · ${s.owned}/${s.total} owned` : ""}</span>
+                        </div>
+                        {/* Progress toward the full set */}
+                        <div className="set-progress"><span style={{ width: `${Math.round((s.equipped / s.total) * 100)}%` }} /></div>
+                        <div className="set-grid">
+                            {s.pieces.map((p) => (
+                                <button
+                                    type="button"
+                                    key={p.id}
+                                    className={`set-tile rar-${p.rarity} ${p.equipped ? "is-equipped" : p.owned ? "is-owned" : "is-missing"}`}
+                                    style={{ borderColor: RARITY[p.rarity] || "#3a3f47" }}
+                                    onClick={() => setInspect(p)}
+                                    title="Tap to inspect"
+                                >
+                                    <ItemArt id={p.id} icon={p.icon} className="set-tile-art" />
+                                    <span className="set-tile-name" style={{ color: p.equipped ? RARITY[p.rarity] : undefined }}>{p.name}</span>
+                                    <span className="set-tile-state">{p.equipped ? "✅ equipped" : p.owned ? "• owned" : "🔒 locked"}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="set-tiers">
+                            {s.tiers.map((t) => (
+                                <div key={t.need} className={`set-tier${t.active ? " active" : ""}`}>
+                                    <strong>{t.need}-piece:</strong> {statText(t.stats)}
+                                </div>
+                            ))}
+                            {s.capstone ? (
+                                <div className={`set-tier set-capstone${s.capstone.active ? " active" : ""}`}>
+                                    <strong>★ Full set:</strong> {s.capstone.desc.replace(/^Full set: /, "")}
+                                </div>
+                            ) : null}
+                        </div>
+                    </section>
+                );
+            })}
+
+            {inspect ? createPortal((
+                <div className="equip-sheet-overlay" onClick={() => setInspect(null)} style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.78)", padding: 20 }}>
+                    <div className={`card rar-${inspect.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340, margin: 0, textAlign: "center", borderColor: RARITY[inspect.rarity] || "#3a3f47", borderWidth: 2 }}>
+                        <ItemArt id={inspect.id} icon={inspect.icon} className="set-tile-art" />
+                        <div style={{ fontWeight: 900, fontSize: "1.15rem", color: RARITY[inspect.rarity] || "#fff" }}>{inspect.name}</div>
+                        <div className="muted" style={{ fontSize: "0.75rem", textTransform: "capitalize", fontWeight: 700 }}>{inspect.rarity}{inspect.slot ? ` · ${inspect.slot.replace(/_/g, " ")}` : ""}</div>
+                        <p style={{ margin: "10px 0 0", fontWeight: 700 }}>{inspect.statsText || "No combat stats"}</p>
+                        {inspect.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {inspect.signature}</p> : null}
+                        {inspect.flavor ? <p className="muted" style={{ margin: "8px 0 0", fontStyle: "italic", fontSize: "0.82rem" }}>“{inspect.flavor}”</p> : null}
+                        <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.8rem" }}>{inspect.equipped ? "✅ Equipped" : inspect.owned ? "In your bag" : "🔒 Not yet yours"}</p>
+                        <button type="button" className="button gold" style={{ marginTop: 12 }} onClick={() => setInspect(null)}>Close</button>
+                    </div>
+                </div>
+            ), document.body) : null}
+        </>
+    );
+}

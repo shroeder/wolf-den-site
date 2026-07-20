@@ -1,15 +1,11 @@
-import Link from "next/link";
-
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getSetsOverview } from "@/lib/marketplace/sets.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { db } from "@/lib/db";
+import SetsClient from "@/components/SetsClient";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Gear Sets · The Wolf Den" };
-
-const RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
-const statText = (stats) => Object.entries(stats).map(([k, v]) => `+${v} ${k.replace(/_/g, " ")}`).join(" · ");
 
 export default async function SetsPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
@@ -28,39 +24,10 @@ export default async function SetsPage() {
             <section className="card">
                 <h1 style={{ marginTop: 0 }}>🧩 Gear Sets</h1>
                 <p className="muted" style={{ marginTop: 0 }}>
-                    Collect matching pieces for stacking bonuses and a full-set capstone. <Link href="/marketplace/inventory" className="pill">⚔️ Your gear</Link>
+                    Collect matching pieces for stacking bonuses and a full-set capstone. Tap any piece to see what it does.
                 </p>
             </section>
-
-            {sets.map((s) => {
-                return (
-                    <section key={s.id} className={`card set-card${s.equipped >= s.total ? " set-complete" : ""}`}>
-                        <div className="set-card-head">
-                            <h2 style={{ margin: 0 }}>{s.name}</h2>
-                            <span className="set-count">{s.equipped}/{s.total} equipped · {s.owned}/{s.total} owned</span>
-                        </div>
-                        <div className="set-pieces">
-                            {s.pieces.map((p) => (
-                                <span key={p.id} className={`set-piece${p.equipped ? " is-equipped" : p.owned ? " is-owned" : " is-missing"}`} style={{ borderColor: RARITY[p.rarity] || "#3a3f47" }}>
-                                    {p.equipped ? "✅" : p.owned ? "•" : "🔒"} {p.name}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="set-tiers">
-                            {s.tiers.map((t) => (
-                                <div key={t.need} className={`set-tier${t.active ? " active" : ""}`}>
-                                    <strong>{t.need}-piece:</strong> {statText(t.stats)}
-                                </div>
-                            ))}
-                            {s.capstone ? (
-                                <div className={`set-tier set-capstone${s.capstone.active ? " active" : ""}`}>
-                                    <strong>★ Full set:</strong> {s.capstone.desc.replace(/^Full set: /, "")}
-                                </div>
-                            ) : null}
-                        </div>
-                    </section>
-                );
-            })}
+            <SetsClient sets={sets} />
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
-import { itemById } from "@/lib/marketplace/items.js";
+import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 
 // Themed gear SETS. Equip N matching pieces to unlock tiered stat bonuses (extra stats on top of the items),
 // and a FULL set unlocks a CAPSTONE proc (a signature-style effect). Each set also has a WEAKNESS AFFINITY:
@@ -163,7 +164,22 @@ export function getSetsOverview(equippedIds, ownedIds) {
     const eq = new Set(equippedIds || []);
     const own = new Set(ownedIds || []);
     return ITEM_SETS.map((set) => {
-        const pieces = set.items.map((id) => ({ id, name: itemById(id)?.name || id, rarity: itemById(id)?.rarity || null, owned: own.has(id), equipped: eq.has(id) }));
+        const pieces = set.items.map((id) => {
+            const it = itemById(id);
+            const sig = signatureFor(id);
+            return {
+                id,
+                name: it?.name || id,
+                rarity: it?.rarity || null,
+                slot: it?.slot || null,
+                icon: it?.icon || null,
+                statsText: describeStats(it?.stats) || "",
+                signature: sig ? `${sig.label}: ${sig.desc}` : null,
+                flavor: it?.flavor || null,
+                owned: own.has(id),
+                equipped: eq.has(id),
+            };
+        });
         const equipped = pieces.filter((p) => p.equipped).length;
         const owned = pieces.filter((p) => p.owned).length;
         return {
