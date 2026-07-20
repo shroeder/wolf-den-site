@@ -44,9 +44,9 @@ export async function donateToHappyHour(buyerId, amount) {
 
     const ev = await getActiveEvent();
     if (ev) {
-        const before = Number((await db.queryOne(`SELECT gold FROM mkt_event_donation WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null))?.gold || 0);
-        await db.query(`UPDATE mkt_event SET pool_gold = pool_gold + $2 WHERE id = $1`, [ev.id, gold]).catch(() => {});
-        await db.query(`INSERT INTO mkt_event_donation (event_id, buyer_id, gold) VALUES ($1, $2, $3) ON CONFLICT (event_id, buyer_id) DO UPDATE SET gold = mkt_event_donation.gold + $3`, [ev.id, buyerId, gold]).catch(() => {});
+        const before = Number((await db.queryOne(`SELECT gold FROM mkt_happy_hour_donation WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null))?.gold || 0);
+        await db.query(`UPDATE mkt_happy_hour SET pool_gold = pool_gold + $2 WHERE id = $1`, [ev.id, gold]).catch(() => {});
+        await db.query(`INSERT INTO mkt_happy_hour_donation (event_id, buyer_id, gold) VALUES ($1, $2, $3) ON CONFLICT (event_id, buyer_id) DO UPDATE SET gold = mkt_happy_hour_donation.gold + $3`, [ev.id, buyerId, gold]).catch(() => {});
         const rewards = await grantDonationRewards(buyerId, before, before + gold);
         await syncEarnedBadges(buyerId).catch(() => {});
         return { ok: true, gold: paid.gold, rewards, ...(await getHappyHourState(buyerId)) };

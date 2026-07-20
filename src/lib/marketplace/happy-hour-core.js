@@ -18,7 +18,7 @@ export const RALLY_KEY = "hh_rally_gold";
 export const RALLY_TRIGGER = 15000;
 
 export async function getActiveEvent() {
-    return db.queryOne(`SELECT * FROM mkt_event WHERE ends_at > NOW() ORDER BY started_at DESC LIMIT 1`).catch(() => null);
+    return db.queryOne(`SELECT * FROM mkt_happy_hour WHERE ends_at > NOW() ORDER BY started_at DESC LIMIT 1`).catch(() => null);
 }
 
 export function eventMultiplier(ev) {
@@ -59,7 +59,7 @@ export async function getHappyHourState(buyerId) {
         return { active: false, rally: { pool: rally, trigger: RALLY_TRIGGER, remaining: Math.max(0, RALLY_TRIGGER - rally) } };
     }
     const [mine, gold] = await Promise.all([
-        buyerId ? db.queryOne(`SELECT gold FROM mkt_event_donation WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : null,
+        buyerId ? db.queryOne(`SELECT gold FROM mkt_happy_hour_donation WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : null,
         buyerId ? db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null) : null,
     ]);
     const myDonation = Number(mine?.gold || 0);
@@ -87,14 +87,14 @@ export async function startHappyHour({ hours = 2, baseMult = 2, startPool = 0 } 
     const base = Math.max(2, Math.min(3, Math.floor(Number(baseMult) || 2)));
     const pool = Math.max(0, Math.floor(Number(startPool) || 0));
     const ev = await db
-        .queryOne(`INSERT INTO mkt_event (kind, resource, base_mult, pool_gold, ends_at) VALUES ('happy_hour', 'xp', $1, $2, NOW() + ($3 || ' hours')::interval) RETURNING *`, [base, pool, String(h)])
+        .queryOne(`INSERT INTO mkt_happy_hour (kind, resource, base_mult, pool_gold, ends_at) VALUES ('happy_hour', 'xp', $1, $2, NOW() + ($3 || ' hours')::interval) RETURNING *`, [base, pool, String(h)])
         .catch(() => null);
     invalidateEventCache();
     return { ok: Boolean(ev), endsAt: ev?.ends_at, baseMult: base, hours: h };
 }
 
 export async function endHappyHour() {
-    await db.query(`UPDATE mkt_event SET ends_at = NOW() WHERE ends_at > NOW()`).catch(() => {});
+    await db.query(`UPDATE mkt_happy_hour SET ends_at = NOW() WHERE ends_at > NOW()`).catch(() => {});
     invalidateEventCache();
     return { ok: true };
 }
@@ -102,7 +102,7 @@ export async function endHappyHour() {
 export async function addToHappyHourPool(amount) {
     const ev = await getActiveEvent();
     if (!ev) return { ok: false, error: "no_event" };
-    await db.query(`UPDATE mkt_event SET pool_gold = pool_gold + $2 WHERE id = $1`, [ev.id, Math.max(0, Math.floor(Number(amount) || 0))]).catch(() => {});
+    await db.query(`UPDATE mkt_happy_hour SET pool_gold = pool_gold + $2 WHERE id = $1`, [ev.id, Math.max(0, Math.floor(Number(amount) || 0))]).catch(() => {});
     invalidateEventCache();
     return { ok: true, ...(await getHappyHourState(null)) };
 }
