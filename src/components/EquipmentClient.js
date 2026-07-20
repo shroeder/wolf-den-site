@@ -255,6 +255,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         <h3>{EQUIP_SLOTS.find((s) => s.slot === slot)?.label}</h3>
                         <button type="button" className="pill" onClick={() => setSlot(null)}>Close</button>
                     </div>
+                    <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.78rem" }}>👆 Tap an item to equip it in this slot.</p>
                     {equipped[slot] ? <button type="button" className="pill" onClick={() => unequip(slot)} disabled={busy}>✕ Unequip {itemDef(equipped[slot])?.name}</button> : null}
                     <div className="equip-bag-grid">
                         {(data.items || []).filter((i) => itemFitsSlot(i, slot)).map((i) => (
