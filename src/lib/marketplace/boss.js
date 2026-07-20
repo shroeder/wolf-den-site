@@ -42,6 +42,14 @@ function manualHit(level, stats = {}, { forceCrit = false } = {}) {
 // Passive per-member hourly auto-damage. Sized so the whole pack's combined drain is fast enough that the
 // live HP counter visibly ticks down second-by-second (the auto-sizer scales boss HP to match, so the
 // fight still lasts the target days — the numbers are just bigger and the counter feels alive).
+// How long a boss fight should last, end to end. Bumped 7 → 10 after Skarnyx died in 3.8 days: fights were
+// coming down too fast because HP was scaled off a theoretical model (or a flat +12%/cycle) that lags the
+// pack's real, ever-growing DPS. New bosses now size off the PREVIOUS boss's OBSERVED kill pace (see
+// sizeNextBossHp), which self-corrects toward this target regardless of how strong the pack has become.
+const BOSS_TARGET_DAYS = 10;
+// A little headroom so the next boss isn't undersized by the pack leveling/growing between fights.
+const BOSS_PACK_GROWTH = 1.1;
+
 const autoPerHour = (level, stats = {}) => Math.round((250 + level * 50) * (1 + (stats.ferocity || 0) / 100));
 
 // Expected damage a single member deals PER DAY: passive auto-attacks 24/7 (gear Ferocity boosts these)
@@ -56,7 +64,7 @@ function memberDailyDamage(level, manualMult = 1, gearStats = {}) {
 // Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level + GEAR + PET power.
 // Assumes everyone lands their daily strike (upper bound), so real fights tend to run a touch longer.
 // Used at create time so HP scales with the pack's real strength instead of a fixed guess. { hp, members }.
-export async function projectBossHp({ targetDays = 7 } = {}) {
+export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
     const members = await db.query(`SELECT id, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
     const [gearStats, petBonuses] = await Promise.all([
         getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map()),
@@ -575,13 +583,38 @@ const PROC_BOSS_NAMES = [
 // Auto-rotate the weekly boss after a kill so play never stalls. Prefer a prepared DRAFT (admin-authored,
 // with art + prize); if none is waiting, generate a procedural boss (HP scaled off the last one + a random
 // element) and bring it live. Art/prize can be filled in later — the boss is fully playable without them.
+// Size the NEXT boss so it lasts ~BOSS_TARGET_DAYS. Primary signal is the PREVIOUS boss's OBSERVED kill
+// pace (total damage ÷ days it stayed alive) — the only measure that reflects the pack's true, current DPS.
+// Falls back to the theoretical projection (fresh install / no prior fight), and never lets the next boss
+// come out weaker than the last one. Returns a rounded HP.
+async function sizeNextBossHp(prevBoss) {
+    let observedDaily = null;
+    if (prevBoss?.id) {
+        const o = await db
+            .queryOne(
+                `SELECT EXTRACT(EPOCH FROM (COALESCE(defeated_at, NOW()) - started_at))/86400.0 AS days,
+                        (SELECT COALESCE(SUM(damage),0) FROM boss_hit WHERE boss_id = $1) AS dmg
+                   FROM boss_event WHERE id = $1`,
+                [prevBoss.id]
+            )
+            .catch(() => null);
+        const days = Number(o?.days) || 0;
+        const dmg = Number(o?.dmg) || 0;
+        if (days >= 0.5 && dmg > 0) observedDaily = dmg / days; // need a meaningful window
+    }
+    let hp;
+    if (observedDaily) hp = observedDaily * BOSS_TARGET_DAYS * BOSS_PACK_GROWTH;
+    else hp = await projectBossHp({}).then((r) => r.hp).catch(() => prevBoss?.max_hp || 500000);
+    hp = Math.max(hp, (prevBoss?.max_hp || 0) * 1.05); // a new boss is never weaker than the last
+    return Math.max(100000, Math.round(hp / 1000) * 1000);
+}
+
 async function activateNextBoss(prevBoss) {
     const live = await db.queryOne(`SELECT id FROM boss_event WHERE status = 'live' AND defeated_at IS NULL LIMIT 1`).catch(() => null);
     if (live) return; // something is already live — nothing to do
     let next = await db.queryOne(`SELECT id FROM boss_event WHERE status = 'draft' ORDER BY started_at ASC LIMIT 1`).catch(() => null);
     if (!next) {
-        const prevHp = prevBoss?.max_hp || (await projectBossHp({}).then((r) => r.hp).catch(() => 500000));
-        const hp = Math.max(100000, Math.round((prevHp * 1.12) / 1000) * 1000); // ~12% tougher each cycle
+        const hp = await sizeNextBossHp(prevBoss); // scaled off the last boss's real kill pace → ~10-day fight
         const name = PROC_BOSS_NAMES[Math.floor(Math.random() * PROC_BOSS_NAMES.length)].trim();
         const div = Math.max(100, Math.round(hp / 7000));
         next = await db
@@ -595,7 +628,7 @@ async function activateNextBoss(prevBoss) {
     if (!next) return;
     await db.query(`UPDATE boss_event SET status = 'ended' WHERE status = 'live' AND id <> $1`, [next.id]).catch(() => {});
     const boss = await db
-        .queryOne(`UPDATE boss_event SET status = 'live', started_at = NOW(), ends_at = NOW() + interval '7 days', defeated_at = NULL WHERE id = $1 RETURNING *`, [next.id])
+        .queryOne(`UPDATE boss_event SET status = 'live', started_at = NOW(), ends_at = NOW() + interval '10 days', defeated_at = NULL WHERE id = $1 RETURNING *`, [next.id])
         .catch(() => null);
     if (boss) await broadcastBoss(boss).catch(() => {});
 }
