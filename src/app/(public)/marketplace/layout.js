@@ -3,11 +3,14 @@
 // in the public layout now so they're present site-wide, not just on /marketplace.)
 
 import DailyCheckin from "@/components/DailyCheckin";
+import GameNav from "@/components/GameNav";
 
 export default function MarketplaceLayout({ children }) {
     return (
         <div className="mkt-app">
             <DailyCheckin />
+            {/* In-game menu bar — self-hides on non-game pages. */}
+            <GameNav />
             {children}
         </div>
     );

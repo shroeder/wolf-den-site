@@ -9802,6 +9802,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .spin-celebrate-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .spin-celebrate-confetti span { position: absolute; top: -14px; width: 9px; height: 14px; border-radius: 2px; animation: spinConfetti 3.2s linear forwards; }
 @keyframes spinConfetti { 0% { transform: translateY(-14px) rotate(0); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0.5; } }
+/* In-game menu bar — hop between game areas without returning to the hub. */
+.game-nav { margin: 0 0 14px; }
+.game-nav-scroll { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.game-nav-scroll::-webkit-scrollbar { display: none; }
+.game-nav-link { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 7px 13px; border-radius: 999px; font-size: 0.82rem; font-weight: 700; text-decoration: none; color: #cdd2d8; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); white-space: nowrap; }
+.game-nav-link:hover { border-color: rgba(255,215,94,0.5); }
+.game-nav-link.is-active { background: rgba(255,215,94,0.16); border-color: rgba(255,215,94,0.6); color: #ffd75e; }
+
 /* THE GAME hub — the single game area's dopamine menu. */
 .game-hub-hero { text-align: center; background: radial-gradient(120% 120% at 50% 0%, rgba(255,215,94,0.12), transparent 60%); }
 .game-hub-stats { margin-top: 12px; }
