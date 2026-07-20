@@ -35,7 +35,7 @@ export async function POST(request) {
                 after(() => sendAdminPush({
                     title: "🐺 New member joined!",
                     body: `${who} just signed up in the app.`,
-                    route: "members",
+                    route: `members?member=${buyer.id}`, // deep-link straight to the new member's profile
                     data: { type: "new_member", buyerId: buyer.id },
                 }).catch(() => {}));
                 return NextResponse.json({ ok: true, needsVerification: true, email: buyer.email });
