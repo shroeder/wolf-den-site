@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 // celebration (flash, coin burst, gold count-up). Renders nothing until the member has quests.
 export default function QuestsClient() {
     const [quests, setQuests] = useState(null);
+    const [meta, setMeta] = useState(null); // { canReset, resetCost, resetUsed, gold }
     const [busy, setBusy] = useState(false);
     const [reward, setReward] = useState(null); // { gold, chest } shown in the celebration
     const [mounted, setMounted] = useState(false);
@@ -16,9 +17,17 @@ export default function QuestsClient() {
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/quests", { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
-        if (d) setQuests(d.quests || []);
+        if (d) { setQuests(d.quests || []); setMeta({ canReset: d.canReset, resetCost: d.resetCost, resetUsed: d.resetUsed, gold: d.gold }); }
     }, []);
     useEffect(() => { load(); }, [load]);
+
+    async function reroll() {
+        if (busy || !meta?.canReset) return;
+        setBusy(true);
+        const r = await fetch("/api/marketplace/quests", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reset" }) }).catch(() => null);
+        if (r?.ok) await load();
+        setBusy(false);
+    }
 
     async function claim(key) {
         if (busy) return;
@@ -41,7 +50,14 @@ export default function QuestsClient() {
 
     return (
         <section className="card quests-card">
-            <h3 style={{ marginTop: 0 }}>📜 Daily Quests {readyCount ? <span className="quests-ready-badge">{readyCount}</span> : null}</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                <h3 style={{ marginTop: 0, marginBottom: 0 }}>📜 Daily Quests {readyCount ? <span className="quests-ready-badge">{readyCount}</span> : null}</h3>
+                {meta && !meta.resetUsed ? (
+                    <button type="button" className="quest-reroll" onClick={reroll} disabled={busy || !meta.canReset} title={meta.canReset ? "" : "Not enough gold"}>
+                        🔄 Reroll · 🪙 {(meta.resetCost || 1500).toLocaleString()}
+                    </button>
+                ) : meta?.resetUsed ? <span className="muted" style={{ fontSize: "0.72rem" }}>rerolled today</span> : null}
+            </div>
             <div className="quests-list">
                 {quests.map((q) => {
                     const pct = Math.min(100, Math.round((q.progress / q.target) * 100));

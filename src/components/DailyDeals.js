@@ -55,6 +55,16 @@ export default function DailyDeals() {
         await load();
     }
 
+    async function reroll() {
+        if (busy || !state?.canReset) return;
+        setBusy("reroll"); setMsg(null);
+        const r = await fetch("/api/marketplace/deals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        if (!d?.ok) setMsg({ ok: false, text: { not_enough_gold: "Not enough gold.", already_reset: "Already rerolled today." }[d?.error] || "Couldn't reroll." });
+        setBusy(null);
+        await load();
+    }
+
     if (!state || !state.deals?.length) return null;
 
     return (
@@ -63,6 +73,11 @@ export default function DailyDeals() {
                 <h2 style={{ margin: 0 }}>🔥 Today&apos;s Deals</h2>
                 <span className="deals-timer">resets in {fmtCountdown(secs)}</span>
             </div>
+            {state.signedIn && !state.resetUsed ? (
+                <button type="button" className="quest-reroll" style={{ marginBottom: 8 }} onClick={reroll} disabled={busy === "reroll" || !state.canReset} title={state.canReset ? "" : "Not enough gold"}>
+                    🔄 Reroll deals · 🪙 {(state.resetCost || 1500).toLocaleString()}
+                </button>
+            ) : state.resetUsed ? <p className="muted" style={{ fontSize: "0.72rem", margin: "0 0 8px" }}>rerolled today — fresh deals tomorrow</p> : null}
             <p className="muted" style={{ margin: "2px 0 10px" }}>Discounted picks that rotate every day — grab them before they&apos;re gone. {state.signedIn ? <span>🪙 {state.gold.toLocaleString()}</span> : null}</p>
             {msg ? <p className={msg.ok ? "deals-ok" : "deals-err"}>{msg.text}</p> : null}
             <div className="deals-grid">

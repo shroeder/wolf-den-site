@@ -41,27 +41,58 @@ function hashStr(s) {
     return h >>> 0;
 }
 
-// The 3 templates assigned to this member today (stable for the whole day).
-function pickDaily(buyerId, day) {
+// The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
+// paid re-roll produces a different set.
+function pickDaily(buyerId, day, reset = false) {
+    const salt = reset ? ":r" : "";
     return QUEST_TEMPLATES
-        .map((t) => ({ t, h: hashStr(`${buyerId}:${day}:${t.key}`) }))
+        .map((t) => ({ t, h: hashStr(`${buyerId}:${day}${salt}:${t.key}`) }))
         .sort((a, b) => a.h - b.h)
         .slice(0, 3)
         .map((x) => x.t);
 }
 
-// Idempotently ensure today's 3 quest rows exist (safe to call from any hook).
-export async function ensureDailyQuests(buyerId) {
-    if (!buyerId) return storeDay();
-    const day = storeDay();
-    for (const t of pickDaily(buyerId, day)) {
+async function insertQuests(buyerId, day, templates) {
+    for (const t of templates) {
         await db.query(
             `INSERT INTO mkt_daily_quest (buyer_id, day, quest_key, target, reward_gold, reward_chest)
              VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (buyer_id, day, quest_key) DO NOTHING`,
             [buyerId, day, t.key, t.target, t.gold || 0, t.chest || null]
         ).catch(() => {});
     }
+}
+
+// Idempotently ensure today's 3 quest rows exist (safe to call from any hook). Gated on existing rows so it
+// never re-adds the default trio over a paid re-roll's replacement quests.
+export async function ensureDailyQuests(buyerId) {
+    if (!buyerId) return storeDay();
+    const day = storeDay();
+    const have = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, day]).catch(() => null);
+    if ((have?.n || 0) >= 1) return day; // already assigned (or re-rolled) today
+    await insertQuests(buyerId, day, pickDaily(buyerId, day));
     return day;
+}
+
+// Pay 1500 gold to re-roll today's quests — once per store-day. Atomic charge + once-a-day guard.
+const QUEST_RESET_COST = 1500;
+export async function resetDailyQuests(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const day = storeDay();
+    const paid = await db
+        .queryOne(
+            `UPDATE mkt_buyer SET gold = gold - $3, quest_reset_day = $2::date
+              WHERE id = $1 AND gold >= $3 AND (quest_reset_day IS DISTINCT FROM $2::date)
+              RETURNING gold`,
+            [buyerId, day, QUEST_RESET_COST]
+        )
+        .catch(() => null);
+    if (!paid) {
+        const b = await db.queryOne(`SELECT quest_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        return { ok: false, error: b?.d === day ? "already_reset" : "not_enough_gold" };
+    }
+    await db.query(`DELETE FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, day]).catch(() => {});
+    await insertQuests(buyerId, day, pickDaily(buyerId, day, true));
+    return { ok: true, gold: paid.gold, ...(await getDailyQuests(buyerId)) };
 }
 
 // Bump progress on any of today's unclaimed quests matching a metric (e.g. "boss_damage", "chest_open").
@@ -105,7 +136,10 @@ export async function getDailyQuests(buyerId) {
         })
         .filter(Boolean)
         .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
-    return { quests, day };
+    // Paid re-roll availability (once per store-day).
+    const meta = await db.queryOne(`SELECT COALESCE(gold,0) AS gold, quest_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const resetUsed = meta?.d === day;
+    return { quests, day, gold: meta?.gold || 0, resetCost: QUEST_RESET_COST, resetUsed, canReset: !resetUsed && (meta?.gold || 0) >= QUEST_RESET_COST };
 }
 
 // Claim a completed, unclaimed quest → grant its reward. Atomic (the UPDATE guards double-claims).

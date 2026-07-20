@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getDailyDeals, buyDailyDeal } from "@/lib/marketplace/daily-deals.js";
+import { getDailyDeals, buyDailyDeal, resetDailyDeals } from "@/lib/marketplace/daily-deals.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -26,7 +26,9 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ error: "not_signed_in" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const res = await buyDailyDeal(buyer.id, String(body?.dealId || ""));
+            const res = body?.action === "reset"
+                ? await resetDailyDeals(buyer.id)
+                : await buyDailyDeal(buyer.id, String(body?.dealId || ""));
             return NextResponse.json(res, { status: res.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.deals.buy.failure" });

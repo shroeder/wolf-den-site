@@ -82,9 +82,10 @@ function dealPool() {
     return [...gear, ...consumables, ...pets].filter((d) => d.basePrice > 0);
 }
 
-// The deterministic list of today's deals (id + kind + discounted price). Same for everyone all day.
-function todaysDeals(dayKey) {
-    const rng = mulberry32(hashSeed(`deals:${dayKey}`));
+// The deterministic list of today's deals (id + kind + discounted price). Same for everyone all day —
+// unless a member paid to re-roll, in which case seedExtra makes their set unique for the day.
+function todaysDeals(dayKey, seedExtra = "") {
+    const rng = mulberry32(hashSeed(`deals:${dayKey}${seedExtra}`));
     const pool = dealPool();
     // Guarantee at least one consumable (cheap + accessible) so there's always an easy grab.
     const consumables = shuffle(pool.filter((d) => d.kind === "consumable"), rng);
@@ -107,23 +108,30 @@ async function ownedSets(buyerId) {
     return { gear: new Set(gearRows.map((r) => r.item_id)), pets: new Set(petRows.map((r) => r.ref)) };
 }
 
+const DEAL_RESET_COST = 1500;
+
 // GET — the day's deals for this member, with claimed/owned/affordable flags + the countdown.
 export async function getDailyDeals(buyerId) {
     const { dayKey, resetInSecs, resetAt } = dayContext();
-    const deals = todaysDeals(dayKey);
-    if (!buyerId) return { deals: deals.map((d) => ({ ...d, desc: dealDescription(d), canBuy: false })), resetInSecs, resetAt, gold: 0, signedIn: false };
-    const [goldRow, claimedRows, owned] = await Promise.all([
+    if (!buyerId) return { deals: todaysDeals(dayKey).map((d) => ({ ...d, desc: dealDescription(d), canBuy: false })), resetInSecs, resetAt, gold: 0, signedIn: false };
+    const [goldRow, claimedRows, owned, resetRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT item_id FROM mkt_daily_deal_purchase WHERE buyer_id = $1 AND day = $2`, [buyerId, dayKey]).catch(() => []),
         ownedSets(buyerId),
+        db.queryOne(`SELECT deal_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
     const gold = goldRow?.gold || 0;
+    const resetUsed = resetRow?.d === dayKey;
+    const deals = todaysDeals(dayKey, resetUsed ? `:${buyerId}:r` : "");
     const claimed = new Set(claimedRows.map((r) => r.item_id));
     return {
         signedIn: true,
         gold,
         resetInSecs,
         resetAt,
+        resetCost: DEAL_RESET_COST,
+        resetUsed,
+        canReset: !resetUsed && gold >= DEAL_RESET_COST,
         deals: deals.map((d) => {
             const isOwned = (d.kind === "gear" && owned.gear.has(d.id)) || (d.kind === "pet" && owned.pets.has(d.id));
             const isClaimed = claimed.has(d.id);
@@ -136,7 +144,10 @@ export async function getDailyDeals(buyerId) {
 export async function buyDailyDeal(buyerId, dealId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const { dayKey } = dayContext();
-    const deal = todaysDeals(dayKey).find((d) => d.id === String(dealId));
+    // Re-derive from the member's actual set (their re-rolled set if they paid to reset today).
+    const resetRow = await db.queryOne(`SELECT deal_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const seedExtra = resetRow?.d === dayKey ? `:${buyerId}:r` : "";
+    const deal = todaysDeals(dayKey, seedExtra).find((d) => d.id === String(dealId));
     if (!deal) return { ok: false, error: "not_a_deal" };
 
     // One per deal per day — reserve the slot up front (unique PK) so a double-tap can't double-buy.
@@ -166,4 +177,23 @@ export async function buyDailyDeal(buyerId, dealId) {
 
     const label = deal.kind === "gear" ? itemById(deal.id)?.name : deal.kind === "pet" ? collectibleById(deal.id)?.name : CONSUMABLES[deal.id]?.name;
     return { ok: true, gold: paid.gold, name: label || deal.name, kind: deal.kind };
+}
+
+// Pay to re-roll the special shop into a fresh, member-unique set — once per store-day. Atomic charge + guard.
+export async function resetDailyDeals(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const { dayKey } = dayContext();
+    const paid = await db
+        .queryOne(
+            `UPDATE mkt_buyer SET gold = gold - $3, deal_reset_day = $2::date
+              WHERE id = $1 AND gold >= $3 AND (deal_reset_day IS DISTINCT FROM $2::date)
+              RETURNING gold`,
+            [buyerId, dayKey, DEAL_RESET_COST]
+        )
+        .catch(() => null);
+    if (!paid) {
+        const b = await db.queryOne(`SELECT deal_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        return { ok: false, error: b?.d === dayKey ? "already_reset" : "not_enough_gold" };
+    }
+    return { ok: true, ...(await getDailyDeals(buyerId)) };
 }

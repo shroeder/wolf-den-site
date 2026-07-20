@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { claimQuest, getDailyQuests } from "@/lib/marketplace/quests.js";
+import { claimQuest, getDailyQuests, resetDailyQuests } from "@/lib/marketplace/quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,7 +31,9 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const res = await claimQuest(buyer.id, String(body?.key || ""));
+            const res = body?.action === "reset"
+                ? await resetDailyQuests(buyer.id)
+                : await claimQuest(buyer.id, String(body?.key || ""));
             if (!res.ok) return noStore(res, { status: 400 });
             return noStore(res);
         } catch (error) {
