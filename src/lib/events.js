@@ -1,59 +1,5 @@
 export const events = [
     {
-        slug: "ayoza-dnd-one-shot",
-        title: "AYOZA: A Custom D&D One-Shot at The Wolf Den",
-        seoTitle: "AYOZA D&D One-Shot Campaign | The Wolf Den",
-        metaDescription:
-            "Play AYOZA, a custom one-shot Dungeons & Dragons adventure built for The Wolf Den in Montgomery, MN. Sunday, July 12 from 3 to 6 PM, with character creation 3–4 PM. $5 at the door, only 6 seats — reserve yours online.",
-        keywords: [
-            "DnD one-shot Montgomery MN",
-            "Dungeons and Dragons Montgomery MN",
-            "custom D&D campaign Minnesota",
-            "tabletop RPG event Montgomery MN",
-            "D&D one shot near me",
-            "AYOZA Wolf Den",
-        ],
-        oneShot: true,
-        day: "Sunday, July 12",
-        date: "2026-07-12T15:00:00-05:00",
-        time: "3:00 PM - 6:00 PM",
-        image: {
-            src: "/images/ayoza-dnd-one-shot-the-wolf-den-montgomery-mn.png",
-            alt: "AYOZA: A World of Mystery & Adventure — custom Dungeons & Dragons one-shot campaign artwork for The Wolf Den in Montgomery, Minnesota",
-            width: 1254,
-            height: 1254,
-        },
-        format: "A guided one-shot Dungeons & Dragons adventure set in AYOZA, a custom world with original story, setting, characters, enemies, and events made by AJ exclusively for The Wolf Den",
-        entryFee: "$5 — paid in person when you arrive at the shop",
-        priceUsd: "5",
-        rsvp: "Reserve your seat online, then pay $5 in person when you arrive",
-        capacity: "6 seats",
-        seatsRemaining: "Live RSVP count",
-        signupLimit: 6,
-        beginnerFriendly: true,
-        audience: "Players new to or experienced with Dungeons & Dragons, ages welcome to roleplay",
-        description:
-            "On Sunday, July 12 from 3:00 PM to 6:00 PM, AJ runs AYOZA — a custom one-shot Dungeons & Dragons adventure built exclusively for The Wolf Den in Montgomery, Minnesota. Original story, setting, characters, and enemies, all in a single self-contained session. The first hour, 3:00 to 4:00 PM, is for character creation, so please arrive promptly.",
-        rules:
-            "AYOZA is a self-contained one-shot, so no prior characters or experience are required. Everything you need to play is provided — custom character sheets, dice, and all materials. Just bring yourself and $5 for entry, paid in person when you arrive. Plan to show up promptly: character creation runs from 3:00 to 4:00 PM, and the adventure begins right after. Your journey starts at the Wolf Lodge: explore, discover, unravel, and belong. Seats are limited to 6 adventurers, so reserve early.",
-        details: {
-            whatToExpect: [
-                "Character creation from 3:00 to 4:00 PM, then straight into the adventure (4:00 to 6:00 PM)",
-                "Everything provided — custom character sheets, dice, and all materials; no prep or experience needed",
-                "A fully custom world — original setting, characters, enemies, and events made by AJ for The Wolf Den",
-                "A welcoming table for both newcomers and seasoned players",
-                "Only 6 seats, so every player is part of the story",
-            ],
-            whoShould:
-                "Anyone curious about Dungeons & Dragons or looking for a fresh, self-contained adventure — beginners and veterans alike.",
-            note: "Entry is $5, paid in person when you arrive at the shop. Please show up promptly — character creation runs from 3:00 to 4:00 PM, so late arrivals may miss the start. Seats are limited to 6; if your plans change, let us know so another player can take your spot.",
-        },
-        futurePlans:
-            "If AYOZA fills up and players want more, The Wolf Den may run additional one-shots and expand the custom world into a longer recurring campaign based on community interest.",
-        refundPolicy:
-            "Entry is $5, paid in person when you arrive at the shop. If you can no longer attend, contact The Wolf Den so we can free your seat for another player.",
-    },
-    {
         slug: "thursday-kids-card-club",
         title: "Thursday Kids Card Club at The Wolf Den",
         seoTitle: "Thursday Kids Card Club | The Wolf Den",
