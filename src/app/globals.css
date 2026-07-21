@@ -10350,3 +10350,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .herochip.has-bg { position: relative; }
 .herochip.has-bg .herochip-name, .herochip.has-bg .herochip-meta { text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
 .herochip.is-link.has-glow:not(.is-you):hover { border-color: color-mix(in srgb, var(--glow) 85%, transparent); }
+
+/* Fortune-wheel icon (react-icons FaDharmachakra) that replaced the ferris-wheel emoji for the Spin. */
+.spin-ico { display: inline-block; vertical-align: -0.14em; color: #ffd75e; }
+.game-nav-ico { display: inline-block; vertical-align: -0.12em; font-size: 1.05em; }
+.game-nav-link.is-active .game-nav-ico { color: #ffd75e; }
+.game-tile-emoji svg { color: #ffd75e; display: block; }

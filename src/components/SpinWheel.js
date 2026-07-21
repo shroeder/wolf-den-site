@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { FaDharmachakra } from "react-icons/fa6";
+
 import CoinCta from "@/components/CoinCta";
 
 // Per-tier wedge fills — jackpot glows gold, mini purple, rare teal, everything else alternating slate.
@@ -98,13 +100,13 @@ export default function SpinWheel() {
     if (!st) return <section className="card"><p className="muted" style={{ margin: 0 }}>Loading…</p></section>;
     if (!st.signedIn) return <section className="card"><p className="muted" style={{ margin: 0 }}>Sign in to spin the daily wheel.</p></section>;
 
-    const spinLabel = st.freeAvailable ? "🎡 FREE SPIN" : st.tokens > 0 ? `🎟️ Spin (${st.tokens} token${st.tokens > 1 ? "s" : ""})` : "No spins left";
+    const spinLabel = st.freeAvailable ? "FREE SPIN" : st.tokens > 0 ? `🎟️ Spin (${st.tokens} token${st.tokens > 1 ? "s" : ""})` : "No spins left";
     const resultKind = result?.jackpot ? "jackpot" : result?.mini ? "mini" : result?.rare ? "rare" : "normal";
 
     return (
         <section className="card spin-card">
             <div className="spin-top">
-                <span>🎡 {st.wheel.name}</span>
+                <span><FaDharmachakra className="spin-ico" aria-hidden="true" /> {st.wheel.name}</span>
                 <span className="muted">🎟️ {st.tokens} tokens · spun {st.spinCount}×</span>
             </div>
             <p className="muted spin-lead">Spin daily for gold, XP, chests, pet treats — and a rare shot at the <strong style={{ color: "#ffd75e" }}>💎 JACKPOT</strong>.</p>
@@ -125,7 +127,7 @@ export default function SpinWheel() {
             {msg ? <div className="spin-msg">{msg}{lowCoins ? <span style={{ marginLeft: 8 }}><CoinCta label="Get coins" /></span> : null}</div> : null}
 
             <div className="spin-actions">
-                <button type="button" className="btn-gold spin-go" onClick={spin} disabled={spinning || !st.canSpin}>{spinning ? "Spinning…" : spinLabel}</button>
+                <button type="button" className="btn-gold spin-go" onClick={spin} disabled={spinning || !st.canSpin}>{spinning ? "Spinning…" : <>{st.freeAvailable ? <FaDharmachakra className="spin-ico" aria-hidden="true" /> : null} {spinLabel}</>}</button>
                 {!st.freeAvailable ? <button type="button" className="spin-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
 

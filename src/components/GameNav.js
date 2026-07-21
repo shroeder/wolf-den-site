@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { FaDharmachakra } from "react-icons/fa6";
 
 // In-game menu bar: a horizontal, scrollable strip of the game areas, shown at the top of every game page
 // so you can hop Boss → Spin → Pets → Gear etc. without going back to the hub. Mounted once in the
@@ -10,7 +11,7 @@ import { useEffect, useState } from "react";
 const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
-    { href: "/marketplace/spin", emoji: "🎡", label: "Spin" },
+    { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Spin" },
     { href: "/marketplace/pets", emoji: "🐾", label: "Pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", label: "Gear" },
     { href: "/marketplace/sets", emoji: "🧩", label: "Sets" },
@@ -52,7 +53,7 @@ export default function GameNav() {
                     const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
                     return (
                         <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}`}>
-                            <span aria-hidden="true">{l.emoji}</span> {l.label}
+                            {l.Icon ? <l.Icon className="game-nav-ico" aria-hidden="true" /> : <span aria-hidden="true">{l.emoji}</span>} {l.label}
                             {badge ? <span className="game-nav-badge" title={`${badge} chest${badge === 1 ? "" : "s"} to open`}>{badge}</span> : null}
                         </Link>
                     );

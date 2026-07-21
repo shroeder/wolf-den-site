@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { FaDharmachakra } from "react-icons/fa6";
 
 // Live stat strip for the game hub: XP + progress to the next unlock, gold, and spin tokens. Best-effort —
 // pulls from the same endpoints the reward nudge + spin wheel use, and self-hides gracefully when signed out.
@@ -32,7 +33,7 @@ export default function GameHubStats() {
             <div className="game-hub-chips">
                 <span className="game-hub-chip">⭐ {(unlock.xp || 0).toLocaleString()} XP</span>
                 {spin?.signedIn ? <span className="game-hub-chip">🎟️ {spin.tokens || 0}</span> : null}
-                {spin?.freeAvailable ? <Link href="/marketplace/spin" className="game-hub-chip is-live">🎡 Free spin ready!</Link> : null}
+                {spin?.freeAvailable ? <Link href="/marketplace/spin" className="game-hub-chip is-live"><FaDharmachakra className="spin-ico" aria-hidden="true" /> Free spin ready!</Link> : null}
             </div>
             {!unlock.maxed && unlock.label ? (
                 <div className="game-hub-progress">

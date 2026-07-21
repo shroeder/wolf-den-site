@@ -135,7 +135,7 @@ function QuestReward({ reward, onClose }) {
                 {reward.chest ? <div className="quest-cele-chest">{reward.chest.emoji} {reward.chest.label}!</div> : null}
                 {reward.bonusXp || reward.bonusSpin ? (
                     <div className="quest-cele-chest" style={{ color: "#ffd75e" }}>
-                        🎉 All quests cleared!{reward.bonusXp ? ` +${reward.bonusXp} XP` : ""}{reward.bonusSpin ? " · 🎡 free spin" : ""}
+                        🎉 All quests cleared!{reward.bonusXp ? ` +${reward.bonusXp} XP` : ""}{reward.bonusSpin ? " · 🎟️ free spin" : ""}
                     </div>
                 ) : null}
                 <button type="button" className="button gold" onClick={onClose}>Nice!</button>

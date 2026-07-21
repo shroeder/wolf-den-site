@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FaDharmachakra } from "react-icons/fa6";
 
 import GameHubStats from "@/components/GameHubStats";
 import ViewPing from "@/components/ViewPing";
@@ -15,7 +16,7 @@ export const metadata = {
 // kept separate from real commerce (Shop / Vendor Marketplace). Every game feature is broken out here.
 const FEATURES = [
     { href: "/marketplace/boss", emoji: "⚔️", title: "Weekly Boss", desc: "Land your daily strike on the shared boss for XP & raffle tickets.", tone: "boss" },
-    { href: "/marketplace/spin", emoji: "🎡", title: "Daily Spin", desc: "One free spin a day — gold, XP, chests… and the jackpot.", tone: "spin" },
+    { href: "/marketplace/spin", Icon: FaDharmachakra, title: "Daily Spin", desc: "One free spin a day — gold, XP, chests… and the jackpot.", tone: "spin" },
     { href: "/marketplace/pets", emoji: "🐾", title: "Pets", desc: "Collect companions, equip one, and level it up.", tone: "pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", title: "Gear", desc: "Your loadout, the gold shop, and loot chests.", tone: "gear" },
     { href: "/marketplace/sets", emoji: "🧩", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
@@ -38,7 +39,7 @@ export default function GamePlayHub() {
             <div className="game-hub-grid">
                 {FEATURES.map((f) => (
                     <Link key={f.href} href={f.href} className={`game-tile tone-${f.tone}`}>
-                        <span className="game-tile-emoji" aria-hidden="true">{f.emoji}</span>
+                        <span className="game-tile-emoji" aria-hidden="true">{f.Icon ? <f.Icon /> : f.emoji}</span>
                         <span className="game-tile-title">{f.title}</span>
                         <span className="game-tile-desc">{f.desc}</span>
                     </Link>
