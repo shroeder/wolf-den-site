@@ -129,7 +129,7 @@ export async function getMemberMetrics(buyerId) {
     }
 
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
-    const allMilestones = ["spend", "first_purchase", "event_checkin", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
+    const allMilestones = ["spend", "first_purchase", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
     // Onboarding completionist: every one-time getting-started task done (the EARN checklist's one-timers).
     const onboardingComplete = ["first_purchase", "discord_link", "profile_complete", "first_message", "first_friend", "first_wishlist", "first_equip"].every((k) => Boolean(progress[k]));
 

@@ -7,7 +7,6 @@ import Link from "next/link";
 export const EARN = [
     { key: "spend", icon: "🛒", label: "Every $1 spent", points: "+5 XP", note: "in-store & online", href: "/shop", cta: "Shop now →", doneNote: "You're earning on purchases", repeatable: true },
     { key: "first_purchase", icon: "⭐", label: "Your first purchase", points: "+100 XP", note: "one-time bonus", href: "/shop", cta: "Make a purchase →" },
-    { key: "event_checkin", icon: "📅", label: "Check in at an event", points: "+50 XP", note: "each event", href: "/marketplace/events", cta: "See events →", doneNote: "Checked in before", repeatable: true },
     { key: "discord_link", icon: "💬", label: "Link your Discord", points: "+50 XP", note: "join the server", href: "/api/marketplace/discord/start", cta: "Link Discord →" },
     { key: "profile_complete", icon: "✅", label: "Complete your profile", points: "+25 XP", note: "name, handle, photo", href: "/marketplace/profile", cta: "Edit profile →" },
     { key: "first_message", icon: "✉️", label: "Send your first message", points: "+40 XP", note: "one-time bonus", href: "/marketplace/messages", cta: "Message the store →" },
