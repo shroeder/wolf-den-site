@@ -10274,7 +10274,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .credit-summary > div strong { color: #ffffff; }
 .credit-summary-total { padding-top: 10px; margin-top: 2px; border-top: 1px solid rgba(255,215,94,0.25); font-size: 1.15rem; font-weight: 900; color: #ffffff; }
 .credit-summary-total strong { color: #ffd75e; }
-.credit-card-field { min-height: 52px; padding: 6px 8px; border-radius: 12px; background: rgba(0,0,0,0.32); border: 1px solid rgba(255,215,94,0.22); margin-bottom: 12px; }
+.credit-card-field { min-height: 52px; padding: 6px; border-radius: 12px; background: #15161c; border: 1px solid rgba(255,215,94,0.22); margin-bottom: 12px; }
 .credit-buy { width: 100%; font-weight: 900; font-size: 1.02rem; padding: 13px; border-radius: 12px; border: none; cursor: pointer;
     color: #3a2c04; background: linear-gradient(135deg, #ffe9a8, #ffcf4a 46%, #f2a93b);
     box-shadow: 0 4px 16px rgba(240,160,40,0.45), inset 0 1px 0 rgba(255,255,255,0.5); transition: transform 0.1s ease; }

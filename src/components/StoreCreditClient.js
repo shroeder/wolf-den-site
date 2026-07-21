@@ -86,12 +86,13 @@ export default function StoreCreditClient({
                 if (!payments) throw new Error("Square did not initialize.");
                 const node = document.getElementById("credit-card");
                 if (node) node.innerHTML = "";
-                // Dark-theme the Square card iframe so it doesn't render as a jarring white block.
+                // Dark-theme the Square card iframe so it doesn't render as a jarring white block. The key is
+                // the INPUT backgroundColor — without it Square leaves the fields white regardless of text color.
                 const card = await payments.card({
                     style: {
-                        input: { color: "#f5ead2", fontSize: "16px" },
-                        "input::placeholder": { color: "#9a9284" },
-                        ".input-container": { borderColor: "rgba(255,215,94,0.28)", borderRadius: "10px" },
+                        input: { backgroundColor: "#15161c", color: "#f5ead2", fontSize: "16px" },
+                        "input::placeholder": { color: "#8a8272" },
+                        ".input-container": { backgroundColor: "#15161c", borderColor: "#4a3f1f", borderRadius: "10px" },
                         ".input-container.is-focus": { borderColor: "#ffd75e" },
                         ".input-container.is-error": { borderColor: "#ff6b5e" },
                         ".message-text": { color: "#ffb0a0" },
