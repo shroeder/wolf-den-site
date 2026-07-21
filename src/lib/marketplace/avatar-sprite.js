@@ -89,10 +89,11 @@ export function pendingSpriteIds(limit = null) {
         .query(
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
-                AND avatar_updated_at IS NOT NULL
                 AND avatar_sprite_attempts < ${MAX_SPRITE_ATTEMPTS}
                 AND (
+                    -- Needs a first sprite (regardless of whether avatar_updated_at was ever stamped)…
                     avatar_sprite_url IS NULL
+                    -- …or the avatar / gear changed since the sprite was drawn (regen, off cooldown).
                     OR (
                         (avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)
                         AND (avatar_sprite_at IS NULL OR avatar_sprite_at < NOW() - INTERVAL '${REGEN_COOLDOWN_HOURS} hours')
