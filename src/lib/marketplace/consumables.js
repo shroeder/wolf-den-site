@@ -205,7 +205,14 @@ export async function useConsumable(buyerId, id, targetItemId = null) {
         await awardXp(buyerId, "consumable", { points: e.amount, meta: { consumable: id } }).catch(() => {});
         applied = `+${e.amount.toLocaleString()} XP`;
     } else if (e.type === "strikes") {
-        await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'strikes', $2, date_trunc('day', NOW()) + interval '1 day')`, [buyerId, e.amount]).catch(() => {});
+        // Expire at the next STORE-LOCAL (America/Chicago) midnight — the same boundary the boss swing counter
+        // resets on. Using UTC midnight let an evening-bought potion stay active past the Chicago-day rollover,
+        // so its bonus strikes counted toward TWO days ("+N today" applied twice). Align them so it's one day.
+        await db.query(
+            `INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at)
+             VALUES ($1, 'strikes', $2, (date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') + interval '1 day') AT TIME ZONE 'America/Chicago')`,
+            [buyerId, e.amount]
+        ).catch(() => {});
         applied = `+${e.amount} boss attacks today`;
     } else if (e.type === "damage") {
         await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, e.mult, String(e.hours)]).catch(() => {});
