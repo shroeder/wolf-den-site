@@ -66,7 +66,7 @@ const WHEELS = [
             { label: "1,000 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 1000 },
             { label: "+2 Spins", emoji: "🎟️", weight: 10, kind: "token", n: 2 },
             { label: "2,500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 2500 },
-            { label: "Gold Chest", emoji: "🧰", weight: 3, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
+            { label: "Iron Chest", emoji: "🧰", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "iron" },
             { label: "2,500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 2500 },
             { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
             { label: "MINI JACKPOT · 3,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 3000 },

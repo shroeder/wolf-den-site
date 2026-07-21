@@ -10,19 +10,19 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 
-// Loot chests: earned on level-up, opened for random gear. Higher tiers weight toward rarer loot.
+// Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
+// you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
+// a sliver of a shot at something great. Ascendant/Eternal only appear in the top few tiers' spreads.
 export const CHEST_TIERS = {
-    wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 68, rare: 27, epic: 5 } },
-    iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 34, rare: 42, epic: 21, legendary: 3 } },
-    gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 30, epic: 47, legendary: 20, mythic: 3 } },
-    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 36, legendary: 48, mythic: 16 } },
-    // Elite chests — the ONLY source of Ascendant/Eternal gear. Never from level-ups; awarded for elite
-    // boss performance (tiny chance) or by the owner. Each opens to a guaranteed elite-tier item.
-    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { ascendant: 100 } },
-    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { eternal: 100 } },
-    // The two rarest chests in the game — top-tier gear PLUS the best shot at ultra-rare relic consumables.
-    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { ascendant: 55, eternal: 45 } },
-    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { eternal: 100 } },
+    wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 60, rare: 32, epic: 7, legendary: 1 } },
+    iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 30, rare: 40, epic: 24, legendary: 6 } },
+    gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 26, epic: 42, legendary: 26, mythic: 6 } },
+    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 28, legendary: 44, mythic: 25, ascendant: 3 } },
+    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { legendary: 32, mythic: 45, ascendant: 20, eternal: 3 } },
+    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { mythic: 40, ascendant: 45, eternal: 15 } },
+    // The two rarest chests — best odds at the top gear PLUS the best shot at ultra-rare relic consumables.
+    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { mythic: 18, ascendant: 47, eternal: 35 } },
+    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { ascendant: 38, eternal: 62 } },
 };
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
@@ -57,6 +57,16 @@ function tierForLevel(level) {
     if (level >= 15) return "iron";
     return "wooden";
 }
+
+// Elite-chest lottery: a rare BONUS roll on each level-up (from L20). Ordered rarest-first and stops at the
+// first hit, so you get at most one elite chest per level and the tiers get exponentially harder to see —
+// the last three especially. This is how Ascendant→Primordial chests are earned purely through play.
+const ELITE_CHEST_LOTTERY = [
+    { tier: "primordial", chance: 0.00015 }, // ~1 in 6,700 level-ups
+    { tier: "celestial", chance: 0.0012 }, //  ~1 in 830
+    { tier: "eternal", chance: 0.006 }, //     ~1 in 165
+    { tier: "ascendant", chance: 0.025 }, //   ~1 in 40
+];
 
 function rollRarity(weights) {
     const total = Object.values(weights).reduce((s, w) => s + w, 0);
@@ -98,9 +108,13 @@ export async function syncLevelChests(buyerId) {
     for (let L = row.chest_level + 1; L <= level; L++) {
         const t = tierForLevel(L);
         tally[t] = (tally[t] || 0) + 1;
-        // Milestone: a BONUS Mythic chest every 10th level. This is now the main way to earn a Mythic
-        // chest (level-ups otherwise cap at Gold), so mythic gear stays a rare chase — ~1 per 10 levels.
+        // Milestone: a BONUS Mythic chest every 10th level. This is the main way to earn a Mythic chest
+        // (level-ups otherwise cap at Gold), so mythic gear stays a rare chase — ~1 per 10 levels.
         if (L % 10 === 0) tally.mythic = (tally.mythic || 0) + 1;
+        // Elite lottery (L20+): a tiny shot at an Ascendant→Primordial chest, exponentially rarer per tier.
+        if (L >= 20) {
+            for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < e.chance) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
+        }
     }
     await addChests(buyerId, tally);
     await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
@@ -144,14 +158,17 @@ export async function openChest(buyerId, tier) {
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const owned = new Set(ownedRows.map((r) => r.item_id));
     const rarity = rollRarity(def.weights);
-    // Elite chests draw from the elite (charged) pool; everything else from the normal loot pool.
-    const pool = ELITE_TIERS.has(tier) ? ELITE_POOL : CHEST_POOL;
+    // Pick the pool by the ROLLED rarity, not the chest tier: Ascendant/Eternal are elite (charged) gear;
+    // everything common→mythic comes from the normal loot pool. This lets a chest's spread span both tiers
+    // (e.g. an Ascendant chest that under-rolls to mythic still grants a real mythic item).
+    const isEliteRarity = rarity === "ascendant" || rarity === "eternal";
+    const pool = isEliteRarity ? ELITE_POOL : CHEST_POOL;
     // Prefer the rolled rarity; if you own them all, widen to any un-owned pool item before falling to dust.
     let candidates = pool.filter((i) => i.rarity === rarity && !owned.has(i.id));
     if (!candidates.length) candidates = pool.filter((i) => !owned.has(i.id));
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
-        await grantItem(buyerId, item.id, ELITE_TIERS.has(tier) ? "elite" : "chest");
+        await grantItem(buyerId, item.id, isEliteRarity ? "elite" : "chest");
         return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
     }
     const gold = DUST[rarity] || 25;
