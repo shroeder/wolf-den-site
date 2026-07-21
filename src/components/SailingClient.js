@@ -36,6 +36,18 @@ const sfx = {
         g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.11, t0 + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
         osc.connect(g); g.connect(c.destination); osc.start(t0); osc.stop(t0 + 0.66);
     },
+    // The big cast-off moment: a low ship's horn, the rising whoosh, and two bright bell dings layered together.
+    depart() {
+        const c = audioCtx(); if (!c) return;
+        const t0 = c.currentTime, horn = c.createOscillator(), hg = c.createGain();
+        horn.type = "sawtooth";
+        horn.frequency.setValueAtTime(120, t0); horn.frequency.exponentialRampToValueAtTime(84, t0 + 0.55);
+        hg.gain.setValueAtTime(0.0001, t0); hg.gain.linearRampToValueAtTime(0.15, t0 + 0.06); hg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.72);
+        horn.connect(hg); hg.connect(c.destination); horn.start(t0); horn.stop(t0 + 0.78);
+        this.sail();
+        tone(988, 0.14, 0.5, { type: "sine", gain: 0.12 });
+        tone(1319, 0.28, 0.5, { type: "sine", gain: 0.11 });
+    },
     arrive() { [523, 659, 784].forEach((f, i) => tone(f, i * 0.12, 0.55, { type: "sine", gain: 0.16 })); },
     dig() { tone(150, 0, 0.11, { type: "square", gain: 0.11 }); },
     win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.1, 0.5, { type: "triangle", gain: 0.16 })); },
@@ -44,6 +56,18 @@ const sfx = {
 
 function Confetti() {
     return <div className="sail-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>;
+}
+
+// A crisp ship's-wheel (helm) for the primary Set-sail CTA — reads far better than the flat ⛵ emoji.
+function HelmIcon() {
+    return (
+        <svg className="sail-cta-svg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"
+            fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="2.6" />
+            <circle cx="12" cy="12" r="8.4" />
+            <path d="M12 3.6v3.8M12 16.6v3.8M3.6 12h3.8M16.6 12h3.8M6.1 6.1l2.7 2.7M15.2 15.2l2.7 2.7M17.9 6.1l-2.7 2.7M8.8 15.2l-2.7 2.7" />
+        </svg>
+    );
 }
 
 function fmtLeft(ms) {
@@ -104,7 +128,11 @@ export default function SailingClient({ initial, hero, pet }) {
 
     const act = useCallback(async (action, extra = {}) => {
         setBusy(true);
-        if (action === "start") { sfx.sail(); arrivedRef.current = false; setCelebrate(null); }
+        if (action === "start") {
+            sfx.depart(); arrivedRef.current = false;
+            setCelebrate("depart");
+            setTimeout(() => setCelebrate((c) => (c === "depart" ? null : c)), 1900);
+        }
         if (action === "dig" || action === "begin_dig") sfx.dig();
         try {
             const r = await fetch("/api/marketplace/sailing", {
@@ -162,7 +190,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     <>
                         <div className="sail-sea" style={{ backgroundImage: `url(${state.oceanBg})` }}>
                             <div className="sail-boat">
-                                <div className="sail-boat-inner">
+                                <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}`}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className="sail-boat-img" src={state.boatArt} alt="Your boat" />
                                     <span className="sail-crew">
@@ -185,42 +213,54 @@ export default function SailingClient({ initial, hero, pet }) {
                                 {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}</span>}
                                 {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
                             </div>
+
+                            {/* Primary action docked to the bottom of the animation window so it reads as part of the scene. */}
+                            {liveStatus === "idle" && (
+                                <div className="sail-cta-dock">
+                                    <button className="sail-cta" disabled={busy} onClick={() => act("start")}>
+                                        <HelmIcon /> {busy ? "Casting off…" : "Set sail"}
+                                    </button>
+                                </div>
+                            )}
+                            {liveStatus === "arrived" && (
+                                <div className="sail-cta-dock">
+                                    <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
+                                        <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Dig for treasure"}
+                                    </button>
+                                </div>
+                            )}
+
                             {celebrate === "arrive" ? (<><div className="sail-landho">🏝️ LAND HO!</div><Confetti /></>) : null}
+                            {celebrate === "depart" ? (<><div className="sail-bonvoyage">⚓ BON VOYAGE!</div><Confetti /></>) : null}
                         </div>
-                        {/* Voyage progress — a little boat creeping from port (⚓) to the island (🏝️). */}
-                        <div className="sail-voyage">
-                            <span className="sail-voyage-end" aria-hidden="true">⚓</span>
-                            <div className="sail-voyage-track">
-                                <span className="sail-voyage-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
-                                <span className="sail-voyage-boat" style={{ left: `${Math.round(progress * 100)}%` }} aria-hidden="true">⛵</span>
+                        {/* Voyage progress — only while actually at sea; a little boat creeping from port (⚓) to the island (🏝️). */}
+                        {liveStatus === "sailing" && (
+                            <div className="sail-voyage">
+                                <span className="sail-voyage-end" aria-hidden="true">⚓</span>
+                                <div className="sail-voyage-track">
+                                    <span className="sail-voyage-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+                                    <span className="sail-voyage-boat" style={{ left: `${Math.round(progress * 100)}%` }} aria-hidden="true">⛵</span>
+                                </div>
+                                <span className="sail-voyage-end" aria-hidden="true">🏝️</span>
                             </div>
-                            <span className="sail-voyage-end" aria-hidden="true">🏝️</span>
-                        </div>
+                        )}
                     </>
                 )}
 
-                {/* Primary action — sits right under the scene so it reads as part of it. */}
-                <div className="sail-actions">
-                    {liveStatus === "idle" && (
-                        <button className="sail-cta" disabled={busy} onClick={() => act("start")}>
-                            <span className="sail-cta-ico">⛵</span> {busy ? "Casting off…" : "Set sail"}
-                        </button>
-                    )}
-                    {liveStatus === "sailing" && (
-                        <>
-                            <button className="pill" disabled>⏳ At sea · {fmtLeft(arrivesAt - now)}</button>
-                            {state.windAvailable
-                                ? <button className="btn-ghost" disabled={busy} onClick={() => act("wind")}>🌬️ Favorable winds · −1h</button>
-                                : <button className="pill" disabled>🌬️ Winds used today</button>}
-                        </>
-                    )}
-                    {liveStatus === "arrived" && (
-                        <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
-                            <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Begin excavation"}
-                        </button>
-                    )}
-                    {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
-                </div>
+                {/* Secondary controls (at-sea status + digging) live below the scene; the hero CTA is docked on the window above. */}
+                {(liveStatus === "sailing" || liveStatus === "digging") && (
+                    <div className="sail-actions">
+                        {liveStatus === "sailing" && (
+                            <>
+                                <button className="pill" disabled>⏳ At sea · {fmtLeft(arrivesAt - now)}</button>
+                                {state.windAvailable
+                                    ? <button className="btn-ghost" disabled={busy} onClick={() => act("wind")}>🌬️ Catch a tailwind · arrive 1h sooner</button>
+                                    : <button className="pill" disabled>🌬️ Tailwind caught · back tomorrow</button>}
+                            </>
+                        )}
+                        {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
+                    </div>
+                )}
 
                 {/* Boat identity + XP */}
                 <div className="sail-boatline">
