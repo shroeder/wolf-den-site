@@ -243,6 +243,7 @@ export default function BossFightClient() {
                                     <div className="herochip-av">
                                         <AvatarStack avatarUrl={f.avatarUrl} border={f.border || "none"} cosmetics={f.avatarCosmetics} size={48} initial={(f.name || "?").slice(0, 1).toUpperCase()} />
                                         {f.badge ? <span className="herochip-badge" title={f.badge.label}>{f.badge.icon}</span> : null}
+                                        {f.dmgRank ? <span className={`herochip-rank rank-${f.dmgRank}`} title={`#${f.dmgRank} damage dealer`} aria-label={`Number ${f.dmgRank} damage`}>{["🥇", "🥈", "🥉"][f.dmgRank - 1]}</span> : null}
                                     </div>
                                     <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>
                                     <span className="herochip-meta">Lv {f.level} · 🎟️ {f.tickets}</span>

@@ -26,6 +26,11 @@ function BattleHeroCard({ f }) {
             style={glow ? { "--glow": glow } : undefined}
         >
             <CardTab badge={f.featuredBadge} compact />
+            {f.dmgRank ? (
+                <span className={`bhc-rank bhc-rank-${f.dmgRank}`} title={`#${f.dmgRank} damage dealer`} aria-label={`Number ${f.dmgRank} damage dealer`}>
+                    <span aria-hidden="true">{["🥇", "🥈", "🥉"][f.dmgRank - 1]}</span>#{f.dmgRank}
+                </span>
+            ) : null}
             <div className="bhc-inner">
                 <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={36} border={f.border} cosmetics={f.avatarCosmetics} />
                 <div className="bhc-body">

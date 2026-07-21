@@ -10356,3 +10356,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .game-nav-ico { display: inline-block; vertical-align: -0.12em; font-size: 1.05em; }
 .game-nav-link.is-active .game-nav-ico { color: #ffd75e; }
 .game-tile-emoji svg { color: #ffd75e; display: block; }
+
+/* Top-3 damage-dealer rank badge on the boss nameplate (top-right corner, compact). */
+.bhc-rank { position: absolute; top: -8px; right: -6px; z-index: 3; display: inline-flex; align-items: center; gap: 1px;
+    padding: 1px 6px 1px 4px; border-radius: 999px; font-size: 0.64rem; font-weight: 900; line-height: 1.6; color: #241900;
+    background: linear-gradient(135deg, #ffe9a8, #ffcf4a); box-shadow: 0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.5); }
+.bhc-rank span { font-size: 0.78rem; }
+.bhc-rank-2 { background: linear-gradient(135deg, #f2f4f8, #c8cdd6); }
+.bhc-rank-3 { background: linear-gradient(135deg, #f0c088, #cd7f42); color: #2a1400; }
+/* Same rank medal on the Active-heroes mini cards (top-left of the avatar). */
+.herochip-rank { position: absolute; top: -5px; left: -5px; z-index: 3; width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.86rem; background: #14110a; border: 1px solid rgba(255,215,94,0.6);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.6); }

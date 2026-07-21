@@ -275,6 +275,8 @@ export async function getBossState(buyerId = null) {
             fighterBadges.get(r.buyer_id).push({ slug: r.slug, label: r.label, description: r.description, icon: r.icon, color: r.color });
         }
     }
+    // The top-3 damage dealers (with any damage) get a rank badge on their card as they enter.
+    const fighterDmgRank = new Map(members.filter((m) => (m.dmg || 0) > 0).slice(0, 3).map((m, i) => [m.id, i + 1]));
     const fighters = members
         .map((m) => {
             // Show the equipped pet at THIS member's level for that pet (highest evolved sprite ≤ level).
@@ -292,6 +294,7 @@ export async function getBossState(buyerId = null) {
                 alias: m.alias || null,
                 level: lvl(m.xp), // hero-card info shown on stage
                 petLevel: petLvl,
+                dmgRank: fighterDmgRank.get(m.id) || null, // 1/2/3 for the top damage dealers, else null
                 border: m.equipped_border && m.equipped_border !== "none" ? m.equipped_border : null,
                 aura: cos && typeof cos === "object" && cos.aura && cos.aura !== "none" ? cos.aura : null,
                 // Full hero-card cosmetics — mirrors the member's configured card (avatar+border+cosmetics,
@@ -313,10 +316,12 @@ export async function getBossState(buyerId = null) {
         })
         .filter((m) => m.spriteUrl);
 
+    const rosterDmgRank = new Map(contributors.filter((c) => (c.dmg || 0) > 0).slice(0, 3).map((c, i) => [c.id, i + 1]));
     const roster = contributors.map((c) => {
         const rcos = sanitizeCosmetics(c.avatar_cosmetics);
         return {
             id: c.id,
+            dmgRank: rosterDmgRank.get(c.id) || null,
             name: c.display_name || c.alias || "Member",
             alias: c.alias || null,
             level: lvl(c.xp),
