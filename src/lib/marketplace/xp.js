@@ -205,6 +205,14 @@ export async function awardPurchaseXp({ email = null, phone = null, buyerId = nu
     const oid = String(orderId || "").trim();
     const dollars = Math.max(0, Math.round((Number(amountCents) || 0) / 100));
 
+    // A RESTOCK buyout (orderId "restock-…") is a PAYOUT — the store bought cards FROM the customer, not a
+    // sale. Reward it modestly like a trade: ~1/5 the value in XP, NO gold, and none of the purchase-only
+    // bonuses/badges (first-purchase, flat, big-spender). Real Square purchases (oid "sq:…") keep full rewards.
+    if (oid.startsWith("restock-")) {
+        if (dollars > 0) await awardXp(id, "restock", { points: Math.round(dollars / 5), gold: 0, dedupeKey: `restock:${oid}`, meta: { orderId: oid } });
+        return id;
+    }
+
     if (dollars > 0 && oid) {
         await awardXp(id, "purchase_spend", { points: dollars * SPEND_XP_PER_DOLLAR, dedupeKey: `spend:${oid}`, meta: { orderId: oid } });
     }

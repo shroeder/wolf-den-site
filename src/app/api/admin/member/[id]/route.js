@@ -27,6 +27,7 @@ const ACTION_LABEL = {
     profile_complete: "✅ Completed their profile",
     purchase_flat: "🛒 Made a purchase",
     purchase_spend: "🛒 Spent in store",
+    restock: "📦 Sold cards to the store (restock)",
     first_purchase: "🛒 First purchase",
     event_checkin: "🎪 Checked in at an event",
     discord_link: "🔗 Linked Discord",
