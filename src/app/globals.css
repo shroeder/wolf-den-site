@@ -10324,7 +10324,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .hud-strip .reward-nudge-togo { font-size: 0.82rem; }
 /* The coin chip — a shiny gold pill that catches the eye, with a punchy round "+" to buy more. */
 .coin-hud { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; overflow: hidden;
-    padding: 4px 5px 4px 11px; border-radius: 999px; text-decoration: none; font-weight: 900; color: #3c2c04;
+    padding: 4px 5px 4px 11px; border-radius: 999px; text-decoration: none; font-weight: 900; color: #241900;
     background: linear-gradient(135deg, #ffe9a8, #ffcf4a 46%, #f2a93b);
     border: 1px solid rgba(255,255,255,0.55);
     box-shadow: 0 2px 9px rgba(240,160,40,0.5), inset 0 1px 0 rgba(255,255,255,0.65); }
@@ -10334,7 +10334,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes coinShine { 0%, 72% { transform: translateX(-130%); } 90%, 100% { transform: translateX(130%); } }
 .coin-hud-icon { font-size: 1rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); animation: coinBob 2.6s ease-in-out infinite; }
 @keyframes coinBob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-1.5px) rotate(-9deg); } }
-.coin-hud-amt { font-size: 0.92rem; letter-spacing: 0.01em; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
+.hud-strip .coin-hud, .hud-strip .coin-hud .coin-hud-amt { color: #241900; }
+.coin-hud-amt { font-size: 0.92rem; font-weight: 900; letter-spacing: 0.01em; }
 .coin-hud-plus { display: inline-grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; font-size: 1.05rem; font-weight: 900; line-height: 1;
     color: #fff; background: linear-gradient(135deg, #ff8a44, #e8431f);
     box-shadow: 0 1px 4px rgba(230,60,20,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
