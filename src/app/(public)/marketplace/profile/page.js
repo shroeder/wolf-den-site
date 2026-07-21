@@ -43,6 +43,7 @@ const TILES = [
     { href: "/marketplace/badges", icon: "🎖️", label: "Badges", sub: "Show off & earn" },
     { href: "/marketplace/leaderboard", icon: "🏆", label: "Leaderboard", sub: "See your rank" },
     { href: "/marketplace/card", icon: "🎟️", label: "Loyalty card", sub: "Scan at the register" },
+    { href: "/marketplace/credit", icon: "💳", label: "Store credit", sub: "Buy credit + coins" },
 ];
 
 export default async function ProfileHubPage() {

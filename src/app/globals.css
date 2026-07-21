@@ -10223,3 +10223,42 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     .chest-flash { display: none; }
     .chest-particle { display: none; }
 }
+
+/* ── Store credit page ─────────────────────────────────────────────────────────────────────────────── */
+.credit-balance { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 6px;
+    padding: 12px 16px; border-radius: 14px; background: linear-gradient(120deg, rgba(255,215,94,0.14), rgba(120,86,10,0.14));
+    border: 1px solid rgba(255,215,94,0.35); }
+.credit-balance-label { font-weight: 700; color: #ffe9a8; letter-spacing: 0.02em; }
+.credit-balance-amount { font-size: clamp(1.6rem, 6vw, 2.2rem); font-weight: 900; color: #ffd75e; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.credit-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.credit-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border-radius: 12px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.14); cursor: pointer; transition: all 0.12s ease; }
+.credit-chip:hover { border-color: rgba(255,215,94,0.5); }
+.credit-chip.is-active { background: rgba(255,215,94,0.16); border-color: rgba(255,215,94,0.7); box-shadow: 0 0 0 1px rgba(255,215,94,0.4) inset; }
+.credit-chip-usd { font-weight: 900; font-size: 1.05rem; }
+.credit-chip-coins { font-size: 0.72rem; font-weight: 700; color: #ffcf7a; }
+.credit-custom { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.credit-custom-field { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px;
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.16); max-width: 160px; font-weight: 800; }
+.credit-custom-field input { flex: 1; min-width: 0; background: transparent; border: none; color: inherit; font: inherit; outline: none; }
+.credit-summary { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; padding: 12px 14px; border-radius: 12px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); }
+.credit-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.9rem; }
+.credit-summary-total { padding-top: 8px; margin-top: 2px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 1.05rem; font-weight: 900; }
+.credit-card-field { min-height: 52px; padding: 4px; border-radius: 10px; background: rgba(255,255,255,0.96); margin-bottom: 12px; }
+.credit-buy { width: 100%; }
+.credit-done { text-align: center; }
+.credit-qr { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.credit-qr img { border-radius: 12px; background: #fff; padding: 8px; }
+.credit-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.credit-history li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 0.9rem; }
+.credit-history li:last-child { border-bottom: none; }
+.credit-plus { color: #7cffb2; font-weight: 800; }
+.credit-minus { color: #ffb0a0; font-weight: 800; }
+.game-nav-gold-plus { display: inline-grid; place-items: center; width: 1.15em; height: 1.15em; margin-left: 2px; border-radius: 50%;
+    background: rgba(255,215,94,0.25); color: #ffe9a8; font-weight: 900; font-size: 0.85em; line-height: 1; }
+.shop-credit-line strong { color: #7cffb2; }
+.shop-credit-toggle { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 10px 12px; border-radius: 10px;
+    background: rgba(124,255,178,0.08); border: 1px solid rgba(124,255,178,0.3); cursor: pointer; font-size: 0.9rem; }
+.shop-credit-toggle input { width: 18px; height: 18px; accent-color: #2ecc71; }

@@ -1,0 +1,266 @@
+"use client";
+
+import QRCode from "qrcode";
+import { useEffect, useRef, useState } from "react";
+
+// Buy store credit (real dollars on your account) with a card, and spend it in-store via a QR staff scan.
+// $1 = 100 coins on top of the credit. Card capture uses the Square Web Payments SDK, same as shop checkout.
+
+const PRESETS_CENTS = [500, 1000, 2500, 5000, 10000];
+
+function usd(cents) {
+    return `$${((Number(cents) || 0) / 100).toFixed(2)}`;
+}
+
+// Minimal Square Web Payments SDK loader (mirrors the shop cart's, trimmed).
+function loadSquare() {
+    if (typeof window === "undefined") return Promise.resolve(null);
+    if (window.Square) return Promise.resolve(window.Square);
+    const existing = document.querySelector('script[data-square-payments="1"]');
+    if (existing) {
+        return new Promise((resolve, reject) => {
+            existing.addEventListener("load", () => (window.Square ? resolve(window.Square) : reject(new Error("Square SDK unavailable."))), { once: true });
+            existing.addEventListener("error", () => reject(new Error("Failed to load Square.")), { once: true });
+        });
+    }
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://web.squarecdn.com/v1/square.js";
+        script.async = true;
+        script.dataset.squarePayments = "1";
+        script.onload = () => (window.Square ? resolve(window.Square) : reject(new Error("Square SDK unavailable.")));
+        script.onerror = () => reject(new Error("Failed to load Square."));
+        document.head.appendChild(script);
+    });
+}
+
+const reasonLabel = {
+    purchase: "Added credit",
+    spend_store: "Spent in store",
+    spend_online: "Spent online",
+    refund: "Refund",
+    adjust: "Adjustment",
+};
+
+export default function StoreCreditClient({
+    paymentsEnabled,
+    squareApplicationId,
+    squareLocationId,
+    initialBalanceCents = 0,
+    initialEvents = [],
+    coinsPerCent = 1,
+    feeRate = 0.035,
+    minCents = 500,
+    maxCents = 50000,
+}) {
+    const [balanceCents, setBalanceCents] = useState(initialBalanceCents);
+    const [events, setEvents] = useState(initialEvents);
+    const [amountCents, setAmountCents] = useState(1000);
+    const [customDollars, setCustomDollars] = useState("");
+    const [cardState, setCardState] = useState("idle"); // idle | loading | ready | error
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+    const [done, setDone] = useState(null); // { amountCents, coins }
+    const cardRef = useRef(null);
+
+    // In-store spend QR.
+    const [claim, setClaim] = useState(null); // { qr, expiresAt }
+    const [claimBusy, setClaimBusy] = useState(false);
+
+    const missingSquareConfig = !squareApplicationId || !squareLocationId;
+    const feeCents = Math.round(amountCents * feeRate);
+    const chargedCents = amountCents + feeCents;
+    const coins = amountCents * coinsPerCent;
+
+    // Mount the Square card field once payments are usable.
+    useEffect(() => {
+        if (!paymentsEnabled || missingSquareConfig) return undefined;
+        let disposed = false;
+        let mounted = null;
+        (async () => {
+            try {
+                setCardState("loading");
+                const Square = await loadSquare();
+                if (disposed) return;
+                const payments = Square?.payments?.(squareApplicationId, squareLocationId);
+                if (!payments) throw new Error("Square did not initialize.");
+                const node = document.getElementById("credit-card");
+                if (node) node.innerHTML = "";
+                const card = await payments.card();
+                mounted = card;
+                await card.attach("#credit-card");
+                if (disposed) { await card.destroy().catch(() => {}); return; }
+                cardRef.current = card;
+                setCardState("ready");
+            } catch (e) {
+                if (disposed) return;
+                setCardState("error");
+                setErr(`Secure card form couldn't load: ${e?.message || "unknown error"}.`);
+            }
+        })();
+        return () => { disposed = true; if (mounted?.destroy) mounted.destroy().catch(() => {}); cardRef.current = null; };
+    }, [paymentsEnabled, missingSquareConfig, squareApplicationId, squareLocationId]);
+
+    async function refresh() {
+        const r = await fetch("/api/marketplace/credit", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+        if (r && typeof r.balanceCents === "number") { setBalanceCents(r.balanceCents); setEvents(r.events || []); }
+    }
+
+    function pickPreset(cents) { setAmountCents(cents); setCustomDollars(""); }
+    function onCustom(v) {
+        setCustomDollars(v);
+        const dollars = Math.floor(Number(v) || 0);
+        if (dollars > 0) setAmountCents(Math.min(maxCents, Math.max(0, dollars * 100)));
+    }
+
+    async function buy() {
+        setErr(""); setDone(null);
+        if (amountCents < minCents) { setErr(`Minimum is ${usd(minCents)}.`); return; }
+        if (amountCents > maxCents) { setErr(`Maximum is ${usd(maxCents)}.`); return; }
+        if (!cardRef.current) { setErr("Card form isn't ready yet."); return; }
+        setBusy(true);
+        try {
+            const tokenized = await cardRef.current.tokenize();
+            if (tokenized?.status !== "OK" || !tokenized.token) throw new Error("Card details were not accepted.");
+            const res = await fetch("/api/marketplace/credit/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceId: tokenized.token, amountCents }),
+            });
+            const d = await res.json().catch(() => null);
+            if (!res.ok || !d?.ok) throw new Error(d?.error || "Purchase failed.");
+            setBalanceCents(d.balanceCents ?? balanceCents + amountCents);
+            setDone({ amountCents: d.amountCents, coins: d.coins });
+            refresh();
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : "Purchase failed.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function showInStoreQr() {
+        setErr(""); setClaimBusy(true);
+        try {
+            const res = await fetch("/api/marketplace/credit/claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+            const d = await res.json().catch(() => null);
+            if (!res.ok || !d?.ok) throw new Error(d?.error === "no_credit" ? "You have no store credit to spend yet." : d?.error || "Couldn't create a code.");
+            const qr = await QRCode.toDataURL(`WDCRD:${d.token}`, { width: 320, margin: 1 }).catch(() => null);
+            setClaim({ qr, expiresAt: d.expiresAt });
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : "Couldn't create a code.");
+        } finally {
+            setClaimBusy(false);
+        }
+    }
+    function closeQr() { setClaim(null); refresh(); }
+
+    return (
+        <>
+            <section className="card">
+                <h1 style={{ marginTop: 0 }}>💳 Store Credit</h1>
+                <div className="credit-balance">
+                    <span className="credit-balance-label">Your balance</span>
+                    <span className="credit-balance-amount">{usd(balanceCents)}</span>
+                </div>
+                <p className="muted" style={{ marginTop: 8 }}>
+                    Add store credit to your account and get <strong>{coinsPerCent * 100} coins for every $1</strong>. Spend it in-store (show a QR at the register) or apply it to an online order. Credit is real money on your account — it never expires.
+                </p>
+            </section>
+
+            {done ? (
+                <section className="card credit-done">
+                    <div style={{ fontSize: "2rem" }}>🎉</div>
+                    <h2 style={{ margin: "4px 0" }}>Added {usd(done.amountCents)} credit!</h2>
+                    <p className="muted" style={{ marginTop: 0 }}>+{done.coins.toLocaleString()} coins dropped into your wallet. New balance: <strong>{usd(balanceCents)}</strong>.</p>
+                    <button className="pill" onClick={() => setDone(null)}>Buy more</button>
+                </section>
+            ) : (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>Add credit</h2>
+                    <div className="credit-presets">
+                        {PRESETS_CENTS.map((c) => (
+                            <button
+                                key={c}
+                                type="button"
+                                className={`credit-chip${amountCents === c && !customDollars ? " is-active" : ""}`}
+                                onClick={() => pickPreset(c)}
+                            >
+                                <span className="credit-chip-usd">{usd(c)}</span>
+                                <span className="credit-chip-coins">+{(c * coinsPerCent).toLocaleString()} 🪙</span>
+                            </button>
+                        ))}
+                    </div>
+                    <label className="credit-custom">
+                        <span className="muted">Custom amount</span>
+                        <span className="credit-custom-field">
+                            <span>$</span>
+                            <input
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="25"
+                                value={customDollars}
+                                onChange={(e) => onCustom(e.target.value.replace(/[^0-9]/g, ""))}
+                            />
+                        </span>
+                    </label>
+
+                    <div className="credit-summary">
+                        <div><span className="muted">Credit added</span><strong>{usd(amountCents)}</strong></div>
+                        <div><span className="muted">Coins earned</span><strong>{coins.toLocaleString()} 🪙</strong></div>
+                        <div><span className="muted">Processing fee (3.5%)</span><strong>{usd(feeCents)}</strong></div>
+                        <div className="credit-summary-total"><span>You pay</span><strong>{usd(chargedCents)}</strong></div>
+                    </div>
+
+                    {!paymentsEnabled ? (
+                        <p className="muted">Online purchases are currently unavailable. You can still spend existing credit in-store.</p>
+                    ) : missingSquareConfig ? (
+                        <p className="muted">Card payments aren’t configured yet.</p>
+                    ) : (
+                        <>
+                            <div id="credit-card" className="credit-card-field" />
+                            {cardState === "loading" ? <p className="muted">Loading secure card form…</p> : null}
+                            <button className="btn-primary credit-buy" onClick={buy} disabled={busy || cardState !== "ready"}>
+                                {busy ? "Processing…" : `Pay ${usd(chargedCents)}`}
+                            </button>
+                            <p className="muted" style={{ fontSize: "0.75rem", marginTop: 6 }}>Secure checkout by Square. Card charged only on success.</p>
+                        </>
+                    )}
+                    {err ? <p className="form-error" role="alert">{err}</p> : null}
+                </section>
+            )}
+
+            <section className="card">
+                <h2 style={{ marginTop: 0 }}>Spend in store</h2>
+                <p className="muted" style={{ marginTop: 0 }}>Show this code to staff at the register. They’ll scan it and enter the amount to take off your purchase.</p>
+                {claim ? (
+                    <div className="credit-qr">
+                        {claim.qr ? <img src={claim.qr} alt="Store credit QR" width={240} height={240} /> : null}
+                        <p className="muted">Balance available: <strong>{usd(balanceCents)}</strong></p>
+                        <button className="pill" onClick={closeQr}>Done</button>
+                    </div>
+                ) : (
+                    <button className="pill" onClick={showInStoreQr} disabled={claimBusy || balanceCents <= 0}>
+                        {claimBusy ? "…" : balanceCents > 0 ? "📲 Show my in-store code" : "No credit to spend yet"}
+                    </button>
+                )}
+            </section>
+
+            {events.length ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>History</h2>
+                    <ul className="credit-history">
+                        {events.map((e, i) => (
+                            <li key={i}>
+                                <span>{reasonLabel[e.reason] || e.reason}</span>
+                                <span className={e.deltaCents >= 0 ? "credit-plus" : "credit-minus"}>
+                                    {e.deltaCents >= 0 ? "+" : "−"}{usd(Math.abs(e.deltaCents))}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
+        </>
+    );
+}

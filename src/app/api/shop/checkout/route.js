@@ -10,7 +10,8 @@ import {
 } from "@/lib/consignment/square";
 import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
-import { awardPurchaseXp } from "@/lib/marketplace/xp.js";
+import { awardPurchaseXp, resolveBuyerId } from "@/lib/marketplace/xp.js";
+import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
@@ -217,11 +218,9 @@ export async function POST(request) {
                 return badRequest("Invalid request body.");
             }
 
+            // A card source may be omitted only when store credit ends up covering the whole order; the
+            // requirement is enforced below once we know the remaining charge.
             const sourceId = String(body.sourceId || "").trim();
-
-            if (!sourceId) {
-                return badRequest("Missing payment source id.");
-            }
 
             const fulfillment = validateFulfillment(body);
             const saveCustomerProfile = body?.saveCustomerProfile === true;
@@ -309,6 +308,25 @@ export async function POST(request) {
             const effectiveTotalCents =
                 cart.subtotalCents + cart.onlineFeeCents + cart.taxCents + effectiveShippingCents;
 
+            // Optional store-credit apply: drain the member's balance to reduce (or fully cover) the card
+            // charge. Only for a SIGNED-IN shop customer whose email maps to a marketplace account — never a
+            // typed guest email, so no one can spend someone else's credit. We commit the actual spend after
+            // the pending order exists (so the ledger references the order) and before charging the card.
+            let creditBuyerId = null;
+            let intendedCreditCents = 0;
+            if (body?.applyStoreCredit === true && authenticatedCustomer?.email) {
+                creditBuyerId = await resolveBuyerId({ email: authenticatedCustomer.email }).catch(() => null);
+                if (creditBuyerId) {
+                    const bal = await getStoreCredit(creditBuyerId).catch(() => 0);
+                    intendedCreditCents = Math.min(bal, effectiveTotalCents);
+                }
+            }
+
+            // If credit can't possibly cover it, we need a card up front.
+            if (effectiveTotalCents - intendedCreditCents > 0 && !sourceId) {
+                return badRequest("Missing payment source id.");
+            }
+
             const idempotencyKey = randomUUID();
 
             const pendingOrder = await createPendingShopOrder({
@@ -338,44 +356,73 @@ export async function POST(request) {
                         : fulfillment.shipping?.name) || null,
             });
 
-            let payment;
+            // Commit the store-credit spend FIRST (atomic + guarded) so we never charge the reduced amount
+            // without securing the credit. If the balance moved underneath us, fall back to charging more.
+            let appliedCreditCents = 0;
+            if (creditBuyerId && intendedCreditCents > 0) {
+                const spent = await spendCredit(creditBuyerId, intendedCreditCents, "spend_online", pendingOrder.id, { orderId: pendingOrder.id });
+                if (spent.ok) appliedCreditCents = intendedCreditCents;
+            }
+            const chargeCents = effectiveTotalCents - appliedCreditCents;
 
-            try {
-                payment = await createSquareCardPayment({
-                    sourceId,
-                    amountCents: effectiveTotalCents,
-                    idempotencyKey,
-                    note: `Shop order ${pendingOrder.id}`,
-                    referenceId: pendingOrder.id,
-                });
-            } catch (error) {
+            // Credit no longer covers it and there's no card → refund what we took and bail.
+            if (chargeCents > 0 && !sourceId) {
+                if (appliedCreditCents > 0) {
+                    await addCredit(creditBuyerId, appliedCreditCents, "refund", pendingOrder.id, { reason: "no_card" }).catch(() => {});
+                }
                 await updateShopOrderPaymentResult(pendingOrder.id, {
                     status: "failed",
-                    paymentErrorCode: error?.squareCode || "payment_create_failed",
-                    paymentErrorMessage: error instanceof Error ? error.message : "Unknown payment error.",
+                    paymentErrorCode: "payment_source_required",
+                    paymentErrorMessage: "A payment card is required.",
                 });
-
-                logger.warn("shop.checkout.payment_failed", {
-                    orderId: pendingOrder.id,
-                    squareCode: error?.squareCode,
-                    squareStatus: error?.squareStatus,
-                });
-
-                return jsonNoStore(
-                    {
-                        error: "Payment could not be processed.",
-                        code: error?.squareCode || "payment_create_failed",
-                    },
-                    { status: error?.squareStatus === 400 ? 402 : 502 }
-                );
+                return badRequest("Missing payment source id.");
             }
 
-            const orderStatus = mapSquareStatusToOrderStatus(payment?.status);
+            let payment = null;
+
+            if (chargeCents > 0) {
+                try {
+                    payment = await createSquareCardPayment({
+                        sourceId,
+                        amountCents: chargeCents,
+                        idempotencyKey,
+                        note: `Shop order ${pendingOrder.id}${appliedCreditCents > 0 ? ` (−$${(appliedCreditCents / 100).toFixed(2)} credit)` : ""}`,
+                        referenceId: pendingOrder.id,
+                    });
+                } catch (error) {
+                    // Card failed → hand back any credit we already spent, then fail the order.
+                    if (appliedCreditCents > 0) {
+                        await addCredit(creditBuyerId, appliedCreditCents, "refund", pendingOrder.id, { reason: "card_failed" }).catch(() => {});
+                    }
+                    await updateShopOrderPaymentResult(pendingOrder.id, {
+                        status: "failed",
+                        paymentErrorCode: error?.squareCode || "payment_create_failed",
+                        paymentErrorMessage: error instanceof Error ? error.message : "Unknown payment error.",
+                    });
+
+                    logger.warn("shop.checkout.payment_failed", {
+                        orderId: pendingOrder.id,
+                        squareCode: error?.squareCode,
+                        squareStatus: error?.squareStatus,
+                    });
+
+                    return jsonNoStore(
+                        {
+                            error: "Payment could not be processed.",
+                            code: error?.squareCode || "payment_create_failed",
+                        },
+                        { status: error?.squareStatus === 400 ? 402 : 502 }
+                    );
+                }
+            }
+
+            // Card path uses Square's status; a fully credit-covered order is completed outright.
+            const orderStatus = payment ? mapSquareStatusToOrderStatus(payment?.status) : "completed";
             const updatedOrder = await updateShopOrderPaymentResult(pendingOrder.id, {
                 status: orderStatus,
-                squarePaymentId: payment?.id,
-                squareStatus: payment?.status,
-                receiptUrl: payment?.receipt_url,
+                squarePaymentId: payment?.id || null,
+                squareStatus: payment?.status || "STORE_CREDIT",
+                receiptUrl: payment?.receipt_url || null,
                 paymentErrorCode: null,
                 paymentErrorMessage: null,
             });

@@ -18,6 +18,7 @@ const LINKS = [
     { href: "/marketplace/track", emoji: "🏆", label: "Rewards" },
     { href: "/marketplace/leaderboard", emoji: "🥇", label: "Ranks" },
     { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties" },
+    { href: "/marketplace/credit", emoji: "💳", label: "Credit" },
 ];
 
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
@@ -47,8 +48,11 @@ export default function GameNav() {
 
     return (
         <nav className="game-nav" aria-label="Game menu">
-            {/* One authoritative gold balance for the whole game — section headers don't repeat it. */}
-            {gold != null ? <span className="game-nav-gold" title="Your gold">🪙 {gold.toLocaleString()}</span> : null}
+            {/* One authoritative gold balance for the whole game — section headers don't repeat it. Tapping it
+                is the universal "get more coins" CTA → buy store credit (100 coins per $1). */}
+            {gold != null ? (
+                <Link href="/marketplace/credit" className="game-nav-gold" title="Tap to add coins / store credit">🪙 {gold.toLocaleString()} <span className="game-nav-gold-plus" aria-hidden="true">＋</span></Link>
+            ) : null}
             <div className="game-nav-scroll">
                 {LINKS.map((l) => {
                     const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;

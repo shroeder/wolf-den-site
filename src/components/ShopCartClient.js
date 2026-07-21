@@ -211,6 +211,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [checkoutBusy, setCheckoutBusy] = useState(false);
     const [authLoading, setAuthLoading] = useState(false);
     const [authCustomer, setAuthCustomer] = useState(null);
+    // Store credit the signed-in customer can apply to this order (0 for guests / unlinked accounts).
+    const [creditBalanceCents, setCreditBalanceCents] = useState(0);
+    const [applyCredit, setApplyCredit] = useState(false);
     const [fulfillmentMode, setFulfillmentMode] = useState("");
     const [pickupName, setPickupName] = useState("");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
@@ -312,8 +315,13 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const shippingKnown = !shippingPending;
     const displayTotalCents = shippingKnown ? baseCents + (displayShippingCents || 0) : null;
 
+    // Store-credit apply math. When the balance covers the whole known total, the card can be skipped.
+    const appliedCreditCents = applyCredit && displayTotalCents != null ? Math.min(creditBalanceCents, displayTotalCents) : 0;
+    const remainingChargeCents = displayTotalCents != null ? Math.max(0, displayTotalCents - appliedCreditCents) : null;
+    const creditCoversAll = applyCredit && displayTotalCents != null && appliedCreditCents >= displayTotalCents;
+
     const canSubmitCheckout = Boolean(
-        checkoutCardState === "ready"
+        (checkoutCardState === "ready" || creditCoversAll)
         && !checkoutBusy
         && cartData.items.length
         && !cartData.hasUnavailableItems
@@ -464,6 +472,17 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         };
     }, [canShowCart, fulfillmentMode, isShippingAddressReady, cartData.items.length, normalizedShipping]);
 
+    // Pull the applicable store-credit balance whenever the sign-in identity changes.
+    useEffect(() => {
+        if (!canShowCart || !authCustomer) { setCreditBalanceCents(0); setApplyCredit(false); return; }
+        let alive = true;
+        fetch("/api/shop/store-credit", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (alive) setCreditBalanceCents(Math.max(0, d?.balanceCents || 0)); })
+            .catch(() => {});
+        return () => { alive = false; };
+    }, [canShowCart, authCustomer]);
+
     const refreshAuthSession = useCallback(async () => {
         if (!canShowCart) {
             setAuthCustomer(null);
@@ -610,6 +629,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             sourceId: null,
             fulfillmentMode,
             saveCustomerProfile: Boolean(saveCustomerProfile && authCustomer),
+            applyStoreCredit: Boolean(applyCredit && creditBalanceCents > 0),
         };
 
         if (fulfillmentMode === "pickup") {
@@ -639,10 +659,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         }
 
         try {
-            const tokenized = await cardRef.current.tokenize();
-
-            if (tokenized?.status !== "OK" || !tokenized.token) {
-                throw new Error("Card details were not accepted. Please verify and try again.");
+            // Skip card tokenization entirely when store credit covers the whole order.
+            let sourceId = null;
+            if (!creditCoversAll) {
+                const tokenized = await cardRef.current.tokenize();
+                if (tokenized?.status !== "OK" || !tokenized.token) {
+                    throw new Error("Card details were not accepted. Please verify and try again.");
+                }
+                sourceId = tokenized.token;
             }
 
             const response = await fetch("/api/shop/checkout", {
@@ -652,7 +676,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 },
                 body: JSON.stringify({
                     ...checkoutPayload,
-                    sourceId: tokenized.token,
+                    sourceId,
                 }),
             });
             const payload = await response.json().catch(() => null);
@@ -1046,17 +1070,37 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 </p>
                             ) : null}
                             <p><span>Online fee (3.5%)</span><strong>{formatMoney(cartData.onlineFeeCents)}</strong></p>
+                            {applyCredit && appliedCreditCents > 0 ? (
+                                <p className="shop-credit-line"><span>Store credit</span><strong>−{formatMoney(appliedCreditCents)}</strong></p>
+                            ) : null}
                             <p className="shop-payment-total">
                                 <span>Total</span>
-                                <strong>{displayTotalCents !== null ? formatMoney(displayTotalCents) : `${formatMoney(baseCents)} + shipping`}</strong>
+                                <strong>
+                                    {displayTotalCents !== null
+                                        ? formatMoney(applyCredit ? remainingChargeCents : displayTotalCents)
+                                        : `${formatMoney(baseCents)} + shipping`}
+                                </strong>
                             </p>
                         </div>
 
+                        {creditBalanceCents > 0 ? (
+                            <label className="shop-credit-toggle">
+                                <input type="checkbox" checked={applyCredit} onChange={(e) => setApplyCredit(e.target.checked)} />
+                                <span>Apply store credit <strong>({formatMoney(creditBalanceCents)} available)</strong></span>
+                            </label>
+                        ) : null}
+
                         {!missingSquareConfig && checkoutCardState !== "error" && (
-                            <div className={checkoutCardState === "loading" ? "shop-payment-card shop-payment-card-loading" : "shop-payment-card"}>
+                            <div
+                                className={checkoutCardState === "loading" ? "shop-payment-card shop-payment-card-loading" : "shop-payment-card"}
+                                style={creditCoversAll ? { display: "none" } : undefined}
+                            >
                                 <div id={mountId} />
                             </div>
                         )}
+                        {creditCoversAll ? (
+                            <p className="secondary">🎉 Store credit covers this order — no card needed.</p>
+                        ) : null}
 
                         {missingSquareConfig && <p className="shop-payment-error">Square public configuration is missing.</p>}
                         {!missingSquareConfig && checkoutCardState === "loading" && <p className="secondary">Loading secure card form...</p>}
