@@ -9281,19 +9281,71 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes battle-boss-idle { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-6px) scale(1.02); } }
 @keyframes battle-boss-hit { 25% { transform: translateX(-10px) rotate(-1.5deg); } 75% { transform: translateX(10px) rotate(1.5deg); } }
 
+/* ── Rotating-trio battle party: 3 adventurers march in, attack, march off, next 3 rotate in. ── */
 .battle-party { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.fighter { position: absolute; transform: scale(var(--s, 1)); transform-origin: bottom center; }
-.fighter-lunge { position: relative; animation: fighter-attack 2.6s ease-in-out infinite; }
-.fighter-sprite { display: block; height: clamp(84px, 21vw, 190px); width: auto; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); animation: fighter-bob 3s ease-in-out infinite; }
-.fighter.is-pad .fighter-sprite { opacity: 0.85; }
-.fighter.is-you .fighter-sprite { filter: drop-shadow(0 0 12px rgba(255,215,94,0.9)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); }
-/* Active pet fights beside its owner — a smaller companion at their feet. */
-.fighter-pet { position: absolute; left: -38%; bottom: 0; height: clamp(46px, 11vw, 98px); width: auto; filter: drop-shadow(0 4px 7px rgba(0,0,0,0.5)); animation: fighter-bob 2.4s ease-in-out infinite; }
-.fighter-name { position: absolute; left: 50%; bottom: -13px; transform: translateX(-50%); max-width: 84px; padding: 1px 6px; border-radius: 8px; background: rgba(0,0,0,0.62); color: #f4ead2; font-size: 0.62rem; font-weight: 700; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; pointer-events: none; }
-.fighter.is-you .fighter-name { background: rgba(120,86,10,0.82); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
-@keyframes fighter-attack { 0%, 52%, 82%, 100% { transform: translateX(0); } 64% { transform: translateX(26px); } 72% { transform: translateX(20px); } }
-/* Sprites are generated facing LEFT; flip them so heroes + pets face the boss (on the right). */
-@keyframes fighter-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.adv { position: absolute; bottom: 6%; transform-origin: bottom center; }
+.adv-slot-0 { left: 15%; bottom: 6%; z-index: 6; }
+.adv-slot-1 { left: 31%; bottom: 12%; z-index: 5; transform: scale(0.92); }
+.adv-slot-2 { left: 46%; bottom: 8%; z-index: 4; transform: scale(0.86); }
+/* adv-body carries the horizontal travel (walk-in / lunge / walk-off); the sprite carries the step-bob and
+   each attack's distinct flourish. */
+.adv-body { position: relative; }
+.adv-flip { display: inline-block; transform-origin: bottom center; }
+.adv-sprite { display: block; height: clamp(120px, 27vw, 250px); width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.55)); transform-origin: bottom center; }
+.adv.is-pad { opacity: 0.85; }
+.adv.is-you .adv-sprite { filter: drop-shadow(0 0 14px rgba(255,215,94,0.95)) drop-shadow(0 8px 12px rgba(0,0,0,0.55)); }
+.adv-pet { position: absolute; left: -40%; bottom: 0; height: clamp(58px, 13vw, 120px); width: auto; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); }
+.adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+.adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
+
+/* Phase 1 — march in from the left (staggered per slot), with a walking step-bob. */
+.party-in .adv-body { animation: advMarchIn 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.party-in .adv-slot-1 .adv-body { animation-delay: 0.16s; }
+.party-in .adv-slot-2 .adv-body { animation-delay: 0.32s; }
+.party-in .adv-sprite, .party-out .adv-sprite { animation: advStep 0.42s ease-in-out infinite; }
+@keyframes advMarchIn { from { transform: translateX(-260%); } to { transform: translateX(0); } }
+@keyframes advStep { 0%, 100% { transform: translateY(0) rotate(-2.5deg); } 25% { transform: translateY(-7px) rotate(0deg); } 50% { transform: translateY(0) rotate(2.5deg); } 75% { transform: translateY(-7px) rotate(0deg); } }
+
+/* Phase 3 — march back off to the left. */
+.party-out .adv-body { animation: advMarchOut 0.9s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+.party-out .adv-slot-1 .adv-body { animation-delay: 0.08s; }
+.party-out .adv-slot-2 .adv-body { animation-delay: 0.16s; }
+@keyframes advMarchOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-260%); opacity: 0; } }
+
+/* Phase 2 — ATTACK. The body lunges toward the boss; each fighter's sprite plays its own flourish, staggered
+   so the trio doesn't strike in perfect unison. Big pool below for variety. */
+.party-attack .adv-body { animation: advLunge 1.4s ease-in-out both; }
+.party-attack .adv-slot-1 .adv-body { animation-delay: 0.12s; }
+.party-attack .adv-slot-2 .adv-body { animation-delay: 0.24s; }
+@keyframes advLunge { 0%, 100% { transform: translateX(0); } 40% { transform: translateX(34px); } 55% { transform: translateX(22px); } }
+.party-attack .adv-sprite { animation-duration: 1.4s; animation-timing-function: ease-in-out; animation-fill-mode: both; }
+.party-attack .adv-slot-1 .adv-sprite { animation-delay: 0.12s; }
+.party-attack .adv-slot-2 .adv-sprite { animation-delay: 0.24s; }
+.party-attack .atk-slash .adv-sprite { animation-name: atkSlash; }
+.party-attack .atk-jump .adv-sprite { animation-name: atkJump; }
+.party-attack .atk-spin .adv-sprite { animation-name: atkSpin; }
+.party-attack .atk-dash .adv-sprite { animation-name: atkDash; }
+.party-attack .atk-overhead .adv-sprite { animation-name: atkOverhead; }
+.party-attack .atk-uppercut .adv-sprite { animation-name: atkUppercut; }
+.party-attack .atk-thrust .adv-sprite { animation-name: atkThrust; }
+.party-attack .atk-combo .adv-sprite { animation-name: atkCombo; }
+.party-attack .atk-leap .adv-sprite { animation-name: atkLeap; }
+.party-attack .atk-smash .adv-sprite { animation-name: atkSmash; }
+.party-attack .atk-whirl .adv-sprite { animation-name: atkWhirl; }
+.party-attack .atk-pounce .adv-sprite { animation-name: atkPounce; }
+@keyframes atkSlash { 0% { transform: rotate(0); } 35% { transform: rotate(-16deg) translateY(-4px); } 55% { transform: rotate(20deg) translateX(10px); } 100% { transform: rotate(0); } }
+@keyframes atkJump { 0% { transform: translateY(0); } 35% { transform: translateY(-46px) rotate(-8deg); } 60% { transform: translateY(6px) rotate(6deg); } 100% { transform: translateY(0); } }
+@keyframes atkSpin { 0% { transform: rotate(0); } 60% { transform: rotate(360deg) scale(1.05); } 100% { transform: rotate(360deg); } }
+@keyframes atkDash { 0% { transform: translateX(0); } 30% { transform: translateX(40px) skewX(-10deg); } 45% { transform: translateX(40px) skewX(-10deg); } 100% { transform: translateX(0); } }
+@keyframes atkOverhead { 0% { transform: rotate(0); } 35% { transform: rotate(-26deg) translateY(-8px); } 58% { transform: rotate(24deg) translateY(6px); } 100% { transform: rotate(0); } }
+@keyframes atkUppercut { 0% { transform: translateY(0) rotate(0); } 45% { transform: translateY(-30px) rotate(-14deg); } 100% { transform: translateY(0) rotate(0); } }
+@keyframes atkThrust { 0% { transform: translateX(0); } 40% { transform: translateX(30px) scaleX(1.06); } 60% { transform: translateX(30px); } 100% { transform: translateX(0); } }
+@keyframes atkCombo { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(20px); } 40% { transform: translateX(4px); } 58% { transform: translateX(22px); } 72% { transform: translateX(6px); } }
+@keyframes atkLeap { 0% { transform: translate(0,0); } 40% { transform: translate(26px,-56px) rotate(-12deg); } 70% { transform: translate(8px,4px) rotate(6deg); } 100% { transform: translate(0,0); } }
+@keyframes atkSmash { 0% { transform: rotate(0) scale(1); } 30% { transform: rotate(-18deg) scale(1.08) translateY(-10px); } 50% { transform: rotate(18deg) scale(1.1) translateY(8px); } 100% { transform: rotate(0) scale(1); } }
+@keyframes atkWhirl { 0% { transform: rotate(0); } 25% { transform: rotate(-30deg); } 50% { transform: rotate(300deg); } 75% { transform: rotate(340deg); } 100% { transform: rotate(360deg); } }
+@keyframes atkPounce { 0% { transform: translateY(0) scaleY(1); } 22% { transform: translateY(10px) scaleY(0.86); } 50% { transform: translateY(-40px) rotate(-8deg) scaleY(1.08); } 100% { transform: translateY(0) scaleY(1); } }
+.battle-wave { font-size: 0.72rem; font-weight: 700; color: #ffcf7a; text-shadow: 0 1px 2px #000; margin-top: 2px; }
 
 .battle-spark { position: absolute; z-index: 6; width: 15px; height: 15px; pointer-events: none; border-radius: 50%; background: radial-gradient(circle, rgba(255,225,140,0.95), rgba(255,140,60,0.55) 45%, transparent 70%); animation: battle-spark 0.75s ease-out forwards; }
 .battle-spark .battle-chip { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); font-size: 0.8rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; white-space: nowrap; animation: battle-chip 0.75s ease-out forwards; }
@@ -9302,7 +9354,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .battle-floater { position: absolute; font-weight: 800; font-size: clamp(1rem, 3.4vw, 1.4rem); color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; z-index: 7; animation: boss2-float 0.85s ease-out forwards; }
 .battle-floater.is-crit { font-size: clamp(1.5rem, 5vw, 2.1rem); color: #ff5a5a; }
 @media (prefers-reduced-motion: reduce) {
-    .battle-bg, .battle-boss, .fighter-lunge, .fighter-sprite { animation: none; }
+    .battle-bg, .battle-boss, .adv-body, .adv-sprite { animation: none !important; }
 }
 .boss2-figure { animation: boss2-breathe 3.4s ease-in-out infinite; }
 .boss2-enemy { font-size: 8.5rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 22px rgba(224, 68, 40, 0.6)); }
