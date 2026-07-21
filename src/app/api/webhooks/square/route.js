@@ -99,6 +99,14 @@ async function handlePurchaseLoyalty(payload) {
         .catch(() => null);
     if (online) return { handled: true, skipped: "online_order" };
 
+    // Store-credit top-ups are NOT merchandise sales — the buyer already got their coins + credit at
+    // checkout. Never award loyalty or mint a staff QR for them. Matched by reference_id (set when the
+    // payment is created, so there's no race with the square_payment_id write) or the payment id.
+    const creditTopUp = await db
+        .queryOne(`SELECT 1 FROM mkt_credit_purchase WHERE id::text = $1 OR square_payment_id = $2 LIMIT 1`, [payment.reference_id || null, payment.id])
+        .catch(() => null);
+    if (creditTopUp) return { handled: true, skipped: "credit_purchase" };
+
     const orderId = payment.order_id || payment.id;
     const awardOrderId = `sq:${orderId}`;
     let amountCents = Number(payment.amount_money?.amount || 0);
