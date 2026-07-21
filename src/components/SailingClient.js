@@ -231,6 +231,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina} digs</span>
                         </div>
                         <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / dig.maxStamina) * 100)}%` }} /></div>
+                        <div className="dig-instruct">👆 Tap the dirt to dig — clear a tile to the bottom to see what it hides</div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
@@ -239,14 +240,14 @@ export default function SailingClient({ initial, hero, pet }) {
                                         key={`${r}-${c}`}
                                         type="button"
                                         className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}`}
-                                        style={{ "--depth": t.depth }}
+                                        style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
                                         disabled={busy || dig.status !== "active" || bottomed}
                                         onClick={() => digTile(r, c)}
-                                        title={bottomed ? (t.found ? "A fragment!" : "Bare rock — nothing here") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of rock`}
+                                        title={bottomed ? (t.found ? "A fragment!" : "Bare dirt — nothing here") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
                                         {t.found ? <span className="dig-found"><FragmentIcon size={30} /></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
-                                                : <span className="dig-rock" aria-hidden="true">{Array.from({ length: t.depth }, (_, i) => <i key={i} />)}</span>}
+                                                : <span className="dig-dirt" aria-hidden="true" />}
                                         {chunk && chunk.r === r && chunk.c === c ? (
                                             <span className="dig-chunks" key={chunk.k} aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span>
                                         ) : null}
@@ -254,14 +255,14 @@ export default function SailingClient({ initial, hero, pet }) {
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip">Chip through the rock. <b>{dig.buried} fragments</b> are buried under this ground — dig a tile all the way to the bottom to find out what it hides. Shallower rock costs fewer swings, so spend your <b>{dig.stamina} digs</b> wisely.</p>
+                        <p className="dig-tip"><b>{dig.buried} fragments</b> are buried under this dirt — clear a tile all the way down to find out what it hides. Shallower dirt costs fewer swings, so spend your <b>{dig.stamina} digs</b> wisely.</p>
                         {dig.status === "active" ? (
                             <button
-                                className="sail-cta sail-digbuy"
+                                className="btn-ghost sail-digbuy"
                                 disabled={busy || ((state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0))}
                                 onClick={() => act("buy_digs")}
                             >
-                                ⛏️ Buy +{state.digRefill?.amount ?? 5} digs{(state.digRefill?.cost ?? 0) > 0 ? ` · 🪙 ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
+                                🪙 Buy {state.digRefill?.amount ?? 5} more digs{(state.digRefill?.cost ?? 0) > 0 ? ` · ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
                             </button>
                         ) : null}
                     </div>

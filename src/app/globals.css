@@ -10550,34 +10550,49 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-frag { color: #ffe9a8; } .dig-stam { color: #bfe9ff; }
 .dig-stambar { height: 7px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 6px 0 10px; }
 .dig-stambar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); transition: width 0.3s ease; }
-.dig-grid { display: grid; gap: 6px; }
+.dig-grid { display: grid; gap: 7px; }
 .dig-frag { display: inline-flex; align-items: center; gap: 5px; }
-/* Each tile is a stack of rock slabs — one per remaining layer — sitting in a dark pit. You chip slabs off the
-   top until you hit the bottom (bare rock or a buried fragment), so clearing them reads as digging DOWN. */
+/* A clear "tap the dirt" instruction so it's obvious the TILES are the action, not the buy button. */
+.dig-instruct { text-align: center; font-weight: 800; font-size: 0.82rem; color: #ffe9c4; margin: 2px 0 10px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+/* Each tile is a raised, beveled MOUND OF DIRT sitting in a dark pit — the raised bevel (like a classic
+   minesweeper tile) reads as tappable. Its height tracks remaining depth, so each dig visibly lowers the dirt
+   and the pit shows through above → you're digging DOWN through the dirt. */
 .dig-tile { aspect-ratio: 1; border: none; border-radius: 9px; cursor: pointer; position: relative; overflow: hidden;
-    background: radial-gradient(120% 120% at 50% 18%, #35291f, #16110c);
-    box-shadow: inset 0 3px 6px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.04);
-    transition: transform 0.07s ease, filter 0.15s ease; }
-.dig-tile:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.12); }
-.dig-tile:not(:disabled):active { transform: scale(0.93); }
+    background: radial-gradient(120% 120% at 50% 20%, #3a2716, #1b1108); /* the pit floor */
+    box-shadow: inset 0 4px 7px rgba(0,0,0,0.6);
+    transition: transform 0.07s ease, filter 0.12s ease; }
+.dig-tile:not(:disabled) { cursor: pointer; }
+.dig-tile:not(:disabled):hover { filter: brightness(1.1); }
+.dig-tile:not(:disabled):hover .dig-dirt { transform: translateY(-2px); }
+.dig-tile:not(:disabled):active .dig-dirt { transform: translateY(3px); filter: brightness(0.92); }
 .dig-tile:disabled { cursor: default; }
-.dig-rock, .dig-hole, .dig-found, .dig-chunks { pointer-events: none; }
-/* Stacked rock layers filling the tile; the top slab is lighter (the exposed surface). */
-.dig-rock { position: absolute; inset: 4%; display: flex; flex-direction: column-reverse; gap: 2px; }
-.dig-rock i { flex: 1; border-radius: 3px; background: linear-gradient(#8b8073, #5c534a);
-    box-shadow: inset 0 2px 0 rgba(255,255,255,0.14), inset 0 -3px 4px rgba(0,0,0,0.45), 0 1px 0 rgba(0,0,0,0.3); }
-.dig-rock i:last-child { background: linear-gradient(#a99c8a, #766a5c); }
-/* Chipped to the bottom, empty — a shadowed pit. */
-.dig-hole { position: absolute; inset: 26%; border-radius: 46%; background: radial-gradient(circle at 50% 36%, rgba(0,0,0,0.3), rgba(0,0,0,0.66)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.7); }
+.dig-dirt, .dig-hole, .dig-found, .dig-chunks { pointer-events: none; }
+/* The raised dirt block — height = remaining dirt; strata bands + a sunlit top crust so it reads as earth. */
+.dig-dirt { position: absolute; left: 5%; right: 5%; bottom: 5%; border-radius: 6px 6px 5px 5px;
+    height: calc((var(--depth, 1) / var(--maxdepth, 3)) * 90% + 10%);
+    background:
+        linear-gradient(rgba(255,226,170,0.4), rgba(255,226,170,0) 26%),
+        repeating-linear-gradient(180deg, #7f5730 0 5px, #6c4926 5px 10px),
+        linear-gradient(#7a512c, #4d341c);
+    box-shadow: inset 0 2px 0 rgba(255,235,190,0.45), inset 0 -6px 8px rgba(0,0,0,0.45),
+        inset 3px 0 0 rgba(255,255,255,0.06), inset -3px 0 0 rgba(0,0,0,0.28), 0 2px 4px rgba(0,0,0,0.5);
+    transition: height 0.16s ease, transform 0.08s ease, filter 0.12s ease; }
+/* little embedded pebbles/clods so it doesn't read as flat */
+.dig-dirt::before, .dig-dirt::after { content: ""; position: absolute; border-radius: 50%; background: rgba(0,0,0,0.22); box-shadow: 0 1px 0 rgba(255,255,255,0.1); }
+.dig-dirt::before { width: 14%; height: 14%; top: 26%; left: 22%; }
+.dig-dirt::after { width: 10%; height: 10%; top: 58%; left: 64%; }
+/* Chipped to the bottom, empty — a shadowed pit of dark dirt. */
+.dig-hole { position: absolute; inset: 26%; border-radius: 46%; background: radial-gradient(circle at 50% 36%, rgba(0,0,0,0.32), rgba(0,0,0,0.66)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.75); }
 /* A fragment unearthed at the bottom — real art, popping in with a glow. */
 .dig-tile.is-found { background: radial-gradient(circle at 50% 46%, #5e4517, #1c1408); }
 .dig-found { position: absolute; inset: 0; display: grid; place-items: center; filter: drop-shadow(0 0 8px #ffd75e);
     animation: digFound 0.5s cubic-bezier(0.2,1.35,0.4,1) both; }
 @keyframes digFound { 0% { opacity: 0; transform: scale(0.2) rotate(-25deg); } 60% { transform: scale(1.2) rotate(6deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
-/* Rock chunks that spray out of a tile on each dig. */
+/* Dirt clods that spray out of a tile on each dig. */
 .dig-chunks { position: absolute; inset: 0; }
-.dig-chunks i { position: absolute; left: 50%; top: 46%; width: 22%; max-width: 9px; aspect-ratio: 1; border-radius: 2px;
-    background: #877c6e; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 1px rgba(0,0,0,0.4);
+.dig-chunks i { position: absolute; left: 50%; top: 46%; width: 22%; max-width: 9px; aspect-ratio: 1; border-radius: 50% 50% 45% 55%;
+    background: #6d4a28; box-shadow: inset 0 1px 0 rgba(255,220,170,0.3), 0 1px 1px rgba(0,0,0,0.4);
     animation: digChunk 0.5s ease-out forwards; animation-delay: calc(var(--i) * 8ms); }
 @keyframes digChunk {
     0% { opacity: 1; transform: translate(-50%, -50%) rotate(0deg); }
@@ -10621,10 +10636,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     animation: sailLevelRibbon 0.6s cubic-bezier(0.2,1.3,0.4,1) both; }
 @keyframes sailLevelRibbon { 0% { opacity: 0; transform: scale(0.6) translateY(-8px); } 60% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
 /* Buy-more-digs button under the excavation grid — a stone palette so it reads as a dig tool, not the gold CTA. */
-.sail-digbuy { width: 100%; justify-content: center; margin-top: 10px; font-size: 0.95rem; animation: none;
-    background: linear-gradient(135deg, #cdd6e0, #93a2b4 55%, #6b7a8d); color: #17202b;
-    box-shadow: 0 5px 0 #495666, 0 10px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6); }
-.sail-digbuy:not(:disabled):active { transform: translateY(4px); box-shadow: 0 1px 0 #495666, 0 4px 10px rgba(0,0,0,0.3); }
+/* Secondary — a small centered ghost button so digging the tiles is clearly the main action. */
+.sail-digbuy { display: flex; width: fit-content; margin: 12px auto 0; font-size: 0.8rem; padding: 7px 14px; }
 @media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock, .sail-forge-chest, .sail-levelup-ribbon { animation: none; } }
 
 /* ===== Sailing: dopamine (CTA, land-ho, confetti) ===== */

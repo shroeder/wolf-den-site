@@ -32,7 +32,7 @@ const BASE_STAMINA = 12;      // digs per voyage, + luck level
 const FRAGMENTS_BURIED = 3;   // individual fragments scattered through the rock (no clusters, no pointer)
 const XP_PER_DIG_WIN = 30;
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
-const DIG_REFILL_COST = 300;  // gold per refill (plain const — zero it for testing if you like)
+const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to ~300 before release
 
 const BOAT_ART = { 1: "/images/sailing/boat-tier1-wood.png" };
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
