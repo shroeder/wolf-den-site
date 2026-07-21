@@ -169,11 +169,13 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                                 has its OWN gait + attack timing so they're not glued at the hip. */}
                             <div className="adv-body">
                                 {glow ? <span className={`adv-aura${f.border ? " has-border" : ""}`} /> : null}
-                                {/* The companion pet — walks in its own trot and strikes AFTER its owner. */}
+                                {/* The companion pet — rides in with its owner and strikes at the SAME time. Flip lives on
+                                    the wrapper (like the hero's adv-flip) so the strike keyframe's transform on the img
+                                    composes with it instead of wiping the flip mid-swing. */}
                                 {f.petSpriteUrl ? (
-                                    <span className="adv-pet-wrap">
+                                    <span className="adv-pet-wrap" style={f.petSpriteFlip ? { transform: "scaleX(-1)" } : undefined}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img className="adv-pet" src={f.petSpriteUrl} alt="" style={f.petSpriteFlip ? { transform: "scaleX(-1)" } : undefined} />
+                                        <img className="adv-pet" src={f.petSpriteUrl} alt="" />
                                     </span>
                                 ) : null}
                                 {/* Flip on a wrapper so the walk/attack keyframes (on the img) compose with it. */}
