@@ -18,18 +18,20 @@ import { rankForLevel } from "@/lib/marketplace/ranks.js";
 function BattleHeroCard({ f }) {
     const rank = rankForLevel(f.level || 1);
     const initial = (f.displayLabel || f.name || "?").slice(0, 1).toUpperCase();
+    // Don't repeat the featured badge (it's the folder tab) in the badge row; cap the rest so the card stays small.
+    const restBadges = (f.displayBadges || []).filter((b) => !f.featuredBadge || b.slug !== f.featuredBadge.slug).slice(0, 3);
     return (
         <div className={`bhc ${f.background ? `has-bg ${backgroundClass(f.background)}` : ""} ${frameClass(f.frame)} ${f.you ? "is-you" : ""}`.replace(/\s+/g, " ").trim()}>
             <CardTab badge={f.featuredBadge} compact />
             <div className="bhc-inner">
-                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={44} border={f.border} cosmetics={f.avatarCosmetics} />
+                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={40} border={f.border} cosmetics={f.avatarCosmetics} />
                 <div className="bhc-body">
                     <div className="bhc-name">{f.you ? "You" : (f.displayLabel || f.name)}</div>
                     <div className="bhc-meta">
                         <span className="rank-chip rank-chip-sm">{rank.emoji} {rank.title}</span>
                         <span className="bhc-lv">Lv {f.level || 1}{f.petLevel ? ` · 🐾 ${f.petLevel}` : ""}</span>
                     </div>
-                    {f.displayBadges?.length ? <UserBadges badges={f.displayBadges} /> : null}
+                    {restBadges.length ? <UserBadges badges={restBadges} /> : null}
                 </div>
             </div>
         </div>

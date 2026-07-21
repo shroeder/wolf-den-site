@@ -9307,22 +9307,22 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    Everyone gets a SOLID plate; members with an equipped profile background show it (crosshatch/hue) under a
    lighter scrim so their configured backplate reads. */
 /* Sits BELOW the centered boss HUD (name + HP bar) so the two never collide, upper-left over the arena. */
-.bhc-slot { position: absolute; top: clamp(84px, 15vw, 104px); left: 8px; z-index: 9; pointer-events: none; width: min(190px, 54vw); animation: bhcIn 0.4s ease both; }
+.bhc-slot { position: absolute; top: clamp(80px, 14vw, 100px); left: 6px; z-index: 9; pointer-events: none; width: min(156px, 44vw); animation: bhcIn 0.4s ease both; }
 @keyframes bhcIn { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
-.bhc { position: relative; border-radius: 13px; box-shadow: 0 6px 18px rgba(0,0,0,0.65); }
-/* Opaque plate for readability. Members with a background cosmetic show it under a lighter scrim so their
-   configured "backplate" (crosshatch/hue) reads while text stays legible. */
-.bhc-inner { position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 13px;
-    background: linear-gradient(180deg, rgba(16,18,26,0.97), rgba(9,10,15,0.98)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
-.bhc.has-bg .bhc-inner { background: linear-gradient(180deg, rgba(10,11,17,0.5), rgba(6,7,11,0.62)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); }
-.bhc-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.bhc-name { font-weight: 800; font-size: 0.86rem; color: #fff; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 118px; }
-.bhc-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.bhc-lv { font-size: 0.68rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; }
-.bhc .user-badges { margin-top: 2px; gap: 4px; flex-wrap: wrap; }
-.bhc .user-badge { font-size: 0.55rem; padding: 1px 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
-.bhc .rank-chip-sm { text-shadow: 0 1px 2px #000; }
-.bhc.is-you { box-shadow: 0 0 0 1.5px rgba(255,215,94,0.75), 0 6px 18px rgba(0,0,0,0.65); }
+.bhc { position: relative; border-radius: 12px; box-shadow: 0 5px 16px rgba(0,0,0,0.6); }
+/* Compact plate. Members with a background cosmetic show it under a light scrim so their configured
+   "backplate" (crosshatch/hue) actually reads; text stays legible via shadows. */
+.bhc-inner { position: relative; display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(16,18,26,0.96), rgba(9,10,15,0.97)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.bhc.has-bg .bhc-inner { background: linear-gradient(180deg, rgba(10,11,17,0.34), rgba(6,7,11,0.5)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
+.bhc-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bhc-name { font-weight: 800; font-size: 0.8rem; color: #fff; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
+.bhc-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.bhc-meta .rank-chip-sm { font-size: 0.6rem; padding: 0 6px; text-shadow: 0 1px 2px #000; }
+.bhc-lv { font-size: 0.64rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; }
+.bhc .user-badges { margin-top: 2px; gap: 3px; flex-wrap: wrap; }
+.bhc .user-badge { font-size: 0.5rem; padding: 1px 5px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.bhc.is-you { box-shadow: 0 0 0 1.5px rgba(255,215,94,0.75), 0 5px 16px rgba(0,0,0,0.6); }
 @media (prefers-reduced-motion: reduce) { .bhc-slot { animation: none; } }
 .adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
