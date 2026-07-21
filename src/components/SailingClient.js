@@ -66,9 +66,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const xpPct = Math.min(100, Math.round((state.xpInto / Math.max(1, state.xpSpan)) * 100));
     const dig = state.dig;
 
-    // Boat position: one-way, home (left) → island (right).
-    const xPct = 7 + progress * 74;
-
     return (
         <div className="stack reveal sailing">
             <section className="card" style={{ overflow: "hidden" }}>
@@ -106,32 +103,43 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </div>
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
-                    <div className="sail-sea" style={{ backgroundImage: `url(${state.oceanBg})` }}>
-                        <div className={`sail-boat${liveStatus === "sailing" ? " is-sailing" : ""}`} style={{ left: `${xPct}%` }}>
-                            <div className="sail-boat-inner">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="sail-boat-img" src={state.boatArt} alt="Your boat" />
-                                <span className="sail-crew">
-                                    {pet?.url ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img className="sail-pet" src={pet.url} alt="" style={pet.flip ? { transform: "scaleX(-1)" } : undefined} />
-                                    ) : null}
-                                    {hero?.spriteUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img className="sail-hero" src={hero.spriteUrl} alt="" style={hero.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
-                                    ) : hero?.avatarUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img className="sail-hero sail-hero-avatar" src={hero.avatarUrl} alt="" />
-                                    ) : null}
-                                </span>
+                    <>
+                        <div className="sail-sea" style={{ backgroundImage: `url(${state.oceanBg})` }}>
+                            <div className="sail-boat">
+                                <div className="sail-boat-inner">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img className="sail-boat-img" src={state.boatArt} alt="Your boat" />
+                                    <span className="sail-crew">
+                                        {pet?.url ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img className="sail-pet" src={pet.url} alt="" style={pet.flip ? { transform: "scaleX(-1)" } : undefined} />
+                                        ) : null}
+                                        {hero?.spriteUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img className="sail-hero" src={hero.spriteUrl} alt="" style={hero.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
+                                        ) : hero?.avatarUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img className="sail-hero sail-hero-avatar" src={hero.avatarUrl} alt="" />
+                                        ) : null}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="sail-status">
+                                {liveStatus === "idle" && <span>⚓ Docked · ready to set sail</span>}
+                                {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}</span>}
+                                {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
                             </div>
                         </div>
-                        <div className="sail-status">
-                            {liveStatus === "idle" && <span>⚓ Docked · ready to set sail</span>}
-                            {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}</span>}
-                            {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
+                        {/* Voyage progress — a little boat creeping from port (⚓) to the island (🏝️). */}
+                        <div className="sail-voyage">
+                            <span className="sail-voyage-end" aria-hidden="true">⚓</span>
+                            <div className="sail-voyage-track">
+                                <span className="sail-voyage-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+                                <span className="sail-voyage-boat" style={{ left: `${Math.round(progress * 100)}%` }} aria-hidden="true">⛵</span>
+                            </div>
+                            <span className="sail-voyage-end" aria-hidden="true">🏝️</span>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 {/* Boat identity + XP */}
