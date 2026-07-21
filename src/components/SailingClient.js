@@ -70,18 +70,13 @@ function Confetti() {
     return <div className="sail-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>;
 }
 
-// Real art for a treasure-chest fragment — a faceted golden shard (replaces the flat 🧩 emoji). Pure inline
-// SVG so it's crisp at any size and needs no asset pipeline; no gradient ids, so many can render at once.
+// Real painted art for a treasure-chest fragment (AI-gen, cel-shaded to match the boat/ocean) — replaces the
+// flat 🧩 emoji everywhere. Same API at every call size.
 function FragmentIcon({ size = 20, className = "" }) {
     return (
-        <svg className={`frag-icon ${className}`.trim()} viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
-            <path d="M7 4 L20 6 L26 15 L23 26 L11 28 L4 18 L9 12 Z" fill="#f2b43c" stroke="#7c4f14" strokeWidth="1.4" strokeLinejoin="round" />
-            <path d="M7 4 L20 6 L18 15 L9 12 Z" fill="#ffe6a0" />
-            <path d="M18 15 L26 15 L23 26 Z" fill="#d98f22" />
-            <path d="M18 15 L23 26 L11 28 L9 12 Z" fill="#e7a52f" />
-            <path d="M9 12 L18 15 M18 15 L20 6 M18 15 L11 28" fill="none" stroke="#7c4f14" strokeWidth="0.8" opacity="0.5" />
-            <circle cx="14.5" cy="14.5" r="1.5" fill="#fff6d8" />
-        </svg>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className={`frag-icon ${className}`.trim()} src="/images/sailing/fragment.png" alt=""
+            width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} draggable={false} />
     );
 }
 
@@ -138,6 +133,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [state, setState] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
+    const [forge, setForge] = useState(null); // the chest just forged from fragments
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [now, setNow] = useState(Date.now);
@@ -191,6 +187,7 @@ export default function SailingClient({ initial, hero, pet }) {
             if (d && !d.error) {
                 setState(d);
                 if (d.result) { d.result.won ? sfx.win() : sfx.fail(); setResult(d.result); }
+                if (d.forged) { sfx.win(); setForge(d.forged); }
             }
         } finally { setBusy(false); }
     }, []);
@@ -363,8 +360,13 @@ export default function SailingClient({ initial, hero, pet }) {
                         <div className="muted sail-hold-sub">Dig them up on the island. Every 10 forms a treasure chest.</div>
                     </div>
                 </div>
-                <div className="sail-hold-bar"><span style={{ width: `${Math.round(((state.fragments % 10) / 10) * 100)}%` }} /></div>
-                <div className="muted sail-hold-note">{state.fragments % 10}/10 toward your next chest</div>
+                <div className="sail-hold-bar"><span style={{ width: `${Math.round(((state.fragments % (state.fragmentsPerChest || 10)) / (state.fragmentsPerChest || 10)) * 100)}%` }} /></div>
+                <div className="muted sail-hold-note">{state.fragments % (state.fragmentsPerChest || 10)}/{state.fragmentsPerChest || 10} toward your next chest</div>
+                {state.fragments >= (state.fragmentsPerChest || 10) ? (
+                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest")}>
+                        🔨 Forge {state.chestReward?.emoji || "🎁"} {state.chestReward?.label || "a chest"} — {state.fragmentsPerChest || 10} fragments
+                    </button>
+                ) : null}
             </section>
 
             {/* Win / fail RECAP — you confirm before it returns you to port. */}
@@ -392,6 +394,22 @@ export default function SailingClient({ initial, hero, pet }) {
                             <div className="muted sail-hold-note">{result.fragments % 10}/10 toward a treasure chest</div>
                         </div>
                         <button className="sail-cta" onClick={() => setResult(null)}>⚓ Back to port</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Chest forged from fragments. */}
+            {forge ? (
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap">
+                        <Confetti />
+                        <div className="sail-recap-hero is-win"><span className="sail-forge-chest">{forge.emoji}</span></div>
+                        <h2 style={{ margin: "4px 0" }}>Chest forged!</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>You fused {state.fragmentsPerChest || 10} fragments into a <b>{forge.label}</b>. It&apos;s waiting in your stash.</p>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+                            <a className="sail-cta" href="/marketplace/inventory">🎒 Open it in your stash</a>
+                            <button className="pill" onClick={() => setForge(null)}>Keep sailing</button>
+                        </div>
                     </div>
                 </div>
             ) : null}

@@ -10612,7 +10612,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-recap-row b { display: inline-flex; align-items: center; gap: 5px; }
 .sail-recap-pos { color: #7cffb2; }
 .sail-recap-chest { margin: 6px 0 12px; display: grid; gap: 5px; }
-@media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock { animation: none; } }
+.sail-forge-btn { width: 100%; justify-content: center; font-size: 0.98rem; margin-top: 4px; }
+.sail-forge-chest { font-size: 3.6rem; display: inline-block; filter: drop-shadow(0 0 18px rgba(255,215,94,0.75)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
+@media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock, .sail-forge-chest { animation: none; } }
 
 /* ===== Sailing: dopamine (CTA, land-ho, confetti) ===== */
 .sail-cta { position: relative; display: inline-flex; align-items: center; gap: 11px; font-weight: 900; font-size: 1.24rem;

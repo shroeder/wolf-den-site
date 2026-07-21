@@ -1,6 +1,11 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+
+// Fragments you dig up on the island fuse into a loot chest.
+const FRAGMENTS_PER_CHEST = 10;
+const CHEST_FROM_FRAGMENTS = "iron";
 
 // SAILING — dispatch your boat on a ONE-WAY voyage to a mysterious island; when it lands you play an
 // excavation dig minigame (ESO-style: a grid of dirt, a limited stamina budget, an Augur "hot/cold" locator)
@@ -131,6 +136,8 @@ function decorate(row) {
         xp, xpInto: Math.max(0, xp - level0Xp), xpSpan: span,
         voyagesCompleted: row?.voyages_completed || 0,
         fragments: row?.fragments || 0,
+        fragmentsPerChest: FRAGMENTS_PER_CHEST,
+        chestReward: { tier: CHEST_FROM_FRAGMENTS, label: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.label || "Chest", emoji: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.emoji || "🎁" },
         speed: { level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL },
         luck: { level: luckLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL },
         voyageMs: voyageDurationMs(speedLevel),
@@ -222,6 +229,20 @@ export async function grantFragment(buyerId, n = 1) {
     if (!buyerId || n <= 0) return;
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     await db.query(`UPDATE mkt_sailing SET fragments = fragments + $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, n]).catch(() => {});
+}
+
+// Spend FRAGMENTS_PER_CHEST fragments to forge a loot chest. Atomic — the WHERE guards against forging with
+// too few (or a double-tap racing the balance).
+export async function forgeChest(buyerId) {
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    const spent = await db.queryOne(
+        `UPDATE mkt_sailing SET fragments = fragments - $2, updated_at = NOW() WHERE buyer_id = $1 AND fragments >= $2 RETURNING fragments`,
+        [buyerId, FRAGMENTS_PER_CHEST]
+    ).catch(() => null);
+    if (!spent) return { ok: false, error: "not_enough", ...(await getSailingState(buyerId)) };
+    await addChests(buyerId, { [CHEST_FROM_FRAGMENTS]: 1 }).catch(() => {});
+    const tier = CHEST_TIERS[CHEST_FROM_FRAGMENTS];
+    return { ok: true, forged: { tier: CHEST_FROM_FRAGMENTS, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁" }, ...(await getSailingState(buyerId)) };
 }
 
 export async function beginDig(buyerId) {
