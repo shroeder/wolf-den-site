@@ -97,6 +97,7 @@ export default async function UserProfilePage({ params }) {
             const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl);
             const active = petActive(def);
             const passive = petPassive(def);
+            const pl = pets.petLevels?.[id] || {};
             return {
                 id,
                 name: def.name,
@@ -104,6 +105,9 @@ export default async function UserProfilePage({ params }) {
                 source: def.source || null,
                 hint: def.hint || null,
                 level: lvl,
+                into: pl.into ?? 0,
+                span: pl.span ?? 0,
+                maxed: Boolean(pl.maxed),
                 featured: pets.featured === id,
                 spriteUrl: art?.url || null,
                 spriteFlip: art?.flip || false,

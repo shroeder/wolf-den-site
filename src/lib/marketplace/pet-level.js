@@ -6,8 +6,11 @@ import { db } from "@/lib/db";
 //  - The equipped pet earns PET_XP_SHARE of every XP the member gains, plus PET_TRICKLE_PER_DAY over time.
 //  - 5 levels; each level multiplies the pet's base passive by the level number (Lv1 ×1 … Lv5 ×5).
 export const PET_MAX_LEVEL = 5;
-export const PET_XP_SHARE = 0.25; // 25% of member XP flows to the equipped pet
-export const PET_TRICKLE_PER_DAY = 20; // passive XP/day while equipped (lazy-accrued, no cron)
+// Re-tuned 2026-07-21 — leveling was far too fast (a Lv3 pet off ~1.4k lifetime XP). Cut the member-XP
+// share and (especially) the free daily trickle so a maxed pet is a real, earned milestone. Thresholds are
+// unchanged so nobody loses a level they already have; only the pace slows going forward.
+export const PET_XP_SHARE = 0.12; // 12% of member XP flows to the equipped pet (was 25%)
+export const PET_TRICKLE_PER_DAY = 5; // passive XP/day while equipped — the big "free maxing" lever (was 20)
 
 // Cumulative pet-XP needed to REACH each level (index 0 = Lv1). Lv5 caps at 1500.
 export const PET_LEVEL_THRESHOLDS = [0, 100, 300, 700, 1500];

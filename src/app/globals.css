@@ -10387,3 +10387,26 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petcard-hero { display: grid; place-items: center; width: 150px; height: 150px; margin: 0 auto 8px; border-radius: 18px;
     background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--rar, #9aa7b5) 30%, transparent), transparent 70%); }
 .petcard-hero svg { width: 96px; height: 96px; color: var(--rar, #9aa7b5); }
+
+/* Public pet inspect sheet — richer look: rarity-tinted hero, level bar, clean stat rows. */
+.petsheet { width: 100%; max-width: 420px; margin: 0; border-radius: 18px 18px 0 0; text-align: center; position: relative;
+    border-top: 3px solid var(--rar, #9aa7b5); }
+.petsheet-eq { display: inline-block; margin-bottom: 6px; padding: 2px 12px; border-radius: 999px; font-size: 0.72rem; font-weight: 800;
+    color: #241900; background: linear-gradient(135deg, #ffe9a8, #ffcf4a); }
+.petsheet-hero { width: 160px; height: 160px; margin: 4px auto 8px; border-radius: 22px;
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--rar, #9aa7b5) 34%, transparent), transparent 70%);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar, #9aa7b5) 30%, transparent); }
+.petsheet-hero img { width: 130px; height: 130px; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55)); }
+.petsheet-name { font-weight: 900; font-size: 1.3rem; color: var(--rar, #fff); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+.petsheet-tags { display: flex; gap: 6px; justify-content: center; margin-top: 5px; flex-wrap: wrap; }
+.petsheet-rar, .petsheet-src { font-size: 0.66rem; font-weight: 800; text-transform: capitalize; padding: 2px 9px; border-radius: 999px; }
+.petsheet-rar { color: var(--rar, #9aa7b5); border: 1px solid color-mix(in srgb, var(--rar, #9aa7b5) 55%, transparent); background: color-mix(in srgb, var(--rar, #9aa7b5) 14%, transparent); }
+.petsheet-src { color: #cdbfa6; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.04); }
+.petsheet-lvl { margin: 12px auto 0; max-width: 260px; }
+.petsheet-lvl-top { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 800; color: #ffcf7a; margin-bottom: 4px; }
+.petsheet-bar { height: 8px; border-radius: 8px; background: rgba(255,255,255,0.12); overflow: hidden; }
+.petsheet-bar span { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, #c8a24a, #ffd75e); }
+.petsheet-active { margin: 14px 0 0; font-weight: 800; color: #ffd75e; }
+.petsheet-passive { margin: 5px 0 0; font-size: 0.92rem; color: #e8ddc8; }
+.petsheet-hint { margin: 10px 0 0; font-style: italic; }
+.petsheet-close { margin-top: 16px; }

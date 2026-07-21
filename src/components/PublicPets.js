@@ -52,17 +52,23 @@ export default function PublicPets({ pets = [] }) {
             </div>
 
             {mounted && detail ? createPortal((
-                <div className="equip-sheet-overlay" onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
-                    <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, textAlign: "center" }}>
-                        <span className="petcard-hero" style={{ "--rar": RAR[detail.rarity] || "#9aa7b5" }}>{art(detail, true)}</span>
-                        <div style={{ fontWeight: 800, fontSize: "1.15rem", color: RAR[detail.rarity] || "#fff" }}>{detail.name}</div>
-                        <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>
-                            Lv {detail.level} · {detail.rarity}{detail.source ? ` · ${detail.source}` : ""}{detail.featured ? " · equipped ✓" : ""}
+                <div className="equip-sheet-overlay petsheet-overlay" onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
+                    <div className="card petsheet" onClick={(e) => e.stopPropagation()} style={{ "--rar": RAR[detail.rarity] || "#9aa7b5" }}>
+                        {detail.featured ? <div className="petsheet-eq">⭐ Equipped companion</div> : null}
+                        <span className="petcard-hero petsheet-hero">{art(detail, true)}</span>
+                        <div className="petsheet-name">{detail.name}</div>
+                        <div className="petsheet-tags">
+                            <span className="petsheet-rar">{detail.rarity}</span>
+                            {detail.source ? <span className="petsheet-src">{detail.source}</span> : null}
                         </div>
-                        {detail.activeDesc ? <p style={{ margin: "10px 0 0", fontWeight: 700, color: "#ffd75e" }}>⚔️ {detail.activeDesc}</p> : null}
-                        {detail.passiveDesc ? <p style={{ margin: "4px 0 0", fontSize: "0.9rem", color: "#e8ddc8" }}>✨ {detail.passiveDesc}</p> : null}
-                        {detail.hint ? <p className="muted" style={{ margin: "8px 0 0", fontStyle: "italic" }}>“{detail.hint}”</p> : null}
-                        <button type="button" className="pill" style={{ marginTop: 14 }} onClick={() => setDetail(null)}>Close</button>
+                        <div className="petsheet-lvl">
+                            <div className="petsheet-lvl-top"><span>Level {detail.level}{detail.maxed ? " · MAX" : " / 5"}</span>{!detail.maxed && detail.span ? <span className="muted">{detail.into}/{detail.span} XP</span> : null}</div>
+                            <div className="petsheet-bar"><span style={{ width: `${detail.maxed ? 100 : detail.span ? Math.round((detail.into / detail.span) * 100) : 0}%` }} /></div>
+                        </div>
+                        {detail.activeDesc ? <p className="petsheet-active">⚔️ {detail.activeDesc}</p> : null}
+                        {detail.passiveDesc ? <p className="petsheet-passive">✨ {detail.passiveDesc}</p> : null}
+                        {detail.hint ? <p className="muted petsheet-hint">“{detail.hint}”</p> : null}
+                        <button type="button" className="pill petsheet-close" onClick={() => setDetail(null)}>Close</button>
                     </div>
                 </div>
             ), document.body) : null}
