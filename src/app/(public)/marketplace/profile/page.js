@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import BackgroundPicker from "@/components/BackgroundPicker";
 import BorderPicker from "@/components/BorderPicker";
-import CollectibleGrid from "@/components/CollectibleGrid";
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
 import FramePicker from "@/components/FramePicker";
@@ -121,8 +120,8 @@ export default async function ProfileHubPage() {
 
             <RewardsTrackPreview track={track} />
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Profile border <span className="muted" style={{ fontWeight: 600, fontSize: "0.85rem" }}>· 💰 {store.gold.toLocaleString()} gold</span></h2>
+            <details className="card hub-collapse">
+                <summary><h2>Profile border <span className="muted" style={{ fontWeight: 600, fontSize: "0.85rem" }}>· 💰 {store.gold.toLocaleString()} gold</span></h2></summary>
                 <p className="muted" style={{ marginTop: 0 }}>Cosmetic frames you unlock by leveling up — tap one you&apos;ve earned to wear it, or tap a locked one to buy it early with gold.</p>
                 <BorderPicker
                     current={profile?.border}
@@ -134,43 +133,37 @@ export default async function ProfileHubPage() {
                     owned={store.purchased.border}
                     gold={store.gold}
                 />
-            </section>
+            </details>
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Profile background</h2>
+            <details className="card hub-collapse">
+                <summary><h2>Profile background</h2></summary>
                 <p className="muted" style={{ marginTop: 0 }}>Scenes you unlock by leveling up — they show behind your profile hero.</p>
                 <BackgroundPicker current={profile?.background} level={level?.level || 1} unlockAll={isStaff} owned={store.purchased.background} gold={store.gold} />
-            </section>
+            </details>
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Profile frame</h2>
+            <details className="card hub-collapse">
+                <summary><h2>Profile frame</h2></summary>
                 <p className="muted" style={{ marginTop: 0 }}>A textured border that hugs your card&apos;s edge — unlock more by leveling up.</p>
                 <FramePicker current={profile?.frame} level={level?.level || 1} unlockAll={isStaff} badges={(profile?.badges || []).map((b) => b.slug)} owned={store.purchased.frame} gold={store.gold} />
-            </section>
+            </details>
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Companions you unlock as you level up. Tap one to set your <strong>active pet</strong> — it rides along on your profile and hero cards, and joins you in the boss battle.</p>
-                <CollectibleGrid level={level?.level || 1} unlockAll={isStaff} selectable featuredId={profile?.featuredCollectibleId} owned={store.purchased.pet} gold={store.gold} />
-            </section>
-
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Badges on your card</h2>
+            <details className="card hub-collapse">
+                <summary><h2>Badges on your card</h2></summary>
                 <p className="muted" style={{ marginTop: 0 }}>Choose up to 3 to show. Your top-ranked pick becomes the tab that sticks up on your card.</p>
                 <ShowcaseBadgePicker badges={profile?.badges || []} current={profile?.showcaseSlugs || []} />
                 <p style={{ marginTop: 12 }}><Link href="/marketplace/badges" className="pill">🎖️ See all badges &amp; what&apos;s next →</Link></p>
-            </section>
+            </details>
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Earn more XP</h2>
+            <details className="card hub-collapse">
+                <summary><h2>Earn more XP</h2></summary>
                 <EarnChecklist progress={progress} signedIn />
-            </section>
+            </details>
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>Notifications</h2>
+            <details className="card hub-collapse">
+                <summary><h2>Notifications</h2></summary>
                 <p className="muted" style={{ marginTop: 0 }}>Email me when I miss something while I&apos;m away. (You always get in-app + push.)</p>
                 <NotifyPrefsClient initialDm={profile?.notifyEmailDm !== false} initialFriend={profile?.notifyEmailFriend !== false} />
-            </section>
+            </details>
 
             <section className="card">
                 <details className="hub-account">

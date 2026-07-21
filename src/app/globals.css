@@ -5800,6 +5800,37 @@ body.tv-mode .shop-mobile-cart-fab {
     font-size: 1.05rem;
 }
 
+/* Collapsible profile-hub sections — the long customizers (border/background/frame/badges/etc.) start closed
+   so the hub stays scannable; tap a header to expand. Reuses the account-details disclosure look. */
+.hub-collapse > summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    list-style: none;
+}
+.hub-collapse > summary::-webkit-details-marker { display: none; }
+.hub-collapse > summary::before {
+    content: "▸";
+    color: #ffd75e;
+    font-size: 0.9em;
+    transition: transform 150ms ease;
+    display: inline-block;
+    flex: 0 0 auto;
+}
+.hub-collapse[open] > summary::before { transform: rotate(90deg); }
+.hub-collapse > summary h2 { margin: 0; }
+.hub-collapse > summary::after {
+    content: "Tap to expand";
+    margin-left: auto;
+    color: var(--muted, #9aa7b5);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.hub-collapse[open] > summary::after { content: "Tap to collapse"; }
+.hub-collapse[open] > summary { margin-bottom: 1rem; }
+
 /* ===== Rewards track (roadmap) ===== */
 .track-topbar {
     display: flex;
