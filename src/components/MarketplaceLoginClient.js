@@ -5,13 +5,13 @@ import { useState } from "react";
 
 // Marketplace BUYER login for the web — the SAME mkt_buyer account the app uses (sets a web cookie).
 // Separate from the flag-gated /shop account system.
-export default function MarketplaceLoginClient({ redirectTo = "/marketplace/profile" }) {
+export default function MarketplaceLoginClient({ redirectTo = "/marketplace/profile", signup = false }) {
     const searchParams = useSearchParams();
     // Hard navigation (not router.push) after auth so EVERY server component + the header re-reads the new
     // session cookie immediately — otherwise you look logged-out until a manual refresh.
     const goAfterAuth = () => window.location.assign(redirectTo);
     // Land straight on the sign-up form when linked from a "create account" CTA (?signup=1).
-    const [mode, setMode] = useState(searchParams?.get("signup") ? "register" : "login"); // login | register | verify | forgot
+    const [mode, setMode] = useState(signup || searchParams?.get("signup") ? "register" : "login"); // login | register | verify | forgot
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [displayName, setDisplayName] = useState("");

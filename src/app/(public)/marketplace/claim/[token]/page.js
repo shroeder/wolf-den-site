@@ -13,8 +13,9 @@ export default async function LoyaltyClaimPage({ params }) {
     const { token } = await params;
     const buyer = await getAuthenticatedBuyer();
 
-    // Sign in first, then land right back on this claim so the points bank without re-scanning.
-    if (!buyer) return <MarketplaceLoginClient redirectTo={`/marketplace/claim/${token}`} />;
+    // Scanning a receipt QR is usually a NEW customer — drop them straight on the create-account form (they
+    // can switch to "sign in" if they already have one), then land right back here so the points bank.
+    if (!buyer) return <MarketplaceLoginClient redirectTo={`/marketplace/claim/${token}`} signup />;
 
     const claim = await getLoyaltyClaim(token);
 

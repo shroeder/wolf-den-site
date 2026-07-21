@@ -7,7 +7,7 @@ import { getInventory } from "@/lib/marketplace/inventory.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
-import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collectibles.js";
 import { CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { describeStats } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
@@ -151,14 +151,22 @@ export async function GET(request, { params }) {
                     list: (pets?.ownedIds || []).map((pid) => {
                         const def = collectibleById(pid);
                         const sp = petSprites[pid];
+                        const lvl = pets?.petLevels?.[pid];
+                        const active = def ? petActive(def) : null;
+                        const passive = def ? petPassive(def) : null;
+                        const fmtStat = (s) => String(s || "").replace(/_/g, " ");
                         return {
                             id: pid,
                             name: def?.name || pid,
                             rarity: def?.rarity || null,
                             source: def?.source || null,
-                            level: pets?.petLevels?.[pid]?.level || 1,
+                            level: lvl?.level || 1,
                             spriteUrl: sp?.url || null,
                             spriteFlip: sp?.flip || false,
+                            hint: def?.hint || null,
+                            // What it does: an equipped (active) buff + the always-on owned (passive) bonus.
+                            activeDesc: active ? `+${active.value}% ${fmtStat(active.stat)} when equipped` : null,
+                            passiveDesc: passive ? `+${lvl?.value ?? passive.value} ${fmtStat(passive.stat)} (owned, all pets stack)` : null,
                         };
                     }),
                 },

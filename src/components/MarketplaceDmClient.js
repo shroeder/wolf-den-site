@@ -51,9 +51,14 @@ export default function MarketplaceDmClient({ threadId }) {
         return () => clearInterval(t);
     }, [load]);
 
+    // Only auto-scroll when a genuinely NEW message arrives — NOT on typing-indicator changes or 3s polls
+    // (those were yanking the view down while you were mid-typing). `nearest` avoids jumping if it's in view.
+    const prevMsgCount = useRef(0);
     useEffect(() => {
-        endRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [thread?.messages?.length, thread?.otherTyping]);
+        const count = thread?.messages?.length || 0;
+        if (count > prevMsgCount.current) endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        prevMsgCount.current = count;
+    }, [thread?.messages?.length]);
 
     function pingTyping() {
         const now = Date.now();
