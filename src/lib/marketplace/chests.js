@@ -14,15 +14,15 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
 // a sliver of a shot at something great. Ascendant/Eternal only appear in the top few tiers' spreads.
 export const CHEST_TIERS = {
-    wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 60, rare: 32, epic: 7, legendary: 1 } },
-    iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 30, rare: 40, epic: 24, legendary: 6 } },
-    gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 26, epic: 42, legendary: 26, mythic: 6 } },
-    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 28, legendary: 44, mythic: 25, ascendant: 3 } },
-    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { legendary: 32, mythic: 45, ascendant: 20, eternal: 3 } },
-    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { mythic: 40, ascendant: 45, eternal: 15 } },
-    // The two rarest chests — best odds at the top gear PLUS the best shot at ultra-rare relic consumables.
-    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { mythic: 18, ascendant: 47, eternal: 35 } },
-    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { ascendant: 38, eternal: 62 } },
+    wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 72, rare: 25, epic: 3 } },
+    iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 44, rare: 40, epic: 14, legendary: 2 } },
+    gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 40, epic: 42, legendary: 16, mythic: 2 } },
+    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 46, legendary: 40, mythic: 13, ascendant: 1 } },
+    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { legendary: 48, mythic: 39, ascendant: 12, eternal: 1 } },
+    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { mythic: 54, ascendant: 38, eternal: 8 } },
+    // The two rarest chests — the best odds at top gear (still never a guarantee) + the best relic shot.
+    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { mythic: 40, ascendant: 46, eternal: 14 } },
+    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { mythic: 12, ascendant: 58, eternal: 30 } },
 };
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
@@ -62,10 +62,10 @@ function tierForLevel(level) {
 // first hit, so you get at most one elite chest per level and the tiers get exponentially harder to see —
 // the last three especially. This is how Ascendant→Primordial chests are earned purely through play.
 const ELITE_CHEST_LOTTERY = [
-    { tier: "primordial", chance: 0.00002 }, // ~1 in 50,000 level-ups
-    { tier: "celestial", chance: 0.00015 }, //  ~1 in 6,700
-    { tier: "eternal", chance: 0.001 }, //      ~1 in 1,000
-    { tier: "ascendant", chance: 0.006 }, //    ~1 in 167
+    { tier: "primordial", chance: 0.00015 }, // ~1 in 6,700 level-ups
+    { tier: "celestial", chance: 0.0012 }, //  ~1 in 830
+    { tier: "eternal", chance: 0.006 }, //     ~1 in 165
+    { tier: "ascendant", chance: 0.025 }, //   ~1 in 40
 ];
 
 function rollRarity(weights) {
