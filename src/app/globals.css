@@ -9965,7 +9965,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .deal-name { font-size: 0.82rem; font-weight: 700; line-height: 1.15; }
 /* Tap-to-inspect on a deal */
 .deal-inspect { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; cursor: pointer; color: inherit; width: 100%; }
-.deal-inspect-hint { font-size: 0.6rem; font-weight: 700; color: #8fb8ff; opacity: 0.85; }
 .deal-sheet-overlay { position: fixed; inset: 0; z-index: 1250; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.78); padding: 20px; }
 .deal-sheet { width: 100%; max-width: 320px; margin: 0; text-align: center; border-width: 2px; }
 .deal-sheet .deal-art { height: 88px; font-size: 4rem; margin-bottom: 4px; }

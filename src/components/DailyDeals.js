@@ -84,10 +84,9 @@ export default function DailyDeals() {
                 {state.deals.map((d) => (
                     <div key={d.id} className={`deal${d.featured ? " is-featured" : ""}`}>
                         {d.featured ? <span className="deal-badge deal-featured">★ FEATURED</span> : <span className="deal-badge">-{Math.round(d.discount * 100)}%</span>}
-                        <button type="button" className="deal-inspect" onClick={() => setInspect(d)} title="Tap to inspect">
+                        <button type="button" className="deal-inspect" onClick={() => setInspect(d)} title="Tap to see what it does">
                             <DealArt deal={d} />
                             <div className="deal-name">{d.name}</div>
-                            <span className="deal-inspect-hint">ⓘ what it does</span>
                         </button>
                         <div className="deal-price">
                             <span className="deal-was">🪙 {d.basePrice.toLocaleString()}</span>
