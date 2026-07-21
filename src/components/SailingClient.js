@@ -168,7 +168,7 @@ export default function SailingClient({ initial, hero, pet }) {
             setCelebrate("depart");
             setTimeout(() => setCelebrate((c) => (c === "depart" ? null : c)), 1900);
         }
-        if (action === "wind") {
+        if (action === "wind" || action === "recharge_wind") {
             sfx.gust();
             setCelebrate("gust");
             setTimeout(() => setCelebrate((c) => (c === "gust" ? null : c)), 2400);
@@ -189,6 +189,8 @@ export default function SailingClient({ initial, hero, pet }) {
     const level = state.level;
     const xpPct = Math.min(100, Math.round((state.xpInto / Math.max(1, state.xpSpan)) * 100));
     const dig = state.dig;
+    const windCost = state.windRecharge?.cost ?? 0;
+    const windTooPoor = windCost > 0 && state.gold < windCost;
 
     return (
         <div className="stack reveal sailing">
@@ -294,7 +296,9 @@ export default function SailingClient({ initial, hero, pet }) {
                         {liveStatus === "sailing" && (
                             state.windAvailable
                                 ? <button className="sail-cta sail-cta-wind" disabled={busy} onClick={() => act("wind")}>{busy ? "Catching the wind…" : "Catch a tailwind — arrive 1h sooner"}</button>
-                                : <button className="pill sail-donepill" disabled>Tailwind caught · resets tomorrow</button>
+                                : <button className="sail-cta sail-cta-wind" disabled={busy || windTooPoor} onClick={() => act("recharge_wind")}>
+                                    {busy ? "Catching the wind…" : windCost > 0 ? `Catch another tailwind — 🪙 ${windCost.toLocaleString()}` : "Catch another tailwind — free (testing)"}
+                                </button>
                         )}
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                     </div>

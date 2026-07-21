@@ -15,6 +15,10 @@ const MAX_LEVEL = 50;
 export const MAX_SPEED_LEVEL = 12;
 export const MAX_LUCK_LEVEL = 12;
 
+// After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
+// the feature is in testing — set back to 500 before release.
+export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
+
 // Dig board.
 const DIG_COLS = 6;
 const DIG_ROWS = 5;
@@ -148,6 +152,8 @@ function decorate(row) {
         status, progress, departedAt, arrivesAt,
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
+        // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
+        windRecharge: { cost: WIND_RECHARGE_COST },
         dig: status === "digging" ? boardView(dig) : null,
     };
 }
@@ -198,6 +204,30 @@ export async function favorableWind(buyerId) {
     ).catch(() => null);
     if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
     return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// Paid re-use of the tailwind once the free daily one is spent: charge gold, then shave another hour off the
+// remaining voyage. Free while WIND_RECHARGE_COST is 0 (testing). Only valid mid-voyage.
+export async function rechargeWind(buyerId) {
+    const row = await readRow(buyerId);
+    const state = decorate(row);
+    if (state.status !== "sailing") return { ok: false, error: "not_sailing", ...(await getSailingState(buyerId)) };
+    if (WIND_RECHARGE_COST > 0 && (state.gold || 0) < WIND_RECHARGE_COST) {
+        return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    }
+    // Apply the hour first (also validates a voyage is actually in progress) so we never charge with no effect.
+    const updated = await db.queryOne(
+        `UPDATE mkt_sailing
+            SET returns_at = GREATEST(NOW(), returns_at - interval '1 hour'), updated_at = NOW()
+          WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at IS NOT NULL AND returns_at > NOW()
+          RETURNING returns_at`,
+        [buyerId]
+    ).catch(() => null);
+    if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
+    if (WIND_RECHARGE_COST > 0) {
+        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2) WHERE id = $1`, [buyerId, WIND_RECHARGE_COST]).catch(() => {});
+    }
+    return { ok: true, spent: WIND_RECHARGE_COST, ...(await getSailingState(buyerId)) };
 }
 
 export async function beginDig(buyerId) {

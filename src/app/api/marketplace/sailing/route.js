@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getSailingState, startVoyage, favorableWind, beginDig, digAt, upgradeSpeed, upgradeLuck } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, upgradeSpeed, upgradeLuck } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -41,6 +41,7 @@ export async function POST(request) {
             switch (body?.action) {
                 case "start": return noStore(await startVoyage(g.buyer.id));
                 case "wind": return noStore(await favorableWind(g.buyer.id));
+                case "recharge_wind": return noStore(await rechargeWind(g.buyer.id));
                 case "begin_dig": return noStore(await beginDig(g.buyer.id));
                 case "dig": return noStore(await digAt(g.buyer.id, body.r, body.c));
                 case "upgrade_speed": return noStore(await upgradeSpeed(g.buyer.id));
