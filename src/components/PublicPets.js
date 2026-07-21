@@ -60,7 +60,7 @@ export default function PublicPets({ pets = [] }) {
                             Lv {detail.level} · {detail.rarity}{detail.source ? ` · ${detail.source}` : ""}{detail.featured ? " · equipped ✓" : ""}
                         </div>
                         {detail.activeDesc ? <p style={{ margin: "10px 0 0", fontWeight: 700, color: "#ffd75e" }}>⚔️ {detail.activeDesc}</p> : null}
-                        {detail.passiveDesc ? <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>✨ {detail.passiveDesc}</p> : null}
+                        {detail.passiveDesc ? <p style={{ margin: "4px 0 0", fontSize: "0.9rem", color: "#e8ddc8" }}>✨ {detail.passiveDesc}</p> : null}
                         {detail.hint ? <p className="muted" style={{ margin: "8px 0 0", fontStyle: "italic" }}>“{detail.hint}”</p> : null}
                         <button type="button" className="pill" style={{ marginTop: 14 }} onClick={() => setDetail(null)}>Close</button>
                     </div>

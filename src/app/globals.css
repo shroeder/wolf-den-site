@@ -10382,7 +10382,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petcard-art svg { width: 40px; height: 40px; color: var(--rar, #9aa7b5); }
 .petcard-eq { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
     font-size: 0.72rem; color: #241900; background: linear-gradient(135deg, #ffe9a8, #ffcf4a); border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
-.petcard-name { font-size: 0.74rem; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.petcard-name { font-size: 0.74rem; font-weight: 700; color: #f4ead2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .petcard-lv { font-size: 0.68rem; font-weight: 800; color: #ffcf7a; }
 .petcard-hero { display: grid; place-items: center; width: 150px; height: 150px; margin: 0 auto 8px; border-radius: 18px;
     background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--rar, #9aa7b5) 30%, transparent), transparent 70%); }
