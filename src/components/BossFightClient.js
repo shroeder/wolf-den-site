@@ -20,7 +20,16 @@ export default function BossFightClient() {
     const [victory, setVictory] = useState(null);
     const [xpFlash, setXpFlash] = useState(false);
     const [liveHp, setLiveHp] = useState(null);
+    const [rewardIdx, setRewardIdx] = useState(0); // which reward item is showing in the rotating drop card
     const floatId = useRef(0);
+
+    // When a boss has more than one reward item, cycle through them every 3s so each gets seen.
+    const rewardCount = data?.boss?.rewardItems?.length || 0;
+    useEffect(() => {
+        if (rewardCount <= 1) { setRewardIdx(0); return undefined; }
+        const t = setInterval(() => setRewardIdx((i) => (i + 1) % rewardCount), 3000);
+        return () => clearInterval(t);
+    }, [rewardCount]);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/boss", { cache: "no-store" }).catch(() => null);
@@ -184,22 +193,30 @@ export default function BossFightClient() {
                             ) : <span style={{ fontSize: "2.4rem", flexShrink: 0 }} aria-hidden="true">🎁</span>}
                         </div>
                     ) : null}
-                    {/* In-game reward gear — drops to random fighters (top dealers slightly favored) */}
-                    {boss.rewardItems?.length ? (
-                        <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.03)" }}>
-                            <span style={{ fontSize: "1.6rem", flexShrink: 0 }} aria-hidden="true">🎁</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>{boss.rewardItems.length > 1 ? `${boss.rewardItems.length} GEAR DROPS` : "GEAR DROP"}</div>
-                                <div style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.35 }}>
-                                    {boss.rewardItems.map((it, i) => (
-                                        <span key={it.id}>{i > 0 ? " · " : ""}<span style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</span></span>
-                                    ))}
+                    {/* In-game reward gear — drops to random fighters (top dealers slightly favored). With more
+                        than one item we rotate through them (name + art) every 3s so each gets its moment. */}
+                    {boss.rewardItems?.length ? (() => {
+                        const items = boss.rewardItems;
+                        const cur = items[rewardIdx % items.length];
+                        return (
+                            <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.03)" }}>
+                                <span style={{ fontSize: "1.6rem", flexShrink: 0 }} aria-hidden="true">🎁</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>{items.length > 1 ? `${items.length} GEAR DROPS` : "GEAR DROP"}</div>
+                                    <div key={cur.id} className="boss-reward-rotate" style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.35 }}>
+                                        <span style={{ color: RARITY_TXT[cur.rarity] || "#fff" }}>{cur.name}</span>
+                                    </div>
+                                    <div className="muted" style={{ fontSize: "0.76rem" }}>Drops to random fighters — top dealers have better odds, but anyone who fights can win.</div>
+                                    {items.length > 1 ? (
+                                        <div className="boss-reward-dots" aria-hidden="true">
+                                            {items.map((it, i) => <span key={it.id} className={i === rewardIdx % items.length ? "is-on" : ""} />)}
+                                        </div>
+                                    ) : null}
                                 </div>
-                                <div className="muted" style={{ fontSize: "0.76rem" }}>Drops to random fighters — top dealers have better odds, but anyone who fights can win.</div>
+                                <ItemArt key={cur.id} id={cur.id} icon={cur.icon} className="boss-chase-art boss-reward-rotate" />
                             </div>
-                            <ItemArt id={boss.rewardItems[0].id} icon={boss.rewardItems[0].icon} className="boss-chase-art" />
-                        </div>
-                    ) : null}
+                        );
+                    })() : null}
                     {/* Everyone — chest chance + XP */}
                     <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)" }}>
                         <span style={{ fontSize: "1.5rem", flexShrink: 0 }} aria-hidden="true">🎁</span>

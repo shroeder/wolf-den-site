@@ -156,6 +156,21 @@ export async function setBuyerSpriteFlip(buyerId, flip) {
 // AI read-pass: for members whose sprite hasn't been facing-checked, look at the stored art and set
 // flip=true if it faces LEFT (we want everyone facing right, toward the boss). Doesn't touch the image.
 // Small batches; resumable via avatar_facing_checked_at. Same shape as the pet detect pass.
+// Clear the facing-checked stamp so the (improved) AI read-pass re-audits sprites it already looked at —
+// used after tuning the detector, or to re-check one member. Manual flips are also cleared for a full
+// re-audit; pass a buyerId to scope it to one. Returns how many are now pending.
+export async function resetSpriteFacingChecks({ buyerId = null } = {}) {
+    if (buyerId) {
+        await db.query(`UPDATE mkt_buyer SET avatar_facing_checked_at = NULL WHERE id = $1 AND avatar_sprite_url IS NOT NULL`, [buyerId]).catch(() => {});
+    } else {
+        await db.query(`UPDATE mkt_buyer SET avatar_facing_checked_at = NULL WHERE avatar_sprite_url IS NOT NULL`).catch(() => {});
+    }
+    const remaining = await db
+        .queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE avatar_facing_checked_at IS NULL AND avatar_sprite_url IS NOT NULL`)
+        .catch(() => null);
+    return { ok: true, pending: remaining?.n || 0 };
+}
+
 export async function detectBuyerSpriteFacings(limit = 6) {
     const rows = await db
         .query(
@@ -168,7 +183,14 @@ export async function detectBuyerSpriteFacings(limit = 6) {
         .catch(() => []);
     const results = [];
     for (const r of rows) {
-        const facing = await detectFacing(r.avatar_sprite_url).catch(() => "unknown");
+        let facing;
+        try {
+            facing = await detectFacing(r.avatar_sprite_url);
+        } catch {
+            // Infra failure (no key / fetch / timeout) — leave this sprite UNCHECKED so it's retried next
+            // pass, instead of permanently recording a wrong "no-flip" for a transient error.
+            continue;
+        }
         const flip = facing === "left";
         await db
             .query(`UPDATE mkt_buyer SET avatar_sprite_flip = $2, avatar_facing_checked_at = NOW() WHERE id = $1`, [r.id, flip])

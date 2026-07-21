@@ -53,40 +53,42 @@ export async function faceBufferRight(buffer) {
 }
 
 // Public: DETECT which way a rendered sprite faces WITHOUT modifying the image. Returns "left" | "right" |
-// "unknown". Used to set a flip flag we apply at render time (instead of re-storing a mirrored image).
+// "unknown" for a genuine model answer. THROWS on an infra failure (no key / fetch / non-200) so the caller
+// can leave the sprite unchecked and retry later instead of permanently recording a wrong "no-flip". Used to
+// set a flip flag we apply at render time (instead of re-storing a mirrored image).
 export async function detectFacing(bufferOrUrl) {
     const key = process.env.OPENAI_API_KEY;
-    if (!key) return "unknown";
-    try {
-        let dataUrl;
-        if (typeof bufferOrUrl === "string") {
-            const resp = await fetch(bufferOrUrl);
-            if (!resp.ok) return "unknown";
-            dataUrl = `data:image/png;base64,${Buffer.from(await resp.arrayBuffer()).toString("base64")}`;
-        } else {
-            dataUrl = `data:image/png;base64,${bufferOrUrl.toString("base64")}`;
-        }
-        const resp = await fetch(CHAT_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-            body: JSON.stringify({
-                model: "gpt-4o-mini",
-                max_tokens: 3,
-                messages: [{ role: "user", content: [
-                    { type: "text", text: "Which horizontal direction is this character/creature's head and body facing? Reply with exactly one word: left or right." },
-                    { type: "image_url", image_url: { url: dataUrl } },
-                ] }],
-            }),
-        });
-        if (!resp.ok) return "unknown";
-        const data = await resp.json().catch(() => null);
-        const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
-        if (answer.includes("left") && !answer.includes("right")) return "left";
-        if (answer.includes("right") && !answer.includes("left")) return "right";
-        return "unknown";
-    } catch {
-        return "unknown";
+    if (!key) throw new Error("OPENAI_API_KEY missing for facing detection.");
+    let dataUrl;
+    if (typeof bufferOrUrl === "string") {
+        const resp = await fetch(bufferOrUrl);
+        if (!resp.ok) throw new Error(`Sprite fetch failed (${resp.status}).`);
+        dataUrl = `data:image/png;base64,${Buffer.from(await resp.arrayBuffer()).toString("base64")}`;
+    } else {
+        dataUrl = `data:image/png;base64,${bufferOrUrl.toString("base64")}`;
     }
+    // gpt-4o (not -mini) is markedly better at reading the facing of a 3/4-view figure. A short answer with a
+    // one-word instruction keeps it cheap. The prompt explicitly frames the 3/4 case so a slightly-angled
+    // body still resolves to the side it's turned toward.
+    const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+            model: "gpt-4o",
+            temperature: 0,
+            max_tokens: 5,
+            messages: [{ role: "user", content: [
+                { type: "text", text: "This is a small game character sprite, usually drawn at a 3/4 angle. Which side of the image is the FRONT of its body and face turned toward? If it's angled, pick the side its chest/nose points to. Answer with exactly one word: left or right." },
+                { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+            ] }],
+        }),
+    });
+    if (!resp.ok) throw new Error(`Facing detection request failed (${resp.status}).`);
+    const data = await resp.json().catch(() => null);
+    const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
+    if (answer.includes("left") && !answer.includes("right")) return "left";
+    if (answer.includes("right") && !answer.includes("left")) return "right";
+    return "unknown"; // a real but ambiguous answer — settle as no-flip; staff can override manually.
 }
 
 // Public: store a PNG buffer to Blob and return its URL (same convention as generateImage).
