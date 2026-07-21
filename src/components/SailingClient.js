@@ -114,14 +114,6 @@ function fmtLeft(ms) {
     return `${sec}s`;
 }
 
-function heatColor(h) {
-    if (h <= 0) return "#37f5c0";
-    if (h === 1) return "#ffe14a";
-    if (h === 2) return "#ff9f43";
-    return "#7a4a4a";
-}
-function heatLabel(h) { return h <= 0 ? "On it!" : h === 1 ? "Warm" : h === 2 ? "Near" : "Cold"; }
-
 function Stars({ level }) {
     const tier = Math.floor((level - 1) / 10) + 1;
     return <span className="sail-stars">{Array.from({ length: 5 }, (_, i) => <span key={i} className={i < tier ? "on" : "off"}>★</span>)}</span>;
@@ -204,28 +196,37 @@ export default function SailingClient({ initial, hero, pet }) {
                     /* ---------- Excavation dig minigame ---------- */
                     <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
                         <div className="dig-hud">
-                            <span className="dig-frag">🧩 Fragment {dig.fragmentExposed}/{dig.fragmentTotal}</span>
-                            <span className="dig-stam" title="Digs remaining">⚡ {dig.stamina}/{dig.maxStamina}</span>
+                            <span className="dig-frag">🧩 Relic {dig.fragmentExposed}/{dig.fragmentTotal}</span>
+                            <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina} digs</span>
                         </div>
                         <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / dig.maxStamina) * 100)}%` }} /></div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
-                            {dig.tiles.flatMap((row, r) => row.map((t, c) => (
-                                <button
-                                    key={`${r}-${c}`}
-                                    type="button"
-                                    className={`dig-tile${t.dug ? " is-dug" : ""}${t.exposed ? " is-exposed" : ""}`}
-                                    style={{ "--heat": heatColor(t.heat), "--depth": t.depth ?? 3 }}
-                                    disabled={busy || dig.status !== "active" || (t.dug && t.depth === 0)}
-                                    onClick={() => act("dig", { r, c })}
-                                    title={heatLabel(t.heat)}
-                                >
-                                    {t.exposed ? <span className="dig-glint">🧩</span>
-                                        : t.dug ? <span className="dig-depth">{t.depth === 0 ? "" : "·".repeat(t.depth)}</span>
-                                            : <span className="dig-mound" />}
-                                </button>
-                            )))}
+                            {dig.tiles.flatMap((row, r) => row.map((t, c) => {
+                                const maxD = t.maxDepth || 3;
+                                const bottomed = t.depth <= 0;
+                                const dugFrac = maxD ? (maxD - t.depth) / maxD : 0; // 0 = untouched mound … 1 = fully excavated
+                                return (
+                                    <button
+                                        key={`${r}-${c}`}
+                                        type="button"
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.exposed ? " is-exposed" : ""}${t.hint ? " is-hint" : ""}`}
+                                        style={{ "--dug": dugFrac, "--depth": t.depth }}
+                                        disabled={busy || dig.status !== "active" || bottomed}
+                                        onClick={() => act("dig", { r, c })}
+                                        title={bottomed ? (t.exposed ? "The relic!" : "Cleared to bedrock") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of soil`}
+                                    >
+                                        {t.exposed ? <span className="dig-glint">🧩</span>
+                                            : bottomed ? <span className="dig-pit" aria-hidden="true" />
+                                                : t.dug
+                                                    ? <span className="dig-layers" aria-hidden="true">{Array.from({ length: t.depth }, (_, i) => <i key={i} />)}</span>
+                                                    : <span className="dig-cap" aria-hidden="true" />}
+                                    </button>
+                                );
+                            }))}
                         </div>
-                        <p className="muted dig-tip">Follow the <b style={{ color: "#37f5c0" }}>green</b> tiles (the Augur reads hot/cold) and clear the dirt over the fragment before your digs run out.</p>
+                        <p className="dig-tip">{dig.struck
+                            ? <>You struck the relic! Follow the <b>glinting seam</b> — dig out the shimmering tiles for more fragments before your digs run out.</>
+                            : <>Dig blind through the soil. Somewhere a relic is buried — <b>break a tile to the bottom</b> to strike it, then follow the seam. Shallower mounds cost fewer digs.</>}</p>
                     </div>
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
@@ -335,9 +336,11 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-reward-overlay" onClick={() => setResult(null)}>
                     <div className="card sail-reward" onClick={(e) => e.stopPropagation()}>
                         {result.won ? <Confetti /> : null}
-                        <div className="sail-reward-emoji">{result.won ? "🧩" : "🪹"}</div>
-                        <h2 style={{ margin: "6px 0" }}>{result.won ? "Fragment recovered!" : "Came up empty"}</h2>
-                        <p className="muted" style={{ marginTop: 0 }}>{result.won ? `You now hold ${result.fragments} treasure-chest fragment${result.fragments === 1 ? "" : "s"}.` : "The fragment stayed buried. Sail out and try again."}</p>
+                        <div className="sail-reward-emoji">{result.won ? (result.earned >= result.total ? "🏆" : "🧩") : "🪹"}</div>
+                        <h2 style={{ margin: "6px 0" }}>{result.won ? (result.earned >= result.total ? "Whole relic unearthed!" : "Relic struck!") : "Came up empty"}</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>{result.won
+                            ? `You unearthed ${result.earned} fragment${result.earned === 1 ? "" : "s"} — ${result.fragments} in the hold now.`
+                            : "The relic stayed buried. Sail out and dig again."}</p>
                         <button className="sail-cta" onClick={() => setResult(null)}>{result.won ? "🎉 Nice" : "Try again"}</button>
                     </div>
                 </div>

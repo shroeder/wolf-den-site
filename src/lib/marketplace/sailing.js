@@ -20,10 +20,11 @@ export const MAX_LUCK_LEVEL = 12;
 export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
 
 // Dig board.
-const DIG_COLS = 6;
-const DIG_ROWS = 5;
-const BASE_STAMINA = 12;      // + luck level
-const FRAGMENT_SIZE = 3;      // adjacent tiles the buried fragment sits under
+const DIG_COLS = 5;
+const DIG_ROWS = 4;
+const DIG_MAX_DEPTH = 3;      // layers of soil over every tile — you dig straight down through them
+const BASE_STAMINA = 14;      // digs per voyage, + luck level
+const FRAGMENT_SIZE = 3;      // the buried relic is a connected cluster of this many tiles
 const XP_PER_DIG_WIN = 30;
 
 const BOAT_ART = { 1: "/images/sailing/boat-tier1-wood.png" };
@@ -66,54 +67,64 @@ function growCluster(rows, cols, size) {
 }
 
 function newBoard(luckLevel) {
-    const depth = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => 1 + randInt(3)));
+    // Every tile hides 1–DIG_MAX_DEPTH layers of soil. The relic gives NO tell — its tiles are depth-random like
+    // any other — so a tile's mound height only telegraphs how many digs it costs, never whether treasure's under
+    // it. There is deliberately no hot/cold heat map: you dig blind until you break a relic tile through to the
+    // bottom, and only THEN does the buried rest of the seam start to shimmer.
+    const depth = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => 1 + randInt(DIG_MAX_DEPTH)));
     const frag = growCluster(DIG_ROWS, DIG_COLS, FRAGMENT_SIZE);
-    // Chebyshev distance to the nearest fragment tile drives the Augur hot/cold reading.
-    const heat = Array.from({ length: DIG_ROWS }, (_, r) =>
-        Array.from({ length: DIG_COLS }, (_, c) => {
-            let d = 99;
-            for (const [fr, fc] of frag) d = Math.min(d, Math.max(Math.abs(fr - r), Math.abs(fc - c)));
-            return d;
-        })
-    );
     const dug = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => false));
     const stamina = digStamina(luckLevel);
-    return { cols: DIG_COLS, rows: DIG_ROWS, depth, frag, heat, dug, stamina, maxStamina: stamina, status: "active" };
+    return { cols: DIG_COLS, rows: DIG_ROWS, depth, maxDepth: DIG_MAX_DEPTH, frag, dug, stamina, maxStamina: stamina, status: "active" };
 }
 
-// Server-authoritative dig. Returns the mutated board.
+// Server-authoritative dig — removes one layer of soil from a tile. Returns the mutated board.
 function applyDig(board, r, c) {
     if (board.status !== "active" || board.stamina <= 0) return board;
     if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return board;
+    if (board.depth[r][c] <= 0) return board; // already excavated to the bottom — never wastes a dig
     board.stamina -= 1;
     board.dug[r][c] = true;
-    if (board.depth[r][c] > 0) board.depth[r][c] -= 1;
-    const exposed = board.frag.every(([fr, fc]) => board.depth[fr][fc] === 0);
-    if (exposed) board.status = "won";
-    else if (board.stamina <= 0) board.status = "lost";
+    board.depth[r][c] -= 1;
+    // You STRIKE the relic when a fragment tile breaks through to the bottom. The first strike already wins the
+    // dig; exposing the whole seam is optional greed (each exposed tile = one more fragment, see digAt).
+    const exposedCount = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+    if (exposedCount >= board.frag.length) board.status = "won"; // whole relic unearthed
+    else if (board.stamina <= 0) board.status = exposedCount >= 1 ? "won" : "lost";
     return board;
 }
 
-// The client-safe view of a board: reveals heat (the Augur) + depth of dug tiles only (undug depth stays a
-// gamble). Fragment tiles are flagged once fully exposed so the client can show the glint.
+// The client-safe view of a board. Reveals each tile's remaining soil depth (terrain height — gives no
+// treasure tell) so the ground can be drawn as excavated holes. A relic tile is flagged `exposed` once broken
+// to the bottom (the glint), and a still-buried relic tile is flagged `hint` (shimmer) ONLY once the seam has
+// been struck and it orthogonally touches an exposed piece — that's the "follow the vein" guidance.
+const ORTHO = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 function boardView(board) {
+    const maxDepth = board.maxDepth || DIG_MAX_DEPTH;
     const fragSet = new Set(board.frag.map(([r, c]) => `${r},${c}`));
+    const exposedFrag = new Set(board.frag.filter(([r, c]) => board.depth[r][c] === 0).map(([r, c]) => `${r},${c}`));
+    const struck = exposedFrag.size > 0;
     const tiles = [];
     for (let r = 0; r < board.rows; r++) {
         const row = [];
         for (let c = 0; c < board.cols; c++) {
             const isFrag = fragSet.has(`${r},${c}`);
+            const exposed = isFrag && board.depth[r][c] === 0;
+            let hint = false;
+            if (struck && isFrag && board.depth[r][c] > 0) {
+                for (const [dr, dc] of ORTHO) if (exposedFrag.has(`${r + dr},${c + dc}`)) { hint = true; break; }
+            }
             row.push({
-                heat: board.heat[r][c],                       // 0 = on it … higher = colder
+                depth: board.depth[r][c],   // layers of soil still on top (terrain height, not a treasure tell)
+                maxDepth,
                 dug: board.dug[r][c],
-                depth: board.dug[r][c] ? board.depth[r][c] : null,
-                exposed: isFrag && board.depth[r][c] === 0,
+                exposed,                    // relic tile broken to the bottom → glint
+                hint,                       // buried relic tile touching an exposed one → shimmer
             });
         }
         tiles.push(row);
     }
-    const exposedCount = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
-    return { cols: board.cols, rows: board.rows, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, tiles, fragmentTotal: board.frag.length, fragmentExposed: exposedCount };
+    return { cols: board.cols, rows: board.rows, maxDepth, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, struck, tiles, fragmentTotal: board.frag.length, fragmentExposed: exposedFrag.size };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -230,6 +241,14 @@ export async function rechargeWind(buyerId) {
     return { ok: true, spent: WIND_RECHARGE_COST, ...(await getSailingState(buyerId)) };
 }
 
+// Grant treasure-chest fragment(s) to a member (used by the Cheer first-of-day item proc). Upserts the sailing
+// row first, since a member may never have sailed.
+export async function grantFragment(buyerId, n = 1) {
+    if (!buyerId || n <= 0) return;
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    await db.query(`UPDATE mkt_sailing SET fragments = fragments + $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, n]).catch(() => {});
+}
+
 export async function beginDig(buyerId) {
     const row = await readRow(buyerId);
     const state = decorate(row);
@@ -246,18 +265,20 @@ export async function digAt(buyerId, r, c) {
     applyDig(board, Number(r), Number(c));
 
     if (board.status === "won" || board.status === "lost") {
-        const won = board.status === "won";
-        // Resolve: grant the fragment on a win, then clear the voyage + board so the boat is back at port.
+        // One fragment per relic tile you broke to the bottom: a single strike wins 1, unearthing the whole
+        // seam wins all 3. Then clear the voyage + board so the boat is back at port.
+        const earned = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+        const won = earned > 0;
         await db.query(
             `UPDATE mkt_sailing
                 SET dig_state = NULL, departed_at = NULL, returns_at = NULL,
                     fragments = fragments + $2, boat_xp = boat_xp + $3,
                     voyages_completed = voyages_completed + 1, updated_at = NOW()
               WHERE buyer_id = $1`,
-            [buyerId, won ? 1 : 0, won ? XP_PER_DIG_WIN : 0]
+            [buyerId, earned, won ? XP_PER_DIG_WIN : 0]
         ).catch(() => {});
         const state = await getSailingState(buyerId);
-        return { ok: true, result: { won, fragments: state.fragments }, ...state };
+        return { ok: true, result: { won, earned, total: board.frag.length, fragments: state.fragments }, ...state };
     }
 
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

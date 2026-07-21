@@ -10511,26 +10511,44 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-frag { color: #ffe9a8; } .dig-stam { color: #bfe9ff; }
 .dig-stambar { height: 7px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 6px 0 10px; }
 .dig-stambar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); transition: width 0.3s ease; }
-.dig-grid { display: grid; gap: 5px; }
-.dig-tile { aspect-ratio: 1; border: none; border-radius: 8px; cursor: pointer; position: relative;
-    /* darker = more dirt still on top (depth); undug tiles default to full depth */
-    background:
-        linear-gradient(rgba(0,0,0,calc(0.12 * var(--depth, 3))), rgba(0,0,0,calc(0.12 * var(--depth, 3)))),
-        radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--heat) 42%, #5a4632), #4a3626);
-    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.08);
-    outline: 2px solid color-mix(in srgb, var(--heat) 55%, transparent); outline-offset: -2px;
-    transition: transform 0.08s ease, filter 0.15s ease; color: #2a1d10; font-weight: 900; }
-.dig-tile:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.12); }
+.dig-grid { display: grid; gap: 6px; }
+/* Each tile is a plug of earth. As it's dug (--dug 0→1) the soil darkens and a hole recesses into it, so the
+   board reads as ground you're excavating straight down through — not a flat puzzle grid. */
+.dig-tile { aspect-ratio: 1; border: none; border-radius: 10px; cursor: pointer; position: relative; overflow: hidden;
+    background: radial-gradient(115% 120% at 50% 16%,
+        color-mix(in srgb, #7a5330 calc((1 - var(--dug, 0)) * 100%), #2a1a0f),
+        color-mix(in srgb, #4a3016 calc((1 - var(--dug, 0)) * 100%), #1c1109));
+    box-shadow:
+        inset 0 3px 0 rgba(255,255,255,calc(0.12 * (1 - var(--dug, 0)))),      /* sunlit crust on fresh ground */
+        inset 0 calc(-3px - var(--dug, 0) * 3px) 6px rgba(0,0,0,0.4),
+        inset 0 0 calc(var(--dug, 0) * 30px) rgba(0,0,0,calc(0.1 + var(--dug, 0) * 0.6)); /* the pit deepens */
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.08s ease, filter 0.15s ease; }
+.dig-tile:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.1); }
 .dig-tile:not(:disabled):active { transform: scale(0.94); }
 .dig-tile:disabled { cursor: default; }
-.dig-tile.is-dug { box-shadow: inset 0 0 12px rgba(0,0,0,0.5); }
-.dig-tile.is-exposed { background: radial-gradient(circle at 50% 45%, #ffe9a8, #e0a53c); outline-color: #ffd75e; animation: digGlint 1.4s ease-in-out infinite; }
-.dig-depth { font-size: 1.1rem; letter-spacing: 1px; color: rgba(255,255,255,0.55); }
-.dig-mound { position: absolute; inset: 22%; border-radius: 50% 50% 45% 45%; background: rgba(0,0,0,0.14); }
-.dig-glint { font-size: 1.2rem; filter: drop-shadow(0 0 6px #ffd75e); }
-.dig-tip { margin: 10px 2px 2px; font-size: 0.8rem; }
-@keyframes digGlint { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
-@media (prefers-reduced-motion: reduce) { .dig-tile.is-exposed { animation: none; } }
+/* Untouched ground: a raised, slightly domed sod cap with a couple of embedded pebbles. */
+.dig-cap { position: absolute; inset: 9%; border-radius: 42% 42% 48% 48% / 55% 55% 45% 45%;
+    background: linear-gradient(#835b37, #593c22); box-shadow: inset 0 3px 0 rgba(255,255,255,0.16), inset 0 -6px 9px rgba(0,0,0,0.4); }
+.dig-cap::before, .dig-cap::after { content: ""; position: absolute; border-radius: 50%; background: rgba(0,0,0,0.28); box-shadow: 0 1px 0 rgba(255,255,255,0.08); }
+.dig-cap::before { width: 17%; height: 17%; top: 26%; left: 24%; }
+.dig-cap::after { width: 12%; height: 12%; top: 54%; left: 62%; }
+/* Remaining soil layers on a half-dug hole — little strata bars, one per layer still to clear. */
+.dig-layers { position: absolute; left: 14%; right: 14%; bottom: 16%; display: flex; flex-direction: column-reverse; gap: 3px; }
+.dig-layers i { height: 3px; border-radius: 2px; background: rgba(255,232,190,0.5); box-shadow: 0 1px 0 rgba(0,0,0,0.45); }
+/* Fully cleared empty tile — a dark little pit dug to bedrock. */
+.dig-pit { position: absolute; inset: 28%; border-radius: 46%; background: radial-gradient(circle at 50% 38%, rgba(0,0,0,0.35), rgba(0,0,0,0.7)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.7); }
+/* Struck relic — a golden fragment glinting at the bottom of the hole. */
+.dig-tile.is-exposed { background: radial-gradient(circle at 50% 44%, #ffe9a8, #b9791f); }
+.dig-glint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.35rem; filter: drop-shadow(0 0 7px #ffd75e); animation: digGlint 1.3s ease-in-out infinite; }
+/* Follow-the-vein shimmer — a buried relic tile next to one you've already struck. */
+.dig-tile.is-hint { animation: digHint 1.15s ease-in-out infinite; }
+.dig-glint, .dig-cap, .dig-layers, .dig-pit { pointer-events: none; }
+.dig-tip { margin: 12px 0 2px; font-size: 0.82rem; line-height: 1.4; color: #f2e8d6;
+    background: rgba(12,16,24,0.74); padding: 9px 12px; border-radius: 10px; }
+.dig-tip b { color: #ffd75e; }
+@keyframes digGlint { 0%,100% { filter: brightness(1) drop-shadow(0 0 6px #ffd75e); } 50% { filter: brightness(1.28) drop-shadow(0 0 13px #ffd75e); } }
+@keyframes digHint { 0%,100% { box-shadow: inset 0 0 0 2px rgba(255,215,94,0.25), 0 0 0 0 rgba(255,215,94,0); } 50% { box-shadow: inset 0 0 0 2px rgba(255,215,94,0.9), 0 0 11px 2px rgba(255,215,94,0.55); } }
+@media (prefers-reduced-motion: reduce) { .dig-tile.is-exposed .dig-glint, .dig-tile.is-hint { animation: none; } }
 
 /* ===== Sailing: dopamine (CTA, land-ho, confetti) ===== */
 .sail-cta { position: relative; display: inline-flex; align-items: center; gap: 11px; font-weight: 900; font-size: 1.24rem;
