@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { COLLECTIBLES, collectibleById } from "@/lib/marketplace/collectibles.js";
 import { faceBufferRight, generateImage, storePng, detectFacing } from "@/lib/marketplace/openai-image.js";
 
 // Each pet gets ONE shared 2D battle sprite (not per-member) so the member's active pet can fight beside
@@ -147,6 +147,24 @@ export async function getPetSpriteLevelData() {
         out[r.pet_id][r.level] = { url: r.url, flip: r.flip === true };
     }
     return out;
+}
+
+// Full sprite set for ONE pet (admin drill-in): the base (Lv1) plus every evolved Lv2–5 sprite it has,
+// each with its own flip flag. Missing levels come back with url:null so the UI can show a gap.
+export async function petSpriteSet(petId) {
+    const id = String(petId || "").trim();
+    if (!id) return { petId: id, name: id, rarity: null, levels: [] };
+    const def = collectibleById(id);
+    const [base, evo] = await Promise.all([
+        db.queryOne(`SELECT url, flip FROM mkt_pet_sprite WHERE pet_id = $1`, [id]).catch(() => null),
+        db.query(`SELECT level, url, flip FROM mkt_pet_sprite_level WHERE pet_id = $1`, [id]).catch(() => []),
+    ]);
+    const byLevel = new Map((evo || []).map((r) => [Number(r.level), r]));
+    const levels = [1, 2, 3, 4, 5].map((n) => {
+        const row = n === 1 ? base : byLevel.get(n);
+        return { level: n, url: row?.url || null, flip: row?.flip === true };
+    });
+    return { petId: id, name: def?.name || id, rarity: def?.rarity || null, levels };
 }
 
 // Pure: given a pet's base sprite ({url,flip}) + its level map, pick the art for `level` — the highest

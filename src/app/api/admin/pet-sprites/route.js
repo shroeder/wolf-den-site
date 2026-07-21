@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { fixPetSpriteOrientations, generateMissingPetSprites, generatePetSprite, petSpriteStatus, setPetSpriteFlip, detectPetSpriteFacings, generateMissingPetSpriteLevels, generatePetSpriteLevel, setPetSpriteLevelFlip, detectPetSpriteLevelFacings, petSpriteLevelStatus } from "@/lib/marketplace/pet-sprite.js";
+import { fixPetSpriteOrientations, generateMissingPetSprites, generatePetSprite, petSpriteStatus, setPetSpriteFlip, detectPetSpriteFacings, generateMissingPetSpriteLevels, generatePetSpriteLevel, setPetSpriteLevelFlip, detectPetSpriteLevelFacings, petSpriteLevelStatus, petSpriteSet } from "@/lib/marketplace/pet-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -18,9 +18,10 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            // ?levels=1 → the per-level (Lv2–5) evolution status; default → the base (Lv1) status.
-            const wantLevels = new URL(request.url).searchParams.get("levels");
-            return noStore(wantLevels ? await petSpriteLevelStatus() : await petSpriteStatus());
+            const params = new URL(request.url).searchParams;
+            // ?pet=<id> → all 5 sprite levels for one pet (drill-in); ?levels=1 → per-level status; else base.
+            if (params.get("pet")) return noStore(await petSpriteSet(params.get("pet")));
+            return noStore(params.get("levels") ? await petSpriteLevelStatus() : await petSpriteStatus());
         } catch (error) {
             return internalError(error, { event: "admin.pet_sprites.status.failure" });
         }
