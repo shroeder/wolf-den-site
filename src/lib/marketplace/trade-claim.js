@@ -4,25 +4,20 @@ import { randomBytes } from "node:crypto";
 
 import { db } from "@/lib/db";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { PAYOUT_REWARD_RATE } from "@/lib/marketplace/reward-rates.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 // Trade rewards. A recorded trade mints a single-use claim (QR) the customer scans to bank XP + record
 // the trade to their account (driving trade badges). One claim per trade; 24h TTL.
 const DEFAULT_TTL_MINUTES = 24 * 60;
 
-// XP for a trade (Luke's formula): a flat bit for the trade itself, mostly driven by the single most
-// valuable card traded in, plus a slight amount on the overall trade size. Tune the constants freely.
-const TRADE_XP_FLAT = 20;
-const TRADE_XP_PER_TOP_DOLLAR = 1; // highest-value card is the main driver
-const TRADE_XP_PER_TOTAL_DOLLAR = 0.15; // trade size is a slight nudge
+// XP for a trade: deliberately modest — trades aren't something we want to heavily incentivize (we pay the
+// customer for the deal). Reward is ONE FIFTH of the trade's total value in XP, and NO gold (see
+// redeemTradeClaim). Real purchases and donations are what earn gold.
+const TRADE_XP_VALUE_FRACTION = 1 / 5;
 
 export function tradeXp({ topCardValueCents = 0, totalValueCents = 0 } = {}) {
-    const top = Math.max(0, Math.round((Number(topCardValueCents) || 0) / 100));
     const total = Math.max(0, Math.round((Number(totalValueCents) || 0) / 100));
-    // A trade is a payout, so the value-driven portion rewards at the discounted rate (flat bit unaffected).
-    const value = top * TRADE_XP_PER_TOP_DOLLAR + total * TRADE_XP_PER_TOTAL_DOLLAR;
-    return TRADE_XP_FLAT + Math.round(value * PAYOUT_REWARD_RATE);
+    return Math.round(total * TRADE_XP_VALUE_FRACTION);
 }
 
 // Compute the reward-relevant stats from a trade's lines. IN lines = cards the customer traded in.
@@ -98,7 +93,8 @@ export async function redeemTradeClaim(token, buyerId) {
 
     const c = won[0];
     const xp = tradeXp({ topCardValueCents: c.top_card_value_cents, totalValueCents: c.total_value_cents });
-    await awardXp(buyerId, "trade", { points: xp, dedupeKey: `trade:${c.trade_id}`, meta: { tradeId: c.trade_id } });
+    // Trades award XP ONLY — no gold (we already paid the customer for the deal).
+    await awardXp(buyerId, "trade", { points: xp, gold: 0, dedupeKey: `trade:${c.trade_id}`, meta: { tradeId: c.trade_id } });
     await db.query(`UPDATE mkt_trade_claim SET xp_awarded = $2 WHERE token = $1`, [token, xp]).catch(() => {});
     const newBadges = await syncEarnedBadges(buyerId).catch(() => []);
     return { ok: true, xp, cardCount: c.card_count, newBadges: newBadges.map((b) => ({ slug: b.slug, label: b.label, icon: b.icon })) };

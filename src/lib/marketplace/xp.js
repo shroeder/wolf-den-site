@@ -101,12 +101,17 @@ export function levelForXp(totalXp) {
 // no user / zero points / any error).
 //   dedupeKey — enforces once-per-entity via the unique index (e.g. once/card, once/day).
 //   dailyCap  — at most this many awards of this action per user per (UTC) day.
-export async function awardXp(buyerId, action, { points = null, dedupeKey = null, dailyCap = null, meta = null } = {}) {
+export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null } = {}) {
     if (!buyerId) return null;
     const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
     if (base <= 0) return null;
-    // Happy Hour multiplies all XP (which cascades to the 1:1 gold + the equipped pet's 25% share below).
-    const pts = Math.round(base * (await activeXpMultiplier().catch(() => 1)));
+    // Happy Hour multiplies all XP (which cascades to the gold + the equipped pet's 25% share below).
+    const mult = await activeXpMultiplier().catch(() => 1);
+    const pts = Math.round(base * mult);
+    // Gold is UNLINKED from XP: by default it still tracks XP 1:1 (purchases, donations, boss, quests…), but a
+    // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
+    // spendable currency for a payout we already paid the customer for.
+    const goldDelta = gold === undefined ? pts : Math.max(0, Math.round(Number(gold) * mult));
 
     // Per-action daily cap: if the user already hit today's limit for this action, skip.
     if (dailyCap != null && dailyCap > 0) {
@@ -131,8 +136,8 @@ export async function awardXp(buyerId, action, { points = null, dedupeKey = null
         return null; // deduped (or a transient error) — never break the caller
     }
     try {
-        // Gold accrues 1:1 with XP (spendable currency for the item shop; doesn't affect level).
-        const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts]);
+        // XP always advances the level; gold accrues separately (goldDelta) so payouts can give none.
+        const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts, goldDelta]);
         // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).
         if (row) {
             const newXp = Number(row.xp) || 0;
