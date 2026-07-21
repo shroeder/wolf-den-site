@@ -17,12 +17,14 @@ export const CHEST_TIERS = {
     wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 72, rare: 25, epic: 3 } },
     iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 44, rare: 40, epic: 14, legendary: 2 } },
     gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 40, epic: 42, legendary: 16, mythic: 2 } },
-    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { epic: 46, legendary: 40, mythic: 13, ascendant: 1 } },
-    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { legendary: 48, mythic: 39, ascendant: 12, eternal: 1 } },
-    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { mythic: 54, ascendant: 38, eternal: 8 } },
-    // The two rarest chests — the best odds at top gear (still never a guarantee) + the best relic shot.
-    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { mythic: 40, ascendant: 46, eternal: 14 } },
-    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { mythic: 12, ascendant: 58, eternal: 30 } },
+    // Top tiers span 5 rarities each, with the curve ANCHORED to the low end — most drops are the ordinary
+    // gear in range and the top rarities are a rare thrill. Higher chests just nudge more weight upward.
+    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { rare: 10, epic: 42, legendary: 34, mythic: 13, ascendant: 1 } },
+    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { epic: 34, legendary: 36, mythic: 22, ascendant: 7, eternal: 1 } },
+    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { epic: 30, legendary: 34, mythic: 24, ascendant: 9, eternal: 3 } },
+    // The two rarest chests — a slightly richer tail (still bottom-anchored) + the best relic shot.
+    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { epic: 24, legendary: 32, mythic: 28, ascendant: 12, eternal: 4 } },
+    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { epic: 18, legendary: 30, mythic: 30, ascendant: 16, eternal: 6 } },
 };
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
