@@ -156,7 +156,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             {busy ? "Casting off…" : `⛵ Set sail · ${(state.voyageMs / 1000).toFixed(0)}s to the island`}
                         </button>
                     )}
-                    {liveStatus === "sailing" && <button className="pill" disabled>⏳ At sea · {fmtLeft(arrivesAt - now)}</button>}
+                    {liveStatus === "sailing" && (
+                        <>
+                            <button className="pill" disabled>⏳ At sea · {fmtLeft(arrivesAt - now)}</button>
+                            {state.windAvailable
+                                ? <button className="btn-ghost" disabled={busy} onClick={() => act("wind")}>🌬️ Favorable winds · −1h</button>
+                                : <button className="pill" disabled>🌬️ Winds used today</button>}
+                        </>
+                    )}
                     {liveStatus === "arrived" && (
                         <button className="btn-gold" disabled={busy} onClick={() => act("begin_dig")}>{busy ? "Landing…" : "⛏️ Begin excavation"}</button>
                     )}

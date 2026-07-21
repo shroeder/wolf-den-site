@@ -10486,7 +10486,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-stars .on { color: #ffd75e; } .sail-stars .off { color: #40485a; }
 .sail-xpbar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .sail-xpbar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); border-radius: 999px; transition: width 0.4s ease; }
-.sail-actions { margin-top: 14px; display: flex; justify-content: center; }
+.sail-actions { margin-top: 14px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .sail-actions > button { font-size: 1rem; }
 
 .sail-upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

@@ -146,12 +146,20 @@ function decorate(row) {
         voyageMs: voyageDurationMs(speedLevel),
         digStamina: digStamina(luckLevel),
         status, progress, departedAt, arrivesAt,
+        // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
+        windAvailable: status === "sailing" && !row?.wind_used_today,
         dig: status === "digging" ? boardView(dig) : null,
     };
 }
 
 async function readRow(buyerId) {
-    return db.queryOne(`SELECT * FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    // Compute "did they already use today's favorable-winds boost" in SQL (store-local day) to sidestep the
+    // JS-Date-from-a-DATE-column timezone trap.
+    return db.queryOne(
+        `SELECT *, (wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wind_used_today
+           FROM mkt_sailing WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
 }
 
 export async function getSailingState(buyerId) {
@@ -172,6 +180,23 @@ export async function startVoyage(buyerId) {
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval, dig_state = NULL, updated_at = NOW()`,
         [buyerId, String(ms)]
     ).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// Once-a-day favorable winds: shave an hour off the remaining voyage (clamped so it can only reach "arrived",
+// never overshoot). Atomic — the WHERE enforces once-per-store-day and that a voyage is actually in progress.
+export async function favorableWind(buyerId) {
+    const updated = await db.queryOne(
+        `UPDATE mkt_sailing
+            SET returns_at = GREATEST(NOW(), returns_at - interval '1 hour'),
+                wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
+          WHERE buyer_id = $1 AND dig_state IS NULL
+            AND returns_at IS NOT NULL AND returns_at > NOW()
+            AND wind_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date
+          RETURNING returns_at`,
+        [buyerId]
+    ).catch(() => null);
+    if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
