@@ -3,7 +3,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GiSpikedDragonHead } from "react-icons/gi";
 
-import MemberHeroCard from "@/components/MemberHeroCard";
+import AvatarStack from "@/components/AvatarStack";
+import CardTab from "@/components/CardTab";
+import UserBadges from "@/components/UserBadges";
+import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
+import { frameClass } from "@/lib/marketplace/frames.js";
+import { rankForLevel } from "@/lib/marketplace/ranks.js";
+
+// The on-stage identity card for whoever is currently attacking. Painted STATICALLY in the top-left of the
+// stage (it doesn't ride the moving sprite) so the words hold still and are readable, fading in as each new
+// hero takes their turn. Renders the member's FULL configured look on a solid, opaque backplate: their
+// equipped profile background (the crosshatch/hue plate), card frame, avatar with its border + cosmetics,
+// featured "folder tab" badge, rank + level, and showcased badges.
+function BattleHeroCard({ f }) {
+    const rank = rankForLevel(f.level || 1);
+    const initial = (f.displayLabel || f.name || "?").slice(0, 1).toUpperCase();
+    return (
+        <div className={`bhc ${f.background ? `has-bg ${backgroundClass(f.background)}` : ""} ${frameClass(f.frame)} ${f.you ? "is-you" : ""}`.replace(/\s+/g, " ").trim()}>
+            <CardTab badge={f.featuredBadge} compact />
+            <div className="bhc-inner">
+                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={38} border={f.border} cosmetics={f.avatarCosmetics} />
+                <div className="bhc-body">
+                    <div className="bhc-name">{f.you ? "You" : (f.displayLabel || f.name)}</div>
+                    <div className="bhc-meta">
+                        <span className="rank-chip rank-chip-sm">{rank.emoji} {rank.title}</span>
+                        <span className="bhc-lv">Lv {f.level || 1}{f.petLevel ? ` · 🐾 ${f.petLevel}` : ""}</span>
+                    </div>
+                    {f.displayBadges?.length ? <UserBadges badges={f.displayBadges} /> : null}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // The 2D side-scrolling battle stage. Instead of cramming the whole (now large) pack on-screen, adventurers
 // take turns: a GROUP of 3 marches in from the left, attacks the boss with a random flourish, then marches
@@ -53,6 +84,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
         const f = roster[wave % roster.length];
         return f ? [{ ...f, key: `${wave}-${f.id || wave}` }] : [];
     }, [wave, roster]);
+    const current = party[0] || null; // the hero whose identity card is shown top-left this beat
 
     // Ambient impact glints on the boss so its continuous passive damage reads as landing.
     const [sparks, setSparks] = useState([]);
@@ -92,16 +124,14 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                         <span className="battle-buff-mult">×{boss.buff.damageMult}</span>
                     </div>
                 ) : null}
-                {boss.weakness ? (
-                    <div className={`battle-weakness${youElement?.matches > 0 ? " has-bonus" : ""}`} title={boss.weakness.desc}>
-                        <span className="battle-buff-emoji">{boss.weakness.emoji}</span>
-                        <span className="battle-buff-label">
-                            Weak: {boss.weakness.label}
-                            {youElement ? (youElement.matches > 0 ? ` · your +${youElement.bonusPct}%` : " · equip it for a bonus") : ""}
-                        </span>
-                    </div>
-                ) : null}
             </div>
+
+            {/* Static, readable identity card for the current attacker — top-left, fades in per hero. */}
+            {current && !current.pad ? (
+                <div className="bhc-slot" key={current.id}>
+                    <BattleHeroCard f={current} />
+                </div>
+            ) : null}
 
             <div className={`battle-boss${bossHit ? " is-hit" : ""}`}>
                 {boss.imageUrl ? (
@@ -121,21 +151,6 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             <div className={`battle-party party-${phase}`}>
                 {party.map((f) => {
                     const glow = AURA_COL[f.aura] || BORDER_COL[f.border] || null;
-                    // The member's full hero card — their configured avatar (border + cosmetics), frame,
-                    // featured "folder tab" badge, showcased badge row, rank chip, level and featured pet —
-                    // floated above them so their whole configured look reads on stage.
-                    const member = !f.pad ? {
-                        displayLabel: f.displayLabel || f.name,
-                        alias: f.alias,
-                        level: f.level || 1,
-                        avatarUrl: f.avatarUrl,
-                        border: f.border || "none",
-                        avatarCosmetics: f.avatarCosmetics,
-                        frame: f.frame || "none",
-                        featuredBadge: f.featuredBadge,
-                        displayBadges: f.displayBadges,
-                        featuredCollectibleId: f.featuredCollectibleId,
-                    } : null;
                     return (
                         <div
                             key={f.key}
@@ -145,13 +160,6 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                             {/* adv-body = the shared march-in/out travel; hero + pet ride it in together but each
                                 has its OWN gait + attack timing so they're not glued at the hip. */}
                             <div className="adv-body">
-                                {/* Full hero card, above the hero. */}
-                                {member ? (
-                                    <div className={`adv-herocard${f.you ? " is-you" : ""}`}>
-                                        <MemberHeroCard member={member} />
-                                        {f.petLevel ? <span className="adv-herocard-pet">🐾 Lv {f.petLevel}</span> : null}
-                                    </div>
-                                ) : null}
                                 {glow ? <span className={`adv-aura${f.border ? " has-border" : ""}`} /> : null}
                                 {/* The companion pet — walks in its own trot and strikes AFTER its owner. */}
                                 {f.petSpriteUrl ? (

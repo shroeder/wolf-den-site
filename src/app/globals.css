@@ -9303,12 +9303,23 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Hero card — name + level + pet level while they're on stage. */
 /* The member's FULL hero card, floated above the hero (the whole configured look — avatar+border+
    cosmetics, frame, folder-tab badge, showcased badges, rank + level). Scaled down to sit on stage. */
-.adv-herocard { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%) scale(0.58); transform-origin: bottom center; width: min(220px, 60vw); pointer-events: none; z-index: 8; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)); }
-/* Solid backing so the card reads as a real plate (the base hero-card bg is near-transparent) and a tighter
-   pad so it stays compact over the stage instead of covering the HUD text. */
-.adv-herocard .hero-card { width: 100%; padding: 8px 9px; background: rgba(10,11,16,0.94); border-color: rgba(255,215,94,0.4); backdrop-filter: blur(2px); }
-.adv-herocard-pet { display: block; margin: 5px auto 0; width: max-content; padding: 2px 10px; border-radius: 999px; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,215,94,0.45); color: #ffcf7a; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 1px 2px #000; }
-.adv-herocard.is-you { filter: drop-shadow(0 0 12px rgba(255,215,94,0.65)) drop-shadow(0 6px 14px rgba(0,0,0,0.6)); }
+/* Static top-left identity card for the current attacker — fades in per hero, holds still so it's readable.
+   Everyone gets a SOLID plate; members with an equipped profile background show it (crosshatch/hue) under a
+   lighter scrim so their configured backplate reads. */
+.bhc-slot { position: absolute; top: 8px; left: 8px; z-index: 9; pointer-events: none; max-width: min(168px, 48vw); animation: bhcIn 0.4s ease both; }
+@keyframes bhcIn { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+.bhc { position: relative; border-radius: 12px; }
+.bhc-inner { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 12px;
+    background: rgba(10, 11, 16, 0.9); box-shadow: 0 4px 14px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08); }
+.bhc.has-bg .bhc-inner { background: rgba(6, 7, 11, 0.44); box-shadow: 0 4px 14px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.14); }
+.bhc-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bhc-name { font-weight: 800; font-size: 0.82rem; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 108px; }
+.bhc-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.bhc-lv { font-size: 0.68rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; }
+.bhc .user-badges { margin-top: 1px; gap: 3px; }
+.bhc .user-badge { font-size: 0.56rem; padding: 1px 5px; }
+.bhc.is-you .bhc-inner { box-shadow: 0 0 0 1px rgba(255,215,94,0.6) inset, 0 4px 14px rgba(0,0,0,0.6); }
+@media (prefers-reduced-motion: reduce) { .bhc-slot { animation: none; } }
 .adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
 
