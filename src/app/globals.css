@@ -10495,3 +10495,30 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-reward-lvl { color: #37f5c0; font-weight: 700; margin: 4px 0; }
 @keyframes sailPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .sail-boat { animation: none !important; } }
+
+/* ===== Sailing: excavation dig minigame ===== */
+.dig-wrap { position: relative; border-radius: 14px; overflow: hidden; padding: 12px; background-size: cover; background-position: center; box-shadow: inset 0 0 70px rgba(0,0,0,0.5); }
+.dig-hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+.dig-frag { color: #ffe9a8; } .dig-stam { color: #bfe9ff; }
+.dig-stambar { height: 7px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 6px 0 10px; }
+.dig-stambar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); transition: width 0.3s ease; }
+.dig-grid { display: grid; gap: 5px; }
+.dig-tile { aspect-ratio: 1; border: none; border-radius: 8px; cursor: pointer; position: relative;
+    /* darker = more dirt still on top (depth); undug tiles default to full depth */
+    background:
+        linear-gradient(rgba(0,0,0,calc(0.12 * var(--depth, 3))), rgba(0,0,0,calc(0.12 * var(--depth, 3)))),
+        radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--heat) 42%, #5a4632), #4a3626);
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.35), inset 0 2px 0 rgba(255,255,255,0.08);
+    outline: 2px solid color-mix(in srgb, var(--heat) 55%, transparent); outline-offset: -2px;
+    transition: transform 0.08s ease, filter 0.15s ease; color: #2a1d10; font-weight: 900; }
+.dig-tile:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.12); }
+.dig-tile:not(:disabled):active { transform: scale(0.94); }
+.dig-tile:disabled { cursor: default; }
+.dig-tile.is-dug { box-shadow: inset 0 0 12px rgba(0,0,0,0.5); }
+.dig-tile.is-exposed { background: radial-gradient(circle at 50% 45%, #ffe9a8, #e0a53c); outline-color: #ffd75e; animation: digGlint 1.4s ease-in-out infinite; }
+.dig-depth { font-size: 1.1rem; letter-spacing: 1px; color: rgba(255,255,255,0.55); }
+.dig-mound { position: absolute; inset: 22%; border-radius: 50% 50% 45% 45%; background: rgba(0,0,0,0.14); }
+.dig-glint { font-size: 1.2rem; filter: drop-shadow(0 0 6px #ffd75e); }
+.dig-tip { margin: 10px 2px 2px; font-size: 0.8rem; }
+@keyframes digGlint { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+@media (prefers-reduced-motion: reduce) { .dig-tile.is-exposed { animation: none; } }
