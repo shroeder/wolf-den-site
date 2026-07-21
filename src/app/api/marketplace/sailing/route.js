@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, upgradeSpeed, upgradeLuck, forgeChest } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, buyDigs, upgradeSpeed, upgradeLuck, forgeChest } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -44,6 +44,7 @@ export async function POST(request) {
                 case "recharge_wind": return noStore(await rechargeWind(g.buyer.id));
                 case "begin_dig": return noStore(await beginDig(g.buyer.id));
                 case "dig": return noStore(await digAt(g.buyer.id, body.r, body.c));
+                case "buy_digs": return noStore(await buyDigs(g.buyer.id));
                 case "upgrade_speed": return noStore(await upgradeSpeed(g.buyer.id));
                 case "upgrade_luck": return noStore(await upgradeLuck(g.buyer.id));
                 case "forge_chest": return noStore(await forgeChest(g.buyer.id));

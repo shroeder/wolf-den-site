@@ -10614,7 +10614,18 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-recap-chest { margin: 6px 0 12px; display: grid; gap: 5px; }
 .sail-forge-btn { width: 100%; justify-content: center; font-size: 0.98rem; margin-top: 4px; }
 .sail-forge-chest { font-size: 3.6rem; display: inline-block; filter: drop-shadow(0 0 18px rgba(255,215,94,0.75)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
-@media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock, .sail-forge-chest { animation: none; } }
+/* Boat level-up ribbon inside the dig recap. */
+.sail-levelup-ribbon { margin: -2px 0 10px; padding: 9px 12px; border-radius: 11px; font-weight: 900; font-size: 1rem; color: #3a2600;
+    background: linear-gradient(135deg, #fff3c4, #ffcf4a 55%, #f5a623);
+    box-shadow: 0 5px 16px rgba(255,180,60,0.55), inset 0 1px 0 rgba(255,255,255,0.75);
+    animation: sailLevelRibbon 0.6s cubic-bezier(0.2,1.3,0.4,1) both; }
+@keyframes sailLevelRibbon { 0% { opacity: 0; transform: scale(0.6) translateY(-8px); } 60% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+/* Buy-more-digs button under the excavation grid — a stone palette so it reads as a dig tool, not the gold CTA. */
+.sail-digbuy { width: 100%; justify-content: center; margin-top: 10px; font-size: 0.95rem; animation: none;
+    background: linear-gradient(135deg, #cdd6e0, #93a2b4 55%, #6b7a8d); color: #17202b;
+    box-shadow: 0 5px 0 #495666, 0 10px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6); }
+.sail-digbuy:not(:disabled):active { transform: translateY(4px); box-shadow: 0 1px 0 #495666, 0 4px 10px rgba(0,0,0,0.3); }
+@media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock, .sail-forge-chest, .sail-levelup-ribbon { animation: none; } }
 
 /* ===== Sailing: dopamine (CTA, land-ho, confetti) ===== */
 .sail-cta { position: relative; display: inline-flex; align-items: center; gap: 11px; font-weight: 900; font-size: 1.24rem;

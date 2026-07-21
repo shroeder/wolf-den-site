@@ -31,6 +31,8 @@ const DIG_MAX_DEPTH = 3;      // layers of rock over every tile — you chip str
 const BASE_STAMINA = 12;      // digs per voyage, + luck level
 const FRAGMENTS_BURIED = 3;   // individual fragments scattered through the rock (no clusters, no pointer)
 const XP_PER_DIG_WIN = 30;
+const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
+const DIG_REFILL_COST = 300;  // gold per refill (plain const — zero it for testing if you like)
 
 const BOAT_ART = { 1: "/images/sailing/boat-tier1-wood.png" };
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
@@ -138,6 +140,7 @@ function decorate(row) {
         fragments: row?.fragments || 0,
         fragmentsPerChest: FRAGMENTS_PER_CHEST,
         chestReward: { tier: CHEST_FROM_FRAGMENTS, label: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.label || "Chest", emoji: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.emoji || "🎁" },
+        digRefill: { amount: DIG_REFILL, cost: DIG_REFILL_COST },
         speed: { level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL },
         luck: { level: luckLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL },
         voyageMs: voyageDurationMs(speedLevel),
@@ -243,6 +246,21 @@ export async function forgeChest(buyerId) {
     await addChests(buyerId, { [CHEST_FROM_FRAGMENTS]: 1 }).catch(() => {});
     const tier = CHEST_TIERS[CHEST_FROM_FRAGMENTS];
     return { ok: true, forged: { tier: CHEST_FROM_FRAGMENTS, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁" }, ...(await getSailingState(buyerId)) };
+}
+
+// Buy DIG_REFILL more digs for the active excavation with gold. Atomic gold spend; only valid mid-dig.
+export async function buyDigs(buyerId) {
+    const row = await readRow(buyerId);
+    const board = row?.dig_state;
+    if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
+    if (DIG_REFILL_COST > 0) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, DIG_REFILL_COST]).catch(() => null);
+        if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    }
+    board.stamina += DIG_REFILL;
+    board.maxStamina += DIG_REFILL;
+    await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
+    return { ok: true, spent: DIG_REFILL_COST, ...(await getSailingState(buyerId)) };
 }
 
 export async function beginDig(buyerId) {

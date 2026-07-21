@@ -63,6 +63,11 @@ const sfx = {
     arrive() { [523, 659, 784].forEach((f, i) => tone(f, i * 0.12, 0.55, { type: "sine", gain: 0.16 })); },
     dig() { tone(110, 0, 0.09, { type: "square", gain: 0.12 }); tone(240, 0.015, 0.06, { type: "sawtooth", gain: 0.06 }); },
     win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.1, 0.5, { type: "triangle", gain: 0.16 })); },
+    // Boat level-up: a bigger triumphant rising fanfare that ends on a held chord.
+    levelUp() {
+        [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.09, 0.5, { type: "triangle", gain: 0.17 }));
+        [784, 1047].forEach((f) => tone(f, 0.46, 0.7, { type: "sine", gain: 0.13 }));
+    },
     fail() { tone(300, 0, 0.22, { type: "sawtooth", gain: 0.1 }); tone(170, 0.12, 0.4, { type: "sawtooth", gain: 0.1 }); },
 };
 
@@ -134,6 +139,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
     const [forge, setForge] = useState(null); // the chest just forged from fragments
+    const [levelUp, setLevelUp] = useState(null); // the new level, when a dig levels the boat up
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [now, setNow] = useState(Date.now);
@@ -179,6 +185,7 @@ export default function SailingClient({ initial, hero, pet }) {
             setTimeout(() => setCelebrate((c) => (c === "gust" ? null : c)), 2400);
         }
         if (action === "dig" || action === "begin_dig") sfx.dig();
+        const prevLevel = stateRef.current?.level || 0;
         try {
             const r = await fetch("/api/marketplace/sailing", {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }),
@@ -186,7 +193,9 @@ export default function SailingClient({ initial, hero, pet }) {
             const d = await r.json().catch(() => ({}));
             if (d && !d.error) {
                 setState(d);
-                if (d.result) { d.result.won ? sfx.win() : sfx.fail(); setResult(d.result); }
+                const leveled = d.level > prevLevel;
+                if (d.result) { d.result.won ? (leveled ? sfx.levelUp() : sfx.win()) : sfx.fail(); setResult(d.result); }
+                if (leveled) { if (!d.result) sfx.levelUp(); setLevelUp(d.level); }
                 if (d.forged) { sfx.win(); setForge(d.forged); }
             }
         } finally { setBusy(false); }
@@ -246,6 +255,15 @@ export default function SailingClient({ initial, hero, pet }) {
                             }))}
                         </div>
                         <p className="dig-tip">Chip through the rock. <b>{dig.buried} fragments</b> are buried under this ground — dig a tile all the way to the bottom to find out what it hides. Shallower rock costs fewer swings, so spend your <b>{dig.stamina} digs</b> wisely.</p>
+                        {dig.status === "active" ? (
+                            <button
+                                className="sail-cta sail-digbuy"
+                                disabled={busy || ((state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0))}
+                                onClick={() => act("buy_digs")}
+                            >
+                                ⛏️ Buy +{state.digRefill?.amount ?? 5} digs{(state.digRefill?.cost ?? 0) > 0 ? ` · 🪙 ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
+                            </button>
+                        ) : null}
                     </div>
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
@@ -374,6 +392,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap">
                         {result.won ? <Confetti /> : null}
+                        {levelUp ? <div className="sail-levelup-ribbon">⬆️ Boat leveled up — Lv {levelUp}!</div> : null}
                         <div className={`sail-recap-hero ${result.won ? "is-win" : "is-fail"}`}>
                             {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} /></span> : <span className="sail-recap-rock">🪨</span>}
                         </div>
@@ -393,7 +412,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             <div className="sail-hold-bar"><span style={{ width: `${Math.round(((result.fragments % 10) / 10) * 100)}%` }} /></div>
                             <div className="muted sail-hold-note">{result.fragments % 10}/10 toward a treasure chest</div>
                         </div>
-                        <button className="sail-cta" onClick={() => setResult(null)}>⚓ Back to port</button>
+                        <button className="sail-cta" onClick={() => { setResult(null); setLevelUp(null); }}>⚓ Back to port</button>
                     </div>
                 </div>
             ) : null}
