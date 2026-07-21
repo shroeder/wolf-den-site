@@ -9250,7 +9250,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes battle-pan { from { transform: translateX(0) scale(1.04); } to { transform: translateX(-3%) scale(1.08); } }
 
 .battle-hud { position: absolute; top: 10px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; z-index: 6; pointer-events: none; }
-.battle-name { font-size: clamp(0.95rem, 3.4vw, 1.4rem); font-weight: 800; color: #ffdccb; text-shadow: 0 2px 6px #000; }
+.battle-name { font-size: clamp(0.95rem, 3.4vw, 1.4rem); font-weight: 800; color: #ffdccb; text-shadow: 0 2px 6px #000; max-width: 92%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .battle-hpbar { width: min(78%, 460px); height: 14px; border-radius: 10px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.18); overflow: hidden; }
 .battle-hpbar span { display: block; height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ff3d3d, #ff8a3d); transition: width 0.4s ease; box-shadow: 0 0 10px rgba(255,80,40,0.6); }
 .battle-hp { font-size: clamp(0.7rem, 2.4vw, 0.85rem); font-weight: 700; color: #ffd0b8; text-shadow: 0 1px 3px #000; }
@@ -9306,19 +9306,23 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Static top-left identity card for the current attacker — fades in per hero, holds still so it's readable.
    Everyone gets a SOLID plate; members with an equipped profile background show it (crosshatch/hue) under a
    lighter scrim so their configured backplate reads. */
-.bhc-slot { position: absolute; top: 8px; left: 8px; z-index: 9; pointer-events: none; max-width: min(168px, 48vw); animation: bhcIn 0.4s ease both; }
+/* Sits BELOW the centered boss HUD (name + HP bar) so the two never collide, upper-left over the arena. */
+.bhc-slot { position: absolute; top: clamp(84px, 15vw, 104px); left: 8px; z-index: 9; pointer-events: none; width: min(190px, 54vw); animation: bhcIn 0.4s ease both; }
 @keyframes bhcIn { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
-.bhc { position: relative; border-radius: 12px; }
-.bhc-inner { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 12px;
-    background: rgba(10, 11, 16, 0.9); box-shadow: 0 4px 14px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08); }
-.bhc.has-bg .bhc-inner { background: rgba(6, 7, 11, 0.44); box-shadow: 0 4px 14px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.14); }
-.bhc-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.bhc-name { font-weight: 800; font-size: 0.82rem; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 108px; }
+.bhc { position: relative; border-radius: 13px; box-shadow: 0 6px 18px rgba(0,0,0,0.65); }
+/* Opaque plate for readability. Members with a background cosmetic show it under a lighter scrim so their
+   configured "backplate" (crosshatch/hue) reads while text stays legible. */
+.bhc-inner { position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 13px;
+    background: linear-gradient(180deg, rgba(16,18,26,0.97), rgba(9,10,15,0.98)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.bhc.has-bg .bhc-inner { background: linear-gradient(180deg, rgba(10,11,17,0.5), rgba(6,7,11,0.62)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); }
+.bhc-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bhc-name { font-weight: 800; font-size: 0.86rem; color: #fff; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 118px; }
 .bhc-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .bhc-lv { font-size: 0.68rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; }
-.bhc .user-badges { margin-top: 1px; gap: 3px; }
-.bhc .user-badge { font-size: 0.56rem; padding: 1px 5px; }
-.bhc.is-you .bhc-inner { box-shadow: 0 0 0 1px rgba(255,215,94,0.6) inset, 0 4px 14px rgba(0,0,0,0.6); }
+.bhc .user-badges { margin-top: 2px; gap: 4px; flex-wrap: wrap; }
+.bhc .user-badge { font-size: 0.55rem; padding: 1px 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.bhc .rank-chip-sm { text-shadow: 0 1px 2px #000; }
+.bhc.is-you { box-shadow: 0 0 0 1.5px rgba(255,215,94,0.75), 0 6px 18px rgba(0,0,0,0.65); }
 @media (prefers-reduced-motion: reduce) { .bhc-slot { animation: none; } }
 .adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }

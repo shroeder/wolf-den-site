@@ -22,7 +22,7 @@ function BattleHeroCard({ f }) {
         <div className={`bhc ${f.background ? `has-bg ${backgroundClass(f.background)}` : ""} ${frameClass(f.frame)} ${f.you ? "is-you" : ""}`.replace(/\s+/g, " ").trim()}>
             <CardTab badge={f.featuredBadge} compact />
             <div className="bhc-inner">
-                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={38} border={f.border} cosmetics={f.avatarCosmetics} />
+                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={44} border={f.border} cosmetics={f.avatarCosmetics} />
                 <div className="bhc-body">
                     <div className="bhc-name">{f.you ? "You" : (f.displayLabel || f.name)}</div>
                     <div className="bhc-meta">
