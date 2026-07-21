@@ -121,7 +121,7 @@ export default async function ProfileHubPage() {
             <RewardsTrackPreview track={track} />
 
             <details className="card hub-collapse">
-                <summary><h2>Profile border <span className="muted" style={{ fontWeight: 600, fontSize: "0.85rem" }}>· 💰 {store.gold.toLocaleString()} gold</span></h2></summary>
+                <summary><h2>Profile border</h2></summary>
                 <p className="muted" style={{ marginTop: 0 }}>Cosmetic frames you unlock by leveling up — tap one you&apos;ve earned to wear it, or tap a locked one to buy it early with gold.</p>
                 <BorderPicker
                     current={profile?.border}
