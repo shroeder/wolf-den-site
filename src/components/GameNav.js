@@ -23,11 +23,15 @@ const LINKS = [
     { href: "/marketplace/credit", emoji: "💳", label: "Credit" },
 ];
 
+// Owner-only in-development areas, appended to the menu just for the owner account.
+const OWNER_LINKS = [{ href: "/marketplace/sailing", emoji: "⛵", label: "Sailing" }];
+
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
-export default function GameNav() {
+export default function GameNav({ owner = false }) {
     const pathname = usePathname() || "";
-    const inGame = LINKS.some((l) => isOn(pathname, l.href));
+    const links = owner ? [...LINKS, ...OWNER_LINKS] : LINKS;
+    const inGame = links.some((l) => isOn(pathname, l.href));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
     const [chests, setChests] = useState(0);
@@ -50,7 +54,7 @@ export default function GameNav() {
         <nav className="game-nav" aria-label="Game menu">
             {/* Coins live in the top HUD strip (RewardNudge), not here — keeps this row purely navigation. */}
             <div className="game-nav-scroll">
-                {LINKS.map((l) => {
+                {links.map((l) => {
                     const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
                     return (
                         <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}`}>
