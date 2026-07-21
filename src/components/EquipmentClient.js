@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 
 import ChestOpener from "@/components/ChestOpener";
+import CoinCta from "@/components/CoinCta";
 import ItemArt from "@/components/ItemArt";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot } from "@/lib/marketplace/items.js";
@@ -386,9 +387,13 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>💰 {(detailItem.cost || 0).toLocaleString()} gold{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                             {detailItem.shop ? (
-                                <button type="button" className="button gold" onClick={() => { buy(detailItem); closeDetail(); }} disabled={busy || !detailItem.canAfford}>
-                                    💰 {detailItem.canAfford ? `Buy for ${(detailItem.cost || 0).toLocaleString()}` : `${(detailItem.cost || 0).toLocaleString()} · need more`}
-                                </button>
+                                detailItem.canAfford ? (
+                                    <button type="button" className="button gold" onClick={() => { buy(detailItem); closeDetail(); }} disabled={busy}>
+                                        💰 Buy for {(detailItem.cost || 0).toLocaleString()}
+                                    </button>
+                                ) : (
+                                    <CoinCta price={detailItem.cost} label="Get coins to buy" />
+                                )
                             ) : detailItem.equipped ? (
                                 <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
                             ) : (

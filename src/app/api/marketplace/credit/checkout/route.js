@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { createSquareCardPayment } from "@/lib/consignment/square";
+import { createSquareCardPayment, createSquareOrder } from "@/lib/consignment/square";
+import { sendAdminPush } from "@/lib/push/send.js";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
@@ -60,6 +61,26 @@ export async function POST(request) {
 
             const purchaseId = await createPendingCreditPurchase({ buyerId: buyer.id, amountCents, feeCents, chargedCents, coins, idempotencyKey });
 
+            // If a "Store Credit" Square catalog item (variable-price, non-taxable) is configured, itemize the
+            // charge against it so it lands under the right item/category in Square reports. Falls back to a
+            // plain payment if the env isn't set or order creation hiccups.
+            let squareOrderId = null;
+            const creditVariationId = String(process.env.SQUARE_STORE_CREDIT_VARIATION_ID || "").trim();
+            if (creditVariationId) {
+                try {
+                    const lineItems = [
+                        { catalog_object_id: creditVariationId, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } },
+                    ];
+                    if (feeCents > 0) {
+                        lineItems.push({ name: "Online processing fee", quantity: "1", base_price_money: { amount: feeCents, currency: "USD" } });
+                    }
+                    const order = await createSquareOrder({ lineItems, referenceId: purchaseId, idempotencyKey: `credit-order-${purchaseId}` });
+                    squareOrderId = order?.id || null;
+                } catch (orderError) {
+                    logger.warn("marketplace.credit.order_itemize_failed", { purchaseId, message: orderError instanceof Error ? orderError.message : "unknown" });
+                }
+            }
+
             let payment;
             try {
                 payment = await createSquareCardPayment({
@@ -68,6 +89,7 @@ export async function POST(request) {
                     idempotencyKey,
                     note: `Store credit $${(amountCents / 100).toFixed(2)} — ${buyer.alias ? `@${buyer.alias}` : buyer.id}`,
                     referenceId: purchaseId,
+                    orderId: squareOrderId,
                 });
             } catch (error) {
                 await failCreditPurchase(purchaseId, { reason: error?.squareCode || "payment_create_failed" });
@@ -84,6 +106,17 @@ export async function POST(request) {
             }
 
             const result = await finalizeCreditPurchase(purchaseId, { squarePaymentId: payment?.id, receiptUrl: payment?.receipt_url });
+
+            // Ping the owner's phone that a coin/credit sale just happened (best-effort).
+            if (result.credited) {
+                sendAdminPush({
+                    title: "💳 Store credit purchased",
+                    body: `${buyer.alias ? `@${buyer.alias}` : "A member"} bought $${(amountCents / 100).toFixed(2)} credit (+${coins.toLocaleString()} coins).`,
+                    route: "members",
+                    data: { type: "credit_purchase", buyerId: buyer.id, amountCents },
+                }).catch(() => {});
+            }
+
             return noStore({
                 ok: true,
                 amountCents,

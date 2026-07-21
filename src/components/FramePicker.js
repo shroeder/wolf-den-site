@@ -57,11 +57,11 @@ export default function FramePicker({ current = "none", level = 1, unlockAll = f
                         <button
                             key={f.id}
                             type="button"
-                            disabled={busy || (!f.unlocked && (!forSale || !canAfford))}
+                            disabled={busy || (!f.unlocked && !forSale)}
                             className={`bg-swatch${isSel ? " is-selected" : ""}${!f.unlocked ? " is-locked" : ""}`}
-                            onClick={() => (f.unlocked ? equip(f.id) : (forSale && canAfford ? buy(f.id) : null))}
+                            onClick={() => (f.unlocked ? equip(f.id) : (forSale ? (canAfford ? buy(f.id) : router.push("/marketplace/credit")) : null))}
                             aria-pressed={isSel}
-                            title={f.unlocked ? f.label : (forSale ? `Buy for ${price.toLocaleString()} gold` : `Unlocks at Level ${f.level}`)}
+                            title={f.unlocked ? f.label : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${f.level}`)}
                         >
                             <span className={`bg-swatch-scene frame-swatch${f.id !== "none" ? ` frame frame-${f.id}` : ""}`}>
                                 <span className="frame-swatch-mark" aria-hidden="true">{f.icon}</span>
@@ -69,7 +69,7 @@ export default function FramePicker({ current = "none", level = 1, unlockAll = f
                             </span>
                             <span className="bg-swatch-label">{f.label}</span>
                             <span className="bg-swatch-sub muted">
-                                {f.unlocked ? (isSel ? "Equipped ✓" : f.hint) : (f.requiresBadges ? f.lockLabel : (forSale ? `💰 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${f.level}`))}
+                                {f.unlocked ? (isSel ? "Equipped ✓" : f.hint) : (f.requiresBadges ? f.lockLabel : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${f.level}`))}
                             </span>
                         </button>
                     );

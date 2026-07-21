@@ -58,11 +58,11 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
                         <button
                             key={b.id}
                             type="button"
-                            disabled={busy || (!b.unlocked && (!forSale || !canAfford))}
+                            disabled={busy || (!b.unlocked && !forSale)}
                             className={`border-swatch${isSel ? " is-selected" : ""}${!b.unlocked ? " is-locked" : ""}`}
-                            onClick={() => (b.unlocked ? equip(b.id) : (forSale && canAfford ? buy(b.id) : null))}
+                            onClick={() => (b.unlocked ? equip(b.id) : (forSale ? (canAfford ? buy(b.id) : router.push("/marketplace/credit")) : null))}
                             aria-pressed={isSel}
-                            title={b.unlocked ? b.label : (forSale ? `Buy for ${price.toLocaleString()} gold` : `Unlocks at Level ${b.level}`)}
+                            title={b.unlocked ? b.label : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${b.level}`)}
                         >
                             <span className={`border-swatch-av${b.id !== "none" ? ` av-border av-border-${b.id}` : ""}`}>
                                 {avatarUrl ? (
@@ -75,7 +75,7 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
                             </span>
                             <span className="border-swatch-label">{b.label}</span>
                             <span className="border-swatch-sub muted">
-                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : (forSale ? `💰 ${price.toLocaleString()}${canAfford ? "" : " · need more"}` : `Lv ${b.level}`))}
+                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${b.level}`))}
                             </span>
                         </button>
                     );

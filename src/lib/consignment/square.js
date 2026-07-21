@@ -1356,12 +1356,32 @@ export async function findShopItemByVariationId(variationId) {
     return null;
 }
 
+// Create a Square ORDER (so a charge is itemized and shows up under a catalog item/category in reports).
+// `lineItems` are raw Square line_item objects. Returns the created order (with its id). Best-effort caller
+// should fall back to a bare payment if this throws.
+export async function createSquareOrder({ lineItems = [], referenceId, idempotencyKey } = {}) {
+    if (!Array.isArray(lineItems) || !lineItems.length) throw new Error("No line items for order.");
+    const payload = await squareFetch("/v2/orders", {
+        method: "POST",
+        body: JSON.stringify({
+            idempotency_key: String(idempotencyKey || "").trim() || randomUUID(),
+            order: {
+                location_id: getSquareLocationId(),
+                reference_id: referenceId || undefined,
+                line_items: lineItems,
+            },
+        }),
+    });
+    return payload.order || null;
+}
+
 export async function createSquareCardPayment({
     sourceId,
     amountCents,
     idempotencyKey,
     note,
     referenceId,
+    orderId = null,
 }) {
     const normalizedSourceId = String(sourceId || "").trim();
     const normalizedAmountCents = Number(amountCents || 0);
@@ -1392,6 +1412,7 @@ export async function createSquareCardPayment({
             autocomplete: true,
             note: note || undefined,
             reference_id: referenceId || undefined,
+            order_id: orderId || undefined,
         }),
     });
 

@@ -92,11 +92,57 @@ export async function spendCredit(buyerId, cents, reason, ref = null, meta = nul
 }
 
 // Grant purchased coins straight to the gold wallet (no Happy-Hour multiplier — this is a paid purchase,
-// not gameplay). Kept separate from awardXp so it never touches XP/levels.
+// not gameplay). Kept separate from awardXp so it never touches XP/levels. Negative clamps at 0.
 export async function grantCoins(buyerId, coins) {
-    const n = Math.max(0, Math.round(Number(coins) || 0));
-    if (!buyerId || n <= 0) return;
-    await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, n]).catch(() => {});
+    const n = Math.round(Number(coins) || 0);
+    if (!buyerId || n === 0) return;
+    if (n > 0) {
+        await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, n]).catch(() => {});
+    } else {
+        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold + $2), updated_at = NOW() WHERE id = $1`, [buyerId, n]).catch(() => {});
+    }
+}
+
+// ── Refunds ──────────────────────────────────────────────────────────────────────────────────────────
+
+// How much store credit was applied to a given online order (positive cents) + which member.
+export async function getOrderCreditApplied(orderId) {
+    if (!orderId) return { buyerId: null, cents: 0 };
+    const rows = await db
+        .query(`SELECT buyer_id, delta_cents FROM mkt_store_credit_event WHERE ref = $1 AND reason = 'spend_online'`, [orderId])
+        .catch(() => []);
+    if (!rows.length) return { buyerId: null, cents: 0 };
+    return { buyerId: rows[0].buyer_id, cents: rows.reduce((s, r) => s + Math.abs(r.delta_cents || 0), 0) };
+}
+
+// Restore the store credit a refunded order had applied. Idempotent: a prior refund event for this order
+// short-circuits so we never double-restore. Returns { cents, buyerId }.
+export async function refundOrderCredit(orderId) {
+    if (!orderId) return { cents: 0 };
+    const already = await db.queryOne(`SELECT 1 FROM mkt_store_credit_event WHERE ref = $1 AND reason = 'refund' LIMIT 1`, [orderId]).catch(() => null);
+    if (already) return { cents: 0 };
+    const { buyerId, cents } = await getOrderCreditApplied(orderId);
+    if (!buyerId || cents <= 0) return { cents: 0 };
+    await addCredit(buyerId, cents, "refund", orderId, { orderId });
+    return { cents, buyerId };
+}
+
+// ── Admin manual adjust (Members screen) ─────────────────────────────────────────────────────────────
+
+// Owner/staff nudge a member's store credit and/or coins with an audit reason. Credit changes flow through
+// the ledger (addCredit/spendCredit) so history stays truthful. Returns the new balances.
+export async function adminAdjust(buyerId, { creditDeltaCents = 0, coinsDelta = 0, reason = "adjust", by = "admin" } = {}) {
+    if (!buyerId) return { ok: false, error: "missing_buyer" };
+    const credit = Math.round(Number(creditDeltaCents) || 0);
+    const coins = Math.round(Number(coinsDelta) || 0);
+    if (credit > 0) await addCredit(buyerId, credit, "adjust", null, { reason, by });
+    else if (credit < 0) {
+        const spent = await spendCredit(buyerId, -credit, "adjust", null, { reason, by });
+        if (!spent.ok) return { ok: false, error: spent.error, balanceCents: await getStoreCredit(buyerId) };
+    }
+    if (coins !== 0) await grantCoins(buyerId, coins);
+    const row = await db.queryOne(`SELECT store_credit_cents, gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return { ok: true, balanceCents: Math.max(0, row?.store_credit_cents ?? 0), coins: Math.max(0, row?.gold ?? 0) };
 }
 
 // ── Online purchase bookkeeping ────────────────────────────────────────────────────────────────────────

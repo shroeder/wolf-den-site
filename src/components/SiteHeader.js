@@ -13,6 +13,7 @@ const navItems = [
     // The whole RPG game (boss/spin/pets/gear/quests/…) lives behind ONE entry now, so it stops competing
     // with real commerce in the nav. Its own dopamine menu is at /marketplace/play.
     { href: "/marketplace/play", label: "🎮 Game" },
+    { href: "/marketplace/credit", label: "💳 Store Credit" },
     { href: "/looking-for", label: "Looking For" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/mystery-bags", label: "Mystery Bags" },

@@ -34,7 +34,7 @@ export async function GET(request) {
                 const [statsMap, petMap, rows] = await Promise.all([
                     getEquippedStatsForMembers(ids).catch(() => new Map()),
                     getPetSpriteData().catch(() => ({})),
-                    db.query(`SELECT id, COALESCE(gold, 0) AS gold, equipped_border, equipped_frame, equipped_background, avatar_cosmetics FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
+                    db.query(`SELECT id, COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS store_credit_cents, equipped_border, equipped_frame, equipped_background, avatar_cosmetics FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
                 ]);
                 const byId = new Map(rows.map((r) => [r.id, r]));
                 // A displayable cosmetic (id + label + icon), or null for the default "none".
@@ -43,6 +43,7 @@ export async function GET(request) {
                     const r = byId.get(m.id) || {};
                     m.stats = statsMap.get(m.id) || {};
                     m.gold = Number(r.gold) || 0;
+                    m.storeCreditCents = Number(r.store_credit_cents) || 0;
                     m.petSpriteUrl = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]?.url) || null;
                     m.petSpriteFlip = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]?.flip) || false;
                     // Equipped cosmetics so the admin can SEE a member's border, card frame, and aura effect.

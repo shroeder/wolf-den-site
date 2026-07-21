@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import CoinCta from "@/components/CoinCta";
+
 // Per-tier wedge fills — jackpot glows gold, mini purple, rare teal, everything else alternating slate.
 const TIER_FILL = { jackpot: "#5a4212", mini: "#3a1f58", rare: "#12463c" };
 const NORMAL_FILL = ["#242a33", "#1a1f27"];
@@ -42,6 +44,7 @@ export default function SpinWheel() {
     const [result, setResult] = useState(null);
     const [celebrate, setCelebrate] = useState(null); // {kind} for jackpot/mini burst
     const [msg, setMsg] = useState(null);
+    const [lowCoins, setLowCoins] = useState(false);
     const timer = useRef(null);
 
     async function load() {
@@ -88,8 +91,8 @@ export default function SpinWheel() {
         if (spinning) return;
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy" }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
-        if (d?.ok) setSt(d);
-        else setMsg(d?.error === "not_enough_gold" ? "Not enough gold." : "Couldn't buy a spin.");
+        if (d?.ok) { setSt(d); setLowCoins(false); }
+        else { setMsg(d?.error === "not_enough_gold" ? "Not enough coins for a spin." : "Couldn't buy a spin."); setLowCoins(d?.error === "not_enough_gold"); }
     }
 
     if (!st) return <section className="card"><p className="muted" style={{ margin: 0 }}>Loading…</p></section>;
@@ -119,7 +122,7 @@ export default function SpinWheel() {
             </div>
 
             {result ? <div className={`spin-result tier-${resultKind}`}>{resultKind === "jackpot" ? "💎 JACKPOT! " : resultKind === "mini" ? "🎰 MINI JACKPOT! " : "You won "}<strong>{result.emoji} {result.text}</strong>!</div> : null}
-            {msg ? <div className="spin-msg">{msg}</div> : null}
+            {msg ? <div className="spin-msg">{msg}{lowCoins ? <span style={{ marginLeft: 8 }}><CoinCta label="Get coins" /></span> : null}</div> : null}
 
             <div className="spin-actions">
                 <button type="button" className="btn-gold spin-go" onClick={spin} disabled={spinning || !st.canSpin}>{spinning ? "Spinning…" : spinLabel}</button>
