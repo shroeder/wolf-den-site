@@ -48,6 +48,18 @@ const sfx = {
         tone(988, 0.14, 0.5, { type: "sine", gain: 0.12 });
         tone(1319, 0.28, 0.5, { type: "sine", gain: 0.11 });
     },
+    // Catching a tailwind: a swelling wind gust that rises then falls off.
+    gust() {
+        const c = audioCtx(); if (!c) return;
+        const t0 = c.currentTime, osc = c.createOscillator(), g = c.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(300, t0);
+        osc.frequency.exponentialRampToValueAtTime(900, t0 + 0.32);
+        osc.frequency.exponentialRampToValueAtTime(280, t0 + 0.72);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.1, t0 + 0.09); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.8);
+        osc.connect(g); g.connect(c.destination); osc.start(t0); osc.stop(t0 + 0.85);
+        tone(784, 0.06, 0.42, { type: "sine", gain: 0.08 });
+    },
     arrive() { [523, 659, 784].forEach((f, i) => tone(f, i * 0.12, 0.55, { type: "sine", gain: 0.16 })); },
     dig() { tone(150, 0, 0.11, { type: "square", gain: 0.11 }); },
     win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.1, 0.5, { type: "triangle", gain: 0.16 })); },
@@ -56,6 +68,29 @@ const sfx = {
 
 function Confetti() {
     return <div className="sail-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>;
+}
+
+// Tailwind gust FX: a screen flash + a stream of leaves/debris blowing across the scene left-to-right.
+function WindGust() {
+    return (
+        <div className="sail-gustfx" aria-hidden="true">
+            <span className="sail-flash" />
+            {Array.from({ length: 18 }, (_, i) => (
+                <span
+                    key={i}
+                    className="sail-leaf"
+                    style={{
+                        "--i": i,
+                        top: `${4 + (i * 91) % 92}%`,
+                        animationDelay: `${(i % 6) * 55}ms`,
+                        fontSize: `${0.65 + ((i * 7) % 5) * 0.2}rem`,
+                    }}
+                >
+                    {["🍃", "🍂", "🍃", "·"][i % 4]}
+                </span>
+            ))}
+        </div>
+    );
 }
 
 // A crisp ship's-wheel (helm) for the primary Set-sail CTA — reads far better than the flat ⛵ emoji.
@@ -133,6 +168,11 @@ export default function SailingClient({ initial, hero, pet }) {
             setCelebrate("depart");
             setTimeout(() => setCelebrate((c) => (c === "depart" ? null : c)), 1900);
         }
+        if (action === "wind") {
+            sfx.gust();
+            setCelebrate("gust");
+            setTimeout(() => setCelebrate((c) => (c === "gust" ? null : c)), 2400);
+        }
         if (action === "dig" || action === "begin_dig") sfx.dig();
         try {
             const r = await fetch("/api/marketplace/sailing", {
@@ -190,7 +230,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     <>
                         <div className="sail-sea" style={{ backgroundImage: `url(${state.oceanBg})` }}>
                             <div className="sail-boat">
-                                <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}`}>
+                                <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${celebrate === "gust" ? " is-gusting" : ""}`}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className="sail-boat-img" src={state.boatArt} alt="Your boat" />
                                     <span className="sail-crew">
@@ -232,6 +272,7 @@ export default function SailingClient({ initial, hero, pet }) {
 
                             {celebrate === "arrive" ? (<><div className="sail-landho">🏝️ LAND HO!</div><Confetti /></>) : null}
                             {celebrate === "depart" ? (<><div className="sail-bonvoyage">⚓ BON VOYAGE!</div><Confetti /></>) : null}
+                            {celebrate === "gust" ? <WindGust /> : null}
                         </div>
                         {/* Voyage progress — only while actually at sea; a little boat creeping from port (⚓) to the island (🏝️). */}
                         {liveStatus === "sailing" && (
@@ -247,16 +288,13 @@ export default function SailingClient({ initial, hero, pet }) {
                     </>
                 )}
 
-                {/* Secondary controls (at-sea status + digging) live below the scene; the hero CTA is docked on the window above. */}
+                {/* At-sea + digging controls below the scene. The tailwind is the one real action here, so it's a primary CTA. */}
                 {(liveStatus === "sailing" || liveStatus === "digging") && (
                     <div className="sail-actions">
                         {liveStatus === "sailing" && (
-                            <>
-                                <button className="pill" disabled>⏳ At sea · {fmtLeft(arrivesAt - now)}</button>
-                                {state.windAvailable
-                                    ? <button className="btn-ghost" disabled={busy} onClick={() => act("wind")}>🌬️ Catch a tailwind · arrive 1h sooner</button>
-                                    : <button className="pill" disabled>🌬️ Tailwind caught · back tomorrow</button>}
-                            </>
+                            state.windAvailable
+                                ? <button className="sail-cta sail-cta-wind" disabled={busy} onClick={() => act("wind")}>{busy ? "Catching the wind…" : "Catch a tailwind — arrive 1h sooner"}</button>
+                                : <button className="pill sail-donepill" disabled>Tailwind caught · resets tomorrow</button>
                         )}
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                     </div>
