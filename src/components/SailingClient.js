@@ -1,10 +1,50 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
 // fail, you land back at port and can set sail again. Server is authoritative for digs + the fragment reward.
+
+// --- juice: tiny Web-Audio SFX (no asset files) --------------------------------------------------------
+let _ac = null;
+function audioCtx() {
+    if (typeof window === "undefined") return null;
+    try {
+        if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+        if (_ac.state === "suspended") _ac.resume().catch(() => {});
+        return _ac;
+    } catch { return null; }
+}
+function tone(freq, start, dur, { type = "sine", gain = 0.15 } = {}) {
+    const c = audioCtx(); if (!c) return;
+    const t0 = c.currentTime + start;
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(gain, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(c.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.03);
+}
+const sfx = {
+    sail() {
+        const c = audioCtx(); if (!c) return;
+        const t0 = c.currentTime, osc = c.createOscillator(), g = c.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(200, t0); osc.frequency.exponentialRampToValueAtTime(560, t0 + 0.5);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.11, t0 + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6);
+        osc.connect(g); g.connect(c.destination); osc.start(t0); osc.stop(t0 + 0.66);
+    },
+    arrive() { [523, 659, 784].forEach((f, i) => tone(f, i * 0.12, 0.55, { type: "sine", gain: 0.16 })); },
+    dig() { tone(150, 0, 0.11, { type: "square", gain: 0.11 }); },
+    win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.1, 0.5, { type: "triangle", gain: 0.16 })); },
+    fail() { tone(300, 0, 0.22, { type: "sawtooth", gain: 0.1 }); tone(170, 0.12, 0.4, { type: "sawtooth", gain: 0.1 }); },
+};
+
+function Confetti() {
+    return <div className="sail-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>;
+}
 
 function fmtLeft(ms) {
     if (ms <= 0) return "landing…";
@@ -15,12 +55,11 @@ function fmtLeft(ms) {
     return `${sec}s`;
 }
 
-// Augur hot/cold reading by Chebyshev distance to the fragment (0 = right on it).
 function heatColor(h) {
-    if (h <= 0) return "#37f5c0";  // green — on the fragment
-    if (h === 1) return "#ffe14a"; // yellow — very close
-    if (h === 2) return "#ff9f43"; // orange — near
-    return "#7a4a4a";              // cold
+    if (h <= 0) return "#37f5c0";
+    if (h === 1) return "#ffe14a";
+    if (h === 2) return "#ff9f43";
+    return "#7a4a4a";
 }
 function heatLabel(h) { return h <= 0 ? "On it!" : h === 1 ? "Warm" : h === 2 ? "Near" : "Cold"; }
 
@@ -29,18 +68,32 @@ function Stars({ level }) {
     return <span className="sail-stars">{Array.from({ length: 5 }, (_, i) => <span key={i} className={i < tier ? "on" : "off"}>★</span>)}</span>;
 }
 
-export default function SailingClient({ initial, hero, pet, captain }) {
+export default function SailingClient({ initial, hero, pet }) {
     const [state, setState] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
+    const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [now, setNow] = useState(Date.now);
 
+    const stateRef = useRef(state);
+    useEffect(() => { stateRef.current = state; }, [state]);
+    const arrivedRef = useRef(false);
+
+    // Clock + arrival detection: when the voyage timer crosses arrival, fire the chime + Land-ho celebration.
     useEffect(() => {
-        const id = setInterval(() => setNow(Date.now()), 1000);
+        const id = setInterval(() => {
+            setNow(Date.now());
+            const s = stateRef.current;
+            if (s.status === "sailing" && s.arrivesAt && Date.now() >= s.arrivesAt && !arrivedRef.current) {
+                arrivedRef.current = true;
+                sfx.arrive();
+                setCelebrate("arrive");
+                setTimeout(() => setCelebrate((c) => (c === "arrive" ? null : c)), 2600);
+            }
+        }, 1000);
         return () => clearInterval(id);
     }, []);
 
-    // Live sailing progress from timestamps; the boat "arrives" when now passes arrivesAt.
     const { departedAt, arrivesAt } = state;
     let liveStatus = state.status;
     let progress = state.progress || 0;
@@ -48,8 +101,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         if (now >= arrivesAt) liveStatus = "arrived";
         else progress = Math.max(0, Math.min(0.999, (now - departedAt) / (arrivesAt - departedAt)));
     }
+
     const act = useCallback(async (action, extra = {}) => {
         setBusy(true);
+        if (action === "start") { sfx.sail(); arrivedRef.current = false; setCelebrate(null); }
+        if (action === "dig" || action === "begin_dig") sfx.dig();
         try {
             const r = await fetch("/api/marketplace/sailing", {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }),
@@ -57,7 +113,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             const d = await r.json().catch(() => ({}));
             if (d && !d.error) {
                 setState(d);
-                if (d.result) setResult(d.result);
+                if (d.result) { d.result.won ? sfx.win() : sfx.fail(); setResult(d.result); }
             }
         } finally { setBusy(false); }
     }, []);
@@ -129,6 +185,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}</span>}
                                 {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
                             </div>
+                            {celebrate === "arrive" ? (<><div className="sail-landho">🏝️ LAND HO!</div><Confetti /></>) : null}
                         </div>
                         {/* Voyage progress — a little boat creeping from port (⚓) to the island (🏝️). */}
                         <div className="sail-voyage">
@@ -142,18 +199,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </>
                 )}
 
-                {/* Boat identity + XP */}
-                <div className="sail-boatline">
-                    <div><span className="sail-boatname">Wood Boat</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level}</span></div>
-                    <span className="muted">🧩 {state.fragments} fragments · 🪙 {state.gold.toLocaleString()}</span>
-                </div>
-                <div className="sail-xpbar"><span style={{ width: `${xpPct}%` }} /></div>
-
-                {/* Primary action */}
+                {/* Primary action — sits right under the scene so it reads as part of it. */}
                 <div className="sail-actions">
                     {liveStatus === "idle" && (
-                        <button className="btn-gold" disabled={busy} onClick={() => act("start")}>
-                            {busy ? "Casting off…" : `⛵ Set sail · ${(state.voyageMs / 1000).toFixed(0)}s to the island`}
+                        <button className="sail-cta" disabled={busy} onClick={() => act("start")}>
+                            <span className="sail-cta-ico">⛵</span> {busy ? "Casting off…" : "Set sail"}
                         </button>
                     )}
                     {liveStatus === "sailing" && (
@@ -165,10 +215,19 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         </>
                     )}
                     {liveStatus === "arrived" && (
-                        <button className="btn-gold" disabled={busy} onClick={() => act("begin_dig")}>{busy ? "Landing…" : "⛏️ Begin excavation"}</button>
+                        <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
+                            <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Begin excavation"}
+                        </button>
                     )}
                     {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                 </div>
+
+                {/* Boat identity + XP */}
+                <div className="sail-boatline">
+                    <div><span className="sail-boatname">Wood Boat</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level}</span></div>
+                    <span className="muted">🧩 {state.fragments} fragments · 🪙 {state.gold.toLocaleString()}</span>
+                </div>
+                <div className="sail-xpbar"><span style={{ width: `${xpPct}%` }} /></div>
             </section>
 
             {/* Upgrades */}
@@ -193,10 +252,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {result ? (
                 <div className="sail-reward-overlay" onClick={() => setResult(null)}>
                     <div className="card sail-reward" onClick={(e) => e.stopPropagation()}>
+                        {result.won ? <Confetti /> : null}
                         <div className="sail-reward-emoji">{result.won ? "🧩" : "🪹"}</div>
                         <h2 style={{ margin: "6px 0" }}>{result.won ? "Fragment recovered!" : "Came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won ? `You now hold ${result.fragments} treasure-chest fragment${result.fragments === 1 ? "" : "s"}.` : "The fragment stayed buried. Sail out and try again."}</p>
-                        <button className="btn-gold" onClick={() => setResult(null)}>{result.won ? "🎉 Nice" : "Try again"}</button>
+                        <button className="sail-cta" onClick={() => setResult(null)}>{result.won ? "🎉 Nice" : "Try again"}</button>
                     </div>
                 </div>
             ) : null}
