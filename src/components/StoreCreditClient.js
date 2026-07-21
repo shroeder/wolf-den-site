@@ -90,13 +90,17 @@ export default function StoreCreditClient({
                 // the INPUT backgroundColor — without it Square leaves the fields white regardless of text color.
                 const card = await payments.card({
                     style: {
-                        input: { backgroundColor: "#15161c", color: "#f5ead2", fontSize: "16px" },
+                        // input.backgroundColor is what actually fills the fields dark (per Square's docs);
+                        // .input-container only accepts border props.
+                        input: { backgroundColor: "#15161c", color: "#f5ead2", fontFamily: "inherit", fontSize: "16px" },
                         "input::placeholder": { color: "#8a8272" },
-                        ".input-container": { backgroundColor: "#15161c", borderColor: "#4a3f1f", borderRadius: "10px" },
+                        ".input-container": { borderColor: "#4a3f1f", borderRadius: "10px" },
                         ".input-container.is-focus": { borderColor: "#ffd75e" },
                         ".input-container.is-error": { borderColor: "#ff6b5e" },
                         ".message-text": { color: "#ffb0a0" },
                         ".message-icon": { color: "#ffb0a0" },
+                        ".message-text.is-error": { color: "#ff6b5e" },
+                        ".message-icon.is-error": { color: "#ff6b5e" },
                     },
                 });
                 mounted = card;
