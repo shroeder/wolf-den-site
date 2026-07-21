@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import CoinCta from "@/components/CoinCta";
+
 // The gold badge shop — prestige badges you can just buy. Lives on the Badges page.
 export default function BadgeShopClient() {
     const [state, setState] = useState(null);
@@ -81,8 +83,8 @@ export default function BadgeShopClient() {
                                 {busy === b.slug ? "Buying…" : `Buy · 💰 ${b.price.toLocaleString()}`}
                             </button>
                         ) : (
-                            // Unaffordable: muted-gold price text + hint, not a grey disabled pill.
-                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>💰 {b.price.toLocaleString()} · need more</span>
+                            // Unaffordable → a real CTA to buy coins, not a muted disabled-looking label.
+                            <span style={{ marginTop: 6, display: "inline-block" }}><CoinCta price={b.price} /></span>
                         )}
                     </div>
                 ))}

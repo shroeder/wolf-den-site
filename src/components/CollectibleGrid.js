@@ -56,7 +56,7 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
     function onTap(c, forSale, price) {
         if (busy) return;
         if (c.unlocked) { if (selectable) feature(c); return; }
-        if (forSale && gold >= price) buy(c);
+        if (forSale) { if (gold >= price) buy(c); else router.push("/marketplace/credit"); }
     }
 
     if (unlockedOnly && !items.length) {
@@ -75,7 +75,7 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                     const forSale = !c.unlocked && !unlockedOnly && !c.eliteOnly;
                     const price = forSale ? cosmeticPrice("pet", c.level) : 0;
                     const canAfford = gold >= price;
-                    const clickable = (selectable && c.unlocked) || (forSale && canAfford);
+                    const clickable = (selectable && c.unlocked) || forSale;
                     return (
                         <button
                             type="button"
@@ -83,12 +83,12 @@ export default function CollectibleGrid({ level = 1, unlockAll = false, selectab
                             onClick={() => onTap(c, forSale, price)}
                             disabled={busy || !clickable}
                             className={`collectible rar-${c.rarity} ${c.unlocked ? "is-unlocked" : "is-locked"}${isFeatured ? " is-featured" : ""}${clickable ? " is-clickable" : ""}`}
-                            title={c.unlocked ? `${c.name} — ${c.hint}${selectable ? (isFeatured ? " · featured (tap to remove)" : " · tap to feature") : ""}` : c.eliteOnly ? `${c.name} · ${c.hint} — unlocked only by obtaining a top-rarity (${c.rarity}) item` : (forSale ? `${c.name} · buy for ${price.toLocaleString()} gold` : `${c.name} · unlocks at Level ${c.level}`)}
+                            title={c.unlocked ? `${c.name} — ${c.hint}${selectable ? (isFeatured ? " · featured (tap to remove)" : " · tap to feature") : ""}` : c.eliteOnly ? `${c.name} · ${c.hint} — unlocked only by obtaining a top-rarity (${c.rarity}) item` : (forSale ? (canAfford ? `${c.name} · buy for ${price.toLocaleString()} gold` : `${c.name} · tap to get more coins`) : `${c.name} · unlocks at Level ${c.level}`)}
                         >
                             <span className="collectible-icon" style={c.unlocked ? { color: c.color } : undefined}>
                                 <PetArt id={c.id} />
                             </span>
-                            <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? `💰 ${price.toLocaleString()}` : `Lv ${c.level}`)}</span>
+                            <span className="collectible-name">{c.unlocked ? c.name : c.eliteOnly ? "✨ Elite" : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} ＋`) : `Lv ${c.level}`)}</span>
                             {isFeatured ? <span className="collectible-star" aria-hidden="true">★</span> : null}
                         </button>
                     );

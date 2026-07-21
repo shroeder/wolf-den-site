@@ -1375,6 +1375,80 @@ export async function createSquareOrder({ lineItems = [], referenceId, idempoten
     return payload.order || null;
 }
 
+// Resolve the Square catalog variation to itemize store-credit purchases against, so they land under a
+// "Store Credit" item/category in Square reports. Auto-provisions it: an env override wins; otherwise we
+// search the catalog by name; otherwise we CREATE a "Store Credit" category + a variable-price, NON-taxable
+// item (variable so we can charge any top-up amount; non-taxable so the order total matches the payment).
+// Memoized per warm instance. Returns the variation id, or null if the token lacks catalog write (caller
+// then falls back to a plain, un-itemized charge).
+let _storeCreditVariationId = null;
+export async function getStoreCreditVariationId() {
+    const override = String(process.env.SQUARE_STORE_CREDIT_VARIATION_ID || "").trim();
+    if (override) return override;
+    if (_storeCreditVariationId) return _storeCreditVariationId;
+    try {
+        // Already in the catalog? Find the item by exact name and use its first variation.
+        const found = await squareFetch("/v2/catalog/search", {
+            method: "POST",
+            body: JSON.stringify({
+                object_types: ["ITEM"],
+                query: { exact_query: { attribute_name: "name", attribute_value: "Store Credit" } },
+                limit: 1,
+            }),
+        }).catch(() => null);
+        const existingVar = found?.objects?.[0]?.item_data?.variations?.[0]?.id;
+        if (existingVar) {
+            _storeCreditVariationId = existingVar;
+            return existingVar;
+        }
+
+        // Create the category first, then the item that references it.
+        const cat = await squareFetch("/v2/catalog/object", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: randomUUID(),
+                object: { type: "CATEGORY", id: "#wd-store-credit-cat", category_data: { name: "Store Credit" } },
+            }),
+        }).catch(() => null);
+        const categoryId = cat?.catalog_object?.id || null;
+
+        const item = await squareFetch("/v2/catalog/object", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: randomUUID(),
+                object: {
+                    type: "ITEM",
+                    id: "#wd-store-credit-item",
+                    item_data: {
+                        name: "Store Credit",
+                        description: "Online store-credit top-up (redeemable in store or online).",
+                        is_taxable: false,
+                        ...(categoryId ? { category_id: categoryId } : {}),
+                        variations: [
+                            {
+                                type: "ITEM_VARIATION",
+                                id: "#wd-store-credit-var",
+                                item_variation_data: {
+                                    item_id: "#wd-store-credit-item",
+                                    name: "Online",
+                                    pricing_type: "VARIABLE_PRICING",
+                                },
+                            },
+                        ],
+                    },
+                },
+            }),
+        });
+        const variationId = item?.catalog_object?.item_data?.variations?.[0]?.id || null;
+        _storeCreditVariationId = variationId;
+        return variationId;
+    } catch (error) {
+        // No catalog write access (or a transient failure) — caller falls back to a plain charge.
+        squareLogger.error("square.store_credit_item.provision_failed", { step: "store_credit_item_provision_failed", message: error instanceof Error ? error.message : "unknown" });
+        return null;
+    }
+}
+
 export async function createSquareCardPayment({
     sourceId,
     amountCents,

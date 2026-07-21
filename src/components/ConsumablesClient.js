@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import CoinCta from "@/components/CoinCta";
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
@@ -154,9 +155,8 @@ export default function ConsumablesClient() {
                                 {busy === `buy:${i.id}` ? "Buying…" : `Buy · 💰 ${i.price.toLocaleString()}`}
                             </button>
                         ) : (
-                            // Unaffordable: muted-gold price text with a hint, matching the gear shop — no grey
-                            // disabled pill (which read like highlighted text).
-                            <span style={{ marginTop: 6, fontSize: "0.78rem", fontWeight: 800, color: "#c9a24a" }}>💰 {i.price.toLocaleString()} · need more</span>
+                            // Unaffordable → a real CTA to buy coins, not a muted disabled-looking label.
+                            <span style={{ marginTop: 6, display: "inline-block" }}><CoinCta price={i.price} /></span>
                         )}
                     </div>
                 ))}

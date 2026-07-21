@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { createSquareCardPayment, createSquareOrder } from "@/lib/consignment/square";
+import { createSquareCardPayment, createSquareOrder, getStoreCreditVariationId } from "@/lib/consignment/square";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -61,11 +61,11 @@ export async function POST(request) {
 
             const purchaseId = await createPendingCreditPurchase({ buyerId: buyer.id, amountCents, feeCents, chargedCents, coins, idempotencyKey });
 
-            // If a "Store Credit" Square catalog item (variable-price, non-taxable) is configured, itemize the
-            // charge against it so it lands under the right item/category in Square reports. Falls back to a
-            // plain payment if the env isn't set or order creation hiccups.
+            // Itemize the charge against a "Store Credit" Square catalog item (auto-provisioned: created in
+            // Square on first sale if it doesn't exist) so it lands under the right item/category in reports.
+            // Falls back to a plain payment if the token lacks catalog write or order creation hiccups.
             let squareOrderId = null;
-            const creditVariationId = String(process.env.SQUARE_STORE_CREDIT_VARIATION_ID || "").trim();
+            const creditVariationId = await getStoreCreditVariationId().catch(() => null);
             if (creditVariationId) {
                 try {
                     const lineItems = [

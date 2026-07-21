@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import CoinCta from "@/components/CoinCta";
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
@@ -96,9 +97,11 @@ export default function DailyDeals() {
                             <button type="button" className="deal-btn" disabled>Owned</button>
                         ) : d.claimed ? (
                             <button type="button" className="deal-btn" disabled>✓ Claimed</button>
+                        ) : state.signedIn && state.gold < d.price ? (
+                            <CoinCta price={d.price} />
                         ) : (
-                            <button type="button" className="deal-btn" onClick={() => buy(d.id)} disabled={!state.signedIn || busy === d.id || state.gold < d.price}>
-                                {busy === d.id ? "…" : state.gold < d.price ? "Need gold" : "Buy"}
+                            <button type="button" className="deal-btn" onClick={() => buy(d.id)} disabled={!state.signedIn || busy === d.id}>
+                                {busy === d.id ? "…" : "Buy"}
                             </button>
                         )}
                     </div>
@@ -115,9 +118,11 @@ export default function DailyDeals() {
                             <span className="deal-was">🪙 {inspect.basePrice.toLocaleString()}</span>
                             <span className="deal-now">🪙 {inspect.price.toLocaleString()}</span>
                         </p>
-                        {inspect.owned ? <div className="muted">You own this.</div> : inspect.claimed ? <div className="muted">Claimed today.</div> : (
-                            <button type="button" className="button gold" style={{ marginTop: 8 }} onClick={() => { buy(inspect.id); setInspect(null); }} disabled={!state.signedIn || state.gold < inspect.price}>
-                                {state.gold < inspect.price ? "Need gold" : `Buy · 🪙 ${inspect.price.toLocaleString()}`}
+                        {inspect.owned ? <div className="muted">You own this.</div> : inspect.claimed ? <div className="muted">Claimed today.</div> : state.signedIn && state.gold < inspect.price ? (
+                            <div style={{ marginTop: 8 }}><CoinCta price={inspect.price} label="Get coins to buy" /></div>
+                        ) : (
+                            <button type="button" className="button gold" style={{ marginTop: 8 }} onClick={() => { buy(inspect.id); setInspect(null); }} disabled={!state.signedIn}>
+                                {`Buy · 🪙 ${inspect.price.toLocaleString()}`}
                             </button>
                         )}
                     </div>
