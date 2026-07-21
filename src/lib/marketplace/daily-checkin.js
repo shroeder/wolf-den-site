@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
 import { getActiveBoss } from "@/lib/marketplace/boss.js";
 import { getDailyQuests } from "@/lib/marketplace/quests.js";
 import { petLevelInfo } from "@/lib/marketplace/pet-level.js";
@@ -113,6 +114,7 @@ async function resolveLoginProcs(buyerId) {
             await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});
             await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, p.id]).catch(() => {});
             await db.query(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, p.id]).catch(() => {});
+            await voidPendingTradesForItem(buyerId, p.id).catch(() => {}); // shattered item can't back a pending trade
             out.push({ emoji: "🎲", text: `${p.label} shattered → unlocked ${won.name}!` });
         }
     }

@@ -7,6 +7,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 
 // Equipped item stats merged with any active set-bonus stats (the single source combat + the UI read).
@@ -268,6 +269,8 @@ export async function sellItem(buyerId, itemId) {
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
     await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, itemId]).catch(() => {});
+    // The item is gone — void any pending trades that were counting on it (refunds their escrow).
+    await voidPendingTradesForItem(buyerId, itemId).catch(() => {});
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, value]).catch(() => null);
     await bumpEquipment(buyerId); // a slot may have emptied — re-gear the sprite
     await trackActivity(buyerId, "sell_gear", { itemId, name: item.name, value });

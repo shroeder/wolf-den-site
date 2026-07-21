@@ -44,7 +44,18 @@ export default function TradeBuilder({ me, them, preselectWant = null }) {
                 }),
             });
             const d = await r.json().catch(() => ({}));
-            if (!r.ok) { setErr(d?.error?.replace(/_/g, " ") || "Couldn't send offer."); return; }
+            if (!r.ok) {
+                const MSG = {
+                    item_in_pending_trade: `${d?.itemName || "That item"} is already tied up in a pending trade — resolve or cancel that one first.`,
+                    they_dont_own_requested: "They no longer have that item.",
+                    you_dont_own_offered: "You no longer have one of those items.",
+                    not_enough_gold: "You don't have enough gold to escrow.",
+                    empty_trade: "Add something to the trade first.",
+                    invalid_target: "You can't trade with that member.",
+                };
+                setErr(MSG[d?.error] || d?.error?.replace(/_/g, " ") || "Couldn't send offer.");
+                return;
+            }
             router.push("/marketplace/trade");
         } finally { setBusy(false); }
     }
