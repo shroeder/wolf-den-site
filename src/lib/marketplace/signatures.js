@@ -45,6 +45,17 @@ const LOGIN = {
 };
 export const COUPON_PCT = 50; //   discount a login coupon grants
 export const COUPON_MAX = 4000; // it only applies to shop items at/under this gold price
+// CHEER procs — bonuses that roll when the wearer CHEERS a hero in the boss fight (see cheer() in boss.js).
+// firstStrike + fragment only fire on your FIRST cheer of the day; fragment (a Sailing treasure-chest piece)
+// is the rarest and gated to elite gear by where it's attached.
+const CHEER = {
+    gold: [8, 12, 16, 22], //          flat bonus gold per cheer
+    xp: [4, 6, 8, 12], //              flat bonus XP per cheer
+    petXpChance: [0.3, 0.4, 0.5, 0.65], // chance to feed the equipped pet
+    petXpAmt: [4, 6, 8, 12],
+    firstStrike: [45, 70, 100, 140], // damage YOU deal on your first cheer of the day
+    fragmentChance: [0.03, 0.05, 0.07, 0.1], // first cheer of the day only
+};
 
 const STREAK_PER = 0.04; // per consecutive attack-day
 const PACK_PER = 0.02; //   per distinct ally who attacked today
@@ -152,22 +163,22 @@ export const ITEM_SIGNATURES = {
     shadow_shroud: { label: "Ambush", firstHitCrit: true }, // epic
     phoenix_mantle: { label: "Rebirth", bloodlust: true }, // legendary — rises over time
     wings_of_dawn: { label: "Daybreak", firstHitMult: 2 }, // legendary
-    oblivion_wings: { label: "Nightfall", xpOnHit: true }, // mythic — scholar
+    oblivion_wings: { label: "Nightfall", xpOnHit: true, cheerXp: true }, // mythic — scholar (XP on hits + on cheers)
     celestial_cloak: { label: "Starfall", goldOnHit: true }, // legendary — prospector
     void_shroud: { label: "Eclipse", bloodlust: true }, // mythic
 
     // ===== Amulets — fortune / arcane / synergy =====
     dragonheart_sigil: { label: "Dragon's Fury", beastbond: true }, // mythic — heart = pet bond
-    galaxy_pendant: { label: "Cosmic Fortune", loginGold: true }, // mythic — daily gold on check-in
+    galaxy_pendant: { label: "Cosmic Fortune", loginGold: true, cheerGold: true }, // mythic — daily gold on check-in + bonus gold on cheers
     wolf_totem: { label: "Pack Tactics", packTactics: true }, // legendary — finally literal!
-    bear_fang: { label: "Maul", beastbond: true }, // legendary
+    bear_fang: { label: "Maul", beastbond: true, cheerPetXp: true }, // legendary — pet bond (strike boost + pet XP on cheers)
     spectre_locket: { label: "Haunt", ticketOnCrit: true }, // mythic
     suncrest: { label: "Solar Flare", overcharge: true }, // mythic
     gs_eternity_amulet: { label: "Timeless", bloodlust: true }, // mythic
     gs2_cosmic_amulet: { label: "Cosmos", warbanner: true }, // mythic
     elephant_totem: { label: "Unstoppable", giantSlayer: true }, // legendary
-    warlords_amulet: { label: "Warlord's Call", packTactics: true }, // legendary
-    wolf_heart: { label: "Wolf Heart", beastbond: true }, // legendary
+    warlords_amulet: { label: "Warlord's Call", packTactics: true, cheerFirstStrike: true }, // legendary — rally leader (first cheer of the day also strikes)
+    wolf_heart: { label: "Wolf Heart", beastbond: true, cheerPetXp: true }, // legendary — pet bond (strike boost + pet XP on cheers)
     star_amulet: { label: "Starlight", ticketOnCrit: true }, // legendary
     serpent_coil: { label: "Venomstrike", beastbond: true }, // legendary
     gs_champion_amulet: { label: "Champion's Heart", packTactics: true }, // legendary
@@ -180,24 +191,24 @@ export const ITEM_SIGNATURES = {
     gs_omnipotence_ring: { label: "Omnipotence", firstHitCrit: true, critMult: 2 }, // mythic (prestige combo)
     gs2_infinity_ring: { label: "Infinity", highroller: true }, // mythic
     infinity_loop: { label: "Eternal Loop", bloodlust: true }, // mythic
-    kings_eternal: { label: "Everking", warbanner: true }, // mythic
+    kings_eternal: { label: "Everking", warbanner: true, cheerFirstStrike: true }, // mythic — rally leader (first cheer of the day also strikes)
     founders_ring: { label: "Founder's Will", warbanner: true }, // mythic
     collectors_signet: { label: "Collector", loginPetGamble: true }, // legendary — gamble a pet (destroys the item)
     kings_ring: { label: "King's Command", packTactics: true }, // legendary
     ring_titans: { label: "Titan Grip", giantSlayer: true }, // legendary
     warlord_ring: { label: "War Banner", packTactics: true }, // legendary
     highroller_ring: { label: "High Roller", dailySpin: true }, // legendary — a guaranteed extra wheel spin each day
-    premium_signet: { label: "Prestige", loginPotion: true }, // legendary — daily gift consumable
-    credit25_ring: { label: "Investor", loginGold: true }, // legendary — daily gold on check-in
+    premium_signet: { label: "Prestige", loginPotion: true, cheerXp: true }, // legendary — daily gift consumable + bonus XP on cheers
+    credit25_ring: { label: "Investor", loginGold: true, cheerGold: true }, // legendary — daily gold on check-in + bonus gold on cheers
     credit50_ring: { label: "Benefactor", loginPotion: true }, // legendary — daily gift consumable
     gs_royal_signet: { label: "Royal Seal", goldOnHit: true }, // legendary
     gs2_kings_band: { label: "Crown Jewel", ticketOnCrit: true }, // legendary
 
     // ===== ELITE (Ascendant / Eternal) — the strongest signatures in the game =====
-    ascendant_crown: { label: "Ascension", warbanner: true }, // ascendant
+    ascendant_crown: { label: "Ascension", warbanner: true, cheerFragment: true }, // ascendant — rare fragment chance on first cheer of the day
     ascendant_blade: { label: "Worldrender", overcharge: true }, // ascendant
     ascendant_aegis: { label: "Unbreakable", warbanner: true }, // ascendant
-    eternal_wolf_crown: { label: "Apex Predator", opportunist: true, firstHitCrit: true }, // eternal
+    eternal_wolf_crown: { label: "Apex Predator", opportunist: true, firstHitCrit: true, cheerFragment: true }, // eternal — rare fragment chance on first cheer of the day
     eternal_infinity: { label: "Infinite", overcharge: true, extraStrikes: 1 }, // eternal
 };
 
@@ -268,6 +279,22 @@ export function rollLoginProcs(equipped, rand = Math.random) {
     return fired;
 }
 
+// Roll every equipped CHEER-proc item when the wearer cheers a hero in the boss fight. Returns the aggregate
+// bonuses; the caller (cheer() in boss.js) applies the grants. `firstOfDay` gates the once-a-day procs.
+export function rollCheerProcs(equipped, { firstOfDay = false, rand = Math.random } = {}) {
+    let gold = 0, xp = 0, petXp = 0, selfDamage = 0, fragment = false;
+    const fired = [];
+    for (const s of sigsOn(equipped)) {
+        const i = tierIdx(s.id);
+        if (s.cheerGold) { gold += CHEER.gold[i]; fired.push(s.label); }
+        if (s.cheerXp) { xp += CHEER.xp[i]; fired.push(s.label); }
+        if (s.cheerPetXp && rand() < CHEER.petXpChance[i]) { petXp += CHEER.petXpAmt[i]; fired.push(s.label); }
+        if (firstOfDay && s.cheerFirstStrike) { selfDamage += CHEER.firstStrike[i]; fired.push(s.label); }
+        if (firstOfDay && s.cheerFragment && rand() < CHEER.fragmentChance[i]) { fragment = true; fired.push(s.label); }
+    }
+    return { gold, xp, petXp, selfDamage, fragment, fired };
+}
+
 // Equipped-pet strike multiplier from a Beastbond signature (1 if none).
 export function beastbondMult(equipped) {
     let m = 1;
@@ -316,5 +343,11 @@ export function signatureFor(itemId) {
     if (s.loginCoupon) parts.push(`${pct(LOGIN.couponChance[i])} chance at your daily check-in for a ${COUPON_PCT}%-off shop coupon (items ≤ ${COUPON_MAX} gold).`);
     if (s.loginPetGamble) parts.push(`${pct(LOGIN.gambleChance[i])} chance at your daily check-in to unlock a random pet — but the item is DESTROYED.`);
     if (s.dailySpin) parts.push("Grants +1 daily wheel spin at your check-in.");
+    // Cheer procs — fire when you cheer a hero in the boss fight.
+    if (s.cheerGold) parts.push(`Earn +${CHEER.gold[i]} bonus gold every time you cheer.`);
+    if (s.cheerXp) parts.push(`Earn +${CHEER.xp[i]} bonus XP every time you cheer.`);
+    if (s.cheerPetXp) parts.push(`${pct(CHEER.petXpChance[i])} chance when you cheer to feed your equipped pet ${CHEER.petXpAmt[i]} XP.`);
+    if (s.cheerFirstStrike) parts.push(`Your FIRST cheer each day also strikes the boss for ${CHEER.firstStrike[i]}.`);
+    if (s.cheerFragment) parts.push(`${pct(CHEER.fragmentChance[i])} chance on your first cheer each day to unearth a treasure-chest fragment.`);
     return { label: s.label, desc: parts.join(" ") };
 }

@@ -22,6 +22,7 @@ export default function BossFightClient() {
     const [victory, setVictory] = useState(null);
     const [xpFlash, setXpFlash] = useState(false);
     const [liveHp, setLiveHp] = useState(null);
+    const [cheerToast, setCheerToast] = useState(null);
     const [rewardIdx, setRewardIdx] = useState(0); // which reward item is showing in the rotating drop card
     const floatId = useRef(0);
 
@@ -59,12 +60,65 @@ export default function BossFightClient() {
         return () => clearInterval(t);
     }, [data?.boss?.autoDps]);
 
-    function popDamage(amount, crit) {
+    function popDamage(amount, crit, cheer = false) {
         const id = floatId.current++;
-        setFloaters((f) => [...f, { id, amount, crit, top: 14 + Math.random() * 38, left: 60 + Math.random() * 24 }]);
+        setFloaters((f) => [...f, { id, amount, crit, cheer, top: 14 + Math.random() * 38, left: 60 + Math.random() * 24 }]);
         setTimeout(() => setFloaters((f) => f.filter((x) => x.id !== id)), 850);
         setHit(true);
         setTimeout(() => setHit(false), 260);
+    }
+
+    // A bright crowd cheer: an ascending triad over a short applause-like noise swell (no asset files).
+    function cheerSound() {
+        if (typeof window === "undefined") return;
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            const ctx = new AC();
+            const now = ctx.currentTime;
+            [523, 659, 784, 1047].forEach((freq, i) => {
+                const o = ctx.createOscillator(), g = ctx.createGain();
+                o.type = "triangle"; o.frequency.value = freq;
+                const t = now + i * 0.07;
+                g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.16, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+                o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.34);
+            });
+            const dur = 0.5;
+            const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+            const ch = buf.getChannelData(0);
+            for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / ch.length, 1.4);
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1800; bp.Q.value = 0.7;
+            const ng = ctx.createGain();
+            ng.gain.setValueAtTime(0.0001, now); ng.gain.linearRampToValueAtTime(0.09, now + 0.08); ng.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+            src.connect(bp); bp.connect(ng); ng.connect(ctx.destination); src.start(now); src.stop(now + dur);
+            setTimeout(() => ctx.close().catch(() => {}), 900);
+        } catch { /* audio blocked — no-op */ }
+    }
+
+    async function cheer(target) {
+        if (!target || !data?.you || (data.you.cheersLeft ?? 0) <= 0) return;
+        cheerSound();
+        setData((d) => ({ ...d, you: { ...d.you, cheersLeft: Math.max(0, (d.you.cheersLeft || 0) - 1) } })); // optimistic
+        const r = await fetch("/api/marketplace/boss/cheer", {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ targetId: target.id }),
+        }).catch(() => null);
+        const res = r ? await r.json().catch(() => null) : null;
+        if (!res || res.error) { await load(); return; }
+        popDamage(res.damage, false, true);
+        setData((d) => ({ ...d, boss: { ...d.boss, hp: res.hp, maxHp: res.maxHp }, you: { ...d.you, cheersLeft: res.left } }));
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-xp-updated"));
+        setCheerToast({
+            key: floatId.current++, targetName: res.targetName, xp: res.xp, gold: res.gold,
+            petXp: res.petXp, fragment: res.fragment, selfDamage: res.selfDamage, badges: res.newBadges || [],
+        });
+        setTimeout(() => setCheerToast(null), 2800);
+        if (res.defeated) {
+            const deadBossId = data?.boss?.id;
+            setVictory({ name: res.name });
+            if (deadBossId) fetch("/api/marketplace/boss-celebrate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bossId: deadBossId }) }).catch(() => {});
+        }
+        load();
     }
 
     async function attack() {
@@ -119,7 +173,21 @@ export default function BossFightClient() {
             <div className="boss2-sub muted">One swing a day for XP + raffle tickets · drop in daily to help finish it.</div>
 
             <div className="boss-stage-wrap">
-                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} />
+                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} canCheer={Boolean(you) && !boss.defeated} cheersLeft={you?.cheersLeft ?? 0} onCheer={cheer} />
+                {cheerToast ? (
+                    <div className="cheer-toast" key={cheerToast.key}>
+                        <div className="cheer-toast-main">📣 You cheered {cheerToast.targetName}!</div>
+                        <div className="cheer-toast-rewards">
+                            +{cheerToast.xp} XP · +{cheerToast.gold} 🪙
+                            {cheerToast.petXp ? ` · 🐾 +${cheerToast.petXp}` : ""}
+                            {cheerToast.selfDamage ? ` · ⚔️ ${cheerToast.selfDamage}` : ""}
+                            {cheerToast.fragment ? " · 🧩 fragment!" : ""}
+                        </div>
+                        {cheerToast.badges?.length ? cheerToast.badges.map((b) => (
+                            <div key={b.slug} className="cheer-toast-badge">🏅 {b.icon} {b.label} unlocked!</div>
+                        )) : null}
+                    </div>
+                ) : null}
                 {burst ? (
                     <div className={`boss-burst${burst.crit ? " is-crit" : ""}`} key={burst.key}>
                         {burst.proc ? <div className="boss-burst-proc">⚡ {burst.proc}!</div> : null}
@@ -169,6 +237,9 @@ export default function BossFightClient() {
                             <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
                             {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
                         </div>
+                    ) : null}
+                    {you && (you.cheersLeft ?? 0) > 0 ? (
+                        <div className="boss2-cheerhint">📣 Tap <b>Cheer</b> on the hero on stage — bonus damage for them, XP + coin for you. <b>{you.cheersLeft}</b> left today.</div>
                     ) : null}
                 </div>
             )}

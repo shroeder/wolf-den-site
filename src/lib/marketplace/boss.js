@@ -6,7 +6,7 @@ import { pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
-import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { petLevelForXp, addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
@@ -16,7 +16,8 @@ import { itemById } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
-import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem } from "@/lib/marketplace/signatures.js";
+import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem, rollCheerProcs } from "@/lib/marketplace/signatures.js";
+import { grantFragment } from "@/lib/marketplace/sailing.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/marketplace/badges.js";
 import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
@@ -384,7 +385,8 @@ export async function getBossState(buyerId = null) {
         const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         // How much of this week's element the viewer is packing (drives the "your N 🔥 pieces: +X%" tip).
         const em = elementMult(myIds, boss.weakness);
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct } };
+        const cheerStatus = await getCheerStatus(buyerId).catch(() => ({ left: 0, perDay: CHEERS_PER_DAY }));
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -832,6 +834,104 @@ export async function attackBoss(buyerId) {
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
     const elemProc = elem.matches > 0 ? `${weaknessInfo(boss.weakness)?.emoji || "✨"} ${weaknessInfo(boss.weakness)?.label || ""} weakness +${elem.bonusPct}%` : null;
     return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
+}
+
+// ===== CHEER — hype up the hero currently on stage during a boss fight =====
+// You get CHEERS_PER_DAY cheers a day. A cheer deals a little bonus damage credited to the CHEERED hero (so it
+// helps the raid and their tickets), and earns YOU a bit of XP + coin. Equipped gear can roll bonus procs
+// (extra gold/XP, pet XP, a first-of-day self-strike, and — rarest — a treasure-chest fragment). Tiered badges
+// track cheers given AND received.
+export const CHEERS_PER_DAY = 3;
+const CHEER_XP = 10;
+const CHEER_GOLD = 10;
+const CHEER_DMG_MIN = 45;
+const CHEER_DMG_MAX = 85;
+const CHEER_DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date"; // store-local day, same as the swing counter
+
+export async function getCheerStatus(buyerId) {
+    if (!buyerId) return { perDay: CHEERS_PER_DAY, used: 0, left: 0 };
+    const row = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_cheer WHERE giver_id = $1 AND day = ${CHEER_DAY}`, [buyerId]).catch(() => null);
+    const used = row?.n || 0;
+    return { perDay: CHEERS_PER_DAY, used, left: Math.max(0, CHEERS_PER_DAY - used) };
+}
+
+export async function cheer(buyerId, targetId) {
+    if (!buyerId) return { error: "unauthorized" };
+    if (!targetId || targetId === buyerId) return { error: "bad_target" };
+    const boss = await getActiveBoss();
+    if (!boss || boss.hp <= 0 || boss.defeated_at) return { error: "no_boss" };
+    // The cheered hero must be a real registered member.
+    const target = await db.queryOne(`SELECT id, display_name, alias FROM mkt_buyer WHERE id = $1 AND alias IS NOT NULL`, [targetId]).catch(() => null);
+    if (!target) return { error: "bad_target" };
+
+    // First cheer of the day? (gates the once-a-day item procs) — read before the insert.
+    const before = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_cheer WHERE giver_id = $1 AND day = ${CHEER_DAY}`, [buyerId]).catch(() => null);
+    const firstOfDay = (before?.n || 0) === 0;
+
+    const dmg = CHEER_DMG_MIN + Math.floor(Math.random() * (CHEER_DMG_MAX - CHEER_DMG_MIN + 1));
+    // Atomic daily-cap insert — the ledger row only lands if today's count is still under the cap, so rapid
+    // taps can't slip past it. No row back = you're out of cheers.
+    const inserted = await db.queryOne(
+        `INSERT INTO mkt_cheer (giver_id, receiver_id, boss_id, day, damage)
+         SELECT $1, $2, $3, ${CHEER_DAY}, $4
+          WHERE (SELECT COUNT(*) FROM mkt_cheer WHERE giver_id = $1 AND day = ${CHEER_DAY}) < $5
+         RETURNING id`,
+        [buyerId, targetId, boss.id, dmg, CHEERS_PER_DAY]
+    ).catch(() => null);
+    if (!inserted) return { error: "no_cheers_left", ...(await getCheerStatus(buyerId)) };
+
+    // Cheer procs off the cheerer's equipped gear.
+    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
+    const procs = rollCheerProcs(equipped, { firstOfDay });
+
+    // Base reward: +10 XP / +10 coin (plus any item bonus). awardXp also trickles the equipped pet its share.
+    const xpGain = CHEER_XP + (procs.xp || 0);
+    const goldGain = CHEER_GOLD + (procs.gold || 0);
+    await awardXp(buyerId, "cheer", { points: xpGain, gold: goldGain }).catch(() => {});
+    if (procs.petXp > 0) await addEquippedPetXp(buyerId, procs.petXp).catch(() => {});
+    if (procs.fragment) await grantFragment(buyerId, 1).catch(() => {});
+
+    // The cheered hero surges — bonus damage credited to THEM (kind='cheer' keeps it out of manual swing counts).
+    let hp = boss.hp, maxHp = boss.max_hp;
+    const row1 = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, dmg]);
+    if (row1) {
+        hp = row1.hp; maxHp = row1.max_hp;
+        await db.query(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'cheer')`, [boss.id, targetId, dmg]).catch(() => {});
+    }
+    // First-cheer-of-day item proc: YOU also strike the boss.
+    if (procs.selfDamage > 0 && row1) {
+        const row2 = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, procs.selfDamage]);
+        if (row2) {
+            hp = row2.hp; maxHp = row2.max_hp;
+            await db.query(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'cheer')`, [boss.id, buyerId, procs.selfDamage]).catch(() => {});
+        }
+    }
+
+    // Lifetime counters + badge sync for both sides.
+    await db.query(`UPDATE mkt_buyer SET cheers_given = cheers_given + 1 WHERE id = $1`, [buyerId]).catch(() => {});
+    await db.query(`UPDATE mkt_buyer SET cheers_received = cheers_received + 1 WHERE id = $1`, [targetId]).catch(() => {});
+    const [newBadges] = await Promise.all([
+        syncEarnedBadges(buyerId).catch(() => []),
+        syncEarnedBadges(targetId).catch(() => []),
+    ]);
+
+    const defeated = await markDefeatIfDead(boss.id, hp, buyerId);
+    const { effectiveHp, autoDps } = defeated
+        ? { effectiveHp: 0, autoDps: 0 }
+        : await autoAccrual({ id: boss.id, hp, started_at: boss.started_at });
+    const status = await getCheerStatus(buyerId);
+    return {
+        ok: true,
+        targetName: target.display_name || target.alias || "your teammate",
+        damage: dmg + (procs.selfDamage || 0),
+        cheerDamage: dmg,
+        selfDamage: procs.selfDamage || 0,
+        xp: xpGain, gold: goldGain, petXp: procs.petXp || 0, fragment: procs.fragment || false,
+        hp: effectiveHp, autoDps, maxHp, defeated,
+        left: status.left, perDay: status.perDay,
+        name: boss.name,
+        newBadges: (newBadges || []).map((b) => ({ slug: b.slug, label: b.label, icon: b.icon })),
+    };
 }
 
 // Passive AUTO-attacks: every registered member's avatar chips away. Run by a background cron; applies the

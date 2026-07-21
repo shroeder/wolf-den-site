@@ -51,11 +51,12 @@ function BattleHeroCard({ f }) {
 // (BossFightClient) owns HP/attack state.
 
 const GROUP = 1; // ONE hero at a time — each gets their moment to shine, then the next slides in.
+const CHEER_EMOJI = ["📣", "🎉", "⭐", "👏", "🙌", "✨", "💥", "📣"]; // pom-poms that fan out when you cheer
 // Border/aura cosmetics → a representative glow color, so a hero's configured look reads on the stage.
 export const BORDER_COL = { ember: "#ff7a3c", bronze: "#cd7f32", aqua: "#5ad0d0", neon: "#39ff14", silver: "#c0c0c0", crimson: "#e23b4e", emerald: "#2ecc71", sunset: "#ff8c5a", sky: "#4aa3ff", rose: "#ff5fa2", gold: "#ffd75e", ocean: "#2aa9c8", aurora: "#7cffb2", amethyst: "#b76bff", frost: "#a8e6ff", inferno: "#ff5a2c", rainbow: "#ff6bd6", cosmic: "#8f7cff", legendary: "#ffd75e", solar: "#ffb24a", abyss: "#6a4fe0", godray: "#fff2b0", singularity: "#b76bff", role_volunteer: "#7cffb2", role_staff: "#ffd75e", role_dev: "#8fb8ff", role_admin: "#ff5a5a" };
 export const AURA_COL = { aura_gold: "#ffd75e", aura_aqua: "#5ad0d0", aura_violet: "#b76bff", aura_rainbow: "#ff6bd6", aura_ember: "#ff7a3c", aura_frost: "#a8e6ff", aura_cosmic: "#8f7cff" };
 
-export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null }) {
+export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null, canCheer = false, cheersLeft = 0, onCheer = null }) {
     // Build the roster: real fighters (with art), padded a little so the stage isn't empty. "You" first so
     // the viewer sees themselves in the opening wave.
     const roster = useMemo(() => {
@@ -94,6 +95,18 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
         return f ? [{ ...f, key: `${wave}-${f.id || wave}` }] : [];
     }, [wave, roster]);
     const current = party[0] || null; // the hero whose identity card is shown top-left this beat
+
+    // Cheering the hero on stage: fire the pom-pom/ring burst locally the instant you tap (feels instant), and
+    // hand the actual network call + damage/reward juice up to the parent via onCheer.
+    const [cheerPulse, setCheerPulse] = useState(0);
+    const cheerNonce = useRef(0);
+    const doCheer = (f) => {
+        if (!f || f.pad || f.you || !canCheer || cheersLeft <= 0) return;
+        const id = (cheerNonce.current += 1);
+        setCheerPulse(id);
+        setTimeout(() => setCheerPulse((p) => (p === id ? 0 : p)), 1500);
+        if (onCheer) onCheer(f);
+    };
 
     // Ambient impact glints on the boss so its continuous passive damage reads as landing.
     const [sparks, setSparks] = useState([]);
@@ -138,6 +151,18 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             {current && !current.pad ? (
                 <div className="bhc-slot" key={current.id}>
                     <BattleHeroCard f={current} />
+                    {canCheer && !current.you && cheersLeft > 0 ? (
+                        <button type="button" className="cheer-btn" onClick={() => doCheer(current)} title={`Cheer ${current.displayLabel || current.name}`}>
+                            📣 Cheer <span className="cheer-btn-n">{cheersLeft}</span>
+                        </button>
+                    ) : null}
+                    {cheerPulse ? (
+                        <div className="cheer-fx" key={cheerPulse} aria-hidden="true">
+                            <span className="cheer-ring" />
+                            {CHEER_EMOJI.map((e, i) => <span key={i} className="cheer-pom" style={{ "--i": i }}>{e}</span>)}
+                            <span className="cheer-pop">CHEER!</span>
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
 
@@ -190,8 +215,8 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             </div>
 
             {floaters.map((f) => (
-                <span key={f.id} className={`battle-floater${f.crit ? " is-crit" : ""}`} style={{ top: `${f.top}%`, left: `${f.left}%` }}>
-                    {f.crit ? `${f.amount}!` : f.amount}
+                <span key={f.id} className={`battle-floater${f.crit ? " is-crit" : ""}${f.cheer ? " is-cheer" : ""}`} style={{ top: `${f.top}%`, left: `${f.left}%` }}>
+                    {f.cheer ? `+${f.amount}` : f.crit ? `${f.amount}!` : f.amount}
                 </span>
             ))}
         </div>

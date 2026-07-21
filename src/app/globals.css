@@ -9359,6 +9359,45 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .bhc .user-badge { font-size: 0.5rem; padding: 1px 5px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
 .bhc.is-you { box-shadow: 0 0 0 1.5px rgba(255,215,94,0.75), 0 5px 16px rgba(0,0,0,0.6); }
 @media (prefers-reduced-motion: reduce) { .bhc-slot { animation: none; } }
+
+/* ===== Boss: Cheer the hero on stage ===== */
+/* The slot has pointer-events:none, so the button must opt back in to be tappable. */
+.cheer-btn { position: absolute; left: 0; top: 100%; margin-top: 7px; z-index: 10; pointer-events: auto;
+    display: inline-flex; align-items: center; gap: 6px; font-weight: 900; font-size: 0.82rem; color: #3a1e00;
+    padding: 7px 13px; border: none; border-radius: 999px; cursor: pointer;
+    background: linear-gradient(135deg, #ffe9a8, #ffcf4a 55%, #ff9f43);
+    box-shadow: 0 3px 0 #b5842f, 0 7px 15px rgba(255,170,60,0.5), inset 0 1px 0 rgba(255,255,255,0.7);
+    animation: cheerBtnBob 1.8s ease-in-out infinite; }
+.cheer-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b5842f, 0 3px 8px rgba(255,170,60,0.4); }
+.cheer-btn-n { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: rgba(58,30,0,0.26); font-size: 0.68rem; }
+@keyframes cheerBtnBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+.cheer-fx { position: absolute; inset: -14% -24%; z-index: 11; pointer-events: none; }
+.cheer-ring { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 3px solid rgba(255,215,94,0.9); animation: cheerRing 0.7s ease-out forwards; }
+@keyframes cheerRing { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(2.7); } }
+.cheer-pom { position: absolute; left: 50%; top: 55%; font-size: 1.05rem; opacity: 0; animation: cheerPom 1.1s ease-out forwards; animation-delay: calc(var(--i) * 25ms); }
+@keyframes cheerPom {
+    0% { opacity: 0; transform: translate(-50%, 0) scale(0.4) rotate(0deg); }
+    18% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + (var(--i) - 3.5) * 27px), -74px) scale(1.1) rotate(calc((var(--i) - 3.5) * 42deg)); }
+}
+.cheer-pop { position: absolute; left: 50%; top: 28%; transform: translate(-50%,-50%); font-weight: 900; font-size: 1.2rem; color: #fff; white-space: nowrap;
+    text-shadow: 0 2px 0 #b5842f, 0 0 14px rgba(255,210,90,0.9); animation: cheerPop 1.1s ease-out forwards; }
+@keyframes cheerPop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0.5); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1.15); } 40% { transform: translate(-50%,-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-120%) scale(1); } }
+
+.battle-floater.is-cheer { color: #ffd75e; text-shadow: 0 0 10px rgba(255,180,60,0.85), 0 1px 3px #000; }
+
+.cheer-toast { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 12; text-align: center;
+    background: rgba(12,16,24,0.85); border: 1px solid rgba(255,215,94,0.42); border-radius: 12px; padding: 8px 14px; max-width: 92%;
+    animation: cheerToast 0.3s ease-out both; pointer-events: none; }
+.cheer-toast-main { font-weight: 800; font-size: 0.88rem; color: #ffe9a8; }
+.cheer-toast-rewards { font-size: 0.78rem; color: #d8e0ea; margin-top: 2px; }
+.cheer-toast-badge { font-size: 0.78rem; color: #ffd75e; font-weight: 700; margin-top: 3px; }
+@keyframes cheerToast { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.boss2-cheerhint { margin-top: 8px; font-size: 0.8rem; color: #cdbfa6; text-align: center; }
+.boss2-cheerhint b { color: #ffd75e; }
+@media (prefers-reduced-motion: reduce) { .cheer-btn, .cheer-fx, .cheer-ring, .cheer-pom, .cheer-pop, .cheer-toast { animation: none; } }
+
 .adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
 

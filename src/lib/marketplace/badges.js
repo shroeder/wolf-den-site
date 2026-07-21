@@ -72,7 +72,7 @@ async function heldSlugs(buyerId) {
 // Live metrics used to evaluate unlock rules AND to show progress on the rewards track. One buyer, a
 // handful of cheap aggregates. Exported so the track page reuses the exact same numbers the engine grants on.
 export async function getMemberMetrics(buyerId) {
-    const buyer = await db.queryOne(`SELECT xp, created_at, COALESCE(event_gold_donated, 0) AS event_gold_donated, COALESCE(spin_count, 0) AS spin_count, COALESCE(mystery_bags_bought, 0) AS mystery_bags_bought, COALESCE(mystery_big_hit, FALSE) AS mystery_big_hit FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const buyer = await db.queryOne(`SELECT xp, created_at, COALESCE(event_gold_donated, 0) AS event_gold_donated, COALESCE(spin_count, 0) AS spin_count, COALESCE(mystery_bags_bought, 0) AS mystery_bags_bought, COALESCE(mystery_big_hit, FALSE) AS mystery_big_hit, COALESCE(cheers_given, 0) AS cheers_given, COALESCE(cheers_received, 0) AS cheers_received FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const xp = buyer?.xp || 0;
 
     const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows, petLevelRows] = await Promise.all([
@@ -185,6 +185,8 @@ export async function getMemberMetrics(buyerId) {
         spinCount: Number(buyer?.spin_count || 0),
         mysteryBags: Number(buyer?.mystery_bags_bought || 0),
         mysteryBigHit: Boolean(buyer?.mystery_big_hit),
+        cheersGiven: Number(buyer?.cheers_given || 0),
+        cheersReceived: Number(buyer?.cheers_received || 0),
     };
 }
 
@@ -271,6 +273,8 @@ export function progressForRule(rule, threshold, m) {
         case "spin_count": return { current: m.spinCount, target: t }; // lifetime wheel spins
         case "mystery_bags": return { current: m.mysteryBags, target: t }; // mystery bags bought from the real store
         case "mystery_big_hit": return { current: m.mysteryBigHit ? 1 : 0, target: 1 }; // pulled a big hit from a bag
+        case "cheers_given": return { current: m.cheersGiven, target: t }; // times you've cheered a hero in the boss fight
+        case "cheers_received": return { current: m.cheersReceived, target: t }; // times the pack has cheered you
         default: return { current: 0, target: t || 1 };
     }
 }

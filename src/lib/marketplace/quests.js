@@ -24,6 +24,8 @@ export const QUEST_TEMPLATES = [
     { key: "take_bounty", label: "Take on a community bounty", metric: "bounty_claim", target: 1, gold: 120, area: "/marketplace/bounties", cta: "Browse bounties" },
     { key: "donate_event", label: "Donate 1,000 gold to the pack (Happy Hour / rally)", metric: "donate_event", target: 1000, gold: 200, area: "/marketplace/boss", cta: "Donate gold" },
     { key: "spin_wheel", label: "Spin the daily wheel", metric: "spin", target: 1, gold: 100, area: "/marketplace/spin", cta: "Spin the wheel" },
+    { key: "cheer_once", label: "Cheer a teammate in the boss fight", metric: "cheer", target: 1, gold: 90, area: "/marketplace/boss", cta: "Cheer a hero" },
+    { key: "cheer_thrice", label: "Cheer 3 times today", metric: "cheer", target: 3, gold: 180, chest: "wooden", area: "/marketplace/boss", cta: "Cheer a hero" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
