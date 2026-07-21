@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -10,7 +11,7 @@ import PetArt from "@/components/PetArt";
 // sheet (portaled to <body> so a transformed ancestor can't push its fixed positioning off-screen).
 const RAR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 
-export default function PublicPets({ pets = [] }) {
+export default function PublicPets({ pets = [], canTrade = false, targetAlias = null }) {
     const [detail, setDetail] = useState(null);
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
@@ -68,7 +69,12 @@ export default function PublicPets({ pets = [] }) {
                         {detail.activeDesc ? <p className="petsheet-active">⚔️ {detail.activeDesc}</p> : null}
                         {detail.passiveDesc ? <p className="petsheet-passive">✨ {detail.passiveDesc}</p> : null}
                         {detail.hint ? <p className="muted petsheet-hint">“{detail.hint}”</p> : null}
-                        <button type="button" className="pill petsheet-close" onClick={() => setDetail(null)}>Close</button>
+                        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                            {canTrade && targetAlias && detail.tradeable ? (
+                                <Link href={`/marketplace/trade/new?to=${encodeURIComponent(targetAlias)}&wantPet=${encodeURIComponent(detail.id)}`} className="btn-gold">🤝 Trade for this pet</Link>
+                            ) : null}
+                            <button type="button" className="pill" onClick={() => setDetail(null)}>Close</button>
+                        </div>
                     </div>
                 </div>
             ), document.body) : null}

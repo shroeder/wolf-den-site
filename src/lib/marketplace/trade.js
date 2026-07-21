@@ -2,6 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById } from "@/lib/marketplace/items.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 
@@ -10,6 +12,64 @@ const MAX_SIDE = 12; // items per side, sanity cap
 function cleanItemIds(list) {
     if (!Array.isArray(list)) return [];
     return [...new Set(list.map((x) => String(x || "").trim()).filter((id) => itemById(id)))].slice(0, MAX_SIDE);
+}
+function cleanPetIds(list) {
+    if (!Array.isArray(list)) return [];
+    return [...new Set(list.map((x) => String(x || "").trim()).filter((id) => collectibleById(id)))].slice(0, MAX_SIDE);
+}
+
+// The set of these pets a member OWNS (an unlock row, or an auto level-pet at/under their level).
+async function ownedPetSet(buyerId, petIds) {
+    if (!petIds.length) return new Set();
+    const [rows, buyer] = await Promise.all([
+        db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND ref = ANY($2)`, [buyerId, petIds]).catch(() => []),
+        db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+    ]);
+    const owned = new Set(rows.map((r) => r.ref));
+    const level = levelForXp(buyer?.xp || 0).level;
+    for (const id of petIds) {
+        const def = collectibleById(id);
+        if (def && def.source === "level" && level >= def.level) owned.add(id);
+    }
+    return owned;
+}
+
+// The subset that are EARNED (source !== 'level') AND still tradeable (unlock row tradeable=TRUE). Only these
+// may be offered in a trade — level pets would just re-unlock for free, and a locked pet was already shared.
+async function earnedTradeablePetSet(buyerId, petIds) {
+    if (!petIds.length) return new Set();
+    const rows = await db
+        .query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND tradeable = TRUE AND ref = ANY($2)`, [buyerId, petIds])
+        .catch(() => []);
+    return new Set(rows.map((r) => r.ref).filter((id) => collectibleById(id)?.source !== "level"));
+}
+
+// Trade a pet the "share a copy, lock both" way: the receiver gets a FRESH Lv1 copy, the giver keeps theirs,
+// and both copies become non-tradeable so the pet can never be farmed/laundered through repeated trades.
+async function sharePetLockBoth(fromOwnerId, toReceiverId, petId) {
+    const lock = (buyerId) =>
+        db.query(
+            `INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref, tradeable) VALUES ($1, 'pet', $2, FALSE)
+             ON CONFLICT (buyer_id, category, ref) DO UPDATE SET tradeable = FALSE`,
+            [buyerId, petId]
+        ).catch(() => {});
+    await lock(toReceiverId); // receiver's fresh copy (no mkt_pet_level row → starts Lv1)
+    await lock(fromOwnerId); // giver keeps it but it's now locked
+}
+
+// Is this pet already tied up in another PENDING offer on this owner's side?
+async function petInPendingTrade(ownerId, petId) {
+    const row = await db
+        .queryOne(
+            `SELECT 1 FROM mkt_trade_offer
+              WHERE status = 'pending'
+                AND ( (to_buyer_id = $1 AND requested_pets @> $2::jsonb)
+                   OR (from_buyer_id = $1 AND offered_pets @> $2::jsonb) )
+              LIMIT 1`,
+            [ownerId, JSON.stringify([petId])]
+        )
+        .catch(() => null);
+    return Boolean(row);
 }
 
 async function ownedSet(buyerId, ids) {
@@ -73,19 +133,36 @@ async function moveItem(fromId, toId, itemId) {
 const bumpGear = (id) => db.query(`UPDATE mkt_buyer SET equipment_updated_at = NOW() WHERE id = $1`, [id]).catch(() => {});
 
 // Propose a trade. Escrows the proposer's offered gold immediately; items are validated + moved at accept.
-export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold, requestedItems, requestedGold, note } = {}) {
+export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold, requestedItems, requestedGold, offeredPets, requestedPets, note } = {}) {
     const toId = String(toUserId || "").trim();
     if (!fromId || !toId || fromId === toId) return { ok: false, error: "invalid_target" };
     const oItems = cleanItemIds(offeredItems);
     const rItems = cleanItemIds(requestedItems);
+    const oPets = cleanPetIds(offeredPets);
+    const rPets = cleanPetIds(requestedPets);
     const oGold = Math.max(0, Math.floor(Number(offeredGold) || 0));
     const rGold = Math.max(0, Math.floor(Number(requestedGold) || 0));
-    if (!oItems.length && !rItems.length && oGold === 0 && rGold === 0) return { ok: false, error: "empty_trade" };
+    if (!oItems.length && !rItems.length && !oPets.length && !rPets.length && oGold === 0 && rGold === 0) return { ok: false, error: "empty_trade" };
 
     // Validate the proposer owns what they're offering, and the recipient owns what's requested.
     const [mine, theirs] = await Promise.all([ownedSet(fromId, oItems), ownedSet(toId, rItems)]);
     if (oItems.some((id) => !mine.has(id))) return { ok: false, error: "you_dont_own_offered" };
     if (rItems.some((id) => !theirs.has(id))) return { ok: false, error: "they_dont_own_requested" };
+
+    // Pets: offered must be MY earned+tradeable pets the recipient doesn't already own; requested must be
+    // THEIR earned+tradeable pets I don't already own.
+    if (oPets.length || rPets.length) {
+        const [myPets, theirPets, iOwn, theyOwn] = await Promise.all([
+            earnedTradeablePetSet(fromId, oPets),
+            earnedTradeablePetSet(toId, rPets),
+            ownedPetSet(fromId, rPets),
+            ownedPetSet(toId, oPets),
+        ]);
+        if (oPets.some((id) => !myPets.has(id))) return { ok: false, error: "pet_not_tradeable" };
+        if (rPets.some((id) => !theirPets.has(id))) return { ok: false, error: "their_pet_not_tradeable" };
+        if (oPets.some((id) => theyOwn.has(id))) return { ok: false, error: "they_already_own_pet" };
+        if (rPets.some((id) => iOwn.has(id))) return { ok: false, error: "you_already_own_pet" };
+    }
 
     // Block duplicate/conflicting requests — no item may be tangled in two pending trades at once (e.g.
     // requesting a piece someone's already got a pending offer on, or re-offering one you already offered).
@@ -97,6 +174,8 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
         const d = itemById(conflict);
         return { ok: false, error: "item_in_pending_trade", itemName: d?.name || conflict };
     }
+    for (const id of oPets) if (await petInPendingTrade(fromId, id)) return { ok: false, error: "pet_in_pending_trade", itemName: collectibleById(id)?.name || id };
+    for (const id of rPets) if (await petInPendingTrade(toId, id)) return { ok: false, error: "pet_in_pending_trade", itemName: collectibleById(id)?.name || id };
 
     // Escrow the offered gold (atomic — fails if they can't cover it).
     if (oGold > 0) {
@@ -104,9 +183,9 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
         if (!row) return { ok: false, error: "not_enough_gold" };
     }
     const offer = await db.queryOne(
-        `INSERT INTO mkt_trade_offer (from_buyer_id, to_buyer_id, offered_items, offered_gold, requested_items, requested_gold, note)
-         VALUES ($1, $2, $3::jsonb, $4, $5::jsonb, $6, $7) RETURNING id`,
-        [fromId, toId, JSON.stringify(oItems), oGold, JSON.stringify(rItems), rGold, note ? String(note).slice(0, 300) : null]
+        `INSERT INTO mkt_trade_offer (from_buyer_id, to_buyer_id, offered_items, offered_gold, requested_items, requested_gold, offered_pets, requested_pets, note)
+         VALUES ($1, $2, $3::jsonb, $4, $5::jsonb, $6, $7::jsonb, $8::jsonb, $9) RETURNING id`,
+        [fromId, toId, JSON.stringify(oItems), oGold, JSON.stringify(rItems), rGold, JSON.stringify(oPets), JSON.stringify(rPets), note ? String(note).slice(0, 300) : null]
     ).catch(() => null);
     if (offer) {
         // Ping the recipient so the offer doesn't sit unseen.
@@ -183,6 +262,26 @@ export async function respondTrade(userId, offerId, action) {
         return { ok: false, error: "you_no_longer_own_requested" };
     }
 
+    // Pets: re-validate they're still each side's earned+tradeable pet the other doesn't already own.
+    const offeredPets = Array.isArray(o.offered_pets) ? o.offered_pets : [];
+    const requestedPets = Array.isArray(o.requested_pets) ? o.requested_pets : [];
+    if (offeredPets.length || requestedPets.length) {
+        const [oStill, rStill, recipientHas, proposerHas] = await Promise.all([
+            earnedTradeablePetSet(o.from_buyer_id, offeredPets),
+            earnedTradeablePetSet(userId, requestedPets),
+            ownedPetSet(userId, offeredPets),
+            ownedPetSet(o.from_buyer_id, requestedPets),
+        ]);
+        const bad =
+            offeredPets.some((id) => !oStill.has(id) || recipientHas.has(id)) ||
+            requestedPets.some((id) => !rStill.has(id) || proposerHas.has(id));
+        if (bad) {
+            await db.query(`UPDATE mkt_trade_offer SET status='void', resolved_at=NOW() WHERE id=$1 AND status='pending'`, [offerId]).catch(() => {});
+            await refund(o);
+            return { ok: false, error: "pet_no_longer_valid" };
+        }
+    }
+
     // Recipient pays their requested gold (atomic). Proposer's offered gold is already escrowed.
     if (o.requested_gold > 0) {
         const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [userId, o.requested_gold]).catch(() => null);
@@ -191,6 +290,9 @@ export async function respondTrade(userId, offerId, action) {
     // Move items both ways.
     for (const id of offeredItems) await moveItem(o.from_buyer_id, userId, id);
     for (const id of requestedItems) await moveItem(userId, o.from_buyer_id, id);
+    // Share pets both ways (receiver gets a fresh Lv1 copy; both copies become non-tradeable).
+    for (const id of offeredPets) await sharePetLockBoth(o.from_buyer_id, userId, id);
+    for (const id of requestedPets) await sharePetLockBoth(userId, o.from_buyer_id, id);
     // Settle gold: recipient receives the escrowed offered gold; proposer receives the requested gold.
     if (o.offered_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [userId, o.offered_gold]);
     if (o.requested_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [o.from_buyer_id, o.requested_gold]);
@@ -219,6 +321,12 @@ function decorate(ids) {
         return d ? { id: d.id, name: d.name, rarity: d.rarity, icon: d.icon } : { id, name: id, rarity: "common", icon: null };
     });
 }
+function decoratePets(ids) {
+    return (Array.isArray(ids) ? ids : []).map((id) => {
+        const d = collectibleById(id);
+        return d ? { id: d.id, name: d.name, rarity: d.rarity } : { id, name: id, rarity: "common" };
+    });
+}
 
 // The viewer's incoming + outgoing pending offers, with the other party's public label.
 export async function listTrades(userId) {
@@ -241,6 +349,7 @@ export async function listTrades(userId) {
         to: { id: r.to_buyer_id, label: r.to_name || r.to_alias || "Member", alias: r.to_alias },
         offeredItems: decorate(r.offered_items), offeredGold: r.offered_gold,
         requestedItems: decorate(r.requested_items), requestedGold: r.requested_gold,
+        offeredPets: decoratePets(r.offered_pets), requestedPets: decoratePets(r.requested_pets),
         note: r.note || null, expiresAt: r.expires_at,
     });
     return {

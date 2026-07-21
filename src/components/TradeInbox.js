@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
+import PetArt from "@/components/PetArt";
 
-function Side({ label, items, gold }) {
-    if (!items.length && !gold) return <span className="muted">nothing</span>;
+function Side({ items = [], gold = 0, pets = [] }) {
+    if (!items.length && !gold && !pets.length) return <span className="muted">nothing</span>;
     return (
         <span className="trade-side">
             {gold ? <span className="trade-gold">💰 {gold.toLocaleString()}</span> : null}
             {items.map((it) => (
                 <span key={it.id} className={`trade-item rar-${it.rarity}`} title={it.name}><ItemArt id={it.id} icon={it.icon} className="trade-item-art" /> {it.name}</span>
+            ))}
+            {pets.map((p) => (
+                <span key={`pet-${p.id}`} className={`trade-item rar-${p.rarity}`} title={p.name}><span className="trade-item-art" style={{ display: "inline-grid", placeItems: "center" }}><PetArt id={p.id} /></span> 🐾 {p.name}</span>
             ))}
         </span>
     );
@@ -49,8 +53,8 @@ export default function TradeInbox() {
                     <div key={o.id} className="trade-offer">
                         <div className="trade-offer-body">
                             <strong>{o.from.label}</strong> offers you:
-                            <div className="trade-line"><span className="muted">You get:</span> <Side items={o.offeredItems} gold={o.offeredGold} /></div>
-                            <div className="trade-line"><span className="muted">You give:</span> <Side items={o.requestedItems} gold={o.requestedGold} /></div>
+                            <div className="trade-line"><span className="muted">You get:</span> <Side items={o.offeredItems} gold={o.offeredGold} pets={o.offeredPets} /></div>
+                            <div className="trade-line"><span className="muted">You give:</span> <Side items={o.requestedItems} gold={o.requestedGold} pets={o.requestedPets} /></div>
                             {o.note ? <p className="muted" style={{ margin: "4px 0 0" }}>“{o.note}”</p> : null}
                         </div>
                         <div className="trade-offer-actions">
@@ -66,8 +70,8 @@ export default function TradeInbox() {
                     <div key={o.id} className="trade-offer">
                         <div className="trade-offer-body">
                             To <strong>{o.to.label}</strong>:
-                            <div className="trade-line"><span className="muted">You give:</span> <Side items={o.offeredItems} gold={o.offeredGold} /></div>
-                            <div className="trade-line"><span className="muted">You get:</span> <Side items={o.requestedItems} gold={o.requestedGold} /></div>
+                            <div className="trade-line"><span className="muted">You give:</span> <Side items={o.offeredItems} gold={o.offeredGold} pets={o.offeredPets} /></div>
+                            <div className="trade-line"><span className="muted">You get:</span> <Side items={o.requestedItems} gold={o.requestedGold} pets={o.requestedPets} /></div>
                         </div>
                         <div className="trade-offer-actions">
                             <button type="button" className="pill" onClick={() => act(o.id, "cancel")} disabled={busy}>Cancel</button>

@@ -75,6 +75,7 @@ export async function petsState(buyerId, { sync = false } = {}) {
     const lockedRefs = new Set(rows.filter((r) => r.tradeable === false).map((r) => r.ref));
     const ownedIds = [];
     const tradeableIds = [];
+    const earnedTradeableIds = []; // pets that can go in a real trade: earned (not level-auto) AND still tradeable
     const passiveTotals = {}; // stat -> summed passive across all owned pets (each scaled by its pet level)
     const petLevels = {}; // pet_id -> { level, xp, into, span, next, maxed, stat, base, value } for owned pets
     for (const pet of COLLECTIBLES) {
@@ -87,6 +88,8 @@ export async function petsState(buyerId, { sync = false } = {}) {
         petLevels[pet.id] = { level: info.level, xp: info.xp, into: info.into, span: info.span, next: info.next, maxed: info.maxed, stat: p.stat, base: p.value, value: p.value * info.level };
         // Tradeable unless an explicit unlock row has locked it (level pets with no row are still tradeable).
         if (!lockedRefs.has(pet.id)) tradeableIds.push(pet.id);
+        // Real trades only accept EARNED pets (level pets would re-unlock for free) that aren't already locked.
+        if (!lockedRefs.has(pet.id) && pet.source !== "level") earnedTradeableIds.push(pet.id);
     }
     // Real-world perk redemption state, keyed by pet id, for owned marquee pets.
     const realWorldByPet = Object.fromEntries((realWorld || []).map((r) => [r.petId, { reward: r.reward, available: r.available, cooldownUntil: r.cooldownUntil }]));
@@ -104,7 +107,7 @@ export async function petsState(buyerId, { sync = false } = {}) {
             petSprites[petId] = perLevel;
         }
     }
-    return { ownedIds, tradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet, petLevels, petSprites };
+    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet, petLevels, petSprites };
 }
 
 export async function equipPet(buyerId, petId) {

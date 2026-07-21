@@ -3,16 +3,19 @@ import { notFound } from "next/navigation";
 
 import TradeBuilder from "@/components/TradeBuilder";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { petsState } from "@/lib/marketplace/pets.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Propose a trade | Wolf Den", robots: { index: false, follow: false } };
 
 const strip = (inv) => (inv?.items || []).map((i) => ({ id: i.id, name: i.name, rarity: i.rarity, icon: i.icon }));
+const petStrip = (ids) => ids.map((id) => collectibleById(id)).filter(Boolean).map((d) => ({ id: d.id, name: d.name, rarity: d.rarity }));
 
 export default async function NewTradePage({ searchParams }) {
-    const { to, want } = await searchParams;
+    const { to, want, wantPet } = await searchParams;
     const me = await getAuthenticatedBuyer().catch(() => null);
     if (!me) {
         return <div className="stack reveal"><section className="card"><p className="muted">Sign in to propose a trade.</p><Link href="/marketplace/login" className="button primary">Sign in</Link></section></div>;
@@ -20,7 +23,16 @@ export default async function NewTradePage({ searchParams }) {
     const target = to ? await getPublicProfileByAlias(to).catch(() => null) : null;
     if (!target || target.id === me.id) notFound();
 
-    const [myInv, theirInv] = await Promise.all([getInventory(me.id).catch(() => null), getInventory(target.id).catch(() => null)]);
+    const [myInv, theirInv, myPets, theirPets] = await Promise.all([
+        getInventory(me.id).catch(() => null),
+        getInventory(target.id).catch(() => null),
+        petsState(me.id).catch(() => ({ earnedTradeableIds: [], ownedIds: [] })),
+        petsState(target.id).catch(() => ({ earnedTradeableIds: [], ownedIds: [] })),
+    ]);
+    // My tradeable pets; their tradeable pets that I DON'T already own (no point requesting a dupe).
+    const myOwned = new Set(myPets.ownedIds || []);
+    const myTradePets = petStrip(myPets.earnedTradeableIds || []);
+    const theirTradePets = petStrip((theirPets.earnedTradeableIds || []).filter((id) => !myOwned.has(id)));
 
     return (
         <div className="stack reveal">
@@ -37,9 +49,10 @@ export default async function NewTradePage({ searchParams }) {
                 </div>
             </section>
             <TradeBuilder
-                me={{ items: strip(myInv), gold: myInv?.gold || 0 }}
-                them={{ id: target.id, label: target.displayLabel, alias: target.alias, items: strip(theirInv) }}
+                me={{ items: strip(myInv), pets: myTradePets, gold: myInv?.gold || 0 }}
+                them={{ id: target.id, label: target.displayLabel, alias: target.alias, items: strip(theirInv), pets: theirTradePets }}
                 preselectWant={want || null}
+                preselectWantPet={wantPet || null}
             />
         </div>
     );

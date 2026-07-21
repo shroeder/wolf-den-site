@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
+import PetArt from "@/components/PetArt";
 
 function ItemToggle({ item, on, onClick }) {
     return (
@@ -15,11 +16,25 @@ function ItemToggle({ item, on, onClick }) {
     );
 }
 
+function PetToggle({ pet, on, onClick }) {
+    return (
+        <button type="button" className={`equip-card rar-${pet.rarity}${on ? " is-equipped" : ""}`} onClick={onClick}>
+            <span className="equip-card-glyph" style={{ display: "grid", placeItems: "center" }}><PetArt id={pet.id} /></span>
+            <span className="equip-card-name">🐾 {pet.name}</span>
+            <span className="equip-card-stats">{on ? "✓ in trade" : "tap to add"}</span>
+        </button>
+    );
+}
+
 // Build a trade: pick items + gold YOU give, and items + gold you want from THEM.
-export default function TradeBuilder({ me, them, preselectWant = null }) {
+export default function TradeBuilder({ me, them, preselectWant = null, preselectWantPet = null }) {
     const router = useRouter();
+    const mePets = me.pets || [];
+    const themPets = them.pets || [];
     const [give, setGive] = useState(new Set());
     const [get, setGet] = useState(() => (preselectWant && them.items.some((i) => i.id === preselectWant) ? new Set([preselectWant]) : new Set()));
+    const [givePets, setGivePets] = useState(new Set());
+    const [getPets, setGetPets] = useState(() => (preselectWantPet && themPets.some((p) => p.id === preselectWantPet) ? new Set([preselectWantPet]) : new Set()));
     const [giveGold, setGiveGold] = useState("");
     const [getGold, setGetGold] = useState("");
     const [note, setNote] = useState("");
@@ -28,7 +43,7 @@ export default function TradeBuilder({ me, them, preselectWant = null }) {
 
     const toggle = (setFn) => (id) => setFn((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
     const gGold = Math.max(0, Math.floor(Number(giveGold) || 0));
-    const empty = give.size === 0 && get.size === 0 && gGold === 0 && (Number(getGold) || 0) === 0;
+    const empty = give.size === 0 && get.size === 0 && givePets.size === 0 && getPets.size === 0 && gGold === 0 && (Number(getGold) || 0) === 0;
 
     async function propose() {
         if (empty || busy) return;
@@ -39,16 +54,21 @@ export default function TradeBuilder({ me, them, preselectWant = null }) {
                 method: "POST", headers: { "content-type": "application/json" },
                 body: JSON.stringify({
                     action: "propose", toUserId: them.id,
-                    offeredItems: [...give], offeredGold: gGold,
-                    requestedItems: [...get], requestedGold: Math.max(0, Math.floor(Number(getGold) || 0)), note,
+                    offeredItems: [...give], offeredGold: gGold, offeredPets: [...givePets],
+                    requestedItems: [...get], requestedGold: Math.max(0, Math.floor(Number(getGold) || 0)), requestedPets: [...getPets], note,
                 }),
             });
             const d = await r.json().catch(() => ({}));
             if (!r.ok) {
                 const MSG = {
                     item_in_pending_trade: `${d?.itemName || "That item"} is already tied up in a pending trade — resolve or cancel that one first.`,
+                    pet_in_pending_trade: `${d?.itemName || "That pet"} is already in a pending trade — resolve that one first.`,
                     they_dont_own_requested: "They no longer have that item.",
                     you_dont_own_offered: "You no longer have one of those items.",
+                    pet_not_tradeable: "One of your pets can't be traded (only earned pets you haven't already traded).",
+                    their_pet_not_tradeable: "One of their pets isn't tradeable.",
+                    they_already_own_pet: "They already own a pet you're offering.",
+                    you_already_own_pet: "You already own a pet you're requesting.",
                     not_enough_gold: "You don't have enough gold to escrow.",
                     empty_trade: "Add something to the trade first.",
                     invalid_target: "You can't trade with that member.",
@@ -76,6 +96,12 @@ export default function TradeBuilder({ me, them, preselectWant = null }) {
                         {me.items.length ? me.items.map((i) => <ItemToggle key={i.id} item={i} on={give.has(i.id)} onClick={() => toggle(setGive)(i.id)} />)
                             : <p className="muted" style={{ margin: 0 }}>You have no items to give.</p>}
                     </div>
+                    {mePets.length ? (
+                        <>
+                            <p className="muted" style={{ margin: "12px 0 6px", fontSize: "0.82rem" }}>🐾 Pets to give <span style={{ opacity: 0.7 }}>(they get a fresh copy; both become non-tradeable)</span></p>
+                            <div className="equip-bag-grid">{mePets.map((p) => <PetToggle key={p.id} pet={p} on={givePets.has(p.id)} onClick={() => toggle(setGivePets)(p.id)} />)}</div>
+                        </>
+                    ) : null}
                 </section>
                 <section className="card" style={{ borderColor: "rgba(55,224,161,0.3)" }}>
                     <h2 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}>
@@ -89,6 +115,12 @@ export default function TradeBuilder({ me, them, preselectWant = null }) {
                         {them.items.length ? them.items.map((i) => <ItemToggle key={i.id} item={i} on={get.has(i.id)} onClick={() => toggle(setGet)(i.id)} />)
                             : <p className="muted" style={{ margin: 0 }}>They have no items to request.</p>}
                     </div>
+                    {themPets.length ? (
+                        <>
+                            <p className="muted" style={{ margin: "12px 0 6px", fontSize: "0.82rem" }}>🐾 Pets to request <span style={{ opacity: 0.7 }}>(their earned pets you don&apos;t own)</span></p>
+                            <div className="equip-bag-grid">{themPets.map((p) => <PetToggle key={p.id} pet={p} on={getPets.has(p.id)} onClick={() => toggle(setGetPets)(p.id)} />)}</div>
+                        </>
+                    ) : null}
                 </section>
             </div>
             <section className="card">

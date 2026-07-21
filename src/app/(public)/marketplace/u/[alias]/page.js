@@ -108,6 +108,7 @@ export default async function UserProfilePage({ params }) {
                 into: pl.into ?? 0,
                 span: pl.span ?? 0,
                 maxed: Boolean(pl.maxed),
+                tradeable: (pets.earnedTradeableIds || []).includes(id),
                 featured: pets.featured === id,
                 spriteUrl: art?.url || null,
                 spriteFlip: art?.flip || false,
@@ -140,7 +141,7 @@ export default async function UserProfilePage({ params }) {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has collected — from leveling, chests, the boss, and the shop.</p>
-                <PublicPets pets={petsData} />
+                <PublicPets pets={petsData} canTrade={Boolean(viewer && viewer.id !== profile.id)} targetAlias={profile.alias} />
             </section>
         </div>
     );
