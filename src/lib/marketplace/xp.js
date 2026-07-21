@@ -113,25 +113,28 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     // spendable currency for a payout we already paid the customer for.
     const goldDelta = gold === undefined ? pts : Math.max(0, Math.round(Number(gold) * mult));
 
-    // Per-action daily cap: if the user already hit today's limit for this action, skip.
-    if (dailyCap != null && dailyCap > 0) {
-        const capRow = await db
-            .queryOne(
-                `SELECT COUNT(*)::int AS n FROM mkt_xp_event
-                  WHERE buyer_id = $1 AND action = $2 AND created_at::date = (NOW() AT TIME ZONE 'utc')::date`,
-                [buyerId, action]
-            )
-            .catch(() => null);
-        if (capRow && capRow.n >= dailyCap) return null;
-    }
-
+    // Per-action daily cap — enforced ATOMICALLY in the insert so rapid/concurrent awards can't slip past it
+    // (a plain COUNT-then-insert is racy: burst clicks all read "under cap" before any row commits). When a
+    // cap is set the row only inserts if today's count is still under it; no row back = capped, so we bail.
     try {
-        // The unique index on dedupe_key makes a duplicate insert throw; we then skip the increment.
-        await db.query(
-            `INSERT INTO mkt_xp_event (buyer_id, action, points, dedupe_key, meta)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [buyerId, action, pts, dedupeKey, meta ? JSON.stringify(meta) : null]
-        );
+        if (dailyCap != null && dailyCap > 0) {
+            const inserted = await db.queryOne(
+                `INSERT INTO mkt_xp_event (buyer_id, action, points, dedupe_key, meta)
+                 SELECT $1, $2, $3, $4, $5
+                  WHERE (SELECT COUNT(*) FROM mkt_xp_event
+                           WHERE buyer_id = $1 AND action = $2 AND created_at::date = (NOW() AT TIME ZONE 'utc')::date) < $6
+                 RETURNING id`,
+                [buyerId, action, pts, dedupeKey, meta ? JSON.stringify(meta) : null, dailyCap]
+            );
+            if (!inserted) return null; // hit today's cap (or deduped) — skip the increment
+        } else {
+            // The unique index on dedupe_key makes a duplicate insert throw; we then skip the increment.
+            await db.query(
+                `INSERT INTO mkt_xp_event (buyer_id, action, points, dedupe_key, meta)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [buyerId, action, pts, dedupeKey, meta ? JSON.stringify(meta) : null]
+            );
+        }
     } catch {
         return null; // deduped (or a transient error) — never break the caller
     }

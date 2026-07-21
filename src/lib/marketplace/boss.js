@@ -773,10 +773,25 @@ export async function attackBoss(buyerId) {
     const crit = swing.crit;
     const ability = pickAbility(crit);
 
+    // RESERVE the swing slot ATOMICALLY (race-safe): the boss_hit only inserts if today's manual count for
+    // this boss is still under the cap — so rapid double-clicks / concurrent requests can't exceed the daily
+    // swing limit (the earlier used>=cap check is just a fast pre-reject; THIS is the real enforcement).
+    const hit = await db.queryOne(
+        `INSERT INTO boss_hit (boss_id, buyer_id, damage, kind)
+         SELECT $1, $2, $3, 'manual'
+          WHERE (SELECT COUNT(*) FROM boss_hit
+                   WHERE buyer_id = $2 AND kind = 'manual' AND boss_id = $1
+                     AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date) < $4
+         RETURNING id`,
+        [boss.id, buyerId, damage, dailyCap]
+    );
+    if (!hit) return { error: "no_attacks_left", attacksLeft: 0 };
+    // Slot reserved — now deal the damage.
     const row = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, damage]);
-    if (!row) return { error: "defeated" };
-
-    const hit = await db.queryOne(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'manual') RETURNING id`, [boss.id, buyerId, damage]);
+    if (!row) {
+        await db.query(`DELETE FROM boss_hit WHERE id = $1`, [hit.id]).catch(() => {}); // boss already dead — release the slot
+        return { error: "defeated" };
+    }
     // XP for the first 3 swings/day only — extra strikes (gear/pets/potions) still deal damage + earn
     // tickets, but no longer print unlimited XP (strike-stacking was dominating the leaderboard).
     await awardXp(buyerId, "boss_attack", { dailyCap: 3, dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${Date.now()}`}` }).catch(() => {});
