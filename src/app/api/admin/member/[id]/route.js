@@ -77,7 +77,7 @@ export async function GET(request, { params }) {
         try {
             const { id } = await params;
             const row = await db.queryOne(
-                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, created_at, last_seen_at, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = $1`,
+                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(store_credit_cents,0) AS store_credit_cents, created_at, last_seen_at, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = $1`,
                 [id]
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -131,6 +131,7 @@ export async function GET(request, { params }) {
                     level: levelForXp(row.xp).level,
                     xp: row.xp,
                     gold: row.gold,
+                    storeCreditCents: row.store_credit_cents,
                     createdAt: iso(row.created_at),
                     lastSeenAt: iso(row.last_seen_at),
                     // Hero-card visuals.
