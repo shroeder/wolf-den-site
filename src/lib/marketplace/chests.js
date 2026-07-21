@@ -98,6 +98,9 @@ export async function syncLevelChests(buyerId) {
     for (let L = row.chest_level + 1; L <= level; L++) {
         const t = tierForLevel(L);
         tally[t] = (tally[t] || 0) + 1;
+        // Milestone: a BONUS Mythic chest every 10th level. This is now the main way to earn a Mythic
+        // chest (level-ups otherwise cap at Gold), so mythic gear stays a rare chase — ~1 per 10 levels.
+        if (L % 10 === 0) tally.mythic = (tally.mythic || 0) + 1;
     }
     await addChests(buyerId, tally);
     await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
