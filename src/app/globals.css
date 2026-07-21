@@ -10462,7 +10462,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-boat-img { display: block; width: clamp(190px, 54vw, 320px); height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Crew ride the deck (roughly the lower-center of the hull). */
-.sail-crew { position: absolute; left: 49%; bottom: 33%; transform: translateX(-50%);
+.sail-crew { position: absolute; left: 49%; bottom: 25%; transform: translateX(-50%);
     display: flex; align-items: flex-end; gap: 2px; pointer-events: none; z-index: 2; }
 .sail-hero { height: clamp(60px, 17vw, 116px); width: auto; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.45)); }
 .sail-hero-avatar { border-radius: 50%; height: clamp(46px, 13vw, 84px); }
