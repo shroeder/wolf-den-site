@@ -28,7 +28,7 @@ export async function GET(request) {
             const pct = target > 0 ? Math.min(100, Math.round((xp / target) * 100)) : 0;
 
             return NextResponse.json(
-                { authed: true, xp, gold, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
+                { authed: true, xp, gold, level, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
                 { headers: { "Cache-Control": "no-store" } }
             );
         } catch (error) {
