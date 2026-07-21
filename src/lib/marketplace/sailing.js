@@ -27,10 +27,11 @@ export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
 // Dig board.
 const DIG_COLS = 4;
 const DIG_ROWS = 4;
-const DIG_MAX_DEPTH = 3;      // layers of rock over every tile — you chip straight down through them
-const BASE_STAMINA = 12;      // digs per voyage, + luck level
-const FRAGMENTS_BURIED = 3;   // individual fragments scattered through the rock (no clusters, no pointer)
-const XP_PER_DIG_WIN = 30;
+const DIG_MAX_DEPTH = 3;      // layers of dirt over every tile — you chip straight down through them
+const BASE_STAMINA = 12;      // digs per voyage (flat; extend mid-dig with "buy more digs")
+const FRAGMENTS_BURIED = 3;   // base fragments scattered through the dirt; Fortune adds +1 buried per level
+const MAX_BURIED = 8;         // cap on buried fragments (half a 4×4 board)
+const SPEED_PCT_PER_LEVEL = 10; // Speed shaves this % off each voyage per level (SPEED_STEP = 0.90)
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
 const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to ~300 before release
 
@@ -51,22 +52,27 @@ export function voyageDurationMs(speedLevel = 0) {
     return Math.max(MIN_VOYAGE_MS, Math.round(BASE_VOYAGE_MS * Math.pow(SPEED_STEP, Math.max(0, speedLevel))));
 }
 function upgradeCost(nextLevel) { return 400 * (nextLevel + 1) * (nextLevel + 1); }
-function digStamina(luckLevel = 0) { return BASE_STAMINA + Math.max(0, luckLevel); }
+// Dig count no longer scales with an upgrade — it's a flat budget you extend mid-dig with "buy more digs".
+function digStamina() { return BASE_STAMINA; }
+// Fortune (stored in the luck_level column) sends the boat to richer islands: +1 buried fragment per level.
+function fragmentsBuried(fortuneLevel = 0) { return Math.min(MAX_BURIED, FRAGMENTS_BURIED + Math.max(0, fortuneLevel)); }
+// The boat's level is EARNED BY UPGRADING, not by digging: one level per Speed/Fortune level bought.
+function boatLevelFromUpgrades(speedLevel = 0, fortuneLevel = 0) { return 1 + Math.max(0, speedLevel) + Math.max(0, fortuneLevel); }
 
 // --- dig board -----------------------------------------------------------------------------------------
 function randInt(n) { return Math.floor(Math.random() * n); }
 
-function newBoard(luckLevel) {
-    // Every tile is a stack of 1–DIG_MAX_DEPTH rock layers you chip through. FRAGMENTS_BURIED fragments are
-    // scattered under random individual tiles — NO clusters, NO pointer, NO shimmer. You never learn a tile's
-    // secret until you break it all the way to the bottom, where you find either bare rock or a fragment.
+function newBoard(fortuneLevel) {
+    // Every tile is a stack of 1–DIG_MAX_DEPTH dirt layers you chip through. Fragments are scattered under
+    // random individual tiles — NO clusters, NO pointer, NO shimmer. Fortune enriches the island with more
+    // buried fragments to find. You never learn a tile's secret until you break it to the bottom.
     const depth = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => 1 + randInt(DIG_MAX_DEPTH)));
     const cells = [];
     for (let r = 0; r < DIG_ROWS; r++) for (let c = 0; c < DIG_COLS; c++) cells.push([r, c]);
     for (let i = cells.length - 1; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
-    const frag = cells.slice(0, FRAGMENTS_BURIED); // the tiles that hide a fragment at the bottom
+    const frag = cells.slice(0, fragmentsBuried(fortuneLevel)); // the tiles that hide a fragment at the bottom
     const dug = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => false));
-    const stamina = digStamina(luckLevel);
+    const stamina = digStamina();
     return { cols: DIG_COLS, rows: DIG_ROWS, depth, maxDepth: DIG_MAX_DEPTH, frag, dug, stamina, maxStamina: stamina, status: "active" };
 }
 
@@ -111,13 +117,9 @@ function boardView(board) {
 
 // --- state ---------------------------------------------------------------------------------------------
 function decorate(row) {
-    const xp = row?.boat_xp || 0;
-    const level = boatLevel(xp);
     const speedLevel = row?.speed_level || 0;
-    const luckLevel = row?.luck_level || 0;
-    const level0Xp = boatXpForLevel(level);
-    const nextXp = boatXpForLevel(Math.min(MAX_LEVEL, level + 1));
-    const span = Math.max(1, nextXp - level0Xp);
+    const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
+    const level = boatLevelFromUpgrades(speedLevel, fortuneLevel); // earned by upgrading, never by digging
 
     const departedAt = row?.departed_at ? new Date(row.departed_at).getTime() : null;
     const arrivesAt = row?.returns_at ? new Date(row.returns_at).getTime() : null; // returns_at = island arrival
@@ -133,18 +135,23 @@ function decorate(row) {
     else if (status === "arrived" || status === "digging") progress = 1;
 
     return {
-        level, maxLevel: MAX_LEVEL, tier: boatTier(level), boatArt: boatArt(level),
+        level, maxLevel: boatLevelFromUpgrades(MAX_SPEED_LEVEL, MAX_LUCK_LEVEL), tier: boatTier(level), boatArt: boatArt(level),
         oceanBg: OCEAN_BG, digBg: DIG_BG, islandArt: ISLAND_ART,
-        xp, xpInto: Math.max(0, xp - level0Xp), xpSpan: span,
         voyagesCompleted: row?.voyages_completed || 0,
         fragments: row?.fragments || 0,
         fragmentsPerChest: FRAGMENTS_PER_CHEST,
         chestReward: { tier: CHEST_FROM_FRAGMENTS, label: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.label || "Chest", emoji: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.emoji || "🎁" },
         digRefill: { amount: DIG_REFILL, cost: DIG_REFILL_COST },
-        speed: { level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL },
-        luck: { level: luckLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL },
+        // The boat's two upgrades — both boat-exclusive. Each carries its per-level effect + current/next value.
+        speed: {
+            level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL,
+            pctPerLevel: SPEED_PCT_PER_LEVEL, voyageNow: voyageDurationMs(speedLevel), voyageNext: voyageDurationMs(speedLevel + 1),
+        },
+        fortune: {
+            level: fortuneLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(fortuneLevel), maxed: fortuneLevel >= MAX_LUCK_LEVEL,
+            buriedNow: fragmentsBuried(fortuneLevel), buriedNext: fragmentsBuried(fortuneLevel + 1),
+        },
         voyageMs: voyageDurationMs(speedLevel),
-        digStamina: digStamina(luckLevel),
         status, progress, departedAt, arrivesAt,
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
@@ -283,16 +290,16 @@ export async function digAt(buyerId, r, c) {
         // voyage + board so the boat is back at port.
         const earned = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
         const won = earned > 0;
+        // NOTE: digging does NOT grant boat XP — the boat only levels up from buying Speed/Fortune upgrades.
         await db.query(
             `UPDATE mkt_sailing
                 SET dig_state = NULL, departed_at = NULL, returns_at = NULL,
-                    fragments = fragments + $2, boat_xp = boat_xp + $3,
-                    voyages_completed = voyages_completed + 1, updated_at = NOW()
+                    fragments = fragments + $2, voyages_completed = voyages_completed + 1, updated_at = NOW()
               WHERE buyer_id = $1`,
-            [buyerId, earned, won ? XP_PER_DIG_WIN : 0]
+            [buyerId, earned]
         ).catch(() => {});
         const state = await getSailingState(buyerId);
-        return { ok: true, result: { won, earned, buried: board.frag.length, xp: won ? XP_PER_DIG_WIN : 0, fragments: state.fragments }, ...state };
+        return { ok: true, result: { won, earned, buried: board.frag.length, fragments: state.fragments }, ...state };
     }
 
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

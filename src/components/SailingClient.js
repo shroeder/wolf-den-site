@@ -210,7 +210,6 @@ export default function SailingClient({ initial, hero, pet }) {
     }, [act]);
 
     const level = state.level;
-    const xpPct = Math.min(100, Math.round((state.xpInto / Math.max(1, state.xpSpan)) * 100));
     const dig = state.dig;
     const windCost = state.windRecharge?.cost ?? 0;
     const windTooPoor = windCost > 0 && state.gold < windCost;
@@ -343,29 +342,37 @@ export default function SailingClient({ initial, hero, pet }) {
                     </div>
                 )}
 
-                {/* Boat identity + XP */}
+                {/* Boat identity — level comes from upgrades, not digging. */}
                 <div className="sail-boatline">
                     <div><span className="sail-boatname">Wood Boat</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level}</span></div>
                     <span className="muted sail-boatline-frag"><FragmentIcon size={14} /> {state.fragments} · 🪙 {state.gold.toLocaleString()}</span>
                 </div>
-                <div className="sail-xpbar"><span style={{ width: `${xpPct}%` }} /></div>
             </section>
 
-            {/* Upgrades */}
+            {/* Boat upgrades — the ONLY way the boat levels up. Two boat-exclusive stats, each explained. */}
             <section className="card">
-                <h2 style={{ marginTop: 0 }}>Upgrade your boat</h2>
+                <h2 style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels up your boat ⭐ — it doesn&apos;t level from digging.</p>
                 <div className="sail-upgrades">
                     <div className="sail-upg">
                         <div className="sail-upg-top"><span>💨 Speed</span><span className="muted">Lv {state.speed.level}/{state.speed.max}</span></div>
-                        <p className="muted sail-upg-desc">Reach the island faster.</p>
+                        <p className="muted sail-upg-desc">Faster voyages to the island — cuts travel time <b>{state.speed.pctPerLevel}%</b> each level.</p>
+                        <div className="sail-upg-effect">
+                            <span>Trip time</span>
+                            <b>{fmtLeft(state.speed.voyageNow)}{state.speed.maxed ? "" : <> → <span className="sail-upg-next">{fmtLeft(state.speed.voyageNext)}</span></>}</b>
+                        </div>
                         {state.speed.maxed ? <button className="pill" disabled>Maxed</button>
                             : <button className="btn-ghost" disabled={busy || state.gold < state.speed.cost} onClick={() => act("upgrade_speed")}>🪙 {state.speed.cost.toLocaleString()}</button>}
                     </div>
                     <div className="sail-upg">
-                        <div className="sail-upg-top"><span>🍀 Luck</span><span className="muted">Lv {state.luck.level}/{state.luck.max}</span></div>
-                        <p className="muted sail-upg-desc">+1 dig stamina per level (currently {state.digStamina}).</p>
-                        {state.luck.maxed ? <button className="pill" disabled>Maxed</button>
-                            : <button className="btn-ghost" disabled={busy || state.gold < state.luck.cost} onClick={() => act("upgrade_luck")}>🪙 {state.luck.cost.toLocaleString()}</button>}
+                        <div className="sail-upg-top"><span>🍀 Fortune</span><span className="muted">Lv {state.fortune.level}/{state.fortune.max}</span></div>
+                        <p className="muted sail-upg-desc">Sail to richer islands — <b>+1</b> fragment buried to dig up each trip, per level.</p>
+                        <div className="sail-upg-effect">
+                            <span>Fragments buried</span>
+                            <b><FragmentIcon size={13} /> {state.fortune.buriedNow}{state.fortune.maxed ? "" : <> → <span className="sail-upg-next">{state.fortune.buriedNext}</span></>}</b>
+                        </div>
+                        {state.fortune.maxed ? <button className="pill" disabled>Maxed</button>
+                            : <button className="btn-ghost" disabled={busy || state.gold < state.fortune.cost} onClick={() => act("upgrade_luck")}>🪙 {state.fortune.cost.toLocaleString()}</button>}
                     </div>
                 </div>
             </section>
@@ -393,7 +400,6 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap">
                         {result.won ? <Confetti /> : null}
-                        {levelUp ? <div className="sail-levelup-ribbon">⬆️ Boat leveled up — Lv {levelUp}!</div> : null}
                         <div className={`sail-recap-hero ${result.won ? "is-win" : "is-fail"}`}>
                             {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} /></span> : <span className="sail-recap-rock">🪨</span>}
                         </div>
@@ -406,14 +412,27 @@ export default function SailingClient({ initial, hero, pet }) {
                         <div className="sail-recap-rows">
                             <div className="sail-recap-row"><span>Fragments this dig</span><b className="sail-recap-pos"><FragmentIcon size={15} /> +{result.earned}</b></div>
                             <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {result.fragments}</b></div>
-                            {result.xp ? <div className="sail-recap-row"><span>Boat XP</span><b className="sail-recap-pos">+{result.xp}</b></div> : null}
                             <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
                         </div>
                         <div className="sail-recap-chest">
                             <div className="sail-hold-bar"><span style={{ width: `${Math.round(((result.fragments % 10) / 10) * 100)}%` }} /></div>
                             <div className="muted sail-hold-note">{result.fragments % 10}/10 toward a treasure chest</div>
                         </div>
-                        <button className="sail-cta" onClick={() => { setResult(null); setLevelUp(null); }}>⚓ Back to port</button>
+                        <button className="sail-cta" onClick={() => setResult(null)}>⚓ Back to port</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Boat level-up — fires when you BUY an upgrade (the only way the boat levels). */}
+            {levelUp ? (
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap">
+                        <Confetti />
+                        <div className="sail-recap-hero is-win"><span className="sail-levelup-badge">⛵</span></div>
+                        <div className="sail-levelup-ribbon">⬆️ Boat leveled up!</div>
+                        <h2 style={{ margin: "8px 0 2px" }}>Wood Boat — Lv {levelUp}</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>Keep upgrading Speed &amp; Fortune to make her stronger.</p>
+                        <button className="sail-cta" onClick={() => setLevelUp(null)}>⭐ Nice</button>
                     </div>
                 </div>
             ) : null}

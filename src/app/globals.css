@@ -10532,7 +10532,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upg { border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .sail-upg-top { display: flex; align-items: center; justify-content: space-between; font-weight: 800; }
 .sail-upg-desc { margin: 0; font-size: 0.8rem; }
+.sail-upg-desc b { color: #ffd75e; }
+/* The "what it does now → next level" effect row on each upgrade card. */
+.sail-upg-effect { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.78rem;
+    margin: 2px 0 4px; padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+.sail-upg-effect > span { color: #9fb0c0; }
+.sail-upg-effect b { display: inline-flex; align-items: center; gap: 4px; color: #f2e8d6; }
+.sail-upg-next { color: #7cffb2; font-weight: 800; }
 .sail-upg > button { margin-top: auto; }
+.sail-levelup-badge { font-size: 3.4rem; display: inline-block; filter: drop-shadow(0 0 16px rgba(255,215,94,0.7)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
 @media (max-width: 420px) { .sail-upgrades { grid-template-columns: 1fr; } }
 
 .sail-reward-overlay { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center;
