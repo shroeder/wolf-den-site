@@ -29,6 +29,14 @@ import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultipl
 // where every member's avatar chips away 24/7 (a background tick applies it and records it over time).
 export const DAILY_ATTACKS = 1;
 
+// Single source of truth for a member's daily manual-strike cap: base + gear/pet extra_strike + signature +
+// set capstone + consumable strike-boosts. BOTH the enforcer (attackBoss) and the status display compute the
+// cap through here so the shown "attacks left" can never drift from what's actually allowed (they used to
+// diverge — the display omitted the capstone + pet bonuses, showing 0 left when a swing was still available).
+function dailyStrikeCap({ extraStrike = 0, equippedIds = {}, bonusStrikes = 0 }) {
+    return DAILY_ATTACKS + (extraStrike || 0) + signatureStrikeBonus(equippedIds) + setCapstoneStrikeBonus(equippedIds) + (bonusStrikes || 0);
+}
+
 const lvl = (xp) => levelForXp(xp || 0).level;
 
 // Damage formulas (both scale with level). Equipped-gear stats buff the manual strike: might (+% damage),
@@ -363,13 +371,14 @@ export async function getBossState(buyerId = null) {
     let you = null;
     if (buyerId) {
         const used = await manualAttacksToday(buyerId, boss.id);
-        const [myStats, myIds, bonusStrikes, boosts] = await Promise.all([
+        const [myStats, myIds, bonusStrikes, boosts, myPet] = await Promise.all([
             getEquippedStats(buyerId).catch(() => ({})),
             getEquippedIds(buyerId).catch(() => ({})),
             memberBonusStrikes(buyerId).catch(() => 0),
             activeBoosts(buyerId).catch(() => []),
+            getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
         ]);
-        const dailyCap = DAILY_ATTACKS + (myStats.extra_strike || 0) + signatureStrikeBonus(myIds) + bonusStrikes;
+        const dailyCap = dailyStrikeCap({ extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0), equippedIds: myIds, bonusStrikes });
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
         const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -732,7 +741,7 @@ export async function attackBoss(buyerId) {
         extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0),
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
-    const dailyCap = DAILY_ATTACKS + (stats.extra_strike || 0) + signatureStrikeBonus(equippedIds) + setCapstoneStrikeBonus(equippedIds) + (await memberBonusStrikes(buyerId).catch(() => 0));
+    const dailyCap = dailyStrikeCap({ extraStrike: stats.extra_strike, equippedIds, bonusStrikes: await memberBonusStrikes(buyerId).catch(() => 0) });
     const used = await manualAttacksToday(buyerId, boss.id);
     if (used >= dailyCap) return { error: "no_attacks_left", attacksLeft: 0 };
 
