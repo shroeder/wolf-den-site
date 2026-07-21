@@ -62,10 +62,10 @@ function tierForLevel(level) {
 // first hit, so you get at most one elite chest per level and the tiers get exponentially harder to see —
 // the last three especially. This is how Ascendant→Primordial chests are earned purely through play.
 const ELITE_CHEST_LOTTERY = [
-    { tier: "primordial", chance: 0.00015 }, // ~1 in 6,700 level-ups
-    { tier: "celestial", chance: 0.0012 }, //  ~1 in 830
-    { tier: "eternal", chance: 0.006 }, //     ~1 in 165
-    { tier: "ascendant", chance: 0.025 }, //   ~1 in 40
+    { tier: "primordial", chance: 0.00002 }, // ~1 in 50,000 level-ups
+    { tier: "celestial", chance: 0.00015 }, //  ~1 in 6,700
+    { tier: "eternal", chance: 0.001 }, //      ~1 in 1,000
+    { tier: "ascendant", chance: 0.006 }, //    ~1 in 167
 ];
 
 function rollRarity(weights) {
