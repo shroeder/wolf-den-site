@@ -10,6 +10,7 @@ import { FaDharmachakra } from "react-icons/fa6";
 // marketplace layout; it self-hides on non-game pages (vendor marketplace, social, profile, checkout…).
 const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
+    { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
     { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Spin" },
     { href: "/marketplace/pets", emoji: "🐾", label: "Pets" },
