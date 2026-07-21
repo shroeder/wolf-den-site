@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import BossBattleScene from "@/components/BossBattleScene";
+import AvatarStack from "@/components/AvatarStack";
+import BossBattleScene, { AURA_COL, BORDER_COL } from "@/components/BossBattleScene";
 import ItemArt from "@/components/ItemArt";
+import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
@@ -232,22 +234,26 @@ export default function BossFightClient() {
                     <h3>🛡️ Active heroes</h3>
                     <div className="hero-strip">
                         {roster.map((f) => {
+                            // Each member's signature color tints their chip; the avatar carries their equipped
+                            // border ring + aura + cosmetic effects (via AvatarStack), and their profile
+                            // background dresses the card — so the mini cards read as uniquely theirs.
+                            const glow = AURA_COL[f.aura] || BORDER_COL[f.border] || null;
                             const inner = (
                                 <>
                                     <div className="herochip-av">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={f.avatarUrl} alt="" />
+                                        <AvatarStack avatarUrl={f.avatarUrl} border={f.border || "none"} cosmetics={f.avatarCosmetics} size={48} initial={(f.name || "?").slice(0, 1).toUpperCase()} />
                                         {f.badge ? <span className="herochip-badge" title={f.badge.label}>{f.badge.icon}</span> : null}
                                     </div>
                                     <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>
                                     <span className="herochip-meta">Lv {f.level} · 🎟️ {f.tickets}</span>
                                 </>
                             );
-                            const cls = `herochip${f.you ? " is-you" : ""}${f.alias ? " is-link" : ""}`;
+                            const cls = `herochip${f.you ? " is-you" : ""}${f.alias ? " is-link" : ""}${f.background ? ` has-bg ${backgroundClass(f.background)}` : ""}${glow ? " has-glow" : ""}`;
+                            const style = glow ? { "--glow": glow } : undefined;
                             return f.alias ? (
-                                <Link key={f.id} href={`/marketplace/u/${f.alias}`} className={cls} title={`Inspect ${f.name}`}>{inner}</Link>
+                                <Link key={f.id} href={`/marketplace/u/${f.alias}`} className={cls} style={style} title={`Inspect ${f.name}`}>{inner}</Link>
                             ) : (
-                                <div key={f.id} className={cls} title={`${f.name} · ${f.dmg.toLocaleString()} dmg`}>{inner}</div>
+                                <div key={f.id} className={cls} style={style} title={`${f.name} · ${f.dmg.toLocaleString()} dmg`}>{inner}</div>
                             );
                         })}
                     </div>

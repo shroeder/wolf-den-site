@@ -9307,14 +9307,18 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    Everyone gets a SOLID plate; members with an equipped profile background show it (crosshatch/hue) under a
    lighter scrim so their configured backplate reads. */
 /* Sits BELOW the centered boss HUD (name + HP bar) so the two never collide, upper-left over the arena. */
-.bhc-slot { position: absolute; top: clamp(80px, 14vw, 100px); left: 6px; z-index: 9; pointer-events: none; width: min(156px, 44vw); animation: bhcIn 0.4s ease both; }
+/* Sits well BELOW the boss name + HP bar + HP number so it never covers the health. */
+.bhc-slot { position: absolute; top: clamp(118px, 20vw, 152px); left: 6px; z-index: 9; pointer-events: none; width: min(150px, 42vw); animation: bhcIn 0.4s ease both; }
 @keyframes bhcIn { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
 .bhc { position: relative; border-radius: 12px; box-shadow: 0 5px 16px rgba(0,0,0,0.6); }
+/* The member's signature color rims the card + adds a soft glow, so each hero's card is visibly THEIRS. */
+.bhc.has-glow { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--glow) 80%, transparent), 0 0 14px color-mix(in srgb, var(--glow) 45%, transparent), 0 5px 16px rgba(0,0,0,0.6); }
 /* Compact plate. Members with a background cosmetic show it under a light scrim so their configured
    "backplate" (crosshatch/hue) actually reads; text stays legible via shadows. */
 .bhc-inner { position: relative; display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 12px;
     background: linear-gradient(180deg, rgba(16,18,26,0.96), rgba(9,10,15,0.97)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
 .bhc.has-bg .bhc-inner { background: linear-gradient(180deg, rgba(10,11,17,0.34), rgba(6,7,11,0.5)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
+.bhc.has-glow .bhc-inner { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--glow) 55%, rgba(255,255,255,0.18)); }
 .bhc-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .bhc-name { font-weight: 800; font-size: 0.8rem; color: #fff; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
 .bhc-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -10300,8 +10304,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .hud-strip { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
     background: linear-gradient(90deg, rgba(255,215,94,0.06), rgba(255,215,94,0.02));
     border-bottom: 1px solid rgba(255,215,94,0.18); }
-.hud-strip .reward-nudge { flex: 1 1 auto; min-width: 0; padding: 2px 4px; background: none; border-bottom: none; }
+.hud-strip .reward-nudge { flex: 1 1 auto; min-width: 0; gap: 8px; padding: 2px 4px; background: none; border-bottom: none; }
 .hud-strip .reward-nudge:hover { background: none; }
+/* Bar-forward on mobile: the progress bar fills the space (no gift/rank label eating it), XP-to-go on the right. */
+.hud-strip .reward-nudge-bar { flex: 1 1 auto; height: 9px; min-width: 46px; }
+.hud-strip .reward-nudge-togo { font-size: 0.82rem; }
 /* The coin chip — a shiny gold pill that catches the eye, with a punchy round "+" to buy more. */
 .coin-hud { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; overflow: hidden;
     padding: 4px 5px 4px 11px; border-radius: 999px; text-decoration: none; font-weight: 900; color: #3c2c04;
@@ -10321,3 +10328,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .coin-hud:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) { .coin-hud::after, .coin-hud-icon { animation: none; } }
 .boss2-sub { font-size: 0.78rem; text-align: center; margin: 2px 0 8px; }
+
+/* Active-heroes mini cards: dressed in each member's signature color + their equipped profile background,
+   so they match the on-stage nameplate. "You" keeps its gold treatment. */
+.herochip.has-glow:not(.is-you) { border-color: color-mix(in srgb, var(--glow) 60%, rgba(255,255,255,0.14));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--glow) 40%, transparent), 0 0 12px -4px var(--glow); }
+.herochip.has-bg { position: relative; }
+.herochip.has-bg .herochip-name, .herochip.has-bg .herochip-meta { text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+.herochip.is-link.has-glow:not(.is-you):hover { border-color: color-mix(in srgb, var(--glow) 85%, transparent); }

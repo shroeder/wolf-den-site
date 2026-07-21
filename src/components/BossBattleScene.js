@@ -5,7 +5,6 @@ import { GiSpikedDragonHead } from "react-icons/gi";
 
 import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
-import UserBadges from "@/components/UserBadges";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { rankForLevel } from "@/lib/marketplace/ranks.js";
@@ -18,20 +17,23 @@ import { rankForLevel } from "@/lib/marketplace/ranks.js";
 function BattleHeroCard({ f }) {
     const rank = rankForLevel(f.level || 1);
     const initial = (f.displayLabel || f.name || "?").slice(0, 1).toUpperCase();
-    // Don't repeat the featured badge (it's the folder tab) in the badge row; cap the rest so the card stays small.
-    const restBadges = (f.displayBadges || []).filter((b) => !f.featuredBadge || b.slug !== f.featuredBadge.slug).slice(0, 3);
+    // The member's signature color (aura → border) tints the card's edge + glow so each one reads as uniquely
+    // theirs, on top of their equipped background/frame/avatar-ring.
+    const glow = AURA_COL[f.aura] || BORDER_COL[f.border] || null;
     return (
-        <div className={`bhc ${f.background ? `has-bg ${backgroundClass(f.background)}` : ""} ${frameClass(f.frame)} ${f.you ? "is-you" : ""}`.replace(/\s+/g, " ").trim()}>
+        <div
+            className={`bhc ${f.background ? `has-bg ${backgroundClass(f.background)}` : ""} ${frameClass(f.frame)} ${f.you ? "is-you" : ""}${glow ? " has-glow" : ""}`.replace(/\s+/g, " ").trim()}
+            style={glow ? { "--glow": glow } : undefined}
+        >
             <CardTab badge={f.featuredBadge} compact />
             <div className="bhc-inner">
-                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={40} border={f.border} cosmetics={f.avatarCosmetics} />
+                <AvatarStack avatarUrl={f.avatarUrl} initial={initial} size={36} border={f.border} cosmetics={f.avatarCosmetics} />
                 <div className="bhc-body">
                     <div className="bhc-name">{f.you ? "You" : (f.displayLabel || f.name)}</div>
                     <div className="bhc-meta">
                         <span className="rank-chip rank-chip-sm">{rank.emoji} {rank.title}</span>
                         <span className="bhc-lv">Lv {f.level || 1}{f.petLevel ? ` · 🐾 ${f.petLevel}` : ""}</span>
                     </div>
-                    {restBadges.length ? <UserBadges badges={restBadges} /> : null}
                 </div>
             </div>
         </div>
@@ -45,8 +47,8 @@ function BattleHeroCard({ f }) {
 
 const GROUP = 1; // ONE hero at a time — each gets their moment to shine, then the next slides in.
 // Border/aura cosmetics → a representative glow color, so a hero's configured look reads on the stage.
-const BORDER_COL = { ember: "#ff7a3c", bronze: "#cd7f32", aqua: "#5ad0d0", neon: "#39ff14", silver: "#c0c0c0", crimson: "#e23b4e", emerald: "#2ecc71", sunset: "#ff8c5a", sky: "#4aa3ff", rose: "#ff5fa2", gold: "#ffd75e", ocean: "#2aa9c8", aurora: "#7cffb2", amethyst: "#b76bff", frost: "#a8e6ff", inferno: "#ff5a2c", rainbow: "#ff6bd6", cosmic: "#8f7cff", legendary: "#ffd75e", solar: "#ffb24a", abyss: "#6a4fe0", godray: "#fff2b0", singularity: "#b76bff", role_volunteer: "#7cffb2", role_staff: "#ffd75e", role_dev: "#8fb8ff", role_admin: "#ff5a5a" };
-const AURA_COL = { aura_gold: "#ffd75e", aura_aqua: "#5ad0d0", aura_violet: "#b76bff", aura_rainbow: "#ff6bd6", aura_ember: "#ff7a3c", aura_frost: "#a8e6ff", aura_cosmic: "#8f7cff" };
+export const BORDER_COL = { ember: "#ff7a3c", bronze: "#cd7f32", aqua: "#5ad0d0", neon: "#39ff14", silver: "#c0c0c0", crimson: "#e23b4e", emerald: "#2ecc71", sunset: "#ff8c5a", sky: "#4aa3ff", rose: "#ff5fa2", gold: "#ffd75e", ocean: "#2aa9c8", aurora: "#7cffb2", amethyst: "#b76bff", frost: "#a8e6ff", inferno: "#ff5a2c", rainbow: "#ff6bd6", cosmic: "#8f7cff", legendary: "#ffd75e", solar: "#ffb24a", abyss: "#6a4fe0", godray: "#fff2b0", singularity: "#b76bff", role_volunteer: "#7cffb2", role_staff: "#ffd75e", role_dev: "#8fb8ff", role_admin: "#ff5a5a" };
+export const AURA_COL = { aura_gold: "#ffd75e", aura_aqua: "#5ad0d0", aura_violet: "#b76bff", aura_rainbow: "#ff6bd6", aura_ember: "#ff7a3c", aura_frost: "#a8e6ff", aura_cosmic: "#8f7cff" };
 
 export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null }) {
     // Build the roster: real fighters (with art), padded a little so the stage isn't empty. "You" first so
@@ -118,7 +120,6 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                 <div className="battle-name">{boss.name}</div>
                 <div className="battle-hpbar"><span style={{ width: `${pct}%` }} /></div>
                 <div className="battle-hp">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</div>
-                {roster.filter((f) => !f.pad).length > 1 ? <div className="battle-wave">⚔️ {roster.filter((f) => !f.pad).length} in the fight</div> : null}
                 {boss.buff ? (
                     <div className="battle-buff" title={`All damage ×${boss.buff.damageMult} while active`}>
                         <span className="battle-buff-emoji">{boss.buff.emoji}</span>

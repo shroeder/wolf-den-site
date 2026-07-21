@@ -205,6 +205,7 @@ export async function getBossState(buyerId = null) {
         db
             .query(
                 `SELECT b.id, b.alias, b.display_name, b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.avatar_sprite_url, b.avatar_sprite_flip, b.xp,
+                        b.equipped_border, b.equipped_frame, b.equipped_background,
                         SUM(h.damage)::int AS dmg,
                         COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
                    FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
@@ -312,20 +313,29 @@ export async function getBossState(buyerId = null) {
         })
         .filter((m) => m.spriteUrl);
 
-    const roster = contributors.map((c) => ({
-        id: c.id,
-        name: c.display_name || c.alias || "Member",
-        alias: c.alias || null,
-        level: lvl(c.xp),
-        avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || DEFAULT_AVATAR_URL,
-        spriteUrl: c.avatar_sprite_url || defaultSprite || null,
-        spriteFlip: c.avatar_sprite_url ? c.avatar_sprite_flip === true : false,
-        badge: badgeByBuyer.get(c.id) || null,
-        dmg: c.dmg,
-        hits: c.hits,
-        tickets: Math.floor(c.dmg / divisor),
-        you: buyerId && c.id === buyerId,
-    }));
+    const roster = contributors.map((c) => {
+        const rcos = sanitizeCosmetics(c.avatar_cosmetics);
+        return {
+            id: c.id,
+            name: c.display_name || c.alias || "Member",
+            alias: c.alias || null,
+            level: lvl(c.xp),
+            avatarUrl: avatarImageUrl(c.avatar_config, c.avatar_cosmetics) || c.avatar_url || DEFAULT_AVATAR_URL,
+            spriteUrl: c.avatar_sprite_url || defaultSprite || null,
+            spriteFlip: c.avatar_sprite_url ? c.avatar_sprite_flip === true : false,
+            badge: badgeByBuyer.get(c.id) || null,
+            // Cosmetic dressing so the mini "Active heroes" cards carry each member's look too.
+            border: c.equipped_border && c.equipped_border !== "none" ? c.equipped_border : null,
+            frame: c.equipped_frame || "none",
+            background: c.equipped_background && c.equipped_background !== "none" ? c.equipped_background : null,
+            avatarCosmetics: rcos,
+            aura: rcos && typeof rcos === "object" && rcos.aura && rcos.aura !== "none" ? rcos.aura : null,
+            dmg: c.dmg,
+            hits: c.hits,
+            tickets: Math.floor(c.dmg / divisor),
+            you: buyerId && c.id === buyerId,
+        };
+    });
 
     // Raffle winner (shown on the defeated screen).
     let winner = null;

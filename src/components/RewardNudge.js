@@ -58,14 +58,8 @@ export default function RewardNudge() {
                     </Link>
                 ) : null}
                 {hasProgress ? (
-                    <Link href="/marketplace/track" className="reward-nudge" aria-label={`Next unlock: ${data.label} at level ${data.unlockLevel} — see your rewards track`}>
-                        <span className="reward-nudge-gift" aria-hidden="true">🎁</span>
-                        <span className="reward-nudge-main">
-                            <span className="reward-nudge-label">
-                                Next: <span aria-hidden="true">{data.icon}</span> <strong>{data.label}</strong>
-                            </span>
-                            <span className="reward-nudge-bar"><span style={{ width: `${data.pct}%` }} /></span>
-                        </span>
+                    <Link href="/marketplace/track" className="reward-nudge" aria-label={`Next unlock: ${data.label} at level ${data.unlockLevel} — ${data.xpToGo} XP to go`}>
+                        <span className="reward-nudge-bar" title={`Next: ${data.label}`}><span style={{ width: `${data.pct}%` }} /></span>
                         <span className="reward-nudge-togo">{data.xpToGo.toLocaleString()} XP →</span>
                     </Link>
                 ) : null}
