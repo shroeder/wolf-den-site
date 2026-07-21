@@ -14,7 +14,7 @@ import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collectibles.js";
+import { collectibleById, petActive, petPassive, petSpecialPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
 import { petActiveLevelMult } from "@/lib/marketplace/pet-level.js";
@@ -100,6 +100,12 @@ export default async function UserProfilePage({ params }) {
             const passive = petPassive(def);
             const pl = pets.petLevels?.[id] || {};
             const activeVal = Math.round((active?.value || 0) * petActiveLevelMult(lvl));
+            const sp = petSpecialPassive(def);
+            const specialDesc = [];
+            if (sp) {
+                if (sp.secondStat) specialDesc.push(`🌟 Dual affinity — also +${Math.round(sp.secondValue * petPassiveLevelMult(lvl))} ${fmtStat(sp.secondStat)}`);
+                if (sp.aura > 0) specialDesc.push(`✨ Menagerie Aura — +${Math.round(sp.aura * 100)}% to all your pets' passives`);
+            }
             return {
                 id,
                 name: def.name,
@@ -116,6 +122,7 @@ export default async function UserProfilePage({ params }) {
                 spriteFlip: art?.flip || false,
                 activeDesc: active ? `+${activeVal}% ${fmtStat(active.stat)} when equipped (Lv ${lvl})` : null,
                 passiveDesc: passive ? `+${pets.petLevels?.[id]?.value ?? passive.value} ${fmtStat(passive.stat)} owned (all pets stack)` : null,
+                specialDesc,
             };
         })
         .filter(Boolean)

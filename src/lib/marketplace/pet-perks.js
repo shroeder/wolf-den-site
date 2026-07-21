@@ -1,7 +1,7 @@
 // Each pet's EQUIPPED signature perk — a unique, flavor-named ability (not just a stat). Perks map to real
 // mechanics that feed the boss fight (see pet-combat.js + boss.js). Client-safe (no server-only / db) so the
 // pets page can render them and the server can compute combat bonuses from the same source.
-import { petPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
+import { petPassive, petSpecialPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
 const EXTRA_STRIKE_BY_RARITY = { common: 1, rare: 1, epic: 1, legendary: 1, mythic: 2, ascendant: 2, eternal: 3 };
@@ -126,11 +126,23 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         else if (k in stats) stats[k] += v;
     };
     // PASSIVE: every owned pet's small themed bonus, scaled only GENTLY by level (Lv5 ×2) — a broad menagerie
-    // bonus, not the main driver.
+    // bonus, not the main driver. Top-rarity pets add a SECOND passive stat (dual affinity) and the best
+    // MENAGERIE AURA among them amplifies the whole passive total.
+    let aura = 0;
     for (const pet of ownedPets) {
         const p = petPassive(pet);
-        const lvl = Math.max(1, Number(levelByPet[pet.id]) || 1);
-        add(p.stat, p.value * petPassiveLevelMult(lvl));
+        const lm = petPassiveLevelMult(Math.max(1, Number(levelByPet[pet.id]) || 1));
+        add(p.stat, p.value * lm);
+        const sp = petSpecialPassive(pet);
+        if (sp) {
+            if (sp.secondStat) add(sp.secondStat, sp.secondValue * lm);
+            if (sp.aura > aura) aura = sp.aura;
+        }
+    }
+    // Menagerie aura amplifies the accumulated PASSIVE totals (applied before the equipped active is layered on).
+    if (aura > 0) {
+        for (const k of Object.keys(stats)) stats[k] = Math.round(stats[k] * (1 + aura));
+        for (const k of Object.keys(economy)) economy[k] = Math.round(economy[k] * (1 + aura));
     }
     // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
     // pet. Proc magnitudes scale too (chances capped so they stay sane).

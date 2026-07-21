@@ -10410,3 +10410,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petsheet-passive { margin: 5px 0 0; font-size: 0.92rem; color: #e8ddc8; }
 .petsheet-hint { margin: 10px 0 0; font-style: italic; }
 .petsheet-close { margin-top: 16px; }
+.petsheet-special { margin: 5px 0 0; font-size: 0.86rem; font-weight: 700; color: #b98cff; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.petx-special .petx-ability-head { color: #b98cff; }
+.petx-special .petx-ability-body { color: #d9c9ff; font-weight: 700; }

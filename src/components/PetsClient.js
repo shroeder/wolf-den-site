@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
 import PetArt from "@/components/PetArt";
-import { COLLECTIBLES, collectibleById, petPassive, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
+import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiveLevelMult, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 
 const SOURCES = [
@@ -282,14 +282,14 @@ export default function PetsClient() {
                                 {[1, 2, 3, 4, 5].map((n) => (
                                     <div key={n} className={`petx-tier${n === lvl.level ? " is-current" : ""}${n < lvl.level ? " is-done" : ""}${n > lvl.level ? " is-locked" : ""}`}>
                                         <span className="petx-tier-stars">{"★".repeat(n)}</span>
-                                        <span className="petx-tier-val">+{lvl.base * n} {statText(passive)}</span>
+                                        <span className="petx-tier-val">+{Math.round(lvl.base * petPassiveLevelMult(n))} {statText(passive)}</span>
                                     </div>
                                 ))}
                             </div>
                             <div className="muted" style={{ fontSize: "0.78rem", marginTop: 6 }}>
                                 {isFeatured
-                                    ? "Equipped — earns 25% of your XP + a little over time."
-                                    : "Equip this pet to level it up (25% of your XP + a trickle over time)."}
+                                    ? "Equipped — earns 12% of your XP + a little over time. Leveling boosts its ⭐ signature (active)."
+                                    : "Equip this pet to level it up (12% of your XP + a trickle over time)."}
                             </div>
                         </div>
                     ) : null}
@@ -299,12 +299,26 @@ export default function PetsClient() {
                             <div className="petx-ability-head">🐾 Passive <span className="muted">· always active while owned</span></div>
                             <div className="petx-ability-body">
                                 <strong>+{lvl ? lvl.value : passive.value} {statText(passive)}</strong>
-                                {lvl && !lvl.maxed ? <span className="muted"> → +{passive.value * (lvl.level + 1)} at Lv {lvl.level + 1}</span> : null}
-                                {" "}— {STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales up to ×5 as this pet levels. Stacks with your whole collection.</span>
+                                {lvl && !lvl.maxed ? <span className="muted"> → +{Math.round(passive.value * petPassiveLevelMult(lvl.level + 1))} at Lv {lvl.level + 1}</span> : null}
+                                {" "}— {STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales gently (up to ×2) as this pet levels. Stacks with your whole collection.</span>
                             </div>
                         </div>
+                        {(() => {
+                            const sp = petSpecialPassive(p);
+                            if (!sp) return null;
+                            const n = lvl ? lvl.level : 1;
+                            const bits = [];
+                            if (sp.secondStat) bits.push(`🌟 Dual affinity — also +${Math.round(sp.secondValue * petPassiveLevelMult(n))} ${PET_STAT_META[sp.secondStat]?.label || sp.secondStat}`);
+                            if (sp.aura > 0) bits.push(`✨ Menagerie Aura — +${Math.round(sp.aura * 100)}% to ALL your pets' passives`);
+                            return (
+                                <div className="petx-ability petx-special">
+                                    <div className="petx-ability-head">💫 {p.rarity} bonus <span className="muted">· always active while owned</span></div>
+                                    <div className="petx-ability-body">{bits.map((b, i) => <div key={i}>{b}</div>)}</div>
+                                </div>
+                            );
+                        })()}
                         <div className="petx-ability">
-                            <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped</span></div>
+                            <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped, grows as you level this pet</span></div>
                             <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
                         </div>
                         {petRealWorld(p) ? (

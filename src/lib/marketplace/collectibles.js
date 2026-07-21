@@ -169,6 +169,27 @@ export function petActive(pet) {
 export function petActiveLevelMult(level) { return 1 + (Math.max(1, Number(level) || 1) - 1) * 0.5; }
 export function petPassiveLevelMult(level) { return 1 + (Math.max(1, Number(level) || 1) - 1) * 0.25; }
 
+// Special passive MECHANIC for top-rarity pets (beyond a bigger number):
+//  - DUAL AFFINITY (legendary+): the pet also grants a SECOND passive stat (its active's theme).
+//  - MENAGERIE AURA (mythic+): it amplifies ALL your owned pets' passive stats (the single best aura applies).
+// Scales up by rarity. Pure + client-safe.
+const PET_SPECIAL_TIER = {
+    legendary: { secondFrac: 0.5, aura: 0 },
+    mythic: { secondFrac: 0.6, aura: 0.08 },
+    ascendant: { secondFrac: 0.7, aura: 0.14 },
+    eternal: { secondFrac: 0.8, aura: 0.22 },
+    celestial: { secondFrac: 0.9, aura: 0.3 },
+    primordial: { secondFrac: 1, aura: 0.4 },
+};
+export function petSpecialPassive(pet) {
+    const t = pet && PET_SPECIAL_TIER[pet.rarity];
+    if (!t) return null;
+    const passiveStat = PET_PASSIVE_STAT[pet.id] || pet.activeStat || "fortune";
+    const second = pet.activeStat && pet.activeStat !== passiveStat ? pet.activeStat : null; // dual affinity
+    const base = PET_PASSIVE_BY_RARITY[pet.rarity] || 1;
+    return { secondStat: second, secondValue: second ? Math.max(1, Math.round(base * t.secondFrac)) : 0, aura: t.aura };
+}
+
 export function petPrice(pet) {
     return pet.price || SHOP_PRICE_BY_RARITY[pet.rarity] || 0;
 }

@@ -68,6 +68,7 @@ export default function PublicPets({ pets = [], canTrade = false, targetAlias = 
                         </div>
                         {detail.activeDesc ? <p className="petsheet-active">⚔️ {detail.activeDesc}</p> : null}
                         {detail.passiveDesc ? <p className="petsheet-passive">✨ {detail.passiveDesc}</p> : null}
+                        {(detail.specialDesc || []).map((s, i) => <p key={i} className="petsheet-special">{s}</p>)}
                         {detail.hint ? <p className="muted petsheet-hint">“{detail.hint}”</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
                             {canTrade && targetAlias && detail.tradeable ? (
