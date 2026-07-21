@@ -8,7 +8,7 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
-import { getEquippedStats, getEquippedStatsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
+import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
@@ -244,6 +244,7 @@ export async function getBossState(buyerId = null) {
     const members = await db
         .query(
             `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
+                    COALESCE(b.xp, 0) AS xp, b.equipped_border, b.avatar_cosmetics,
                     (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
                     COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
@@ -256,12 +257,19 @@ export async function getBossState(buyerId = null) {
     const fighters = members
         .map((m) => {
             // Show the equipped pet at THIS member's level for that pet (highest evolved sprite ≤ level).
+            const petLvl = m.featured_collectible ? petLevelForXp(m.featured_pet_xp || 0) : null;
             const petArt = m.featured_collectible
-                ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible], petLevelForXp(m.featured_pet_xp || 0))
+                ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible], petLvl || 1)
                 : null;
+            let cos = m.avatar_cosmetics;
+            if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch { cos = null; } }
             return {
                 id: m.id,
                 name: m.display_name || m.alias || "Member",
+                level: lvl(m.xp), // hero-card info shown on stage
+                petLevel: petLvl,
+                border: m.equipped_border && m.equipped_border !== "none" ? m.equipped_border : null,
+                aura: cos && typeof cos === "object" && cos.aura && cos.aura !== "none" ? cos.aura : null,
                 spriteUrl: m.avatar_sprite_url || defaultSprite || null,
                 // Only mirror the member's OWN sprite (the shared default sprite already faces right).
                 spriteFlip: m.avatar_sprite_url ? m.avatar_sprite_flip === true : false,
@@ -745,10 +753,18 @@ export async function runBossAutoTick() {
 
     const members = await db.query(`SELECT id, xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
     // Equipped Ferocity boosts each member's passive auto-damage.
-    const statsByMember = await getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map());
+    const [statsByMember, idsByMember] = await Promise.all([
+        getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map()),
+        getEquippedIdsForMembers(members.map((m) => m.id)).catch(() => new Map()),
+    ]);
     const buffMult = await activeDamageMult().catch(() => 1);
     const rows = members
-        .map((m) => ({ id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), statsByMember.get(m.id) || {}) * hours * buffMult) }))
+        .map((m) => {
+            // Elemental affinity now boosts PASSIVE auto-damage too (not just manual): matching-element gear
+            // deals bonus damage vs a boss weak to that element.
+            const elem = elementMult(idsByMember.get(m.id) || [], boss.weakness).mult;
+            return { id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), statsByMember.get(m.id) || {}) * hours * buffMult * elem) };
+        })
         .filter((r) => r.damage > 0);
     if (!rows.length) return { applied: 0, fighters: 0 };
 

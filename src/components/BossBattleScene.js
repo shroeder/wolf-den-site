@@ -12,6 +12,9 @@ const GROUP = 3;
 // A varied set of attack flourishes — each wave's fighters get different ones so it feels alive. Add more
 // keyframes with the same class prefix to grow the pool.
 const ATTACKS = ["slash", "jump", "spin", "dash", "overhead", "uppercut", "thrust", "combo", "leap", "smash", "whirl", "pounce"];
+// Border/aura cosmetics → a representative glow color, so a hero's configured look reads on the stage.
+const BORDER_COL = { ember: "#ff7a3c", bronze: "#cd7f32", aqua: "#5ad0d0", neon: "#39ff14", silver: "#c0c0c0", crimson: "#e23b4e", emerald: "#2ecc71", sunset: "#ff8c5a", sky: "#4aa3ff", rose: "#ff5fa2", gold: "#ffd75e", ocean: "#2aa9c8", aurora: "#7cffb2", amethyst: "#b76bff", frost: "#a8e6ff", inferno: "#ff5a2c", rainbow: "#ff6bd6", cosmic: "#8f7cff", legendary: "#ffd75e", solar: "#ffb24a", abyss: "#6a4fe0", godray: "#fff2b0", singularity: "#b76bff", role_volunteer: "#7cffb2", role_staff: "#ffd75e", role_dev: "#8fb8ff", role_admin: "#ff5a5a" };
+const AURA_COL = { aura_gold: "#ffd75e", aura_aqua: "#5ad0d0", aura_violet: "#b76bff", aura_rainbow: "#ff6bd6", aura_ember: "#ff7a3c", aura_frost: "#a8e6ff", aura_cosmic: "#8f7cff" };
 
 export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null }) {
     // Build the roster: real fighters (with art), padded a little so the stage isn't empty. "You" first so
@@ -128,25 +131,41 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             {/* The rotating trio. The phase class drives walk-in / attack / walk-off; each fighter's own
                 attack class picks its flourish. */}
             <div className={`battle-party party-${phase}`}>
-                {party.map((f) => (
-                    <div
-                        key={f.key}
-                        className={`adv adv-slot-${f.slot} atk-${f.attack}${f.you ? " is-you" : ""}${f.pad ? " is-pad" : ""}`}
-                    >
-                        <div className="adv-body">
-                            {f.petSpriteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="adv-pet" src={f.petSpriteUrl} alt="" style={f.petSpriteFlip ? { transform: "scaleX(-1)" } : undefined} />
-                            ) : null}
-                            {/* Flip lives on a WRAPPER so the walk/attack keyframes (on the img) compose with it. */}
-                            <span className="adv-flip" style={f.spriteFlip ? { transform: "scaleX(-1)" } : undefined}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="adv-sprite" src={f.spriteUrl} alt="" />
-                            </span>
-                            {!f.pad && f.name ? <span className="adv-name">{f.you ? "You" : f.name}</span> : null}
+                {party.map((f) => {
+                    const glow = AURA_COL[f.aura] || BORDER_COL[f.border] || null;
+                    return (
+                        <div
+                            key={f.key}
+                            className={`adv adv-slot-${f.slot} atk-${f.attack}${f.you ? " is-you" : ""}${f.pad ? " is-pad" : ""}`}
+                            style={glow ? { "--glow": glow } : undefined}
+                        >
+                            {/* adv-body = the shared march-in/out travel; hero + pet ride it in together but each
+                                has its OWN gait + attack timing so they're not glued at the hip. */}
+                            <div className="adv-body">
+                                {glow ? <span className={`adv-aura${f.border ? " has-border" : ""}`} /> : null}
+                                {/* The companion pet — walks in its own trot and strikes AFTER its owner. */}
+                                {f.petSpriteUrl ? (
+                                    <span className="adv-pet-wrap">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className="adv-pet" src={f.petSpriteUrl} alt="" style={f.petSpriteFlip ? { transform: "scaleX(-1)" } : undefined} />
+                                    </span>
+                                ) : null}
+                                {/* Flip on a wrapper so the walk/attack keyframes (on the img) compose with it. */}
+                                <span className="adv-flip" style={f.spriteFlip ? { transform: "scaleX(-1)" } : undefined}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img className="adv-sprite" src={f.spriteUrl} alt="" />
+                                </span>
+                                {/* Hero card — name, level, pet level, shown while they're on stage. */}
+                                {!f.pad && f.name ? (
+                                    <div className="adv-card" style={f.border ? { borderColor: BORDER_COL[f.border] || undefined } : undefined}>
+                                        <span className="adv-card-name">{f.you ? "You" : f.name}</span>
+                                        <span className="adv-card-meta">Lv {f.level || 1}{f.petLevel ? ` · 🐾 Lv ${f.petLevel}` : ""}</span>
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {floaters.map((f) => (

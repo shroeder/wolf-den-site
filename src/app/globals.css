@@ -9294,7 +9294,19 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .adv-sprite { display: block; height: clamp(120px, 27vw, 250px); width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.55)); transform-origin: bottom center; }
 .adv.is-pad { opacity: 0.85; }
 .adv.is-you .adv-sprite { filter: drop-shadow(0 0 14px rgba(255,215,94,0.95)) drop-shadow(0 8px 12px rgba(0,0,0,0.55)); }
-.adv-pet { position: absolute; left: -40%; bottom: 0; height: clamp(58px, 13vw, 120px); width: auto; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); }
+/* Companion pet — a sibling of the hero (not glued to it): its own trot + its own attack, slightly behind. */
+.adv-pet-wrap { position: absolute; left: -34%; bottom: 0; z-index: -1; transform-origin: bottom center; }
+.adv-pet { display: block; height: clamp(58px, 13vw, 120px); width: auto; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); transform-origin: bottom center; }
+/* Aura/border glow behind the hero — reads their configured cosmetic on stage. */
+.adv-aura { position: absolute; left: 50%; bottom: 8%; width: 130%; height: 130%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--glow, #ffd75e) 55%, transparent), transparent 68%); filter: blur(2px); z-index: -2; pointer-events: none; animation: advAuraPulse 2.6s ease-in-out infinite; }
+.adv-aura.has-border { box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow, #ffd75e) 70%, transparent) inset; }
+@keyframes advAuraPulse { 0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(0.95); } 50% { opacity: 0.85; transform: translateX(-50%) scale(1.05); } }
+/* Hero card — name + level + pet level while they're on stage. */
+.adv-card { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 10px; border-radius: 9px; background: rgba(0,0,0,0.72); border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 2px 8px rgba(0,0,0,0.5); white-space: nowrap; }
+.adv-card-name { font-size: 0.74rem; font-weight: 800; color: #f6ead0; text-shadow: 0 1px 2px #000; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.adv-card-meta { font-size: 0.62rem; font-weight: 700; color: #ffcf7a; letter-spacing: 0.02em; }
+.adv.is-you .adv-card { background: rgba(120,86,10,0.85); border-color: rgba(255,215,94,0.6); }
+.adv.is-you .adv-card-name { color: #ffe9a8; }
 .adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
 
@@ -9303,8 +9315,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .party-in .adv-slot-1 .adv-body { animation-delay: 0.16s; }
 .party-in .adv-slot-2 .adv-body { animation-delay: 0.32s; }
 .party-in .adv-sprite, .party-out .adv-sprite { animation: advStep 0.42s ease-in-out infinite; }
+/* Pet trots on its OWN faster gait so hero + pet don't bob in lockstep. */
+.party-in .adv-pet, .party-out .adv-pet { animation: petTrot 0.3s ease-in-out infinite; }
 @keyframes advMarchIn { from { transform: translateX(-260%); } to { transform: translateX(0); } }
 @keyframes advStep { 0%, 100% { transform: translateY(0) rotate(-2.5deg); } 25% { transform: translateY(-7px) rotate(0deg); } 50% { transform: translateY(0) rotate(2.5deg); } 75% { transform: translateY(-7px) rotate(0deg); } }
+@keyframes petTrot { 0%, 100% { transform: translateY(0) rotate(2deg); } 50% { transform: translateY(-5px) rotate(-2deg); } }
 
 /* Phase 3 — march back off to the left. */
 .party-out .adv-body { animation: advMarchOut 0.9s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
@@ -9312,13 +9327,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .party-out .adv-slot-2 .adv-body { animation-delay: 0.16s; }
 @keyframes advMarchOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-260%); opacity: 0; } }
 
-/* Phase 2 — ATTACK. The body lunges toward the boss; each fighter's sprite plays its own flourish, staggered
-   so the trio doesn't strike in perfect unison. Big pool below for variety. */
-.party-attack .adv-body { animation: advLunge 1.4s ease-in-out both; }
-.party-attack .adv-slot-1 .adv-body { animation-delay: 0.12s; }
-.party-attack .adv-slot-2 .adv-body { animation-delay: 0.24s; }
-@keyframes advLunge { 0%, 100% { transform: translateX(0); } 40% { transform: translateX(34px); } 55% { transform: translateX(22px); } }
-.party-attack .adv-sprite { animation-duration: 1.4s; animation-timing-function: ease-in-out; animation-fill-mode: both; }
+/* Phase 2 — ATTACK. Each hero's sprite plays its own flourish (which carries its forward lunge), staggered
+   so the trio doesn't strike in unison. The PET then strikes on its own, a beat AFTER its owner. */
+.party-attack .adv-sprite { animation-duration: 1.2s; animation-timing-function: ease-in-out; animation-fill-mode: both; }
+/* Pet attacks after the hero — its own pounce, delayed so it clearly follows the player's swing. */
+.party-attack .adv-pet { animation: petStrike 0.9s 0.55s ease-in-out both; }
+.party-attack .adv-slot-1 .adv-pet { animation-delay: 0.67s; }
+.party-attack .adv-slot-2 .adv-pet { animation-delay: 0.79s; }
+@keyframes petStrike { 0% { transform: translate(0,0) rotate(0); } 30% { transform: translate(4px,8px) scaleY(0.85); } 60% { transform: translate(30px,-20px) rotate(-10deg); } 100% { transform: translate(0,0) rotate(0); } }
 .party-attack .adv-slot-1 .adv-sprite { animation-delay: 0.12s; }
 .party-attack .adv-slot-2 .adv-sprite { animation-delay: 0.24s; }
 .party-attack .atk-slash .adv-sprite { animation-name: atkSlash; }
@@ -9354,7 +9370,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .battle-floater { position: absolute; font-weight: 800; font-size: clamp(1rem, 3.4vw, 1.4rem); color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; z-index: 7; animation: boss2-float 0.85s ease-out forwards; }
 .battle-floater.is-crit { font-size: clamp(1.5rem, 5vw, 2.1rem); color: #ff5a5a; }
 @media (prefers-reduced-motion: reduce) {
-    .battle-bg, .battle-boss, .adv-body, .adv-sprite { animation: none !important; }
+    .battle-bg, .battle-boss, .adv-body, .adv-sprite, .adv-pet, .adv-aura { animation: none !important; }
 }
 .boss2-figure { animation: boss2-breathe 3.4s ease-in-out infinite; }
 .boss2-enemy { font-size: 8.5rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 22px rgba(224, 68, 40, 0.6)); }

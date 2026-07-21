@@ -63,6 +63,16 @@ export async function getEquippedStats(buyerId) {
     return withSetBonuses(Object.values(bySlot));
 }
 
+// Equipped item IDs for many members at once (Map buyer_id -> [item_id]). Used by the auto-tick to apply
+// each member's elemental affinity (matching gear boosts passive damage vs a boss weak to that element).
+export async function getEquippedIdsForMembers(buyerIds = []) {
+    const out = new Map();
+    if (!buyerIds.length) return out;
+    const rows = await db.query(`SELECT buyer_id, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1)`, [buyerIds]).catch(() => []);
+    for (const r of rows) { if (!out.has(r.buyer_id)) out.set(r.buyer_id, []); out.get(r.buyer_id).push(r.item_id); }
+    return out;
+}
+
 // Equipped stats for many members at once (one query) — used by the hourly auto-tick.
 export async function getEquippedStatsForMembers(buyerIds = []) {
     const out = new Map();
