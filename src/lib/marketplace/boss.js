@@ -1,7 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
+import { avatarImageUrl, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
+import { pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
@@ -243,8 +244,8 @@ export async function getBossState(buyerId = null) {
     // member count, which is fine for a store-sized roster.
     const members = await db
         .query(
-            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
-                    COALESCE(b.xp, 0) AS xp, b.equipped_border, b.avatar_cosmetics,
+            `SELECT b.id, b.display_name, b.alias, b.avatar_url, b.avatar_config, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
+                    COALESCE(b.xp, 0) AS xp, b.equipped_border, b.equipped_frame, b.avatar_cosmetics, b.showcase_badge_slugs,
                     (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
                     COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
@@ -254,6 +255,25 @@ export async function getBossState(buyerId = null) {
             [boss.id]
         )
         .catch(() => []);
+    // Every fighter's full badge set in one query, so each hero card can show their showcased badges +
+    // the "folder tab" featured badge exactly as it renders on their profile.
+    const fighterBadges = new Map();
+    const memberIds = members.map((m) => m.id);
+    if (memberIds.length) {
+        const allBadges = await db
+            .query(
+                `SELECT ub.buyer_id, b.slug, b.label, b.description, b.icon, b.color
+                   FROM mkt_user_badge ub JOIN mkt_badge b ON b.slug = ub.badge_slug
+                  WHERE ub.buyer_id = ANY($1)
+                  ORDER BY b.sort_order ASC, b.label ASC`,
+                [memberIds]
+            )
+            .catch(() => []);
+        for (const r of allBadges) {
+            if (!fighterBadges.has(r.buyer_id)) fighterBadges.set(r.buyer_id, []);
+            fighterBadges.get(r.buyer_id).push({ slug: r.slug, label: r.label, description: r.description, icon: r.icon, color: r.color });
+        }
+    }
     const fighters = members
         .map((m) => {
             // Show the equipped pet at THIS member's level for that pet (highest evolved sprite ≤ level).
@@ -261,15 +281,26 @@ export async function getBossState(buyerId = null) {
             const petArt = m.featured_collectible
                 ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible], petLvl || 1)
                 : null;
-            let cos = m.avatar_cosmetics;
-            if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch { cos = null; } }
+            const cos = sanitizeCosmetics(m.avatar_cosmetics);
+            const badges = fighterBadges.get(m.id) || [];
+            const displayBadges = pickShowcaseBadges(badges, m.showcase_badge_slugs || null);
             return {
                 id: m.id,
                 name: m.display_name || m.alias || "Member",
+                displayLabel: m.display_name || m.alias || "Member",
+                alias: m.alias || null,
                 level: lvl(m.xp), // hero-card info shown on stage
                 petLevel: petLvl,
                 border: m.equipped_border && m.equipped_border !== "none" ? m.equipped_border : null,
                 aura: cos && typeof cos === "object" && cos.aura && cos.aura !== "none" ? cos.aura : null,
+                // Full hero-card cosmetics — mirrors the member's configured card (avatar+border+cosmetics,
+                // frame, featured badge/tab, showcased badges, featured pet).
+                avatarUrl: avatarImageUrl(m.avatar_config, m.avatar_cosmetics) || m.avatar_url || DEFAULT_AVATAR_URL,
+                avatarCosmetics: cos,
+                frame: m.equipped_frame || "none",
+                featuredBadge: displayBadges[0] || null,
+                displayBadges,
+                featuredCollectibleId: m.featured_collectible || null,
                 spriteUrl: m.avatar_sprite_url || defaultSprite || null,
                 // Only mirror the member's OWN sprite (the shared default sprite already faces right).
                 spriteFlip: m.avatar_sprite_url ? m.avatar_sprite_flip === true : false,

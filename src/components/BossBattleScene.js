@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GiSpikedDragonHead } from "react-icons/gi";
 
+import MemberHeroCard from "@/components/MemberHeroCard";
+
 // The 2D side-scrolling battle stage. Instead of cramming the whole (now large) pack on-screen, adventurers
 // take turns: a GROUP of 3 marches in from the left, attacks the boss with a random flourish, then marches
 // off as the next 3 rotate in — cycling through everyone who's fighting. Purely presentational; the parent
@@ -36,7 +38,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
     // The turn-based state machine. Timings tuned so a full wave is a satisfying ~4.5s beat.
     useEffect(() => {
         if (reduced.current) return undefined;
-        const ms = phase === "in" ? 900 : phase === "attack" ? 1300 : 700;
+        const ms = phase === "in" ? 850 : phase === "attack" ? 620 : 560;
         const t = setTimeout(() => {
             if (phase === "in") setPhase("attack");
             else if (phase === "attack") setPhase("out");
@@ -119,6 +121,21 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
             <div className={`battle-party party-${phase}`}>
                 {party.map((f) => {
                     const glow = AURA_COL[f.aura] || BORDER_COL[f.border] || null;
+                    // The member's full hero card — their configured avatar (border + cosmetics), frame,
+                    // featured "folder tab" badge, showcased badge row, rank chip, level and featured pet —
+                    // floated above them so their whole configured look reads on stage.
+                    const member = !f.pad ? {
+                        displayLabel: f.displayLabel || f.name,
+                        alias: f.alias,
+                        level: f.level || 1,
+                        avatarUrl: f.avatarUrl,
+                        border: f.border || "none",
+                        avatarCosmetics: f.avatarCosmetics,
+                        frame: f.frame || "none",
+                        featuredBadge: f.featuredBadge,
+                        displayBadges: f.displayBadges,
+                        featuredCollectibleId: f.featuredCollectibleId,
+                    } : null;
                     return (
                         <div
                             key={f.key}
@@ -128,6 +145,13 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                             {/* adv-body = the shared march-in/out travel; hero + pet ride it in together but each
                                 has its OWN gait + attack timing so they're not glued at the hip. */}
                             <div className="adv-body">
+                                {/* Full hero card, above the hero. */}
+                                {member ? (
+                                    <div className={`adv-herocard${f.you ? " is-you" : ""}`}>
+                                        <MemberHeroCard member={member} />
+                                        {f.petLevel ? <span className="adv-herocard-pet">🐾 Lv {f.petLevel}</span> : null}
+                                    </div>
+                                ) : null}
                                 {glow ? <span className={`adv-aura${f.border ? " has-border" : ""}`} /> : null}
                                 {/* The companion pet — walks in its own trot and strikes AFTER its owner. */}
                                 {f.petSpriteUrl ? (
@@ -141,13 +165,6 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className="adv-sprite" src={f.spriteUrl} alt="" />
                                 </span>
-                                {/* Hero card — name, level, pet level, shown while they're on stage. */}
-                                {!f.pad && f.name ? (
-                                    <div className="adv-card" style={f.border ? { borderColor: BORDER_COL[f.border] || undefined } : undefined}>
-                                        <span className="adv-card-name">{f.you ? "You" : f.name}</span>
-                                        <span className="adv-card-meta">Lv {f.level || 1}{f.petLevel ? ` · 🐾 Lv ${f.petLevel}` : ""}</span>
-                                    </div>
-                                ) : null}
                             </div>
                         </div>
                     );
