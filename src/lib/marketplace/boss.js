@@ -705,7 +705,9 @@ export async function attackBoss(buyerId) {
     if (!row) return { error: "defeated" };
 
     const hit = await db.queryOne(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'manual') RETURNING id`, [boss.id, buyerId, damage]);
-    await awardXp(buyerId, "boss_attack", { dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${Date.now()}`}` }).catch(() => {});
+    // XP for the first 3 swings/day only — extra strikes (gear/pets/potions) still deal damage + earn
+    // tickets, but no longer print unlimited XP (strike-stacking was dominating the leaderboard).
+    await awardXp(buyerId, "boss_attack", { dailyCap: 3, dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${Date.now()}`}` }).catch(() => {});
     // Signature rewards: Scholar XP + Prospector gold on this hit.
     if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
     if (onHit.gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, onHit.gold]).catch(() => {});
