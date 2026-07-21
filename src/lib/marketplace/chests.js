@@ -49,10 +49,12 @@ const CHEST_CONSUMABLES = {
     primordial: { chance: 0.75, pool: ["elixir_renewal", "sands_of_time", "treat_ambrosia"] },
 };
 
+// Level-up chests are deliberately CAPPED at Gold (never Mythic) and reach the higher tiers later, so
+// leveling doesn't firehose legendary/mythic gear. Rarer loot comes from OPENING those chests, the boss,
+// and elite grants — not from the level-up cadence itself.
 function tierForLevel(level) {
-    if (level >= 45) return "mythic";
-    if (level >= 25) return "gold";
-    if (level >= 10) return "iron";
+    if (level >= 35) return "gold"; // cap — no Mythic chests from level-ups
+    if (level >= 15) return "iron";
     return "wooden";
 }
 
