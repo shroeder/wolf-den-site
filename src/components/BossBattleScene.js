@@ -8,10 +8,7 @@ import { GiSpikedDragonHead } from "react-icons/gi";
 // off as the next 3 rotate in — cycling through everyone who's fighting. Purely presentational; the parent
 // (BossFightClient) owns HP/attack state.
 
-const GROUP = 3;
-// A varied set of attack flourishes — each wave's fighters get different ones so it feels alive. Add more
-// keyframes with the same class prefix to grow the pool.
-const ATTACKS = ["slash", "jump", "spin", "dash", "overhead", "uppercut", "thrust", "combo", "leap", "smash", "whirl", "pounce"];
+const GROUP = 1; // ONE hero at a time — each gets their moment to shine, then the next slides in.
 // Border/aura cosmetics → a representative glow color, so a hero's configured look reads on the stage.
 const BORDER_COL = { ember: "#ff7a3c", bronze: "#cd7f32", aqua: "#5ad0d0", neon: "#39ff14", silver: "#c0c0c0", crimson: "#e23b4e", emerald: "#2ecc71", sunset: "#ff8c5a", sky: "#4aa3ff", rose: "#ff5fa2", gold: "#ffd75e", ocean: "#2aa9c8", aurora: "#7cffb2", amethyst: "#b76bff", frost: "#a8e6ff", inferno: "#ff5a2c", rainbow: "#ff6bd6", cosmic: "#8f7cff", legendary: "#ffd75e", solar: "#ffb24a", abyss: "#6a4fe0", godray: "#fff2b0", singularity: "#b76bff", role_volunteer: "#7cffb2", role_staff: "#ffd75e", role_dev: "#8fb8ff", role_admin: "#ff5a5a" };
 const AURA_COL = { aura_gold: "#ffd75e", aura_aqua: "#5ad0d0", aura_violet: "#b76bff", aura_rainbow: "#ff6bd6", aura_ember: "#ff7a3c", aura_frost: "#a8e6ff", aura_cosmic: "#8f7cff" };
@@ -39,7 +36,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
     // The turn-based state machine. Timings tuned so a full wave is a satisfying ~4.5s beat.
     useEffect(() => {
         if (reduced.current) return undefined;
-        const ms = phase === "in" ? 1500 : phase === "attack" ? 1500 : 1000;
+        const ms = phase === "in" ? 900 : phase === "attack" ? 1300 : 700;
         const t = setTimeout(() => {
             if (phase === "in") setPhase("attack");
             else if (phase === "attack") setPhase("out");
@@ -48,22 +45,11 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
         return () => clearTimeout(t);
     }, [phase, wave, waveCount]);
 
-    // The 3 (or fewer) fighters on stage this wave, each with a stable-per-wave attack flourish + slot.
+    // The one fighter on stage this wave.
     const party = useMemo(() => {
-        const start = wave * GROUP;
-        const g = [];
-        for (let i = 0; i < GROUP; i += 1) {
-            const idx = start + i;
-            if (idx >= roster.length) break;
-            const f = roster[idx];
-            g.push({
-                ...f,
-                key: `${wave}-${f.id || idx}`,
-                slot: i,
-                attack: ATTACKS[(wave * 5 + i * 3) % ATTACKS.length],
-            });
-        }
-        return g;
+        if (!roster.length) return [];
+        const f = roster[wave % roster.length];
+        return f ? [{ ...f, key: `${wave}-${f.id || wave}` }] : [];
     }, [wave, roster]);
 
     // Ambient impact glints on the boss so its continuous passive damage reads as landing.
@@ -96,7 +82,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                 <div className="battle-name">{boss.name}</div>
                 <div className="battle-hpbar"><span style={{ width: `${pct}%` }} /></div>
                 <div className="battle-hp">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</div>
-                {roster.length > GROUP ? <div className="battle-wave">⚔️ {roster.filter((f) => !f.pad).length} in the fight · wave {wave + 1}/{waveCount}</div> : null}
+                {roster.filter((f) => !f.pad).length > 1 ? <div className="battle-wave">⚔️ {roster.filter((f) => !f.pad).length} in the fight</div> : null}
                 {boss.buff ? (
                     <div className="battle-buff" title={`All damage ×${boss.buff.damageMult} while active`}>
                         <span className="battle-buff-emoji">{boss.buff.emoji}</span>
@@ -136,7 +122,7 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                     return (
                         <div
                             key={f.key}
-                            className={`adv adv-slot-${f.slot} atk-${f.attack}${f.you ? " is-you" : ""}${f.pad ? " is-pad" : ""}`}
+                            className={`adv${f.you ? " is-you" : ""}${f.pad ? " is-pad" : ""}`}
                             style={glow ? { "--glow": glow } : undefined}
                         >
                             {/* adv-body = the shared march-in/out travel; hero + pet ride it in together but each
