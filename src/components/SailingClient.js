@@ -61,13 +61,28 @@ const sfx = {
         tone(784, 0.06, 0.42, { type: "sine", gain: 0.08 });
     },
     arrive() { [523, 659, 784].forEach((f, i) => tone(f, i * 0.12, 0.55, { type: "sine", gain: 0.16 })); },
-    dig() { tone(150, 0, 0.11, { type: "square", gain: 0.11 }); },
+    dig() { tone(110, 0, 0.09, { type: "square", gain: 0.12 }); tone(240, 0.015, 0.06, { type: "sawtooth", gain: 0.06 }); },
     win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.1, 0.5, { type: "triangle", gain: 0.16 })); },
     fail() { tone(300, 0, 0.22, { type: "sawtooth", gain: 0.1 }); tone(170, 0.12, 0.4, { type: "sawtooth", gain: 0.1 }); },
 };
 
 function Confetti() {
     return <div className="sail-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>;
+}
+
+// Real art for a treasure-chest fragment — a faceted golden shard (replaces the flat 🧩 emoji). Pure inline
+// SVG so it's crisp at any size and needs no asset pipeline; no gradient ids, so many can render at once.
+function FragmentIcon({ size = 20, className = "" }) {
+    return (
+        <svg className={`frag-icon ${className}`.trim()} viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
+            <path d="M7 4 L20 6 L26 15 L23 26 L11 28 L4 18 L9 12 Z" fill="#f2b43c" stroke="#7c4f14" strokeWidth="1.4" strokeLinejoin="round" />
+            <path d="M7 4 L20 6 L18 15 L9 12 Z" fill="#ffe6a0" />
+            <path d="M18 15 L26 15 L23 26 Z" fill="#d98f22" />
+            <path d="M18 15 L23 26 L11 28 L9 12 Z" fill="#e7a52f" />
+            <path d="M9 12 L18 15 M18 15 L20 6 M18 15 L11 28" fill="none" stroke="#7c4f14" strokeWidth="0.8" opacity="0.5" />
+            <circle cx="14.5" cy="14.5" r="1.5" fill="#fff6d8" />
+        </svg>
+    );
 }
 
 // Tailwind gust FX: a screen flash + a stream of leaves/debris blowing across the scene left-to-right.
@@ -124,11 +139,13 @@ export default function SailingClient({ initial, hero, pet }) {
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
+    const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [now, setNow] = useState(Date.now);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);
     const arrivedRef = useRef(false);
+    const chunkId = useRef(0);
 
     // Clock + arrival detection: when the voyage timer crosses arrival, fire the chime + Land-ho celebration.
     useEffect(() => {
@@ -178,6 +195,14 @@ export default function SailingClient({ initial, hero, pet }) {
         } finally { setBusy(false); }
     }, []);
 
+    // Dig a tile: spray rock chunks from it instantly (feels tactile), then send the dig to the server.
+    const digTile = useCallback((r, c) => {
+        const k = (chunkId.current += 1);
+        setChunk({ r, c, k });
+        setTimeout(() => setChunk((cur) => (cur?.k === k ? null : cur)), 520);
+        act("dig", { r, c });
+    }, [act]);
+
     const level = state.level;
     const xpPct = Math.min(100, Math.round((state.xpInto / Math.max(1, state.xpSpan)) * 100));
     const dig = state.dig;
@@ -196,37 +221,34 @@ export default function SailingClient({ initial, hero, pet }) {
                     /* ---------- Excavation dig minigame ---------- */
                     <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
                         <div className="dig-hud">
-                            <span className="dig-frag">🧩 Relic {dig.fragmentExposed}/{dig.fragmentTotal}</span>
+                            <span className="dig-frag"><FragmentIcon size={16} /> {dig.found}/{dig.buried} found</span>
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina} digs</span>
                         </div>
                         <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / dig.maxStamina) * 100)}%` }} /></div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
-                                const maxD = t.maxDepth || 3;
                                 const bottomed = t.depth <= 0;
-                                const dugFrac = maxD ? (maxD - t.depth) / maxD : 0; // 0 = untouched mound … 1 = fully excavated
                                 return (
                                     <button
                                         key={`${r}-${c}`}
                                         type="button"
-                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.exposed ? " is-exposed" : ""}${t.hint ? " is-hint" : ""}`}
-                                        style={{ "--dug": dugFrac, "--depth": t.depth }}
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}`}
+                                        style={{ "--depth": t.depth }}
                                         disabled={busy || dig.status !== "active" || bottomed}
-                                        onClick={() => act("dig", { r, c })}
-                                        title={bottomed ? (t.exposed ? "The relic!" : "Cleared to bedrock") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of soil`}
+                                        onClick={() => digTile(r, c)}
+                                        title={bottomed ? (t.found ? "A fragment!" : "Bare rock — nothing here") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of rock`}
                                     >
-                                        {t.exposed ? <span className="dig-glint">🧩</span>
-                                            : bottomed ? <span className="dig-pit" aria-hidden="true" />
-                                                : t.dug
-                                                    ? <span className="dig-layers" aria-hidden="true">{Array.from({ length: t.depth }, (_, i) => <i key={i} />)}</span>
-                                                    : <span className="dig-cap" aria-hidden="true" />}
+                                        {t.found ? <span className="dig-found"><FragmentIcon size={30} /></span>
+                                            : bottomed ? <span className="dig-hole" aria-hidden="true" />
+                                                : <span className="dig-rock" aria-hidden="true">{Array.from({ length: t.depth }, (_, i) => <i key={i} />)}</span>}
+                                        {chunk && chunk.r === r && chunk.c === c ? (
+                                            <span className="dig-chunks" key={chunk.k} aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span>
+                                        ) : null}
                                     </button>
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip">{dig.struck
-                            ? <>You struck the relic! Follow the <b>glinting seam</b> — dig out the shimmering tiles for more fragments before your digs run out.</>
-                            : <>Dig blind through the soil. Somewhere a relic is buried — <b>break a tile to the bottom</b> to strike it, then follow the seam. Shallower mounds cost fewer digs.</>}</p>
+                        <p className="dig-tip">Chip through the rock. <b>{dig.buried} fragments</b> are buried under this ground — dig a tile all the way to the bottom to find out what it hides. Shallower rock costs fewer swings, so spend your <b>{dig.stamina} digs</b> wisely.</p>
                     </div>
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
@@ -308,7 +330,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 {/* Boat identity + XP */}
                 <div className="sail-boatline">
                     <div><span className="sail-boatname">Wood Boat</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level}</span></div>
-                    <span className="muted">🧩 {state.fragments} fragments · 🪙 {state.gold.toLocaleString()}</span>
+                    <span className="muted sail-boatline-frag"><FragmentIcon size={14} /> {state.fragments} · 🪙 {state.gold.toLocaleString()}</span>
                 </div>
                 <div className="sail-xpbar"><span style={{ width: `${xpPct}%` }} /></div>
             </section>
@@ -332,16 +354,44 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             </section>
 
+            {/* Your fragment hold — a clear home for the fragments you dig up. */}
+            <section className="card sail-hold">
+                <div className="sail-hold-head">
+                    <FragmentIcon size={32} className="sail-hold-icon" />
+                    <div className="sail-hold-body">
+                        <div className="sail-hold-count">{state.fragments} treasure-chest fragment{state.fragments === 1 ? "" : "s"}</div>
+                        <div className="muted sail-hold-sub">Dig them up on the island. Every 10 forms a treasure chest.</div>
+                    </div>
+                </div>
+                <div className="sail-hold-bar"><span style={{ width: `${Math.round(((state.fragments % 10) / 10) * 100)}%` }} /></div>
+                <div className="muted sail-hold-note">{state.fragments % 10}/10 toward your next chest</div>
+            </section>
+
+            {/* Win / fail RECAP — you confirm before it returns you to port. */}
             {result ? (
-                <div className="sail-reward-overlay" onClick={() => setResult(null)}>
-                    <div className="card sail-reward" onClick={(e) => e.stopPropagation()}>
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap">
                         {result.won ? <Confetti /> : null}
-                        <div className="sail-reward-emoji">{result.won ? (result.earned >= result.total ? "🏆" : "🧩") : "🪹"}</div>
-                        <h2 style={{ margin: "6px 0" }}>{result.won ? (result.earned >= result.total ? "Whole relic unearthed!" : "Relic struck!") : "Came up empty"}</h2>
+                        <div className={`sail-recap-hero ${result.won ? "is-win" : "is-fail"}`}>
+                            {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} /></span> : <span className="sail-recap-rock">🪨</span>}
+                        </div>
+                        <h2 style={{ margin: "4px 0" }}>{result.won
+                            ? (result.earned >= result.buried ? "Full haul!" : result.earned > 1 ? "Fragments unearthed!" : "Fragment unearthed!")
+                            : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You unearthed ${result.earned} fragment${result.earned === 1 ? "" : "s"} — ${result.fragments} in the hold now.`
-                            : "The relic stayed buried. Sail out and dig again."}</p>
-                        <button className="sail-cta" onClick={() => setResult(null)}>{result.won ? "🎉 Nice" : "Try again"}</button>
+                            ? `You dug up ${result.earned} of ${result.buried} buried fragment${result.buried === 1 ? "" : "s"}.`
+                            : "Nothing but bare rock this time. Sail out and try a new island."}</p>
+                        <div className="sail-recap-rows">
+                            <div className="sail-recap-row"><span>Fragments this dig</span><b className="sail-recap-pos"><FragmentIcon size={15} /> +{result.earned}</b></div>
+                            <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {result.fragments}</b></div>
+                            {result.xp ? <div className="sail-recap-row"><span>Boat XP</span><b className="sail-recap-pos">+{result.xp}</b></div> : null}
+                            <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
+                        </div>
+                        <div className="sail-recap-chest">
+                            <div className="sail-hold-bar"><span style={{ width: `${Math.round(((result.fragments % 10) / 10) * 100)}%` }} /></div>
+                            <div className="muted sail-hold-note">{result.fragments % 10}/10 toward a treasure chest</div>
+                        </div>
+                        <button className="sail-cta" onClick={() => setResult(null)}>⚓ Back to port</button>
                     </div>
                 </div>
             ) : null}

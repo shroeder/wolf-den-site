@@ -20,11 +20,11 @@ export const MAX_LUCK_LEVEL = 12;
 export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
 
 // Dig board.
-const DIG_COLS = 5;
+const DIG_COLS = 4;
 const DIG_ROWS = 4;
-const DIG_MAX_DEPTH = 3;      // layers of soil over every tile — you dig straight down through them
-const BASE_STAMINA = 14;      // digs per voyage, + luck level
-const FRAGMENT_SIZE = 3;      // the buried relic is a connected cluster of this many tiles
+const DIG_MAX_DEPTH = 3;      // layers of rock over every tile — you chip straight down through them
+const BASE_STAMINA = 12;      // digs per voyage, + luck level
+const FRAGMENTS_BURIED = 3;   // individual fragments scattered through the rock (no clusters, no pointer)
 const XP_PER_DIG_WIN = 30;
 
 const BOAT_ART = { 1: "/images/sailing/boat-tier1-wood.png" };
@@ -49,82 +49,57 @@ function digStamina(luckLevel = 0) { return BASE_STAMINA + Math.max(0, luckLevel
 // --- dig board -----------------------------------------------------------------------------------------
 function randInt(n) { return Math.floor(Math.random() * n); }
 
-// A connected cluster of `size` tiles (the buried fragment footprint).
-function growCluster(rows, cols, size) {
-    const start = [randInt(rows), randInt(cols)];
-    const cells = [start];
-    const seen = new Set([`${start[0]},${start[1]}`]);
-    let guard = 0;
-    while (cells.length < size && guard++ < 200) {
-        const [r, c] = cells[randInt(cells.length)];
-        const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-        const [dr, dc] = dirs[randInt(4)];
-        const nr = r + dr, nc = c + dc;
-        const key = `${nr},${nc}`;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !seen.has(key)) { seen.add(key); cells.push([nr, nc]); }
-    }
-    return cells;
-}
-
 function newBoard(luckLevel) {
-    // Every tile hides 1–DIG_MAX_DEPTH layers of soil. The relic gives NO tell — its tiles are depth-random like
-    // any other — so a tile's mound height only telegraphs how many digs it costs, never whether treasure's under
-    // it. There is deliberately no hot/cold heat map: you dig blind until you break a relic tile through to the
-    // bottom, and only THEN does the buried rest of the seam start to shimmer.
+    // Every tile is a stack of 1–DIG_MAX_DEPTH rock layers you chip through. FRAGMENTS_BURIED fragments are
+    // scattered under random individual tiles — NO clusters, NO pointer, NO shimmer. You never learn a tile's
+    // secret until you break it all the way to the bottom, where you find either bare rock or a fragment.
     const depth = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => 1 + randInt(DIG_MAX_DEPTH)));
-    const frag = growCluster(DIG_ROWS, DIG_COLS, FRAGMENT_SIZE);
+    const cells = [];
+    for (let r = 0; r < DIG_ROWS; r++) for (let c = 0; c < DIG_COLS; c++) cells.push([r, c]);
+    for (let i = cells.length - 1; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+    const frag = cells.slice(0, FRAGMENTS_BURIED); // the tiles that hide a fragment at the bottom
     const dug = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => false));
     const stamina = digStamina(luckLevel);
     return { cols: DIG_COLS, rows: DIG_ROWS, depth, maxDepth: DIG_MAX_DEPTH, frag, dug, stamina, maxStamina: stamina, status: "active" };
 }
 
-// Server-authoritative dig — removes one layer of soil from a tile. Returns the mutated board.
+// Server-authoritative dig — chips one layer of rock off a tile. Returns the mutated board.
 function applyDig(board, r, c) {
     if (board.status !== "active" || board.stamina <= 0) return board;
     if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return board;
-    if (board.depth[r][c] <= 0) return board; // already excavated to the bottom — never wastes a dig
+    if (board.depth[r][c] <= 0) return board; // already chipped to the bottom — never wastes a dig
     board.stamina -= 1;
     board.dug[r][c] = true;
     board.depth[r][c] -= 1;
-    // You STRIKE the relic when a fragment tile breaks through to the bottom. The first strike already wins the
-    // dig; exposing the whole seam is optional greed (each exposed tile = one more fragment, see digAt).
-    const exposedCount = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
-    if (exposedCount >= board.frag.length) board.status = "won"; // whole relic unearthed
-    else if (board.stamina <= 0) board.status = exposedCount >= 1 ? "won" : "lost";
+    // A fragment is unearthed the moment its tile breaks through to the bottom. Dig until you've found them all
+    // or your pick runs out; any fragment found means you keep them (see digAt).
+    const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+    if (found >= board.frag.length) board.status = "won"; // every buried fragment unearthed
+    else if (board.stamina <= 0) board.status = found >= 1 ? "won" : "lost";
     return board;
 }
 
-// The client-safe view of a board. Reveals each tile's remaining soil depth (terrain height — gives no
-// treasure tell) so the ground can be drawn as excavated holes. A relic tile is flagged `exposed` once broken
-// to the bottom (the glint), and a still-buried relic tile is flagged `hint` (shimmer) ONLY once the seam has
-// been struck and it orthogonally touches an exposed piece — that's the "follow the vein" guidance.
-const ORTHO = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+// The client-safe view of a board. Reveals each tile's remaining rock depth (so the layers can be drawn) and
+// nothing about where the fragments are — a tile only flags `found` once it's been chipped to the bottom AND it
+// hid a fragment. No pointer, no shimmer: the board never tells you where to dig next.
 function boardView(board) {
     const maxDepth = board.maxDepth || DIG_MAX_DEPTH;
     const fragSet = new Set(board.frag.map(([r, c]) => `${r},${c}`));
-    const exposedFrag = new Set(board.frag.filter(([r, c]) => board.depth[r][c] === 0).map(([r, c]) => `${r},${c}`));
-    const struck = exposedFrag.size > 0;
     const tiles = [];
     for (let r = 0; r < board.rows; r++) {
         const row = [];
         for (let c = 0; c < board.cols; c++) {
-            const isFrag = fragSet.has(`${r},${c}`);
-            const exposed = isFrag && board.depth[r][c] === 0;
-            let hint = false;
-            if (struck && isFrag && board.depth[r][c] > 0) {
-                for (const [dr, dc] of ORTHO) if (exposedFrag.has(`${r + dr},${c + dc}`)) { hint = true; break; }
-            }
             row.push({
-                depth: board.depth[r][c],   // layers of soil still on top (terrain height, not a treasure tell)
+                depth: board.depth[r][c],   // rock layers still on top (drives the stacked-slab drawing)
                 maxDepth,
                 dug: board.dug[r][c],
-                exposed,                    // relic tile broken to the bottom → glint
-                hint,                       // buried relic tile touching an exposed one → shimmer
+                found: fragSet.has(`${r},${c}`) && board.depth[r][c] === 0, // fragment unearthed at the bottom
             });
         }
         tiles.push(row);
     }
-    return { cols: board.cols, rows: board.rows, maxDepth, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, struck, tiles, fragmentTotal: board.frag.length, fragmentExposed: exposedFrag.size };
+    const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
+    return { cols: board.cols, rows: board.rows, maxDepth, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, tiles, buried: board.frag.length, found };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -265,8 +240,8 @@ export async function digAt(buyerId, r, c) {
     applyDig(board, Number(r), Number(c));
 
     if (board.status === "won" || board.status === "lost") {
-        // One fragment per relic tile you broke to the bottom: a single strike wins 1, unearthing the whole
-        // seam wins all 3. Then clear the voyage + board so the boat is back at port.
+        // One fragment per tile you unearthed — find one, find all three, or come up empty. Then clear the
+        // voyage + board so the boat is back at port.
         const earned = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
         const won = earned > 0;
         await db.query(
@@ -278,7 +253,7 @@ export async function digAt(buyerId, r, c) {
             [buyerId, earned, won ? XP_PER_DIG_WIN : 0]
         ).catch(() => {});
         const state = await getSailingState(buyerId);
-        return { ok: true, result: { won, earned, total: board.frag.length, fragments: state.fragments }, ...state };
+        return { ok: true, result: { won, earned, buried: board.frag.length, xp: won ? XP_PER_DIG_WIN : 0, fragments: state.fragments }, ...state };
     }
 
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

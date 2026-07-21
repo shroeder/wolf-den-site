@@ -10551,43 +10551,68 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-stambar { height: 7px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 6px 0 10px; }
 .dig-stambar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); transition: width 0.3s ease; }
 .dig-grid { display: grid; gap: 6px; }
-/* Each tile is a plug of earth. As it's dug (--dug 0→1) the soil darkens and a hole recesses into it, so the
-   board reads as ground you're excavating straight down through — not a flat puzzle grid. */
-.dig-tile { aspect-ratio: 1; border: none; border-radius: 10px; cursor: pointer; position: relative; overflow: hidden;
-    background: radial-gradient(115% 120% at 50% 16%,
-        color-mix(in srgb, #7a5330 calc((1 - var(--dug, 0)) * 100%), #2a1a0f),
-        color-mix(in srgb, #4a3016 calc((1 - var(--dug, 0)) * 100%), #1c1109));
-    box-shadow:
-        inset 0 3px 0 rgba(255,255,255,calc(0.12 * (1 - var(--dug, 0)))),      /* sunlit crust on fresh ground */
-        inset 0 calc(-3px - var(--dug, 0) * 3px) 6px rgba(0,0,0,0.4),
-        inset 0 0 calc(var(--dug, 0) * 30px) rgba(0,0,0,calc(0.1 + var(--dug, 0) * 0.6)); /* the pit deepens */
-    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.08s ease, filter 0.15s ease; }
-.dig-tile:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.1); }
-.dig-tile:not(:disabled):active { transform: scale(0.94); }
+.dig-frag { display: inline-flex; align-items: center; gap: 5px; }
+/* Each tile is a stack of rock slabs — one per remaining layer — sitting in a dark pit. You chip slabs off the
+   top until you hit the bottom (bare rock or a buried fragment), so clearing them reads as digging DOWN. */
+.dig-tile { aspect-ratio: 1; border: none; border-radius: 9px; cursor: pointer; position: relative; overflow: hidden;
+    background: radial-gradient(120% 120% at 50% 18%, #35291f, #16110c);
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.04);
+    transition: transform 0.07s ease, filter 0.15s ease; }
+.dig-tile:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.12); }
+.dig-tile:not(:disabled):active { transform: scale(0.93); }
 .dig-tile:disabled { cursor: default; }
-/* Untouched ground: a raised, slightly domed sod cap with a couple of embedded pebbles. */
-.dig-cap { position: absolute; inset: 9%; border-radius: 42% 42% 48% 48% / 55% 55% 45% 45%;
-    background: linear-gradient(#835b37, #593c22); box-shadow: inset 0 3px 0 rgba(255,255,255,0.16), inset 0 -6px 9px rgba(0,0,0,0.4); }
-.dig-cap::before, .dig-cap::after { content: ""; position: absolute; border-radius: 50%; background: rgba(0,0,0,0.28); box-shadow: 0 1px 0 rgba(255,255,255,0.08); }
-.dig-cap::before { width: 17%; height: 17%; top: 26%; left: 24%; }
-.dig-cap::after { width: 12%; height: 12%; top: 54%; left: 62%; }
-/* Remaining soil layers on a half-dug hole — little strata bars, one per layer still to clear. */
-.dig-layers { position: absolute; left: 14%; right: 14%; bottom: 16%; display: flex; flex-direction: column-reverse; gap: 3px; }
-.dig-layers i { height: 3px; border-radius: 2px; background: rgba(255,232,190,0.5); box-shadow: 0 1px 0 rgba(0,0,0,0.45); }
-/* Fully cleared empty tile — a dark little pit dug to bedrock. */
-.dig-pit { position: absolute; inset: 28%; border-radius: 46%; background: radial-gradient(circle at 50% 38%, rgba(0,0,0,0.35), rgba(0,0,0,0.7)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.7); }
-/* Struck relic — a golden fragment glinting at the bottom of the hole. */
-.dig-tile.is-exposed { background: radial-gradient(circle at 50% 44%, #ffe9a8, #b9791f); }
-.dig-glint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.35rem; filter: drop-shadow(0 0 7px #ffd75e); animation: digGlint 1.3s ease-in-out infinite; }
-/* Follow-the-vein shimmer — a buried relic tile next to one you've already struck. */
-.dig-tile.is-hint { animation: digHint 1.15s ease-in-out infinite; }
-.dig-glint, .dig-cap, .dig-layers, .dig-pit { pointer-events: none; }
-.dig-tip { margin: 12px 0 2px; font-size: 0.82rem; line-height: 1.4; color: #f2e8d6;
-    background: rgba(12,16,24,0.74); padding: 9px 12px; border-radius: 10px; }
+.dig-rock, .dig-hole, .dig-found, .dig-chunks { pointer-events: none; }
+/* Stacked rock layers filling the tile; the top slab is lighter (the exposed surface). */
+.dig-rock { position: absolute; inset: 4%; display: flex; flex-direction: column-reverse; gap: 2px; }
+.dig-rock i { flex: 1; border-radius: 3px; background: linear-gradient(#8b8073, #5c534a);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.14), inset 0 -3px 4px rgba(0,0,0,0.45), 0 1px 0 rgba(0,0,0,0.3); }
+.dig-rock i:last-child { background: linear-gradient(#a99c8a, #766a5c); }
+/* Chipped to the bottom, empty — a shadowed pit. */
+.dig-hole { position: absolute; inset: 26%; border-radius: 46%; background: radial-gradient(circle at 50% 36%, rgba(0,0,0,0.3), rgba(0,0,0,0.66)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.7); }
+/* A fragment unearthed at the bottom — real art, popping in with a glow. */
+.dig-tile.is-found { background: radial-gradient(circle at 50% 46%, #5e4517, #1c1408); }
+.dig-found { position: absolute; inset: 0; display: grid; place-items: center; filter: drop-shadow(0 0 8px #ffd75e);
+    animation: digFound 0.5s cubic-bezier(0.2,1.35,0.4,1) both; }
+@keyframes digFound { 0% { opacity: 0; transform: scale(0.2) rotate(-25deg); } 60% { transform: scale(1.2) rotate(6deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+/* Rock chunks that spray out of a tile on each dig. */
+.dig-chunks { position: absolute; inset: 0; }
+.dig-chunks i { position: absolute; left: 50%; top: 46%; width: 22%; max-width: 9px; aspect-ratio: 1; border-radius: 2px;
+    background: #877c6e; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 1px rgba(0,0,0,0.4);
+    animation: digChunk 0.5s ease-out forwards; animation-delay: calc(var(--i) * 8ms); }
+@keyframes digChunk {
+    0% { opacity: 1; transform: translate(-50%, -50%) rotate(0deg); }
+    100% { opacity: 0; transform: translate(calc(-50% + (var(--i) - 3) * 26px), calc(-50% - 34px + var(--i) * 6px)) rotate(calc((var(--i) - 3) * 130deg)); }
+}
+.dig-tip { margin: 12px 0 2px; font-size: 0.82rem; line-height: 1.45; color: #f2e8d6;
+    background: rgba(12,16,24,0.78); padding: 9px 12px; border-radius: 10px; }
 .dig-tip b { color: #ffd75e; }
-@keyframes digGlint { 0%,100% { filter: brightness(1) drop-shadow(0 0 6px #ffd75e); } 50% { filter: brightness(1.28) drop-shadow(0 0 13px #ffd75e); } }
-@keyframes digHint { 0%,100% { box-shadow: inset 0 0 0 2px rgba(255,215,94,0.25), 0 0 0 0 rgba(255,215,94,0); } 50% { box-shadow: inset 0 0 0 2px rgba(255,215,94,0.9), 0 0 11px 2px rgba(255,215,94,0.55); } }
-@media (prefers-reduced-motion: reduce) { .dig-tile.is-exposed .dig-glint, .dig-tile.is-hint { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .dig-found, .dig-chunks i { animation: none; } }
+
+/* ===== Sailing: fragment art, the hold card, and the dig recap ===== */
+.frag-icon { display: inline-block; vertical-align: -0.15em; flex: 0 0 auto; }
+.sail-boatline-frag { display: inline-flex; align-items: center; gap: 5px; }
+.sail-hold { display: grid; gap: 8px; }
+.sail-hold-head { display: flex; align-items: center; gap: 12px; }
+.sail-hold-icon { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
+.sail-hold-count { font-weight: 800; font-size: 1rem; }
+.sail-hold-sub { font-size: 0.78rem; }
+.sail-hold-bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.sail-hold-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f5b93c, #ffe6a0); transition: width 0.4s ease; }
+.sail-hold-note { font-size: 0.74rem; }
+
+.sail-recap { max-width: 340px; text-align: center; position: relative; overflow: hidden; animation: sailPop 0.32s cubic-bezier(0.2,1.2,0.4,1) both; }
+.sail-recap-hero { display: grid; place-items: center; margin: 4px 0 8px; min-height: 88px; }
+.sail-recap-frag { animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; filter: drop-shadow(0 0 16px rgba(255,200,80,0.7)); }
+@keyframes recapFrag { 0% { opacity: 0; transform: scale(0.3) rotate(-30deg); } 55% { transform: scale(1.18) rotate(8deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+.sail-recap-rock { font-size: 3.4rem; display: inline-block; animation: recapRock 0.6s ease-out both; }
+@keyframes recapRock { 0% { opacity: 0; transform: translateY(-14px) rotate(-8deg); } 60% { transform: translateY(3px); } 100% { opacity: 0.85; transform: translateY(0); } }
+.sail-recap-rows { display: grid; gap: 6px; margin: 10px 0; text-align: left; }
+.sail-recap-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.86rem; padding: 6px 10px; border-radius: 9px; background: rgba(255,255,255,0.04); }
+.sail-recap-row > span { color: #b9c2cf; }
+.sail-recap-row b { display: inline-flex; align-items: center; gap: 5px; }
+.sail-recap-pos { color: #7cffb2; }
+.sail-recap-chest { margin: 6px 0 12px; display: grid; gap: 5px; }
+@media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock { animation: none; } }
 
 /* ===== Sailing: dopamine (CTA, land-ho, confetti) ===== */
 .sail-cta { position: relative; display: inline-flex; align-items: center; gap: 11px; font-weight: 900; font-size: 1.24rem;
