@@ -1,7 +1,7 @@
 // Each pet's EQUIPPED signature perk — a unique, flavor-named ability (not just a stat). Perks map to real
 // mechanics that feed the boss fight (see pet-combat.js + boss.js). Client-safe (no server-only / db) so the
 // pets page can render them and the server can compute combat bonuses from the same source.
-import { petPassive } from "@/lib/marketplace/collectibles.js";
+import { petPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
 const EXTRA_STRIKE_BY_RARITY = { common: 1, rare: 1, epic: 1, legendary: 1, mythic: 2, ascendant: 2, eternal: 3 };
@@ -125,20 +125,26 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         if (k in economy) economy[k] += v;
         else if (k in stats) stats[k] += v;
     };
+    // PASSIVE: every owned pet's small themed bonus, scaled only GENTLY by level (Lv5 ×2) — a broad menagerie
+    // bonus, not the main driver.
     for (const pet of ownedPets) {
         const p = petPassive(pet);
         const lvl = Math.max(1, Number(levelByPet[pet.id]) || 1);
-        add(p.stat, p.value * lvl);
+        add(p.stat, p.value * petPassiveLevelMult(lvl));
     }
+    // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
+    // pet. Proc magnitudes scale too (chances capped so they stay sane).
     if (equippedPet) {
         const def = PET_PERKS[equippedPet.id] || { key: equippedPet.activeStat || "fortune" };
         const v = petPerkValue(equippedPet.rarity, def.key);
-        if (def.key === "first_hit") proc.firstHitMult = v;
-        else if (def.key === "erupt") { proc.eruptChance = v.chance; proc.eruptMult = v.mult; }
-        else if (def.key === "chain_strike") proc.chainChance = v;
-        else if (def.key === "execute") proc.executePct = v;
-        else if (def.key === "first_blood") proc.firstBloodPct = v;
-        else add(def.key, v);
+        const aMult = petActiveLevelMult(Math.max(1, Number(levelByPet[equippedPet.id]) || 1));
+        const cap = (x, hi) => Math.min(hi, x);
+        if (def.key === "first_hit") proc.firstHitMult = 1 + (v - 1) * aMult; // scale the bonus above ×1
+        else if (def.key === "erupt") { proc.eruptChance = cap(v.chance * aMult, 0.6); proc.eruptMult = v.mult; }
+        else if (def.key === "chain_strike") proc.chainChance = cap(v * aMult, 0.6);
+        else if (def.key === "execute") proc.executePct = cap(v * aMult, 1.2);
+        else if (def.key === "first_blood") proc.firstBloodPct = cap(v * aMult, 1.2);
+        else add(def.key, v * aMult);
     }
     return { stats, economy, proc };
 }

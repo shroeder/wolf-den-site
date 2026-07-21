@@ -141,11 +141,11 @@ export async function getMemberMetrics(buyerId) {
     // Pet-leveling milestones: highest single-pet level, # maxed (Lv5), total levels gained, and whether any
     // maxed pet is legendary-or-higher (for the Radiant Phoenix unlock).
     const LEGENDARY_PLUS = new Set(["legendary", "mythic", "ascendant", "eternal"]);
-    const petLevelValues = (petLevelRows || []).map((r) => petLevelForXp(r.xp));
+    const petLevelValues = (petLevelRows || []).map((r) => petLevelForXp(r.xp, collectibleById(r.pet_id)?.rarity));
     const maxPetLevel = petLevelValues.length ? Math.max(...petLevelValues) : 1;
     const petsMaxed = petLevelValues.filter((lv) => lv >= 5).length;
     const petLevelsTotal = petLevelValues.reduce((sum, lv) => sum + Math.max(0, lv - 1), 0);
-    const maxedLegendaryPlus = (petLevelRows || []).some((r) => petLevelForXp(r.xp) >= 5 && LEGENDARY_PLUS.has(collectibleById(r.pet_id)?.rarity));
+    const maxedLegendaryPlus = (petLevelRows || []).some((r) => petLevelForXp(r.xp, collectibleById(r.pet_id)?.rarity) >= 5 && LEGENDARY_PLUS.has(collectibleById(r.pet_id)?.rarity));
 
     return {
         xp,

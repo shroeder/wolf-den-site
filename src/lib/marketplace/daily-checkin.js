@@ -55,7 +55,7 @@ async function awaySummary(buyerId) {
     let pet = null;
     if (buyer?.featured_collectible) {
         const xpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, buyer.featured_collectible]).catch(() => null);
-        const info = petLevelInfo(xpRow?.xp || 0);
+        const info = petLevelInfo(xpRow?.xp || 0, collectibleById(buyer.featured_collectible)?.rarity);
         pet = { name: collectibleById(buyer.featured_collectible)?.name || "your pet", level: info.level, into: info.into, span: info.span, maxed: info.maxed };
     }
     const questsReady = (quests.quests || []).filter((q) => q.done && !q.claimed).length;

@@ -1,42 +1,55 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
-// Pet leveling (equipped pet only). Tuning locked 2026-07-19: BALANCED pace, BIG (5×) max passive.
+// Pet leveling (equipped pet only). Re-tuned 2026-07-21:
 //  - The equipped pet earns PET_XP_SHARE of every XP the member gains, plus PET_TRICKLE_PER_DAY over time.
-//  - 5 levels; each level multiplies the pet's base passive by the level number (Lv1 ×1 … Lv5 ×5).
+//  - Cut the share + (especially) the free daily trickle so a maxed pet is a real, earned milestone.
+//  - The required XP per level is a QUADRATIC ramp SCALED BY RARITY — a rarer pet is a much longer haul.
 export const PET_MAX_LEVEL = 5;
-// Re-tuned 2026-07-21 — leveling was far too fast (a Lv3 pet off ~1.4k lifetime XP). Cut the member-XP
-// share and (especially) the free daily trickle so a maxed pet is a real, earned milestone. Thresholds are
-// unchanged so nobody loses a level they already have; only the pace slows going forward.
 export const PET_XP_SHARE = 0.12; // 12% of member XP flows to the equipped pet (was 25%)
 export const PET_TRICKLE_PER_DAY = 5; // passive XP/day while equipped — the big "free maxing" lever (was 20)
 
-// Cumulative pet-XP needed to REACH each level (index 0 = Lv1). Lv5 caps at 1500.
-export const PET_LEVEL_THRESHOLDS = [0, 100, 300, 700, 1500];
-export const PET_MAX_XP = PET_LEVEL_THRESHOLDS[PET_MAX_LEVEL - 1];
+// Base quadratic ramp: reach Lv L ≈ 150·(L-1)² XP. Multiplied per rarity below (common ~3mo → legendary ~6mo
+// at a moderate pace). NOTE: raising the ramp DOES re-level existing pets down — intended (leveling was easy).
+const PET_BASE_THRESHOLDS = [0, 150, 600, 1350, 2400];
+export const PET_XP_RARITY_MULT = { common: 1, rare: 1.3, epic: 1.7, legendary: 2.2, mythic: 2.8, ascendant: 3.6, eternal: 4.6, celestial: 5.8, primordial: 7 };
+export function petRarityMult(rarity) { return PET_XP_RARITY_MULT[rarity] || 1; }
+function rarityOf(petId) { return collectibleById(petId)?.rarity; }
+
+// Cumulative pet-XP to REACH each level for a rarity (index 0 = Lv1).
+export function petThresholds(rarity) {
+    const m = petRarityMult(rarity);
+    return PET_BASE_THRESHOLDS.map((t) => Math.round(t * m));
+}
+export function petMaxXp(rarity) { return petThresholds(rarity)[PET_MAX_LEVEL - 1]; }
+
+// The level-scaling mults live in collectibles.js (pure, client-safe); re-exported here for server callers.
+export { petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 const DAY_MS = 86400000;
 
-// Level (1..5) for a given pet-XP total.
-export function petLevelForXp(xp) {
+// Level (1..5) for a pet-XP total. Pass the pet's RARITY (or its id) so the right rarity curve is used.
+export function petLevelForXp(xp, rarity = "common") {
+    const th = petThresholds(rarity);
     const n = Math.max(0, Number(xp) || 0);
     let lvl = 1;
-    for (let i = 1; i < PET_LEVEL_THRESHOLDS.length; i += 1) {
-        if (n >= PET_LEVEL_THRESHOLDS[i]) lvl = i + 1;
+    for (let i = 1; i < th.length; i += 1) {
+        if (n >= th[i]) lvl = i + 1;
     }
     return Math.min(PET_MAX_LEVEL, lvl);
 }
 
-// A displayable progress snapshot for a pet-XP total: level, the multiplier it grants, and progress toward
-// the next level (null once maxed).
-export function petLevelInfo(xp) {
+// A displayable progress snapshot for a pet-XP total (rarity-aware): level + progress toward the next level.
+export function petLevelInfo(xp, rarity = "common") {
+    const th = petThresholds(rarity);
     const n = Math.max(0, Number(xp) || 0);
-    const level = petLevelForXp(n);
-    const mult = level; // Lv1 ×1 … Lv5 ×5
+    const level = petLevelForXp(n, rarity);
+    const mult = level;
     if (level >= PET_MAX_LEVEL) return { xp: n, level, mult, maxed: true, into: 0, span: 0, next: null };
-    const floor = PET_LEVEL_THRESHOLDS[level - 1];
-    const next = PET_LEVEL_THRESHOLDS[level];
+    const floor = th[level - 1];
+    const next = th[level];
     return { xp: n, level, mult, maxed: false, into: n - floor, span: next - floor, next };
 }
 
@@ -61,7 +74,7 @@ export async function getPetXpForBuyers() {
 // Level map (pet_id -> level) from an xp map — what combinePetBonuses wants for passive scaling.
 export function levelsFromXpMap(xpMap = {}) {
     const out = {};
-    for (const [petId, xp] of Object.entries(xpMap)) out[petId] = petLevelForXp(xp);
+    for (const [petId, xp] of Object.entries(xpMap)) out[petId] = petLevelForXp(xp, rarityOf(petId));
     return out;
 }
 
@@ -73,20 +86,22 @@ export async function addEquippedPetXp(buyerId, amount) {
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const petId = buyer?.featured_collectible;
     if (!petId) return { ok: false, error: "no_pet_equipped" };
+    const rarity = rarityOf(petId);
+    const maxXp = petMaxXp(rarity);
     const before = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
-    const prevLevel = petLevelForXp(before?.xp || 0);
+    const prevLevel = petLevelForXp(before?.xp || 0, rarity);
     const row = await db
         .queryOne(
             `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at)
-             VALUES ($1, $2, LEAST($3, ${PET_MAX_XP}), NOW(), NOW())
+             VALUES ($1, $2, LEAST($3, $4), NOW(), NOW())
              ON CONFLICT (buyer_id, pet_id)
-             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3, ${PET_MAX_XP}), updated_at = NOW()
+             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3, $4), updated_at = NOW()
              RETURNING xp`,
-            [buyerId, petId, add]
+            [buyerId, petId, add, maxXp]
         )
         .catch(() => null);
-    const xp = row?.xp ?? (before?.xp || 0) + add;
-    const level = petLevelForXp(xp);
+    const xp = row?.xp ?? Math.min(maxXp, (before?.xp || 0) + add);
+    const level = petLevelForXp(xp, rarity);
     return { ok: true, petId, xp, level, leveled: level > prevLevel };
 }
 
@@ -96,10 +111,11 @@ export async function levelUpEquippedPet(buyerId) {
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const petId = buyer?.featured_collectible;
     if (!petId) return { ok: false, error: "no_pet_equipped" };
+    const rarity = rarityOf(petId);
     const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
-    const level = petLevelForXp(row?.xp || 0);
+    const level = petLevelForXp(row?.xp || 0, rarity);
     if (level >= PET_MAX_LEVEL) return { ok: false, error: "already_max", petId, level };
-    const targetXp = PET_LEVEL_THRESHOLDS[level]; // xp needed to reach the next level
+    const targetXp = petThresholds(rarity)[level]; // xp needed to reach the next level
     await db
         .query(
             `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())
@@ -126,6 +142,7 @@ export async function accrueEquippedPetTrickle(buyerId) {
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const petId = buyer?.featured_collectible;
     if (!petId) return;
+    const maxXp = petMaxXp(rarityOf(petId));
     const row = await db.queryOne(`SELECT xp, last_tick_at FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
     if (!row) {
         // First time we see this equipped pet — start its clock, no XP yet.
@@ -134,7 +151,7 @@ export async function accrueEquippedPetTrickle(buyerId) {
             .catch(() => {});
         return;
     }
-    if ((Number(row.xp) || 0) >= PET_MAX_XP) return; // capped — stop trickling
+    if ((Number(row.xp) || 0) >= maxXp) return; // capped — stop trickling
     if (!row.last_tick_at) {
         await db.query(`UPDATE mkt_pet_level SET last_tick_at = NOW() WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => {});
         return;
@@ -144,7 +161,7 @@ export async function accrueEquippedPetTrickle(buyerId) {
     if (elapsedMs <= 0) return;
     const gained = Math.floor((elapsedMs / DAY_MS) * PET_TRICKLE_PER_DAY);
     if (gained <= 0) return; // not enough time for a whole XP yet — leave the clock so the remainder carries
-    const newXp = Math.min(PET_MAX_XP, (Number(row.xp) || 0) + gained);
+    const newXp = Math.min(maxXp, (Number(row.xp) || 0) + gained);
     // Advance the clock by only the consumed time so the leftover fraction keeps accumulating.
     const consumedMs = (gained / PET_TRICKLE_PER_DAY) * DAY_MS;
     const newTick = new Date(lastTick + consumedMs);

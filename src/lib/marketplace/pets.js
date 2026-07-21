@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
-import { getPetXpMap, petLevelInfo, accrueEquippedPetTrickle, startPetTrickleClock } from "@/lib/marketplace/pet-level.js";
+import { getPetXpMap, petLevelInfo, petPassiveLevelMult, accrueEquippedPetTrickle, startPetTrickleClock } from "@/lib/marketplace/pet-level.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -82,10 +82,11 @@ export async function petsState(buyerId, { sync = false } = {}) {
         if (!isCollectibleUnlocked(pet, level, { owned: granted })) continue;
         ownedIds.push(pet.id);
         const p = petPassive(pet);
-        const info = petLevelInfo(petXp[pet.id] || 0);
-        // Passive scales with the pet's level (Lv1 ×1 … Lv5 ×5).
-        passiveTotals[p.stat] = (passiveTotals[p.stat] || 0) + p.value * info.level;
-        petLevels[pet.id] = { level: info.level, xp: info.xp, into: info.into, span: info.span, next: info.next, maxed: info.maxed, stat: p.stat, base: p.value, value: p.value * info.level };
+        const info = petLevelInfo(petXp[pet.id] || 0, pet.rarity);
+        // Passive scales GENTLY with the pet's level (Lv1 ×1 … Lv5 ×2) — leveling's big payoff is the ACTIVE now.
+        const passiveVal = Math.round(p.value * petPassiveLevelMult(info.level));
+        passiveTotals[p.stat] = (passiveTotals[p.stat] || 0) + passiveVal;
+        petLevels[pet.id] = { level: info.level, xp: info.xp, into: info.into, span: info.span, next: info.next, maxed: info.maxed, stat: p.stat, base: p.value, value: passiveVal };
         // Tradeable unless an explicit unlock row has locked it (level pets with no row are still tradeable).
         if (!lockedRefs.has(pet.id)) tradeableIds.push(pet.id);
         // Real trades only accept EARNED pets (level pets would re-unlock for free) that aren't already locked.

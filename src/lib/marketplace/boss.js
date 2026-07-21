@@ -7,6 +7,7 @@ import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -280,7 +281,7 @@ export async function getBossState(buyerId = null) {
     const fighters = members
         .map((m) => {
             // Show the equipped pet at THIS member's level for that pet (highest evolved sprite ≤ level).
-            const petLvl = m.featured_collectible ? petLevelForXp(m.featured_pet_xp || 0) : null;
+            const petLvl = m.featured_collectible ? petLevelForXp(m.featured_pet_xp || 0, collectibleById(m.featured_collectible)?.rarity) : null;
             const petArt = m.featured_collectible
                 ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible], petLvl || 1)
                 : null;

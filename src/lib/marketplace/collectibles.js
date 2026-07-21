@@ -163,6 +163,12 @@ export function petActive(pet) {
     return { stat: pet.activeStat || "fortune", value: PET_ACTIVE_BY_RARITY[pet.rarity] || 3 };
 }
 
+// Level scaling (pure, client-safe): leveling boosts the EQUIPPED pet's ACTIVE (Lv5 ×3), while the always-on
+// per-owned-pet PASSIVE scales only gently (Lv5 ×2). So "collect pets" (passive) and "invest in one" (active)
+// stay distinct and the active clearly wins on your equipped companion.
+export function petActiveLevelMult(level) { return 1 + (Math.max(1, Number(level) || 1) - 1) * 0.5; }
+export function petPassiveLevelMult(level) { return 1 + (Math.max(1, Number(level) || 1) - 1) * 0.25; }
+
 export function petPrice(pet) {
     return pet.price || SHOP_PRICE_BY_RARITY[pet.rarity] || 0;
 }

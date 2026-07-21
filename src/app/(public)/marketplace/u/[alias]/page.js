@@ -17,6 +17,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collectibles.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { petActiveLevelMult } from "@/lib/marketplace/pet-level.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
@@ -98,6 +99,7 @@ export default async function UserProfilePage({ params }) {
             const active = petActive(def);
             const passive = petPassive(def);
             const pl = pets.petLevels?.[id] || {};
+            const activeVal = Math.round((active?.value || 0) * petActiveLevelMult(lvl));
             return {
                 id,
                 name: def.name,
@@ -112,7 +114,7 @@ export default async function UserProfilePage({ params }) {
                 featured: pets.featured === id,
                 spriteUrl: art?.url || null,
                 spriteFlip: art?.flip || false,
-                activeDesc: active ? `+${active.value}% ${fmtStat(active.stat)} when equipped` : null,
+                activeDesc: active ? `+${activeVal}% ${fmtStat(active.stat)} when equipped (Lv ${lvl})` : null,
                 passiveDesc: passive ? `+${pets.petLevels?.[id]?.value ?? passive.value} ${fmtStat(passive.stat)} owned (all pets stack)` : null,
             };
         })
