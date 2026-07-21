@@ -5,17 +5,19 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 
 import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
-import CollectibleGrid from "@/components/CollectibleGrid";
 import FeaturedCollectible from "@/components/FeaturedCollectible";
 import ProfileActions from "@/components/ProfileActions";
 import PublicGear from "@/components/PublicGear";
+import PublicPets from "@/components/PublicPets";
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collectibles.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
@@ -80,6 +82,38 @@ export default async function UserProfilePage({ params }) {
     // Telemetry: someone inspected another member's profile.
     if (viewer && viewer.id !== profile.id) after(() => trackActivity(viewer.id, "view_profile", { alias: profile.alias, name: profile.displayLabel }));
 
+    // Rich pet data for the public view: each owned pet's level, its accurate level-appropriate battle
+    // sprite, and whether it's the equipped/featured companion — so visitors can inspect them.
+    const [petSpriteBase, petSpriteLevels] = await Promise.all([
+        getPetSpriteData().catch(() => ({})),
+        getPetSpriteLevelData().catch(() => ({})),
+    ]);
+    const fmtStat = (s) => String(s || "").replace(/_/g, " ");
+    const petsData = (pets.ownedIds || [])
+        .map((id) => {
+            const def = collectibleById(id);
+            if (!def) return null;
+            const lvl = pets.petLevels?.[id]?.level || 1;
+            const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl);
+            const active = petActive(def);
+            const passive = petPassive(def);
+            return {
+                id,
+                name: def.name,
+                rarity: def.rarity || null,
+                source: def.source || null,
+                hint: def.hint || null,
+                level: lvl,
+                featured: pets.featured === id,
+                spriteUrl: art?.url || null,
+                spriteFlip: art?.flip || false,
+                activeDesc: active ? `+${active.value}% ${fmtStat(active.stat)} when equipped` : null,
+                passiveDesc: passive ? `+${pets.petLevels?.[id]?.value ?? passive.value} ${fmtStat(passive.stat)} owned (all pets stack)` : null,
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b.level - a.level || a.name.localeCompare(b.name));
+
     return (
         <div className="stack reveal">
             <section className={`card ${backgroundClass(profile.background)} ${frameClass(profile.frame)} ${profile.featuredBadge ? "has-card-tab" : ""}`.trim()}>
@@ -102,7 +136,7 @@ export default async function UserProfilePage({ params }) {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has collected — from leveling, chests, the boss, and the shop.</p>
-                <CollectibleGrid level={profile.level?.level || 1} owned={pets.ownedIds || []} unlockedOnly />
+                <PublicPets pets={petsData} />
             </section>
         </div>
     );

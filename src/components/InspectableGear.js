@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import ItemArt from "@/components/ItemArt";
 
@@ -10,6 +11,10 @@ import ItemArt from "@/components/ItemArt";
 // "propose a trade" button. Data is prepared server-side by <PublicGear>.
 export default function InspectableGear({ equipped = [], inventory = [], canTrade = false, targetAlias = null }) {
     const [detail, setDetail] = useState(null);
+    // Portal the inspect sheet to <body> so a transformed/animated ancestor (e.g. .reveal) can't capture its
+    // position: fixed and push it off-screen.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
 
     const chip = (i) => (
         <button
@@ -38,7 +43,7 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
                 </>
             ) : null}
 
-            {detail ? (
+            {mounted && detail ? createPortal((
                 <div className="equip-sheet-overlay" onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
                     <div className={`card equip-sheet rar-${detail.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -60,7 +65,7 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
                         </div>
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
         </>
     );
 }
