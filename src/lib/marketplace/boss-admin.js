@@ -220,13 +220,24 @@ export async function setBossPrize(bossId, { name, imageUrl, squareId } = {}) {
 }
 
 // Set (or clear) the hand-picked IN-GAME chase item awarded to the #1 damage dealer. Pass a valid item
-// id, or null-ish to clear.
+// id, or null-ish to clear. (Legacy single-item setter — still supported; also mirrors into reward_item_ids.)
 export async function setBossChaseItem(bossId, itemId) {
     const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
     if (!boss) throw new Error("Boss not found");
     const id = itemId && itemById(itemId) ? itemId : null;
-    await db.query(`UPDATE boss_event SET chase_item_id = $2 WHERE id = $1`, [bossId, id]);
+    await db.query(`UPDATE boss_event SET chase_item_id = $2, reward_item_ids = $3::jsonb WHERE id = $1`, [bossId, id, JSON.stringify(id ? [id] : [])]);
     return { ok: true, chaseItemId: id, chaseItemName: id ? itemById(id).name : null };
+}
+
+// Set the LIST of in-game reward items for a boss (0+ ids). On the kill each drops to a weighted-random
+// participant (top dealers get a modest edge, never guaranteed). Invalid ids are dropped.
+export async function setBossRewardItems(bossId, itemIds) {
+    const boss = await db.queryOne(`SELECT id FROM boss_event WHERE id = $1`, [bossId]);
+    if (!boss) throw new Error("Boss not found");
+    const ids = (Array.isArray(itemIds) ? itemIds : []).map((x) => String(x)).filter((x) => itemById(x));
+    // Keep chase_item_id pointed at the first (back-compat for anything still reading it).
+    await db.query(`UPDATE boss_event SET reward_item_ids = $2::jsonb, chase_item_id = $3 WHERE id = $1`, [bossId, JSON.stringify(ids), ids[0] || null]);
+    return { ok: true, rewardItemIds: ids, items: ids.map((id) => ({ id, name: itemById(id).name, rarity: itemById(id).rarity })) };
 }
 
 // Owner hands the raffle prize to the winner — mark it claimed so it drops off the "to hand out" list.

@@ -346,7 +346,9 @@ export async function getBossState(buyerId = null) {
             backgroundUrl: boss.background_url || null,
             rewards: boss.rewards_text || null,
             prize: boss.prize_name ? { name: boss.prize_name, imageUrl: boss.prize_image_url || null } : null,
-            chaseItem: (boss.chase_item_id && itemById(boss.chase_item_id)) ? { id: boss.chase_item_id, name: itemById(boss.chase_item_id).name, rarity: itemById(boss.chase_item_id).rarity, icon: itemById(boss.chase_item_id).icon } : null,
+            // In-game reward items — 0+ drop to weighted-random fighters on the kill (top dealers slightly favored).
+            rewardItems: (Array.isArray(boss.reward_item_ids) && boss.reward_item_ids.length ? boss.reward_item_ids : (boss.chase_item_id ? [boss.chase_item_id] : []))
+                .map((id) => itemById(id)).filter(Boolean).map((it) => ({ id: it.id, name: it.name, rarity: it.rarity, icon: it.icon })),
             ticketDivisor: divisor,
             endsAt: boss.ends_at || null,
             defeated: Boolean(boss.defeated_at),
@@ -528,18 +530,33 @@ async function finalizeBossKill(bossId) {
     }
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
 
-    // IN-GAME CHASE GEAR + a drop-only badge → the #1 damage dealer (their skill reward).
-    let chaseItem = null;
-    if (top1 && boss.chase_item_id) {
-        chaseItem = itemById(boss.chase_item_id);
-        if (chaseItem) await grantItem(top1.id, chaseItem.id, "boss_reward").catch(() => {});
+    // IN-GAME REWARD ITEMS — the admin hand-picks 0+ items; each drops to a WEIGHTED-RANDOM participant.
+    // The top 3 dealers get a modest edge (weights 3/2/2 vs 1 for everyone else), but it's far from a
+    // guarantee — anyone who fought can win. Distinct winners while there are enough people.
+    const rewardItemIds = Array.isArray(boss.reward_item_ids) && boss.reward_item_ids.length
+        ? boss.reward_item_ids
+        : (boss.chase_item_id ? [boss.chase_item_id] : []);
+    const rankBoost = new Map(ranked.slice(0, 3).map((p, i) => [p.id, [3, 2, 2][i]]));
+    const itemWinners = new Map(); // buyerId -> [itemName]
+    let drawPool = pool.slice();
+    for (const itemId of rewardItemIds) {
+        const item = itemById(itemId);
+        if (!item) continue;
+        const candidates = drawPool.length ? drawPool : pool; // reuse everyone if there are more items than people
+        const winner = weightedDraw(candidates, (p) => rankBoost.get(p.id) || 1);
+        if (!winner) continue;
+        await grantItem(winner.id, item.id, "boss_reward").catch(() => {});
+        if (!itemWinners.has(winner.id)) itemWinners.set(winner.id, []);
+        itemWinners.get(winner.id).push(item.name);
+        if (drawPool.length) drawPool = drawPool.filter((p) => p.id !== winner.id);
     }
+    // Drop-only badge is still the #1 dealer's skill recognition.
     const top1Badge = top1 ? await grantRandomDropBadge(top1.id).catch(() => null) : null;
 
-    // LOOT CHESTS — a CONSOLATION for the rest of the pack. Anyone who already won something (top damage, the
-    // raffle prize, or a boss pet) is EXCLUDED — no chest piled on top of a real reward — and tiers are capped
-    // at Iron so a chest never out-rewards the prizes. (The old elite Ascendant+ chest for #1 is gone.)
-    const rewardWinners = new Set([top1?.id, raffleWinner?.id, ...petWinners].filter(Boolean));
+    // LOOT CHESTS — a CONSOLATION for the rest of the pack. Anyone who already won something (the raffle
+    // prize, a boss pet, or a reward item) is EXCLUDED, and tiers are capped at Iron so a chest never
+    // out-rewards the prizes.
+    const rewardWinners = new Set([raffleWinner?.id, ...petWinners, ...itemWinners.keys()].filter(Boolean));
     const chestByBuyer = new Map();
     for (const p of pool) {
         if (rewardWinners.has(p.id)) continue; // already got a good reward — no bonus chest
@@ -549,22 +566,22 @@ async function finalizeBossKill(bossId) {
         chestByBuyer.set(p.id, tier);
         await addChests(p.id, { [tier]: 1 }).catch(() => {});
     }
-    const eliteChest = null; // elite Ascendant+ boss chest retired — too generous stacked on the #1 dealer
 
     // Pack-wide celebration pop-up — personalized to what each member actually won.
     for (const p of pool) {
         const isTop = top1 && p.id === top1.id;
         const isRaffle = raffleWinner && p.id === raffleWinner.id;
         const chestTier = chestByBuyer.get(p.id) || null;
+        const wonItems = itemWinners.get(p.id) || [];
         const bits = [];
-        if (isTop) bits.push(chaseItem ? `🥇 You dealt the most damage and won ${chaseItem.name}!` : `🥇 You dealt the most damage!`);
-        if (isTop && eliteChest) bits.push({ ascendant: "🌟 An ASCENDANT chest dropped — incredibly rare!", eternal: "👑 An ETERNAL chest dropped!", celestial: "🌌 A CELESTIAL chest dropped — almost unheard of!", primordial: "☀️ A PRIMORDIAL chest dropped — the rarest thing in the Den!" }[eliteChest]);
+        if (wonItems.length) bits.push(`🎁 A boss reward dropped to you — ${wonItems.join(" & ")}! Equip it from your gear.`);
+        if (isTop) bits.push(`🥇 You dealt the most damage!`);
         if (isRaffle && boss.prize_name) bits.push(`🎟️ You won the raffle — come claim ${boss.prize_name} in-store!`);
         if (chestTier) { const c = CHEST_TIERS[chestTier]; bits.push(`${c.emoji} ${c.label} landed in your stash — open it!`); }
         if (isTop && top1Badge) bits.push(`You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.`);
         if (!bits.length) bits.push(`The whole pack took down ${boss.name}! See the final stats →`);
-        const title = isRaffle && boss.prize_name ? "🎟️ You won the raffle!" : isTop ? "🥇 You topped the boss!" : chestTier ? "🎁 Boss loot!" : "☠️ Boss slain!";
-        const icon = isRaffle && boss.prize_name ? "🎟️" : isTop ? "🥇" : chestTier ? "🎁" : "🏆";
+        const title = isRaffle && boss.prize_name ? "🎟️ You won the raffle!" : wonItems.length ? "🎁 Boss reward!" : isTop ? "🥇 You topped the boss!" : chestTier ? "🎁 Boss loot!" : "☠️ Boss slain!";
+        const icon = isRaffle && boss.prize_name ? "🎟️" : wonItems.length ? "🎁" : isTop ? "🥇" : chestTier ? "🎁" : "🏆";
         await recordGift(p.id, { kind: "boss", title, body: bits.join(" "), icon, url: `/marketplace/boss/recap/${bossId}` }).catch(() => {});
     }
 

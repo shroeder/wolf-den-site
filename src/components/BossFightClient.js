@@ -184,16 +184,20 @@ export default function BossFightClient() {
                             ) : <span style={{ fontSize: "2.4rem", flexShrink: 0 }} aria-hidden="true">🎁</span>}
                         </div>
                     ) : null}
-                    {/* #1 damage — in-game chase gear */}
-                    {boss.chaseItem ? (
+                    {/* In-game reward gear — drops to random fighters (top dealers slightly favored) */}
+                    {boss.rewardItems?.length ? (
                         <div style={{ display: "flex", gap: 12, alignItems: "center", padding: 12, borderRadius: 14, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.03)" }}>
-                            <span style={{ fontSize: "1.6rem", flexShrink: 0 }} aria-hidden="true">🥇</span>
+                            <span style={{ fontSize: "1.6rem", flexShrink: 0 }} aria-hidden="true">🎁</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>#1 DAMAGE</div>
-                                <div style={{ fontWeight: 800, fontSize: "0.95rem" }}><span style={{ color: RARITY_TXT[boss.chaseItem.rarity] || "#fff" }}>{boss.chaseItem.name}</span> <span className="muted" style={{ fontWeight: 700 }}>· in-game gear</span></div>
-                                <div className="muted" style={{ fontSize: "0.76rem" }}>The top damage dealer earns it.</div>
+                                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#cdbfa6", letterSpacing: "0.05em" }}>{boss.rewardItems.length > 1 ? `${boss.rewardItems.length} GEAR DROPS` : "GEAR DROP"}</div>
+                                <div style={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.35 }}>
+                                    {boss.rewardItems.map((it, i) => (
+                                        <span key={it.id}>{i > 0 ? " · " : ""}<span style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</span></span>
+                                    ))}
+                                </div>
+                                <div className="muted" style={{ fontSize: "0.76rem" }}>Drops to random fighters — top dealers have better odds, but anyone who fights can win.</div>
                             </div>
-                            <ItemArt id={boss.chaseItem.id} icon={boss.chaseItem.icon} className="boss-chase-art" />
+                            <ItemArt id={boss.rewardItems[0].id} icon={boss.rewardItems[0].icon} className="boss-chase-art" />
                         </div>
                     ) : null}
                     {/* Everyone — chest chance + XP */}
