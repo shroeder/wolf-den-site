@@ -78,7 +78,7 @@ export default function DailyDeals() {
                     🔄 Reroll deals · 🪙 {(state.resetCost || 1500).toLocaleString()}
                 </button>
             ) : state.resetUsed ? <p className="muted" style={{ fontSize: "0.72rem", margin: "0 0 8px" }}>rerolled today — fresh deals tomorrow</p> : null}
-            <p className="muted" style={{ margin: "2px 0 10px" }}>Discounted picks that rotate every day — grab them before they&apos;re gone. {state.signedIn ? <span>🪙 {state.gold.toLocaleString()}</span> : null}</p>
+            <p className="muted" style={{ margin: "2px 0 10px" }}>Discounted picks that rotate every day — grab them before they&apos;re gone.</p>
             {msg ? <p className={msg.ok ? "deals-ok" : "deals-err"}>{msg.text}</p> : null}
             <div className="deals-grid">
                 {state.deals.map((d) => (

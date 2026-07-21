@@ -83,7 +83,7 @@ export default function ConsumablesClient() {
     return (
         <section className="card">
             <button type="button" className="collapse-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-                <span>🧪 Consumables <span className="equip-gold">{(state.gold || 0).toLocaleString()} gold</span>{stash.length ? <span className="collapse-count">{stash.length} in stash</span> : null}</span>
+                <span>🧪 Consumables{stash.length ? <span className="collapse-count">{stash.length} in stash</span> : null}</span>
                 <span className="collapse-chevron">{open ? "▾" : "▸"}</span>
             </button>
             {!open ? null : (<>

@@ -28,12 +28,17 @@ export default function GameNav() {
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
     const [chests, setChests] = useState(0);
+    const [gold, setGold] = useState(null);
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
         fetch("/api/marketplace/chests", { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
-            .then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); })
+            .then((d) => {
+                if (!alive) return;
+                setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
+                if (typeof d?.gold === "number") setGold(d.gold);
+            })
             .catch(() => {});
         return () => { alive = false; };
     }, [inGame, pathname]);
@@ -42,6 +47,8 @@ export default function GameNav() {
 
     return (
         <nav className="game-nav" aria-label="Game menu">
+            {/* One authoritative gold balance for the whole game — section headers don't repeat it. */}
+            {gold != null ? <span className="game-nav-gold" title="Your gold">🪙 {gold.toLocaleString()}</span> : null}
             <div className="game-nav-scroll">
                 {LINKS.map((l) => {
                     const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;

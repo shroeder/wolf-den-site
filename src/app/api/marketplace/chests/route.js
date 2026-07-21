@@ -4,6 +4,7 @@ import { getChests, openChest } from "@/lib/marketplace/chests.js";
 import { grantRandomDropBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,7 +20,11 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
-            return noStore({ chests: await getChests(buyer.id) });
+            const [chests, goldRow] = await Promise.all([
+                getChests(buyer.id),
+                db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null),
+            ]);
+            return noStore({ chests, gold: goldRow?.gold || 0 });
         } catch (error) {
             return internalError(error, { event: "marketplace.chests.get.failure" });
         }

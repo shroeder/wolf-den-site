@@ -31,7 +31,6 @@ export default function GameHubStats() {
         <div className="game-hub-stats">
             <div className="game-hub-chips">
                 <span className="game-hub-chip">⭐ {(unlock.xp || 0).toLocaleString()} XP</span>
-                {spin?.signedIn ? <span className="game-hub-chip">🪙 {(spin.gold || 0).toLocaleString()}</span> : null}
                 {spin?.signedIn ? <span className="game-hub-chip">🎟️ {spin.tokens || 0}</span> : null}
                 {spin?.freeAvailable ? <Link href="/marketplace/spin" className="game-hub-chip is-live">🎡 Free spin ready!</Link> : null}
             </div>

@@ -102,7 +102,7 @@ export default function SpinWheel() {
         <section className="card spin-card">
             <div className="spin-top">
                 <span>🎡 {st.wheel.name}</span>
-                <span className="muted">🪙 {st.gold.toLocaleString()} · 🎟️ {st.tokens} · spun {st.spinCount}×</span>
+                <span className="muted">🎟️ {st.tokens} tokens · spun {st.spinCount}×</span>
             </div>
             <p className="muted spin-lead">Spin daily for gold, XP, chests, pet treats — and a rare shot at the <strong style={{ color: "#ffd75e" }}>💎 JACKPOT</strong>.</p>
 
