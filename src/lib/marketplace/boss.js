@@ -132,11 +132,13 @@ export async function getActiveBoss() {
 // Scoped to bossId so a freshly-spawned boss grants a fresh daily attack even if the pack already killed one
 // earlier the same day — players asked to be able to swing again when a new boss appears.
 async function manualAttacksToday(buyerId, bossId) {
+    // Read the authoritative swing counter (mkt_boss_swing) — the same row the atomic reservation increments,
+    // so "attacks used" here always matches what enforcement will allow (no drift between the displayed
+    // attacks-left and what the cap actually permits).
     const row = await db
         .queryOne(
-            `SELECT COUNT(*)::int AS n FROM boss_hit
-              WHERE buyer_id = $1 AND kind = 'manual' AND boss_id = $2
-                AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date`,
+            `SELECT n FROM mkt_boss_swing
+              WHERE buyer_id = $1 AND boss_id = $2 AND day = (NOW() AT TIME ZONE 'America/Chicago')::date`,
             [buyerId, bossId]
         )
         .catch(() => null);
@@ -774,28 +776,39 @@ export async function attackBoss(buyerId) {
     const crit = swing.crit;
     const ability = pickAbility(crit);
 
-    // RESERVE the swing slot ATOMICALLY (race-safe): the boss_hit only inserts if today's manual count for
-    // this boss is still under the cap — so rapid double-clicks / concurrent requests can't exceed the daily
-    // swing limit (the earlier used>=cap check is just a fast pre-reject; THIS is the real enforcement).
-    const hit = await db.queryOne(
-        `INSERT INTO boss_hit (boss_id, buyer_id, damage, kind)
-         SELECT $1, $2, $3, 'manual'
-          WHERE (SELECT COUNT(*) FROM boss_hit
-                   WHERE buyer_id = $2 AND kind = 'manual' AND boss_id = $1
-                     AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date) < $4
-         RETURNING id`,
-        [boss.id, buyerId, damage, dailyCap]
+    // RESERVE the swing slot ATOMICALLY — truly race-safe. A single conditional UPDATE on the per-(buyer,
+    // boss, day) counter: the row lock serializes concurrent writers, so a scripted simultaneous burst blocks
+    // and re-checks n < cap against the COMMITTED value. Unlike the old count-then-insert (which could let two
+    // requests both read count < cap before either committed), the cap can never be exceeded. The earlier
+    // used>=cap check is just a fast pre-reject; THIS is the real enforcement.
+    const slot = await db.queryOne(
+        `INSERT INTO mkt_boss_swing (buyer_id, boss_id, day, n)
+         VALUES ($1, $2, (NOW() AT TIME ZONE 'America/Chicago')::date, 1)
+         ON CONFLICT (buyer_id, boss_id, day)
+         DO UPDATE SET n = mkt_boss_swing.n + 1 WHERE mkt_boss_swing.n < $3
+         RETURNING n`,
+        [buyerId, boss.id, dailyCap]
     );
-    if (!hit) return { error: "no_attacks_left", attacksLeft: 0 };
+    if (!slot) return { error: "no_attacks_left", attacksLeft: 0 };
     // Slot reserved — now deal the damage.
     const row = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, damage]);
     if (!row) {
-        await db.query(`DELETE FROM boss_hit WHERE id = $1`, [hit.id]).catch(() => {}); // boss already dead — release the slot
+        // Boss already dead — release the reserved slot so the swing isn't wasted.
+        await db.query(`UPDATE mkt_boss_swing SET n = GREATEST(0, n - 1) WHERE buyer_id = $1 AND boss_id = $2 AND day = (NOW() AT TIME ZONE 'America/Chicago')::date`, [buyerId, boss.id]).catch(() => {});
         return { error: "defeated" };
     }
-    // XP for the first 3 swings/day only — extra strikes (gear/pets/potions) still deal damage + earn
-    // tickets, but no longer print unlimited XP (strike-stacking was dominating the leaderboard).
-    await awardXp(buyerId, "boss_attack", { dailyCap: 3, dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${Date.now()}`}` }).catch(() => {});
+    // Log the manual hit for the damage ledger (feeds top-damage, hitters-today, and dmg-rank medals).
+    const hit = await db.queryOne(
+        `INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'manual') RETURNING id`,
+        [boss.id, buyerId, damage]
+    );
+    // XP for the first 3 swings/day only, gated on the ATOMIC swing number (slot.n is this swing's 1-based
+    // count) — extra strikes (gear/pets/potions) still deal damage + earn tickets, but can't print unlimited
+    // XP even under a concurrent burst. dailyCap:3 kept as a backstop. (Strike-stacking was dominating the
+    // leaderboard; slot.n ties the XP cap to the same row-locked counter that enforces the swing cap.)
+    if (slot.n <= 3) {
+        await awardXp(buyerId, "boss_attack", { dailyCap: 3, dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${slot.n}`}` }).catch(() => {});
+    }
     // Signature rewards: Scholar XP + Prospector gold on this hit.
     if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
     if (onHit.gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, onHit.gold]).catch(() => {});
