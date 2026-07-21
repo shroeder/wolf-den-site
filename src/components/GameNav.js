@@ -29,7 +29,6 @@ export default function GameNav() {
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
     const [chests, setChests] = useState(0);
-    const [gold, setGold] = useState(null);
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
@@ -38,7 +37,6 @@ export default function GameNav() {
             .then((d) => {
                 if (!alive) return;
                 setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
-                if (typeof d?.gold === "number") setGold(d.gold);
             })
             .catch(() => {});
         return () => { alive = false; };
@@ -48,11 +46,7 @@ export default function GameNav() {
 
     return (
         <nav className="game-nav" aria-label="Game menu">
-            {/* One authoritative gold balance for the whole game — section headers don't repeat it. Tapping it
-                is the universal "get more coins" CTA → buy store credit (100 coins per $1). */}
-            {gold != null ? (
-                <Link href="/marketplace/credit" className="game-nav-gold" title="Tap to add coins / store credit">🪙 {gold.toLocaleString()} <span className="game-nav-gold-plus" aria-hidden="true">＋</span></Link>
-            ) : null}
+            {/* Coins live in the top HUD strip (RewardNudge), not here — keeps this row purely navigation. */}
             <div className="game-nav-scroll">
                 {LINKS.map((l) => {
                     const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;

@@ -44,20 +44,32 @@ export default function RewardNudge() {
 
     if (!data || !data.authed) return null;
 
+    const hasProgress = !data.maxed && data.label;
+
     return (
         <>
-            {!data.maxed && data.label ? (
-                <Link href="/marketplace/track" className="reward-nudge" aria-label={`Next unlock: ${data.label} at level ${data.unlockLevel} — see your rewards track`}>
-                    <span className="reward-nudge-gift" aria-hidden="true">🎁</span>
-                    <span className="reward-nudge-main">
-                        <span className="reward-nudge-label">
-                            Next: <span aria-hidden="true">{data.icon}</span> <strong>{data.label}</strong>
+            <div className="hud-strip">
+                {/* Coins — the enticing currency chip (shimmering gold), tap the + to buy more store credit. */}
+                {typeof data.gold === "number" ? (
+                    <Link href="/marketplace/credit" className="coin-hud" aria-label={`${data.gold} coins — tap to get more`}>
+                        <span className="coin-hud-icon" aria-hidden="true">🪙</span>
+                        <span className="coin-hud-amt">{data.gold.toLocaleString()}</span>
+                        <span className="coin-hud-plus" aria-hidden="true">+</span>
+                    </Link>
+                ) : null}
+                {hasProgress ? (
+                    <Link href="/marketplace/track" className="reward-nudge" aria-label={`Next unlock: ${data.label} at level ${data.unlockLevel} — see your rewards track`}>
+                        <span className="reward-nudge-gift" aria-hidden="true">🎁</span>
+                        <span className="reward-nudge-main">
+                            <span className="reward-nudge-label">
+                                Next: <span aria-hidden="true">{data.icon}</span> <strong>{data.label}</strong>
+                            </span>
+                            <span className="reward-nudge-bar"><span style={{ width: `${data.pct}%` }} /></span>
                         </span>
-                        <span className="reward-nudge-bar"><span style={{ width: `${data.pct}%` }} /></span>
-                    </span>
-                    <span className="reward-nudge-togo">{data.xpToGo.toLocaleString()} XP →</span>
-                </Link>
-            ) : null}
+                        <span className="reward-nudge-togo">{data.xpToGo.toLocaleString()} XP →</span>
+                    </Link>
+                ) : null}
+            </div>
             {toast ? <div className="xp-toast" role="status">🎉 {toast}</div> : null}
         </>
     );

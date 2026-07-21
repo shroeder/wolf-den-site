@@ -19,10 +19,6 @@ export default function BossPage() {
         <div className="stack reveal">
             <ViewPing event="view_boss" />
             <section className="card">
-                <h1 style={{ marginTop: 0, marginBottom: 4 }}>⚔️ Weekly Boss</h1>
-                <p className="muted" style={{ margin: "0 0 10px", fontSize: "0.82rem" }}>
-                    One shared boss all week · <strong>one swing a day</strong> for XP + raffle tickets. Drop in daily to help finish it.
-                </p>
                 <BossFightClient />
             </section>
             {/* The community donate/rally widget lives here (boss page only) — compact so it doesn't hog space. */}

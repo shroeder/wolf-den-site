@@ -16,18 +16,19 @@ export async function GET(request) {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ authed: false }, { headers: { "Cache-Control": "no-store" } });
 
-            const row = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);
+            const row = await db.queryOne(`SELECT xp, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);
             const xp = Math.max(0, Math.floor(Number(row?.xp) || 0));
+            const gold = Math.max(0, Math.floor(Number(row?.gold) || 0));
             const level = levelForXp(xp).level;
             const next = nextUnlock(level);
-            if (!next) return NextResponse.json({ authed: true, maxed: true, xp }, { headers: { "Cache-Control": "no-store" } });
+            if (!next) return NextResponse.json({ authed: true, maxed: true, xp, gold }, { headers: { "Cache-Control": "no-store" } });
 
             const target = 50 * (next.level - 1) * next.level; // cumulative XP to REACH next.level
             const xpToGo = Math.max(0, target - xp);
             const pct = target > 0 ? Math.min(100, Math.round((xp / target) * 100)) : 0;
 
             return NextResponse.json(
-                { authed: true, xp, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
+                { authed: true, xp, gold, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
                 { headers: { "Cache-Control": "no-store" } }
             );
         } catch (error) {

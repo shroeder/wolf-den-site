@@ -10295,3 +10295,29 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-reward-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.22); transition: background 0.2s ease; }
 .boss-reward-dots span.is-on { background: #ffd75e; }
 @media (prefers-reduced-motion: reduce) { .boss-reward-rotate { animation: none; } }
+
+/* ── Top HUD strip: dopamine coin chip + the rank-progress nudge, one slim row (replaces the nav gold pill) ── */
+.hud-strip { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+    background: linear-gradient(90deg, rgba(255,215,94,0.06), rgba(255,215,94,0.02));
+    border-bottom: 1px solid rgba(255,215,94,0.18); }
+.hud-strip .reward-nudge { flex: 1 1 auto; min-width: 0; padding: 2px 4px; background: none; border-bottom: none; }
+.hud-strip .reward-nudge:hover { background: none; }
+/* The coin chip — a shiny gold pill that catches the eye, with a punchy round "+" to buy more. */
+.coin-hud { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; overflow: hidden;
+    padding: 4px 5px 4px 11px; border-radius: 999px; text-decoration: none; font-weight: 900; color: #3c2c04;
+    background: linear-gradient(135deg, #ffe9a8, #ffcf4a 46%, #f2a93b);
+    border: 1px solid rgba(255,255,255,0.55);
+    box-shadow: 0 2px 9px rgba(240,160,40,0.5), inset 0 1px 0 rgba(255,255,255,0.65); }
+.coin-hud::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,0.8) 50%, transparent 58%);
+    transform: translateX(-130%); animation: coinShine 3.8s ease-in-out infinite; }
+@keyframes coinShine { 0%, 72% { transform: translateX(-130%); } 90%, 100% { transform: translateX(130%); } }
+.coin-hud-icon { font-size: 1rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); animation: coinBob 2.6s ease-in-out infinite; }
+@keyframes coinBob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-1.5px) rotate(-9deg); } }
+.coin-hud-amt { font-size: 0.92rem; letter-spacing: 0.01em; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
+.coin-hud-plus { display: inline-grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; font-size: 1.05rem; font-weight: 900; line-height: 1;
+    color: #fff; background: linear-gradient(135deg, #ff8a44, #e8431f);
+    box-shadow: 0 1px 4px rgba(230,60,20,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
+.coin-hud:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) { .coin-hud::after, .coin-hud-icon { animation: none; } }
+.boss2-sub { font-size: 0.78rem; text-align: center; margin: 2px 0 8px; }
