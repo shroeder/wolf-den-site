@@ -9594,7 +9594,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fb-arena { position: absolute; inset: 0; animation: fbShake 0.5s 3.4s both; }
 @keyframes fbShake { 0%,100% { transform: translate(0,0); } 12% { transform: translate(-9px, 5px); } 30% { transform: translate(8px, -6px); } 48% { transform: translate(-7px, 4px); } 66% { transform: translate(5px, -3px); } 82% { transform: translate(-3px, 2px); } }
 /* Boss: looms, braces, takes the hit (white flash + shove), then shatters into light and is gone. */
-.fb-boss { position: absolute; right: 2%; bottom: 6%; height: 80%; width: auto; transform-origin: bottom center;
+.fb-boss { position: absolute; right: -6%; bottom: 10%; height: 84%; width: auto; z-index: 2; transform-origin: bottom center;
     filter: drop-shadow(0 12px 22px rgba(0,0,0,0.6)); animation: fbBoss 5.6s ease-in-out both; }
 .fb-boss-fallback { display: grid; place-items: center; font-size: 12rem; }
 @keyframes fbBoss {
@@ -9609,7 +9609,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 /* Hero (MVP sprite): rushes in, winds up in slow-mo, then LUNGES through the boss and stands victorious.
    scaleX(var(--fb-face)) is innermost so a flipped sprite still lunges toward the boss (screen-right). */
-.fb-hero { position: absolute; left: 6%; bottom: 8%; height: 52%; width: auto; z-index: 5; transform-origin: bottom center;
+.fb-hero { position: absolute; left: 14%; bottom: 5%; height: 58%; width: auto; z-index: 5; transform-origin: bottom center;
     --fb-face: 1; filter: drop-shadow(0 0 16px rgba(255,215,94,0.85)) drop-shadow(0 8px 12px rgba(0,0,0,0.6));
     animation: fbHero 5.6s cubic-bezier(0.4, 0, 0.2, 1) both; }
 .fb-hero.is-flip { --fb-face: -1; }

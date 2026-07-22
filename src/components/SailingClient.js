@@ -12,13 +12,13 @@ const GUST_MS = 3000;
 // Where the crew (hero + pet) plant their feet, per boat FORM (tier), as a `bottom` % of the hull art. Open
 // boats (tier 1–2) have a low floor so the crew must sit LOW or they hover in the open hull; taller ships seat
 // higher on their deck. Tiers not listed fall back to the default in CSS. Tune per boat as forms are seen.
-const CREW_BOTTOM = { 1: 22, 2: 23, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+const CREW_BOTTOM = { 1: 31, 2: 32, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
 
 // Where the ambient (background) sailors' rider + pet plant their feet, per boat FORM (tier). Same idea as
 // CREW_BOTTOM but for the small background boats, whose deck height varies by form — a single value can't fit
 // an open dinghy AND a tall galleon, which is why earlier single-value tweaks kept missing.
-const AMB_RIDER_B = { 1: 23, 2: 24, 3: 37, 4: 37, 5: 39, 6: 37, 7: 37, 8: 39, 9: 39 };
-const AMB_PET_B = { 1: 21, 2: 22, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+const AMB_RIDER_B = { 1: 30, 2: 31, 3: 37, 4: 37, 5: 39, 6: 37, 7: 37, 8: 39, 9: 39 };
+const AMB_PET_B = { 1: 28, 2: 29, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
