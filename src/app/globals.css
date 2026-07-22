@@ -10075,7 +10075,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .checkin-summary { text-align: left; display: flex; flex-direction: column; gap: 6px; margin: 0 auto 16px; max-width: 300px; }
 .checkin-row { font-size: 0.85rem; color: #cbd2da; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; border-radius: 10px; padding: 7px 10px; }
 /* Tappable "spend it" nudge rows (unopened chests / free spin) — clearly a call to action. */
-.checkin-cta { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #1c130a; text-decoration: none;
+/* Keep the dark ink on ALL link states — the global `a:visited` rule (0,1,1) otherwise outranks this and
+   repaints the text muted grey once the target page has been visited, killing contrast on the gold pill. */
+.checkin-cta, .checkin-cta:link, .checkin-cta:visited, .checkin-cta:hover { color: #1c130a; }
+.checkin-cta { display: flex; align-items: center; gap: 6px; font-weight: 700; text-decoration: none;
     background: linear-gradient(135deg, #ffe9a8, #ffcf4a); border-color: rgba(255,215,94,0.6); transition: filter 0.12s ease, transform 0.06s ease; }
 .checkin-cta strong { color: #7a4a00; }
 .checkin-cta .checkin-cta-arrow { margin-left: auto; font-weight: 900; }
