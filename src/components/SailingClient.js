@@ -21,6 +21,13 @@ const GUST_MS = 3000;
 const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30 };
 // Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
+// An uncovered chest cell's role from its position in the chest (rr/rc + dims) → edge irons, corner, lock.
+function chestClasses(cp) {
+    if (!cp) return "";
+    const t = cp.rr === 0, b = cp.rr === cp.H - 1, l = cp.rc === 0, r = cp.rc === cp.W - 1;
+    const lock = cp.rr === Math.floor((cp.H - 1) / 2) && cp.rc === Math.floor((cp.W - 1) / 2);
+    return `${t ? " et" : ""}${b ? " eb" : ""}${l ? " el" : ""}${r ? " er" : ""}${lock ? " lock" : ""}`;
+}
 const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
@@ -501,7 +508,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     /* ---------- Excavation dig minigame ---------- */
                     <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
                         <div className="dig-hud">
-                            <span className="dig-frag">🏺 {dig.found}/{dig.buried} unearthed</span>
+                            <span className="dig-frag">🎁 {dig.found}/{dig.buried} chest</span>
                             {dig.tier ? <span className="dig-tier" title="Difficulty — climbs with your Excavation level">Depth {dig.tier}</span> : null}
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina}</span>
                         </div>
@@ -541,7 +548,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                         onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : willScan ? senseTile(r, c) : digTile(r, c))}
                                         title={bottomed ? (t.found ? "Part of the relic!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the relic is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : willScan ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
-                                        {t.found ? <span className="dig-found"><span className="dig-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span><FragmentIcon size={30} art={t.tier ? `/images/sailing/fragment-${t.tier}.png` : undefined} /></span>
+                                        {t.found ? <span className={`dig-chestcell${chestClasses(t.chestPos)}`} aria-hidden="true"><span className="dig-chest-burst">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
                                                 : <><span className="dig-dirt" aria-hidden="true" />{t.sense != null ? <span className="dig-heat" aria-hidden="true">{t.sense >= 3 ? "🔥" : t.sense === 2 ? "♨️" : t.sense === 1 ? "❄️" : "🧊"}<small>{HEAT_WORD[t.sense]}</small></span> : null}</>}
                                         {chunk && chunk.r === r && chunk.c === c ? (
@@ -554,7 +561,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip">One <b>{dig.buried}-piece relic</b> is buried here in a single shape. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> it out and watch its shape appear, before your digs run out.</p>
+                        <p className="dig-tip">A <b>buried treasure chest</b> is down here. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> its tiles to uncover the chest and haul out its fragments, before your digs run out.</p>
                         {dig.status === "active" ? (
                             (state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0) ? (
                                 <CoinCta price={state.digRefill?.cost ?? 0} have={state.gold} label={`Get coins for ${state.digRefill?.amount ?? 5} more digs`} className="sail-digbuy-cta" />
@@ -877,14 +884,14 @@ export default function SailingClient({ initial, hero, pet }) {
                             {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} art={(result.haul && result.haul[0]?.art) || "/images/sailing/fragment-wooden.png"} /></span> : <span className="sail-recap-rock">🪨</span>}
                         </div>
                         <h2 style={{ margin: "4px 0" }}>{result.won
-                            ? (result.fullArtifact ? `The ${result.shape || "relic"} is yours!` : result.shape ? `The ${result.shape}, partly unearthed` : "Shard unearthed!")
+                            ? (result.fullArtifact ? "Chest unearthed! 🎁" : "Chest partly uncovered")
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You uncovered ${result.earned} of ${result.buried} relic piece${result.buried === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
+                            ? `You exposed ${result.uncovered}/${result.total} of the chest and hauled out ${result.earned} fragment${result.earned === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         {result.reveal ? (
                             <div className="sail-reveal">
-                                <div className="sail-reveal-label">🗺️ Where the {result.shape || "relic"} was buried:</div>
+                                <div className="sail-reveal-label">🗺️ Where the chest was buried:</div>
                                 <div className="sail-reveal-grid" style={{ gridTemplateColumns: `repeat(${result.reveal.cols}, 1fr)`, maxWidth: `${result.reveal.cols * 26}px` }}>
                                     {Array.from({ length: result.reveal.rows * result.reveal.cols }, (_, i) => {
                                         const rr = Math.floor(i / result.reveal.cols), cc = i % result.reveal.cols;

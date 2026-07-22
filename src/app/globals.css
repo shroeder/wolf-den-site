@@ -11284,16 +11284,30 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-dirt::after { width: 10%; height: 10%; top: 58%; left: 64%; }
 /* Chipped to the bottom, empty — a shadowed pit of dark dirt. */
 .dig-hole { position: absolute; inset: 26%; border-radius: 46%; background: radial-gradient(circle at 50% 36%, rgba(0,0,0,0.32), rgba(0,0,0,0.66)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.75); }
-/* An unearthed RELIC cell — golden carved surface; adjacent cells share the look so the shape reads as ONE
-   connected artifact emerging from the dirt. */
-.dig-tile.is-found { background:
-        radial-gradient(120% 90% at 50% 25%, rgba(255,244,200,0.6), rgba(255,244,200,0) 55%),
-        linear-gradient(160deg, #ffe08a, #d9a636 55%, #9c6f1e);
-    box-shadow: inset 0 0 0 1px rgba(120,80,10,0.5), inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -4px 8px rgba(120,80,10,0.55), 0 0 14px rgba(255,200,80,0.4); }
-.dig-found { position: absolute; inset: 0; display: grid; place-items: center; filter: drop-shadow(0 0 8px #fff2c0);
-    animation: digFound 0.5s cubic-bezier(0.2,1.35,0.4,1) both; }
-.dig-found .frag-icon { width: 66% !important; height: 66% !important; }
-@keyframes digFound { 0% { opacity: 0; transform: scale(0.2) rotate(-25deg); } 60% { transform: scale(1.2) rotate(6deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+/* An uncovered CHEST cell — an ironbound wooden lid. Each cell draws its slice (edge irons on the chest's
+   outer sides, a lock in the middle) so digging assembles ONE chest as it emerges from the dirt. */
+.dig-tile.is-found { background: radial-gradient(120% 120% at 50% 20%, #3a2716, #1b1108); }
+.dig-chestcell { position: absolute; inset: 0; pointer-events: none; border-radius: 3px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,225,170,0.28), rgba(0,0,0,0) 30%),
+        repeating-linear-gradient(180deg, #7a4f27 0 6px, #6a4321 6px 12px), linear-gradient(#754a26, #4d3018);
+    box-shadow: inset 0 2px 2px rgba(255,220,170,0.3), inset 0 -5px 8px rgba(0,0,0,0.45);
+    animation: digChestPop 0.4s cubic-bezier(0.2,1.35,0.4,1) both; }
+@keyframes digChestPop { 0% { opacity: 0; transform: scale(0.55); } 60% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+/* Iron rim on the chest's OUTER edges (so the whole chest reads as ironbound; corners get two = a bracket). */
+.dig-chestcell.et { border-top: 4px solid #2c2118; } .dig-chestcell.eb { border-bottom: 4px solid #241a12; }
+.dig-chestcell.el { border-left: 4px solid #2c2118; } .dig-chestcell.er { border-right: 4px solid #2c2118; }
+.dig-chestcell.et, .dig-chestcell.eb, .dig-chestcell.el, .dig-chestcell.er { box-shadow: inset 0 2px 2px rgba(255,220,170,0.3), inset 0 -5px 8px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(60,44,26,0.6); }
+/* The lock — a brass plate + keyhole on the centre cell. */
+.dig-chestcell.lock::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 46%; height: 56%; border-radius: 4px; background: radial-gradient(circle at 45% 30%, #ffe9a0, #d9a838 55%, #8a5f16);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.5); }
+.dig-chestcell.lock::before { content: ""; position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 1;
+    width: 10%; height: 22%; border-radius: 999px 999px 2px 2px; background: #3a2610; box-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+/* Golden sparkle burst when a chest cell pops. */
+.dig-chest-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.dig-chest-burst i { position: absolute; width: 3px; height: 40%; border-radius: 2px; transform-origin: 50% 100%; opacity: 0;
+    background: linear-gradient(to top, rgba(255,215,94,0), rgba(255,235,150,0.95)); transform: rotate(calc(var(--i) * 45deg));
+    animation: digBurst 0.6s ease-out both; }
 /* Dirt clods that spray out of a tile on each dig. */
 .dig-chunks { position: absolute; inset: 0; }
 .dig-chunks i { position: absolute; left: 50%; top: 46%; width: 22%; max-width: 9px; aspect-ratio: 1; border-radius: 50% 50% 45% 55%;
@@ -11384,7 +11398,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-tool-body { flex: 1; min-width: 0; }
 .sail-tool-name { font-weight: 800; font-size: 0.86rem; }
 .sail-tool-desc { font-size: 0.76rem; }
-@media (prefers-reduced-motion: reduce) { .dig-found, .dig-chunks i, .dig-clue, .dig-ping i, .dig-burst i { animation: none; } .dig-ping, .dig-burst { display: none; } }
+@media (prefers-reduced-motion: reduce) { .dig-chestcell, .dig-chunks i, .dig-clue, .dig-ping i, .dig-chest-burst i { animation: none; } .dig-ping, .dig-chest-burst { display: none; } }
 
 /* ===== Sailing: fragment art, the hold card, and the dig recap ===== */
 .frag-icon { display: inline-block; vertical-align: -0.15em; flex: 0 0 auto; }

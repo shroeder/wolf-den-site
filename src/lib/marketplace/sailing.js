@@ -311,16 +311,14 @@ function fragMaxDepth(luckLevel = 0) { return Math.max(1, DIG_MAX_DEPTH - Math.f
 // ── DIG DIFFICULTY — a "steady & matched" ramp: the board, treasure count, dirt depth all grow with your
 // Excavation level (voyages completed), and your Sense budget grows too, so it stays a fair-but-hard hunt
 // rather than trivialising as you unlock. All knobs are plain consts — tune freely, no env vars. ──
-const DIG_MAX_SIZE = 6;                 // biggest square board (mobile-friendly)
+const DIG_MAX_SIZE = 8;                 // biggest square board (mobile-friendly)
 const DIG_TIER_EVERY = 8;              // +1 difficulty tier per this many voyages
 const DIG_MAX_TIER = 6;
 function digTier(voyages = 0) { return Math.min(DIG_MAX_TIER, 1 + Math.floor(Math.max(0, voyages) / DIG_TIER_EVERY)); }
-function digSize(tier) { return Math.min(DIG_MAX_SIZE, 3 + tier); }              // t1=4 … t3=6 (capped)
+// Grid = big enough to fit the chest (up to 6 long) PLUS a couple cells of hiding room (bigger boards at high
+// tiers hide the same chest better = harder).
+function digSize(tier) { return Math.min(DIG_MAX_SIZE, chestLength(tier) + 2); } // t1=6 … t3=8 (capped)
 function digDepthMax(tier) { return tier >= 4 ? 4 : 3; }                          // deeper dirt at high tiers
-function digTreasureCount(tier, fortuneBuried) {                                  // more to find as you climb
-    const size = digSize(tier);
-    return Math.min(Math.floor(size * size * 0.28), 3 + (tier - 1) + Math.max(0, fortuneBuried));
-}
 // Scan charges (the detector) — deliberately FEW ("a couple"), so a scan is a precious "feel it out" moment,
 // not a solve-the-grid tool. Luck (find_level) grants the odd extra. Tune freely.
 function digSenseBudget(tier, treasures, luckLevel = 0) {
@@ -334,42 +332,22 @@ function senseHeat(board, r, c) {
     return best <= 1 ? 3 : best === 2 ? 2 : best === 3 ? 1 : 0;
 }
 
-// ── THE ARTIFACT — instead of scattered shards, ONE oddly-shaped relic is buried; hot/cold homes in on that
-// single object, and digging it out reveals its shape. Shapes are polyominoes (offsets from a corner). Bigger
-// tiers / Fortune bury a bigger relic (more cells → more fragments). Named so the recap can announce it. ──
-const ARTIFACT_SHAPES = [
-    { name: "Fang", cells: [[0, 0], [1, 0], [1, 1]] },                       // 3
-    { name: "Sliver", cells: [[0, 0], [0, 1], [0, 2]] },                     // 3 line
-    { name: "Crown", cells: [[0, 0], [0, 1], [0, 2], [1, 1]] },              // 4 T
-    { name: "Hook", cells: [[0, 0], [1, 0], [2, 0], [2, 1]] },               // 4 L
-    { name: "Blade", cells: [[0, 0], [0, 1], [1, 1], [1, 2]] },              // 4 S
-    { name: "Tablet", cells: [[0, 0], [0, 1], [1, 0], [1, 1]] },             // 4 square
-    { name: "Sceptre", cells: [[0, 0], [0, 1], [0, 2], [0, 3]] },            // 4 bar
-    { name: "Sigil", cells: [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]] },      // 5 plus
-    { name: "Idol", cells: [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0]] },       // 5 P
-    { name: "Serpent", cells: [[0, 0], [0, 1], [1, 1], [1, 2], [2, 2]] },    // 5 zig
-    { name: "Effigy", cells: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 2], [2, 1]] }, // 6 chalice
-];
-function normalizeCells(cells) {
-    const minR = Math.min(...cells.map((c) => c[0])), minC = Math.min(...cells.map((c) => c[1]));
-    return cells.map(([r, c]) => [r - minR, c - minC]);
-}
-// Bury one relic: pick a shape near the target size that fits, random rotation + reflection, random position.
-function placeArtifact(rows, cols, targetSize) {
-    const fits = ARTIFACT_SHAPES.filter((s) => s.cells.length <= Math.min(rows, cols) * Math.max(rows, cols));
-    fits.sort((a, b) => Math.abs(a.cells.length - targetSize) - Math.abs(b.cells.length - targetSize));
-    const closest = Math.abs(fits[0].cells.length - targetSize);
-    const pool = fits.filter((s) => Math.abs(s.cells.length - targetSize) === closest);
-    const shape = pool[randInt(pool.length)];
-    let cells = shape.cells.map((c) => [c[0], c[1]]);
-    if (Math.random() < 0.5) cells = cells.map(([r, c]) => [r, -c]);        // reflect
-    for (let t = randInt(4); t > 0; t--) cells = cells.map(([r, c]) => [c, -r]); // rotate 90° t times
-    cells = normalizeCells(cells);
-    const h = Math.max(...cells.map((c) => c[0])) + 1, w = Math.max(...cells.map((c) => c[1])) + 1;
-    if (h > rows || w > cols) cells = normalizeCells(shape.cells.map((c) => [c[0], c[1]])); // fallback: unrotated
-    const H = Math.max(...cells.map((c) => c[0])) + 1, W = Math.max(...cells.map((c) => c[1])) + 1;
-    const or = randInt(Math.max(1, rows - H + 1)), oc = randInt(Math.max(1, cols - W + 1));
-    return { cells: cells.map(([r, c]) => [r + or, c + oc]), name: shape.name };
+// ── THE CHEST — a literal buried treasure chest (a 2×N rectangle) is what you're uncovering. Hot/cold homes in
+// on it; digging its cells reveals the chest piece-by-piece (corners, iron bands, the lock). Fragments are an
+// ABSTRACTED reward (a few per chest, by tier + how much you exposed) — NOT one-per-cell. ──
+const CHEST_SHORT = 2;                                    // the chest is always 2 cells "deep"
+function chestLength(tier) { return Math.min(6, 3 + tier); } // 4 (t1) … 6 (t3+) cells long
+// Bury the chest: pick an orientation (horizontal 2×N or vertical N×2), drop it at a random fitting spot.
+function placeChest(rows, cols, tier) {
+    const long = chestLength(tier);
+    const horiz = Math.random() < 0.5;
+    const H = horiz ? CHEST_SHORT : Math.min(long, rows);
+    const W = horiz ? Math.min(long, cols) : CHEST_SHORT;
+    const r0 = randInt(Math.max(1, rows - H + 1));
+    const c0 = randInt(Math.max(1, cols - W + 1));
+    const cells = [];
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) cells.push([r0 + r, c0 + c]);
+    return { cells, H, W, r0, c0 };
 }
 
 function newBoard(row) {
@@ -381,21 +359,20 @@ function newBoard(row) {
     const size = digSize(tier);
     const rows = size, cols = size;
     const maxDepth = digDepthMax(tier);
-    // Every tile is a stack of 1–maxDepth dirt layers you chip through. ONE oddly-shaped relic is buried under a
-    // connected patch of tiles; a SCAN reads how close the relic is (hot→cold), and digging it out reveals its
-    // shape. Fortune buries a BIGGER relic (more cells → more fragments); Luck lets you dig it out shallower.
+    // Every tile is a stack of 1–maxDepth dirt layers you chip through. A literal CHEST (a 2×N rectangle) is
+    // buried; a SCAN reads how close it is (hot→cold), and digging its cells uncovers the chest piece-by-piece.
     const depth = Array.from({ length: rows }, () => Array.from({ length: cols }, () => 1 + randInt(maxDepth)));
     const perks = boatPerks(level);
-    const targetSize = Math.max(3, Math.min(6, 3 + (tier - 1) + Math.max(0, perks.buried))); // t1→3 … t4→6, +Fortune
-    const artifact = placeArtifact(rows, cols, targetSize);
-    const frag = artifact.cells;          // the relic's tiles (kept named `frag` so downstream unearth logic holds)
-    const shape = artifact.name;
-    // The whole relic is ONE tier (rolled from the voyage duration + Rarity); each cell you uncover yields a
-    // fragment of it, so the tile shows the REAL fragment and a bigger relic = more of them.
+    const chest = placeChest(rows, cols, tier);
+    const frag = chest.cells;             // the chest's tiles (kept named `frag` so downstream unearth logic holds)
+    const chestBox = { H: chest.H, W: chest.W, r0: chest.r0, c0: chest.c0 };
+    const shape = "chest";
+    // The chest is ONE tier (rolled from the voyage duration + Rarity); the fragment REWARD is abstracted from
+    // this tier + how much of the chest you expose (see finishDig) — not one fragment per cell.
     const quality = row?.voyage_quality || "standard";
     const artifactTier = rollFragmentTier(quality, row?.rarity_level || 0, level);
     const fragTiers = frag.map(() => artifactTier);
-    // Luck caps how deep a relic tile can be; the "first strike guaranteed" perk forces one cell to the surface.
+    // Luck caps how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
@@ -410,7 +387,7 @@ function newBoard(row) {
         detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
     };
     const tools = unlockedTools(row?.voyages_completed || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
@@ -488,19 +465,21 @@ function applyTool(board, toolId, r, c) {
 function boardView(board) {
     const maxDepth = board.maxDepth || DIG_MAX_DEPTH;
     const fragSet = new Set(board.frag.map(([r, c]) => `${r},${c}`));
-    const tierAt = new Map();
-    (board.fragTiers || []).forEach((t, i) => { const [fr, fc] = board.frag[i] || []; if (fr != null) tierAt.set(`${fr},${fc}`, t); });
     const tiles = [];
     for (let r = 0; r < board.rows; r++) {
         const row = [];
         for (let c = 0; c < board.cols; c++) {
             const isFound = fragSet.has(`${r},${c}`) && board.depth[r][c] === 0;
+            // A found chest cell's position WITHIN the chest (rr/rc + dims) → the client draws that piece
+            // (corner bracket / iron band / lock). Only sent for uncovered cells, so it's not a spoiler.
+            const cb = board.chestBox;
+            const chestPos = isFound && cb ? { rr: r - cb.r0, rc: c - cb.c0, H: cb.H, W: cb.W } : null;
             row.push({
                 depth: board.depth[r][c],   // rock layers still on top (drives the stacked-slab drawing)
                 maxDepth,
                 dug: board.dug[r][c],
-                found: isFound,             // treasure unearthed at the bottom
-                tier: isFound ? (tierAt.get(`${r},${c}`) || null) : null, // its real fragment tier → correct sprite
+                found: isFound,             // a chest cell uncovered at the bottom
+                chestPos,                   // where in the chest this cell sits (for the drawing), or null
                 sense: board.sensed && board.sensed[r][c] >= 0 ? board.sensed[r][c] : null, // scan HEAT (0–3), or null
             });
         }
@@ -950,11 +929,15 @@ async function finishDig(buyerId, board) {
     const level = decorate(row).level;
     const quality = row?.voyage_quality || "standard";
     const rarityLevel = row?.rarity_level || 0;
-    // Collect the tiers of the treasures actually unearthed (their tiers were rolled at board creation, so the
-    // recap matches the sprites you saw pop out). Lucky Strike BONUS shards have no tile, so roll those fresh.
-    const foundTiers = [];
-    board.frag.forEach(([fr, fc], i) => { if (board.depth[fr][fc] === 0) foundTiers.push((board.fragTiers && board.fragTiers[i]) || rollFragmentTier(quality, rarityLevel, level)); });
-    for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level));
+    // Reward is ABSTRACTED from the chest tier + how much of it you EXPOSED — not one fragment per cell. A fully
+    // uncovered chest gives (2 + tier) fragments (t1=3 … t6=8), scaled down if you only got part of it.
+    const total = board.frag.length;
+    const uncovered = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+    const chestTier = (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
+    const maxFrags = 2 + (board.tier || 1);
+    const fragCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total))) : 0;
+    const foundTiers = Array.from({ length: fragCount }, () => chestTier);
+    for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level)); // lucky Strike bonuses
     const earned = foundTiers.length;
     const won = earned > 0;
     // Merge into the current per-tier hold.
@@ -978,10 +961,10 @@ async function finishDig(buyerId, board) {
         const c = CHEST_TIERS[tier] || {};
         return { tier, n, name: (c.label || tier).replace(" Chest", ""), emoji: c.emoji || "🎁", color: c.color || "#b08a52", art: fragmentArt(tier) };
     }).sort((a, b) => CHEST_ORDER.indexOf(b.tier) - CHEST_ORDER.indexOf(a.tier));
-    const fullyUnearthed = board.frag.every(([fr, fc]) => board.depth[fr][fc] === 0);
-    // Reveal where the relic actually was, so players learn how scanning maps to the buried shape.
+    const fullyUnearthed = uncovered >= total;
+    // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
-    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, haul, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
+    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
