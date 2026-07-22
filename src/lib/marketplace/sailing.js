@@ -784,7 +784,7 @@ export async function ackEncounter(buyerId) {
 }
 
 // ── RAIDS ──────────────────────────────────────────────────────────────────────────────────────────────
-const RAID_TARGET_COLS = `b.id, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
+const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
                 COALESCE(s.speed_level,0) AS speed_level, COALESCE(s.luck_level,0) AS luck_level,
                 COALESCE(s.rarity_level,0) AS rarity_level, COALESCE(s.find_level,0) AS find_level,
                 COALESCE(s.raid_level,0) AS raid_level`;
@@ -838,7 +838,7 @@ export async function getRaidTargets(buyerId, limit = 12) {
         const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
         const g = gear.get(r.id) || { count: 0, topRank: -1, topRarity: null };
         return {
-            id: r.id, name: r.alias, level, boat: boatArt(level),
+            id: r.id, name: r.display_name || r.alias, handle: r.alias, level, boat: boatArt(level),
             rider: r.avatar_sprite_url || r.avatar_url || null,
             riderFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
             items: g.count, topRarity: g.topRarity, gearRank: g.topRank,
@@ -911,7 +911,7 @@ export async function doRaid(buyerId, targetId = null) {
         outcome: sim.win ? "win" : "lose", gold: goldDelta, itemWon, dodged, stunUsed: sim.stunUsed,
         battle: sim.events, myHp: sim.myHp, foeHp: sim.foeHp, myLevel,
         target: {
-            name: target.alias, level: foeLevel, boat: boatArt(foeLevel),
+            name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel),
             rider: target.avatar_sprite_url || target.avatar_url || null,
             riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
         },

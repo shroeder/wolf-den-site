@@ -1089,10 +1089,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <div className="sail-raid-empty">No ships on the horizon right now — try again later.</div>
                             ) : raidTargets.map((t) => (
                                 <div key={t.id} className="sail-raid-target">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={t.boat} alt="" className="sail-raid-boat" />
+                                    <div className="sail-raid-face">
+                                        {t.rider ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img src={t.rider} alt="" className={`sail-raid-rider ${t.riderFlip ? "is-flip" : ""}`} />
+                                        ) : <span className="sail-raid-noface">🧑‍✈️</span>}
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={t.boat} alt="" className="sail-raid-boat" />
+                                    </div>
                                     <div className="sail-raid-tinfo">
                                         <div className="sail-raid-tname">{t.name} <span className="sail-raid-tlvl">Lv {t.level}</span></div>
+                                        {t.handle && t.handle !== t.name ? <div className="sail-raid-thandle muted">@{t.handle}</div> : null}
                                         <div className="sail-raid-tgear">
                                             {t.topRarity
                                                 ? <span className={`sail-raid-rar rar-${t.topRarity}`}>{t.topRarity}</span>

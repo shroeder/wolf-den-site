@@ -11593,10 +11593,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-raid-empty { padding: 22px 8px; text-align: center; opacity: 0.7; font-size: 0.88rem; }
 .sail-raid-target { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: 12px;
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
-.sail-raid-boat { width: 52px; height: 52px; object-fit: contain; flex: none; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4)); }
+/* Face + boat badge so you can SEE who each ship belongs to */
+.sail-raid-face { position: relative; width: 58px; height: 52px; flex: none; }
+.sail-raid-rider { position: absolute; left: 0; top: -2px; width: 40px; height: 46px; object-fit: contain; object-position: top center;
+    border-radius: 10px; background: rgba(0,0,0,0.25); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
+.sail-raid-rider.is-flip { transform: scaleX(-1); }
+.sail-raid-noface { position: absolute; left: 0; top: 2px; font-size: 2rem; }
+.sail-raid-boat { position: absolute; right: -2px; bottom: -2px; width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 .sail-raid-tinfo { flex: 1; min-width: 0; }
 .sail-raid-tname { font-weight: 800; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sail-raid-tlvl { font-size: 0.72rem; font-weight: 700; opacity: 0.7; }
+.sail-raid-thandle { font-size: 0.72rem; line-height: 1.1; }
 .sail-raid-tgear { font-size: 0.76rem; margin-top: 2px; }
 .sail-raid-rar { display: inline-block; font-weight: 800; text-transform: capitalize; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem; }
 .sail-raid-rar.rar-common { color: #cdd6e2; background: rgba(205,214,226,0.14); }
