@@ -10705,9 +10705,35 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* The sail CTAs are inline-flex (they live in a centered dock on the sea scene); here they're standalone, so
    make them full-width block buttons with real spacing — otherwise the inline baseline overlaps the text above. */
 .merchant-cine-inner .sail-cta { display: flex; width: 100%; justify-content: center; margin-top: 14px; }
-.merchant-head { display: flex; align-items: center; gap: 12px; }
-.merchant-art { width: clamp(72px, 22vw, 104px); height: auto; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); animation: merchantBob 2.6s ease-in-out infinite; }
-@keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } }
+/* Beach STAGE — the golden-hour cove backdrop the merchant performs on, so it feels like a place, not a card. */
+.merchant-stage { position: relative; width: 100%; height: clamp(230px, 54vw, 320px); border-radius: 16px; overflow: hidden;
+    background: url("/images/sailing/merchant-bg.png") center 42% / cover no-repeat;
+    border: 1px solid rgba(255,215,94,0.45); box-shadow: inset 0 -46px 60px rgba(60,28,0,0.4), 0 10px 30px rgba(0,0,0,0.5); }
+.merchant-stage.is-compact { height: clamp(130px, 32vw, 170px); }
+/* Merchant himself, full body, standing on the sand (never cropped). */
+.merchant-figure { position: absolute; left: 50%; bottom: -1%; height: 94%; width: auto; z-index: 3;
+    filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45)); animation: merchantFloat 2.8s ease-in-out infinite; }
+@keyframes merchantFloat { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-1deg); } 50% { transform: translateX(-50%) translateY(-6px) rotate(1deg); } }
+@keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } } /* used by .sail-enc-art (encounter foe bob) */
+.merchant-stage.is-compact .merchant-figure { height: 96%; }
+/* Coins flying everywhere — a continuous spinning, drifting shower across the stage. */
+.merchant-coinfall { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.merchant-coin { position: absolute; top: 0; border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle at 35% 30%, #fff3b0, #ffcf4a 55%, #b8860b);
+    box-shadow: 0 0 6px rgba(255,215,94,0.75), inset 0 -2px 2px rgba(140,90,0,0.6);
+    animation-name: merchantCoinFall; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform; }
+@keyframes merchantCoinFall {
+    0% { transform: translate(0, -24px) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { transform: translate(var(--drift, 0px), 340px) rotate(680deg); opacity: 0; }
+}
+/* Title banner across the base of the stage + the flavor line below it. */
+.merchant-stage-cap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 26px 12px 9px; text-align: center;
+    font-weight: 900; font-size: clamp(1.1rem, 4.8vw, 1.45rem); color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.85);
+    background: linear-gradient(to top, rgba(24,12,0,0.78), rgba(24,12,0,0.3) 60%, transparent); }
+.merchant-sub { margin: 8px 2px 0; font-size: 0.85rem; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .merchant-figure, .merchant-coin { animation: none !important; } .merchant-coin { opacity: 0.9; } }
 .merchant-won { margin: 10px 0; text-align: center; font-weight: 800; color: #ffe08a; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); border-radius: 12px; padding: 8px 12px; }
 /* The coin-catch minigame field. */
 .mg-area { position: relative; width: 100%; height: clamp(300px, 60vw, 400px); margin: 12px 0; border-radius: 14px; overflow: hidden;
@@ -10747,7 +10773,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .mg-recap-pet { border: none !important; background: none !important; justify-content: center; }
 .mg-recap-btn { margin-top: 14px; min-width: 150px; }
 .mg-recap-btn:disabled { opacity: 0.5; cursor: default; }
-@media (prefers-reduced-motion: reduce) { .merchant-art, .merchant-cine, .mg-recap, .mg-recap-scrim { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .merchant-cine, .mg-recap, .mg-recap-scrim { animation: none; } }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }

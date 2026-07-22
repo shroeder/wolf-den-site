@@ -11,6 +11,17 @@ const MERCHANT_ART = "/images/sailing/merchant.png";
 const ELEPHANT_ART = "/images/sailing/pet-elephant.png";
 const GAME_MS = 20000;
 
+// Static coin-shower config for the beach stage (deterministic → no hydration mismatch). Coins rain across the
+// whole stage and spin/drift so it reads as "coins flying everywhere." Negative delays pre-fill the field.
+const STAGE_COINS = Array.from({ length: 18 }, (_, i) => ({
+    i,
+    left: (i * 53 + 7) % 100,          // spread across the width
+    delay: -(((i * 0.41) % 3.4).toFixed(2)), // negative → coins already mid-air on mount
+    dur: 2.3 + ((i * 7) % 22) / 10,    // 2.3–4.4s fall
+    drift: ((i % 5) - 2) * 18,         // -36..+36px sideways sway
+    size: 12 + (i % 3) * 5,            // 12 / 17 / 22px
+}));
+
 // ── Funky synth loop (Web-Audio, no asset files, CSP-safe). Best-effort; silent if audio is blocked. ──
 function makeFunkMusic() {
     let ctx = null, timer = null, step = 0;
@@ -141,14 +152,22 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
     return createPortal((
         <div className="merchant-cine">
             <div className="merchant-cine-inner">
-                <div className="merchant-head">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={MERCHANT_ART} alt="The Gold Merchant" className="merchant-art" />
-                    <div>
-                        <h3 style={{ margin: 0 }}>💰 The Gold Merchant!</h3>
-                        <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.85rem" }}>A rare showman on the sand, coins flying everywhere. Catch what you can, then browse his wares.</p>
+                {/* Immersive beach stage: the merchant stands on the sand under a golden-hour sky, showering coins. */}
+                <div className={`merchant-stage${phase === "playing" ? " is-compact" : ""}`}>
+                    <div className="merchant-coinfall" aria-hidden="true">
+                        {STAGE_COINS.map((c) => (
+                            <span
+                                key={c.i}
+                                className="merchant-coin"
+                                style={{ left: `${c.left}%`, width: c.size, height: c.size, marginLeft: -(c.size / 2), "--drift": `${c.drift}px`, animationDuration: `${c.dur}s`, animationDelay: `${c.delay}s` }}
+                            />
+                        ))}
                     </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={MERCHANT_ART} alt="The Gold Merchant" className="merchant-figure" />
+                    <div className="merchant-stage-cap">💰 The Gold Merchant!</div>
                 </div>
+                <p className="muted merchant-sub">A rare showman on the sand, coins flying everywhere. Catch what you can, then browse his wares.</p>
 
                 {phase === "playing" ? (
                     <div
