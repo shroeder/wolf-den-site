@@ -18,7 +18,7 @@ const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000; // Speed shaves a FLAT 2 minutes o
 const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
 const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
 // Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
-// → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (8) distinct arts, and each
+// → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (9) distinct arts, and each
 // form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-
 // find) in find_level.
 export const MAX_SPEED_LEVEL = 20;
@@ -26,7 +26,7 @@ export const MAX_FORTUNE_LEVEL = 20;
 export const MAX_RARITY_LEVEL = 20;
 export const MAX_LUCK_LEVEL = 20;
 const LEVELS_PER_FORM = 10;
-const BOAT_TIERS = 8;
+const BOAT_TIERS = 9;
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
 // the feature is in testing — set back to 500 before release.
@@ -91,32 +91,33 @@ function excavationView(voyages) {
 // The 8 boat FORMS. Reaching each level unlocks a new hull art (BOAT_ART[tier]) + a permanent perk applied by
 // boatPerks(). Perks are cumulative and reuse the existing engine knobs so they're cheap + safe.
 const MILESTONES = [
-    { level: 10, tier: 2, name: "Sturdy Sloop", perk: "+1 fragment buried on every island", buried: 1 },
-    { level: 20, tier: 3, name: "Swift Cutter", perk: "Voyages are 10% faster", voyage: 0.9 },
-    { level: 30, tier: 4, name: "Trade Brig", perk: "+12% chance a forged chest is upgraded a tier", chest: 0.12 },
-    { level: 40, tier: 5, name: "Trade-Wind Schooner", perk: "15% chance a tailwind isn't used up", windSave: 0.15 },
-    { level: 50, tier: 6, name: "Gilded Galleon", perk: "Your first dig each trip always strikes a fragment", surface: true },
-    { level: 60, tier: 7, name: "Dragon Ship", perk: "Voyages are another 10% faster", voyage: 0.9 },
-    { level: 70, tier: 8, name: "Ghost Ship", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
-    { level: 80, tier: 8, name: "Ghost Ship — Fully Crewed", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
+    { level: 10, tier: 2, name: "Swift Cutter", perk: "+1 fragment buried on every island", buried: 1 },
+    { level: 20, tier: 3, name: "Trade Brig", perk: "Voyages are 10% faster", voyage: 0.9 },
+    { level: 30, tier: 4, name: "Trade-Wind Schooner", perk: "+12% chance a forged chest is upgraded a tier", chest: 0.12 },
+    { level: 40, tier: 5, name: "Gilded Galleon", perk: "15% chance a tailwind isn't used up", windSave: 0.15 },
+    { level: 50, tier: 6, name: "Iron Man-o'-War", perk: "Your first dig each trip always strikes a fragment", surface: true },
+    { level: 60, tier: 7, name: "Arcane Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
+    { level: 70, tier: 8, name: "Dragon Ship", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
+    { level: 80, tier: 9, name: "Ghost Ship", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
 ];
 
 const BOAT_ART = {
     1: "/images/sailing/boat-tier1-wood.png",
-    2: "/images/sailing/boat-tier2-sloop.png",
-    3: "/images/sailing/boat-tier3-cutter.png",
-    4: "/images/sailing/boat-tier4-brig.png",
-    5: "/images/sailing/boat-tier5-schooner.png",
-    6: "/images/sailing/boat-tier6-galleon.png",
-    7: "/images/sailing/boat-tier7-dragon.png",
-    8: "/images/sailing/boat-tier8-ghost.png",
+    2: "/images/sailing/boat-tier2-cutter.png",
+    3: "/images/sailing/boat-tier3-brig.png",
+    4: "/images/sailing/boat-tier4-schooner.png",
+    5: "/images/sailing/boat-tier5-galleon.png",
+    6: "/images/sailing/boat-tier6-manowar.png",
+    7: "/images/sailing/boat-tier7-arcane.png",
+    8: "/images/sailing/boat-tier8-dragon.png",
+    9: "/images/sailing/boat-tier9-ghost.png",
 };
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
 export const DIG_BG = "/images/sailing/dig-bg.png";
 export const ISLAND_ART = "/images/sailing/island.png";
 
 // --- pure curves ---------------------------------------------------------------------------------------
-// A new boat form every LEVELS_PER_FORM levels, capped at BOAT_TIERS distinct arts (level 80 → tier 8).
+// A new boat form every LEVELS_PER_FORM levels, capped at BOAT_TIERS distinct arts (level 80 → tier 9).
 export function boatTier(level) { return Math.min(BOAT_TIERS, Math.floor(Math.max(1, level) / LEVELS_PER_FORM) + 1); }
 export function boatArt(level) {
     // Show the highest boat art at/below this tier (so un-minted higher tiers fall back to the last real one).
