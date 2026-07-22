@@ -182,6 +182,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
     const [calOpen, setCalOpen] = useState(false); // owner-only crew-position calibrator overlay
+    const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade card just bought (brief level-up pop)
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
     // correct on the very first render — no flicker from a default to the picked one. Held stable for the
     // session (later state updates re-roll d.sky, but we keep this original).
@@ -339,6 +340,13 @@ export default function SailingClient({ initial, hero, pet }) {
         act("dig", { r, c });
     }, [act]);
 
+    // Buy an upgrade with a satisfying card pop: flash the card, then run the action.
+    const buyUpgrade = useCallback((flashKey, action, payload) => {
+        setUpgFlash(flashKey);
+        setTimeout(() => setUpgFlash((k) => (k === flashKey ? null : k)), 750);
+        act(action, payload);
+    }, [act]);
+
     // Use the armed area-clear tool at a tile (its footprint anchors here), then disarm it.
     const runToolAt = useCallback((tool, r, c) => {
         const k = (chunkId.current += 1);
@@ -473,6 +481,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <img key={n} src={sky || state.oceanBg} alt="" />
                                 ))}
                             </div>
+                            {/* Sun/moon glints shimmering on the swell — subtle at anchor, quicker underway. */}
+                            <div className={`sail-glints${liveStatus === "sailing" ? " is-fast" : ""}`} aria-hidden="true">
+                                <i /><i /><i /><i /><i /><i />
+                            </div>
                             {/* Other sailors drifting across the horizon behind your boat (each waveable while sailing). */}
                             <div className="sail-ambient">
                                 {ambient.map((b) => (
@@ -507,6 +519,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 >
                                     {liveStatus === "sailing" ? (
                                         <>
+                                            <span className="sail-wake" aria-hidden="true"><i /><i /><i /><i /></span>
                                             <span className="sail-wind" aria-hidden="true"><i /><i /><i /></span>
                                             <span className="sail-mist" aria-hidden="true"><i /><i /><i /></span>
                                         </>
@@ -662,7 +675,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels your boat ⭐ — every 10 levels it takes a new form and unlocks a perk. (Digging doesn&apos;t level the boat.)</p>
                 <div className="sail-upgrades is-boat">
                     {upgrades.map((u) => (
-                        <div className={`sail-upg${u.data.maxed ? " is-maxed" : ""}`} key={u.action}>
+                        <div className={`sail-upg${u.data.maxed ? " is-maxed" : ""}${upgFlash === u.action ? " is-bought" : ""}`} key={u.action}>
                             <div className="sail-upg-top">
                                 <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
                                 <span className="muted sail-upg-lv">Lv {u.data.level}/{u.data.max}</span>
@@ -674,7 +687,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 <b>{u.now}{u.data.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
                             </div>
                             {u.data.maxed ? <button className="pill" disabled>✓ Maxed</button>
-                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < u.data.cost} onClick={() => act(u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
+                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < u.data.cost} onClick={() => buyUpgrade(u.action, u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>
@@ -708,7 +721,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Every trip raises your Excavation level, unlocking a new tool every {state.excavation?.perTool || 10} levels. You&apos;re Excavation <b>Lv {state.excavation?.level || 0}</b>{state.excavation?.nextTool ? <> · next tool ({state.excavation.nextTool.name}) at <b>Lv {state.excavation.nextTool.unlock}</b></> : ""}.</p>
                 <div className="sail-upgrades is-dig">
                     {digTracks.map((u) => (
-                        <div className={`sail-upg${u.data?.maxed ? " is-maxed" : ""}`} key={u.track}>
+                        <div className={`sail-upg${u.data?.maxed ? " is-maxed" : ""}${upgFlash === `dig:${u.track}` ? " is-bought" : ""}`} key={u.track}>
                             <div className="sail-upg-top">
                                 <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
                                 <span className="muted sail-upg-lv">Lv {u.data?.level ?? 0}/{u.data?.max ?? 0}</span>
@@ -720,7 +733,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 <b>{u.now}{u.data?.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
                             </div>
                             {u.data?.maxed ? <button className="pill" disabled>✓ Maxed</button>
-                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < (u.data?.cost || 0)} onClick={() => act("upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
+                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < (u.data?.cost || 0)} onClick={() => buyUpgrade(`dig:${u.track}`, "upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>

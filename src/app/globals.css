@@ -10780,9 +10780,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Sitting lower in the water while underway (it rode a touch high before). */
 .sail-boat.is-underway { bottom: -4%; }
 .sail-boat-inner { position: relative; transform-origin: bottom center; }
-/* Underway: the hull leans back on its wake (bow up), so "sailing" reads instantly vs. "docked". */
-.sail-boat-inner.is-sailing { animation: sailCruiseRock 2.4s ease-in-out infinite; }
-@keyframes sailCruiseRock { 0%, 100% { transform: rotate(-2.4deg) translateY(0); } 50% { transform: rotate(-4.2deg) translateY(-3px); } }
+/* Underway: the hull leans back on its wake (bow up) and rides the swell — a two-crest rhythm (pitch +
+   heave) so "sailing" reads as real motion, not a metronome tick. */
+.sail-boat-inner.is-sailing { animation: sailCruiseRock 3.4s ease-in-out infinite; }
+@keyframes sailCruiseRock {
+    0%   { transform: rotate(-2deg)   translateY(0); }
+    22%  { transform: rotate(-4.6deg) translateY(-5px); }  /* crest — bow lifts */
+    45%  { transform: rotate(-2.4deg) translateY(2px); }   /* trough — settle */
+    68%  { transform: rotate(-3.8deg) translateY(-3px); }  /* smaller crest */
+    100% { transform: rotate(-2deg)   translateY(0); }
+}
 /* Bow spray/mist thrown off the FRONT (right) of the hull at the waterline. */
 .sail-mist { position: absolute; right: 3%; bottom: 15%; width: 34%; height: 42%; pointer-events: none; z-index: 4; }
 .sail-mist i { position: absolute; bottom: 0; right: 6%; width: 16px; height: 16px; border-radius: 50%;
@@ -10798,7 +10805,30 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-wind i:nth-child(2) { top: 50%; width: 58%; animation: sailWind 1.1s linear infinite 0.37s; }
 .sail-wind i:nth-child(3) { top: 80%; width: 34%; animation: sailWind 1.1s linear infinite 0.74s; }
 @keyframes sailWind { 0% { opacity: 0; transform: translateX(35%); } 25% { opacity: 0.85; } 100% { opacity: 0; transform: translateX(-130%); } }
-@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind { display: none; } }
+/* Foam WAKE churned off the stern (left), trailing back on the water — sells forward motion under the hull. */
+.sail-wake { position: absolute; left: 6%; bottom: 8%; width: 60%; height: 20%; pointer-events: none; z-index: 1; }
+.sail-wake i { position: absolute; left: 60%; bottom: 12%; height: 4px; border-radius: 999px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7)); opacity: 0; filter: blur(0.4px);
+    animation: sailWake 1.4s linear infinite; }
+.sail-wake i:nth-child(1) { width: 60%; bottom: 4%;  animation-delay: 0s; }
+.sail-wake i:nth-child(2) { width: 46%; bottom: 30%; animation-delay: 0.35s; }
+.sail-wake i:nth-child(3) { width: 70%; bottom: 55%; animation-delay: 0.7s; height: 3px; }
+.sail-wake i:nth-child(4) { width: 40%; bottom: 78%; animation-delay: 1.05s; height: 3px; }
+@keyframes sailWake { 0% { opacity: 0; transform: translateX(20%) scaleX(0.5); } 20% { opacity: 0.8; } 100% { opacity: 0; transform: translateX(-150%) scaleX(1.4); } }
+/* Water-surface glints — thin light streaks glimmering on the swell. Always on (subtle); quicker underway. */
+.sail-glints { position: absolute; left: 0; right: 0; bottom: 4%; height: 40%; z-index: 1; pointer-events: none; overflow: hidden; }
+.sail-glints i { position: absolute; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55) 50%, transparent); opacity: 0;
+    animation: sailGlint 5s ease-in-out infinite; }
+.sail-glints i:nth-child(1) { left: 12%; width: 26%; top: 14%; animation-delay: 0s; }
+.sail-glints i:nth-child(2) { left: 54%; width: 30%; top: 30%; animation-delay: 1.2s; }
+.sail-glints i:nth-child(3) { left: 22%; width: 22%; top: 48%; animation-delay: 2.1s; }
+.sail-glints i:nth-child(4) { left: 60%; width: 24%; top: 62%; animation-delay: 0.7s; }
+.sail-glints i:nth-child(5) { left: 8%;  width: 34%; top: 78%; animation-delay: 3s; }
+.sail-glints i:nth-child(6) { left: 44%; width: 20%; top: 88%; animation-delay: 1.8s; }
+.sail-glints.is-fast i { animation-duration: 2.6s; }
+@keyframes sailGlint { 0%, 100% { opacity: 0; transform: translateX(0) scaleX(0.7); } 45% { opacity: 0.7; } 55% { opacity: 0.7; } 50% { transform: translateX(-8px) scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind, .sail-wake, .sail-glints { display: none; } }
 .sail-boat-img { display: block; width: clamp(190px, 54vw, 320px); height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Magical auras on the epic tiers — the art carries the colour, this adds the glow (gold / fire / spirit). */
@@ -10897,6 +10927,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upg-buy:not(:disabled) { color: #ffe8a8; font-weight: 800; border-color: rgba(255,215,94,0.5);
     background: linear-gradient(180deg, rgba(255,215,94,0.2), rgba(255,215,94,0.06)); }
 .sail-upg-buy:not(:disabled):hover { background: linear-gradient(180deg, rgba(255,215,94,0.3), rgba(255,215,94,0.12)); }
+/* Juice: brief pop + accent flash on the card you just bought. */
+.sail-upg.is-bought { animation: sailUpgPop 0.7s cubic-bezier(0.2,1.4,0.35,1) both; }
+.sail-upg.is-bought::after { content: ""; position: absolute; inset: 0; border-radius: 14px; pointer-events: none;
+    box-shadow: inset 0 0 0 2px var(--accent), 0 0 22px -2px var(--accent); animation: sailUpgFlash 0.7s ease-out both; }
+@keyframes sailUpgPop { 0% { transform: scale(1); } 35% { transform: scale(1.045); } 100% { transform: scale(1); } }
+@keyframes sailUpgFlash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sail-upg.is-bought { animation: none; } .sail-upg.is-bought::after { animation: none; opacity: 0; } }
 /* Section header accent bar so the whole upgrade AREA reads as a titled panel. */
 .sail-upg-h { display: flex; align-items: center; gap: 9px; }
 .sail-upg-h::before { content: ""; width: 4px; height: 1.05em; border-radius: 2px; background: linear-gradient(#ffd75e, #ff9d3d); box-shadow: 0 0 10px -2px #ffb43c; }
