@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChestIcon from "@/components/ChestIcon";
+import CoinCta from "@/components/CoinCta";
 import CrewCalibrator from "@/components/CrewCalibrator";
 import MerchantScene from "@/components/MerchantScene";
 
@@ -548,13 +549,13 @@ export default function SailingClient({ initial, hero, pet }) {
                         </div>
                         <p className="dig-tip">One <b>{dig.buried}-piece relic</b> is buried here in a single shape. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> it out and watch its shape appear, before your digs run out.</p>
                         {dig.status === "active" ? (
-                            <button
-                                className="btn-ghost sail-digbuy"
-                                disabled={busy || ((state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0))}
-                                onClick={() => act("buy_digs")}
-                            >
-                                🪙 Buy {state.digRefill?.amount ?? 5} more digs{(state.digRefill?.cost ?? 0) > 0 ? ` · ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
-                            </button>
+                            (state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0) ? (
+                                <CoinCta price={state.digRefill?.cost ?? 0} have={state.gold} label={`Get coins for ${state.digRefill?.amount ?? 5} more digs`} className="sail-digbuy-cta" />
+                            ) : (
+                                <button className="btn-ghost sail-digbuy" disabled={busy} onClick={() => act("buy_digs")}>
+                                    🪙 Buy {state.digRefill?.amount ?? 5} more digs{(state.digRefill?.cost ?? 0) > 0 ? ` · ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
+                                </button>
+                            )
                         ) : null}
                     </div>
                 ) : (
@@ -794,7 +795,8 @@ export default function SailingClient({ initial, hero, pet }) {
                                 <b>{u.now}{u.data.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
                             </div>
                             {u.data.maxed ? <button className="pill" disabled>✓ Maxed</button>
-                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < u.data.cost} onClick={() => buyUpgrade(u.action, u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
+                                : state.gold < u.data.cost ? <CoinCta price={u.data.cost} have={state.gold} className="sail-upg-cta" />
+                                    : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(u.action, u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>
@@ -840,7 +842,8 @@ export default function SailingClient({ initial, hero, pet }) {
                                 <b>{u.now}{u.data?.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
                             </div>
                             {u.data?.maxed ? <button className="pill" disabled>✓ Maxed</button>
-                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < (u.data?.cost || 0)} onClick={() => buyUpgrade(`dig:${u.track}`, "upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
+                                : state.gold < (u.data?.cost || 0) ? <CoinCta price={u.data?.cost || 0} have={state.gold} className="sail-upg-cta" />
+                                    : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(`dig:${u.track}`, "upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>

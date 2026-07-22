@@ -11119,7 +11119,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upg-effect > span { color: #9fb0c0; }
 .sail-upg-effect b { display: inline-flex; align-items: center; gap: 4px; color: #f2e8d6; }
 .sail-upg-next { color: #7cffb2; font-weight: 800; }
-.sail-upg > button { margin-top: auto; }
+.sail-upg > button, .sail-upg > .coin-cta { margin-top: auto; }
+.sail-upg > .coin-cta { width: 100%; justify-content: center; }
+.sail-digbuy-cta { display: inline-flex; margin: 4px auto 0; }
 /* Gold-cost buy button gets a gold wash so the spend reads clearly. */
 .sail-upg-buy:not(:disabled) { color: #ffe8a8; font-weight: 800; border-color: rgba(255,215,94,0.5);
     background: linear-gradient(180deg, rgba(255,215,94,0.2), rgba(255,215,94,0.06)); }
