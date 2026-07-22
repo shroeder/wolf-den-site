@@ -185,6 +185,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
     const [selectedTool, setSelectedTool] = useState(null); // an area-clear dig tool armed to tap a tile
     const [digMode, setDigMode] = useState("dig"); // "dig" (chip a tile) | "sense" (probe a tile for a clue)
+    const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a sonar probe
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
@@ -361,8 +362,13 @@ export default function SailingClient({ initial, hero, pet }) {
         act("dig", { r, c });
     }, [act]);
 
-    // Probe a tile with the treasure sense (reveals its neighbour-treasure clue).
-    const senseTile = useCallback((r, c) => { act("sense", { r, c }); }, [act]);
+    // Probe a tile with the treasure sense: fire a sonar ripple instantly (tactile), then ask the server.
+    const senseTile = useCallback((r, c) => {
+        const k = (chunkId.current += 1);
+        setSensePing({ r, c, k });
+        setTimeout(() => setSensePing((p) => (p?.k === k ? null : p)), 600);
+        act("sense", { r, c });
+    }, [act]);
 
     // Buy an upgrade with a satisfying card pop: flash the card, then run the action.
     const buyUpgrade = useCallback((flashKey, action, payload) => {
@@ -445,10 +451,14 @@ export default function SailingClient({ initial, hero, pet }) {
                         {/* Mode toggle: DIG chips a tile; SENSE probes for a clue (how many treasures touch it). */}
                         <div className="dig-modes">
                             <button type="button" className={`dig-mode-btn${digMode === "dig" && !selectedTool ? " is-on" : ""}`}
-                                onClick={() => { setDigMode("dig"); setSelectedTool(null); }}>⛏️ Dig</button>
+                                onClick={() => { setDigMode("dig"); setSelectedTool(null); }}>
+                                <span className="dig-mode-ico">⛏️</span><span className="dig-mode-txt">Dig<small>break dirt, grab loot</small></span>
+                            </button>
                             <button type="button" className={`dig-mode-btn is-sense${digMode === "sense" && !selectedTool ? " is-on" : ""}`}
                                 disabled={busy || (dig.senses ?? 0) <= 0}
-                                onClick={() => { setDigMode("sense"); setSelectedTool(null); }}>🔍 Sense · {dig.senses ?? 0}</button>
+                                onClick={() => { setDigMode("sense"); setSelectedTool(null); }}>
+                                <span className="dig-mode-ico">🔍</span><span className="dig-mode-txt">Sense<small>{dig.senses ?? 0} probes left</small></span>
+                            </button>
                         </div>
                         {/* Tool bar — armed tools clear an area when you tap a tile. */}
                         {(dig.tools || []).length ? (
@@ -484,12 +494,15 @@ export default function SailingClient({ initial, hero, pet }) {
                                         onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : senseArmed ? senseTile(r, c) : digTile(r, c))}
                                         title={bottomed ? (t.found ? "Treasure!" : "Bare dirt — nothing here") : t.sense != null ? `${t.sense} treasure${t.sense === 1 ? "" : "s"} touching this tile` : senseArmed ? "Probe this tile" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
-                                        {t.found ? <span className="dig-found"><FragmentIcon size={30} /></span>
+                                        {t.found ? <span className="dig-found"><span className="dig-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span><FragmentIcon size={30} /></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
                                                 : t.sense != null ? <span className={`dig-clue dig-clue-${Math.min(3, t.sense)}`}>{t.sense}</span>
                                                     : <span className="dig-dirt" aria-hidden="true" />}
                                         {chunk && chunk.r === r && chunk.c === c ? (
                                             <span className="dig-chunks" key={chunk.k} aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span>
+                                        ) : null}
+                                        {sensePing && sensePing.r === r && sensePing.c === c ? (
+                                            <span className="dig-ping" key={sensePing.k} aria-hidden="true"><i /><i /></span>
                                         ) : null}
                                     </button>
                                 );
