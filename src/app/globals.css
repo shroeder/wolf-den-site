@@ -10585,6 +10585,25 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
 @keyframes sailAmbientRev { 0% { left: 118%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: -22%; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .sail-ambient { display: none; } }
+/* Wave button floating above a passing sailor (the ambient layer is pointer-events:none, so opt back in). */
+.sail-wave-btn { position: absolute; left: 50%; bottom: 100%; margin-bottom: 15px; transform: translateX(-50%); z-index: 4;
+    pointer-events: auto; cursor: pointer; border: none; border-radius: 999px; padding: 2px 8px; font-size: 0.85rem; line-height: 1.25;
+    background: rgba(16,24,40,0.85); box-shadow: 0 2px 7px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,215,94,0.55);
+    animation: sailWaveBob 1.5s ease-in-out infinite; }
+.sail-wave-btn:disabled { opacity: 0.5; cursor: default; animation: none; }
+.sail-wave-btn:not(:disabled):active { transform: translateX(-50%) scale(0.88); }
+@keyframes sailWaveBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+/* "You waved!" reward pop, floating over the scene. */
+.sail-wavefx { position: absolute; left: 50%; top: 15%; transform: translateX(-50%); z-index: 7; pointer-events: none;
+    font-weight: 800; font-size: 0.9rem; color: #eaf6ff; white-space: nowrap; background: rgba(12,20,32,0.86);
+    border: 1px solid rgba(124,201,255,0.5); border-radius: 12px; padding: 6px 14px; animation: sailWaveFx 2.2s ease-out forwards; }
+@keyframes sailWaveFx { 0% { opacity: 0; transform: translate(-50%, 8px); } 12% { opacity: 1; transform: translate(-50%, 0); } 78% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -16px); } }
+/* Marine-encounter recap modal (reuses .sail-reward-overlay + .sail-recap). */
+.sail-enc-foe { font-size: 2.8rem; line-height: 1; }
+.sail-enc-ribbon { display: inline-block; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.78rem; color: #ffd75e; margin-bottom: 2px; }
+.sail-enc-rewards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 6px; }
+.sail-enc-reward { font-weight: 800; font-size: 0.85rem; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); }
+.sail-enc-reward.is-bonus { color: #7cffb2; border-color: rgba(124,255,178,0.4); background: rgba(124,255,178,0.12); }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }

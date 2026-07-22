@@ -162,6 +162,8 @@ export default function SailingClient({ initial, hero, pet }) {
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
     const [gusting, setGusting] = useState(false);     // the tailwind gust is currently playing
     const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
+    const [waveFx, setWaveFx] = useState(null);        // { xp, coins, minutes, k } — the "you waved!" reward toast
+    const [ackingEnc, setAckingEnc] = useState(false); // dismissing an encounter recap (awaiting the ack round-trip)
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
@@ -280,6 +282,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 }
                 if (d.forged) { sfx.win(); setForge(d.forged); }
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
+                if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
             }
         } finally { setBusy(false); }
     }, [triggerGust]);
@@ -314,8 +317,8 @@ export default function SailingClient({ initial, hero, pet }) {
             desc: <>Faster voyages — shaves <b>{state.speed.minPerLevel} min</b> off each trip, per level.</>,
             effLabel: "Trip time", now: fmtLeft(state.speed.voyageNow), next: fmtLeft(state.speed.voyageNext) },
         { action: "upgrade_fortune", icon: "🍀", name: "Fortune", data: state.fortune,
-            desc: <>Richer islands — <b>+1</b> fragment buried to dig up each trip, per level.</>,
-            effLabel: "Fragments buried", now: state.fortune.buriedNow, next: state.fortune.buriedNext },
+            desc: <>Draws trouble — <b>+1.5%</b> chance of a marine <b>encounter</b> at your voyage&apos;s midpoint, per level.</>,
+            effLabel: "Encounter chance", now: `${state.fortune.encounterNow}%`, next: `${state.fortune.encounterNext}%` },
         { action: "upgrade_rarity", icon: "💎", name: "Rarity", data: state.rarity,
             desc: <>Better loot — a chance your forged chest is bumped up a tier.</>,
             effLabel: "Chest upgrade", now: `${state.rarity.pctNow}%`, next: `${state.rarity.pctNext}%` },
@@ -414,8 +417,8 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <img key={n} src={sky || state.oceanBg} alt="" />
                                 ))}
                             </div>
-                            {/* Other sailors drifting across the horizon behind your boat. */}
-                            <div className="sail-ambient" aria-hidden="true">
+                            {/* Other sailors drifting across the horizon behind your boat (each waveable while sailing). */}
+                            <div className="sail-ambient">
                                 {ambient.map((b) => (
                                     <span key={b.id} className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
                                         <span className="sail-ambient-hull">
@@ -431,6 +434,13 @@ export default function SailingClient({ initial, hero, pet }) {
                                             ) : null}
                                         </span>
                                         {b.name ? <span className="sail-ambient-name">{b.name}</span> : null}
+                                        {/* Wave to a real passing sailor — a few times a day, right above them. */}
+                                        {liveStatus === "sailing" && b.name && (state.waves?.left || 0) > 0 ? (
+                                            <button type="button" className="sail-wave-btn" disabled={busy}
+                                                onClick={(e) => { e.stopPropagation(); act("wave"); }} aria-label={`Wave to ${b.name}`}>
+                                                👋
+                                            </button>
+                                        ) : null}
                                     </span>
                                 ))}
                             </div>
@@ -462,9 +472,13 @@ export default function SailingClient({ initial, hero, pet }) {
                                     </span>
                                 </div>
                             </div>
+                            {/* "You waved!" reward pop, floating over the scene. */}
+                            {waveFx ? (
+                                <div className="sail-wavefx" key={waveFx.k}>👋 +{waveFx.xp} XP · +🪙 {waveFx.coins} · −{waveFx.minutes}m</div>
+                            ) : null}
                             <div className="sail-status">
                                 {liveStatus === "idle" && <span>⚓ Docked · ready to set sail</span>}
-                                {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}</span>}
+                                {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}{(state.waves?.left || 0) > 0 ? <span className="muted"> · 👋 {state.waves.left} left</span> : null}</span>}
                                 {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
                             </div>
 
@@ -730,6 +744,27 @@ export default function SailingClient({ initial, hero, pet }) {
                         <div className="sail-form-perkbig">🎁 {inspectForm.perk}</div>
                         <div className={`sail-inspect-status${inspectForm.unlocked ? " is-on" : ""}`}>{inspectForm.unlocked ? "✅ Unlocked" : `🔒 Reach Lv ${inspectForm.level} to unlock`}</div>
                         <button className="sail-cta" onClick={() => setInspectForm(null)}>Close</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Marine encounter recap — a foe met at the voyage's midpoint, resolved while you were away. */}
+            {state.encounter ? (
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap sail-encounter">
+                        <Confetti />
+                        <div className="sail-recap-hero is-win"><span className="sail-enc-foe">{state.encounter.emoji}</span></div>
+                        <div className="sail-enc-ribbon">⚔️ Marine encounter!</div>
+                        <h2 style={{ margin: "6px 0 2px" }}>You defeated {state.encounter.foe}!</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>You {state.encounter.loot}.</p>
+                        <div className="sail-enc-rewards">
+                            <span className="sail-enc-reward">✨ +{state.encounter.xp} XP</span>
+                            <span className="sail-enc-reward">🪙 +{state.encounter.coins}</span>
+                            {state.encounter.bonus ? <span className="sail-enc-reward is-bonus">{state.encounter.bonus.emoji} {state.encounter.bonus.label}</span> : null}
+                        </div>
+                        <button className="sail-cta" disabled={ackingEnc} onClick={() => { setAckingEnc(true); Promise.resolve(act("ack_encounter")).finally(() => setAckingEnc(false)); }}>
+                            {ackingEnc ? "…" : "Onward! ⚓"}
+                        </button>
                     </div>
                 </div>
             ) : null}

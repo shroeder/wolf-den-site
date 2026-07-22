@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, buyDigs, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeDig, activateTool, forgeChest } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, buyDigs, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeDig, activateTool, forgeChest, waveAtSailor, ackEncounter } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -52,6 +52,8 @@ export async function POST(request) {
                 case "upgrade_dig": return noStore(await upgradeDig(g.buyer.id, body.track));
                 case "use_tool": return noStore(await activateTool(g.buyer.id, body.tool, body.r, body.c));
                 case "forge_chest": return noStore(await forgeChest(g.buyer.id, body.tier));
+                case "wave": return noStore(await waveAtSailor(g.buyer.id));
+                case "ack_encounter": return noStore(await ackEncounter(g.buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

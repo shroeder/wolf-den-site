@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
+import { grantConsumable } from "@/lib/marketplace/consumables.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -44,6 +46,52 @@ const BOAT_TIERS = 9;
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
 // the feature is in testing — set back to 500 before release.
 export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
+
+// ── Waves ── greet a passing member a few times a day for a little XP/coins + a small travel cut.
+const WAVES_PER_DAY = 3;
+const WAVE_XP = 25;
+const WAVE_COINS = 10;
+const WAVE_SHAVE_MS = 2 * 60 * 1000; // 2 minutes off the remaining voyage
+
+// ── Marine encounters ── FORTUNE now drives the chance a voyage rolls an encounter at its halfway mark
+// (repurposed from "+buried fragments"). No push / no travel pause — it resolves lazily on the member's next
+// check-in and shows a one-off recap modal.
+const ENCOUNTER_BASE = 0.20;          // base chance per voyage
+const ENCOUNTER_PER_FORTUNE = 0.015;  // +1.5% per Fortune level → +30% at max (20)
+const ENCOUNTER_CHANCE_CAP = 0.65;
+function encounterChance(fortuneLevel = 0) {
+    return Math.min(ENCOUNTER_CHANCE_CAP, ENCOUNTER_BASE + Math.max(0, fortuneLevel) * ENCOUNTER_PER_FORTUNE);
+}
+// Foes you can meet at sea — pure flavor; rewards are rolled separately so any foe can drop anything.
+const ENCOUNTERS = [
+    { foe: "roaming pirates", emoji: "🏴‍☠️", loot: "looted their hold" },
+    { foe: "a lurking kraken", emoji: "🐙", loot: "salvaged its hide" },
+    { foe: "a giant clam", emoji: "🦪", loot: "prised a pearl from its shell" },
+    { foe: "a ghost galleon", emoji: "👻", loot: "plundered its spectral hold" },
+    { foe: "a sea serpent", emoji: "🐍", loot: "harvested its glittering scales" },
+    { foe: "a rogue leviathan", emoji: "🐋", loot: "carved a trove from the deep" },
+    { foe: "a smuggler's sloop", emoji: "⛵", loot: "seized their contraband" },
+    { foe: "a reef drake", emoji: "🐉", loot: "raided its sunken nest" },
+];
+// Bonus loot table (weighted). Always-on XP + coins are separate; this is the extra thrill. Deliberately
+// LOW-power (fragments, cheap pet treats, low chests, a spin token) — nothing that swings the boss fight.
+const ENCOUNTER_LOOT = [
+    { w: 22, kind: "none" },
+    { w: 26, kind: "fragment", n: 1, label: "a chest fragment", emoji: "🔩" },
+    { w: 10, kind: "fragment", n: 2, label: "2 chest fragments", emoji: "🔩" },
+    { w: 12, kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" },
+    { w: 7,  kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" },
+    { w: 11, kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" },
+    { w: 5,  kind: "chest", tier: "iron", label: "an Iron chest", emoji: "⚙️" },
+    { w: 4,  kind: "consumable", id: "spin_lucky_coin", label: "a Lucky Coin (+2 spins)", emoji: "🎟️" },
+    { w: 3,  kind: "consumable", id: "stone_storm", label: "a Storm Crystal (+3 strikes)", emoji: "🔷" },
+];
+function pickWeighted(list) {
+    const total = list.reduce((s, x) => s + x.w, 0) || 1;
+    let r = Math.random() * total;
+    for (const x of list) { r -= x.w; if (r <= 0) return x; }
+    return list[list.length - 1];
+}
 
 // Dig board.
 const DIG_COLS = 4;
@@ -176,9 +224,10 @@ export function voyageDurationMs(speedLevel = 0, level = 1) {
 function upgradeCost(nextLevel) { return 100 * (nextLevel + 1) * (nextLevel + 1); }
 // Dig count is a DIGGING upgrade (not a boat lever): base budget + the Stamina track.
 function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrackValue("stamina", staminaLevel)); }
-// Fortune (luck_level column) sends the boat to richer islands: +1 buried per level (+ milestone bonuses).
-function fragmentsBuried(fortuneLevel = 0, level = 1) {
-    return Math.min(MAX_BURIED, FRAGMENTS_BURIED + Math.max(0, fortuneLevel) + boatPerks(level).buried);
+// Buried fragments per island — base + boat-FORM milestone bonuses. (Fortune no longer feeds this; it now
+// drives marine-encounter chance instead — see encounterChance.)
+function fragmentsBuried(level = 1) {
+    return Math.min(MAX_BURIED, FRAGMENTS_BURIED + boatPerks(level).buried);
 }
 // The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 4 tracks.
 function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0) { return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l); }
@@ -200,7 +249,7 @@ function newBoard(row) {
     const cells = [];
     for (let r = 0; r < DIG_ROWS; r++) for (let c = 0; c < DIG_COLS; c++) cells.push([r, c]);
     for (let i = cells.length - 1; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
-    const frag = cells.slice(0, fragmentsBuried(fortuneLevel, level));
+    const frag = cells.slice(0, fragmentsBuried(level));
     // Luck caps how deep a fragment tile can be; the "first strike guaranteed" perk forces one to the surface.
     const cap = fragMaxDepth(luckLevel);
     const perks = boatPerks(level);
@@ -348,7 +397,7 @@ function decorate(row) {
         },
         fortune: {
             level: fortuneLevel, max: MAX_FORTUNE_LEVEL, cost: upgradeCost(fortuneLevel), maxed: fortuneLevel >= MAX_FORTUNE_LEVEL,
-            buriedNow: fragmentsBuried(fortuneLevel, level), buriedNext: fragmentsBuried(fortuneLevel + 1, level),
+            encounterNow: Math.round(encounterChance(fortuneLevel) * 100), encounterNext: Math.round(encounterChance(fortuneLevel + 1) * 100),
         },
         rarity: {
             level: rarityLevel, max: MAX_RARITY_LEVEL, cost: upgradeCost(rarityLevel), maxed: rarityLevel >= MAX_RARITY_LEVEL,
@@ -363,6 +412,14 @@ function decorate(row) {
         digUpgrades: digUpgradesView(row),
         excavation: excavationView(row?.voyages_completed || 0),
         status, progress, departedAt, arrivesAt,
+        // Waves — greet a passing sailor a few times a day (only meaningful mid-voyage).
+        waves: {
+            max: WAVES_PER_DAY,
+            left: Math.max(0, WAVES_PER_DAY - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
+            xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000,
+        },
+        // A resolved-but-unacknowledged marine encounter, if any — the client shows it as a one-off recap modal.
+        encounter: (row && row.encounter_result) || null,
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
         // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
@@ -375,13 +432,43 @@ async function readRow(buyerId) {
     // Compute "did they already use today's favorable-winds boost" in SQL (store-local day) to sidestep the
     // JS-Date-from-a-DATE-column timezone trap.
     return db.queryOne(
-        `SELECT *, (wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wind_used_today
+        `SELECT *, (wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wind_used_today,
+                (wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wave_is_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId]
     ).catch(() => null);
 }
 
+// Resolve a DUE, unresolved encounter exactly once: roll the outcome, atomically CLAIM it (so only the first
+// concurrent caller writes the result), then apply the grants. A no-op when nothing is pending/due.
+async function resolveDueEncounter(buyerId) {
+    const row = await readRow(buyerId);
+    if (!row || !row.encounter_at || row.encounter_result) return;
+    if (new Date(row.encounter_at).getTime() > Date.now()) return; // halfway mark not reached yet
+    const enc = ENCOUNTERS[randInt(ENCOUNTERS.length)];
+    const xp = 150 + randInt(211);   // decent: 150–360
+    const coins = 20 + randInt(51);  // small: 20–70
+    const loot = pickWeighted(ENCOUNTER_LOOT);
+    const result = {
+        foe: enc.foe, emoji: enc.emoji, loot: enc.loot, xp, coins,
+        bonus: loot.kind === "none" ? null : { label: loot.label, emoji: loot.emoji },
+    };
+    // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.
+    const claimed = await db.queryOne(
+        `UPDATE mkt_sailing SET encounter_result = $2::jsonb, updated_at = NOW()
+          WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_at <= NOW() AND encounter_result IS NULL
+          RETURNING buyer_id`,
+        [buyerId, JSON.stringify(result)]
+    ).catch(() => null);
+    if (!claimed) return;
+    await awardXp(buyerId, "sail_encounter", { points: xp, gold: coins }).catch(() => {});
+    if (loot.kind === "fragment") await grantFragment(buyerId, loot.n || 1).catch(() => {});
+    else if (loot.kind === "chest") await addChests(buyerId, { [loot.tier]: 1 }).catch(() => {});
+    else if (loot.kind === "consumable") await grantConsumable(buyerId, loot.id, 1).catch(() => {});
+}
+
 export async function getSailingState(buyerId) {
+    await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     const [row, goldRow, others, petMap] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
@@ -427,12 +514,45 @@ export async function startVoyage(buyerId, optionId = "standard") {
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
     const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
     const ms = Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult);
+    // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark; reset any prior encounter.
+    const encMs = Math.random() < encounterChance(state.fortune.level) ? String(Math.round(ms / 2)) : null;
     await db.query(
-        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, updated_at)
-         VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4, NOW())
-         ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval, dig_state = NULL, voyage_quality = $3, voyage_ms = $4, updated_at = NOW()`,
-        [buyerId, String(ms), opt.id, ms]
+        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, encounter_at, encounter_result, updated_at)
+         VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4,
+                 CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END, NULL, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
+                 dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
+                 encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
+                 encounter_result = NULL, updated_at = NOW()`,
+        [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// Wave to a passing sailor — up to WAVES_PER_DAY/day, each a little XP + coins + a small travel-time cut.
+// Atomic: the WHERE enforces mid-voyage + the daily cap so rapid taps can't overspend.
+export async function waveAtSailor(buyerId) {
+    const state = decorate(await readRow(buyerId));
+    if (state.status !== "sailing") return { ok: false, error: "not_sailing", ...(await getSailingState(buyerId)) };
+    const waved = await db.queryOne(
+        `UPDATE mkt_sailing
+            SET wave_count = CASE WHEN wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN wave_count + 1 ELSE 1 END,
+                wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
+                returns_at = GREATEST(NOW(), returns_at - ($2 || ' milliseconds')::interval),
+                updated_at = NOW()
+          WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at IS NOT NULL AND returns_at > NOW()
+            AND (wave_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date OR wave_count < $3)
+          RETURNING wave_count`,
+        [buyerId, String(WAVE_SHAVE_MS), WAVES_PER_DAY]
+    ).catch(() => null);
+    if (!waved) return { ok: false, error: "no_waves", ...(await getSailingState(buyerId)) };
+    await awardXp(buyerId, "sail_wave", { points: WAVE_XP, gold: WAVE_COINS }).catch(() => {});
+    return { ok: true, waved: { xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000 }, ...(await getSailingState(buyerId)) };
+}
+
+// Acknowledge (dismiss) a resolved encounter's recap — clears it so it never shows again.
+export async function ackEncounter(buyerId) {
+    await db.query(`UPDATE mkt_sailing SET encounter_result = NULL, encounter_at = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
