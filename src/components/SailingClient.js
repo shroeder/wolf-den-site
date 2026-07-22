@@ -161,12 +161,20 @@ export default function SailingClient({ initial, hero, pet }) {
         let timer;
         const spawn = () => {
             if (!alive) return;
-            const fleet = stateRef.current?.fleet || [];
+            const s = stateRef.current;
+            const fleet = s?.fleet || [];
             if (fleet.length) {
                 const pick = fleet[Math.floor(Math.random() * fleet.length)];
                 const id = (ambientId.current += 1);
-                const dur = 12 + Math.random() * 7;
-                setAmbient((a) => [...a, { id, art: pick.art, name: pick.name, flip: Math.random() < 0.5, top: 31 + Math.random() * 11, dur }]);
+                // While YOU are sailing, the other ships all head the same way you do (right) and you overtake
+                // them — so they drift right→left but stay facing right. Docked, they just pass by either way.
+                const sailingNow = s?.status === "sailing" && s?.arrivesAt && Date.now() < s.arrivesAt;
+                const dir = sailingNow ? "left" : (Math.random() < 0.5 ? "left" : "right");
+                const dur = sailingNow ? 9 + Math.random() * 4 : 14 + Math.random() * 8;
+                setAmbient((a) => [...a, {
+                    id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip,
+                    dir, faceLeft: dir === "left" && !sailingNow, top: 49 + Math.random() * 12, dur,
+                }]);
                 setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
             }
             timer = setTimeout(spawn, (13 + Math.random() * 11) * 1000);
@@ -357,15 +365,27 @@ export default function SailingClient({ initial, hero, pet }) {
                             {/* Other sailors drifting across the horizon behind your boat. */}
                             <div className="sail-ambient" aria-hidden="true">
                                 {ambient.map((b) => (
-                                    <span key={b.id} className={`sail-ambient-boat${b.flip ? " is-flip" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={b.art} alt="" />
+                                    <span key={b.id} className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
+                                        <span className="sail-ambient-hull">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={b.art} alt="" />
+                                            {b.rider ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img className="sail-ambient-rider" src={b.rider} alt="" style={b.riderFlip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
+                                            ) : null}
+                                        </span>
                                         {b.name ? <span className="sail-ambient-name">{b.name}</span> : null}
                                     </span>
                                 ))}
                             </div>
-                            <div className="sail-boat">
-                                <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${celebrate === "gust" ? " is-gusting" : ""}`}>
+                            <div className={`sail-boat${liveStatus === "sailing" ? " is-underway" : ""}`}>
+                                <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${celebrate === "gust" ? " is-gusting" : ""}${liveStatus === "sailing" ? " is-sailing" : ""}`}>
+                                    {liveStatus === "sailing" ? (
+                                        <>
+                                            <span className="sail-wind" aria-hidden="true"><i /><i /><i /></span>
+                                            <span className="sail-mist" aria-hidden="true"><i /><i /><i /></span>
+                                        </>
+                                    ) : null}
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className={`sail-boat-img boat-aura-${state.tier}`} src={state.boatArt} alt="Your boat" />
                                     <span className="sail-crew">

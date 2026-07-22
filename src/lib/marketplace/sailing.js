@@ -355,22 +355,31 @@ export async function getSailingState(buyerId) {
     const [row, goldRow, others] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        // Other members' boats to sail past in the background (by their form). Empty while owner-gated.
+        // Everyone else sails the horizon behind you — a REAL member riding their REAL ship. Every member has
+        // at least the starter hull; if they've bought boat upgrades we show that form. The avatar sprite (or
+        // built avatar) rides on deck so you can actually see who's out there.
         db.query(
-            `SELECT b.alias, s.speed_level, s.luck_level, s.rarity_level, s.find_level
-               FROM mkt_sailing s JOIN mkt_buyer b ON b.id = s.buyer_id
-              WHERE s.buyer_id <> $1 AND b.alias IS NOT NULL LIMIT 6`,
+            `SELECT b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
+                    COALESCE(s.speed_level, 0) AS speed_level, COALESCE(s.luck_level, 0) AS luck_level,
+                    COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level
+               FROM mkt_buyer b
+               LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+              WHERE b.id <> $1 AND b.alias IS NOT NULL
+                AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
+              ORDER BY COALESCE(b.xp, 0) DESC
+              LIMIT 12`,
             [buyerId]
         ).catch(() => []),
     ]);
     const fleet = (others || []).map((o) => ({
-        art: boatArt(boatLevelFromUpgrades(o.speed_level || 0, o.luck_level || 0, o.rarity_level || 0, o.find_level || 0)),
+        art: boatArt(boatLevelFromUpgrades(o.speed_level, o.luck_level, o.rarity_level, o.find_level)),
         name: o.alias,
+        rider: o.avatar_sprite_url || o.avatar_url || null,
+        // Only the AI sprite needs the face-right mirror; the built avatar already faces forward.
+        riderFlip: o.avatar_sprite_url ? o.avatar_sprite_flip === true : false,
     }));
-    // Pad with a few humble STARTER hulls so the horizon is never empty (decorative until multiplayer
-    // sailing opens). Only tier 1-2 — a nameless high-tier ship on the horizon would misrepresent that
-    // nobody can sail yet, and spoil the reveal of the epic forms.
-    for (const t of [1, 2, 1, 2, 1]) if (fleet.length < 6) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null });
+    // Only pad if literally nobody else has a hero yet, so the horizon isn't dead empty in early testing.
+    for (const t of [1, 2, 1]) if (fleet.length < 3) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null, rider: null, riderFlip: false });
     return { ...decorate(row), gold: goldRow?.gold || 0, fleet };
 }
 

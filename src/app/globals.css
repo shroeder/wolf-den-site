@@ -10508,18 +10508,44 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-ambient { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .sail-ambient-boat { position: absolute; left: -22%; opacity: 0; will-change: left, opacity;
     animation-name: sailAmbient; animation-timing-function: linear; animation-fill-mode: forwards; }
-.sail-ambient-boat img { display: block; width: clamp(30px, 10vw, 58px); height: auto; filter: brightness(0.82) saturate(0.85); }
-.sail-ambient-boat.is-flip { animation-name: sailAmbientRev; }
-.sail-ambient-boat.is-flip img { transform: scaleX(-1); }
+.sail-ambient-hull { position: relative; display: block; }
+.sail-ambient-boat img { display: block; width: clamp(34px, 11vw, 66px); height: auto; filter: brightness(0.94) saturate(0.98); }
+/* Base = heading right (no flip). is-rev flips the TRAVEL direction; is-faceleft mirrors the hull+rider so it
+   also LOOKS like it's heading left. (While you're underway we set is-rev WITHOUT is-faceleft, so the fleet
+   drifts backward past you while still pointed the same way you are.) */
+.sail-ambient-boat.is-rev { animation-name: sailAmbientRev; }
+.sail-ambient-boat.is-faceleft .sail-ambient-hull { transform: scaleX(-1); }
+/* The real member riding on deck — small + distant, sitting on the midship. */
+.sail-ambient-rider { position: absolute; left: 50%; bottom: 42%; transform: translateX(-50%);
+    width: 42%; max-width: 30px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
 .sail-ambient-name { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap;
-    font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.75; }
-@keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.5; } 88% { opacity: 0.5; } 100% { left: 118%; opacity: 0; } }
-@keyframes sailAmbientRev { 0% { left: 118%; opacity: 0; } 12% { opacity: 0.5; } 88% { opacity: 0.5; } 100% { left: -22%; opacity: 0; } }
+    font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
+@keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
+@keyframes sailAmbientRev { 0% { left: 118%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: -22%; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .sail-ambient { display: none; } }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }
 .sail-boat-inner { position: relative; transform-origin: bottom center; }
+/* Underway: the hull leans back on its wake (bow up), so "sailing" reads instantly vs. "docked". */
+.sail-boat-inner.is-sailing { animation: sailCruiseRock 2.4s ease-in-out infinite; }
+@keyframes sailCruiseRock { 0%, 100% { transform: rotate(-2.4deg) translateY(0); } 50% { transform: rotate(-4.2deg) translateY(-3px); } }
+/* Bow spray/mist thrown off the FRONT (right) of the hull at the waterline. */
+.sail-mist { position: absolute; right: 3%; bottom: 15%; width: 34%; height: 42%; pointer-events: none; z-index: 4; }
+.sail-mist i { position: absolute; bottom: 0; right: 6%; width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(215,238,255,0.2) 65%, transparent 75%);
+    opacity: 0; animation: sailSpray 1.5s ease-out infinite; }
+.sail-mist i:nth-child(2) { width: 11px; height: 11px; animation-delay: 0.5s; }
+.sail-mist i:nth-child(3) { width: 21px; height: 21px; animation-delay: 1s; }
+@keyframes sailSpray { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 25% { opacity: 0.9; } 100% { opacity: 0; transform: translate(30px, -20px) scale(1.35); } }
+/* Wind streaks trailing off the STERN (left), reinforcing forward motion. */
+.sail-wind { position: absolute; left: -4%; top: 32%; width: 46%; height: 34%; pointer-events: none; z-index: 4; }
+.sail-wind i { position: absolute; left: 58%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75)); opacity: 0; }
+.sail-wind i:nth-child(1) { top: 18%; width: 42%; animation: sailWind 1.1s linear infinite; }
+.sail-wind i:nth-child(2) { top: 50%; width: 58%; animation: sailWind 1.1s linear infinite 0.37s; }
+.sail-wind i:nth-child(3) { top: 80%; width: 34%; animation: sailWind 1.1s linear infinite 0.74s; }
+@keyframes sailWind { 0% { opacity: 0; transform: translateX(35%); } 25% { opacity: 0.85; } 100% { opacity: 0; transform: translateX(-130%); } }
+@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind { display: none; } }
 .sail-boat-img { display: block; width: clamp(190px, 54vw, 320px); height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Magical auras on the epic tiers — the art carries the colour, this adds the glow (gold / fire / spirit). */
