@@ -6,6 +6,7 @@ import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -99,7 +100,7 @@ function pickWeighted(list) {
 const MERCHANT_BASE_CHANCE = 1.0;    // ⚠️ TEST OVERRIDE (was 0.05) — always land the Gold Merchant
 const MERCHANT_GOLD_FLOOR = 20;      // minimum coin-minigame payout (just for playing)
 const MERCHANT_GOLD_CEIL = 300;      // payout cap
-const MERCHANT_PET_CHANCE = 1.0;     // ⚠️ TEST OVERRIDE (was 0.15) — merchant always offers the elephant pet
+const MERCHANT_PET_CHANCE = 1.0;     // ⚠️ TEST OVERRIDE (was 0.10) — 10% shot at the elephant pet on a PERFECT coin-catch run
 const MERCHANT_PET_ID = "elephant_spear";
 const MERCHANT_PET_RARITY = "legendary";
 // Elephant find bonus by EQUIPPED pet level (1..5): +1% → +5%.
@@ -137,10 +138,12 @@ async function rollMerchant(buyerId) {
             const c = CONSUMABLES[s.id] || {};
             return { id: s.id, name: c.name || s.id, emoji: c.emoji || "🧪", desc: c.desc || "", price: Math.max(1, Math.round(s.base * (1 - s.off))), off: Math.round(s.off * 100) };
         });
-        offer = { shop: stock, petOffered: Math.random() < MERCHANT_PET_CHANCE, petClaimed: false, minigamePlayed: false, goldWon: 0 };
+        // The pet is NOT a free gift — it's a 10% drop on a PERFECT coin-catch run (see merchantMinigame).
+        offer = { shop: stock, minigamePlayed: false, goldWon: 0, perfect: false, petGranted: null };
     }
     // Guard on merchant_json IS NULL so concurrent reads roll it exactly once.
-    await db.query(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL`, [buyerId, JSON.stringify(offer)]).catch(() => {});
+    const rolled = await db.queryOne(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL RETURNING buyer_id`, [buyerId, JSON.stringify(offer)]).catch(() => null);
+    if (rolled && !offer.none) await grantEventBadge(buyerId, "merchant_met").catch(() => {}); // "Gold Rush" — met the merchant
 }
 
 // Dig board.
@@ -611,23 +614,30 @@ export async function ackEncounter(buyerId) {
 }
 
 // ── Gold Merchant actions ──────────────────────────────────────────────────────────────────────────────
-// The coin-catch minigame result. `collected` is what the client says you caught; clamped to [floor, ceil]
-// and paid ONCE (atomic guard on minigamePlayed). Owner-gated for now, so the client-reported score is fine.
-export async function merchantMinigame(buyerId, collected) {
+// The coin-catch minigame result. `collected` = gold caught (clamped [floor, ceil]); `lives` = lives left, so
+// a PERFECT run = finished with all 3 (never took a hit). Perfect earns the "Coin Virtuoso" badge and a 10%
+// shot at the exclusive elephant pet. Paid + resolved ONCE (atomic guard on minigamePlayed). Owner-gated, so
+// the client-reported score/lives are trusted for now.
+export async function merchantMinigame(buyerId, collected, lives) {
     const row = await readRow(buyerId);
     const m = row?.merchant_json;
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
     const gold = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
+    const perfect = Number(lives) >= 3;
+    const petGranted = perfect && Math.random() < MERCHANT_PET_CHANCE ? MERCHANT_PET_ID : null;
     const won = await db.queryOne(
         `UPDATE mkt_sailing
-            SET merchant_json = jsonb_set(jsonb_set(merchant_json, '{minigamePlayed}', 'true'), '{goldWon}', to_jsonb($2::int)), updated_at = NOW()
+            SET merchant_json = merchant_json || jsonb_build_object('minigamePlayed', TRUE, 'goldWon', $2::int, 'perfect', $3::boolean, 'petGranted', $4::text),
+                updated_at = NOW()
           WHERE buyer_id = $1 AND merchant_json IS NOT NULL AND (merchant_json->>'minigamePlayed')::boolean IS NOT TRUE
           RETURNING buyer_id`,
-        [buyerId, gold]
+        [buyerId, gold, perfect, petGranted]
     ).catch(() => null);
     if (!won) return { ok: false, error: "already_played", ...(await getSailingState(buyerId)) };
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, gold]).catch(() => {});
-    return { ok: true, goldWon: gold, ...(await getSailingState(buyerId)) };
+    if (perfect) await grantEventBadge(buyerId, "merchant_perfect").catch(() => {}); // "Coin Virtuoso"
+    if (petGranted) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, petGranted]).catch(() => {});
+    return { ok: true, goldWon: gold, perfect, petGranted, ...(await getSailingState(buyerId)) };
 }
 
 // Buy one of the merchant's discounted exclusive consumables. Price comes from HIS rolled offer (not the
@@ -642,20 +652,6 @@ export async function merchantBuy(buyerId, itemId) {
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
     await grantConsumable(buyerId, itemId, 1).catch(() => {});
     return { ok: true, bought: { id: item.id, name: item.name, emoji: item.emoji }, ...(await getSailingState(buyerId)) };
-}
-
-// Claim the merchant-exclusive elephant pet (free, once, only if he's offering it this visit).
-export async function merchantClaimPet(buyerId) {
-    const claimed = await db.queryOne(
-        `UPDATE mkt_sailing SET merchant_json = jsonb_set(merchant_json, '{petClaimed}', 'true'), updated_at = NOW()
-          WHERE buyer_id = $1 AND merchant_json IS NOT NULL
-            AND (merchant_json->>'petOffered')::boolean IS TRUE AND (merchant_json->>'petClaimed')::boolean IS NOT TRUE
-          RETURNING buyer_id`,
-        [buyerId]
-    ).catch(() => null);
-    if (!claimed) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
-    await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, MERCHANT_PET_ID]).catch(() => {});
-    return { ok: true, petGranted: MERCHANT_PET_ID, ...(await getSailingState(buyerId)) };
 }
 
 // Once-a-day favorable winds: shave an hour off the remaining voyage (clamped so it can only reach "arrived",

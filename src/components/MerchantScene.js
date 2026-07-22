@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // The Gold Merchant island event — shown when you LAND (before the dig) if he rolled in. A coin-catch arcade
 // minigame (move to catch falling gold, dodge the bricks, 3 lives, ~20s), his discounted exclusive shop, a
@@ -52,8 +53,10 @@ function makeFunkMusic() {
     };
 }
 
-export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 300, busy, heroImg, onPlay, onBuy, onClaimPet, onLeave }) {
+export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 300, busy, heroImg, onPlay, onBuy, onLeave }) {
     const [phase, setPhase] = useState(merchant.minigamePlayed ? "done" : "intro"); // intro | playing | done
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
     const [lives, setLives] = useState(3);
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(GAME_MS / 1000);
@@ -77,7 +80,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
         s.running = false;
         cancelAnimationFrame(raf.current);
         setPhase("done");
-        onPlay(Math.max(floor, Math.min(ceil, s.score))); // server clamps too
+        onPlay(Math.max(floor, Math.min(ceil, s.score)), s.lives); // server clamps + a perfect = 3 lives left
     }, [onPlay, floor, ceil]);
 
     const loop = useCallback((now) => {
@@ -123,84 +126,92 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
         gs.current.targetX = Math.max(0.05, Math.min(0.95, (clientX - r.left) / r.width));
     }, []);
 
-    const petOfferable = merchant.petOffered && !merchant.petClaimed;
+    const played = phase === "done" || merchant.minigamePlayed;
 
-    return (
-        <div className="merchant card">
-            <div className="merchant-head">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={MERCHANT_ART} alt="The Gold Merchant" className="merchant-art" />
-                <div>
-                    <h3 style={{ margin: 0 }}>💰 The Gold Merchant!</h3>
-                    <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.85rem" }}>A rare showman on the sand, coins flying everywhere. Catch what you can, then browse his wares.</p>
-                </div>
-            </div>
-
-            {phase === "playing" ? (
-                <div
-                    className="mg-area" ref={areaRef}
-                    onPointerMove={(e) => move(e.clientX)}
-                    onTouchMove={(e) => { if (e.touches[0]) move(e.touches[0].clientX); }}
-                >
-                    <div className="mg-hud">
-                        <span>{"❤️".repeat(Math.max(0, lives))}<span style={{ opacity: 0.3 }}>{"❤️".repeat(Math.max(0, 3 - lives))}</span></span>
-                        <span>🪙 {score}</span>
-                        <span>⏱️ {timeLeft}s</span>
+    if (!mounted) return null;
+    return createPortal((
+        <div className="merchant-cine">
+            <div className="merchant-cine-inner">
+                <div className="merchant-head">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={MERCHANT_ART} alt="The Gold Merchant" className="merchant-art" />
+                    <div>
+                        <h3 style={{ margin: 0 }}>💰 The Gold Merchant!</h3>
+                        <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.85rem" }}>A rare showman on the sand, coins flying everywhere. Catch what you can, then browse his wares.</p>
                     </div>
-                    {render.entities.map((e) => (
-                        <span key={e.id} className={e.type === "gold" ? "mg-gold" : "mg-brick"} style={{ left: `${e.x * 100}%`, top: `${e.y}px` }} />
-                    ))}
-                    <span className={`mg-player${hitClass(render.hitAt)}`} style={{ left: `${render.playerX * 100}%`, bottom: 8 }}>
-                        {heroImg ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={heroImg} alt="" />
-                        ) : "🧍"}
-                    </span>
-                    <p className="mg-hint">Drag to move · catch 🪙 · dodge the bricks</p>
                 </div>
-            ) : (
-                <>
-                    {phase === "done" || merchant.minigamePlayed ? (
-                        <div className="merchant-won">🪙 You caught <strong>{merchant.goldWon || Math.max(floor, Math.min(ceil, score))}</strong> gold from the coin toss!</div>
-                    ) : (
-                        <button type="button" className="sail-cta sail-cta-wind" onClick={start}>🪙 Catch the coin toss!</button>
-                    )}
 
-                    {petOfferable ? (
-                        <div className="merchant-pet">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={ELEPHANT_ART} alt="Merchant's Guard" />
-                            <div>
-                                <strong>✨ A rare gift: Merchant&apos;s Guard</strong>
-                                <p className="muted" style={{ margin: "2px 0 6px", fontSize: "0.82rem" }}>An elephant warrior only he carries — equip it to raise your odds of finding him again.</p>
-                                <button type="button" className="btn-gold" disabled={busy} onClick={onClaimPet}>🐘 Take the pet — free</button>
-                            </div>
+                {phase === "playing" ? (
+                    <div
+                        className="mg-area" ref={areaRef}
+                        onPointerMove={(e) => move(e.clientX)}
+                        onTouchMove={(e) => { if (e.touches[0]) move(e.touches[0].clientX); }}
+                    >
+                        <div className="mg-hud">
+                            <span>{"❤️".repeat(Math.max(0, lives))}<span style={{ opacity: 0.3 }}>{"❤️".repeat(Math.max(0, 3 - lives))}</span></span>
+                            <span>🪙 {score}</span>
+                            <span>⏱️ {timeLeft}s</span>
                         </div>
-                    ) : merchant.petClaimed ? (
-                        <div className="merchant-won">🐘 You took the Merchant&apos;s Guard!</div>
-                    ) : null}
-
-                    <h4 style={{ margin: "12px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own 🪙 {gold.toLocaleString()}</span></h4>
-                    <div className="merchant-shop">
-                        {(merchant.shop || []).map((it) => (
-                            <div key={it.id} className="merchant-item">
-                                <span className="merchant-item-emoji">{it.emoji}</span>
-                                <div className="merchant-item-body">
-                                    <strong>{it.name} <span className="merchant-off">-{it.off}%</span></strong>
-                                    <span className="muted" style={{ fontSize: "0.76rem" }}>{it.desc}</span>
-                                </div>
-                                <button type="button" className="btn btn-small" disabled={busy || gold < it.price} onClick={() => onBuy(it.id)}>🪙 {it.price.toLocaleString()}</button>
-                            </div>
+                        {render.entities.map((e) => (
+                            <span key={e.id} className={e.type === "gold" ? "mg-gold" : "mg-brick"} style={{ left: `${e.x * 100}%`, top: `${e.y}px` }} />
                         ))}
+                        <span className={`mg-player${hitClass(render.hitAt)}`} style={{ left: `${render.playerX * 100}%`, bottom: 8 }}>
+                            {heroImg ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={heroImg} alt="" />
+                            ) : "🧍"}
+                        </span>
+                        <p className="mg-hint">Drag to move · catch 🪙 · dodge the bricks</p>
                     </div>
+                ) : (
+                    <>
+                        {played ? (
+                            <div className="merchant-won">🪙 You caught <strong>{merchant.goldWon || Math.max(floor, Math.min(ceil, score))}</strong> gold from the coin toss!</div>
+                        ) : (
+                            <button type="button" className="sail-cta sail-cta-wind" onClick={start}>🪙 Catch the coin toss!</button>
+                        )}
 
-                    <button type="button" className="sail-cta sail-cta-dig" disabled={busy} onClick={onLeave} style={{ marginTop: 14 }}>
-                        <span className="sail-cta-ico">⛏️</span> Take my leave — dig for treasure
-                    </button>
-                </>
-            )}
+                        {/* Perfect run → celebration + the 10% pet result. */}
+                        {played && merchant.perfect ? (
+                            <div className={`merchant-perfect-fx${merchant.petGranted ? " has-pet" : ""}`}>
+                                <div className="merchant-perfect-ribbon">✨ PERFECT! Not a single hit ✨</div>
+                                {merchant.petGranted ? (
+                                    <div className="merchant-pet">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={ELEPHANT_ART} alt="Merchant's Guard" />
+                                        <div>
+                                            <strong>🐘 The Merchant&apos;s Guard is yours!</strong>
+                                            <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.82rem" }}>His exclusive elephant pet — equip it to raise your odds of finding him again.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>No pet this time — a flawless run gives a 🐘 <strong>10%</strong> shot at his exclusive elephant. Find him again to try once more.</p>
+                                )}
+                            </div>
+                        ) : null}
+
+                        <h4 style={{ margin: "14px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own 🪙 {gold.toLocaleString()}</span></h4>
+                        <div className="merchant-shop">
+                            {(merchant.shop || []).map((it) => (
+                                <div key={it.id} className="merchant-item">
+                                    <span className="merchant-item-emoji">{it.emoji}</span>
+                                    <div className="merchant-item-body">
+                                        <strong>{it.name} <span className="merchant-off">-{it.off}%</span></strong>
+                                        <span className="muted" style={{ fontSize: "0.76rem" }}>{it.desc}</span>
+                                    </div>
+                                    <button type="button" className="btn btn-small" disabled={busy || gold < it.price} onClick={() => onBuy(it.id)}>🪙 {it.price.toLocaleString()}</button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button type="button" className="sail-cta sail-cta-dig" disabled={busy} onClick={onLeave} style={{ marginTop: 16 }}>
+                            <span className="sail-cta-ico">⛏️</span> Take my leave — dig for treasure
+                        </button>
+                    </>
+                )}
+            </div>
         </div>
-    );
+    ), document.body);
 }
 
 // Adds a brief hit-flash class to the player when they took a hit in the last 220ms.

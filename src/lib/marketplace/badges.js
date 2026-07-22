@@ -347,6 +347,21 @@ export async function syncEarnedBadges(buyerId) {
     return granted;
 }
 
+// Grant a specific badge directly (for EVENT badges that aren't metric-threshold based — e.g. "met the Gold
+// Merchant", "perfect coin toss"). Idempotent; rewards XP/gold + browser-pushes only on a genuinely new grant.
+// Returns true if it was newly granted.
+export async function grantEventBadge(buyerId, slug) {
+    if (!buyerId || !slug) return false;
+    const ins = await db
+        .queryOne(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'system') ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId, slug])
+        .catch(() => null);
+    if (!ins) return false;
+    await rewardBadgeEarned(buyerId, slug);
+    const def = (await listBadges().catch(() => [])).find((b) => b.slug === slug);
+    if (def) await pushBadgeEarned(buyerId, def);
+    return true;
+}
+
 // Keep the live 1st/2nd/3rd-place badges in sync with the leaderboard: grant place_N to the current
 // rank-N member (by XP) and revoke it from everyone else. Idempotent — run on a cron. Unlike normal auto
 // badges these are REVOCABLE (you lose your medal when someone overtakes you).

@@ -529,9 +529,8 @@ export default function SailingClient({ initial, hero, pet }) {
                                 ceil={state.merchantGold?.ceil ?? 300}
                                 busy={busy}
                                 heroImg={hero?.spriteUrl || hero?.avatarUrl || null}
-                                onPlay={(collected) => act("merchant_play", { collected })}
+                                onPlay={(collected, lives) => act("merchant_play", { collected, lives })}
                                 onBuy={(item) => act("merchant_buy", { item })}
-                                onClaimPet={() => act("merchant_claim_pet")}
                                 onLeave={() => act("begin_dig")}
                             />
                         ) : null}

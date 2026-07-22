@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, buyDigs, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeDig, activateTool, forgeChest, waveAtSailor, ackEncounter, merchantMinigame, merchantBuy, merchantClaimPet } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, buyDigs, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeDig, activateTool, forgeChest, waveAtSailor, ackEncounter, merchantMinigame, merchantBuy } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -54,9 +54,8 @@ export async function POST(request) {
                 case "forge_chest": return noStore(await forgeChest(g.buyer.id, body.tier));
                 case "wave": return noStore(await waveAtSailor(g.buyer.id));
                 case "ack_encounter": return noStore(await ackEncounter(g.buyer.id));
-                case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected));
+                case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected, body.lives));
                 case "merchant_buy": return noStore(await merchantBuy(g.buyer.id, body.item));
-                case "merchant_claim_pet": return noStore(await merchantClaimPet(g.buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {
