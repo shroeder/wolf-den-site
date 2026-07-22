@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
-import { previewShopCoupon, consumeShopCoupon, getShopCoupon } from "@/lib/marketplace/shop-coupon.js";
+import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
@@ -224,17 +224,23 @@ export async function getInventory(buyerId) {
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
     const gold = goldRow?.gold || 0;
-    // The gold shop: xp_shop items you don't own yet.
+    const coupon = await getShopCoupon(buyerId).catch(() => null);
+    // The gold shop: xp_shop items you don't own yet. effectiveCost folds in an active coupon so the price
+    // shown + affordability match what the buy actually charges (canAfford on FULL price was a bug — an item
+    // you could afford at half price still read "need more").
     const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id))
-        .map((i) => ({
-            id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-            stats: i.stats, statsText: describeStats(i.stats), signature: signatureFor(i.id),
-            cost: Math.max(0, i.xpCost || 0), canAfford: gold >= Math.max(0, i.xpCost || 0), shop: true,
-        }))
+        .map((i) => {
+            const cost = Math.max(0, i.xpCost || 0);
+            const effectiveCost = couponedPrice(coupon, cost);
+            return {
+                id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
+                stats: i.stats, statsText: describeStats(i.stats), signature: signatureFor(i.id),
+                cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
+            };
+        })
         // One clean progression: rarity, then price, then level — no more "worst again" as you scroll.
         .sort((a, z) => (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[z.rarity] ?? 9) || a.cost - z.cost || (a.reqLevel || 0) - (z.reqLevel || 0));
     const equippedList = Object.values(bySlot);
-    const coupon = await getShopCoupon(buyerId).catch(() => null);
     return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), coupon };
 }
 

@@ -320,9 +320,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {/* Gold shop */}
             {(data.shop || []).length ? (
                 <div className="card">
-                    <h3>💰 Shop</h3>
+                    <h3>🪙 Shop</h3>
                     <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear.</p>
-                    {data.coupon ? <div className="shop-coupon">🎟️ {data.coupon.pct}% off coupon active — auto-applies to a gear pick ≤ {data.coupon.max.toLocaleString()} gold</div> : null}
+                    {data.coupon ? <div className="shop-coupon">🏷️ {data.coupon.pct}% off coupon active — auto-applies to your next gear pick ≤ 🪙 {data.coupon.max.toLocaleString()} (one use)</div> : null}
                     <div className="equip-bag-grid">
                         {(data.shop || []).map((i) => {
                             return (
@@ -332,7 +332,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
                                     <span className="equip-card-stats">{i.statsText}</span>
                                     <ElBadge id={i.id} />
-                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>💰 {(i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                 </button>
                             );
                         })}
@@ -384,12 +384,12 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setName ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p> : null}
-                        {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>💰 {(detailItem.cost || 0).toLocaleString()} gold{detailItem.canAfford ? "" : " · not enough"}</p> : null}
+                        {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {detailItem.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(detailItem.cost || 0).toLocaleString()}</span> {(detailItem.effectiveCost || 0).toLocaleString()}</> : (detailItem.cost || 0).toLocaleString()} gold{detailItem.discounted ? ` · ${data.coupon?.pct || 50}% off` : ""}{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                             {detailItem.shop ? (
                                 detailItem.canAfford ? (
                                     <button type="button" className="button gold" onClick={() => { buy(detailItem); closeDetail(); }} disabled={busy}>
-                                        💰 Buy for {(detailItem.cost || 0).toLocaleString()}
+                                        🪙 Buy for {((detailItem.discounted ? detailItem.effectiveCost : detailItem.cost) || 0).toLocaleString()}
                                     </button>
                                 ) : (
                                     <CoinCta price={detailItem.cost} label="Get coins to buy" />
@@ -401,9 +401,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             )}
                             {!detailItem.shop && detailItem.sellValue > 0 ? (
                                 sellArmed ? (
-                                    <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 💰 {detailItem.sellValue}</button>
+                                    <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>
                                 ) : (
-                                    <button type="button" className="pill" onClick={() => setSellArmed(true)} disabled={busy}>💰 Sell for {detailItem.sellValue}</button>
+                                    <button type="button" className="pill" onClick={() => setSellArmed(true)} disabled={busy}>🪙 Sell for {detailItem.sellValue}</button>
                                 )
                             ) : null}
                             <button type="button" className="pill" onClick={closeDetail} style={{ marginLeft: "auto" }}>Close</button>
@@ -416,9 +416,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {coinBurst ? createPortal((
                 <div className="coinfx" key={coinBurst.key} aria-hidden="true">
                     {coinBurst.coins.map((c, i) => (
-                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>💰</span>
+                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>🪙</span>
                     ))}
-                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 💰</div>
+                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 🪙</div>
                 </div>
             ), document.body) : null}
 

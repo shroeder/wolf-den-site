@@ -5,7 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp, levelUpEquippedPet } from "@/lib/marketplace/pet-level.js";
-import { previewShopCoupon, consumeShopCoupon, getShopCoupon } from "@/lib/marketplace/shop-coupon.js";
+import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
@@ -96,7 +96,9 @@ export async function listConsumables(buyerId) {
     const gold = goldRow?.gold || 0;
     const shop = SHOP_ORDER.filter((id) => CONSUMABLES[id]?.price != null).map((id) => {
         const c = CONSUMABLES[id];
-        return { id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, price: c.price, canAfford: gold >= c.price };
+        // effectivePrice folds in an active coupon so the shown price + affordability match the actual charge.
+        const effectivePrice = couponedPrice(coupon, c.price);
+        return { id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, price: c.price, effectivePrice, discounted: effectivePrice < c.price, canAfford: gold >= effectivePrice };
     });
     const stash = ownRows.map((r) => {
         const c = CONSUMABLES[r.consumable_id];
