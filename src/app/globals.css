@@ -10751,12 +10751,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .merchant-stage.is-compact { height: clamp(130px, 32vw, 170px); }
 /* Merchant himself — the art fills its canvas edge-to-edge (hat at the very top pixel), so we scale to fit
    with clear headroom and DON'T bottom-anchor tight, or the hat clips. object-fit contain = never cropped. */
-.merchant-figure { position: absolute; left: 50%; bottom: 2%; height: 98%; width: 80%; max-width: 300px; z-index: 3;
+.merchant-figure { position: absolute; left: 50%; bottom: 4%; height: 84%; width: 82%; max-width: 300px; z-index: 3;
     object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45));
     animation: merchantFloat 2.8s ease-in-out infinite; }
 @keyframes merchantFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
 @keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } } /* used by .sail-enc-art (encounter foe bob) */
-.merchant-stage.is-compact .merchant-figure { height: 104%; bottom: 1%; }
+.merchant-stage.is-compact .merchant-figure { height: 92%; bottom: 3%; }
 /* Coins flying everywhere — a continuous spinning, drifting shower across the stage. */
 .merchant-coinfall { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .merchant-coin { position: absolute; top: 0; border-radius: 50%; opacity: 0;
@@ -11524,12 +11524,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 /* During the gust the whole sea PUNCHES: a brightness kick + the water layers blast past faster, so it reads
    as real speed, not just the boat lurching. */
+/* NOTE: don't override any child animation-DURATION here — changing an animation's duration mid-run makes the
+   browser recompute its position and visibly SNAP (that was the "background snapping" on tailwind). The surge
+   read comes from the boat lunge + speed lines + this brightness punch, none of which restart anything. */
 .sail-sea.is-gust { animation: seaGustPunch 620ms ease-out; }
 @keyframes seaGustPunch { 0% { filter: brightness(1) saturate(1); } 20% { filter: brightness(1.16) saturate(1.1); } 100% { filter: brightness(1) saturate(1); } }
-.sail-sea.is-gust .sail-nearwater.is-scrolling i { animation-duration: 0.5s !important; }
-.sail-sea.is-gust .sail-wake i { animation-duration: 0.7s !important; }
-.sail-sea.is-gust .sail-glints i { animation-duration: 1.2s !important; }
-.sail-sea.is-gust .sail-sky-scroll.is-scrolling { animation-duration: 12s; } /* horizon rushes for the gust */
 
 /* Wind FX overlay: a flash, ripping speed lines, and a few leaves streaming across the scene. */
 .sail-gustfx { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
