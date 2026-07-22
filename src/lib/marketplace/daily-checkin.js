@@ -6,7 +6,8 @@ import { getActiveBoss } from "@/lib/marketplace/boss.js";
 import { getDailyQuests } from "@/lib/marketplace/quests.js";
 import { petLevelInfo } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
-import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+import { addChests, getChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+import { getSpinState } from "@/lib/marketplace/spin.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signatures.js";
@@ -40,10 +41,12 @@ const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 // A short "while you were away" summary — all truthful, computed live.
 async function awaySummary(buyerId) {
-    const [boss, buyer, quests] = await Promise.all([
+    const [boss, buyer, quests, chests, spin] = await Promise.all([
         getActiveBoss().catch(() => null),
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getDailyQuests(buyerId).catch(() => ({ quests: [] })),
+        getChests(buyerId).catch(() => []),
+        getSpinState(buyerId).catch(() => null),
     ]);
     let bossName = null;
     let packDamage24h = 0;
@@ -59,7 +62,10 @@ async function awaySummary(buyerId) {
         pet = { name: collectibleById(buyer.featured_collectible)?.name || "your pet", level: info.level, into: info.into, span: info.span, maxed: info.maxed };
     }
     const questsReady = (quests.quests || []).filter((q) => q.done && !q.claimed).length;
-    return { bossName, packDamage24h, pet, questsReady };
+    // Nudge members sitting on unopened chests / an unused spin — engagement they often forget about.
+    const chestsToOpen = (chests || []).reduce((n, c) => n + (c.count || 0), 0);
+    const spinReady = Boolean(spin?.canSpin);
+    return { bossName, packDamage24h, pet, questsReady, chestsToOpen, spinReady };
 }
 
 // GET — the member's check-in state: streak, today's claimable reward, and the away summary.

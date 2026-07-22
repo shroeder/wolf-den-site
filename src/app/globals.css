@@ -10071,6 +10071,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .checkin-sub { margin: 0 0 12px; font-size: 0.9rem; color: #cbd2da; }
 .checkin-summary { text-align: left; display: flex; flex-direction: column; gap: 6px; margin: 0 auto 16px; max-width: 300px; }
 .checkin-row { font-size: 0.85rem; color: #cbd2da; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; border-radius: 10px; padding: 7px 10px; }
+/* Tappable "spend it" nudge rows (unopened chests / free spin) — clearly a call to action. */
+.checkin-cta { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #1c130a; text-decoration: none;
+    background: linear-gradient(135deg, #ffe9a8, #ffcf4a); border-color: rgba(255,215,94,0.6); transition: filter 0.12s ease, transform 0.06s ease; }
+.checkin-cta strong { color: #7a4a00; }
+.checkin-cta .checkin-cta-arrow { margin-left: auto; font-weight: 900; }
+.checkin-cta:hover { filter: brightness(1.05); }
+.checkin-cta:active { transform: translateY(1px); }
 .checkin-loot-head { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #ffd75e; }
 .shop-coupon { margin: 0 0 10px; padding: 7px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; color: #0f0f12; background: linear-gradient(90deg, #ffd75e, #ff9a6a); }
 /* Today's Deals — rotating discounted shop */

@@ -50,6 +50,22 @@ export default function DailyCheckin() {
     const streak = claimed ? claimed.streak : state.nextStreak;
     const reward = claimed ? claimed.reward : state.reward;
 
+    // Nudge to spend what they've got sitting unused — tapping navigates there (and stops the re-pop today).
+    const prompts = (
+        <>
+            {s.chestsToOpen > 0 ? (
+                <a className="checkin-row checkin-cta" href="/marketplace/inventory" onClick={markSeen}>
+                    🎁 <strong>{s.chestsToOpen}</strong> loot chest{s.chestsToOpen > 1 ? "s" : ""} to open <span className="checkin-cta-arrow">→</span>
+                </a>
+            ) : null}
+            {s.spinReady ? (
+                <a className="checkin-row checkin-cta" href="/marketplace/spin" onClick={markSeen}>
+                    🎡 Your free spin is ready <span className="checkin-cta-arrow">→</span>
+                </a>
+            ) : null}
+        </>
+    );
+
     return createPortal(
         <div className="checkin-overlay" onClick={dismiss}>
             <div className={`checkin-modal${claimed?.jackpot ? " is-jackpot" : ""}`} onClick={(e) => e.stopPropagation()}>
@@ -74,6 +90,7 @@ export default function DailyCheckin() {
                                 {claimed.logins.map((l, idx) => <div key={idx} className="checkin-row">{l.emoji} {l.text}</div>)}
                             </div>
                         ) : null}
+                        {(s.chestsToOpen > 0 || s.spinReady) ? <div className="checkin-summary">{prompts}</div> : null}
                         <p className="checkin-sub">{claimed.jackpot ? "🎉 Weekly jackpot! Keep the streak alive." : "See you tomorrow to keep the streak going."}</p>
                         <button type="button" className="btn-gold" onClick={dismiss}>Sweet!</button>
                     </>
@@ -85,6 +102,7 @@ export default function DailyCheckin() {
                             {s.pet ? <div className="checkin-row">🐾 <strong>{s.pet.name}</strong> is Lv {s.pet.level}{s.pet.maxed ? " (MAX)" : ""}</div> : null}
                             {s.bossName && s.packDamage24h > 0 ? <div className="checkin-row">⚔️ The pack hit <strong>{s.bossName}</strong> for {s.packDamage24h.toLocaleString()} in the last day</div> : null}
                             {s.questsReady > 0 ? <div className="checkin-row">📜 {s.questsReady} quest{s.questsReady > 1 ? "s" : ""} ready to claim</div> : null}
+                            {prompts}
                         </div>
                         <button type="button" className="btn-gold" onClick={claim} disabled={busy}>{busy ? "…" : `Claim Day ${streak}`}</button>
                     </>
