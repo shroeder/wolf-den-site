@@ -76,7 +76,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
     const [recapReady, setRecapReady] = useState(false); // recap accepts the "Continue" click (anti-misclick delay)
     const areaRef = useRef(null);
     const padRef = useRef(null);
-    const gs = useRef({ entities: [], eid: 0, playerX: 0.5, targetX: 0.5, lives: 3, score: 0, missed: 0, combo: 0, bestCombo: 0, floaters: [], fid: 0, running: false, endAt: 0, lastSpawn: 0, spawnGap: 500, hitAt: 0 });
+    const gs = useRef({ entities: [], eid: 0, playerX: 0.5, targetX: 0.5, lives: 3, score: 0, missed: 0, combo: 0, bestCombo: 0, floaters: [], fid: 0, running: false, endAt: 0, last: 0, lastSpawn: 0, spawnGap: 500, hitAt: 0 });
     const raf = useRef(0);
     const music = useRef(null);
     const loopRef = useRef(null); // holds the latest loop fn so it can schedule itself without a self-reference
@@ -106,19 +106,23 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
     const loop = useCallback((now) => {
         const s = gs.current;
         if (!s.running) return;
+        // Frame-rate INDEPENDENT: advance by real elapsed time so it plays identically on 60Hz and 120Hz
+        // screens (and never speeds up / stalls on a janky frame). Velocities below are in px/SECOND.
+        const dt = Math.min(0.05, ((now - (s.last || now)) / 1000) || 0);
+        s.last = now;
         const area = areaRef.current;
         const W = area?.clientWidth || 320, H = area?.clientHeight || 360;
         if (now - s.lastSpawn > s.spawnGap) {
-            s.lastSpawn = now; s.spawnGap = 320 + Math.random() * 420;
-            const brick = Math.random() < 0.24;
+            s.lastSpawn = now; s.spawnGap = 360 + Math.random() * 420;
+            const brick = Math.random() < 0.2;
             // Coins spill from the merchant's hands (top-center); bricks he lobs from anywhere.
             const x = brick ? 0.08 + Math.random() * 0.84 : 0.5 + (Math.random() - 0.5) * 0.7;
-            s.entities.push({ id: (s.eid += 1), x: Math.max(0.06, Math.min(0.94, x)), y: -24, vy: (brick ? 3.0 : 2.1) + Math.random() * 1.5, type: brick ? "brick" : "gold" });
+            s.entities.push({ id: (s.eid += 1), x: Math.max(0.06, Math.min(0.94, x)), y: -24, vy: (brick ? 165 : 135) + Math.random() * 80, type: brick ? "brick" : "gold" });
         }
         const px = s.playerX * W, catchY = H - 56;
         s.entities = s.entities.filter((e) => {
-            e.y += e.vy;
-            const near = e.y > catchY - 32 && e.y < catchY + 24 && Math.abs(e.x * W - px) < 46;
+            e.y += e.vy * dt;
+            const near = e.y > catchY - 34 && e.y < catchY + 26 && Math.abs(e.x * W - px) < 50;
             if (near) {
                 if (e.type === "gold") {
                     s.combo += 1; if (s.combo > s.bestCombo) s.bestCombo = s.combo;
@@ -137,7 +141,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
             return true;
         });
         s.floaters = s.floaters.filter((f) => now - f.born < 750);
-        s.playerX += (s.targetX - s.playerX) * 0.34;
+        s.playerX += (s.targetX - s.playerX) * Math.min(1, dt * 22); // snappy, dt-normalized follow of your thumb
         setLives(s.lives); setScore(s.score); setTimeLeft(Math.max(0, Math.ceil((s.endAt - now) / 1000)));
         setRender({
             entities: s.entities.map((e) => ({ id: e.id, x: e.x, y: e.y, type: e.type })),
@@ -154,7 +158,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
         const s = gs.current;
         s.entities = []; s.playerX = 0.5; s.targetX = 0.5; s.lives = 3; s.score = 0; s.missed = 0;
         s.combo = 0; s.bestCombo = 0; s.floaters = []; s.running = true;
-        s.lastSpawn = performance.now(); s.spawnGap = 500; s.endAt = performance.now() + GAME_MS;
+        s.last = performance.now(); s.lastSpawn = performance.now(); s.spawnGap = 500; s.endAt = performance.now() + GAME_MS;
         setLives(3); setScore(0); setTimeLeft(GAME_MS / 1000); setPhase("playing");
         raf.current = requestAnimationFrame((t) => loopRef.current && loopRef.current(t));
     }, []);
