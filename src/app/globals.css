@@ -10840,6 +10840,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upgrade-sparks i:nth-child(5) { --sx: 4px; --sy: -26px; }
 @keyframes upgSpark { 0%, 38% { opacity: 0; transform: translate(0,0) scale(0.4); } 42% { opacity: 1; transform: translate(0,0) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.3); } }
 @media (prefers-reduced-motion: reduce) { .sail-upgrade-boat, .sail-upgrade-hammer, .sail-upgrade-sparks i { animation: none; } }
+/* Chest FORGE reveal — the real per-tier chest (ChestIcon) shudders while a hammer bangs + sparks fly. */
+.sail-forge-scene { position: relative; display: inline-grid; place-items: center; padding: 12px 0 6px; }
+.sail-forge-chest { animation: upgShake 0.5s ease-in-out 4; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5)) drop-shadow(0 0 16px rgba(255,215,94,0.6)); }
+.sail-forge-scene .sail-upgrade-hammer { top: 0%; left: 63%; font-size: 2.7rem; }
+.sail-forge-scene .sail-upgrade-sparks { top: 44%; left: 50%; }
+/* A sail-CTA used as a LINK (e.g. "Open it in your stash") — the global a:visited rule would otherwise wash
+   the text to muted grey on gold. Pin the dark ink + kill the underline. */
+.sail-cta:link, .sail-cta:visited { color: #2a1400; text-decoration: none; }
 /* Boat forms list + the "new form" unlock celebration. */
 .sail-forms-list { display: grid; gap: 6px; }
 .sail-form { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.03); opacity: 0.88;
@@ -11037,7 +11045,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-recap-pos { color: #7cffb2; }
 .sail-recap-chest { margin: 6px 0 12px; display: grid; gap: 5px; }
 .sail-forge-btn { width: 100%; justify-content: center; font-size: 0.98rem; margin-top: 4px; }
-.sail-forge-chest { font-size: 3.6rem; display: inline-block; filter: drop-shadow(0 0 18px rgba(255,215,94,0.75)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
 /* Boat level-up ribbon inside the dig recap. */
 .sail-levelup-ribbon { margin: -2px 0 10px; padding: 9px 12px; border-radius: 11px; font-weight: 900; font-size: 1rem; color: #3a2600;
     background: linear-gradient(135deg, #fff3c4, #ffcf4a 55%, #f5a623);

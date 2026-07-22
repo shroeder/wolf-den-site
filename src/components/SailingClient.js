@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import ChestIcon from "@/components/ChestIcon";
 import MerchantScene from "@/components/MerchantScene";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
@@ -322,7 +323,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     const crossed = (d.forms || []).find((f) => f.level > prevLevel && f.level <= d.level);
                     if (crossed) { sfx.levelUp(); setFormUnlock(crossed); } else { sfx.hammer(); setLevelUp(d.level); }
                 }
-                if (d.forged) { sfx.win(); setForge(d.forged); }
+                if (d.forged) { sfx.hammer(); setForge(d.forged); } // metallic "ting" as the chest is forged
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
             }
@@ -832,16 +833,20 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             ) : null}
 
-            {/* Chest forged from fragments. */}
+            {/* Chest forged from fragments — the real chest gets HAMMERED into shape (sparks fly), then revealed. */}
             {forge ? (
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap">
                         <Confetti />
-                        <div className="sail-recap-hero is-win"><span className="sail-forge-chest">{forge.emoji}</span></div>
+                        <div className={`sail-forge-scene rar-${forge.tier}`}>
+                            <ChestIcon tier={forge.tier} className="sail-forge-chest" size={130} />
+                            <span className="sail-upgrade-hammer" aria-hidden="true">🔨</span>
+                            <span className="sail-upgrade-sparks" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+                        </div>
                         <h2 style={{ margin: "4px 0" }}>Chest forged!</h2>
                         <p className="muted" style={{ marginTop: 0 }}>You fused {state.fragmentsPerChest || 10} fragments into a <b>{forge.label}</b>. It&apos;s waiting in your stash.</p>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
-                            <a className="sail-cta" href="/marketplace/inventory">🎒 Open it in your stash</a>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 8 }}>
+                            <a className="sail-cta sail-cta-dig" href="/marketplace/inventory">Open it in your stash →</a>
                             <button className="pill" onClick={() => setForge(null)}>Keep sailing</button>
                         </div>
                     </div>
