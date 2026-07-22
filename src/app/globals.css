@@ -9362,12 +9362,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .adv { position: absolute; left: 27%; bottom: 8%; z-index: 6; transform-origin: bottom center; }
 .adv-body { position: relative; }
 .adv-flip { display: inline-block; transform-origin: bottom center; }
-.adv-sprite { display: block; height: clamp(96px, 21vw, 190px); width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.55)); transform-origin: bottom center; }
+/* Facing lives HERE (via --adv-face: 1|-1), baked as the innermost transform, so the attack keyframe's
+   translate stays in SCREEN space and always lunges toward the boss — a flipped sprite no longer attacks
+   backwards (which happened when the flip was a parent scaleX that mirrored the child's lunge). */
+.adv-sprite { display: block; height: clamp(96px, 21vw, 190px); width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.55)); transform-origin: bottom center; transform: scaleX(var(--adv-face, 1)); }
 .adv.is-pad { opacity: 0.85; }
 .adv.is-you .adv-sprite { filter: drop-shadow(0 0 14px rgba(255,215,94,0.95)) drop-shadow(0 8px 12px rgba(0,0,0,0.55)); }
 /* Companion pet — a sibling of the hero (not glued to it): its own trot + its own attack, slightly behind. */
 .adv-pet-wrap { position: absolute; left: -34%; bottom: 0; z-index: -1; transform-origin: bottom center; }
-.adv-pet { display: block; height: clamp(58px, 13vw, 120px); width: auto; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); transform-origin: bottom center; }
+.adv-pet { display: block; height: clamp(58px, 13vw, 120px); width: auto; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); transform-origin: bottom center; transform: scaleX(var(--pet-face, 1)); }
 /* Aura/border glow behind the hero — reads their configured cosmetic on stage. */
 .adv-aura { position: absolute; left: 50%; bottom: 8%; width: 130%; height: 130%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--glow, #ffd75e) 55%, transparent), transparent 68%); filter: blur(2px); z-index: -2; pointer-events: none; animation: advAuraPulse 2.6s ease-in-out infinite; }
 .adv-aura.has-border { box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow, #ffd75e) 70%, transparent) inset; }
@@ -9453,10 +9456,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Phase 2 — ATTACK. One clean lunge-strike toward the boss; the PET then strikes a beat after its owner. */
 /* No wind-up: the hero snaps forward into the boss and back. Peak (~40% = ~0.2s) lines up with the boss's
    delayed flinch, so the bump and the damage flash happen together. */
+/* scaleX(var(--*-face)) is the INNERMOST (rightmost) transform in every frame so the sprite mirrors in place
+   while the outer translateX lunges in screen space — flipped fighters strike toward the boss, not away. */
 .party-attack .adv-sprite { animation: advAttack 0.5s cubic-bezier(0.25, 0.9, 0.3, 1) both; }
-@keyframes advAttack { 0% { transform: translateX(0) scale(1); } 40% { transform: translateX(44px) scale(1.05); } 60% { transform: translateX(44px) scale(1.05); } 100% { transform: translateX(0) scale(1); } }
+@keyframes advAttack { 0% { transform: translateX(0) scale(1) scaleX(var(--adv-face,1)); } 40% { transform: translateX(44px) scale(1.05) scaleX(var(--adv-face,1)); } 60% { transform: translateX(44px) scale(1.05) scaleX(var(--adv-face,1)); } 100% { transform: translateX(0) scale(1) scaleX(var(--adv-face,1)); } }
 .party-attack .adv-pet { animation: petStrike 0.5s cubic-bezier(0.25, 0.9, 0.3, 1) both; }
-@keyframes petStrike { 0% { transform: translate(0,0); } 45% { transform: translate(34px,-14px) rotate(-8deg); } 60% { transform: translate(34px,-14px) rotate(-8deg); } 100% { transform: translate(0,0); } }
+@keyframes petStrike { 0% { transform: translate(0,0) scaleX(var(--pet-face,1)); } 45% { transform: translate(34px,-14px) rotate(-8deg) scaleX(var(--pet-face,1)); } 60% { transform: translate(34px,-14px) rotate(-8deg) scaleX(var(--pet-face,1)); } 100% { transform: translate(0,0) scaleX(var(--pet-face,1)); } }
 .battle-wave { font-size: 0.72rem; font-weight: 700; color: #ffcf7a; text-shadow: 0 1px 2px #000; margin-top: 2px; }
 
 .battle-spark { position: absolute; z-index: 6; width: 15px; height: 15px; pointer-events: none; border-radius: 50%; background: radial-gradient(circle, rgba(255,225,140,0.95), rgba(255,140,60,0.55) 45%, transparent 70%); animation: battle-spark 0.75s ease-out forwards; }

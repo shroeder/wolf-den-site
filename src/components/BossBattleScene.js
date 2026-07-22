@@ -194,19 +194,19 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                                 has its OWN gait + attack timing so they're not glued at the hip. */}
                             <div className="adv-body">
                                 {glow ? <span className={`adv-aura${f.border ? " has-border" : ""}`} /> : null}
-                                {/* The companion pet — rides in with its owner and strikes at the SAME time. Flip lives on
-                                    the wrapper (like the hero's adv-flip) so the strike keyframe's transform on the img
-                                    composes with it instead of wiping the flip mid-swing. */}
+                                {/* The companion pet — rides in with its owner and strikes at the SAME time. Facing is a
+                                    --pet-face var baked INTO the sprite's own transform (see globals.css) so the strike
+                                    keyframe's translate lunges toward the boss even when the sprite is mirrored. */}
                                 {f.petSpriteUrl ? (
-                                    <span className="adv-pet-wrap" style={f.petSpriteFlip ? { transform: "scaleX(-1)" } : undefined}>
+                                    <span className="adv-pet-wrap">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img className="adv-pet" src={f.petSpriteUrl} alt="" />
+                                        <img className="adv-pet" src={f.petSpriteUrl} alt="" style={{ "--pet-face": f.petSpriteFlip ? -1 : 1 }} />
                                     </span>
                                 ) : null}
-                                {/* Flip on a wrapper so the walk/attack keyframes (on the img) compose with it. */}
-                                <span className="adv-flip" style={f.spriteFlip ? { transform: "scaleX(-1)" } : undefined}>
+                                {/* Facing baked into the sprite's transform (--adv-face) so a flipped hero still lunges forward. */}
+                                <span className="adv-flip">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img className="adv-sprite" src={f.spriteUrl} alt="" />
+                                    <img className="adv-sprite" src={f.spriteUrl} alt="" style={{ "--adv-face": f.spriteFlip ? -1 : 1 }} />
                                 </span>
                             </div>
                         </div>
