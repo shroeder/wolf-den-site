@@ -3,22 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import ChestIcon from "@/components/ChestIcon";
+import CrewCalibrator from "@/components/CrewCalibrator";
 import MerchantScene from "@/components/MerchantScene";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
 const GUST_MS = 3000;
 
-// Where the crew (hero + pet) plant their feet, per boat FORM (tier), as a `bottom` % of the hull art. Open
-// boats (tier 1–2) have a low floor so the crew must sit LOW or they hover in the open hull; taller ships seat
-// higher on their deck. Tiers not listed fall back to the default in CSS. Tune per boat as forms are seen.
-const CREW_BOTTOM = { 1: 28, 2: 29, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
-
-// Where the ambient (background) sailors' rider + pet plant their feet, per boat FORM (tier). Same idea as
-// CREW_BOTTOM but for the small background boats, whose deck height varies by form — a single value can't fit
-// an open dinghy AND a tall galleon, which is why earlier single-value tweaks kept missing.
-const AMB_RIDER_B = { 1: 30, 2: 31, 3: 37, 4: 37, 5: 39, 6: 37, 7: 37, 8: 39, 9: 39 };
-const AMB_PET_B = { 1: 28, 2: 29, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+// ── DECK: the ONE source of truth for where a figure's FEET rest on each boat FORM (tier), as a `bottom`
+// % of the hull art. Because the big hero boat and the little background boats use the SAME art per form,
+// this single map drives the main crew (hero + pet), the ambient rider, AND the ambient pet — so they can
+// never drift apart again (the old three-separate-maps setup is what kept letting the background sailors
+// float while the main crew looked fine). Open boats (tier 1–2) have a low floor so figures sit LOW; taller
+// ships seat higher. To retune a form or add a new boat, use the owner-only "🎯 Calibrate crew" overlay on
+// this page (renders all forms with a deck guide + live nudge) and paste the resulting numbers here.
+const DECK = { 1: 28, 2: 29, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
@@ -181,6 +181,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [encReady, setEncReady] = useState(false);   // encounter recap accepts its dismiss click (anti-misclick delay)
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
+    const [calOpen, setCalOpen] = useState(false); // owner-only crew-position calibrator overlay
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
     // correct on the very first render — no flicker from a default to the picked one. Held stable for the
     // session (later state updates re-roll d.sky, but we keep this original).
@@ -386,7 +387,19 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-head">
                     <h1 style={{ margin: 0 }}>⛵ Sailing</h1>
                     <span className="sail-owner-pill">Owner preview</span>
+                    {/* Owner-only: dial crew feet-position on every boat form at once (⚠️ dev tool, hide at public launch). */}
+                    <button type="button" className="sail-cal-btn" onClick={() => setCalOpen(true)}>🎯 Calibrate crew</button>
                 </div>
+                {calOpen ? (
+                    <CrewCalibrator
+                        initial={DECK}
+                        heroImg={hero?.spriteUrl || hero?.avatarUrl || null}
+                        heroFlip={Boolean(hero?.spriteUrl && hero?.spriteFlip)}
+                        petImg={pet?.url || null}
+                        petFlip={Boolean(pet?.flip)}
+                        onClose={() => setCalOpen(false)}
+                    />
+                ) : null}
 
                 {liveStatus === "digging" && dig ? (
                     /* ---------- Excavation dig minigame ---------- */
@@ -464,7 +477,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             <div className="sail-ambient">
                                 {ambient.map((b) => (
                                     <span key={b.id} className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
-                                        <span className="sail-ambient-hull" style={{ "--rider-b": `${AMB_RIDER_B[b.tier] ?? 22}%`, "--pet-b": `${AMB_PET_B[b.tier] ?? 20}%` }}>
+                                        <span className="sail-ambient-hull" style={{ "--rider-b": `${deckPct(b.tier)}%`, "--pet-b": `${deckPct(b.tier)}%` }}>
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={b.art} alt="" />
                                             {b.pet ? (
@@ -500,7 +513,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                     ) : null}
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className={`sail-boat-img boat-aura-${state.tier}`} src={state.boatArt} alt="Your boat" />
-                                    <span className="sail-crew" style={CREW_BOTTOM[state.tier] ? { "--crew-bottom": `${CREW_BOTTOM[state.tier]}%` } : undefined}>
+                                    <span className="sail-crew" style={{ "--crew-bottom": `${deckPct(state.tier)}%` }}>
                                         {pet?.url ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img className="sail-pet" src={pet.url} alt="" style={pet.flip ? { transform: "scaleX(-1)" } : undefined} />
