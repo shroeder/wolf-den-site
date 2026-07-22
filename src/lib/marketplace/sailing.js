@@ -784,20 +784,68 @@ export async function ackEncounter(buyerId) {
 }
 
 // ── RAIDS ──────────────────────────────────────────────────────────────────────────────────────────────
+const RAID_TARGET_COLS = `b.id, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
+                COALESCE(s.speed_level,0) AS speed_level, COALESCE(s.luck_level,0) AS luck_level,
+                COALESCE(s.rarity_level,0) AS rarity_level, COALESCE(s.find_level,0) AS find_level,
+                COALESCE(s.raid_level,0) AS raid_level`;
+const RAID_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+
 // Pick a random passing player to raid — a real member with a hero. They're a target only; they lose nothing.
 async function pickRaidTarget(buyerId) {
     return db.queryOne(
-        `SELECT b.id, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
-                COALESCE(s.speed_level,0) AS speed_level, COALESCE(s.luck_level,0) AS luck_level,
-                COALESCE(s.rarity_level,0) AS rarity_level, COALESCE(s.find_level,0) AS find_level,
-                COALESCE(s.raid_level,0) AS raid_level
-           FROM mkt_buyer b
-           LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
-          WHERE b.id <> $1 AND b.alias IS NOT NULL
-            AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
+        `SELECT ${RAID_TARGET_COLS}
+           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+          WHERE b.id <> $1 AND b.alias IS NOT NULL AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
           ORDER BY random() LIMIT 1`,
         [buyerId]
     ).catch(() => null);
+}
+// Fetch a SPECIFIC target the player chose (validated: a real, other member).
+async function raidTargetById(buyerId, targetId) {
+    if (!targetId) return null;
+    return db.queryOne(
+        `SELECT ${RAID_TARGET_COLS}
+           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+          WHERE b.id = $2 AND b.id <> $1 AND b.alias IS NOT NULL`,
+        [buyerId, targetId]
+    ).catch(() => null);
+}
+
+// The selectable-target list for the raid picker: real passing members + a hint of their GEAR (item count +
+// best rarity) so you can deliberately hunt someone worth plundering. Best-gear-first.
+export async function getRaidTargets(buyerId, limit = 12) {
+    const rows = await db.query(
+        `SELECT ${RAID_TARGET_COLS}
+           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+          WHERE b.id <> $1 AND b.alias IS NOT NULL AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
+          ORDER BY b.last_seen_at DESC NULLS LAST LIMIT 40`,
+        [buyerId]
+    ).catch(() => []);
+    if (!rows.length) return [];
+    const ids = rows.map((r) => r.id);
+    const items = await db.query(`SELECT buyer_id, item_id FROM mkt_user_item WHERE buyer_id = ANY($1)`, [ids]).catch(() => []);
+    const gear = new Map();
+    for (const it of items) {
+        const def = itemById(it.item_id);
+        if (!def) continue;
+        const cur = gear.get(it.buyer_id) || { count: 0, topRank: -1, topRarity: null };
+        cur.count += 1;
+        const rank = RAID_RARITY_RANK[def.rarity] ?? -1;
+        if (rank > cur.topRank) { cur.topRank = rank; cur.topRarity = def.rarity; }
+        gear.set(it.buyer_id, cur);
+    }
+    const list = rows.map((r) => {
+        const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
+        const g = gear.get(r.id) || { count: 0, topRank: -1, topRarity: null };
+        return {
+            id: r.id, name: r.alias, level, boat: boatArt(level),
+            rider: r.avatar_sprite_url || r.avatar_url || null,
+            riderFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
+            items: g.count, topRarity: g.topRarity, gearRank: g.topRank,
+        };
+    });
+    list.sort((a, z) => z.gearRank - a.gearRank || z.items - a.items || z.level - a.level);
+    return list.slice(0, limit);
 }
 
 // Simulate a ship-vs-ship auto-battle. Both open at 100 HP and trade cannon volleys; damage scales with boat
@@ -825,10 +873,11 @@ function simulateRaid({ myLevel, foeLevel, canStun }) {
 
 // Run the once-a-day raid. Win → gold (+0.5% to copy one random item of theirs; they keep it). Lose → 10–100
 // gold. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
-export async function doRaid(buyerId) {
+export async function doRaid(buyerId, targetId = null) {
     const row = await readRow(buyerId);
     if (row?.raid_used_today) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
-    const target = await pickRaidTarget(buyerId);
+    // Raid the CHOSEN target if one was picked (validated); otherwise fall back to a random passing ship.
+    const target = (await raidTargetById(buyerId, targetId)) || (targetId ? null : await pickRaidTarget(buyerId));
     if (!target) return { ok: false, error: "no_target", ...(await getSailingState(buyerId)) };
 
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);

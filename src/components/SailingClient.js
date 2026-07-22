@@ -216,7 +216,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // session (later state updates re-roll d.sky, but we keep this original).
     const [sky, setSky] = useState(() => initial?.sky || initial?.oceanBg || null);
     const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
-    const [raidConfirm, setRaidConfirm] = useState(false); // the "are you sure?" raid modal
+    const [raidOpen, setRaidOpen] = useState(false);       // the raid target-picker modal is open
+    const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidPlay, setRaidPlay] = useState(null);        // the resolved raid → drives the full-screen battle scene
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
@@ -422,7 +423,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 if (d.forged) { sfx.hammer(); setForge(d.forged); } // metallic "ting" as the chest is forged
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
-                if (d.raidResult) { setRaidConfirm(false); setRaidPlay(d.raidResult); } // launch the full-screen auto-battle
+                if (d.raidResult) { setRaidOpen(false); setRaidTargets(null); setRaidPlay(d.raidResult); } // launch the full-screen auto-battle
             }
         } finally { setBusy(false); }
     }, [triggerGust]);
@@ -449,6 +450,19 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         setTimeout(() => setUpgFlash((k) => (k === flashKey ? null : k)), 750);
         act(action, payload);
     }, [act]);
+
+    // Open the raid picker and load the selectable targets (real passing members, best-gear-first).
+    const openRaid = useCallback(async () => {
+        setRaidOpen(true);
+        setRaidTargets(null);
+        try {
+            const r = await fetch("/api/marketplace/sailing", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "raid_targets" }),
+            });
+            const d = await r.json().catch(() => ({}));
+            setRaidTargets(Array.isArray(d.targets) ? d.targets : []);
+        } catch { setRaidTargets([]); }
+    }, []);
 
     const level = state.level;
     const dig = state.dig;
@@ -732,7 +746,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             ))}
                         </div>
                         <button className="sail-cta sail-cta-raid" disabled={busy || !state.raid?.available}
-                            onClick={() => setRaidConfirm(true)}>
+                            onClick={openRaid}>
                             {state.raid?.available ? <>🏴‍☠️ Raid a passing ship</> : <>🏴‍☠️ Raided today — back tomorrow</>}
                         </button>
                     </div>
@@ -751,7 +765,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                         {liveStatus === "sailing" && (
                             <button className="sail-cta sail-cta-raid" disabled={busy || !state.raid?.available}
-                                onClick={() => setRaidConfirm(true)}>
+                                onClick={openRaid}>
                                 {state.raid?.available ? <>🏴‍☠️ Raid a passing ship</> : <>🏴‍☠️ Raided today</>}
                             </button>
                         )}
@@ -1055,23 +1069,44 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             ) : null}
 
-            {/* RAID — confirm modal (make the stakes crystal clear + let them back out) */}
-            {raidConfirm ? (
+            {/* RAID — target picker: choose WHO to raid (best-gear-first) with the stakes shown up front. */}
+            {raidOpen ? (
                 <div className="sail-reward-overlay">
-                    <div className="card sail-recap sail-raid-confirm">
+                    <div className="card sail-recap sail-raid-pick">
                         <div className="sail-raid-crest" aria-hidden="true">🏴‍☠️</div>
-                        <h2 style={{ margin: "6px 0 2px" }}>Raid a passing ship?</h2>
-                        <p className="muted" style={{ marginTop: 0 }}>You get <b>one raid a day</b>. Here&apos;s the deal:</p>
+                        <h2 style={{ margin: "6px 0 2px" }}>Choose your target</h2>
                         <ul className="sail-raid-terms">
-                            <li><span>🏆 Win</span> — pocket <b>gold</b>, and a rare <b>{state.raid?.itemChance ?? 0.5}%</b> shot at a copy of one of their items. <em>They lose nothing.</em></li>
+                            <li><span>🏆 Win</span> — pocket <b>gold</b> + a <b>{state.raid?.itemChance ?? 0.5}%</b> shot at a copy of one of their items. <em>They lose nothing.</em></li>
                             <li><span>🏳️ Lose</span> — you drop <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>.</li>
                             {state.raid?.dodgePct ? <li><span>🍃 Cunning</span> — {state.raid.dodgePct}% chance this <b>won&apos;t use up</b> today&apos;s raid.</li> : null}
-                            {state.raid?.canStun ? <li><span>💫 Warship</span> — your ship can <b>stun</b> the foe once this fight.</li> : null}
+                            {state.raid?.canStun ? <li><span>💫 Warship</span> — you can <b>stun</b> the foe once this fight.</li> : null}
                         </ul>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
-                            <button className="sail-cta sail-cta-raid" disabled={busy} onClick={() => act("raid")}>{busy ? "Sailing in…" : "⚔️ Raid!"}</button>
-                            <button className="pill" disabled={busy} onClick={() => setRaidConfirm(false)}>Back out</button>
+                        <p className="muted sail-raid-hint">Ships with the best loot are up top. Pick one to raid.</p>
+                        <div className="sail-raid-list">
+                            {raidTargets === null ? (
+                                <div className="sail-raid-empty">Scanning the horizon…</div>
+                            ) : raidTargets.length === 0 ? (
+                                <div className="sail-raid-empty">No ships on the horizon right now — try again later.</div>
+                            ) : raidTargets.map((t) => (
+                                <div key={t.id} className="sail-raid-target">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={t.boat} alt="" className="sail-raid-boat" />
+                                    <div className="sail-raid-tinfo">
+                                        <div className="sail-raid-tname">{t.name} <span className="sail-raid-tlvl">Lv {t.level}</span></div>
+                                        <div className="sail-raid-tgear">
+                                            {t.topRarity
+                                                ? <span className={`sail-raid-rar rar-${t.topRarity}`}>{t.topRarity}</span>
+                                                : <span className="muted">no gear</span>}
+                                            <span className="muted"> · 🎁 {t.items} item{t.items === 1 ? "" : "s"}</span>
+                                        </div>
+                                    </div>
+                                    <button className="sail-cta sail-cta-raid sail-raid-go" disabled={busy} onClick={() => act("raid", { target: t.id })}>
+                                        {busy ? "…" : "⚔️ Raid"}
+                                    </button>
+                                </div>
+                            ))}
                         </div>
+                        <button className="pill" disabled={busy} onClick={() => { setRaidOpen(false); setRaidTargets(null); }}>Back out</button>
                     </div>
                 </div>
             ) : null}
