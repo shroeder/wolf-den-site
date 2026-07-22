@@ -2,21 +2,22 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
+import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
 const FRAGMENTS_PER_CHEST = 10;
 // A dug shard's tier is rolled from the chosen voyage DURATION (longer = better), never above the cap for now.
 // wooden = common · iron = pretty rare · gold (the cap) = very rare. Higher tiers exist but don't drop yet.
-const FRAGMENT_TIER_CAP = "gold";
+const FRAGMENT_TIER_CAP = "mythic"; // long trips reach one step past gold; short/standard stay lower
 const fragmentArt = (tier) => `/images/sailing/fragment-${tier}.png`;
 
 // Three embark durations: trip time = your (Speed-shortened) base voyage × mult; longer trips roll better
-// shards. `frag` = tier weights (only up to the cap). Plain consts (no env) so they're easy to tune.
+// shards. `frag` = tier weights (each option's own ceiling). Plain consts (no env) so they're easy to tune.
 export const VOYAGE_OPTIONS = [
-    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 90, iron: 10 } },
-    { id: "standard", label: "Standard run", mult: 2, frag: { wooden: 74, iron: 22, gold: 4 } },
-    { id: "long", label: "Long expedition", mult: 3.5, frag: { wooden: 58, iron: 30, gold: 12 } },
+    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 88, iron: 12 } },
+    { id: "standard", label: "Standard run", mult: 2, frag: { wooden: 70, iron: 24, gold: 6 } },
+    { id: "long", label: "Long expedition", mult: 3.5, frag: { wooden: 54, iron: 28, gold: 15, mythic: 3 } },
 ];
 
 // SAILING — dispatch your boat on a ONE-WAY voyage to a mysterious island; when it lands you play an
@@ -24,11 +25,12 @@ export const VOYAGE_OPTIONS = [
 // trying to unearth a treasure-chest FRAGMENT before you run out. Win or fail, you return to port and can set
 // sail again. Speed shortens the voyage; Luck adds dig stamina. Owner-gated while in development.
 
-// Real base voyage = 4 hours. (Lower this one const for quick testing — e.g. 60*1000 for 1-min trips.)
-export const BASE_VOYAGE_MS = 4 * 60 * 60 * 1000;
-const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000; // Speed shaves a FLAT 2 minutes off each voyage, per level
+// TESTING: base voyage = 90s so the whole loop (and the progress bar) is observable in a sitting.
+// TODO(luke): before release restore BASE_VOYAGE_MS = 4*60*60*1000 (4h), SPEED_OFF = 2*60*1000, MIN = 30*60*1000.
+export const BASE_VOYAGE_MS = 90 * 1000;
+const SPEED_OFF_MS_PER_LEVEL = 10 * 1000;      // Speed shaves 10s off each voyage, per level (testing scale)
 const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
-const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
+const MIN_VOYAGE_MS = 20 * 1000;               // a voyage never dips below 20 seconds (testing scale)
 // Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
 // → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (9) distinct arts, and each
 // form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-
@@ -369,34 +371,40 @@ async function readRow(buyerId) {
 }
 
 export async function getSailingState(buyerId) {
-    const [row, goldRow, others] = await Promise.all([
+    const [row, goldRow, others, petMap] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        // Everyone else sails the horizon behind you — a REAL member riding their REAL ship. Every member has
-        // at least the starter hull; if they've bought boat upgrades we show that form. The avatar sprite (or
-        // built avatar) rides on deck so you can actually see who's out there.
+        // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
+        // has at least the starter hull; if they've bought boat upgrades we show that form. Ordered by recent
+        // activity so you see LIVE players, not always the same top-XP account.
         db.query(
-            `SELECT b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
+            `SELECT b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
                     COALESCE(s.speed_level, 0) AS speed_level, COALESCE(s.luck_level, 0) AS luck_level,
                     COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level
                FROM mkt_buyer b
                LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
               WHERE b.id <> $1 AND b.alias IS NOT NULL
                 AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
-              ORDER BY COALESCE(b.xp, 0) DESC
-              LIMIT 12`,
+              ORDER BY b.last_seen_at DESC NULLS LAST, COALESCE(b.xp, 0) DESC
+              LIMIT 24`,
             [buyerId]
         ).catch(() => []),
+        getPetSpriteData().catch(() => ({})),
     ]);
-    const fleet = (others || []).map((o) => ({
-        art: boatArt(boatLevelFromUpgrades(o.speed_level, o.luck_level, o.rarity_level, o.find_level)),
-        name: o.alias,
-        rider: o.avatar_sprite_url || o.avatar_url || null,
-        // Only the AI sprite needs the face-right mirror; the built avatar already faces forward.
-        riderFlip: o.avatar_sprite_url ? o.avatar_sprite_flip === true : false,
-    }));
+    const fleet = (others || []).map((o) => {
+        const pet = o.featured_collectible ? petMap[o.featured_collectible] : null;
+        return {
+            art: boatArt(boatLevelFromUpgrades(o.speed_level, o.luck_level, o.rarity_level, o.find_level)),
+            name: o.alias,
+            rider: o.avatar_sprite_url || o.avatar_url || null,
+            // Only the AI sprite needs the face-right mirror; the built avatar already faces forward.
+            riderFlip: o.avatar_sprite_url ? o.avatar_sprite_flip === true : false,
+            pet: pet?.url || null,
+            petFlip: pet?.flip === true,
+        };
+    });
     // Only pad if literally nobody else has a hero yet, so the horizon isn't dead empty in early testing.
-    for (const t of [1, 2, 1]) if (fleet.length < 3) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null, rider: null, riderFlip: false });
+    for (const t of [1, 2, 1]) if (fleet.length < 3) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null, rider: null, riderFlip: false, pet: null, petFlip: false });
     return { ...decorate(row), gold: goldRow?.gold || 0, fleet };
 }
 

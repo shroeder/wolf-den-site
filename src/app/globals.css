@@ -10515,9 +10515,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    drifts backward past you while still pointed the same way you are.) */
 .sail-ambient-boat.is-rev { animation-name: sailAmbientRev; }
 .sail-ambient-boat.is-faceleft .sail-ambient-hull { transform: scaleX(-1); }
-/* The real member riding on deck — small + distant, sitting on the midship. */
-.sail-ambient-rider { position: absolute; left: 50%; bottom: 42%; transform: translateX(-50%);
-    width: 42%; max-width: 30px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
+/* The real member (+ pet) riding on deck — small + distant, standing ON the midship, not floating above it. */
+.sail-ambient-rider { position: absolute; left: 55%; bottom: 33%; transform: translateX(-50%);
+    width: 38%; max-width: 26px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
+.sail-ambient-pet { position: absolute; left: 34%; bottom: 31%; transform: translateX(-50%);
+    width: 28%; max-width: 19px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 .sail-ambient-name { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap;
     font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
 @keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
@@ -10526,6 +10528,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }
+/* Sitting lower in the water while underway (it rode a touch high before). */
+.sail-boat.is-underway { bottom: 6%; }
 .sail-boat-inner { position: relative; transform-origin: bottom center; }
 /* Underway: the hull leans back on its wake (bow up), so "sailing" reads instantly vs. "docked". */
 .sail-boat-inner.is-sailing { animation: sailCruiseRock 2.4s ease-in-out infinite; }
@@ -10743,7 +10747,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 /* ===== Sailing: fragment art, the hold card, and the dig recap ===== */
 .frag-icon { display: inline-block; vertical-align: -0.15em; flex: 0 0 auto; }
-.sail-boatline-frag { display: inline-flex; align-items: center; gap: 5px; }
+.sail-boatline-frag { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sail-frag-chip { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; }
+.sail-frag-gold { display: inline-flex; align-items: center; gap: 3px; }
 .sail-hold { display: grid; gap: 8px; }
 .sail-hold-head { display: flex; align-items: center; gap: 12px; }
 .sail-hold-icon { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
@@ -10849,14 +10855,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes sailCastOff { 0% { transform: rotate(0) translateX(0); } 20% { transform: rotate(7deg) translateX(-7px); } 52% { transform: rotate(-5deg) translateX(12px); } 78% { transform: rotate(2deg) translateX(-3px); } 100% { transform: rotate(0) translateX(0); } }
 @keyframes sailHelmSpin { to { transform: rotate(360deg); } }
 
-/* Tailwind gust: hull rocks back as the sails catch, surges forward fast, then eases slowly back to center. */
-.sail-boat-inner.is-gusting { animation: sailGust 2.3s cubic-bezier(0.16, 0.9, 0.28, 1) both; }
+/* Tailwind gust: hull rocks back as the sails catch, surges forward, then GLIDES smoothly home (no snap). */
+.sail-boat-inner.is-gusting { animation: sailGust 3s ease-in-out both; }
 @keyframes sailGust {
     0% { transform: rotate(0) translateX(0); }
-    9% { transform: rotate(10deg) translateX(-16px); }   /* rock back — wind slams the sails */
-    30% { transform: rotate(-9deg) translateX(52px); }   /* surge forward, fast */
-    46% { transform: rotate(-4deg) translateX(34px); }
-    100% { transform: rotate(0) translateX(0); }          /* drift slowly back to the middle */
+    10% { transform: rotate(9deg) translateX(-14px); }   /* rock back — wind slams the sails */
+    30% { transform: rotate(-8deg) translateX(46px); }   /* surge forward */
+    48% { transform: rotate(-5deg) translateX(34px); }
+    66% { transform: rotate(-3deg) translateX(22px); }
+    83% { transform: rotate(-1deg) translateX(10px); }
+    100% { transform: rotate(0) translateX(0); }          /* glide the last bit home, evenly */
 }
 
 /* Wind FX overlay: a quick screen flash + leaves/debris streaming across the scene. */

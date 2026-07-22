@@ -154,6 +154,8 @@ export default function SailingClient({ initial, hero, pet }) {
     const arrivedRef = useRef(false);
     const chunkId = useRef(0);
     const ambientId = useRef(0);
+    const fleetIdx = useRef(0);        // round-robin cursor so consecutive ships are DIFFERENT members
+    const boostRef = useRef(0);        // Date.now() until which traffic is sped up (after a tailwind)
 
     // Every so often, send another sailor's boat drifting across the horizon behind yours.
     useEffect(() => {
@@ -163,23 +165,29 @@ export default function SailingClient({ initial, hero, pet }) {
             if (!alive) return;
             const s = stateRef.current;
             const fleet = s?.fleet || [];
+            const sailingNow = s?.status === "sailing" && s?.arrivesAt && Date.now() < s.arrivesAt;
+            const boosting = sailingNow && Date.now() < boostRef.current;
             if (fleet.length) {
-                const pick = fleet[Math.floor(Math.random() * fleet.length)];
+                // Cycle the fleet so you see DIFFERENT members in turn (not the same one at random).
+                const pick = fleet[fleetIdx.current % fleet.length];
+                fleetIdx.current += 1;
                 const id = (ambientId.current += 1);
                 // While YOU are sailing, the other ships all head the same way you do (right) and you overtake
                 // them — so they drift right→left but stay facing right. Docked, they just pass by either way.
-                const sailingNow = s?.status === "sailing" && s?.arrivesAt && Date.now() < s.arrivesAt;
                 const dir = sailingNow ? "left" : (Math.random() < 0.5 ? "left" : "right");
-                const dur = sailingNow ? 9 + Math.random() * 4 : 14 + Math.random() * 8;
+                // Slow crawl while sailing (distant ships shouldn't whip by); a tailwind briefly speeds them up.
+                const dur = boosting ? 7 + Math.random() * 3 : sailingNow ? 20 + Math.random() * 9 : 15 + Math.random() * 8;
                 setAmbient((a) => [...a, {
-                    id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip,
-                    dir, faceLeft: dir === "left" && !sailingNow, top: 49 + Math.random() * 12, dur,
+                    id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
+                    dir, faceLeft: dir === "left" && !sailingNow, top: 39 + Math.random() * 11, dur,
                 }]);
                 setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
             }
-            timer = setTimeout(spawn, (13 + Math.random() * 11) * 1000);
+            // More frequent traffic while sailing, a flurry during a tailwind boost, sparse while docked.
+            const gap = boosting ? 1.4 + Math.random() * 1.4 : sailingNow ? 4.5 + Math.random() * 3.5 : 13 + Math.random() * 10;
+            timer = setTimeout(spawn, gap * 1000);
         };
-        timer = setTimeout(spawn, 2500);
+        timer = setTimeout(spawn, 1800);
         return () => { alive = false; clearTimeout(timer); };
     }, []);
 
@@ -216,7 +224,8 @@ export default function SailingClient({ initial, hero, pet }) {
         if (action === "wind" || action === "recharge_wind") {
             sfx.gust();
             setCelebrate("gust");
-            setTimeout(() => setCelebrate((c) => (c === "gust" ? null : c)), 2400);
+            boostRef.current = Date.now() + 6500; // speed up the passing fleet so it feels like you surged ahead
+            setTimeout(() => setCelebrate((c) => (c === "gust" ? null : c)), 3000);
         }
         if (action === "dig" || action === "begin_dig") sfx.dig();
         const prevLevel = stateRef.current?.level || 0;
@@ -369,6 +378,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                         <span className="sail-ambient-hull">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={b.art} alt="" />
+                                            {b.pet ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img className="sail-ambient-pet" src={b.pet} alt="" style={b.petFlip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
+                                            ) : null}
                                             {b.rider ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img className="sail-ambient-rider" src={b.rider} alt="" style={b.riderFlip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
@@ -470,7 +483,16 @@ export default function SailingClient({ initial, hero, pet }) {
                 {/* Boat identity — level + form come from upgrades, not digging. */}
                 <div className="sail-boatline">
                     <div><span className="sail-boatname">{boatName}</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level} · Form {state.tier}/{state.boatTiers}</span></div>
-                    <span className="muted sail-boatline-frag"><FragmentIcon size={14} /> {state.fragments} · 🪙 {state.gold.toLocaleString()}</span>
+                    <span className="muted sail-boatline-frag">
+                        {(() => {
+                            const held = (state.fragmentTiers || []).filter((f) => f.count > 0);
+                            const chips = held.length ? held : [{ tier: "wooden", art: "/images/sailing/fragment-wooden.png", count: 0 }];
+                            return chips.map((f) => (
+                                <span key={f.tier} className="sail-frag-chip"><FragmentIcon size={14} art={f.art} /> {f.count}</span>
+                            ));
+                        })()}
+                        <span className="sail-frag-gold">🪙 {state.gold.toLocaleString()}</span>
+                    </span>
                 </div>
             </section>
 
