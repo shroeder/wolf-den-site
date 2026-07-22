@@ -78,15 +78,15 @@ const ENCOUNTERS = [
 // Bonus loot table (weighted). Always-on XP + coins are separate; this is the extra thrill. Deliberately
 // LOW-power (fragments, cheap pet treats, low chests, a spin token) — nothing that swings the boss fight.
 const ENCOUNTER_LOOT = [
-    { w: 22, kind: "none" },
-    { w: 26, kind: "fragment", n: 1, label: "a chest fragment", emoji: "🔩" },
-    { w: 10, kind: "fragment", n: 2, label: "2 chest fragments", emoji: "🔩" },
-    { w: 12, kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" },
-    { w: 7,  kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" },
-    { w: 11, kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" },
-    { w: 5,  kind: "chest", tier: "iron", label: "an Iron chest", emoji: "⚙️" },
-    { w: 4,  kind: "consumable", id: "spin_lucky_coin", label: "a Lucky Coin (+2 spins)", emoji: "🎟️" },
-    { w: 3,  kind: "consumable", id: "stone_storm", label: "a Storm Crystal (+3 strikes)", emoji: "🔷" },
+    { w: 40, kind: "none" },
+    { w: 28, kind: "fragment", n: 1, label: "a Wooden chest fragment", emoji: "🟫" },
+    { w: 8,  kind: "fragment", n: 2, label: "2 Wooden chest fragments", emoji: "🟫" },
+    { w: 8,  kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" },
+    { w: 4,  kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" },
+    { w: 6,  kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" },
+    { w: 2,  kind: "chest", tier: "iron", label: "an Iron chest", emoji: "⚙️" },
+    { w: 2,  kind: "consumable", id: "spin_lucky_coin", label: "a Lucky Coin (+2 spins)", emoji: "🎟️" },
+    { w: 2,  kind: "consumable", id: "stone_storm", label: "a Storm Crystal (+3 strikes)", emoji: "🔷" },
 ];
 function pickWeighted(list) {
     const total = list.reduce((s, x) => s + x.w, 0) || 1;
@@ -508,8 +508,8 @@ async function resolveDueEncounter(buyerId) {
     if (!arrivesAt || total <= 0) return;
     if (Date.now() < arrivesAt - total / 2) return; // not past the midpoint yet
     const enc = ENCOUNTERS[randInt(ENCOUNTERS.length)];
-    const xp = 150 + randInt(211);   // decent: 150–360
-    const coins = 20 + randInt(51);  // small: 20–70
+    const xp = 40 + randInt(81);     // modest: 40–120 (was 150–360 — too rich for a ~1-in-5 event)
+    const coins = 10 + randInt(21);  // small: 10–30
     const loot = pickWeighted(ENCOUNTER_LOOT);
     const result = {
         foe: enc.foe, emoji: enc.emoji, loot: enc.loot, xp, coins,
