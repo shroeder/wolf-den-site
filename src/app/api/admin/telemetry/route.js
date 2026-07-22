@@ -20,7 +20,7 @@ export async function GET(request) {
                 const visitors = await recentVisitors({ limit: Number(searchParams.get("limit")) || 150 });
                 return NextResponse.json({ visitors }, { headers: { "Cache-Control": "no-store" } });
             }
-            const hours = Number(searchParams.get("hours")) || 24;
+            const hours = Number(searchParams.get("hours")) || 168;
             const aud = searchParams.get("audience");
             const audience = aud === "members" || aud === "anon" ? aud : "all";
             const data = await telemetryDashboard({ hours, audience });

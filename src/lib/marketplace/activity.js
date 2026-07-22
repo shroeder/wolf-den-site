@@ -174,8 +174,8 @@ export async function activityCounts(buyerIds, days = 30) {
 // Site-wide telemetry dashboard: recent live feed + engagement reports over a window (hours).
 // audience filters everything to signed-in members, anonymous visitors, or all traffic — the admin app's
 // Activity screen toggles between them. Also returns a per-person rollup (people) for the chosen audience.
-export async function telemetryDashboard({ hours = 24, feedLimit = 120, audience = "all" } = {}) {
-    const win = `${Math.max(1, Math.min(720, Number(hours) || 24))} hours`;
+export async function telemetryDashboard({ hours = 168, feedLimit = 120, audience = "all" } = {}) {
+    const win = `${Math.max(1, Math.min(720, Number(hours) || 168))} hours`;
     // Audience clause on mkt_activity_event (whitelisted → safe to inline). `A` = with the `a.` feed alias.
     const aud = audience === "members" ? " AND buyer_id IS NOT NULL" : audience === "anon" ? " AND buyer_id IS NULL" : "";
     const audA = audience === "members" ? " AND a.buyer_id IS NOT NULL" : audience === "anon" ? " AND a.buyer_id IS NULL" : "";
@@ -199,10 +199,16 @@ export async function telemetryDashboard({ hours = 24, feedLimit = 120, audience
                FROM mkt_activity_event WHERE created_at > NOW() - $1::interval${aud}`,
             [win]
         ).catch(() => null),
+        // Traffic chart — hourly buckets for short windows, daily buckets once it spans more than ~2 days.
         db.query(
-            `SELECT to_char(date_trunc('hour', created_at), 'MM-DD HH24:00') AS bucket, COUNT(*)::int AS n
-               FROM mkt_activity_event WHERE created_at > NOW() - interval '24 hours'
-              GROUP BY 1 ORDER BY 1`
+            (Number(hours) || 168) > 48
+                ? `SELECT to_char(date_trunc('day', created_at), 'MM-DD') AS bucket, COUNT(*)::int AS n
+                     FROM mkt_activity_event WHERE created_at > NOW() - $1::interval${aud}
+                    GROUP BY 1 ORDER BY 1`
+                : `SELECT to_char(date_trunc('hour', created_at), 'MM-DD HH24:00') AS bucket, COUNT(*)::int AS n
+                     FROM mkt_activity_event WHERE created_at > NOW() - $1::interval${aud}
+                    GROUP BY 1 ORDER BY 1`,
+            [win]
         ).catch(() => []),
         db.query(`SELECT device, COUNT(*)::int AS n FROM mkt_activity_event WHERE device IS NOT NULL AND created_at > NOW() - $1::interval${aud} GROUP BY device ORDER BY n DESC`, [win]).catch(() => []),
         db.query(`SELECT country, COUNT(*)::int AS n FROM mkt_activity_event WHERE country IS NOT NULL AND created_at > NOW() - $1::interval${aud} GROUP BY country ORDER BY n DESC LIMIT 15`, [win]).catch(() => []),
