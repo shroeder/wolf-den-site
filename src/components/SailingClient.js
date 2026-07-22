@@ -777,7 +777,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <div className="muted sail-hold-note">{toward}/{per} toward a {f.chestLabel}{f.droppable ? "" : " · not found at sea yet"}</div>
                                 </div>
                                 {ready ? (
-                                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest", { tier: f.tier })}>🔨 <ChestIcon tier={f.tier} size={22} /></button>
+                                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest", { tier: f.tier })}>🔨 {f.chestImage
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        ? <img className="sail-forge-btn-chest" src={f.chestImage} alt="" />
+                                        : <ChestIcon tier={f.tier} size={22} />}</button>
                                 ) : null}
                             </div>
                         );
@@ -1016,7 +1019,10 @@ export default function SailingClient({ initial, hero, pet }) {
                     <div className="card sail-recap">
                         <Confetti />
                         <div className={`sail-forge-scene rar-${forge.tier}`}>
-                            <ChestIcon tier={forge.tier} className="sail-forge-chest" size={130} />
+                            {forge.image
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img className="sail-forge-chest" src={forge.image} alt={forge.label} width={130} height={130} style={{ objectFit: "contain" }} />
+                                : <ChestIcon tier={forge.tier} className="sail-forge-chest" size={130} />}
                             <span className="sail-upgrade-hammer" aria-hidden="true">🔨</span>
                             <span className="sail-upgrade-sparks" aria-hidden="true"><i /><i /><i /><i /><i /></span>
                         </div>

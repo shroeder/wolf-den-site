@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
@@ -180,7 +181,7 @@ const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to 
 const DIG_TRACKS = {
     stamina:   { max: 10, per: 1,    cap: 10,   kind: "count" }, // +1 dig per trip / level
     pierce:    { max: 5,  per: 0.03, cap: 0.15, kind: "pct" },   // dig clears ALL layers of a tile — 15% max
-    strike:    { max: 5,  per: 0.02, cap: 0.10, kind: "pct" },   // a dig strikes a lucky bonus fragment — 10% max
+    strike:    { max: 5,  per: 0.006, cap: 0.03, kind: "pct" },  // a dig strikes a lucky bonus fragment — 3% max (was 10%, far too rich)
     efficient: { max: 5,  per: 0.04, cap: 0.20, kind: "pct" },   // a tool doesn't spend its stamina charge — 20% max
     detonator: { max: 5,  per: 0.01, cap: 0.05, kind: "pct" },   // a dig spawns a free explosion — 5% max
 };
@@ -519,7 +520,7 @@ function boardView(board) {
 }
 
 // --- state ---------------------------------------------------------------------------------------------
-function decorate(row) {
+function decorate(row, chestArt = {}) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -554,7 +555,7 @@ function decorate(row) {
         voyagesCompleted: row?.voyages_completed || 0,
         fragments: totalFragments(row),
         fragmentsPerChest: boatPerks(level).forgeCost,
-        fragmentTiers: fragmentsView(row, level),
+        fragmentTiers: fragmentsView(row, level, chestArt),
         // Embark duration choices — trip time + which shards each favours — for the "set sail" picker.
         voyageOptions: VOYAGE_OPTIONS.map((o) => ({
             id: o.id, label: o.label,
@@ -651,7 +652,7 @@ async function resolveDueEncounter(buyerId) {
 export async function getSailingState(buyerId) {
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, petMap] = await Promise.all([
+    const [row, goldRow, others, petMap, chestArt] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
@@ -670,6 +671,7 @@ export async function getSailingState(buyerId) {
             [buyerId]
         ).catch(() => []),
         getPetSpriteData().catch(() => ({})),
+        getChestArt().catch(() => ({})),
     ]);
     const fleet = (others || []).map((o) => {
         const pet = o.featured_collectible ? petMap[o.featured_collectible] : null;
@@ -688,7 +690,7 @@ export async function getSailingState(buyerId) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row), gold: goldRow?.gold || 0, fleet, sky };
+    return { ...decorate(row, chestArt), gold: goldRow?.gold || 0, fleet, sky };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -876,7 +878,8 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
     await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});
     const tier = CHEST_TIERS[tierKey];
     const upgraded = tierKey !== fragmentTier;
-    return { ok: true, forged: { tier: tierKey, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁", upgraded, from: fragmentTier }, ...(await getSailingState(buyerId)) };
+    const chestArt = await getChestArt().catch(() => ({}));
+    return { ok: true, forged: { tier: tierKey, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁", image: chestArt[tierKey] || null, upgraded, from: fragmentTier }, ...(await getSailingState(buyerId)) };
 }
 
 // Buy DIG_REFILL more digs for the active excavation with gold. Atomic gold spend; only valid mid-dig.
@@ -924,7 +927,7 @@ function rollFragmentTier(qualityId, rarityLevel = 0, level = 1) {
     return tier;
 }
 // Per-tier shard holdings for the UI: every droppable tier (up to the cap) + any tier already held.
-function fragmentsView(row, level) {
+function fragmentsView(row, level, chestArt = {}) {
     const counts = (row && typeof row.fragments_json === "object" && row.fragments_json) || {};
     const perChest = boatPerks(level).forgeCost;
     const capIdx = CHEST_ORDER.indexOf(FRAGMENT_TIER_CAP);
@@ -941,6 +944,7 @@ function fragmentsView(row, level) {
                 emoji: c.emoji || "🎁",
                 color: c.color || "#b08a52",
                 art: fragmentArt(t),
+                chestImage: chestArt[t] || null, // the REAL per-tier AI chest sprite (falls back to ChestIcon in the UI)
                 count,
                 perChest,
                 canForge: count >= perChest,
@@ -965,7 +969,7 @@ async function finishDig(buyerId, board) {
     const total = board.frag.length;
     const uncovered = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
     const chestTier = (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
-    const maxFrags = 2 + (board.tier || 1);
+    const maxFrags = 2 + ((board.tier || 1) >= 3 ? 1 : 0); // a full chest = 2 fragments (3 at high tiers) — not a pile
     const fragCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total))) : 0;
     const foundTiers = Array.from({ length: fragCount }, () => chestTier);
     for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level)); // lucky Strike bonuses
