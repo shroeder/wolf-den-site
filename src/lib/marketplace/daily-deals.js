@@ -72,9 +72,14 @@ function dayContext() {
     return { dayKey, resetInSecs: secsUntilReset, resetAt: new Date(now.getTime() + secsUntilReset * 1000).toISOString() };
 }
 
+// Daily deals never put too-powerful gear on sale — cap the rarity of gear that can appear.
+const DEAL_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+const DEAL_RARITY_CAP = "epic"; // nothing above epic goes on sale
+
 // The full purchasable pool across categories (gear / consumables / shop pets), each with a base gold price.
 function dealPool() {
-    const gear = ITEMS.filter((i) => i.source === "xp_shop" && (i.xpCost || 0) > 0)
+    const gear = ITEMS.filter((i) => i.source === "xp_shop" && (i.xpCost || 0) > 0
+            && (DEAL_RARITY_RANK[i.rarity] ?? 9) <= (DEAL_RARITY_RANK[DEAL_RARITY_CAP] ?? 2))
         .map((i) => ({ kind: "gear", id: i.id, name: i.name, rarity: i.rarity, basePrice: i.xpCost }));
     const consumables = Object.entries(CONSUMABLES).filter(([, c]) => c.price != null)
         .map(([id, c]) => ({ kind: "consumable", id, name: c.name, emoji: c.emoji, basePrice: c.price }));

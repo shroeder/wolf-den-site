@@ -12,7 +12,7 @@ import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
-import { itemById } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
@@ -695,6 +695,18 @@ const PROC_BOSS_NAMES = [
 // pace (total damage ÷ days it stayed alive) — the only measure that reflects the pack's true, current DPS.
 // Falls back to the theoretical projection (fresh install / no prior fight), and never lets the next boss
 // come out weaker than the last one. Returns a rounded HP.
+// Auto-pick N reward items for a procedurally-generated boss, capped so it never drops too-rare gear.
+const REWARD_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+function pickRewardItems(n = 3, capRarity = "epic") {
+    const cap = REWARD_RARITY_RANK[capRarity] ?? 2;
+    // Real stat gear only, at/below the cap, and never the charged real-world-perk items (source 'admin').
+    const pool = ITEMS.filter((i) => i.stats && i.source !== "admin" && (REWARD_RARITY_RANK[i.rarity] ?? 9) <= cap);
+    const out = [];
+    const bag = pool.slice();
+    while (out.length < n && bag.length) out.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0].id);
+    return out;
+}
+
 async function sizeNextBossHp(prevBoss) {
     let observedDaily = null;
     if (prevBoss?.id) {
@@ -710,9 +722,13 @@ async function sizeNextBossHp(prevBoss) {
         const dmg = Number(o?.dmg) || 0;
         if (days >= 0.5 && dmg > 0) observedDaily = dmg / days; // need a meaningful window
     }
-    let hp;
-    if (observedDaily) hp = observedDaily * BOSS_TARGET_DAYS * BOSS_PACK_GROWTH;
-    else hp = await projectBossHp({}).then((r) => r.hp).catch(() => prevBoss?.max_hp || 500000);
+    // Size off the LARGER of the previous boss's observed kill pace and the current pack's projected power, so a
+    // pack that has geared up (or a stat/formula change like the passive-damage buff) can't leave the next boss
+    // undersized and dying in a few days.
+    const projected = await projectBossHp({}).then((r) => r.hp).catch(() => 0);
+    let hp = observedDaily ? observedDaily * BOSS_TARGET_DAYS * BOSS_PACK_GROWTH : projected;
+    if (projected) hp = Math.max(hp, projected);
+    if (!hp) hp = prevBoss?.max_hp || 500000;
     hp = Math.max(hp, (prevBoss?.max_hp || 0) * 1.05); // a new boss is never weaker than the last
     return Math.max(100000, Math.round(hp / 1000) * 1000);
 }
@@ -725,11 +741,12 @@ async function activateNextBoss(prevBoss) {
         const hp = await sizeNextBossHp(prevBoss); // scaled off the last boss's real kill pace → ~10-day fight
         const name = PROC_BOSS_NAMES[Math.floor(Math.random() * PROC_BOSS_NAMES.length)].trim();
         const div = Math.max(100, Math.round(hp / 7000));
+        const rewardIds = pickRewardItems(3, "epic"); // 3 gear drops, capped at epic (never legendary+)
         next = await db
             .queryOne(
-                `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, ticket_divisor, weakness)
-                 VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5) RETURNING id`,
-                [name, hp, "A new terror rises to challenge the pack.", div, pickWeakness()]
+                `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, ticket_divisor, weakness, reward_item_ids, chase_item_id)
+                 VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5, $6::jsonb, $7) RETURNING id`,
+                [name, hp, "A new terror rises to challenge the pack.", div, pickWeakness(), JSON.stringify(rewardIds), rewardIds[0] || null]
             )
             .catch(() => null);
     }
