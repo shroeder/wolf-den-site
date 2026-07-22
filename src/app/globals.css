@@ -9827,6 +9827,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .collapse-head { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; color: inherit; font: inherit; font-size: 1.15rem; font-weight: 800; }
 .collapse-count { font-size: 0.72rem; font-weight: 700; color: #8fb8ff; background: rgba(120,180,255,0.14); border-radius: 999px; padding: 2px 9px; margin-left: 8px; }
 .collapse-chevron { color: #ffd75e; font-size: 1rem; flex: none; }
+/* Gold-shop slot categories (collapsible). Each is a header row + its grid, separated by a hairline. */
+.shop-cat { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; margin-top: 12px; }
+.shop-cat .collapse-head { font-size: 0.98rem; }
+.shop-cat .equip-bag-grid { margin-top: 10px; }
 .quests-list { display: flex; flex-direction: column; gap: 10px; }
 .quest { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.08); }
 .quest.is-ready { border-color: rgba(255, 215, 94, 0.55); box-shadow: 0 0 14px -6px #ffd75e; }

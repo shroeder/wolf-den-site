@@ -1,5 +1,3 @@
-import ConsumablesClient from "@/components/ConsumablesClient";
-import DailyDeals from "@/components/DailyDeals";
 import EquipmentClient from "@/components/EquipmentClient";
 import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -36,13 +34,9 @@ export default async function InventoryPage() {
             <section className="card">
                 <h1 style={{ marginTop: 0 }}>⚔️ Your Gear</h1>
                 <p className="muted" style={{ marginTop: 0 }}>
-                    Equip items to buff your boss fight. Some gear also carries in-store perks.
+                    Equip items to buff your boss fight. Some gear also carries in-store perks. Buy more over on <a href="/marketplace/store" style={{ color: "#8fd8ff", fontWeight: 700 }}>Store</a>.
                 </p>
             </section>
-
-            <DailyDeals />
-
-            <ConsumablesClient />
 
             <EquipmentClient
                 avatarUrl={profile?.avatarUrl}

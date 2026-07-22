@@ -117,7 +117,7 @@ export const ITEM_SIGNATURES = {
     golden_crown: { label: "Midas Touch", goldOnHit: true }, // mythic — gold
     ancient_halo: { label: "Sanctified", xpOnHit: true }, // mythic
     patrons_crown: { label: "Patron's Blessing", firstHitCrit: true }, // mythic
-    bigspender_crown: { label: "Big Spender", creditBonus: 0.25 }, // mythic — +25% coins on store-credit buys
+    bigspender_crown: { label: "Big Spender", creditBonus: 0.09 }, // mythic — +9% coins on store-credit buys
     whale_crown: { label: "Leviathan", giantSlayer: true }, // mythic
     gs_god_helm: { label: "Divine Sight", firstHitCrit: true }, // mythic
     gs_sovereign_crown: { label: "Sovereign", warbanner: true }, // mythic — rally the realm
@@ -199,8 +199,8 @@ export const ITEM_SIGNATURES = {
     warlord_ring: { label: "War Banner", packTactics: true }, // legendary
     highroller_ring: { label: "High Roller", dailySpin: true }, // legendary — a guaranteed extra wheel spin each day
     premium_signet: { label: "Prestige", loginPotion: true, cheerXp: true }, // legendary — daily gift consumable + bonus XP on cheers
-    credit25_ring: { label: "Investor", creditBonus: 0.10 }, // legendary — +10% coins on store-credit buys
-    credit50_ring: { label: "Benefactor", creditBonus: 0.20 }, // legendary — +20% coins on store-credit buys
+    credit25_ring: { label: "Investor", creditBonus: 0.03 }, // legendary — +3% coins on store-credit buys
+    credit50_ring: { label: "Benefactor", creditBonus: 0.06 }, // legendary — +6% coins on store-credit buys
     gs_royal_signet: { label: "Royal Seal", goldOnHit: true }, // legendary
     gs2_kings_band: { label: "Crown Jewel", ticketOnCrit: true }, // legendary
 

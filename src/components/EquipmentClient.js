@@ -25,6 +25,20 @@ const SLOT_ICON = {
     main_hand: "⚔️", off_hand: "🛡️", helmet: "🪖", chest: "🥋", belt: "🎗️", boots: "🥾", amulet: "📿", ring1: "💍", ring2: "💍",
 };
 
+// Gold-shop categories, in display order — the shop groups its gear by slot into collapsible sections. Any
+// slot not listed here is appended under "Other" so nothing is ever dropped.
+const SHOP_SLOT_CATS = [
+    { slot: "main_hand", label: "Weapons", icon: "⚔️" },
+    { slot: "off_hand", label: "Off-Hand", icon: "🛡️" },
+    { slot: "helmet", label: "Helmets", icon: "🪖" },
+    { slot: "chest", label: "Chest Armor", icon: "🥋" },
+    { slot: "belt", label: "Belts", icon: "🎗️" },
+    { slot: "boots", label: "Boots", icon: "🥾" },
+    { slot: "back", label: "Backs", icon: "🧣" },
+    { slot: "amulet", label: "Amulets", icon: "📿" },
+    { slot: "ring", label: "Rings", icon: "💍" },
+];
+
 function ItemGlyph({ id, className = "" }) {
     return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} />;
 }
@@ -42,7 +56,7 @@ const chargeErr = (code) => ({
     unauthorized: "Please sign in again.",
 }[code] || "Couldn't start that redemption. Try again.");
 
-export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null }) {
+export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null, view = "gear" }) {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [slot, setSlot] = useState(null); // open picker for this slot
@@ -54,6 +68,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const burstKey = useRef(0);
     const [chargeClaim, setChargeClaim] = useState(null); // { token, qr, rewardLabel, itemName } — QR to show staff
     const [buyCele, setBuyCele] = useState(null); // purchase celebration (the item you just bought)
+    const [collapsedCats, setCollapsedCats] = useState(() => new Set()); // store: which shop slot-categories are collapsed
+    const toggleCat = (slot) => setCollapsedCats((prev) => { const n = new Set(prev); if (n.has(slot)) n.delete(slot); else n.add(slot); return n; });
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/inventory", { cache: "no-store" }).catch(() => null);
@@ -181,9 +197,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const stats = data.stats || {};
     const statEntries = Object.entries(stats).filter(([, v]) => v);
     const charged = (data.items || []).filter((i) => i.charge);
+    // Group the gold shop by slot into ordered, collapsible categories (any unlisted slot → "Other").
+    const shopBySlot = (data.shop || []).reduce((acc, i) => { (acc[i.slot] = acc[i.slot] || []).push(i); return acc; }, {});
+    const shopCategories = [
+        ...SHOP_SLOT_CATS.filter((c) => shopBySlot[c.slot]?.length).map((c) => ({ ...c, items: shopBySlot[c.slot] })),
+        ...Object.keys(shopBySlot).filter((s) => !SHOP_SLOT_CATS.some((c) => c.slot === s))
+            .map((s) => ({ slot: s, label: s.replace(/_/g, " "), icon: "🎒", items: shopBySlot[s] })),
+    ];
 
     return (
         <div className="equip">
+            {view !== "store" ? (<>
             <ChestOpener onLoot={load} />
             <div className="equip-doll" style={backdropUrl ? { backgroundImage: `linear-gradient(rgba(8,6,4,0.55), rgba(8,6,4,0.7)), url(${backdropUrl})` } : undefined}>
                 {EQUIP_SLOTS.map((s) => {
@@ -316,27 +340,38 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     </div>
                 ) : <p className="muted" style={{ margin: 0 }}>No items yet — level up, fight the boss, and check back.</p>}
             </div>
+            </>) : null}
 
-            {/* Gold shop */}
-            {(data.shop || []).length ? (
+            {/* Gold shop — its own STORE view, gear grouped by slot into collapsible categories. */}
+            {view !== "gear" && (data.shop || []).length ? (
                 <div className="card">
-                    <h3>🪙 Shop</h3>
-                    <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear.</p>
+                    <h3>🪙 Gold Shop</h3>
+                    <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear. Browse by slot.</p>
                     {data.coupon ? <div className="shop-coupon">🏷️ {data.coupon.pct}% off coupon active — auto-applies to your next gear pick ≤ 🪙 {data.coupon.max.toLocaleString()} (one use)</div> : null}
-                    <div className="equip-bag-grid">
-                        {(data.shop || []).map((i) => {
-                            return (
-                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${i.statsText}`}>
-                                    <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
-                                    <span className="equip-card-name">{i.name}</span>
-                                    <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
-                                    <span className="equip-card-stats">{i.statsText}</span>
-                                    <ElBadge id={i.id} />
-                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                    {shopCategories.map((cat) => {
+                        const open = !collapsedCats.has(cat.slot);
+                        return (
+                            <div key={cat.slot} className="shop-cat">
+                                <button type="button" className="collapse-head" onClick={() => toggleCat(cat.slot)} aria-expanded={open}>
+                                    <span style={{ textTransform: "capitalize" }}>{cat.icon} {cat.label}<span className="collapse-count">{cat.items.length}</span></span>
+                                    <span className="collapse-chevron">{open ? "▾" : "▸"}</span>
                                 </button>
-                            );
-                        })}
-                    </div>
+                                {open ? (
+                                    <div className="equip-bag-grid">
+                                        {cat.items.map((i) => (
+                                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${i.statsText}`}>
+                                                <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
+                                                <span className="equip-card-name">{i.name}</span>
+                                                <span className="equip-card-stats">{i.statsText}</span>
+                                                <ElBadge id={i.id} />
+                                                <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })}
                 </div>
             ) : null}
 

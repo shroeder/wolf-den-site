@@ -15,6 +15,7 @@ const LINKS = [
     { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Spin" },
     { href: "/marketplace/pets", emoji: "🐾", label: "Pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", label: "Gear" },
+    { href: "/marketplace/store", emoji: "🛒", label: "Store" },
     { href: "/marketplace/sets", emoji: "🧩", label: "Sets" },
     { href: "/marketplace/quests", emoji: "📜", label: "Quests" },
     { href: "/marketplace/track", emoji: "🏆", label: "Rewards" },
