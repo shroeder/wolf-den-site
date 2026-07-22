@@ -5,7 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp, levelUpEquippedPet } from "@/lib/marketplace/pet-level.js";
-import { previewShopCoupon, consumeShopCoupon } from "@/lib/marketplace/shop-coupon.js";
+import { previewShopCoupon, consumeShopCoupon, getShopCoupon } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
@@ -86,11 +86,12 @@ export async function activeBoosts(buyerId) {
 
 export async function listConsumables(buyerId) {
     if (!buyerId) return { gold: 0, shop: [], stash: [], chargedItems: [], active: [] };
-    const [goldRow, ownRows, chargedRows, active] = await Promise.all([
+    const [goldRow, ownRows, chargedRows, active, coupon] = await Promise.all([
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT item_id, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         activeBoosts(buyerId),
+        getShopCoupon(buyerId).catch(() => null),
     ]);
     const gold = goldRow?.gold || 0;
     const shop = SHOP_ORDER.filter((id) => CONSUMABLES[id]?.price != null).map((id) => {
@@ -113,7 +114,7 @@ export async function listConsumables(buyerId) {
         const onCooldown = left > 0 && readyAt > now;
         return { id: def.id, name: def.name, icon: def.icon, rarity: def.rarity, chargesLeft: left, maxCharges: def.charges || 0, full: left >= (def.charges || 0), onCooldown, cooldownUntil: onCooldown ? new Date(readyAt).toISOString() : null };
     }).filter(Boolean);
-    return { gold, shop, stash, chargedItems, active };
+    return { gold, shop, stash, chargedItems, active, coupon };
 }
 
 // Grant a consumable (chest drop / owner). Best-effort.

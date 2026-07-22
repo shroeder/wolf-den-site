@@ -143,7 +143,10 @@ export default function ConsumablesClient() {
                 </div>
             ) : null}
 
-            <h3 style={{ margin: "6px 0" }}>💰 Shop</h3>
+            <h3 style={{ margin: "6px 0" }}>🪙 Shop</h3>
+            {state.coupon ? (
+                <div className="shop-coupon">🏷️ {state.coupon.pct}% off coupon active — auto-applies to your next buy ≤ 🪙 {state.coupon.max.toLocaleString()} (one use)</div>
+            ) : null}
             <div className="badge-board">
                 {(state.shop || []).map((i) => (
                     <div key={i.id} className="badge-tile">
@@ -152,7 +155,7 @@ export default function ConsumablesClient() {
                         <span className="badge-tile-desc muted">{KIND_LABEL[i.kind] || ""} · {i.desc}</span>
                         {i.canAfford ? (
                             <button type="button" className="btn btn-small" disabled={busy === `buy:${i.id}`} onClick={() => post({ id: i.id, action: "buy" }, `buy:${i.id}`)} style={{ marginTop: 6 }}>
-                                {busy === `buy:${i.id}` ? "Buying…" : `Buy · 💰 ${i.price.toLocaleString()}`}
+                                {busy === `buy:${i.id}` ? "Buying…" : `Buy · 🪙 ${i.price.toLocaleString()}`}
                             </button>
                         ) : (
                             // Unaffordable → a real CTA to buy coins, not a muted disabled-looking label.

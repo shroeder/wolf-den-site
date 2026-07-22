@@ -7371,6 +7371,47 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     color: #ffd75e !important;
 }
 
+/* Compact themed action button (Use / Buy on shop + stash tiles). Was previously used with no matching CSS,
+   so it fell back to the raw browser button — hence the ugly white boxes. Mirrors .btn-gold, sized down. */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 215, 94, 0.55);
+    background: linear-gradient(135deg, #e6c76b, #d4af37 52%, #b8912e);
+    color: #171008;
+    font: inherit;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 3px 12px rgba(212, 175, 55, 0.26);
+    transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+.btn:hover,
+.btn:focus-visible {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 6px 18px rgba(212, 175, 55, 0.4);
+}
+.btn:disabled,
+.btn[disabled] {
+    opacity: 0.55;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+    filter: none;
+}
+.btn-small {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+    border-radius: 8px;
+}
+
 .rewards-callout.rewards-earned {
     background: linear-gradient(105deg, rgba(76, 217, 123, 0.16), rgba(255, 215, 94, 0.1));
     border-color: rgba(120, 220, 150, 0.5);
