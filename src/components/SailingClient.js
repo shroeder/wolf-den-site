@@ -405,13 +405,14 @@ export default function SailingClient({ initial, hero, pet }) {
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
                     <>
                         <div className="sail-sea">
-                            {/* Random horizon backdrop; scrolls right→left while you're underway. Two copies
-                                translate as one so the loop is seamless. */}
+                            {/* Random horizon backdrop; scrolls right→left while you're underway. FOUR copies with
+                                every other one mirrored (CSS) so the strip tiles SEAMLESSLY — the art isn't
+                                edge-matched, but a mirrored copy's edge always equals its neighbor's, killing the seam. */}
                             <div className={`sail-sky-scroll${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={sky || state.oceanBg} alt="" />
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={sky || state.oceanBg} alt="" />
+                                {[0, 1, 2, 3].map((n) => (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img key={n} src={sky || state.oceanBg} alt="" />
+                                ))}
                             </div>
                             {/* Other sailors drifting across the horizon behind your boat. */}
                             <div className="sail-ambient" aria-hidden="true">
