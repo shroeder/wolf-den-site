@@ -186,16 +186,22 @@ const DIG_TRACKS = {
 };
 const digTrackValue = (t, lvl) => Math.min(DIG_TRACKS[t].cap, Math.max(0, lvl) * DIG_TRACKS[t].per);
 
-// Area-clear TOOLS — unlocked every 10 excavation levels (excavation level = voyages completed). Using one
-// spends `stamina` from your dig budget (unless Efficient procs) and clears a cols×rows patch, `layers` deep.
+// Area-clear TOOLS — no longer selected/charged. They fire as RANDOM PROCS on a dig, each clearing a cols×rows
+// patch `layers` deep. Unlocked by CHEST-POINTS (chests you've forged, weighted by tier: 1/2/3/4). You can
+// INVEST gold to raise a tool's proc chance up to TOOL_MAX_LEVEL (each level costs exponentially more).
 const DIG_TOOLS = [
-    { id: "wide",  name: "Wide Dig",   emoji: "🪓", unlock: 10, stamina: 2, cols: 2, rows: 2, layers: 1 },
-    { id: "deep",  name: "Deep Blast", emoji: "💥", unlock: 20, stamina: 3, cols: 2, rows: 2, layers: 2 },
-    { id: "quake", name: "Quake",      emoji: "🌋", unlock: 30, stamina: 4, cols: 3, rows: 3, layers: 1 },
+    { id: "wide",      name: "Wide Dig",   emoji: "🪓", unlockPoints: 12,  cols: 2, rows: 2, layers: 1 },
+    { id: "deep",      name: "Deep Blast", emoji: "💥", unlockPoints: 30,  cols: 2, rows: 2, layers: 2 },
+    { id: "quake",     name: "Quake",      emoji: "🌋", unlockPoints: 100, cols: 3, rows: 3, layers: 1 },
+    { id: "cataclysm", name: "Cataclysm",  emoji: "☄️", unlockPoints: 400, cols: 3, rows: 3, layers: 2 },
 ];
-const EXCAVATION_PER_TOOL = 10;
-const excavationLevel = (voyages = 0) => Math.max(0, voyages);
-const unlockedTools = (voyages = 0) => DIG_TOOLS.filter((t) => excavationLevel(voyages) >= t.unlock);
+const TOOL_PROC_BASE = 0.015;      // 1.5% per unlocked tool at level 0 …
+const TOOL_PROC_PER_LEVEL = 0.007; // … +0.7%/level → 5% when maxed
+const TOOL_MAX_LEVEL = 5;
+const toolProcChance = (lvl = 0) => TOOL_PROC_BASE + Math.min(TOOL_MAX_LEVEL, Math.max(0, lvl)) * TOOL_PROC_PER_LEVEL;
+const toolUpgradeCost = (lvl = 0) => Math.round(250 * Math.pow(2.2, Math.max(0, lvl))); // 250 → 550 → 1210 → 2662 → 5856
+const CHEST_POINT_WEIGHT = (tierKey) => Math.min(4, Math.max(1, CHEST_ORDER.indexOf(tierKey) + 1)); // tier 1–4 → 1–4 pts
+const unlockedTools = (chestPoints = 0) => DIG_TOOLS.filter((t) => chestPoints >= t.unlockPoints);
 const DIG_TRACK_COL = { stamina: "dig_stamina_level", pierce: "dig_pierce_level", strike: "dig_strike_level", efficient: "dig_efficient_level", detonator: "dig_detonator_level" };
 function digTrackView(row, t) {
     const lvl = row?.[DIG_TRACK_COL[t]] || 0;
@@ -212,10 +218,21 @@ function digUpgradesView(row) {
         detonator: digTrackView(row, "detonator"),
     };
 }
-function excavationView(voyages) {
-    const lvl = excavationLevel(voyages);
-    const tools = DIG_TOOLS.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, unlock: t.unlock, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers, unlocked: lvl >= t.unlock }));
-    return { level: lvl, perTool: EXCAVATION_PER_TOOL, tools, nextTool: tools.find((t) => !t.unlocked) || null };
+// Tool INVEST view — each tool's unlock state (by chest-points), current proc %, and next invest level/cost.
+function toolsView(row) {
+    const chestPoints = row?.chest_points || 0;
+    const levels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
+    const tools = DIG_TOOLS.map((t) => {
+        const lvl = Number(levels[t.id]) || 0;
+        const unlocked = chestPoints >= t.unlockPoints;
+        return {
+            id: t.id, name: t.name, emoji: t.emoji, area: `${t.cols}×${t.rows}`, layers: t.layers,
+            unlocked, unlockPoints: t.unlockPoints,
+            level: lvl, max: TOOL_MAX_LEVEL, maxed: lvl >= TOOL_MAX_LEVEL,
+            procNow: toolProcChance(lvl), procNext: toolProcChance(lvl + 1), cost: toolUpgradeCost(lvl),
+        };
+    });
+    return { chestPoints, tools, nextUnlock: tools.find((t) => !t.unlocked) || null };
 }
 
 // The 8 boat FORMS. Reaching each level unlocks a new hull art (BOAT_ART[tier]) + a permanent perk applied by
@@ -386,7 +403,9 @@ function newBoard(row) {
         efficient: digTrackValue("efficient", row?.dig_efficient_level || 0),
         detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
     };
-    const tools = unlockedTools(row?.voyages_completed || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers }));
+    // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
+    const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
+    const tools = unlockedTools(row?.chest_points || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
     return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
@@ -420,8 +439,25 @@ function applyDig(board, r, c) {
             if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols && board.depth[nr][nc] > 0) { board.depth[nr][nc] -= 1; board.dug[nr][nc] = true; }
         }
     }
+    // TOOLS now fire as random PROCS on the dig — each unlocked tool rolls its chance and, if it hits, clears
+    // its patch for free (no selecting, no charge). Record the last one that fired for a client flourish.
+    board.toolProc = null;
+    for (const tool of board.tools || []) {
+        if (tool.proc && Math.random() < tool.proc + (up.efficient || 0)) { clearPatch(board, tool, r, c); board.toolProc = tool.id; } // Efficient adds to every tool's proc chance
+    }
     resolveBoard(board);
     return board;
+}
+
+// Clear a tool's cols×rows patch anchored at (r,c), `layers` deep. Shared by the dig procs.
+function clearPatch(board, tool, r, c) {
+    for (let dr = 0; dr < tool.rows; dr++) for (let dc = 0; dc < tool.cols; dc++) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols) {
+            board.dug[nr][nc] = true;
+            board.depth[nr][nc] = Math.max(0, board.depth[nr][nc] - tool.layers);
+        }
+    }
 }
 
 // SENSE (the detector): spend one probe to reveal a tile's clue = how many treasures sit in its 8 neighbours
@@ -435,28 +471,6 @@ function applySense(board, r, c) {
     board.senses -= 1;
     board.sensed[r][c] = senseHeat(board, r, c);         // 3 hot / 2 warm / 1 cool / 0 cold
     return board;
-}
-
-// Use an unlocked area-clear TOOL at (r,c): spend its stamina charge (unless Efficient procs) and clear a
-// cols×rows patch `layers` deep. Returns { ok, board } — ok:false when the tool can't be used.
-function applyTool(board, toolId, r, c) {
-    if (board.status !== "active") return { ok: false };
-    const tool = (board.tools || []).find((t) => t.id === toolId);
-    if (!tool) return { ok: false };
-    const up = board.up || {};
-    const free = up.efficient && Math.random() < up.efficient;
-    const cost = free ? 0 : tool.stamina;
-    if (board.stamina < cost) return { ok: false };
-    board.stamina -= cost;
-    for (let dr = 0; dr < tool.rows; dr++) for (let dc = 0; dc < tool.cols; dc++) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols) {
-            board.dug[nr][nc] = true;
-            board.depth[nr][nc] = Math.max(0, board.depth[nr][nc] - tool.layers);
-        }
-    }
-    resolveBoard(board);
-    return { ok: true, free };
 }
 
 // The client-safe view of a board. Reveals each tile's remaining rock depth (so the layers can be drawn) and
@@ -486,7 +500,7 @@ function boardView(board) {
         tiles.push(row);
     }
     const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
-    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, tools: board.tools || [] };
+    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -553,7 +567,7 @@ function decorate(row) {
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
-        excavation: excavationView(row?.voyages_completed || 0),
+        digTools: toolsView(row), // chest-point-unlocked proc tools + invest state
         status, progress, departedAt, arrivesAt,
         // Waves — greet a passing sailor a few times a day (only meaningful mid-voyage).
         waves: {
@@ -843,6 +857,8 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
         if (i >= 0 && i < CHEST_ORDER.length - 1) tierKey = CHEST_ORDER[i + 1];
     }
     await addChests(buyerId, { [tierKey]: 1 }).catch(() => {});
+    // Chest-points (tier-weighted 1–4) drive the dig-tool unlocks + their invest tiers.
+    await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});
     const tier = CHEST_TIERS[tierKey];
     const upgraded = tierKey !== fragmentTier;
     return { ok: true, forged: { tier: tierKey, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁", upgraded, from: fragmentTier }, ...(await getSailingState(buyerId)) };
@@ -988,14 +1004,22 @@ export async function senseAt(buyerId, r, c) {
     return persistDig(buyerId, board);
 }
 
-// Use an unlocked area-clear tool at (r,c).
-export async function activateTool(buyerId, toolId, r, c) {
+// Invest gold to raise an unlocked tool's proc chance by one level (up to TOOL_MAX_LEVEL).
+export async function upgradeTool(buyerId, toolId) {
     const row = await readRow(buyerId);
-    const board = row?.dig_state;
-    if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
-    const res = applyTool(board, String(toolId), Number(r), Number(c));
-    if (!res.ok) return { ok: false, error: "cant_use_tool", ...(await getSailingState(buyerId)) };
-    return (board.status === "won" || board.status === "lost") ? finishDig(buyerId, board) : persistDig(buyerId, board);
+    const tool = DIG_TOOLS.find((t) => t.id === String(toolId));
+    if (!tool) return { ok: false, error: "bad_tool", ...(await getSailingState(buyerId)) };
+    if ((row?.chest_points || 0) < tool.unlockPoints) return { ok: false, error: "locked", ...(await getSailingState(buyerId)) };
+    const levels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
+    const lvl = Number(levels[tool.id]) || 0;
+    if (lvl >= TOOL_MAX_LEVEL) return { ok: false, error: "maxed", ...(await getSailingState(buyerId)) };
+    const cost = toolUpgradeCost(lvl);
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, updated_at = NOW() WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    const next = { ...levels, [tool.id]: lvl + 1 };
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    await db.query(`UPDATE mkt_sailing SET dig_tool_levels = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
 // The four boat upgrade tracks → their DB columns + level caps. Fortune lives in the legacy luck_level column;
