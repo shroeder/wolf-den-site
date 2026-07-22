@@ -29,10 +29,10 @@ export const VOYAGE_OPTIONS = [
 // sail again. Speed shortens the voyage; Luck adds dig stamina. Owner-gated while in development.
 
 // Base voyage = 4 hours (the SHORT option). Standard = 12h, Long = 24h (see VOYAGE_OPTIONS mults).
-export const BASE_VOYAGE_MS = 4 * 60 * 60 * 1000;
+export const BASE_VOYAGE_MS = 60 * 1000; // ⚠️ TEST OVERRIDE (was 4 * 60 * 60 * 1000 = 4h) — short trips to test the sailing loop
 const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000;  // Speed shaves a FLAT 2 minutes off each voyage, per level
 const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
-const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
+const MIN_VOYAGE_MS = 10 * 1000;               // ⚠️ TEST OVERRIDE (was 30 * 60 * 1000 = 30 min) — short trips for testing
 // Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
 // → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (9) distinct arts, and each
 // form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-
@@ -57,9 +57,9 @@ const WAVE_SHAVE_MS = 2 * 60 * 1000; // 2 minutes off the remaining voyage
 // ── Marine encounters ── FORTUNE now drives the chance a voyage rolls an encounter at its halfway mark
 // (repurposed from "+buried fragments"). No push / no travel pause — it resolves lazily on the member's next
 // check-in and shows a one-off recap modal.
-const ENCOUNTER_BASE = 0.20;          // base chance per voyage
+const ENCOUNTER_BASE = 1.0;           // ⚠️ TEST OVERRIDE (was 0.20) — always roll a marine encounter
 const ENCOUNTER_PER_FORTUNE = 0.015;  // +1.5% per Fortune level → +30% at max (20)
-const ENCOUNTER_CHANCE_CAP = 0.65;
+const ENCOUNTER_CHANCE_CAP = 1.0;     // ⚠️ TEST OVERRIDE (was 0.65) — let the forced 100% through the cap
 function encounterChance(fortuneLevel = 0) {
     return Math.min(ENCOUNTER_CHANCE_CAP, ENCOUNTER_BASE + Math.max(0, fortuneLevel) * ENCOUNTER_PER_FORTUNE);
 }
@@ -96,10 +96,10 @@ function pickWeighted(list) {
 
 // ── Gold Merchant island event ── a rare gold-clad showman who greets you when you LAND (before the dig):
 // a coin-catch minigame for gold, a discounted exclusive shop, and a rare shot at his exclusive elephant pet.
-const MERCHANT_BASE_CHANCE = 0.05;   // 5% per landing (+ the elephant pet's find bonus)
+const MERCHANT_BASE_CHANCE = 1.0;    // ⚠️ TEST OVERRIDE (was 0.05) — always land the Gold Merchant
 const MERCHANT_GOLD_FLOOR = 20;      // minimum coin-minigame payout (just for playing)
 const MERCHANT_GOLD_CEIL = 300;      // payout cap
-const MERCHANT_PET_CHANCE = 0.15;    // chance a given merchant is offering the elephant pet (free)
+const MERCHANT_PET_CHANCE = 1.0;     // ⚠️ TEST OVERRIDE (was 0.15) — merchant always offers the elephant pet
 const MERCHANT_PET_ID = "elephant_spear";
 const MERCHANT_PET_RARITY = "legendary";
 // Elephant find bonus by EQUIPPED pet level (1..5): +1% → +5%.
