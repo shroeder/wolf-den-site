@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import SailingClient from "@/components/SailingClient";
@@ -27,6 +28,11 @@ export default async function SailingPage() {
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
     ]);
+
+    // Render the sky the CLIENT last chose (stored in a cookie) so a refresh shows the right backdrop from the
+    // first paint — no flash from the server's random pick to the client's real-world/time-of-day one.
+    const skyCookie = (await cookies()).get("wolfden-sail-sky")?.value;
+    if (skyCookie && /^\/images\/sailing\/sky-[a-z]+\.png$/.test(skyCookie)) state.sky = skyCookie;
 
     const hero = {
         spriteUrl: me?.avatar_sprite_url || null,

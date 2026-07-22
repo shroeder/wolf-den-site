@@ -230,6 +230,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     const d = r.ok ? await r.json().catch(() => null) : null;
                     if (d?.sky) {
                         try { localStorage.setItem("wolfden-sail-sky", JSON.stringify({ sky: d.sky, at: Date.now() })); } catch { /* ignore */ }
+                        try { document.cookie = `wolfden-sail-sky=${d.sky}; path=/; max-age=${45 * 60}; samesite=lax`; } catch { /* ignore */ } // so next refresh's SSR uses the real-weather sky
                         if (applyLive) setSky(d.sky); // only on an explicit tap — a change they asked for
                     }
                 } catch { /* keep the current sky */ }
@@ -251,6 +252,7 @@ export default function SailingClient({ initial, hero, pet }) {
             if (raw) { const c = JSON.parse(raw); if (c?.sky && Date.now() - Number(c.at) < 45 * 60 * 1000) chosen = c.sky; }
         } catch { /* ignore */ }
         setSky(chosen);
+        try { document.cookie = `wolfden-sail-sky=${chosen}; path=/; max-age=${45 * 60}; samesite=lax`; } catch { /* ignore */ }
         let pref = null;
         try { pref = localStorage.getItem("wolfden-sail-geo"); } catch { /* ignore */ }
         if (pref === "1") requestAmbiance(false);   // refresh cache for NEXT load — no live swap
