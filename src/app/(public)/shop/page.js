@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import RewardsCallout from "@/components/RewardsCallout";
 import ShopBrowser from "@/components/ShopBrowser";
+import StoreCreditCallout from "@/components/StoreCreditCallout";
 import { listShopInventory } from "@/lib/consignment/square";
 import { listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
@@ -33,7 +34,7 @@ export default async function ShopPage() {
 
     return (
         <div className="stack reveal">
-            {paymentsEnabled ? <RewardsCallout /> : null}
+            {paymentsEnabled ? <><RewardsCallout /><StoreCreditCallout /></> : null}
             {hasContent ? (
                 <section className="card">
                     <ShopBrowser

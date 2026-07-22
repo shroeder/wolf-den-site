@@ -7318,6 +7318,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-size: 0.92rem;
     margin-top: 2px;
 }
+/* Store-credit hook for signed-in members (shop). Coin-gold, a touch shinier than the rewards join hook. */
+.storecredit-callout { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; overflow: hidden;
+    background: radial-gradient(120% 120% at 12% 0%, rgba(255,215,94,0.2), transparent 55%), linear-gradient(105deg, rgba(240,160,40,0.14), rgba(255,215,94,0.08));
+    border: 1px solid rgba(255,215,94,0.45); }
+.storecredit-callout-coin { font-size: 2.1rem; line-height: 1; flex: none; filter: drop-shadow(0 2px 5px rgba(240,160,40,0.6)); animation: coinBob 2.6s ease-in-out infinite; }
+.storecredit-callout-text { min-width: 0; flex: 1 1 240px; }
+.storecredit-callout-title { font-weight: 800; font-size: 1.08rem; }
+.storecredit-callout-sub { color: #d9cdb4; font-size: 0.9rem; margin-top: 2px; }
+.storecredit-callout-sub b { color: #ffd75e; }
+.storecredit-callout-cta { flex: none; }
+@media (prefers-reduced-motion: reduce) { .storecredit-callout-coin { animation: none; } }
 /* Premium gold CTA — used across the rewards surfaces (home callout, rewards page, post-checkout). */
 .btn-gold {
     flex: 0 0 auto;
