@@ -687,11 +687,15 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
                     lastSoldAt: null,
                 };
                 const quantitySold = Number(lineItem.quantity || 0);
-                // Use base_price_money × quantity (listed item price) so consignor
-                // revenue reflects what the item was priced at, not the post-tax
-                // amount Square reports in gross_sales_money when tax is inclusive.
-                const unitPrice = normalizeMoney(lineItem.base_price_money?.amount ?? lineItem.gross_sales_money?.amount ?? lineItem.total_money?.amount);
-                const grossRevenue = unitPrice * quantitySold;
+                // Consignor revenue must reflect what the item ACTUALLY sold for, net of any
+                // discount/comp applied at the register — NOT the sticker price. Square keeps the
+                // discount separate from the line's gross, so: net = gross_sales_money − total_discount_money.
+                // (The Wolf Den taxes ADDITIVELY, so gross_sales_money is already pre-tax — no tax to back out.)
+                // A 100%-off comp → $0 owed; a 20%-off sale → the consignor's cut of the discounted price.
+                // Fall back to base_price × qty (minus discount) only if Square omits gross_sales_money.
+                const grossCents = Number(lineItem.gross_sales_money?.amount ?? (Number(lineItem.base_price_money?.amount || 0) * quantitySold));
+                const discountCents = Number(lineItem.total_discount_money?.amount || 0);
+                const grossRevenue = normalizeMoney(Math.max(0, grossCents - discountCents));
                 const soldAt = order.closed_at || order.updated_at || null;
 
                 current.quantitySold += quantitySold;

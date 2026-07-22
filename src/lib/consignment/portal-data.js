@@ -48,6 +48,9 @@ async function buildSummary(consignor, inventory, salesForSummary, options = {})
     const estimatedPayoutGross = totalRevenue * payoutRate;
     const totalPaid = await getTotalPaidForConsignor(consignor.id);
     const estimatedPayout = Math.max(0, estimatedPayoutGross - totalPaid);
+    // Signed balance: positive = still owed to the consignor, NEGATIVE = we've overpaid and the
+    // consignor owes the store back (estimatedPayout floors at 0 and would hide an overpayment).
+    const netBalance = estimatedPayoutGross - totalPaid;
 
     return {
         totalGrossRevenue,
@@ -57,6 +60,8 @@ async function buildSummary(consignor, inventory, salesForSummary, options = {})
         estimatedPayoutGross,
         totalPaid,
         estimatedPayout,
+        netBalance,
+        overpaid: netBalance < 0 ? -netBalance : 0,
         outstandingBalance: estimatedPayout,
         catalogItems: inventory.length,
         unitsInStock: totalUnitsInStock,
