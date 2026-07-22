@@ -10840,6 +10840,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upgrade-sparks i:nth-child(5) { --sx: 4px; --sy: -26px; }
 @keyframes upgSpark { 0%, 38% { opacity: 0; transform: translate(0,0) scale(0.4); } 42% { opacity: 1; transform: translate(0,0) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.3); } }
 @media (prefers-reduced-motion: reduce) { .sail-upgrade-boat, .sail-upgrade-hammer, .sail-upgrade-sparks i { animation: none; } }
+/* Owner-only "test final blow" box on the boss page (dashed to read as a dev tool). */
+.boss-owner-test { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 6px 0 10px; padding: 10px 12px;
+    border: 1px dashed rgba(255,215,94,0.5); border-radius: 12px; background: rgba(255,215,94,0.06); text-align: center; font-size: 0.85rem; color: #e6d3b0; }
 /* Chest FORGE reveal — the real per-tier chest (ChestIcon) shudders while a hammer bangs + sparks fly. */
 .sail-forge-scene { position: relative; display: inline-grid; place-items: center; padding: 12px 0 6px; }
 .sail-forge-chest { animation: upgShake 0.5s ease-in-out 4; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5)) drop-shadow(0 0 16px rgba(255,215,94,0.6)); }

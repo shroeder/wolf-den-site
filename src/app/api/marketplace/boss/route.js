@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getBossState } from "@/lib/marketplace/boss.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -13,6 +14,7 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             const state = await getBossState(buyer?.id || null);
+            state.owner = Boolean(buyer && isOwner(buyer.id)); // gates the owner-only "test final blow" button
             return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.boss.state.failure" });

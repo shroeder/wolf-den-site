@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
 import BossBattleScene, { AURA_COL, BORDER_COL } from "@/components/BossBattleScene";
+import BossFinalBlow from "@/components/BossFinalBlow";
 import ItemArt from "@/components/ItemArt";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 
@@ -166,11 +167,28 @@ export default function BossFightClient() {
     const { boss, roster = [], fighters = [], you } = data;
     const displayHp = liveHp != null ? liveHp : boss.hp;
     const pct = Math.max(0, Math.min(100, (displayHp / boss.maxHp) * 100));
+    // Owner-only preview of the final-blow kill cinematic — uses the current boss + top fighter (or a mock) as
+    // the MVP so it can be watched + tuned without waiting for a real kill. Gated on data.owner (server isOwner).
+    const testMvp = data.owner ? {
+        name: fighters[0]?.name || "The Wolf Den",
+        dmg: fighters[0]?.dmg || 999999,
+        spriteUrl: fighters[0]?.spriteUrl || null,
+        spriteFlip: fighters[0]?.spriteFlip || false,
+        avatarUrl: fighters[0]?.avatarUrl || null,
+        you: true,
+    } : null;
 
     return (
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
             <div className="boss2-sub muted">One swing a day for XP + raffle tickets · drop in daily to help finish it.</div>
+
+            {testMvp ? (
+                <div className="boss-owner-test">
+                    <span>🧪 <strong>Owner test</strong> · preview the final-blow kill cinematic (only you see this)</span>
+                    <BossFinalBlow mvp={testMvp} boss={{ name: boss.name, imageUrl: boss.imageUrl }} />
+                </div>
+            ) : null}
 
             <div className="boss-stage-wrap">
                 <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} canCheer={Boolean(you) && !boss.defeated} cheersLeft={you?.cheersLeft ?? 0} onCheer={cheer} />
