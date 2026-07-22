@@ -332,9 +332,9 @@ const DIG_MAX_SIZE = 8;                 // biggest square board (mobile-friendly
 const DIG_TIER_EVERY = 8;              // +1 difficulty tier per this many voyages
 const DIG_MAX_TIER = 6;
 function digTier(voyages = 0) { return Math.min(DIG_MAX_TIER, 1 + Math.floor(Math.max(0, voyages) / DIG_TIER_EVERY)); }
-// Grid = big enough to fit the chest (up to 6 long) PLUS a couple cells of hiding room (bigger boards at high
-// tiers hide the same chest better = harder).
-function digSize(tier) { return Math.min(DIG_MAX_SIZE, chestLength(tier) + 2); } // t1=6 … t3=8 (capped)
+// Grid = big enough to hide the fixed 3-wide chest with room; bigger at higher tiers = the same chest hides
+// better = harder. (Kept modest so tiles stay tappable on mobile.)
+function digSize(tier) { return Math.min(7, 4 + tier); } // t1=5 … t3=7 (capped)
 function digDepthMax(tier) { return tier >= 4 ? 4 : 3; }                          // deeper dirt at high tiers
 // Scan charges (the detector) — deliberately FEW ("a couple"), so a scan is a precious "feel it out" moment,
 // not a solve-the-grid tool. Luck (find_level) grants the odd extra. Tune freely.
@@ -352,14 +352,11 @@ function senseHeat(board, r, c) {
 // ── THE CHEST — a literal buried treasure chest (a 2×N rectangle) is what you're uncovering. Hot/cold homes in
 // on it; digging its cells reveals the chest piece-by-piece (corners, iron bands, the lock). Fragments are an
 // ABSTRACTED reward (a few per chest, by tier + how much you exposed) — NOT one-per-cell. ──
-const CHEST_SHORT = 2;                                    // the chest is always 2 cells "deep"
-function chestLength(tier) { return Math.min(6, 3 + tier); } // 4 (t1) … 6 (t3+) cells long
-// Bury the chest: pick an orientation (horizontal 2×N or vertical N×2), drop it at a random fitting spot.
-function placeChest(rows, cols, tier) {
-    const long = chestLength(tier);
-    const horiz = Math.random() < 0.5;
-    const H = horiz ? CHEST_SHORT : Math.min(long, rows);
-    const W = horiz ? Math.min(long, cols) : CHEST_SHORT;
+// The chest footprint is FIXED at 2×2 so the real chest SPRITE (dig-chest.png, square) slices cleanly across
+// the four tiles and assembles into a recognizable chest as you uncover it.
+const CHEST_ROWS = 2, CHEST_COLS = 2;
+function placeChest(rows, cols) {
+    const H = CHEST_ROWS, W = CHEST_COLS;
     const r0 = randInt(Math.max(1, rows - H + 1));
     const c0 = randInt(Math.max(1, cols - W + 1));
     const cells = [];
@@ -380,7 +377,7 @@ function newBoard(row) {
     // buried; a SCAN reads how close it is (hot→cold), and digging its cells uncovers the chest piece-by-piece.
     const depth = Array.from({ length: rows }, () => Array.from({ length: cols }, () => 1 + randInt(maxDepth)));
     const perks = boatPerks(level);
-    const chest = placeChest(rows, cols, tier);
+    const chest = placeChest(rows, cols);
     const frag = chest.cells;             // the chest's tiles (kept named `frag` so downstream unearth logic holds)
     const chestBox = { H: chest.H, W: chest.W, r0: chest.r0, c0: chest.c0 };
     const shape = "chest";

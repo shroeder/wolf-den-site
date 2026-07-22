@@ -21,12 +21,15 @@ const GUST_MS = 3000;
 const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30 };
 // Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
-// An uncovered chest cell's role from its position in the chest (rr/rc + dims) → edge irons, corner, lock.
-function chestClasses(cp) {
-    if (!cp) return "";
-    const t = cp.rr === 0, b = cp.rr === cp.H - 1, l = cp.rc === 0, r = cp.rc === cp.W - 1;
-    const lock = cp.rr === Math.floor((cp.H - 1) / 2) && cp.rc === Math.floor((cp.W - 1) / 2);
-    return `${t ? " et" : ""}${b ? " eb" : ""}${l ? " el" : ""}${r ? " er" : ""}${lock ? " lock" : ""}`;
+// An uncovered chest cell shows ITS SLICE of the real chest sprite (positioned like a sprite-sheet), so the
+// tiles assemble into one recognizable treasure chest as you dig it out.
+function chestSlice(cp) {
+    if (!cp) return undefined;
+    return {
+        backgroundImage: "url(/images/sailing/dig-chest.png)",
+        backgroundSize: `${cp.W * 100}% ${cp.H * 100}%`,
+        backgroundPosition: `${cp.W > 1 ? (cp.rc / (cp.W - 1)) * 100 : 50}% ${cp.H > 1 ? (cp.rr / (cp.H - 1)) * 100 : 50}%`,
+    };
 }
 const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
@@ -539,7 +542,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                         onClick={() => (willScan ? senseTile(r, c) : digTile(r, c))}
                                         title={bottomed ? (t.found ? "Part of the relic!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the relic is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : willScan ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
-                                        {t.found ? <span className={`dig-chestcell${chestClasses(t.chestPos)}`} aria-hidden="true"><span className="dig-chest-burst">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span></span>
+                                        {t.found ? <span className="dig-chestcell" aria-hidden="true" style={chestSlice(t.chestPos)}><span className="dig-chest-burst">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
                                                 : <><span className="dig-dirt" aria-hidden="true" />{t.sense != null ? <span className="dig-heat" aria-hidden="true">{t.sense >= 3 ? "🔥" : t.sense === 2 ? "♨️" : t.sense === 1 ? "❄️" : "🧊"}<small>{HEAT_WORD[t.sense]}</small></span> : null}</>}
                                         {chunk && chunk.r === r && chunk.c === c ? (
@@ -774,7 +777,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <div className="muted sail-hold-note">{toward}/{per} toward a {f.chestLabel}{f.droppable ? "" : " · not found at sea yet"}</div>
                                 </div>
                                 {ready ? (
-                                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest", { tier: f.tier })}>🔨 {f.emoji}</button>
+                                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest", { tier: f.tier })}>🔨 <ChestIcon tier={f.tier} size={22} /></button>
                                 ) : null}
                             </div>
                         );

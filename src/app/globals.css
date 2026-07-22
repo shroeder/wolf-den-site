@@ -11295,25 +11295,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     box-shadow: inset 0 6px 10px rgba(0,0,0,0.9), inset 0 -2px 2px rgba(255,220,170,0.04); }
 /* faint rim at the top so it reads as a pit dug DOWN below the surface, not a raised block */
 .dig-hole::before { content: ""; position: absolute; left: 8%; right: 8%; top: -1px; height: 3px; border-radius: 3px; background: rgba(0,0,0,0.5); box-shadow: 0 -1px 0 rgba(255,225,180,0.12); }
-/* An uncovered CHEST cell — an ironbound wooden lid. Each cell draws its slice (edge irons on the chest's
-   outer sides, a lock in the middle) so digging assembles ONE chest as it emerges from the dirt. */
-.dig-tile.is-found { background: radial-gradient(120% 120% at 50% 20%, #3a2716, #1b1108); }
-.dig-chestcell { position: absolute; inset: 0; pointer-events: none; border-radius: 3px; overflow: hidden;
-    background: linear-gradient(180deg, rgba(255,225,170,0.28), rgba(0,0,0,0) 30%),
-        repeating-linear-gradient(180deg, #7a4f27 0 6px, #6a4321 6px 12px), linear-gradient(#754a26, #4d3018);
-    box-shadow: inset 0 2px 2px rgba(255,220,170,0.3), inset 0 -5px 8px rgba(0,0,0,0.45);
-    animation: digChestPop 0.4s cubic-bezier(0.2,1.35,0.4,1) both; }
-@keyframes digChestPop { 0% { opacity: 0; transform: scale(0.55); } 60% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
-/* Iron rim on the chest's OUTER edges (so the whole chest reads as ironbound; corners get two = a bracket). */
-.dig-chestcell.et { border-top: 4px solid #2c2118; } .dig-chestcell.eb { border-bottom: 4px solid #241a12; }
-.dig-chestcell.el { border-left: 4px solid #2c2118; } .dig-chestcell.er { border-right: 4px solid #2c2118; }
-.dig-chestcell.et, .dig-chestcell.eb, .dig-chestcell.el, .dig-chestcell.er { box-shadow: inset 0 2px 2px rgba(255,220,170,0.3), inset 0 -5px 8px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(60,44,26,0.6); }
-/* The lock — a brass plate + keyhole on the centre cell. */
-.dig-chestcell.lock::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: 46%; height: 56%; border-radius: 4px; background: radial-gradient(circle at 45% 30%, #ffe9a0, #d9a838 55%, #8a5f16);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.5); }
-.dig-chestcell.lock::before { content: ""; position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); z-index: 1;
-    width: 10%; height: 22%; border-radius: 999px 999px 2px 2px; background: #3a2610; box-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+/* An uncovered cell reveals ITS SLICE of the real reward SPRITE (via inline background-position), so digging
+   assembles the actual chest/item under the mud. The tile floor is dark so the sprite reads on top. */
+.dig-tile.is-found { background: radial-gradient(120% 120% at 50% 25%, #241a10, #0c0805); }
+.dig-chestcell { position: absolute; inset: 0; pointer-events: none; background-repeat: no-repeat;
+    filter: drop-shadow(0 0 5px rgba(255,205,90,0.45)); animation: digChestPop 0.35s cubic-bezier(0.2,1.35,0.4,1) both; }
+@keyframes digChestPop { 0% { opacity: 0; transform: scale(0.6); } 60% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
 /* Golden sparkle burst when a chest cell pops. */
 .dig-chest-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .dig-chest-burst i { position: absolute; width: 3px; height: 40%; border-radius: 2px; transform-origin: 50% 100%; opacity: 0;
@@ -11443,6 +11430,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-hold-tier-name { font-weight: 800; font-size: 0.9rem; }
 .sail-hold-tier-count { font-weight: 800; font-size: 0.9rem; color: #eaf2ff; }
 .sail-hold-tier .sail-forge-btn { width: auto; margin-top: 0; padding: 8px 12px; font-size: 1.05rem; }
+.sail-forge-btn { display: inline-flex; align-items: center; gap: 5px; }
+.sail-forge-btn .chest-icon, .sail-forge-btn svg { flex: none; }
 /* Embark: choose a voyage length before setting sail. */
 .sail-embark { margin-top: 10px; display: grid; gap: 8px; }
 .sail-embark-title { font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
