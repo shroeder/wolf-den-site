@@ -285,6 +285,13 @@ export default function SailingClient({ initial, hero, pet }) {
         else progress = Math.max(0, Math.min(0.999, 1 - (arrivesAt - now) / state.voyageTotalMs));
     }
 
+    // Weather MOOD from the rolled horizon art (sky-<type>.png) — drives cloud density, water chop, and rain.
+    const skyType = ((sky || state.oceanBg || "").match(/sky-([a-z]+)\.png/) || [])[1] || "";
+    const mood = skyType === "storm" ? "storm"
+        : (skyType === "night" || skyType === "aurora") ? "night"
+        : (skyType === "overcast" || skyType === "fog") ? "overcast"
+        : "calm";
+
     // Kick off the tailwind gust. Restart-safe: if a gust is already playing (you caught another one), drop the
     // class for one paint then re-add it so the CSS animation replays from 0 instead of no-op'ing on the class it
     // already has. Cleanup is driven by the boat's `onAnimationEnd`; the timer here is only a missed-event backstop.
@@ -471,7 +478,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
                     <>
-                        <div className="sail-sea">
+                        <div className={`sail-sea sail-mood-${mood}`}>
                             {/* Random horizon backdrop; scrolls right→left while you're underway. FOUR copies with
                                 every other one mirrored (CSS) so the strip tiles SEAMLESSLY — the art isn't
                                 edge-matched, but a mirrored copy's edge always equals its neighbor's, killing the seam. */}
@@ -494,6 +501,14 @@ export default function SailingClient({ initial, hero, pet }) {
                             <div className={`sail-nearwater${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true"><i /><i /><i /></div>
                             {/* A depth gradient so the near water reads darker/deeper than the horizon. */}
                             <div className="sail-depth" aria-hidden="true" />
+                            {/* Wildlife — the odd gull gliding across the sky, and an occasional breaching fish. */}
+                            <div className="sail-wildlife" aria-hidden="true">
+                                <svg className="sail-gull g1" viewBox="0 0 40 14"><path d="M2 12 Q11 2 20 11 Q29 2 38 12" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                <svg className="sail-gull g2" viewBox="0 0 40 14"><path d="M2 12 Q11 2 20 11 Q29 2 38 12" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                <span className="sail-fish"><svg viewBox="0 0 28 16"><path d="M2 8 C7 1 18 1 22 8 C18 15 7 15 2 8 Z M22 8 L27 4 L27 12 Z" fill="currentColor" /></svg><span className="sail-fish-splash" /></span>
+                            </div>
+                            {/* Rain — only when the rolled horizon is a storm. */}
+                            {mood === "storm" ? <div className="sail-rain" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div> : null}
                             {/* Other sailors drifting across the horizon behind your boat (each waveable while sailing). */}
                             <div className="sail-ambient">
                                 {ambient.map((b) => (

@@ -10866,7 +10866,80 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-bowwave i:nth-child(1) { width: 62%; height: 62%; }
 .sail-bowwave i:nth-child(2) { width: 40%; height: 40%; right: 22%; animation-delay: 0.6s; }
 @keyframes sailBowWave { 0% { opacity: 0; transform: translate(0, 5px) scale(0.45); } 28% { opacity: 0.95; } 100% { opacity: 0; transform: translate(20px, -8px) scale(1.35); } }
-@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind, .sail-wake, .sail-glints, .sail-clouds, .sail-nearwater, .sail-bowwave, .sail-reflection { display: none; } }
+/* ── Wildlife: gulls gliding past + an occasional breaching fish (mostly-empty timelines = appears now & then). ── */
+.sail-wildlife { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.sail-gull { position: absolute; left: -12%; opacity: 0; color: rgba(26,32,50,0.5); }
+.sail-gull.g1 { top: 15%; width: 34px; height: 12px; animation: gullGlide 23s linear infinite; }
+.sail-gull.g2 { top: 23%; width: 24px; height: 9px;  animation: gullGlide 31s linear infinite 13s; }
+@keyframes gullGlide {
+    0%   { left: -12%; opacity: 0;    transform: translateY(0) scaleY(1); }
+    4%   { opacity: 0.55; }
+    8%   { transform: translateY(-6px) scaleY(0.65); }  /* wing up */
+    12%  { transform: translateY(-1px) scaleY(1); }     /* wing down */
+    16%  { transform: translateY(-6px) scaleY(0.65); }
+    20%  { transform: translateY(-1px) scaleY(1); }
+    24%  { opacity: 0.55; transform: translateY(-5px) scaleY(0.7); }
+    28%  { left: 108%; opacity: 0; }
+    100% { left: 108%; opacity: 0; }
+}
+.sail-fish { position: absolute; left: 30%; bottom: 19%; width: 26px; height: 16px; color: rgba(18,28,44,0.72); opacity: 0;
+    animation: fishBreach 20s ease-in-out infinite 7s; }
+.sail-fish svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+@keyframes fishBreach {
+    0%, 100% { opacity: 0; transform: translateY(18px) rotate(34deg); }
+    2%  { opacity: 0.9; transform: translateY(6px) rotate(22deg); }    /* burst out */
+    5%  { transform: translateY(-16px) rotate(-6deg); }                /* apex */
+    8%  { opacity: 0.9; transform: translateY(6px) rotate(-32deg); }   /* dive back */
+    11% { opacity: 0; transform: translateY(18px) rotate(-42deg); }
+}
+.sail-fish-splash { position: absolute; left: 50%; bottom: -3px; width: 20px; height: 7px; transform: translateX(-50%) scale(0.4);
+    border: 2px solid rgba(255,255,255,0.7); border-top: none; border-radius: 0 0 50% 50%; opacity: 0;
+    animation: fishSplash 20s ease-out infinite 7s; }
+@keyframes fishSplash { 0%, 1.5%, 100% { opacity: 0; transform: translateX(-50%) scale(0.4); } 2.5% { opacity: 0.85; transform: translateX(-50%) scale(1); } 6% { opacity: 0; } 8% { opacity: 0.7; transform: translateX(-50%) scale(0.7); } 11% { opacity: 0; } }
+/* ── Rain (storm mood only) — slanted streaks falling across the scene. ── */
+.sail-rain { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.sail-rain i { position: absolute; top: -16%; width: 1.5px; height: 15%; border-radius: 2px; transform: rotate(12deg);
+    background: linear-gradient(rgba(210,225,255,0), rgba(210,225,255,0.5)); animation: rainFall linear infinite; }
+.sail-rain i:nth-child(1) { left: 6%;  animation-duration: 0.6s; animation-delay: 0s; }
+.sail-rain i:nth-child(2) { left: 17%; animation-duration: 0.75s; animation-delay: 0.2s; }
+.sail-rain i:nth-child(3) { left: 27%; animation-duration: 0.55s; animation-delay: 0.35s; }
+.sail-rain i:nth-child(4) { left: 38%; animation-duration: 0.7s; animation-delay: 0.1s; }
+.sail-rain i:nth-child(5) { left: 48%; animation-duration: 0.62s; animation-delay: 0.5s; }
+.sail-rain i:nth-child(6) { left: 59%; animation-duration: 0.78s; animation-delay: 0.28s; }
+.sail-rain i:nth-child(7) { left: 69%; animation-duration: 0.57s; animation-delay: 0.42s; }
+.sail-rain i:nth-child(8) { left: 80%; animation-duration: 0.68s; animation-delay: 0.15s; }
+.sail-rain i:nth-child(9) { left: 90%; animation-duration: 0.72s; animation-delay: 0.33s; }
+.sail-rain i:nth-child(10){ left: 98%; animation-duration: 0.6s; animation-delay: 0.48s; }
+@keyframes rainFall { from { transform: translate(0, 0) rotate(12deg); } to { transform: translate(-40px, 620%) rotate(12deg); } }
+/* ── Weather MOODS — tune chop, clouds, glints, wildlife to the rolled horizon. ── */
+/* STORM: heavy chop, dark clouds, no sun-glint/reflection, birds & fish take shelter. */
+.sail-mood-storm .sail-boat { animation-name: sailBobStorm; animation-duration: 2.7s; }
+.sail-mood-storm .sail-boat-inner.is-sailing { animation-name: sailStormRock; animation-duration: 2.1s; }
+.sail-mood-storm .sail-clouds { mix-blend-mode: normal; }
+.sail-mood-storm .sail-clouds i { background: radial-gradient(circle, rgba(44,50,64,0.62), rgba(44,50,64,0.16) 60%, transparent 74%); opacity: 0.92; }
+.sail-mood-storm .sail-glints { opacity: 0.35; }
+.sail-mood-storm .sail-reflection { display: none; }
+.sail-mood-storm .sail-gull, .sail-mood-storm .sail-fish, .sail-mood-storm .sail-fish-splash { display: none; }
+.sail-mood-storm .sail-nearwater.is-scrolling i { animation-duration: 1.5s; }
+@keyframes sailBobStorm { 0%, 100% { transform: translateX(-50%) translateY(0) rotate(-2deg); } 50% { transform: translateX(-50%) translateY(-9px) rotate(2.6deg); } }
+@keyframes sailStormRock {
+    0%   { transform: rotate(-1deg) translateY(0); }
+    20%  { transform: rotate(-6deg) translateY(-8px); }
+    40%  { transform: rotate(-1deg) translateY(3px); }
+    60%  { transform: rotate(-5deg) translateY(-5px); }
+    80%  { transform: rotate(-2deg) translateY(1px); }
+    100% { transform: rotate(-1deg) translateY(0); }
+}
+/* NIGHT / AURORA: sparse, dim clouds, slower moon-glint, no gulls (fish still breach). */
+.sail-mood-night .sail-clouds i { opacity: 0.32; }
+.sail-mood-night .sail-glints i { animation-duration: 6.5s; }
+.sail-mood-night .sail-glints.is-fast i { animation-duration: 3.4s; }
+.sail-mood-night .sail-gull { display: none; }
+/* OVERCAST / FOG: thick soft clouds, muted reflection, hazier depth. */
+.sail-mood-overcast .sail-clouds i { opacity: 0.85; filter: blur(15px); }
+.sail-mood-overcast .sail-reflection { opacity: 0.45; }
+.sail-mood-overcast .sail-depth { background: linear-gradient(to bottom, rgba(200,210,222,0.1), rgba(3,16,28,0.42)); }
+@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind, .sail-wake, .sail-glints, .sail-clouds, .sail-nearwater, .sail-bowwave, .sail-reflection, .sail-wildlife, .sail-rain { display: none; } }
 .sail-boat-img { display: block; width: clamp(190px, 54vw, 320px); height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Magical auras on the epic tiers — the art carries the colour, this adds the glow (gold / fire / spirit). */
