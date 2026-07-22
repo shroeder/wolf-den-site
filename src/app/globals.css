@@ -10862,18 +10862,44 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-actions { margin-top: 14px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .sail-actions > button { font-size: 1rem; }
 
-.sail-upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.sail-upg { border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-.sail-upg-top { display: flex; align-items: center; justify-content: space-between; font-weight: 800; }
+.sail-upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; --accent: #ffd75e; --accent-soft: rgba(255,215,94,0.45); }
+.sail-upgrades.is-boat { --accent: #6fd0ff; --accent-soft: rgba(111,208,255,0.45); } /* sea-blue for travel/loot levers */
+.sail-upgrades.is-dig { --accent: #ffc061; --accent-soft: rgba(255,192,97,0.45); }  /* warm amber for excavation */
+/* Glassy, depth-y upgrade card with a tinted accent edge + icon chip (was a flat outline). */
+.sail-upg { position: relative; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px 12px 12px 14px;
+    display: flex; flex-direction: column; gap: 7px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02) 72%), rgba(10,14,22,0.42);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 16px rgba(0,0,0,0.28);
+    transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.sail-upg::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0.85; }
+@media (hover: hover) { .sail-upg:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 10px 22px rgba(0,0,0,0.34); } }
+.sail-upg.is-maxed { border-color: var(--accent-soft); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px var(--accent-soft), 0 6px 16px rgba(0,0,0,0.28); }
+.sail-upg-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.sail-upg-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; }
+.sail-upg-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; font-size: 1.05rem; flex: none;
+    background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.18), rgba(255,255,255,0.04)); border: 1px solid var(--accent-soft);
+    box-shadow: 0 0 14px -5px var(--accent); }
+.sail-upg-lv { font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+/* Level progress bar — makes leveling feel like progress, not just a number. */
+.sail-upg-bar { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.sail-upg-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), rgba(255,255,255,0.55));
+    box-shadow: 0 0 8px -1px var(--accent); transition: width 0.5s cubic-bezier(0.3,1.2,0.4,1); }
 .sail-upg-desc { margin: 0; font-size: 0.8rem; }
 .sail-upg-desc b { color: #ffd75e; }
 /* The "what it does now → next level" effect row on each upgrade card. */
 .sail-upg-effect { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.78rem;
-    margin: 2px 0 4px; padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+    margin: 1px 0 3px; padding: 6px 9px; border-radius: 9px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.06); }
 .sail-upg-effect > span { color: #9fb0c0; }
 .sail-upg-effect b { display: inline-flex; align-items: center; gap: 4px; color: #f2e8d6; }
 .sail-upg-next { color: #7cffb2; font-weight: 800; }
 .sail-upg > button { margin-top: auto; }
+/* Gold-cost buy button gets a gold wash so the spend reads clearly. */
+.sail-upg-buy:not(:disabled) { color: #ffe8a8; font-weight: 800; border-color: rgba(255,215,94,0.5);
+    background: linear-gradient(180deg, rgba(255,215,94,0.2), rgba(255,215,94,0.06)); }
+.sail-upg-buy:not(:disabled):hover { background: linear-gradient(180deg, rgba(255,215,94,0.3), rgba(255,215,94,0.12)); }
+/* Section header accent bar so the whole upgrade AREA reads as a titled panel. */
+.sail-upg-h { display: flex; align-items: center; gap: 9px; }
+.sail-upg-h::before { content: ""; width: 4px; height: 1.05em; border-radius: 2px; background: linear-gradient(#ffd75e, #ff9d3d); box-shadow: 0 0 10px -2px #ffb43c; }
 .sail-levelup-badge { font-size: 3.4rem; display: inline-block; filter: drop-shadow(0 0 16px rgba(255,215,94,0.7)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
 /* Boat upgrade badge: the ACTUAL ship shuddering while a hammer bangs on it and sparks fly (4 strikes). */
 .sail-upgrade-scene { position: relative; display: inline-grid; place-items: center; padding: 6px 0; }

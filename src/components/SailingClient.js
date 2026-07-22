@@ -658,19 +658,23 @@ export default function SailingClient({ initial, hero, pet }) {
 
             {/* Boat upgrades — 4 travel/loot levers. Buying any of them levels the boat; every 10 levels = new form. */}
             <section className="card">
-                <h2 style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
+                <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels your boat ⭐ — every 10 levels it takes a new form and unlocks a perk. (Digging doesn&apos;t level the boat.)</p>
-                <div className="sail-upgrades">
+                <div className="sail-upgrades is-boat">
                     {upgrades.map((u) => (
-                        <div className="sail-upg" key={u.action}>
-                            <div className="sail-upg-top"><span>{u.icon} {u.name}</span><span className="muted">Lv {u.data.level}/{u.data.max}</span></div>
+                        <div className={`sail-upg${u.data.maxed ? " is-maxed" : ""}`} key={u.action}>
+                            <div className="sail-upg-top">
+                                <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
+                                <span className="muted sail-upg-lv">Lv {u.data.level}/{u.data.max}</span>
+                            </div>
+                            <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.data.max ? Math.min(100, (u.data.level / u.data.max) * 100) : 0}%` }} /></div>
                             <p className="muted sail-upg-desc">{u.desc}</p>
                             <div className="sail-upg-effect">
                                 <span>{u.effLabel}</span>
                                 <b>{u.now}{u.data.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
                             </div>
-                            {u.data.maxed ? <button className="pill" disabled>Maxed</button>
-                                : <button className="btn-ghost" disabled={busy || state.gold < u.data.cost} onClick={() => act(u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
+                            {u.data.maxed ? <button className="pill" disabled>✓ Maxed</button>
+                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < u.data.cost} onClick={() => act(u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>
@@ -700,19 +704,23 @@ export default function SailingClient({ initial, hero, pet }) {
 
             {/* Excavation — the digging upgrade system (separate from the boat). */}
             <section className="card">
-                <h2 style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
+                <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Every trip raises your Excavation level, unlocking a new tool every {state.excavation?.perTool || 10} levels. You&apos;re Excavation <b>Lv {state.excavation?.level || 0}</b>{state.excavation?.nextTool ? <> · next tool ({state.excavation.nextTool.name}) at <b>Lv {state.excavation.nextTool.unlock}</b></> : ""}.</p>
-                <div className="sail-upgrades">
+                <div className="sail-upgrades is-dig">
                     {digTracks.map((u) => (
-                        <div className="sail-upg" key={u.track}>
-                            <div className="sail-upg-top"><span>{u.icon} {u.name}</span><span className="muted">Lv {u.data?.level ?? 0}/{u.data?.max ?? 0}</span></div>
+                        <div className={`sail-upg${u.data?.maxed ? " is-maxed" : ""}`} key={u.track}>
+                            <div className="sail-upg-top">
+                                <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
+                                <span className="muted sail-upg-lv">Lv {u.data?.level ?? 0}/{u.data?.max ?? 0}</span>
+                            </div>
+                            <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.data?.max ? Math.min(100, ((u.data?.level ?? 0) / u.data.max) * 100) : 0}%` }} /></div>
                             <p className="muted sail-upg-desc">{u.desc}</p>
                             <div className="sail-upg-effect">
                                 <span>{u.effLabel}</span>
                                 <b>{u.now}{u.data?.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
                             </div>
-                            {u.data?.maxed ? <button className="pill" disabled>Maxed</button>
-                                : <button className="btn-ghost" disabled={busy || state.gold < (u.data?.cost || 0)} onClick={() => act("upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
+                            {u.data?.maxed ? <button className="pill" disabled>✓ Maxed</button>
+                                : <button className="btn-ghost sail-upg-buy" disabled={busy || state.gold < (u.data?.cost || 0)} onClick={() => act("upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>
