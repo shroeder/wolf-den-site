@@ -71,11 +71,12 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
     const [lives, setLives] = useState(3);
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(GAME_MS / 1000);
-    const [render, setRender] = useState({ entities: [], playerX: 0.5, hitAt: 0 }); // per-frame render snapshot
+    const [render, setRender] = useState({ entities: [], playerX: 0.5, hitAt: 0, floaters: [], combo: 0, mult: 1 }); // per-frame render snapshot
     const [recap, setRecap] = useState(null);      // post-game recap modal data (null = closed)
     const [recapReady, setRecapReady] = useState(false); // recap accepts the "Continue" click (anti-misclick delay)
     const areaRef = useRef(null);
-    const gs = useRef({ entities: [], eid: 0, playerX: 0.5, targetX: 0.5, lives: 3, score: 0, missed: 0, running: false, endAt: 0, lastSpawn: 0, spawnGap: 500, hitAt: 0 });
+    const padRef = useRef(null);
+    const gs = useRef({ entities: [], eid: 0, playerX: 0.5, targetX: 0.5, lives: 3, score: 0, missed: 0, combo: 0, bestCombo: 0, floaters: [], fid: 0, running: false, endAt: 0, lastSpawn: 0, spawnGap: 500, hitAt: 0 });
     const raf = useRef(0);
     const music = useRef(null);
     const loopRef = useRef(null); // holds the latest loop fn so it can schedule itself without a self-reference
@@ -108,25 +109,42 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
         const area = areaRef.current;
         const W = area?.clientWidth || 320, H = area?.clientHeight || 360;
         if (now - s.lastSpawn > s.spawnGap) {
-            s.lastSpawn = now; s.spawnGap = 340 + Math.random() * 460;
-            const brick = Math.random() < 0.26;
-            s.entities.push({ id: (s.eid += 1), x: 0.08 + Math.random() * 0.84, y: -24, vy: (brick ? 3.0 : 2.2) + Math.random() * 1.6, type: brick ? "brick" : "gold" });
+            s.lastSpawn = now; s.spawnGap = 320 + Math.random() * 420;
+            const brick = Math.random() < 0.24;
+            // Coins spill from the merchant's hands (top-center); bricks he lobs from anywhere.
+            const x = brick ? 0.08 + Math.random() * 0.84 : 0.5 + (Math.random() - 0.5) * 0.7;
+            s.entities.push({ id: (s.eid += 1), x: Math.max(0.06, Math.min(0.94, x)), y: -24, vy: (brick ? 3.0 : 2.1) + Math.random() * 1.5, type: brick ? "brick" : "gold" });
         }
-        const px = s.playerX * W, catchY = H - 42;
+        const px = s.playerX * W, catchY = H - 56;
         s.entities = s.entities.filter((e) => {
             e.y += e.vy;
-            const near = e.y > catchY - 30 && e.y < catchY + 22 && Math.abs(e.x * W - px) < 44;
+            const near = e.y > catchY - 32 && e.y < catchY + 24 && Math.abs(e.x * W - px) < 46;
             if (near) {
-                if (e.type === "gold") { s.score += 5 + Math.floor(Math.random() * 11); return false; }
-                s.lives -= 1; s.hitAt = now; if (s.lives <= 0) { endGame(); return false; }
+                if (e.type === "gold") {
+                    s.combo += 1; if (s.combo > s.bestCombo) s.bestCombo = s.combo;
+                    const mult = comboMult(s.combo);
+                    const amt = Math.round((5 + Math.floor(Math.random() * 11)) * mult);
+                    s.score += amt;
+                    s.floaters.push({ id: (s.fid += 1), x: e.x, y: catchY, txt: `+${amt}`, kind: mult > 1 ? "big" : "gold", born: now });
+                    return false;
+                }
+                s.lives -= 1; s.hitAt = now; s.combo = 0;
+                s.floaters.push({ id: (s.fid += 1), x: e.x, y: catchY, txt: "−1 ❤", kind: "hit", born: now });
+                if (s.lives <= 0) { endGame(); return false; }
                 return false;
             }
-            if (e.y >= H + 34) { if (e.type === "gold") s.missed += 1; return false; } // a coin fell past uncaught
+            if (e.y >= H + 34) { if (e.type === "gold") { s.missed += 1; s.combo = 0; } return false; } // a coin fell past uncaught
             return true;
         });
+        s.floaters = s.floaters.filter((f) => now - f.born < 750);
         s.playerX += (s.targetX - s.playerX) * 0.34;
         setLives(s.lives); setScore(s.score); setTimeLeft(Math.max(0, Math.ceil((s.endAt - now) / 1000)));
-        setRender({ entities: s.entities.map((e) => ({ id: e.id, x: e.x, y: e.y, type: e.type })), playerX: s.playerX, hitAt: s.hitAt });
+        setRender({
+            entities: s.entities.map((e) => ({ id: e.id, x: e.x, y: e.y, type: e.type })),
+            playerX: s.playerX, hitAt: s.hitAt,
+            floaters: s.floaters.map((f) => ({ id: f.id, x: f.x, y: f.y, txt: f.txt, kind: f.kind })),
+            combo: s.combo, mult: comboMult(s.combo),
+        });
         if (now >= s.endAt) { endGame(); return; }
         raf.current = requestAnimationFrame((t) => loopRef.current && loopRef.current(t));
     }, [endGame]);
@@ -134,17 +152,21 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
 
     const start = useCallback(() => {
         const s = gs.current;
-        s.entities = []; s.playerX = 0.5; s.targetX = 0.5; s.lives = 3; s.score = 0; s.missed = 0; s.running = true;
+        s.entities = []; s.playerX = 0.5; s.targetX = 0.5; s.lives = 3; s.score = 0; s.missed = 0;
+        s.combo = 0; s.bestCombo = 0; s.floaters = []; s.running = true;
         s.lastSpawn = performance.now(); s.spawnGap = 500; s.endAt = performance.now() + GAME_MS;
         setLives(3); setScore(0); setTimeLeft(GAME_MS / 1000); setPhase("playing");
         raf.current = requestAnimationFrame((t) => loopRef.current && loopRef.current(t));
     }, []);
 
-    const move = useCallback((clientX) => {
-        const area = areaRef.current; if (!area) return;
-        const r = area.getBoundingClientRect();
+    // Move by an absolute clientX relative to a control element (the pad OR the arena — either works).
+    const moveByEl = useCallback((el, clientX) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
         gs.current.targetX = Math.max(0.05, Math.min(0.95, (clientX - r.left) / r.width));
     }, []);
+    const move = useCallback((clientX) => moveByEl(areaRef.current, clientX), [moveByEl]);
+    const movePad = useCallback((clientX) => moveByEl(padRef.current, clientX), [moveByEl]);
 
     const played = phase === "done" || merchant.minigamePlayed;
 
@@ -170,28 +192,51 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                 <p className="muted merchant-sub">A rare showman on the sand, coins flying everywhere. Catch what you can, then browse his wares.</p>
 
                 {phase === "playing" ? (
+                    <>
                     <div
                         className="mg-area" ref={areaRef}
-                        onPointerMove={(e) => move(e.clientX)}
+                        onPointerMove={(e) => { if (e.buttons || e.pointerType === "touch") move(e.clientX); }}
                         onTouchMove={(e) => { if (e.touches[0]) move(e.touches[0].clientX); }}
                     >
                         <div className="mg-hud">
                             <span>{"❤️".repeat(Math.max(0, lives))}<span style={{ opacity: 0.3 }}>{"❤️".repeat(Math.max(0, 3 - lives))}</span></span>
-                            <span>🪙 {score}</span>
+                            <span className="mg-hud-score">🪙 {score}</span>
                             <span>⏱️ {timeLeft}s</span>
                         </div>
+                        {/* The merchant leans in from the top, flinging the coins into play. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="mg-tosser" src={MERCHANT_ART} alt="" />
+                        {render.combo >= 3 ? (
+                            <div className={`mg-combo${render.mult >= 2.5 ? " is-hot" : ""}`}>{render.combo}× combo · <b>{render.mult}×</b> gold</div>
+                        ) : null}
                         {render.entities.map((e) => (
                             <span key={e.id} className={e.type === "gold" ? "mg-gold" : "mg-brick"} style={{ left: `${e.x * 100}%`, top: `${e.y}px` }} />
                         ))}
-                        <span className={`mg-player${hitClass(render.hitAt)}`} style={{ left: `${render.playerX * 100}%`, bottom: 8 }}>
+                        {render.floaters.map((f) => (
+                            <span key={f.id} className={`mg-float mg-float-${f.kind}`} style={{ left: `${f.x * 100}%`, top: `${f.y}px` }}>{f.txt}</span>
+                        ))}
+                        {/* Catch-zone glow so you can read where the catch line is without your finger anywhere near it. */}
+                        <span className="mg-catchline" />
+                        <span className={`mg-player${hitClass(render.hitAt)}`} style={{ left: `${render.playerX * 100}%` }}>
+                            <span className="mg-player-glow" />
                             {heroImg ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={heroImg} alt="" />
                             ) : "🧍"}
                         </span>
-                        <p className="mg-hint">Drag to move · catch 🪙 · dodge the bricks</p>
                     </div>
-                ) : (
+                    {/* Control PAD below the field — slide your thumb here so it never covers the coins or your guy. */}
+                    <div
+                        className="mg-pad" ref={padRef}
+                        onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); movePad(e.clientX); }}
+                        onPointerMove={(e) => { if (e.buttons || e.pointerType === "touch") movePad(e.clientX); }}
+                        onTouchStart={(e) => { if (e.touches[0]) movePad(e.touches[0].clientX); }}
+                        onTouchMove={(e) => { if (e.touches[0]) movePad(e.touches[0].clientX); }}
+                    >
+                        <span className="mg-pad-knob" style={{ left: `${render.playerX * 100}%` }}>⛵</span>
+                        <span className="mg-pad-label">◀ slide your thumb to move ▶</span>
+                    </div>
+                    </>) : (
                     <>
                         {played ? (
                             <div className="merchant-won">🪙 You caught <strong>{merchant.goldWon || Math.max(floor, Math.min(ceil, score))}</strong> gold from the coin toss!</div>
@@ -266,4 +311,13 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
 // Adds a brief hit-flash class to the player when they took a hit in the last 220ms.
 function hitClass(hitAt) {
     return hitAt && performance.now() - hitAt < 220 ? " is-hit" : "";
+}
+
+// Combo multiplier: catching coins in a row without a miss/hit ramps the payout, so skilled play pays more.
+function comboMult(combo) {
+    if (combo >= 15) return 3;
+    if (combo >= 10) return 2.5;
+    if (combo >= 6) return 2;
+    if (combo >= 3) return 1.5;
+    return 1;
 }

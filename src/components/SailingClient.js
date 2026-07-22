@@ -113,23 +113,36 @@ function FragmentIcon({ size = 20, className = "", art = "/images/sailing/fragme
     );
 }
 
-// Tailwind gust FX: a screen flash + a stream of leaves/debris blowing across the scene left-to-right.
+// Tailwind gust FX: a screen flash, a burst of horizontal SPEED LINES ripping past (the main "we just surged"
+// cue), and a few leaves/debris for texture — all streaming left-to-right across the scene.
 function WindGust() {
     return (
         <div className="sail-gustfx" aria-hidden="true">
             <span className="sail-flash" />
             {Array.from({ length: 18 }, (_, i) => (
                 <span
-                    key={i}
+                    key={`s${i}`}
+                    className="sail-speedline"
+                    style={{
+                        "--i": i,
+                        top: `${3 + (i * 61) % 94}%`,
+                        width: `${34 + ((i * 13) % 5) * 10}%`,
+                        animationDelay: `${(i % 9) * 28}ms`,
+                    }}
+                />
+            ))}
+            {Array.from({ length: 9 }, (_, i) => (
+                <span
+                    key={`l${i}`}
                     className="sail-leaf"
                     style={{
                         "--i": i,
-                        top: `${4 + (i * 91) % 92}%`,
-                        animationDelay: `${(i % 6) * 55}ms`,
-                        fontSize: `${0.65 + ((i * 7) % 5) * 0.2}rem`,
+                        top: `${8 + (i * 53) % 82}%`,
+                        animationDelay: `${(i % 5) * 55}ms`,
+                        fontSize: `${0.7 + ((i * 7) % 4) * 0.2}rem`,
                     }}
                 >
-                    {["🍃", "🍂", "🍃", "·"][i % 4]}
+                    {["🍃", "🍂", "·"][i % 3]}
                 </span>
             ))}
         </div>
@@ -478,7 +491,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
                     <>
-                        <div className={`sail-sea sail-mood-${mood}`}>
+                        <div className={`sail-sea sail-mood-${mood}${gusting ? " is-gust" : ""}`}>
                             {/* Random horizon backdrop; scrolls right→left while you're underway. FOUR copies with
                                 every other one mirrored (CSS) so the strip tiles SEAMLESSLY — the art isn't
                                 edge-matched, but a mirrored copy's edge always equals its neighbor's, killing the seam. */}
