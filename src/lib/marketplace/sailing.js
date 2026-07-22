@@ -30,10 +30,10 @@ export const VOYAGE_OPTIONS = [
 // sail again. Speed shortens the voyage; Luck adds dig stamina. Owner-gated while in development.
 
 // Base voyage = 4 hours (the SHORT option). Standard = 12h, Long = 24h (see VOYAGE_OPTIONS mults).
-export const BASE_VOYAGE_MS = 60 * 1000; // ⚠️ TEST OVERRIDE (was 4 * 60 * 60 * 1000 = 4h) — short trips to test the sailing loop
+export const BASE_VOYAGE_MS = 4 * 60 * 60 * 1000; // 4h base (SHORT option); standard/long multiply this
 const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000;  // Speed shaves a FLAT 2 minutes off each voyage, per level
 const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
-const MIN_VOYAGE_MS = 10 * 1000;               // ⚠️ TEST OVERRIDE (was 30 * 60 * 1000 = 30 min) — short trips for testing
+const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
 // Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
 // → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (9) distinct arts, and each
 // form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-

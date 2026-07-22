@@ -10666,9 +10666,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-ambient-boat.is-rev { animation-name: sailAmbientRev; }
 .sail-ambient-boat.is-faceleft .sail-ambient-hull { transform: scaleX(-1); }
 /* The real member (+ pet) riding on deck — small + distant, standing ON the midship, not floating above it. */
-.sail-ambient-rider { position: absolute; left: 60%; bottom: 11%; transform: translateX(-50%);
+.sail-ambient-rider { position: absolute; left: 60%; bottom: 17%; transform: translateX(-50%);
     width: 28%; max-width: 40px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
-.sail-ambient-pet { position: absolute; left: 22%; bottom: 10%; transform: translateX(-50%);
+.sail-ambient-pet { position: absolute; left: 22%; bottom: 16%; transform: translateX(-50%);
     width: 24%; max-width: 30px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 .sail-ambient-name { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap;
     font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
