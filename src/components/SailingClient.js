@@ -445,7 +445,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     /* ---------- Excavation dig minigame ---------- */
                     <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
                         <div className="dig-hud">
-                            <span className="dig-frag"><FragmentIcon size={16} /> {dig.found}/{dig.buried} found</span>
+                            <span className="dig-frag">🏺 {dig.found}/{dig.buried} unearthed</span>
                             {dig.tier ? <span className="dig-tier" title="Difficulty — climbs with your Excavation level">Depth {dig.tier}</span> : null}
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina}</span>
                         </div>
@@ -471,8 +471,8 @@ export default function SailingClient({ initial, hero, pet }) {
                         <div className="dig-instruct">{selectedTool
                             ? <>💥 <b>{selectedTool.name}</b> armed — tap tiles to clear a {selectedTool.cols}×{selectedTool.rows} patch each. <button type="button" className="dig-tool-cancel" onClick={() => setSelectedTool(null)}>done</button></>
                             : scanArmed
-                                ? <>🔍 <b>Tap a tile to scan it</b> — it&apos;ll tell you how close the treasure is (🔥 HOT → ❄️ COLD). <button type="button" className="dig-tool-cancel" onClick={() => setScanArmed(false)}>cancel</button></>
-                                : <>⛏️ <b>Tap dirt to dig.</b> Low on luck? Hit <b>🔍 Scan</b> to feel where the treasure&apos;s hiding first.</>}</div>
+                                ? <>🔍 <b>Tap a tile to scan it</b> — it&apos;ll tell you how close the relic is (🔥 HOT → 🧊 COLD). <button type="button" className="dig-tool-cancel" onClick={() => setScanArmed(false)}>cancel</button></>
+                                : <>⛏️ <b>Tap dirt to dig.</b> Hit <b>🔍 Scan</b> to feel where the buried relic is, then dig it out.</>}</div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
@@ -485,7 +485,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                         style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
                                         disabled={disabled}
                                         onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : scanArmed ? senseTile(r, c) : digTile(r, c))}
-                                        title={bottomed ? (t.found ? "Treasure!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — treasure is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : scanArmed ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
+                                        title={bottomed ? (t.found ? "Part of the relic!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the relic is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : scanArmed ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
                                         {t.found ? <span className="dig-found"><span className="dig-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span><FragmentIcon size={30} art={t.tier ? `/images/sailing/fragment-${t.tier}.png` : undefined} /></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
@@ -500,7 +500,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip"><b>{dig.buried} treasures</b> are buried here. <b>🔍 Scan</b> a spot to feel how close the loot is — 🔥 <b>HOT</b> means it&apos;s right nearby, 🧊 <b>COLD</b> means far — then <b>⛏️ dig</b> the warm spots before your digs run out.</p>
+                        <p className="dig-tip">One <b>{dig.buried}-piece relic</b> is buried here in a single shape. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> it out and watch its shape appear, before your digs run out.</p>
                         {dig.status === "active" ? (
                             <button
                                 className="btn-ghost sail-digbuy"
@@ -821,10 +821,10 @@ export default function SailingClient({ initial, hero, pet }) {
                             {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} art={(result.haul && result.haul[0]?.art) || "/images/sailing/fragment-wooden.png"} /></span> : <span className="sail-recap-rock">🪨</span>}
                         </div>
                         <h2 style={{ margin: "4px 0" }}>{result.won
-                            ? (result.earned >= result.buried ? "Full haul!" : result.earned > 1 ? "Shards unearthed!" : "Shard unearthed!")
+                            ? (result.fullArtifact ? `The ${result.shape || "relic"} is yours!` : result.shape ? `The ${result.shape}, partly unearthed` : "Shard unearthed!")
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You dug up ${result.earned} shard${result.earned === 1 ? "" : "s"}${result.bonus ? ` (incl. ${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
+                            ? `You uncovered ${result.earned} of ${result.buried} relic piece${result.buried === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         <div className="sail-recap-rows">
                             {result.won && result.haul?.length ? result.haul.map((h) => (

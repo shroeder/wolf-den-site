@@ -11230,10 +11230,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-dirt::after { width: 10%; height: 10%; top: 58%; left: 64%; }
 /* Chipped to the bottom, empty — a shadowed pit of dark dirt. */
 .dig-hole { position: absolute; inset: 26%; border-radius: 46%; background: radial-gradient(circle at 50% 36%, rgba(0,0,0,0.32), rgba(0,0,0,0.66)); box-shadow: inset 0 2px 5px rgba(0,0,0,0.75); }
-/* A fragment unearthed at the bottom — real art, popping in with a glow. */
-.dig-tile.is-found { background: radial-gradient(circle at 50% 46%, #5e4517, #1c1408); }
-.dig-found { position: absolute; inset: 0; display: grid; place-items: center; filter: drop-shadow(0 0 8px #ffd75e);
+/* An unearthed RELIC cell — golden carved surface; adjacent cells share the look so the shape reads as ONE
+   connected artifact emerging from the dirt. */
+.dig-tile.is-found { background:
+        radial-gradient(120% 90% at 50% 25%, rgba(255,244,200,0.6), rgba(255,244,200,0) 55%),
+        linear-gradient(160deg, #ffe08a, #d9a636 55%, #9c6f1e);
+    box-shadow: inset 0 0 0 1px rgba(120,80,10,0.5), inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -4px 8px rgba(120,80,10,0.55), 0 0 14px rgba(255,200,80,0.4); }
+.dig-found { position: absolute; inset: 0; display: grid; place-items: center; filter: drop-shadow(0 0 8px #fff2c0);
     animation: digFound 0.5s cubic-bezier(0.2,1.35,0.4,1) both; }
+.dig-found .frag-icon { width: 66% !important; height: 66% !important; }
 @keyframes digFound { 0% { opacity: 0; transform: scale(0.2) rotate(-25deg); } 60% { transform: scale(1.2) rotate(6deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
 /* Dirt clods that spray out of a tile on each dig. */
 .dig-chunks { position: absolute; inset: 0; }

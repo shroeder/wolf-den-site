@@ -325,6 +325,44 @@ function senseHeat(board, r, c) {
     return best <= 1 ? 3 : best === 2 ? 2 : best === 3 ? 1 : 0;
 }
 
+// ── THE ARTIFACT — instead of scattered shards, ONE oddly-shaped relic is buried; hot/cold homes in on that
+// single object, and digging it out reveals its shape. Shapes are polyominoes (offsets from a corner). Bigger
+// tiers / Fortune bury a bigger relic (more cells → more fragments). Named so the recap can announce it. ──
+const ARTIFACT_SHAPES = [
+    { name: "Fang", cells: [[0, 0], [1, 0], [1, 1]] },                       // 3
+    { name: "Sliver", cells: [[0, 0], [0, 1], [0, 2]] },                     // 3 line
+    { name: "Crown", cells: [[0, 0], [0, 1], [0, 2], [1, 1]] },              // 4 T
+    { name: "Hook", cells: [[0, 0], [1, 0], [2, 0], [2, 1]] },               // 4 L
+    { name: "Blade", cells: [[0, 0], [0, 1], [1, 1], [1, 2]] },              // 4 S
+    { name: "Tablet", cells: [[0, 0], [0, 1], [1, 0], [1, 1]] },             // 4 square
+    { name: "Sceptre", cells: [[0, 0], [0, 1], [0, 2], [0, 3]] },            // 4 bar
+    { name: "Sigil", cells: [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]] },      // 5 plus
+    { name: "Idol", cells: [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0]] },       // 5 P
+    { name: "Serpent", cells: [[0, 0], [0, 1], [1, 1], [1, 2], [2, 2]] },    // 5 zig
+    { name: "Effigy", cells: [[0, 0], [0, 1], [0, 2], [1, 0], [1, 2], [2, 1]] }, // 6 chalice
+];
+function normalizeCells(cells) {
+    const minR = Math.min(...cells.map((c) => c[0])), minC = Math.min(...cells.map((c) => c[1]));
+    return cells.map(([r, c]) => [r - minR, c - minC]);
+}
+// Bury one relic: pick a shape near the target size that fits, random rotation + reflection, random position.
+function placeArtifact(rows, cols, targetSize) {
+    const fits = ARTIFACT_SHAPES.filter((s) => s.cells.length <= Math.min(rows, cols) * Math.max(rows, cols));
+    fits.sort((a, b) => Math.abs(a.cells.length - targetSize) - Math.abs(b.cells.length - targetSize));
+    const closest = Math.abs(fits[0].cells.length - targetSize);
+    const pool = fits.filter((s) => Math.abs(s.cells.length - targetSize) === closest);
+    const shape = pool[randInt(pool.length)];
+    let cells = shape.cells.map((c) => [c[0], c[1]]);
+    if (Math.random() < 0.5) cells = cells.map(([r, c]) => [r, -c]);        // reflect
+    for (let t = randInt(4); t > 0; t--) cells = cells.map(([r, c]) => [c, -r]); // rotate 90° t times
+    cells = normalizeCells(cells);
+    const h = Math.max(...cells.map((c) => c[0])) + 1, w = Math.max(...cells.map((c) => c[1])) + 1;
+    if (h > rows || w > cols) cells = normalizeCells(shape.cells.map((c) => [c[0], c[1]])); // fallback: unrotated
+    const H = Math.max(...cells.map((c) => c[0])) + 1, W = Math.max(...cells.map((c) => c[1])) + 1;
+    const or = randInt(Math.max(1, rows - H + 1)), oc = randInt(Math.max(1, cols - W + 1));
+    return { cells: cells.map(([r, c]) => [r + or, c + oc]), name: shape.name };
+}
+
 function newBoard(row) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
@@ -334,27 +372,27 @@ function newBoard(row) {
     const size = digSize(tier);
     const rows = size, cols = size;
     const maxDepth = digDepthMax(tier);
-    // Every tile is a stack of 1–maxDepth dirt layers you chip through. Treasure is scattered under random tiles;
-    // you never learn a tile's secret until the bottom — but SENSE probes reveal how many treasures neighbour a
-    // tile (Minesweeper-style), so it's deduction, not blind luck. Fortune = more buried; Luck = shallower.
+    // Every tile is a stack of 1–maxDepth dirt layers you chip through. ONE oddly-shaped relic is buried under a
+    // connected patch of tiles; a SCAN reads how close the relic is (hot→cold), and digging it out reveals its
+    // shape. Fortune buries a BIGGER relic (more cells → more fragments); Luck lets you dig it out shallower.
     const depth = Array.from({ length: rows }, () => Array.from({ length: cols }, () => 1 + randInt(maxDepth)));
-    const cells = [];
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push([r, c]);
-    for (let i = cells.length - 1; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
-    const nTreasure = digTreasureCount(tier, boatPerks(level).buried);
-    const frag = cells.slice(0, nTreasure);
-    // Roll each buried treasure's tier NOW (from the voyage's duration weights + Rarity), so the tile shows the
-    // REAL fragment when unearthed — no more everything looking like a wooden shard.
-    const quality = row?.voyage_quality || "standard";
-    const fragTiers = frag.map(() => rollFragmentTier(quality, row?.rarity_level || 0, level));
-    // Luck caps how deep a treasure tile can be; the "first strike guaranteed" perk forces one to the surface.
-    const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
     const perks = boatPerks(level);
+    const targetSize = Math.max(3, Math.min(6, 3 + (tier - 1) + Math.max(0, perks.buried))); // t1→3 … t4→6, +Fortune
+    const artifact = placeArtifact(rows, cols, targetSize);
+    const frag = artifact.cells;          // the relic's tiles (kept named `frag` so downstream unearth logic holds)
+    const shape = artifact.name;
+    // The whole relic is ONE tier (rolled from the voyage duration + Rarity); each cell you uncover yields a
+    // fragment of it, so the tile shows the REAL fragment and a bigger relic = more of them.
+    const quality = row?.voyage_quality || "standard";
+    const artifactTier = rollFragmentTier(quality, row?.rarity_level || 0, level);
+    const fragTiers = frag.map(() => artifactTier);
+    // Luck caps how deep a relic tile can be; the "first strike guaranteed" perk forces one cell to the surface.
+    const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
-    const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-probed; else the clue
+    const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
     const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2; // a few more digs on the bigger boards
-    const maxSenses = digSenseBudget(tier, nTreasure, luckLevel);
+    const maxSenses = digSenseBudget(tier, frag.length, luckLevel);
     // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
     const up = {
         pierce: digTrackValue("pierce", row?.dig_pierce_level || 0),
@@ -363,7 +401,7 @@ function newBoard(row) {
         detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
     };
     const tools = unlockedTools(row?.voyages_completed || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
@@ -460,7 +498,7 @@ function boardView(board) {
         tiles.push(row);
     }
     const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
-    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, tools: board.tools || [] };
+    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, tools: board.tools || [] };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -931,7 +969,8 @@ async function finishDig(buyerId, board) {
         const c = CHEST_TIERS[tier] || {};
         return { tier, n, name: (c.label || tier).replace(" Chest", ""), emoji: c.emoji || "🎁", color: c.color || "#b08a52", art: fragmentArt(tier) };
     }).sort((a, b) => CHEST_ORDER.indexOf(b.tier) - CHEST_ORDER.indexOf(a.tier));
-    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, haul }, ...state };
+    const fullyUnearthed = board.frag.every(([fr, fc]) => board.depth[fr][fc] === 0);
+    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, haul, shape: board.shape || null, fullArtifact: fullyUnearthed }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
