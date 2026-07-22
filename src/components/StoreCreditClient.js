@@ -176,15 +176,25 @@ export default function StoreCreditClient({
 
     return (
         <>
-            <section className="card">
-                <h1 style={{ marginTop: 0 }}>💳 Store Credit</h1>
+            <section className="card credit-hero">
+                <div className="credit-hero-glow" aria-hidden="true" />
+                <div className="credit-hero-top">
+                    <span className="credit-hero-coin" aria-hidden="true">🪙</span>
+                    <div className="credit-hero-copy">
+                        <h1 className="credit-hero-title">Top up. Spend anywhere.</h1>
+                        <p className="credit-hero-sub">Load store credit and pocket <strong>{coinsPerCent * 100} coins for every $1</strong> — the same dollars work in the shop, online, <em>and</em> in the game.</p>
+                    </div>
+                </div>
                 <div className="credit-balance">
                     <span className="credit-balance-label">Your balance</span>
                     <span className="credit-balance-amount">{usd(balanceCents)}</span>
                 </div>
-                <p className="muted" style={{ marginTop: 8 }}>
-                    Add store credit to your account and get <strong>{coinsPerCent * 100} coins for every $1</strong>. Spend it in-store (show a QR at the register) or apply it to an online order. Credit is real money on your account — it never expires.
-                </p>
+                <div className="credit-perks">
+                    <span className="credit-perk"><b>🪙 {coinsPerCent * 100}/$1</b>coins on top</span>
+                    <span className="credit-perk"><b>🏪 In-store & online</b>spend it anywhere</span>
+                    <span className="credit-perk"><b>♾️ Never expires</b>real money, kept</span>
+                    <span className="credit-perk"><b>⚡ Instant</b>lands in your wallet</span>
+                </div>
             </section>
 
             {done ? (
@@ -202,9 +212,10 @@ export default function StoreCreditClient({
                             <button
                                 key={c}
                                 type="button"
-                                className={`credit-chip${amountCents === c && !customDollars ? " is-active" : ""}`}
+                                className={`credit-chip${amountCents === c && !customDollars ? " is-active" : ""}${c === 2500 ? " is-featured" : ""}`}
                                 onClick={() => pickPreset(c)}
                             >
+                                {c === 2500 ? <span className="credit-chip-flag">★ Popular</span> : null}
                                 <span className="credit-chip-usd">{usd(c)}</span>
                                 <span className="credit-chip-coins">+{Math.round(c * coinsPerCent * (1 + coinBonus)).toLocaleString()} 🪙</span>
                             </button>
