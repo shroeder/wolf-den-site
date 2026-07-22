@@ -369,22 +369,37 @@ export async function syncLeaderboardBadges() {
 
 // Members with the badges they hold, for the admin browser. Admin context, so PII (name/email) is fine.
 // `q` matches alias, display name, first/last name, or email.
-export async function listMembersWithBadges({ q = "", limit = 40, offset = 0 } = {}) {
-    const lim = Math.min(100, Math.max(1, Number(limit) || 40));
+export async function listMembersWithBadges({ q = "", limit = 40, offset = 0, filterIds = null } = {}) {
+    const lim = Math.min(200, Math.max(1, Number(limit) || 40));
     const off = Math.max(0, Number(offset) || 0);
     const term = String(q || "").trim().toLowerCase();
+    const idList = Array.isArray(filterIds) ? filterIds.filter(Boolean) : null;
 
-    const where = term
-        ? `WHERE LOWER(COALESCE(alias, '') || ' ' || COALESCE(display_name, '') || ' ' || COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') || ' ' || COALESCE(email, '')) LIKE $1`
-        : "";
-    const params = term ? [`%${term}%`, lim, off] : [lim, off];
+    // Three ways to scope the roster: an explicit id set (e.g. "who bought store credit"), a search term,
+    // or unfiltered. Each shifts the LIMIT/OFFSET placeholder numbers.
+    let where = "";
+    let params;
+    let limPh;
+    let offPh;
+    if (idList && idList.length) {
+        where = `WHERE id = ANY($1)`;
+        params = [idList, lim, off];
+        limPh = "$2"; offPh = "$3";
+    } else if (term) {
+        where = `WHERE LOWER(COALESCE(alias, '') || ' ' || COALESCE(display_name, '') || ' ' || COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') || ' ' || COALESCE(email, '')) LIKE $1`;
+        params = [`%${term}%`, lim, off];
+        limPh = "$2"; offPh = "$3";
+    } else {
+        params = [lim, off];
+        limPh = "$1"; offPh = "$2";
+    }
     const rows = await db
         .query(
             `SELECT id, alias, display_name, first_name, last_name, email, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, avatar_sprite_flip, featured_collectible, equipped_border, COALESCE(xp, 0) AS xp, last_seen_at, created_at
                FROM mkt_buyer
                ${where}
               ORDER BY COALESCE(xp, 0) DESC, created_at DESC
-              LIMIT ${term ? "$2" : "$1"} OFFSET ${term ? "$3" : "$2"}`,
+              LIMIT ${limPh} OFFSET ${offPh}`,
             params
         )
         .catch(() => []);

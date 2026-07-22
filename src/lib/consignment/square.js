@@ -1423,7 +1423,12 @@ export async function getStoreCreditVariationId() {
                         name: "Store Credit",
                         description: "Online store-credit top-up (redeemable in store or online).",
                         is_taxable: false,
-                        ...(categoryId ? { category_id: categoryId } : {}),
+                        // Link the category on BOTH the legacy `category_id` AND the newer `reporting_category`
+                        // — Square's item/category SALES REPORT keys off reporting_category, so category_id
+                        // alone leaves the item "Uncategorized" in reports. (An item that already exists in the
+                        // catalog won't be re-created here; set its Reporting Category once in the Square
+                        // dashboard, or set SQUARE_STORE_CREDIT_VARIATION_ID.)
+                        ...(categoryId ? { category_id: categoryId, reporting_category: { id: categoryId } } : {}),
                         variations: [
                             {
                                 type: "ITEM_VARIATION",
