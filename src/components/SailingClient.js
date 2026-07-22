@@ -12,7 +12,7 @@ const GUST_MS = 3000;
 // Where the crew (hero + pet) plant their feet, per boat FORM (tier), as a `bottom` % of the hull art. Open
 // boats (tier 1–2) have a low floor so the crew must sit LOW or they hover in the open hull; taller ships seat
 // higher on their deck. Tiers not listed fall back to the default in CSS. Tune per boat as forms are seen.
-const CREW_BOTTOM = { 1: 31, 2: 32, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+const CREW_BOTTOM = { 1: 28, 2: 29, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
 
 // Where the ambient (background) sailors' rider + pet plant their feet, per boat FORM (tier). Same idea as
 // CREW_BOTTOM but for the small background boats, whose deck height varies by form — a single value can't fit
@@ -238,7 +238,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 setAmbient((a) => [...a, {
                     id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
                     tier: Number((pick.art.match(/boat-tier(\d+)/) || [])[1]) || 1, // deck height differs by boat form
-                    dir, faceLeft: dir === "left" && !sailingNow, top: 34 + Math.random() * 10, dur,
+                    dir, faceLeft: dir === "left" && !sailingNow, top: 46 + Math.random() * 8, dur, // seat the hull near the horizon waterline, not floating above it
                 }]);
                 setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
             }
