@@ -198,7 +198,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 const dur = boosting ? 7 + Math.random() * 3 : sailingNow ? 20 + Math.random() * 9 : 15 + Math.random() * 8;
                 setAmbient((a) => [...a, {
                     id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
-                    dir, faceLeft: dir === "left" && !sailingNow, top: 39 + Math.random() * 11, dur,
+                    dir, faceLeft: dir === "left" && !sailingNow, top: 34 + Math.random() * 10, dur,
                 }]);
                 setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
             }
