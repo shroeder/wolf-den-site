@@ -536,14 +536,14 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <button
                                         key={`${r}-${c}`}
                                         type="button"
-                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${willScan ? " is-sensearm" : ""}${t.sense != null && !bottomed ? ` is-sensed heat-${t.sense}` : ""}`}
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${bottomed && t.item ? " is-item" : ""}${willScan ? " is-sensearm" : ""}${t.sense != null && !bottomed ? ` is-sensed heat-${t.sense}` : ""}`}
                                         style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
                                         disabled={disabled}
                                         onClick={() => (willScan ? senseTile(r, c) : digTile(r, c))}
-                                        title={bottomed ? (t.found ? "Part of the relic!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the relic is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : willScan ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
+                                        title={bottomed ? (t.found ? "Part of the chest!" : t.item ? `Found: ${t.item.name}!` : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the chest is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : willScan ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
                                         {t.found ? <span className="dig-chestcell" aria-hidden="true" style={chestSlice(t.chestPos)}><span className="dig-chest-burst">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span></span>
-                                            : bottomed ? <span className="dig-hole" aria-hidden="true" />
+                                            : bottomed ? (t.item ? <span className="dig-item" title={t.item.name}>{t.item.emoji}</span> : <span className="dig-hole" aria-hidden="true" />)
                                                 : <><span className="dig-dirt" aria-hidden="true" />{t.sense != null ? <span className="dig-heat" aria-hidden="true">{t.sense >= 3 ? "🔥" : t.sense === 2 ? "♨️" : t.sense === 1 ? "❄️" : "🧊"}<small>{HEAT_WORD[t.sense]}</small></span> : null}</>}
                                         {chunk && chunk.r === r && chunk.c === c ? (
                                             <span className="dig-chunks" key={chunk.k} aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span>
@@ -555,7 +555,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip">A <b>buried treasure chest</b> is down here. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> its tiles to uncover the chest and haul out its fragments, before your digs run out.</p>
+                        <p className="dig-tip">A <b>buried treasure chest</b> is down here. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> to uncover it. <b>Grab any items 🧪 you dig up</b> along the way too, before your digs run out.</p>
                         {dig.status === "active" ? (
                             (state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0) ? (
                                 <CoinCta price={state.digRefill?.cost ?? 0} have={state.gold} label={`Get coins for ${state.digRefill?.amount ?? 5} more digs`} className="sail-digbuy-cta" />
@@ -886,7 +886,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             ? (result.fullArtifact ? "Chest unearthed! 🎁" : "Chest partly uncovered")
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You exposed ${result.uncovered}/${result.total} of the chest and hauled out ${result.earned} fragment${result.earned === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
+                            ? `You exposed ${result.uncovered}/${result.total} of the chest and hauled out ${result.earned} fragment${result.earned === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}${result.items?.length ? `, and dug up ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"}` : ""}.`
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         {result.reveal ? (
                             <div className="sail-reveal">
@@ -907,6 +907,12 @@ export default function SailingClient({ initial, hero, pet }) {
                                 <div className="sail-recap-row" key={h.tier}>
                                     <span><FragmentIcon size={16} art={h.art} /> {h.name} shard{h.n === 1 ? "" : "s"}</span>
                                     <b className="sail-recap-pos" style={{ color: h.color }}>+{h.n}</b>
+                                </div>
+                            )) : null}
+                            {result.items?.length ? result.items.map((it) => (
+                                <div className="sail-recap-row" key={it.id}>
+                                    <span><span style={{ fontSize: "1rem" }}>{it.emoji}</span> {it.name}</span>
+                                    <b className="sail-recap-pos" style={{ color: "#7cffb2" }}>+{it.n}</b>
                                 </div>
                             )) : null}
                             <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {state.fragments}</b></div>

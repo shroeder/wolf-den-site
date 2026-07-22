@@ -363,6 +363,13 @@ function placeChest(rows, cols) {
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) cells.push([r0 + r, c0 + c]);
     return { cells, H, W, r0, c0 };
 }
+// REAL consumables scattered as 1×1 buried finds — the chest is the goal, but you grab whatever you dig up on
+// the way. Mid/low-value buyables + a few drop-only treats (kept modest so it's a nice bonus, not a firehose).
+const DIG_ITEM_POOL = [
+    "pot_adrenaline", "stone_storm", "scroll_wisdom", "treat_bone", "treat_snack", "treat_toy",
+    "spin_lucky_coin", "treat_wild", "pot_secondwind", "treat_feast",
+];
+const digItemCount = (tier) => Math.min(5, 2 + Math.floor(tier / 2)); // 2 (t1) … 5 (t6)
 
 function newBoard(row) {
     const fortuneLevel = row?.luck_level || 0;
@@ -389,6 +396,12 @@ function newBoard(row) {
     // Luck caps how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
+    // Scatter real consumable ITEMS (1×1) on random non-chest tiles — bonus finds you dig up along the way.
+    const chestSet = new Set(frag.map(([fr, fc]) => `${fr},${fc}`));
+    const free = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (!chestSet.has(`${r},${c}`)) free.push([r, c]);
+    for (let i = free.length - 1; i > 0; i--) { const j = randInt(i + 1); [free[i], free[j]] = [free[j], free[i]]; }
+    const items = free.slice(0, digItemCount(tier)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
     const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2; // a few more digs on the bigger boards
@@ -403,7 +416,7 @@ function newBoard(row) {
     // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
     const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
     const tools = unlockedTools(row?.chest_points || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
@@ -476,6 +489,7 @@ function applySense(board, r, c) {
 function boardView(board) {
     const maxDepth = board.maxDepth || DIG_MAX_DEPTH;
     const fragSet = new Set(board.frag.map(([r, c]) => `${r},${c}`));
+    const itemAt = new Map((board.items || []).map((it) => [`${it.r},${it.c}`, it.id]));
     const tiles = [];
     for (let r = 0; r < board.rows; r++) {
         const row = [];
@@ -485,12 +499,16 @@ function boardView(board) {
             // (corner bracket / iron band / lock). Only sent for uncovered cells, so it's not a spoiler.
             const cb = board.chestBox;
             const chestPos = isFound && cb ? { rr: r - cb.r0, rc: c - cb.c0, H: cb.H, W: cb.W } : null;
+            // A dug 1×1 item tile reveals the real consumable's emoji/name (a bonus find on the way to the chest).
+            const itemId = board.depth[r][c] === 0 ? itemAt.get(`${r},${c}`) : null;
+            const item = itemId ? { id: itemId, emoji: CONSUMABLES[itemId]?.emoji || "🎁", name: CONSUMABLES[itemId]?.name || "Item" } : null;
             row.push({
                 depth: board.depth[r][c],   // rock layers still on top (drives the stacked-slab drawing)
                 maxDepth,
                 dug: board.dug[r][c],
                 found: isFound,             // a chest cell uncovered at the bottom
                 chestPos,                   // where in the chest this cell sits (for the drawing), or null
+                item,                       // a real consumable uncovered here (emoji/name), or null
                 sense: board.sensed && board.sensed[r][c] >= 0 ? board.sensed[r][c] : null, // scan HEAT (0–3), or null
             });
         }
@@ -952,7 +970,13 @@ async function finishDig(buyerId, board) {
     const foundTiers = Array.from({ length: fragCount }, () => chestTier);
     for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level)); // lucky Strike bonuses
     const earned = foundTiers.length;
-    const won = earned > 0;
+    // Grant every real ITEM you dug up along the way, and gather them for the recap.
+    const foundItems = (board.items || []).filter((it) => board.depth[it.r]?.[it.c] === 0);
+    for (const it of foundItems) await grantConsumable(buyerId, it.id, 1).catch(() => {});
+    const itemTally = {};
+    for (const it of foundItems) itemTally[it.id] = (itemTally[it.id] || 0) + 1;
+    const itemsHaul = Object.entries(itemTally).map(([id, n]) => ({ id, n, name: CONSUMABLES[id]?.name || id, emoji: CONSUMABLES[id]?.emoji || "🎁" }));
+    const won = earned > 0 || foundItems.length > 0;
     // Merge into the current per-tier hold.
     const counts = { ...((row && typeof row.fragments_json === "object" && row.fragments_json) || {}) };
     const byTier = {};
@@ -977,7 +1001,7 @@ async function finishDig(buyerId, board) {
     const fullyUnearthed = uncovered >= total;
     // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
-    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
+    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
