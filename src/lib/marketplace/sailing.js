@@ -15,9 +15,9 @@ const fragmentArt = (tier) => `/images/sailing/fragment-${tier}.png`;
 // Three embark durations: trip time = your (Speed-shortened) base voyage × mult; longer trips roll better
 // shards. `frag` = tier weights (each option's own ceiling). Plain consts (no env) so they're easy to tune.
 export const VOYAGE_OPTIONS = [
-    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 88, iron: 12 } },
-    { id: "standard", label: "Standard run", mult: 2, frag: { wooden: 70, iron: 24, gold: 6 } },
-    { id: "long", label: "Long expedition", mult: 3.5, frag: { wooden: 54, iron: 28, gold: 15, mythic: 3 } },
+    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 88, iron: 12 } },                 // ~4h
+    { id: "standard", label: "Standard run", mult: 3, frag: { wooden: 70, iron: 24, gold: 6 } },   // ~12h
+    { id: "long", label: "Long expedition", mult: 6, frag: { wooden: 54, iron: 28, gold: 15, mythic: 3 } }, // ~24h
 ];
 
 // SAILING — dispatch your boat on a ONE-WAY voyage to a mysterious island; when it lands you play an
@@ -25,12 +25,11 @@ export const VOYAGE_OPTIONS = [
 // trying to unearth a treasure-chest FRAGMENT before you run out. Win or fail, you return to port and can set
 // sail again. Speed shortens the voyage; Luck adds dig stamina. Owner-gated while in development.
 
-// TESTING: base voyage = 90s so the whole loop (and the progress bar) is observable in a sitting.
-// TODO(luke): before release restore BASE_VOYAGE_MS = 4*60*60*1000 (4h), SPEED_OFF = 2*60*1000, MIN = 30*60*1000.
-export const BASE_VOYAGE_MS = 90 * 1000;
-const SPEED_OFF_MS_PER_LEVEL = 10 * 1000;      // Speed shaves 10s off each voyage, per level (testing scale)
+// Base voyage = 4 hours (the SHORT option). Standard = 12h, Long = 24h (see VOYAGE_OPTIONS mults).
+export const BASE_VOYAGE_MS = 4 * 60 * 60 * 1000;
+const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000;  // Speed shaves a FLAT 2 minutes off each voyage, per level
 const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
-const MIN_VOYAGE_MS = 20 * 1000;               // a voyage never dips below 20 seconds (testing scale)
+const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
 // Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
 // → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (9) distinct arts, and each
 // form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-
@@ -128,6 +127,12 @@ const BOAT_ART = {
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
 export const DIG_BG = "/images/sailing/dig-bg.png";
 export const ISLAND_ART = "/images/sailing/island.png";
+// Ten scrolling sky/seascapes — the client randomly picks one per app open, so the horizon varies (sunset,
+// night, storm, fog…) each session and scrolls behind the boat while sailing.
+const SKY_BGS = ["sunset", "sunrise", "night", "storm", "fog", "clearday", "goldenhour", "dusk", "overcast", "aurora"]
+    .map((t) => `/images/sailing/sky-${t}.png`);
+// Dig-pit backdrop hints at the RARITY of the duration you chose (short→plain, standard→gold, long→mythic).
+const DIG_BGS = { short: "/images/sailing/dig-short.png", standard: "/images/sailing/dig-standard.png", long: "/images/sailing/dig-long.png" };
 
 // --- pure curves ---------------------------------------------------------------------------------------
 // A new boat form every LEVELS_PER_FORM levels, capped at BOAT_TIERS distinct arts (level 80 → tier 9).
@@ -309,8 +314,12 @@ function decorate(row) {
     if (dig && dig.status === "active") status = "digging";
     else if (departedAt && arrivesAt) status = now >= arrivesAt ? "arrived" : "sailing";
 
+    // Progress is REMAINING-based (how close to arrival vs. the ORIGINAL planned trip) so a tailwind — which
+    // shortens the remaining time — visibly jumps the boat forward. Elapsed-based math left it pinned at 0
+    // until the trip collapsed. Fall back to the current span for legacy voyages with no stored voyage_ms.
+    const voyageTotalMs = Number(row?.voyage_ms) || (departedAt && arrivesAt ? Math.max(1, arrivesAt - departedAt) : 0);
     let progress = 0;
-    if (status === "sailing") progress = Math.min(0.999, Math.max(0, (now - departedAt) / (arrivesAt - departedAt)));
+    if (status === "sailing" && arrivesAt && voyageTotalMs > 0) progress = Math.min(0.999, Math.max(0, 1 - (arrivesAt - now) / voyageTotalMs));
     else if (status === "arrived" || status === "digging") progress = 1;
 
     const rarityPct = (lvl) => Math.min(90, Math.round((Math.max(0, lvl) * RARITY_UPGRADE_PER_LEVEL + boatPerks(level).chestBonus) * 100));
@@ -318,7 +327,9 @@ function decorate(row) {
         level, maxLevel: boatLevelFromUpgrades(MAX_SPEED_LEVEL, MAX_FORTUNE_LEVEL, MAX_RARITY_LEVEL, MAX_LUCK_LEVEL),
         tier: boatTier(level), boatTiers: BOAT_TIERS, boatArt: boatArt(level),
         forms: boatFormsView(level),
-        oceanBg: OCEAN_BG, digBg: DIG_BG, islandArt: ISLAND_ART,
+        oceanBg: OCEAN_BG, digBg: DIG_BGS[row?.voyage_quality] || DIG_BG, islandArt: ISLAND_ART,
+        skies: SKY_BGS, // the client picks one at random per app open + scrolls it while sailing
+        voyageTotalMs, // original planned trip length, for the remaining-based progress bar
         voyagesCompleted: row?.voyages_completed || 0,
         fragments: totalFragments(row),
         fragmentsPerChest: boatPerks(level).forgeCost,
@@ -414,10 +425,10 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
     const ms = Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult);
     await db.query(
-        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, updated_at)
-         VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, NOW())
-         ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval, dig_state = NULL, voyage_quality = $3, updated_at = NOW()`,
-        [buyerId, String(ms), opt.id]
+        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, updated_at)
+         VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval, dig_state = NULL, voyage_quality = $3, voyage_ms = $4, updated_at = NOW()`,
+        [buyerId, String(ms), opt.id, ms]
     ).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }

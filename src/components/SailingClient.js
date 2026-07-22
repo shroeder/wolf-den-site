@@ -69,6 +69,16 @@ const sfx = {
         [784, 1047].forEach((f) => tone(f, 0.46, 0.7, { type: "sine", gain: 0.13 }));
     },
     fail() { tone(300, 0, 0.22, { type: "sawtooth", gain: 0.1 }); tone(170, 0.12, 0.4, { type: "sawtooth", gain: 0.1 }); },
+    // Boat upgrade: four metallic hammer CLANGS (synced to the banging animation) capped with a bright ding.
+    hammer() {
+        [0, 0.5, 1.0, 1.5].forEach((t) => {
+            tone(1500, t, 0.13, { type: "square", gain: 0.09 });
+            tone(2200, t + 0.006, 0.09, { type: "square", gain: 0.05 });
+            tone(3200, t + 0.01, 0.06, { type: "sawtooth", gain: 0.035 });
+            tone(560, t, 0.08, { type: "triangle", gain: 0.06 });
+        });
+        [880, 1319].forEach((f) => tone(f, 1.7, 0.55, { type: "sine", gain: 0.13 }));
+    },
 };
 
 function Confetti() {
@@ -148,6 +158,15 @@ export default function SailingClient({ initial, hero, pet }) {
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
+    const [sky, setSky] = useState(null); // a random horizon backdrop, chosen once per app open
+
+    // Pick a random sky/seascape on mount (in an effect so SSR + client agree — no hydration mismatch from
+    // Math.random running during render).
+    useEffect(() => {
+        const list = initial?.skies || [];
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (list.length) setSky(list[Math.floor(Math.random() * list.length)]);
+    }, [initial]);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);
@@ -206,12 +225,14 @@ export default function SailingClient({ initial, hero, pet }) {
         return () => clearInterval(id);
     }, []);
 
-    const { departedAt, arrivesAt } = state;
+    const { arrivesAt } = state;
     let liveStatus = state.status;
     let progress = state.progress || 0;
-    if (state.status === "sailing" && departedAt && arrivesAt) {
+    // Remaining-based: how close to arrival vs. the ORIGINAL trip, so a tailwind (which cuts the remaining
+    // time) visibly jumps the boat forward instead of leaving it pinned at the left.
+    if (state.status === "sailing" && arrivesAt && state.voyageTotalMs > 0) {
         if (now >= arrivesAt) liveStatus = "arrived";
-        else progress = Math.max(0, Math.min(0.999, (now - departedAt) / (arrivesAt - departedAt)));
+        else progress = Math.max(0, Math.min(0.999, 1 - (arrivesAt - now) / state.voyageTotalMs));
     }
 
     const act = useCallback(async (action, extra = {}) => {
@@ -239,10 +260,9 @@ export default function SailingClient({ initial, hero, pet }) {
                 const leveled = d.level > prevLevel;
                 if (d.result) { d.result.won ? sfx.win() : sfx.fail(); setResult(d.result); }
                 if (leveled) {
-                    sfx.levelUp();
                     // Crossing a 10-level milestone unlocks a new FORM — a bigger, special celebration.
                     const crossed = (d.forms || []).find((f) => f.level > prevLevel && f.level <= d.level);
-                    if (crossed) setFormUnlock(crossed); else setLevelUp(d.level);
+                    if (crossed) { sfx.levelUp(); setFormUnlock(crossed); } else { sfx.hammer(); setLevelUp(d.level); }
                 }
                 if (d.forged) { sfx.win(); setForge(d.forged); }
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
@@ -370,7 +390,15 @@ export default function SailingClient({ initial, hero, pet }) {
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
                     <>
-                        <div className="sail-sea" style={{ backgroundImage: `url(${state.oceanBg})` }}>
+                        <div className="sail-sea">
+                            {/* Random horizon backdrop; scrolls right→left while you're underway. Two copies
+                                translate as one so the loop is seamless. */}
+                            <div className={`sail-sky-scroll${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={sky || state.oceanBg} alt="" />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={sky || state.oceanBg} alt="" />
+                            </div>
                             {/* Other sailors drifting across the horizon behind your boat. */}
                             <div className="sail-ambient" aria-hidden="true">
                                 {ambient.map((b) => (
@@ -633,11 +661,19 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap">
                         <Confetti />
-                        <div className="sail-recap-hero is-win"><span className="sail-levelup-badge">⛵</span></div>
-                        <div className="sail-levelup-ribbon">⬆️ Boat leveled up!</div>
+                        {/* Your ACTUAL ship being hammered into shape — hammer bangs, sparks fly (see act()'s clang sfx). */}
+                        <div className="sail-recap-hero is-win">
+                            <span className="sail-upgrade-scene">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className={`sail-upgrade-boat boat-aura-${state.tier}`} src={state.boatArt} alt="" />
+                                <span className="sail-upgrade-hammer" aria-hidden="true">🔨</span>
+                                <span className="sail-upgrade-sparks" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+                            </span>
+                        </div>
+                        <div className="sail-levelup-ribbon">🔨 Boat leveled up!</div>
                         <h2 style={{ margin: "8px 0 2px" }}>{boatName} — Lv {levelUp}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>Keep upgrading — every 10 levels she takes a new form.</p>
-                        <button className="sail-cta" onClick={() => setLevelUp(null)}>⭐ Nice</button>
+                        <button className="sail-cta" onClick={() => setLevelUp(null)}>⚓ Set sail</button>
                     </div>
                 </div>
             ) : null}
