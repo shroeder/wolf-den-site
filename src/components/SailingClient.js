@@ -17,7 +17,7 @@ const GUST_MS = 3000;
 // float while the main crew looked fine). Open boats (tier 1–2) have a low floor so figures sit LOW; taller
 // ships seat higher. To retune a form or add a new boat, use the owner-only "🎯 Calibrate crew" overlay on
 // this page (renders all forms with a deck guide + live nudge) and paste the resulting numbers here.
-const DECK = { 1: 28, 2: 29, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30 };
 const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
