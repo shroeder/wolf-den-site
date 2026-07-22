@@ -10730,13 +10730,23 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .merchant-item-emoji { font-size: 1.5rem; flex: none; }
 .merchant-item-body { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .merchant-off { font-size: 0.66rem; font-weight: 800; color: #0f2a12; background: #7cffb2; border-radius: 999px; padding: 1px 6px; vertical-align: middle; }
-/* Perfect coin-catch celebration. */
-.merchant-perfect-fx { margin: 12px 0 0; padding: 12px; border-radius: 14px; text-align: center; border: 1px solid rgba(255,215,94,0.5);
-    background: radial-gradient(120% 120% at 50% 0%, rgba(255,215,94,0.22), rgba(255,215,94,0.05) 70%); animation: fbCineIn 0.4s ease both; }
-.merchant-perfect-fx.has-pet { border-color: rgba(124,201,255,0.55); }
-.merchant-perfect-ribbon { font-weight: 900; letter-spacing: 0.04em; color: #ffe08a; text-shadow: 0 2px 6px #000; font-size: 1.05rem; animation: fbSlain 1s cubic-bezier(0.2,1.3,0.3,1) both; }
-.merchant-perfect-fx .merchant-pet { border: none; background: none; margin-top: 8px; }
-@media (prefers-reduced-motion: reduce) { .merchant-art, .merchant-cine, .merchant-perfect-fx, .merchant-perfect-ribbon { animation: none; } }
+/* Post-game recap modal (over the merchant overlay). Pops in and locks its Continue button for ~0.75s. */
+.mg-recap-scrim { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(4,4,8,0.74); animation: fbCineIn 0.25s ease both; }
+.mg-recap { width: 100%; max-width: 360px; text-align: center; border-radius: 18px; padding: 20px 18px; border: 1px solid rgba(255,215,94,0.5);
+    background: radial-gradient(140% 120% at 50% 0%, rgba(255,215,94,0.18), rgba(16,14,10,0.97) 65%); box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    animation: mgRecapPop 0.4s cubic-bezier(0.2,1.3,0.3,1) both; }
+.mg-recap.is-perfect { border-color: rgba(124,201,255,0.6); box-shadow: 0 0 40px rgba(124,201,255,0.35), 0 20px 60px rgba(0,0,0,0.7); }
+@keyframes mgRecapPop { 0% { opacity: 0; transform: scale(0.82) translateY(12px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+.mg-recap-title { font-weight: 900; font-size: 1.3rem; color: #ffe08a; text-shadow: 0 2px 6px #000; margin-bottom: 12px; }
+.mg-recap.is-perfect .mg-recap-title { color: #bfe3ff; text-shadow: 0 0 14px rgba(124,201,255,0.7), 0 2px 6px #000; }
+.mg-recap-stats { display: flex; flex-direction: column; gap: 6px; margin: 0 auto 10px; max-width: 240px; }
+.mg-recap-stats > div { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+.mg-recap-stats strong { color: #ffd75e; }
+.mg-recap-pet { border: none !important; background: none !important; justify-content: center; }
+.mg-recap-btn { margin-top: 14px; min-width: 150px; }
+.mg-recap-btn:disabled { opacity: 0.5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .merchant-art, .merchant-cine, .mg-recap, .mg-recap-scrim { animation: none; } }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }

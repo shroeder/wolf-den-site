@@ -54,7 +54,7 @@ export async function POST(request) {
                 case "forge_chest": return noStore(await forgeChest(g.buyer.id, body.tier));
                 case "wave": return noStore(await waveAtSailor(g.buyer.id));
                 case "ack_encounter": return noStore(await ackEncounter(g.buyer.id));
-                case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected, body.lives));
+                case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected, body.perfect));
                 case "merchant_buy": return noStore(await merchantBuy(g.buyer.id, body.item));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }

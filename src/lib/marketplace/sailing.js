@@ -98,8 +98,8 @@ function pickWeighted(list) {
 // ── Gold Merchant island event ── a rare gold-clad showman who greets you when you LAND (before the dig):
 // a coin-catch minigame for gold, a discounted exclusive shop, and a rare shot at his exclusive elephant pet.
 const MERCHANT_BASE_CHANCE = 1.0;    // ⚠️ TEST OVERRIDE (was 0.05) — always land the Gold Merchant
-const MERCHANT_GOLD_FLOOR = 20;      // minimum coin-minigame payout (just for playing)
-const MERCHANT_GOLD_CEIL = 300;      // payout cap
+const MERCHANT_GOLD_FLOOR = 10;      // minimum coin-minigame payout (just for playing)
+const MERCHANT_GOLD_CEIL = 150;      // payout cap (trimmed from 300 — was a bit too rich)
 const MERCHANT_PET_CHANCE = 1.0;     // ⚠️ TEST OVERRIDE (was 0.10) — 10% shot at the elephant pet on a PERFECT coin-catch run
 const MERCHANT_PET_ID = "elephant_spear";
 const MERCHANT_PET_RARITY = "legendary";
@@ -107,12 +107,12 @@ const MERCHANT_PET_RARITY = "legendary";
 const MERCHANT_PET_FIND = [0, 0.01, 0.02, 0.03, 0.04, 0.05];
 // His exclusive stock — premium / drop-only consumables at a steep discount (you can't buy these normally).
 const MERCHANT_STOCK = [
-    { id: "treat_wild", base: 1600, off: 0.45 },
-    { id: "treat_marrow", base: 3200, off: 0.45 },
-    { id: "spin_golden_ticket", base: 2400, off: 0.4 },
-    { id: "scroll_wisdom", base: 1500, off: 0.5 },
-    { id: "pot_secondwind", base: 3200, off: 0.5 },
-    { id: "stone_ember", base: 3500, off: 0.5 },
+    { id: "treat_wild", base: 1600, off: 0.3 },
+    { id: "treat_marrow", base: 3200, off: 0.3 },
+    { id: "spin_golden_ticket", base: 2400, off: 0.25 },
+    { id: "scroll_wisdom", base: 1500, off: 0.35 },
+    { id: "pot_secondwind", base: 3200, off: 0.35 },
+    { id: "stone_ember", base: 3500, off: 0.35 },
 ];
 
 // The equipped elephant pet's merchant-find bonus (0 if it isn't equipped).
@@ -500,6 +500,7 @@ async function readRow(buyerId) {
 async function resolveDueEncounter(buyerId) {
     const row = await readRow(buyerId);
     if (!row || !row.encounter_at || row.encounter_result) return;
+    if (row.dig_state) return; // already ashore digging — don't pop a mid-voyage encounter over the dig
     if (new Date(row.encounter_at).getTime() > Date.now()) return; // halfway mark not reached yet
     const enc = ENCOUNTERS[randInt(ENCOUNTERS.length)];
     const xp = 150 + randInt(211);   // decent: 150–360
@@ -512,7 +513,7 @@ async function resolveDueEncounter(buyerId) {
     // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.
     const claimed = await db.queryOne(
         `UPDATE mkt_sailing SET encounter_result = $2::jsonb, updated_at = NOW()
-          WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_at <= NOW() AND encounter_result IS NULL
+          WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_at <= NOW() AND encounter_result IS NULL AND dig_state IS NULL
           RETURNING buyer_id`,
         [buyerId, JSON.stringify(result)]
     ).catch(() => null);
@@ -614,16 +615,16 @@ export async function ackEncounter(buyerId) {
 }
 
 // ── Gold Merchant actions ──────────────────────────────────────────────────────────────────────────────
-// The coin-catch minigame result. `collected` = gold caught (clamped [floor, ceil]); `lives` = lives left, so
-// a PERFECT run = finished with all 3 (never took a hit). Perfect earns the "Coin Virtuoso" badge and a 10%
+// The coin-catch minigame result. `collected` = gold caught (clamped [floor, ceil]); `perfect` = the client's
+// flawless flag (caught EVERY coin AND never took a hit). Perfect earns the "Coin Virtuoso" badge and a 10%
 // shot at the exclusive elephant pet. Paid + resolved ONCE (atomic guard on minigamePlayed). Owner-gated, so
-// the client-reported score/lives are trusted for now.
-export async function merchantMinigame(buyerId, collected, lives) {
+// the client-reported score/perfect are trusted for now.
+export async function merchantMinigame(buyerId, collected, perfectFlag) {
     const row = await readRow(buyerId);
     const m = row?.merchant_json;
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
     const gold = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
-    const perfect = Number(lives) >= 3;
+    const perfect = Boolean(perfectFlag);
     const petGranted = perfect && Math.random() < MERCHANT_PET_CHANCE ? MERCHANT_PET_ID : null;
     const won = await db.queryOne(
         `UPDATE mkt_sailing

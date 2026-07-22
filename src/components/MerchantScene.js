@@ -61,8 +61,10 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(GAME_MS / 1000);
     const [render, setRender] = useState({ entities: [], playerX: 0.5, hitAt: 0 }); // per-frame render snapshot
+    const [recap, setRecap] = useState(null);      // post-game recap modal data (null = closed)
+    const [recapReady, setRecapReady] = useState(false); // recap accepts the "Continue" click (anti-misclick delay)
     const areaRef = useRef(null);
-    const gs = useRef({ entities: [], eid: 0, playerX: 0.5, targetX: 0.5, lives: 3, score: 0, running: false, endAt: 0, lastSpawn: 0, spawnGap: 500, hitAt: 0 });
+    const gs = useRef({ entities: [], eid: 0, playerX: 0.5, targetX: 0.5, lives: 3, score: 0, missed: 0, running: false, endAt: 0, lastSpawn: 0, spawnGap: 500, hitAt: 0 });
     const raf = useRef(0);
     const music = useRef(null);
     const loopRef = useRef(null); // holds the latest loop fn so it can schedule itself without a self-reference
@@ -79,9 +81,15 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
         if (!s.running) return;
         s.running = false;
         cancelAnimationFrame(raf.current);
+        const gold = Math.max(floor, Math.min(ceil, s.score));
+        const perfect = s.lives >= 3 && s.missed === 0; // caught EVERY coin AND never took a hit
+        setRecap({ gold, hits: 3 - s.lives, missed: s.missed, perfect });
+        setRecapReady(false);
         setPhase("done");
-        onPlay(Math.max(floor, Math.min(ceil, s.score)), s.lives); // server clamps + a perfect = 3 lives left
+        onPlay(gold, perfect); // server clamps + grants the badge/pet on a perfect run
     }, [onPlay, floor, ceil]);
+    // Anti-misclick: the recap ignores clicks for a beat after it appears (you're often mid-tapping the game).
+    useEffect(() => { if (!recap) return undefined; const t = setTimeout(() => setRecapReady(true), 750); return () => clearTimeout(t); }, [recap]);
 
     const loop = useCallback((now) => {
         const s = gs.current;
@@ -102,7 +110,8 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                 s.lives -= 1; s.hitAt = now; if (s.lives <= 0) { endGame(); return false; }
                 return false;
             }
-            return e.y < H + 34;
+            if (e.y >= H + 34) { if (e.type === "gold") s.missed += 1; return false; } // a coin fell past uncaught
+            return true;
         });
         s.playerX += (s.targetX - s.playerX) * 0.34;
         setLives(s.lives); setScore(s.score); setTimeLeft(Math.max(0, Math.ceil((s.endAt - now) / 1000)));
@@ -114,7 +123,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
 
     const start = useCallback(() => {
         const s = gs.current;
-        s.entities = []; s.playerX = 0.5; s.targetX = 0.5; s.lives = 3; s.score = 0; s.running = true;
+        s.entities = []; s.playerX = 0.5; s.targetX = 0.5; s.lives = 3; s.score = 0; s.missed = 0; s.running = true;
         s.lastSpawn = performance.now(); s.spawnGap = 500; s.endAt = performance.now() + GAME_MS;
         setLives(3); setScore(0); setTimeLeft(GAME_MS / 1000); setPhase("playing");
         raf.current = requestAnimationFrame((t) => loopRef.current && loopRef.current(t));
@@ -171,23 +180,9 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                             <button type="button" className="sail-cta sail-cta-wind" onClick={start}>🪙 Catch the coin toss!</button>
                         )}
 
-                        {/* Perfect run → celebration + the 10% pet result. */}
+                        {/* A compact persistent note once the recap's been dismissed. */}
                         {played && merchant.perfect ? (
-                            <div className={`merchant-perfect-fx${merchant.petGranted ? " has-pet" : ""}`}>
-                                <div className="merchant-perfect-ribbon">✨ PERFECT! Not a single hit ✨</div>
-                                {merchant.petGranted ? (
-                                    <div className="merchant-pet">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={ELEPHANT_ART} alt="Merchant's Guard" />
-                                        <div>
-                                            <strong>🐘 The Merchant&apos;s Guard is yours!</strong>
-                                            <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.82rem" }}>His exclusive elephant pet — equip it to raise your odds of finding him again.</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>No pet this time — a flawless run gives a 🐘 <strong>10%</strong> shot at his exclusive elephant. Find him again to try once more.</p>
-                                )}
-                            </div>
+                            <div className="merchant-won" style={{ borderColor: "rgba(124,201,255,0.5)", color: "#bfe3ff" }}>✨ Perfect run!{merchant.petGranted ? " 🐘 You won the Merchant's Guard!" : ""}</div>
                         ) : null}
 
                         <h4 style={{ margin: "14px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own 🪙 {gold.toLocaleString()}</span></h4>
@@ -210,6 +205,41 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     </>
                 )}
             </div>
+
+            {/* Post-game recap so the sudden end has a beat. Ignores clicks for ~0.75s (anti-misclick). */}
+            {recap ? (
+                <div className="mg-recap-scrim">
+                    <div className={`mg-recap${recap.perfect ? " is-perfect" : ""}`}>
+                        <div className="mg-recap-title">{recap.perfect ? "✨ PERFECT RUN! ✨" : "Coin toss complete!"}</div>
+                        <div className="mg-recap-stats">
+                            <div><span>🪙 Gold caught</span><strong>{recap.gold}</strong></div>
+                            <div><span>💥 Hits taken</span><strong>{recap.hits}</strong></div>
+                            <div><span>💨 Coins missed</span><strong>{recap.missed}</strong></div>
+                        </div>
+                        {recap.perfect ? (
+                            !merchant.minigamePlayed ? (
+                                <p className="muted" style={{ margin: "4px 0 0" }}>Tallying your haul…</p>
+                            ) : merchant.petGranted ? (
+                                <div className="merchant-pet mg-recap-pet">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={ELEPHANT_ART} alt="Merchant's Guard" />
+                                    <div>
+                                        <strong>🐘 The Merchant&apos;s Guard is yours!</strong>
+                                        <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.8rem" }}>His exclusive elephant — equip it to find him more often.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>Flawless! No pet this time — a perfect run is a 🐘 <strong>10%</strong> shot at his elephant.</p>
+                            )
+                        ) : (
+                            <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>Catch <strong>every</strong> coin AND dodge <strong>every</strong> brick for a shot at his exclusive pet.</p>
+                        )}
+                        <button type="button" className="btn-gold mg-recap-btn" disabled={!recapReady} onClick={() => setRecap(null)}>
+                            {recapReady ? "Continue" : "…"}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
         </div>
     ), document.body);
 }

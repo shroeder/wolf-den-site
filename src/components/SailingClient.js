@@ -171,6 +171,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
     const [waveFx, setWaveFx] = useState(null);        // { xp, coins, minutes, k } — the "you waved!" reward toast
     const [ackingEnc, setAckingEnc] = useState(false); // dismissing an encounter recap (awaiting the ack round-trip)
+    const [encReady, setEncReady] = useState(false);   // encounter recap accepts its dismiss click (anti-misclick delay)
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
@@ -195,6 +196,16 @@ export default function SailingClient({ initial, hero, pet }) {
             if (r.ok) { const d = await r.json().catch(() => null); if (d && !d.error) setState(d); }
         } catch { /* keep prior state */ }
     }, []);
+
+    // Anti-misclick: after an encounter recap appears (and only when NOT digging), ignore its dismiss click for
+    // a beat — players are often mid-tapping something else and would otherwise close it instantly.
+    useEffect(() => {
+        const active = Boolean(state.encounter) && state.status !== "digging";
+        if (!active) { setEncReady(false); return undefined; }
+        setEncReady(false);
+        const t = setTimeout(() => setEncReady(true), 700);
+        return () => clearTimeout(t);
+    }, [state.encounter, state.status]);
 
     // Every so often, send another sailor's boat drifting across the horizon behind yours.
     useEffect(() => {
@@ -529,7 +540,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 ceil={state.merchantGold?.ceil ?? 300}
                                 busy={busy}
                                 heroImg={hero?.spriteUrl || hero?.avatarUrl || null}
-                                onPlay={(collected, lives) => act("merchant_play", { collected, lives })}
+                                onPlay={(collected, perfect) => act("merchant_play", { collected, perfect })}
                                 onBuy={(item) => act("merchant_buy", { item })}
                                 onLeave={() => act("begin_dig")}
                             />
@@ -787,8 +798,9 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             ) : null}
 
-            {/* Marine encounter recap — a foe met at the voyage's midpoint, resolved while you were away. */}
-            {state.encounter ? (
+            {/* Marine encounter recap — a foe met at the voyage's midpoint, resolved while you were away.
+                Never over the dig (a race could otherwise pop it mid-excavation). */}
+            {state.encounter && liveStatus !== "digging" ? (
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap sail-encounter">
                         <Confetti />
@@ -801,8 +813,8 @@ export default function SailingClient({ initial, hero, pet }) {
                             <span className="sail-enc-reward">🪙 +{state.encounter.coins}</span>
                             {state.encounter.bonus ? <span className="sail-enc-reward is-bonus">{state.encounter.bonus.emoji} {state.encounter.bonus.label}</span> : null}
                         </div>
-                        <button className="sail-cta" disabled={ackingEnc} onClick={() => { setAckingEnc(true); Promise.resolve(act("ack_encounter")).finally(() => setAckingEnc(false)); }}>
-                            {ackingEnc ? "…" : "Onward! ⚓"}
+                        <button className="sail-cta" disabled={ackingEnc || !encReady} onClick={() => { setAckingEnc(true); Promise.resolve(act("ack_encounter")).finally(() => setAckingEnc(false)); }}>
+                            {ackingEnc ? "…" : encReady ? "Onward! ⚓" : "…"}
                         </button>
                     </div>
                 </div>
