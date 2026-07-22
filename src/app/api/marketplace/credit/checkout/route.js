@@ -15,6 +15,7 @@ import {
     MAX_CREDIT_CENTS,
     MIN_CREDIT_CENTS,
 } from "@/lib/marketplace/store-credit.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -115,6 +116,8 @@ export async function POST(request) {
                     route: "members",
                     data: { type: "credit_purchase", buyerId: buyer.id, amountCents },
                 }).catch(() => {});
+                // Grant any newly-earned store-credit badges from the higher lifetime total.
+                syncEarnedBadges(buyer.id).catch(() => {});
             }
 
             return noStore({

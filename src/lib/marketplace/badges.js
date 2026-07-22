@@ -118,6 +118,10 @@ export async function getMemberMetrics(buyerId) {
         db.query(`SELECT pet_id, xp FROM mkt_pet_level WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
 
+    // Lifetime store credit PURCHASED (paid top-ups only, in dollars) — drives the store-credit badges. Admin
+    // adjustments never create a mkt_credit_purchase row, so hand-granted credit correctly doesn't count.
+    const creditRow = await db.queryOne(`SELECT COALESCE(SUM(amount_cents), 0)::bigint AS c FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`, [buyerId]).catch(() => null);
+
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
     const ownedItemRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     let eliteItems = 0, eternalItems = 0;
@@ -187,6 +191,7 @@ export async function getMemberMetrics(buyerId) {
         mysteryBigHit: Boolean(buyer?.mystery_big_hit),
         cheersGiven: Number(buyer?.cheers_given || 0),
         cheersReceived: Number(buyer?.cheers_received || 0),
+        creditPurchased: Math.round(Number(creditRow?.c || 0) / 100), // lifetime $ of store credit bought
     };
 }
 
@@ -275,6 +280,7 @@ export function progressForRule(rule, threshold, m) {
         case "mystery_big_hit": return { current: m.mysteryBigHit ? 1 : 0, target: 1 }; // pulled a big hit from a bag
         case "cheers_given": return { current: m.cheersGiven, target: t }; // times you've cheered a hero in the boss fight
         case "cheers_received": return { current: m.cheersReceived, target: t }; // times the pack has cheered you
+        case "credit_purchased": return { current: m.creditPurchased, target: t }; // lifetime $ of store credit bought
         default: return { current: 0, target: t || 1 };
     }
 }
