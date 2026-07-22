@@ -142,6 +142,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
+    const [selectedTool, setSelectedTool] = useState(null); // an area-clear dig tool armed to tap a tile
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
@@ -240,6 +241,15 @@ export default function SailingClient({ initial, hero, pet }) {
         act("dig", { r, c });
     }, [act]);
 
+    // Use the armed area-clear tool at a tile (its footprint anchors here), then disarm it.
+    const runToolAt = useCallback((tool, r, c) => {
+        const k = (chunkId.current += 1);
+        setChunk({ r, c, k });
+        setTimeout(() => setChunk((cur) => (cur?.k === k ? null : cur)), 520);
+        setSelectedTool(null);
+        act("use_tool", { tool: tool.id, r, c });
+    }, [act]);
+
     const level = state.level;
     const dig = state.dig;
     const windCost = state.windRecharge?.cost ?? 0;
@@ -262,6 +272,16 @@ export default function SailingClient({ initial, hero, pet }) {
             desc: <>Strike sooner — fragments sit closer to the surface, found on your early digs.</>,
             effLabel: "Buried within", now: `${state.luck.depthNow} layer${state.luck.depthNow === 1 ? "" : "s"}`, next: `${state.luck.depthNext} layer${state.luck.depthNext === 1 ? "" : "s"}` },
     ];
+    // Digging upgrade tracks (separate system) — gold-leveled; the tools unlock via excavation level.
+    const pct = (v) => `${Math.round((v || 0) * 100)}%`;
+    const dg = state.digUpgrades || {};
+    const digTracks = [
+        { track: "stamina", icon: "⛏️", name: "Stamina", data: dg.stamina, desc: <>More digs each trip — <b>+1</b> per level.</>, effLabel: "Digs / trip", now: dg.stamina?.digsNow, next: dg.stamina?.digsNext },
+        { track: "pierce", icon: "🪨", name: "Pierce", data: dg.pierce, desc: <>Chance a dig breaks through <b>every layer</b> of a tile at once.</>, effLabel: "Pierce chance", now: pct(dg.pierce?.valueNow), next: pct(dg.pierce?.valueNext) },
+        { track: "strike", icon: "✨", name: "Strike", data: dg.strike, desc: <>Chance a dig <b>strikes a lucky bonus</b> fragment.</>, effLabel: "Strike chance", now: pct(dg.strike?.valueNow), next: pct(dg.strike?.valueNext) },
+        { track: "efficient", icon: "♻️", name: "Efficient", data: dg.efficient, desc: <>Chance a <b>tool doesn&apos;t spend</b> its stamina charge.</>, effLabel: "Free-use chance", now: pct(dg.efficient?.valueNow), next: pct(dg.efficient?.valueNext) },
+        { track: "detonator", icon: "💥", name: "Detonator", data: dg.detonator, desc: <>Chance a dig <b>spawns an explosion</b> (clears a 3×3, one layer).</>, effLabel: "Explosion chance", now: pct(dg.detonator?.valueNow), next: pct(dg.detonator?.valueNext) },
+    ];
 
     return (
         <div className="stack reveal sailing">
@@ -279,7 +299,23 @@ export default function SailingClient({ initial, hero, pet }) {
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina} digs</span>
                         </div>
                         <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / dig.maxStamina) * 100)}%` }} /></div>
-                        <div className="dig-instruct">👆 Tap the dirt to dig — clear a tile to the bottom to see what it hides</div>
+                        {/* Tool bar — armed tools clear an area when you tap a tile. */}
+                        {(dig.tools || []).length ? (
+                            <div className="dig-tools">
+                                {dig.tools.map((t) => (
+                                    <button key={t.id} type="button"
+                                        className={`dig-tool-btn${selectedTool?.id === t.id ? " is-armed" : ""}`}
+                                        disabled={busy || dig.stamina < 1}
+                                        onClick={() => setSelectedTool(selectedTool?.id === t.id ? null : t)}
+                                        title={`${t.name}: clears ${t.cols}×${t.rows}${t.layers > 1 ? `, ${t.layers} layers` : ""} for ${t.stamina} stamina`}>
+                                        {t.emoji} <span className="dig-tool-cost">{t.stamina}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                        <div className="dig-instruct">{selectedTool
+                            ? <>💥 <b>{selectedTool.name}</b> armed — tap a tile to clear a {selectedTool.cols}×{selectedTool.rows}{selectedTool.layers > 1 ? `, ${selectedTool.layers} layers` : ""} patch ({selectedTool.stamina} stamina). <button type="button" className="dig-tool-cancel" onClick={() => setSelectedTool(null)}>cancel</button></>
+                            : <>👆 Tap the dirt to dig — clear a tile to the bottom to see what it hides</>}</div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
@@ -287,10 +323,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <button
                                         key={`${r}-${c}`}
                                         type="button"
-                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}`}
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}`}
                                         style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
-                                        disabled={busy || dig.status !== "active" || bottomed}
-                                        onClick={() => digTile(r, c)}
+                                        disabled={busy || dig.status !== "active" || (!selectedTool && bottomed)}
+                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : digTile(r, c))}
                                         title={bottomed ? (t.found ? "A fragment!" : "Bare dirt — nothing here") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
                                         {t.found ? <span className="dig-found"><FragmentIcon size={30} /></span>
@@ -469,6 +505,38 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             </section>
 
+            {/* Excavation — the digging upgrade system (separate from the boat). */}
+            <section className="card">
+                <h2 style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Every trip raises your Excavation level, unlocking a new tool every {state.excavation?.perTool || 10} levels. You&apos;re Excavation <b>Lv {state.excavation?.level || 0}</b>{state.excavation?.nextTool ? <> · next tool ({state.excavation.nextTool.name}) at <b>Lv {state.excavation.nextTool.unlock}</b></> : ""}.</p>
+                <div className="sail-upgrades">
+                    {digTracks.map((u) => (
+                        <div className="sail-upg" key={u.track}>
+                            <div className="sail-upg-top"><span>{u.icon} {u.name}</span><span className="muted">Lv {u.data?.level ?? 0}/{u.data?.max ?? 0}</span></div>
+                            <p className="muted sail-upg-desc">{u.desc}</p>
+                            <div className="sail-upg-effect">
+                                <span>{u.effLabel}</span>
+                                <b>{u.now}{u.data?.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
+                            </div>
+                            {u.data?.maxed ? <button className="pill" disabled>Maxed</button>
+                                : <button className="btn-ghost" disabled={busy || state.gold < (u.data?.cost || 0)} onClick={() => act("upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
+                        </div>
+                    ))}
+                </div>
+                <div className="sail-tools-head">🧰 Tools <span className="muted">· unlock by digging</span></div>
+                <div className="sail-tools-list">
+                    {(state.excavation?.tools || []).map((t) => (
+                        <div className={`sail-tool${t.unlocked ? " is-unlocked" : ""}`} key={t.id}>
+                            <span className="sail-tool-emoji">{t.unlocked ? t.emoji : "🔒"}</span>
+                            <div className="sail-tool-body">
+                                <div className="sail-tool-name">{t.name} <span className="muted">· {t.stamina} stamina</span></div>
+                                <div className="muted sail-tool-desc">Clears {t.cols}×{t.rows}{t.layers > 1 ? `, ${t.layers} layers` : ""}{t.unlocked ? "" : ` · unlock at Excavation Lv ${t.unlock}`}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
             {/* Win / fail RECAP — you confirm before it returns you to port. */}
             {result ? (
                 <div className="sail-reward-overlay">
@@ -481,7 +549,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             ? (result.earned >= result.buried ? "Full haul!" : result.earned > 1 ? "Fragments unearthed!" : "Fragment unearthed!")
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You dug up ${result.earned} of ${result.buried} buried fragment${result.buried === 1 ? "" : "s"}.`
+                            ? `You dug up ${result.earned} fragment${result.earned === 1 ? "" : "s"}${result.bonus ? ` (incl. ${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ` of ${result.buried} buried`}.`
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         <div className="sail-recap-rows">
                             <div className="sail-recap-row"><span>Fragments this dig</span><b className="sail-recap-pos"><FragmentIcon size={15} /> +{result.earned}</b></div>

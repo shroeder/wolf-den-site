@@ -45,6 +45,49 @@ const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
 const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to ~300 before release
 const FORGE_TIER_ORDER = ["wooden", "iron", "gold"]; // ascending chest tiers, for Rarity's tier-bump
 
+// ── DIGGING UPGRADES (separate from the boat) ── five gold-leveled tracks. Each track's PER-LEVEL value ×
+// its MAX level = the cap Luke asked for.
+const DIG_TRACKS = {
+    stamina:   { max: 10, per: 1,    cap: 10,   kind: "count" }, // +1 dig per trip / level
+    pierce:    { max: 5,  per: 0.03, cap: 0.15, kind: "pct" },   // dig clears ALL layers of a tile — 15% max
+    strike:    { max: 5,  per: 0.02, cap: 0.10, kind: "pct" },   // a dig strikes a lucky bonus fragment — 10% max
+    efficient: { max: 5,  per: 0.04, cap: 0.20, kind: "pct" },   // a tool doesn't spend its stamina charge — 20% max
+    detonator: { max: 5,  per: 0.01, cap: 0.05, kind: "pct" },   // a dig spawns a free explosion — 5% max
+};
+const digTrackValue = (t, lvl) => Math.min(DIG_TRACKS[t].cap, Math.max(0, lvl) * DIG_TRACKS[t].per);
+
+// Area-clear TOOLS — unlocked every 10 excavation levels (excavation level = voyages completed). Using one
+// spends `stamina` from your dig budget (unless Efficient procs) and clears a cols×rows patch, `layers` deep.
+const DIG_TOOLS = [
+    { id: "wide",  name: "Wide Dig",   emoji: "🪓", unlock: 10, stamina: 2, cols: 2, rows: 2, layers: 1 },
+    { id: "deep",  name: "Deep Blast", emoji: "💥", unlock: 20, stamina: 3, cols: 2, rows: 2, layers: 2 },
+    { id: "quake", name: "Quake",      emoji: "🌋", unlock: 30, stamina: 4, cols: 3, rows: 3, layers: 1 },
+];
+const EXCAVATION_PER_TOOL = 10;
+const excavationLevel = (voyages = 0) => Math.max(0, voyages);
+const unlockedTools = (voyages = 0) => DIG_TOOLS.filter((t) => excavationLevel(voyages) >= t.unlock);
+const DIG_TRACK_COL = { stamina: "dig_stamina_level", pierce: "dig_pierce_level", strike: "dig_strike_level", efficient: "dig_efficient_level", detonator: "dig_detonator_level" };
+function digTrackView(row, t) {
+    const lvl = row?.[DIG_TRACK_COL[t]] || 0;
+    const def = DIG_TRACKS[t];
+    return { level: lvl, max: def.max, cost: upgradeCost(lvl), maxed: lvl >= def.max, kind: def.kind, cap: def.cap, valueNow: digTrackValue(t, lvl), valueNext: digTrackValue(t, lvl + 1) };
+}
+function digUpgradesView(row) {
+    const stamLvl = row?.dig_stamina_level || 0;
+    return {
+        stamina: { ...digTrackView(row, "stamina"), digsNow: digStamina(stamLvl), digsNext: digStamina(stamLvl + 1) },
+        pierce: digTrackView(row, "pierce"),
+        strike: digTrackView(row, "strike"),
+        efficient: digTrackView(row, "efficient"),
+        detonator: digTrackView(row, "detonator"),
+    };
+}
+function excavationView(voyages) {
+    const lvl = excavationLevel(voyages);
+    const tools = DIG_TOOLS.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, unlock: t.unlock, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers, unlocked: lvl >= t.unlock }));
+    return { level: lvl, perTool: EXCAVATION_PER_TOOL, tools, nextTool: tools.find((t) => !t.unlocked) || null };
+}
+
 // The 8 boat FORMS. Reaching each level unlocks a new hull art (BOAT_ART[tier]) + a permanent perk applied by
 // boatPerks(). Perks are cumulative and reuse the existing engine knobs so they're cheap + safe.
 const MILESTONES = [
@@ -112,8 +155,8 @@ export function voyageDurationMs(speedLevel = 0, level = 1) {
 }
 // Progressive cost — each level costs quadratically more than the last.
 function upgradeCost(nextLevel) { return 100 * (nextLevel + 1) * (nextLevel + 1); }
-// Dig count is NOT a boat lever — flat base budget, extended mid-dig with "buy more digs".
-function digStamina() { return BASE_STAMINA; }
+// Dig count is a DIGGING upgrade (not a boat lever): base budget + the Stamina track.
+function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrackValue("stamina", staminaLevel)); }
 // Fortune (luck_level column) sends the boat to richer islands: +1 buried per level (+ milestone bonuses).
 function fragmentsBuried(fortuneLevel = 0, level = 1) {
     return Math.min(MAX_BURIED, FRAGMENTS_BURIED + Math.max(0, fortuneLevel) + boatPerks(level).buried);
@@ -127,7 +170,10 @@ function randInt(n) { return Math.floor(Math.random() * n); }
 // Luck (find_level): how shallow the shallowest a fragment can sit — higher Luck = struck sooner.
 function fragMaxDepth(luckLevel = 0) { return Math.max(1, DIG_MAX_DEPTH - Math.floor(Math.max(0, luckLevel) / LUCK_PER_SHALLOW)); }
 
-function newBoard(fortuneLevel, luckLevel, level) {
+function newBoard(row) {
+    const fortuneLevel = row?.luck_level || 0;
+    const luckLevel = row?.find_level || 0;
+    const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel);
     // Every tile is a stack of 1–DIG_MAX_DEPTH dirt layers you chip through. Fragments are scattered under
     // random individual tiles — NO clusters, NO pointer, NO shimmer. Fortune enriches the island with more
     // buried fragments; Luck buries them shallower (struck sooner). Never learn a tile's secret until the bottom.
@@ -141,24 +187,72 @@ function newBoard(fortuneLevel, luckLevel, level) {
     const perks = boatPerks(level);
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
     const dug = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => false));
-    const stamina = digStamina();
-    return { cols: DIG_COLS, rows: DIG_ROWS, depth, maxDepth: DIG_MAX_DEPTH, frag, dug, stamina, maxStamina: stamina, status: "active" };
+    const stamina = digStamina(row?.dig_stamina_level || 0);
+    // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
+    const up = {
+        pierce: digTrackValue("pierce", row?.dig_pierce_level || 0),
+        strike: digTrackValue("strike", row?.dig_strike_level || 0),
+        efficient: digTrackValue("efficient", row?.dig_efficient_level || 0),
+        detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
+    };
+    const tools = unlockedTools(row?.voyages_completed || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers }));
+    return { cols: DIG_COLS, rows: DIG_ROWS, depth, maxDepth: DIG_MAX_DEPTH, frag, dug, stamina, maxStamina: stamina, status: "active", up, tools, bonus: 0 };
 }
 
-// Server-authoritative dig — chips one layer of rock off a tile. Returns the mutated board.
+// Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
+// least one fragment (unearthed or a lucky Strike bonus) to your name.
+function resolveBoard(board) {
+    const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+    if (found >= board.frag.length) board.status = "won";
+    else if (board.stamina <= 0) board.status = (found + (board.bonus || 0)) >= 1 ? "won" : "lost";
+    return found;
+}
+
+// Server-authoritative dig — chips one layer off a tile, plus the digging-upgrade procs (pierce / strike /
+// detonator). Returns the mutated board.
 function applyDig(board, r, c) {
     if (board.status !== "active" || board.stamina <= 0) return board;
     if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return board;
     if (board.depth[r][c] <= 0) return board; // already chipped to the bottom — never wastes a dig
     board.stamina -= 1;
     board.dug[r][c] = true;
-    board.depth[r][c] -= 1;
-    // A fragment is unearthed the moment its tile breaks through to the bottom. Dig until you've found them all
-    // or your pick runs out; any fragment found means you keep them (see digAt).
-    const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
-    if (found >= board.frag.length) board.status = "won"; // every buried fragment unearthed
-    else if (board.stamina <= 0) board.status = found >= 1 ? "won" : "lost";
+    const up = board.up || {};
+    // Pierce: this dig breaks through EVERY remaining layer of the tile at once (else just one).
+    if (up.pierce && Math.random() < up.pierce) board.depth[r][c] = 0;
+    else board.depth[r][c] -= 1;
+    // Strike: a lucky bonus fragment (no location tell — it's just extra loot on this swing).
+    if (up.strike && Math.random() < up.strike) board.bonus = (board.bonus || 0) + 1;
+    // Detonator: a free explosion clears the 3×3 around the dig by one layer.
+    if (up.detonator && Math.random() < up.detonator) {
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            const nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols && board.depth[nr][nc] > 0) { board.depth[nr][nc] -= 1; board.dug[nr][nc] = true; }
+        }
+    }
+    resolveBoard(board);
     return board;
+}
+
+// Use an unlocked area-clear TOOL at (r,c): spend its stamina charge (unless Efficient procs) and clear a
+// cols×rows patch `layers` deep. Returns { ok, board } — ok:false when the tool can't be used.
+function applyTool(board, toolId, r, c) {
+    if (board.status !== "active") return { ok: false };
+    const tool = (board.tools || []).find((t) => t.id === toolId);
+    if (!tool) return { ok: false };
+    const up = board.up || {};
+    const free = up.efficient && Math.random() < up.efficient;
+    const cost = free ? 0 : tool.stamina;
+    if (board.stamina < cost) return { ok: false };
+    board.stamina -= cost;
+    for (let dr = 0; dr < tool.rows; dr++) for (let dc = 0; dc < tool.cols; dc++) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols) {
+            board.dug[nr][nc] = true;
+            board.depth[nr][nc] = Math.max(0, board.depth[nr][nc] - tool.layers);
+        }
+    }
+    resolveBoard(board);
+    return { ok: true, free };
 }
 
 // The client-safe view of a board. Reveals each tile's remaining rock depth (so the layers can be drawn) and
@@ -181,7 +275,7 @@ function boardView(board) {
         tiles.push(row);
     }
     const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
-    return { cols: board.cols, rows: board.rows, maxDepth, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, tiles, buried: board.frag.length, found };
+    return { cols: board.cols, rows: board.rows, maxDepth, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, tools: board.tools || [] };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -234,6 +328,9 @@ function decorate(row) {
             depthNow: fragMaxDepth(luckLevel), depthNext: fragMaxDepth(luckLevel + 1),
         },
         voyageMs: voyageDurationMs(speedLevel, level),
+        // Digging upgrade system (separate from the boat).
+        digUpgrades: digUpgradesView(row),
+        excavation: excavationView(row?.voyages_completed || 0),
         status, progress, departedAt, arrivesAt,
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
@@ -388,7 +485,28 @@ export async function beginDig(buyerId) {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "arrived") return { ok: false, error: "not_arrived", ...(await getSailingState(buyerId)) };
-    const board = newBoard(row?.luck_level || 0, row?.find_level || 0, state.level);
+    const board = newBoard(row);
+    await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// Resolve a finished dig: fragments earned = tiles unearthed + lucky Strike bonuses. Clears the voyage + board.
+async function finishDig(buyerId, board) {
+    const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+    const earned = found + (board.bonus || 0);
+    const won = earned > 0;
+    // NOTE: digging does NOT level the boat — but voyages_completed drives the EXCAVATION level (tool unlocks).
+    await db.query(
+        `UPDATE mkt_sailing
+            SET dig_state = NULL, departed_at = NULL, returns_at = NULL,
+                fragments = fragments + $2, voyages_completed = voyages_completed + 1, updated_at = NOW()
+          WHERE buyer_id = $1`,
+        [buyerId, earned]
+    ).catch(() => {});
+    const state = await getSailingState(buyerId);
+    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, fragments: state.fragments }, ...state };
+}
+async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
@@ -398,32 +516,32 @@ export async function digAt(buyerId, r, c) {
     const board = row?.dig_state;
     if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
     applyDig(board, Number(r), Number(c));
+    return (board.status === "won" || board.status === "lost") ? finishDig(buyerId, board) : persistDig(buyerId, board);
+}
 
-    if (board.status === "won" || board.status === "lost") {
-        // One fragment per tile you unearthed — find one, find all three, or come up empty. Then clear the
-        // voyage + board so the boat is back at port.
-        const earned = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
-        const won = earned > 0;
-        // NOTE: digging does NOT level the boat — the boat only levels up from buying upgrades.
-        await db.query(
-            `UPDATE mkt_sailing
-                SET dig_state = NULL, departed_at = NULL, returns_at = NULL,
-                    fragments = fragments + $2, voyages_completed = voyages_completed + 1, updated_at = NOW()
-              WHERE buyer_id = $1`,
-            [buyerId, earned]
-        ).catch(() => {});
-        const state = await getSailingState(buyerId);
-        return { ok: true, result: { won, earned, buried: board.frag.length, fragments: state.fragments }, ...state };
-    }
-
-    await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
-    return { ok: true, ...(await getSailingState(buyerId)) };
+// Use an unlocked area-clear tool at (r,c).
+export async function activateTool(buyerId, toolId, r, c) {
+    const row = await readRow(buyerId);
+    const board = row?.dig_state;
+    if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
+    const res = applyTool(board, String(toolId), Number(r), Number(c));
+    if (!res.ok) return { ok: false, error: "cant_use_tool", ...(await getSailingState(buyerId)) };
+    return (board.status === "won" || board.status === "lost") ? finishDig(buyerId, board) : persistDig(buyerId, board);
 }
 
 // The four boat upgrade tracks → their DB columns + level caps. Fortune lives in the legacy luck_level column;
 // the "Luck" (early-find) lever lives in find_level.
-const UPGRADE_COLS = { speed: "speed_level", fortune: "luck_level", rarity: "rarity_level", luck: "find_level" };
-const UPGRADE_MAX = { speed: MAX_SPEED_LEVEL, fortune: MAX_FORTUNE_LEVEL, rarity: MAX_RARITY_LEVEL, luck: MAX_LUCK_LEVEL };
+const UPGRADE_COLS = {
+    speed: "speed_level", fortune: "luck_level", rarity: "rarity_level", luck: "find_level",
+    // Digging tracks (separate system):
+    dig_stamina: "dig_stamina_level", dig_pierce: "dig_pierce_level", dig_strike: "dig_strike_level",
+    dig_efficient: "dig_efficient_level", dig_detonator: "dig_detonator_level",
+};
+const UPGRADE_MAX = {
+    speed: MAX_SPEED_LEVEL, fortune: MAX_FORTUNE_LEVEL, rarity: MAX_RARITY_LEVEL, luck: MAX_LUCK_LEVEL,
+    dig_stamina: DIG_TRACKS.stamina.max, dig_pierce: DIG_TRACKS.pierce.max, dig_strike: DIG_TRACKS.strike.max,
+    dig_efficient: DIG_TRACKS.efficient.max, dig_detonator: DIG_TRACKS.detonator.max,
+};
 
 async function buyUpgrade(buyerId, kind) {
     const col = UPGRADE_COLS[kind];
@@ -442,3 +560,4 @@ export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
 export const upgradeFortune = (buyerId) => buyUpgrade(buyerId, "fortune");
 export const upgradeRarity = (buyerId) => buyUpgrade(buyerId, "rarity");
 export const upgradeLuck = (buyerId) => buyUpgrade(buyerId, "luck"); // the "Luck" (early-find) lever
+export const upgradeDig = (buyerId, track) => buyUpgrade(buyerId, `dig_${track}`); // digging tracks
