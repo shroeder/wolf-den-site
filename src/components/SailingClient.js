@@ -166,7 +166,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 const pick = fleet[Math.floor(Math.random() * fleet.length)];
                 const id = (ambientId.current += 1);
                 const dur = 12 + Math.random() * 7;
-                setAmbient((a) => [...a, { id, art: pick.art, name: pick.name, flip: Math.random() < 0.5, top: 6 + Math.random() * 32, dur }]);
+                setAmbient((a) => [...a, { id, art: pick.art, name: pick.name, flip: Math.random() < 0.5, top: 31 + Math.random() * 11, dur }]);
                 setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
             }
             timer = setTimeout(spawn, (13 + Math.random() * 11) * 1000);
@@ -367,7 +367,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             <div className="sail-boat">
                                 <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${celebrate === "gust" ? " is-gusting" : ""}`}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img className="sail-boat-img" src={state.boatArt} alt="Your boat" />
+                                    <img className={`sail-boat-img boat-aura-${state.tier}`} src={state.boatArt} alt="Your boat" />
                                     <span className="sail-crew">
                                         {pet?.url ? (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -492,7 +492,7 @@ export default function SailingClient({ initial, hero, pet }) {
                         <button type="button" className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level} onClick={() => setInspectForm(f)}>
                             <span className="sail-form-art">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={f.art} alt="" className={f.unlocked ? "" : "is-locked"} />
+                                <img src={f.art} alt="" className={`${f.unlocked ? "" : "is-locked"} boat-aura-${f.tier}`} />
                                 {f.unlocked ? null : <span className="sail-form-lock">🔒</span>}
                             </span>
                             <div className="sail-form-body">
@@ -601,7 +601,7 @@ export default function SailingClient({ initial, hero, pet }) {
                         <button type="button" className="sail-inspect-x" onClick={() => setInspectForm(null)} aria-label="Close">×</button>
                         <div className="sail-inspect-art">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={inspectForm.art} alt={inspectForm.name} className={inspectForm.unlocked ? "" : "is-locked"} />
+                            <img src={inspectForm.art} alt={inspectForm.name} className={`${inspectForm.unlocked ? "" : "is-locked"} boat-aura-${inspectForm.tier}`} />
                             {inspectForm.unlocked ? null : <span className="sail-inspect-lock">🔒</span>}
                         </div>
                         <h2 style={{ margin: "6px 0 2px" }}>{inspectForm.name}</h2>

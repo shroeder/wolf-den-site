@@ -96,9 +96,9 @@ const MILESTONES = [
     { level: 30, tier: 4, name: "Trade Brig", perk: "+12% chance a forged chest is upgraded a tier", chest: 0.12 },
     { level: 40, tier: 5, name: "Trade-Wind Schooner", perk: "15% chance a tailwind isn't used up", windSave: 0.15 },
     { level: 50, tier: 6, name: "Gilded Galleon", perk: "Your first dig each trip always strikes a fragment", surface: true },
-    { level: 60, tier: 7, name: "Storm Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
-    { level: 70, tier: 8, name: "Leviathan", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
-    { level: 80, tier: 8, name: "Leviathan, Fully Rigged", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
+    { level: 60, tier: 7, name: "Dragon Ship", perk: "Voyages are another 10% faster", voyage: 0.9 },
+    { level: 70, tier: 8, name: "Ghost Ship", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
+    { level: 80, tier: 8, name: "Ghost Ship — Fully Crewed", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
 ];
 
 const BOAT_ART = {
@@ -108,8 +108,8 @@ const BOAT_ART = {
     4: "/images/sailing/boat-tier4-brig.png",
     5: "/images/sailing/boat-tier5-schooner.png",
     6: "/images/sailing/boat-tier6-galleon.png",
-    7: "/images/sailing/boat-tier7-frigate.png",
-    8: "/images/sailing/boat-tier8-leviathan.png",
+    7: "/images/sailing/boat-tier7-dragon.png",
+    8: "/images/sailing/boat-tier8-ghost.png",
 };
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
 export const DIG_BG = "/images/sailing/dig-bg.png";
