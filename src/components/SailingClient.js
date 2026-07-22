@@ -184,6 +184,15 @@ export default function SailingClient({ initial, hero, pet }) {
     const fleetIdx = useRef(0);        // round-robin cursor so consecutive ships are DIFFERENT members
     const boostRef = useRef(0);        // Date.now() until which traffic is sped up (after a tailwind)
     const gustTimer = useRef(null);    // safety timer that clears `gusting` if the animationend event is missed
+    const halfwayRef = useRef(null);   // departedAt we've already done the one-shot midpoint refetch for
+
+    // Silent state refresh (GET) — used for the one-shot midpoint refetch so a marine encounter pops live.
+    const load = useCallback(async () => {
+        try {
+            const r = await fetch("/api/marketplace/sailing", { cache: "no-store" });
+            if (r.ok) { const d = await r.json().catch(() => null); if (d && !d.error) setState(d); }
+        } catch { /* keep prior state */ }
+    }, []);
 
     // Every so often, send another sailor's boat drifting across the horizon behind yours.
     useEffect(() => {
@@ -231,9 +240,17 @@ export default function SailingClient({ initial, hero, pet }) {
                 setCelebrate("arrive");
                 setTimeout(() => setCelebrate((c) => (c === "arrive" ? null : c)), 2600);
             }
+            // A voyage's encounter is scheduled at its ORIGINAL midpoint and resolves server-side on the next
+            // state read. Do ONE silent refetch the moment we cross that midpoint so an encounter pops live even
+            // while idle here (no continuous polling). departedAt + voyageTotalMs/2 = the fixed midpoint.
+            if (s.status === "sailing" && s.departedAt && s.voyageTotalMs > 0 && halfwayRef.current !== s.departedAt
+                && Date.now() >= s.departedAt + s.voyageTotalMs / 2) {
+                halfwayRef.current = s.departedAt;
+                load();
+            }
         }, 1000);
         return () => clearInterval(id);
-    }, []);
+    }, [load]);
 
     const { arrivesAt } = state;
     let liveStatus = state.status;
