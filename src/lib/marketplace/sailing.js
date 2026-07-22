@@ -366,8 +366,10 @@ export async function getSailingState(buyerId) {
         art: boatArt(boatLevelFromUpgrades(o.speed_level || 0, o.luck_level || 0, o.rarity_level || 0, o.find_level || 0)),
         name: o.alias,
     }));
-    // Pad with a few generic hulls so the horizon is never empty (decorative until multiplayer sailing opens).
-    for (const t of [2, 4, 6, 8, 1]) if (fleet.length < 6) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null });
+    // Pad with a few humble STARTER hulls so the horizon is never empty (decorative until multiplayer
+    // sailing opens). Only tier 1-2 — a nameless high-tier ship on the horizon would misrepresent that
+    // nobody can sail yet, and spoil the reveal of the epic forms.
+    for (const t of [1, 2, 1, 2, 1]) if (fleet.length < 6) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null });
     return { ...decorate(row), gold: goldRow?.gold || 0, fleet };
 }
 

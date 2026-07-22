@@ -579,17 +579,21 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             ) : null}
 
-            {/* NEW FORM — the "very special" unlock every 10 levels: new hull + a permanent perk. */}
+            {/* NEW FORM — the "very special" unlock every 10 levels: a grand reveal of the actual new hull. */}
             {formUnlock ? (
-                <div className="sail-reward-overlay">
-                    <div className="card sail-recap sail-formcard">
+                <div className="sail-reward-overlay sail-formreveal-overlay">
+                    <div className="card sail-recap sail-formreveal">
                         <Confetti />
-                        <div className="sail-recap-hero is-win"><span className="sail-form-hero">⛵</span></div>
-                        <div className="sail-levelup-ribbon">✨ NEW BOAT FORM ✨</div>
-                        <h2 style={{ margin: "8px 0 2px" }}>{formUnlock.name}</h2>
-                        <p className="muted" style={{ marginTop: 0 }}>Form {formUnlock.tier} of {state.boatTiers} — reached at Lv {formUnlock.level}.</p>
+                        <div className="sail-formreveal-ribbon">✨ NEW BOAT FORM ✨</div>
+                        <div className="sail-formreveal-stage">
+                            <span className="sail-formreveal-rays" aria-hidden="true" />
+                            <span className="sail-formreveal-burst" aria-hidden="true" />
+                            <img src={formUnlock.art} alt={formUnlock.name} className={`sail-formreveal-boat boat-aura-${formUnlock.tier}`} />
+                        </div>
+                        <div className="sail-formreveal-tier">Form {formUnlock.tier} of {state.boatTiers} · reached at Lv {formUnlock.level}</div>
+                        <h2 className="sail-formreveal-name">{formUnlock.name}</h2>
                         <div className="sail-form-perkbig">🎁 Perk unlocked: {formUnlock.perk}</div>
-                        <button className="sail-cta" onClick={() => setFormUnlock(null)}>Set sail ⛵</button>
+                        <button className="sail-cta sail-cta-dig" onClick={() => setFormUnlock(null)}>Set sail ⛵</button>
                     </div>
                 </div>
             ) : null}
