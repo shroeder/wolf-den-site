@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import BossFinalBlow from "@/components/BossFinalBlow";
 import { getBossRecap } from "@/lib/marketplace/boss.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 
@@ -27,7 +28,7 @@ export default async function BossRecapPage({ params }) {
         );
     }
 
-    const { boss, totalDamage, fighters, leaderboard, winner, mine } = recap;
+    const { boss, totalDamage, fighters, leaderboard, winner, mine, mvp } = recap;
 
     return (
         <div className="stack reveal">
@@ -48,6 +49,16 @@ export default async function BossRecapPage({ params }) {
                     <div><span className="brs-num">{(boss.maxHp || 0).toLocaleString()}</span><span className="brs-lbl">HP crushed</span></div>
                 </div>
             </section>
+
+            {mvp ? (
+                <section className="card boss-recap-finalblow">
+                    <h3 style={{ marginTop: 0 }}>🎬 The final blow</h3>
+                    <p className="muted" style={{ marginTop: 0 }}>
+                        {mvp.you ? "You dealt" : `${mvp.name} dealt`} the most damage — <strong>{mvp.dmg.toLocaleString()}</strong>. Relive the killing strike.
+                    </p>
+                    <BossFinalBlow mvp={mvp} boss={boss} />
+                </section>
+            ) : null}
 
             {winner ? (
                 <section className="card boss-recap-winner">

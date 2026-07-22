@@ -9578,6 +9578,92 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-ticket-tix small { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #cdbfa6; }
 .boss2-victory-overlay { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.72); }
 
+/* ===== "FINAL BLOW" cinematic — the MVP's killing strike, slow-mo zoom + shatter (BossFinalBlow.js) ===== */
+.boss-recap-finalblow { text-align: center; }
+.fb-cta { margin: 4px auto 0; }
+.fb-cine { position: fixed; inset: 0; z-index: 1400; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(120% 120% at 70% 45%, rgba(40,10,10,0.9), rgba(3,4,8,0.98) 70%); overflow: hidden;
+    animation: fbCineIn 0.45s ease both; }
+@keyframes fbCineIn { from { opacity: 0; } to { opacity: 1; } }
+.fb-close { position: absolute; top: 12px; right: 14px; z-index: 6; width: 38px; height: 38px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.12); color: #fff; font-size: 1.4rem; line-height: 1; cursor: pointer; }
+/* The camera: the whole scene zooms toward the impact as the hero winds up, then eases back out. */
+.fb-scene { position: relative; width: min(92vw, 640px); height: min(64vh, 460px); transform-origin: 70% 54%;
+    animation: fbZoom 5.6s cubic-bezier(0.5, 0, 0.2, 1) both; will-change: transform; }
+@keyframes fbZoom { 0% { transform: scale(1); } 36% { transform: scale(1); } 62% { transform: scale(1.34); } 80% { transform: scale(1.28); } 100% { transform: scale(1.06); } }
+.fb-arena { position: absolute; inset: 0; animation: fbShake 0.5s 3.4s both; }
+@keyframes fbShake { 0%,100% { transform: translate(0,0); } 12% { transform: translate(-9px, 5px); } 30% { transform: translate(8px, -6px); } 48% { transform: translate(-7px, 4px); } 66% { transform: translate(5px, -3px); } 82% { transform: translate(-3px, 2px); } }
+/* Boss: looms, braces, takes the hit (white flash + shove), then shatters into light and is gone. */
+.fb-boss { position: absolute; right: 2%; bottom: 6%; height: 80%; width: auto; transform-origin: bottom center;
+    filter: drop-shadow(0 12px 22px rgba(0,0,0,0.6)); animation: fbBoss 5.6s ease-in-out both; }
+.fb-boss-fallback { display: grid; place-items: center; font-size: 12rem; }
+@keyframes fbBoss {
+    0% { transform: translateY(0) scale(1) rotate(0); filter: brightness(1); }
+    50% { transform: translateY(-4px) scale(1); filter: brightness(1); }
+    58% { transform: translateY(0) scale(0.99) rotate(1deg); filter: brightness(1.1); }   /* brace */
+    62% { transform: translateX(-24px) scale(1.02) rotate(-3deg); filter: brightness(2.4); } /* IMPACT — flash */
+    67% { transform: translateX(10px) scale(1) rotate(1.5deg); filter: brightness(1.3); }    /* recoil */
+    72% { transform: translateX(0) scale(1.04); filter: brightness(1.6); opacity: 1; }
+    84% { transform: translateX(0) scale(1.28); filter: brightness(3) blur(6px); opacity: 0; } /* shatter */
+    100% { transform: translateX(0) scale(1.3); opacity: 0; filter: brightness(3) blur(10px); }
+}
+/* Hero (MVP sprite): rushes in, winds up in slow-mo, then LUNGES through the boss and stands victorious.
+   scaleX(var(--fb-face)) is innermost so a flipped sprite still lunges toward the boss (screen-right). */
+.fb-hero { position: absolute; left: 6%; bottom: 8%; height: 52%; width: auto; z-index: 5; transform-origin: bottom center;
+    --fb-face: 1; filter: drop-shadow(0 0 16px rgba(255,215,94,0.85)) drop-shadow(0 8px 12px rgba(0,0,0,0.6));
+    animation: fbHero 5.6s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.fb-hero.is-flip { --fb-face: -1; }
+@keyframes fbHero {
+    0% { transform: translateX(-240%) scale(1) scaleX(var(--fb-face,1)); opacity: 0; }
+    10% { opacity: 1; }
+    24% { transform: translateX(0) scale(1) scaleX(var(--fb-face,1)); opacity: 1; }         /* arrived */
+    38% { transform: translateX(-8%) scale(1.05) scaleX(var(--fb-face,1)); }                 /* slow wind-up */
+    56% { transform: translateX(-14%) scale(1.08) scaleX(var(--fb-face,1)); }
+    62% { transform: translateX(64%) scale(1.16) scaleX(var(--fb-face,1)); }                 /* LUNGE through */
+    68% { transform: translateX(52%) scale(1.1) scaleX(var(--fb-face,1)); }
+    82% { transform: translateX(8%) scale(1) scaleX(var(--fb-face,1)); }                      /* land, victorious */
+    100% { transform: translateX(8%) scale(1) scaleX(var(--fb-face,1)); opacity: 1; }
+}
+/* Impact flash across the arena. */
+.fb-flash { position: absolute; inset: -20%; z-index: 4; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at 68% 52%, rgba(255,255,255,0.98), rgba(255,220,150,0.5) 35%, transparent 62%);
+    animation: fbFlash 0.6s ease-out 3.36s both; }
+@keyframes fbFlash { 0% { opacity: 0; } 16% { opacity: 1; } 100% { opacity: 0; } }
+/* Shatter shards bursting from the boss. */
+.fb-shards { position: absolute; right: 20%; top: 40%; z-index: 3; pointer-events: none; }
+.fb-shards span { position: absolute; width: 10px; height: 10px; border-radius: 2px; background: linear-gradient(135deg, #fff, #ffb066);
+    opacity: 0; animation: fbShard 1.1s ease-out both; animation-delay: calc(3.55s + (var(--i) * 8ms)); }
+@keyframes fbShard {
+    0% { opacity: 1; transform: translate(0,0) rotate(0) scale(1); }
+    100% { opacity: 0; transform: translate(calc(cos(var(--i) * 18deg) * 220px), calc(sin(var(--i) * 18deg) * 220px - 40px)) rotate(320deg) scale(0.4); }
+}
+/* Giant crit damage number on impact. */
+.fb-dmg { position: absolute; right: 24%; top: 24%; z-index: 5; font-weight: 900; font-size: clamp(2.4rem, 9vw, 4.6rem);
+    color: #fff; text-shadow: 0 3px 0 #b5842f, 0 0 24px rgba(255,180,60,0.95); white-space: nowrap; opacity: 0;
+    animation: fbDmg 1.5s cubic-bezier(0.2,1.4,0.4,1) 3.44s both; }
+@keyframes fbDmg { 0% { opacity: 0; transform: scale(0.3); } 14% { opacity: 1; transform: scale(1.25); } 28% { transform: scale(1); } 78% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-34px); } }
+.fb-title { position: absolute; top: 8%; left: 50%; transform: translateX(-50%); z-index: 5; font-weight: 900; letter-spacing: 0.14em;
+    font-size: clamp(1rem, 4vw, 1.7rem); color: #ffd0d0; text-shadow: 0 2px 10px #000; animation: fbTitle 2.3s ease both; }
+@keyframes fbTitle { 0% { opacity: 0; transform: translateX(-50%) scale(0.8); } 12% { opacity: 1; transform: translateX(-50%) scale(1); } 70% { opacity: 1; } 100% { opacity: 0; } }
+.fb-slain { position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%); z-index: 6; font-weight: 900; letter-spacing: 0.06em;
+    font-size: clamp(2rem, 9vw, 4rem); color: #fff; text-shadow: 0 3px 0 #7a1010, 0 0 30px rgba(255,80,80,0.9); white-space: nowrap;
+    opacity: 0; animation: fbSlain 1.6s cubic-bezier(0.2,1.3,0.3,1) 3.92s both; }
+@keyframes fbSlain { 0% { opacity: 0; transform: translate(-50%,-50%) scale(2.4); } 20% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 100% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+.fb-caption { position: absolute; bottom: 6%; left: 50%; transform: translateX(-50%); z-index: 6; text-align: center; width: 92%;
+    opacity: 0; animation: fbCaptionIn 0.85s ease 4.7s both; }
+@keyframes fbCaptionIn { 0% { opacity: 0; transform: translate(-50%, 14px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+.fb-caption-name { font-weight: 900; font-size: clamp(1rem, 4.5vw, 1.5rem); color: #ffd75e; text-shadow: 0 2px 6px #000; }
+.fb-caption-sub { font-weight: 700; font-size: 0.9rem; color: #e6d3b0; margin-top: 3px; text-shadow: 0 1px 3px #000; }
+.fb-actions { position: absolute; bottom: 6%; right: 6%; z-index: 7; display: flex; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+.fb-actions.is-on { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) {
+    .fb-scene, .fb-arena, .fb-boss, .fb-hero, .fb-flash, .fb-shards span, .fb-dmg, .fb-title, .fb-slain, .fb-caption { animation: none !important; }
+    .fb-flash, .fb-shards, .fb-dmg, .fb-title { display: none; }
+    .fb-slain, .fb-caption { opacity: 1; }
+    .fb-hero { transform: translateX(8%); }
+    .fb-actions { opacity: 1; pointer-events: auto; }
+}
+
 /* Boss RECAP page — final battle stats for a defeated boss (linked from the defeat notifications). */
 .boss-recap-hero { text-align: center; background: radial-gradient(120% 120% at 50% 0%, rgba(255,90,90,0.14), transparent 60%); }
 .boss-recap-slain { display: inline-block; font-weight: 900; letter-spacing: 0.12em; font-size: 0.8rem; color: #ff8a8a; border: 1px solid rgba(255,90,90,0.5); border-radius: 999px; padding: 2px 12px; }

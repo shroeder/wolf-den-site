@@ -483,6 +483,21 @@ export async function getBossRecap(bossId, buyerId = null) {
         const idx = rows.findIndex((r) => r.id === buyerId);
         if (idx >= 0) { const r = rows[idx]; mine = { rank: idx + 1, dmg: r.dmg, tickets: Math.floor(r.dmg / divisor), hits: r.hits }; }
     }
+    // MVP = the top damage dealer, with their battle SPRITE, for the "final blow" cinematic.
+    let mvp = null;
+    if (rows.length) {
+        const top = rows[0];
+        const s = await db.queryOne(`SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [top.id]).catch(() => null);
+        mvp = {
+            name: top.display_name || top.alias || "Member",
+            dmg: top.dmg,
+            level: lvl(top.xp),
+            spriteUrl: s?.avatar_sprite_url || null,
+            spriteFlip: s?.avatar_sprite_url ? s?.avatar_sprite_flip === true : false,
+            avatarUrl: avatarImageUrl(top.avatar_config, top.avatar_cosmetics) || top.avatar_url || DEFAULT_AVATAR_URL,
+            you: Boolean(buyerId && top.id === buyerId),
+        };
+    }
     return {
         boss: { id: boss.id, name: boss.name, imageUrl: boss.image_url || null, maxHp: boss.max_hp, defeatedAt: boss.defeated_at, weakness: weaknessInfo(boss.weakness), prize: boss.prize_name ? { name: boss.prize_name, imageUrl: boss.prize_image_url || null } : null },
         totalDamage,
@@ -490,6 +505,7 @@ export async function getBossRecap(bossId, buyerId = null) {
         leaderboard,
         winner,
         mine,
+        mvp,
     };
 }
 
