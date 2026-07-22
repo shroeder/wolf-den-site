@@ -416,7 +416,10 @@ export async function getSailingState(buyerId) {
     });
     // Only pad if literally nobody else has a hero yet, so the horizon isn't dead empty in early testing.
     for (const t of [1, 2, 1]) if (fleet.length < 3) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null, rider: null, riderFlip: false, pet: null, petFlip: false });
-    return { ...decorate(row), gold: goldRow?.gold || 0, fleet };
+    // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
+    // longer flips from a default to the chosen one on load.
+    const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
+    return { ...decorate(row), gold: goldRow?.gold || 0, fleet, sky };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {

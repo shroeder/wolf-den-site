@@ -158,15 +158,10 @@ export default function SailingClient({ initial, hero, pet }) {
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
-    const [sky, setSky] = useState(null); // a random horizon backdrop, chosen once per app open
-
-    // Pick a random sky/seascape on mount (in an effect so SSR + client agree — no hydration mismatch from
-    // Math.random running during render).
-    useEffect(() => {
-        const list = initial?.skies || [];
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (list.length) setSky(list[Math.floor(Math.random() * list.length)]);
-    }, [initial]);
+    // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
+    // correct on the very first render — no flicker from a default to the picked one. Held stable for the
+    // session (later state updates re-roll d.sky, but we keep this original).
+    const [sky] = useState(() => initial?.sky || initial?.oceanBg || null);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);

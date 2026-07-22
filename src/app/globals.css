@@ -10516,17 +10516,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-ambient-boat { position: absolute; left: -22%; opacity: 0; will-change: left, opacity;
     animation-name: sailAmbient; animation-timing-function: linear; animation-fill-mode: forwards; }
 .sail-ambient-hull { position: relative; display: block; }
-.sail-ambient-boat img { display: block; width: clamp(50px, 15vw, 98px); height: auto; filter: brightness(0.94) saturate(0.98); }
+.sail-ambient-boat img { display: block; width: clamp(72px, 21vw, 132px); height: auto; filter: brightness(0.94) saturate(0.98); }
 /* Base = heading right (no flip). is-rev flips the TRAVEL direction; is-faceleft mirrors the hull+rider so it
    also LOOKS like it's heading left. (While you're underway we set is-rev WITHOUT is-faceleft, so the fleet
    drifts backward past you while still pointed the same way you are.) */
 .sail-ambient-boat.is-rev { animation-name: sailAmbientRev; }
 .sail-ambient-boat.is-faceleft .sail-ambient-hull { transform: scaleX(-1); }
 /* The real member (+ pet) riding on deck — small + distant, standing ON the midship, not floating above it. */
-.sail-ambient-rider { position: absolute; left: 55%; bottom: 22%; transform: translateX(-50%);
-    width: 40%; max-width: 42px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
-.sail-ambient-pet { position: absolute; left: 33%; bottom: 20%; transform: translateX(-50%);
-    width: 32%; max-width: 32px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+.sail-ambient-rider { position: absolute; left: 60%; bottom: 22%; transform: translateX(-50%);
+    width: 28%; max-width: 40px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
+.sail-ambient-pet { position: absolute; left: 22%; bottom: 20%; transform: translateX(-50%);
+    width: 24%; max-width: 30px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 .sail-ambient-name { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap;
     font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
 @keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
