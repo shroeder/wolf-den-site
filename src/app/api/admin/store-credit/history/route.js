@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/db";
-import { listStoreCreditEvents } from "@/lib/marketplace/store-credit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -24,7 +23,7 @@ export async function GET(request) {
             const buyerId = String(searchParams.get("buyerId") || "").trim();
             if (!buyerId) return noStore({ error: "missing_buyerId" }, { status: 400 });
 
-            const [member, events, agg] = await Promise.all([
+            const [member, eventRows, agg] = await Promise.all([
                 db.queryOne(
                     `SELECT COALESCE(display_name, alias, first_name, email, 'Member') AS name,
                             email,
@@ -32,13 +31,28 @@ export async function GET(request) {
                        FROM mkt_buyer WHERE id = $1`,
                     [buyerId]
                 ).catch(() => null),
-                listStoreCreditEvents(buyerId, 100),
+                // Ledger, newest-first. Format the date in STORE-LOCAL time (America/Chicago) so an evening
+                // purchase doesn't display as the next (UTC) day.
+                db.query(
+                    `SELECT delta_cents, balance_after_cents, reason, ref,
+                            to_char(created_at AT TIME ZONE 'America/Chicago', 'YYYY-MM-DD') AS day
+                       FROM mkt_store_credit_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 100`,
+                    [buyerId]
+                ).catch(() => []),
                 db.queryOne(
                     `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS total_cents, COUNT(*)::int AS n
                        FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`,
                     [buyerId]
                 ).catch(() => null),
             ]);
+
+            const events = (eventRows || []).map((e) => ({
+                deltaCents: e.delta_cents,
+                balanceCents: e.balance_after_cents,
+                reason: e.reason,
+                ref: e.ref || null,
+                at: e.day, // store-local YYYY-MM-DD
+            }));
 
             return noStore({
                 member: {

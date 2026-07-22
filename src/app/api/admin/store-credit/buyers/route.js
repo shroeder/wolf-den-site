@@ -29,7 +29,7 @@ export async function GET(request) {
                     `SELECT buyer_id,
                             COALESCE(SUM(amount_cents), 0)::bigint AS total_cents,
                             COUNT(*)::int AS purchases,
-                            MAX(credited_at) AS last_at
+                            to_char(MAX(credited_at) AT TIME ZONE 'America/Chicago', 'YYYY-MM-DD') AS last_day
                        FROM mkt_credit_purchase
                       WHERE status = 'paid'
                       GROUP BY buyer_id
@@ -45,12 +45,13 @@ export async function GET(request) {
             // current balance, active pet sprite, and equipped cosmetics (border/frame/background/aura).
             const [petMap, rows] = await Promise.all([
                 getPetSpriteData().catch(() => ({})),
-                db.query(`SELECT id, COALESCE(store_credit_cents, 0) AS store_credit_cents, equipped_border, equipped_frame, equipped_background, avatar_cosmetics FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
+                db.query(`SELECT id, COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS store_credit_cents, equipped_border, equipped_frame, equipped_background, avatar_cosmetics FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
             ]);
             const byId = new Map(rows.map((r) => [r.id, r]));
             const meta = (def) => (def && def.id !== "none" ? { id: def.id, label: def.label, icon: def.icon || null } : null);
             for (const m of members) {
                 const r = byId.get(m.id) || {};
+                m.gold = Number(r.gold) || 0;
                 m.storeCreditCents = Number(r.store_credit_cents) || 0;
                 m.petSpriteUrl = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]?.url) || null;
                 m.petSpriteFlip = (m.featuredCollectibleId && petMap[m.featuredCollectibleId]?.flip) || false;
@@ -72,7 +73,7 @@ export async function GET(request) {
                         ...m,
                         purchasedTotalCents: Number(r.total_cents) || 0,
                         purchaseCount: Number(r.purchases) || 0,
-                        lastPurchaseAt: r.last_at ? new Date(r.last_at).toISOString() : null,
+                        lastPurchaseAt: r.last_day || null, // store-local (America/Chicago) YYYY-MM-DD
                     };
                 })
                 .filter(Boolean);
