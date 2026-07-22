@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
@@ -207,8 +207,10 @@ export default function SailingClient({ initial, hero, pet }) {
     const [sky, setSky] = useState(() => initial?.sky || initial?.oceanBg || null);
     const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
 
-    // Ask for location, then set the sky to match the player's ACTUAL weather + time of day (Open-Meteo).
-    const requestAmbiance = useCallback((fromClick) => {
+    // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
+    // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
+    // from under anyone mid-session. On plain page loads the cached sky is applied before paint (below).
+    const requestAmbiance = useCallback((applyLive) => {
         if (typeof navigator === "undefined" || !navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
@@ -217,23 +219,32 @@ export default function SailingClient({ initial, hero, pet }) {
                 try {
                     const r = await fetch(`/api/marketplace/sailing/ambiance?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`, { cache: "no-store" });
                     const d = r.ok ? await r.json().catch(() => null) : null;
-                    if (d?.sky) setSky(d.sky); // mood is derived from the sky URL in render, so this is enough
-                } catch { /* keep the time-based sky */ }
+                    if (d?.sky) {
+                        try { localStorage.setItem("wolfden-sail-sky", JSON.stringify({ sky: d.sky, at: Date.now() })); } catch { /* ignore */ }
+                        if (applyLive) setSky(d.sky); // only on an explicit tap — a change they asked for
+                    }
+                } catch { /* keep the current sky */ }
             },
-            () => { if (fromClick) setGeoPrompt(false); }, // denied
+            () => { if (applyLive) setGeoPrompt(false); }, // denied
             { timeout: 8000, maximumAge: 30 * 60 * 1000 },
         );
     }, []);
 
-    // On mount: match TIME of day right away (no permission needed); if location was granted before, pull real
-    // weather; otherwise offer the location prompt.
-    useEffect(() => {
+    // Decide the sky ONCE, before the browser paints, so it never visibly switches on you: use a fresh cached
+    // real-weather sky if we have one, else the local time of day. Then quietly refresh the cache for next load
+    // (no live change), or offer the location prompt.
+    useLayoutEffect(() => {
         const h = new Date().getHours();
-        const t = h < 5 ? "night" : h < 7 ? "sunrise" : h < 16 ? "clearday" : h < 18 ? "goldenhour" : h < 19 ? "sunset" : h < 21 ? "dusk" : "night";
-        setSky(`/images/sailing/sky-${t}.png`);
+        const t = h < 5 ? "night" : h < 7 ? "sunrise" : h < 17 ? "clearday" : h < 19 ? "goldenhour" : h < 20 ? "sunset" : h < 21 ? "dusk" : "night";
+        let chosen = `/images/sailing/sky-${t}.png`;
+        try {
+            const raw = localStorage.getItem("wolfden-sail-sky");
+            if (raw) { const c = JSON.parse(raw); if (c?.sky && Date.now() - Number(c.at) < 45 * 60 * 1000) chosen = c.sky; }
+        } catch { /* ignore */ }
+        setSky(chosen);
         let pref = null;
         try { pref = localStorage.getItem("wolfden-sail-geo"); } catch { /* ignore */ }
-        if (pref === "1") requestAmbiance(false);
+        if (pref === "1") requestAmbiance(false);   // refresh cache for NEXT load — no live swap
         else if (pref !== "no") setGeoPrompt(true);
     }, [requestAmbiance]);
 

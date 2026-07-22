@@ -23,11 +23,13 @@ function pickSky(cur, daily) {
     if (code === 45 || code === 48) return { sky: "fog", mood: "overcast" }; // fog
     if (code === 3 || (code >= 51 && code <= 57)) return { sky: "overcast", mood: "overcast" }; // overcast / drizzle
 
-    // Clear-ish → choose by time of day using today's sunrise/sunset (local ISO strings from Open-Meteo).
-    const now = Date.now();
+    // Clear-ish → choose by time of day. Open-Meteo returns LOCAL times with NO offset (e.g. "2026-07-22T20:40")
+    // and this server runs in UTC, so we must compare against Open-Meteo's OWN local clock (current.time),
+    // parsed the same naive way as sunrise/sunset — otherwise the tz offset skews the windows (e.g. sunset 5h early).
+    const now = Date.parse(cur?.time || "");
     const sr = Date.parse(daily?.sunrise?.[0] || ""), ss = Date.parse(daily?.sunset?.[0] || "");
     const min = 60 * 1000;
-    if (Number.isFinite(sr) && Number.isFinite(ss)) {
+    if (Number.isFinite(now) && Number.isFinite(sr) && Number.isFinite(ss)) {
         if (now >= sr - 20 * min && now <= sr + 45 * min) return { sky: "sunrise", mood: "calm" };
         if (now >= ss - 45 * min && now <= ss + 10 * min) return { sky: "sunset", mood: "calm" };
         if (now >= ss + 10 * min && now <= ss + 55 * min) return { sky: "dusk", mood: "calm" };
