@@ -481,10 +481,19 @@ export default function SailingClient({ initial, hero, pet }) {
                                     <img key={n} src={sky || state.oceanBg} alt="" />
                                 ))}
                             </div>
+                            {/* Clouds drifting across the sky, independent of the horizon scroll (screen-blended so
+                                they pick up the art's warmth — sunset vs night). */}
+                            <div className={`sail-clouds${liveStatus === "sailing" ? " is-fast" : ""}`} aria-hidden="true"><i /><i /><i /></div>
+                            {/* A soft light column reflecting on the water under the horizon (blends with the sky's colour). */}
+                            <div className="sail-reflection" aria-hidden="true" />
                             {/* Sun/moon glints shimmering on the swell — subtle at anchor, quicker underway. */}
                             <div className={`sail-glints${liveStatus === "sailing" ? " is-fast" : ""}`} aria-hidden="true">
                                 <i /><i /><i /><i /><i /><i />
                             </div>
+                            {/* Foreground water streaks racing past — faster than the horizon, for parallax depth (underway only). */}
+                            <div className={`sail-nearwater${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true"><i /><i /><i /></div>
+                            {/* A depth gradient so the near water reads darker/deeper than the horizon. */}
+                            <div className="sail-depth" aria-hidden="true" />
                             {/* Other sailors drifting across the horizon behind your boat (each waveable while sailing). */}
                             <div className="sail-ambient">
                                 {ambient.map((b) => (
@@ -520,6 +529,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                     {liveStatus === "sailing" ? (
                                         <>
                                             <span className="sail-wake" aria-hidden="true"><i /><i /><i /><i /></span>
+                                            <span className="sail-bowwave" aria-hidden="true"><i /><i /></span>
                                             <span className="sail-wind" aria-hidden="true"><i /><i /><i /></span>
                                             <span className="sail-mist" aria-hidden="true"><i /><i /><i /></span>
                                         </>

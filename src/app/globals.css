@@ -10828,7 +10828,45 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-glints i:nth-child(6) { left: 44%; width: 20%; top: 88%; animation-delay: 1.8s; }
 .sail-glints.is-fast i { animation-duration: 2.6s; }
 @keyframes sailGlint { 0%, 100% { opacity: 0; transform: translateX(0) scaleX(0.7); } 45% { opacity: 0.7; } 55% { opacity: 0.7; } 50% { transform: translateX(-8px) scaleX(1); } }
-@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind, .sail-wake, .sail-glints { display: none; } }
+/* Drifting clouds — slow, independent of the horizon scroll; screen-blended so they take on the sky's colour. */
+.sail-clouds { position: absolute; left: 0; right: 0; top: 0; height: 56%; z-index: 1; pointer-events: none; overflow: hidden; mix-blend-mode: screen; }
+.sail-clouds i { position: absolute; border-radius: 50%; filter: blur(11px);
+    background: radial-gradient(circle, rgba(255,255,255,0.5), rgba(255,255,255,0.12) 58%, transparent 72%); animation: cloudDrift linear infinite; }
+.sail-clouds i:nth-child(1) { width: 42%; height: 20%; top: 12%; animation-duration: 74s; }
+.sail-clouds i:nth-child(2) { width: 30%; height: 15%; top: 30%; opacity: 0.8; animation-duration: 96s; animation-delay: -34s; }
+.sail-clouds i:nth-child(3) { width: 54%; height: 24%; top: 3%;  opacity: 0.6; animation-duration: 120s; animation-delay: -60s; }
+@keyframes cloudDrift { from { left: 108%; } to { left: -60%; } }
+.sail-clouds.is-fast i { animation-duration: 34s; }
+.sail-clouds.is-fast i:nth-child(2) { animation-duration: 42s; }
+.sail-clouds.is-fast i:nth-child(3) { animation-duration: 52s; }
+/* Light column reflecting on the water under the horizon — screen-blended, so warm at sunset / pale at night. */
+.sail-reflection { position: absolute; left: 50%; top: 44%; width: 24%; height: 34%; transform: translateX(-50%); z-index: 1; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.32), rgba(255,255,255,0.08) 55%, transparent 82%); filter: blur(4px);
+    mix-blend-mode: screen; animation: sailRefl 4.5s ease-in-out infinite; }
+@keyframes sailRefl { 0%, 100% { opacity: 0.4; transform: translateX(-50%) scaleX(0.9); } 50% { opacity: 0.7; transform: translateX(-50%) scaleX(1.15); } }
+/* Depth gradient — the near water reads deeper/darker than the painted horizon. */
+.sail-depth { position: absolute; left: 0; right: 0; bottom: 0; height: 34%; z-index: 1; pointer-events: none;
+    background: linear-gradient(to bottom, transparent, rgba(3,16,28,0.45)); }
+/* Foreground water streaks racing past — FASTER than the horizon scroll, for parallax depth. Underway only. */
+.sail-nearwater { position: absolute; left: 0; right: 0; bottom: 0; height: 24%; z-index: 2; pointer-events: none; overflow: hidden; }
+.sail-nearwater i { position: absolute; left: 100%; height: 3px; border-radius: 999px; opacity: 0; filter: blur(0.4px);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6) 50%, transparent); }
+.sail-nearwater i:nth-child(1) { top: 32%; width: 44%; }
+.sail-nearwater i:nth-child(2) { top: 58%; width: 60%; height: 4px; }
+.sail-nearwater i:nth-child(3) { top: 82%; width: 34%; }
+.sail-nearwater.is-scrolling i { animation: sailNearWater 2.4s linear infinite; }
+.sail-nearwater.is-scrolling i:nth-child(2) { animation-duration: 3.1s; }
+.sail-nearwater.is-scrolling i:nth-child(3) { animation-duration: 1.8s; }
+@keyframes sailNearWater { 0% { opacity: 0; transform: translateX(0); } 12% { opacity: 0.7; } 88% { opacity: 0.7; } 100% { opacity: 0; transform: translateX(-260%); } }
+/* Bigger bow-wave crest bursting off the FRONT (right) of the hull at the waterline. */
+.sail-bowwave { position: absolute; right: 6%; bottom: 9%; width: 32%; height: 20%; pointer-events: none; z-index: 4; }
+.sail-bowwave i { position: absolute; bottom: 0; right: 4%; border-radius: 50%; filter: blur(1px);
+    background: radial-gradient(ellipse at 50% 60%, rgba(255,255,255,0.9), rgba(220,240,255,0.35) 52%, transparent 70%);
+    opacity: 0; animation: sailBowWave 1.3s ease-out infinite; }
+.sail-bowwave i:nth-child(1) { width: 62%; height: 62%; }
+.sail-bowwave i:nth-child(2) { width: 40%; height: 40%; right: 22%; animation-delay: 0.6s; }
+@keyframes sailBowWave { 0% { opacity: 0; transform: translate(0, 5px) scale(0.45); } 28% { opacity: 0.95; } 100% { opacity: 0; transform: translate(20px, -8px) scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind, .sail-wake, .sail-glints, .sail-clouds, .sail-nearwater, .sail-bowwave, .sail-reflection { display: none; } }
 .sail-boat-img { display: block; width: clamp(190px, 54vw, 320px); height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Magical auras on the epic tiers — the art carries the colour, this adds the glow (gold / fire / spirit). */
