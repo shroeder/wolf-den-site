@@ -50,11 +50,11 @@ export default function QuestsClient() {
 
     return (
         <section className="card quests-card">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
                 <h3 style={{ marginTop: 0, marginBottom: 0 }}>📜 Daily Quests {readyCount ? <span className="quests-ready-badge">{readyCount}</span> : null}</h3>
                 {meta && !meta.resetUsed ? (
                     <button type="button" className="quest-reroll" onClick={reroll} disabled={busy || !meta.canReset} title={meta.canReset ? "" : "Not enough gold"}>
-                        🔄 Reroll · 🪙 {(meta.resetCost || 1500).toLocaleString()}
+                        Reroll · 🪙 {(meta.resetCost || 1500).toLocaleString()}
                     </button>
                 ) : meta?.resetUsed ? <span className="muted" style={{ fontSize: "0.72rem" }}>rerolled today</span> : null}
             </div>

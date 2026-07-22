@@ -9771,7 +9771,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* ============ Daily quests ============ */
 .quests-card { border-color: rgba(120, 180, 255, 0.28); }
 .quests-ready-badge { background: #4a90d9; color: #fff; font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 1px 9px; margin-left: 6px; }
-.quest-reroll { flex: none; padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(120,180,255,0.5); background: rgba(120,180,255,0.12); color: #cfe2ff; font-size: 0.74rem; font-weight: 800; cursor: pointer; }
+.quest-reroll { flex: none; padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #d8dee6; font-size: 0.74rem; font-weight: 800; cursor: pointer; }
+.quest-reroll:not(:disabled):hover { background: rgba(255,255,255,0.1); }
 .quest-reroll:disabled { opacity: 0.45; cursor: default; }
 
 /* Collapsible card header (tap the title to expand/collapse a pile of items) */

@@ -70,13 +70,13 @@ export default function DailyDeals() {
 
     return (
         <section className="card deals-card">
-            <div className="deals-head">
+            <div className="deals-head" style={{ marginBottom: 12 }}>
                 <h2 style={{ margin: 0 }}>🔥 Today&apos;s Deals</h2>
                 <span className="deals-timer">resets in {fmtCountdown(secs)}</span>
             </div>
             {state.signedIn && !state.resetUsed ? (
-                <button type="button" className="quest-reroll" style={{ marginBottom: 8 }} onClick={reroll} disabled={busy === "reroll" || !state.canReset} title={state.canReset ? "" : "Not enough gold"}>
-                    🔄 Reroll deals · 🪙 {(state.resetCost || 1500).toLocaleString()}
+                <button type="button" className="quest-reroll" style={{ marginBottom: 14 }} onClick={reroll} disabled={busy === "reroll" || !state.canReset} title={state.canReset ? "" : "Not enough gold"}>
+                    Reroll deals · 🪙 {(state.resetCost || 1500).toLocaleString()}
                 </button>
             ) : state.resetUsed ? <p className="muted" style={{ fontSize: "0.72rem", margin: "0 0 8px" }}>rerolled today — fresh deals tomorrow</p> : null}
             <p className="muted" style={{ margin: "2px 0 10px" }}>Discounted picks that rotate every day — grab them before they&apos;re gone.</p>

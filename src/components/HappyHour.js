@@ -69,7 +69,7 @@ export default function HappyHour({ compact = false }) {
             <section className={`card hh-card hh-rally${compact ? " hh-compact" : ""}`}>
                 <div className="hh-head">
                     <div className="hh-title">🐺 Rally the pack</div>
-                    <span className="hh-timer">summons Happy Hour</span>
+                    <span className="hh-timer">Summons Happy Hour</span>
                 </div>
                 <div className="hh-meter"><span style={{ width: `${rpct}%` }} /></div>
                 <div className="hh-meter-label">🪙 {r.pool.toLocaleString()} / {r.trigger.toLocaleString()} — donate {r.remaining.toLocaleString()} more to <strong>trigger a Happy Hour</strong></div>

@@ -7,6 +7,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
 import { getActiveEvent, getHappyHourState, startHappyHour, invalidateEventCache, RALLY_KEY, RALLY_TRIGGER } from "@/lib/marketplace/happy-hour-core.js";
 
 // Donate action for Happy Hour (imports the item/badge/quest systems, so it lives OUTSIDE happy-hour-core
@@ -38,6 +39,8 @@ export async function donateToHappyHour(buyerId, amount) {
     const gold = Math.max(1, Math.floor(Number(amount) || 0));
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, event_gold_donated = event_gold_donated + $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, gold]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold" };
+    // 1 XP per gold donated — gold is already spent, so award XP only (no gold back).
+    await awardXp(buyerId, "donate_event", { points: gold, gold: 0 }).catch(() => {});
     await bumpQuestProgress(buyerId, "donate_event", gold).catch(() => {});
     await trackActivity(buyerId, "happy_hour_donate", { gold }).catch(() => {});
     invalidateEventCache();
