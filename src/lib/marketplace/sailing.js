@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
-import { grantConsumable } from "@/lib/marketplace/consumables.js";
+import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -91,6 +92,55 @@ function pickWeighted(list) {
     let r = Math.random() * total;
     for (const x of list) { r -= x.w; if (r <= 0) return x; }
     return list[list.length - 1];
+}
+
+// ── Gold Merchant island event ── a rare gold-clad showman who greets you when you LAND (before the dig):
+// a coin-catch minigame for gold, a discounted exclusive shop, and a rare shot at his exclusive elephant pet.
+const MERCHANT_BASE_CHANCE = 0.05;   // 5% per landing (+ the elephant pet's find bonus)
+const MERCHANT_GOLD_FLOOR = 20;      // minimum coin-minigame payout (just for playing)
+const MERCHANT_GOLD_CEIL = 300;      // payout cap
+const MERCHANT_PET_CHANCE = 0.15;    // chance a given merchant is offering the elephant pet (free)
+const MERCHANT_PET_ID = "elephant_spear";
+const MERCHANT_PET_RARITY = "legendary";
+// Elephant find bonus by EQUIPPED pet level (1..5): +1% → +5%.
+const MERCHANT_PET_FIND = [0, 0.01, 0.02, 0.03, 0.04, 0.05];
+// His exclusive stock — premium / drop-only consumables at a steep discount (you can't buy these normally).
+const MERCHANT_STOCK = [
+    { id: "treat_wild", base: 1600, off: 0.45 },
+    { id: "treat_marrow", base: 3200, off: 0.45 },
+    { id: "spin_golden_ticket", base: 2400, off: 0.4 },
+    { id: "scroll_wisdom", base: 1500, off: 0.5 },
+    { id: "pot_secondwind", base: 3200, off: 0.5 },
+    { id: "stone_ember", base: 3500, off: 0.5 },
+];
+
+// The equipped elephant pet's merchant-find bonus (0 if it isn't equipped).
+async function merchantFindBonus(buyerId) {
+    const b = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (b?.featured_collectible !== MERCHANT_PET_ID) return 0;
+    const xpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, MERCHANT_PET_ID]).catch(() => null);
+    const lvl = petLevelForXp(xpRow?.xp || 0, MERCHANT_PET_RARITY);
+    return MERCHANT_PET_FIND[Math.max(1, Math.min(5, lvl))] || 0;
+}
+
+// Roll the merchant ONCE per voyage, lazily, at the "arrived" interstitial (landed, no dig yet, not rolled).
+// merchant_json: NULL = not rolled; {none:true} = rolled/no merchant; an object = the merchant is here.
+async function rollMerchant(buyerId) {
+    const row = await readRow(buyerId);
+    if (!row || row.dig_state || row.merchant_json != null) return;
+    const arrived = row.departed_at && row.returns_at && Date.now() >= new Date(row.returns_at).getTime();
+    if (!arrived) return;
+    const chance = MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId);
+    let offer = { none: true };
+    if (Math.random() < chance) {
+        const stock = [...MERCHANT_STOCK].sort(() => Math.random() - 0.5).slice(0, 3).map((s) => {
+            const c = CONSUMABLES[s.id] || {};
+            return { id: s.id, name: c.name || s.id, emoji: c.emoji || "🧪", desc: c.desc || "", price: Math.max(1, Math.round(s.base * (1 - s.off))), off: Math.round(s.off * 100) };
+        });
+        offer = { shop: stock, petOffered: Math.random() < MERCHANT_PET_CHANCE, petClaimed: false, minigamePlayed: false, goldWon: 0 };
+    }
+    // Guard on merchant_json IS NULL so concurrent reads roll it exactly once.
+    await db.query(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL`, [buyerId, JSON.stringify(offer)]).catch(() => {});
 }
 
 // Dig board.
@@ -420,6 +470,9 @@ function decorate(row) {
         },
         // A resolved-but-unacknowledged marine encounter, if any — the client shows it as a one-off recap modal.
         encounter: (row && row.encounter_result) || null,
+        // The Gold Merchant offer, if he showed up this landing (shown at "arrived", before the dig).
+        merchant: (row && row.merchant_json && !row.merchant_json.none) ? row.merchant_json : null,
+        merchantGold: { floor: MERCHANT_GOLD_FLOOR, ceil: MERCHANT_GOLD_CEIL },
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
         // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
@@ -469,6 +522,7 @@ async function resolveDueEncounter(buyerId) {
 
 export async function getSailingState(buyerId) {
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
+    await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
     const [row, goldRow, others, petMap] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
@@ -523,7 +577,7 @@ export async function startVoyage(buyerId, optionId = "standard") {
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
-                 encounter_result = NULL, updated_at = NOW()`,
+                 encounter_result = NULL, merchant_json = NULL, updated_at = NOW()`,
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
@@ -554,6 +608,54 @@ export async function waveAtSailor(buyerId) {
 export async function ackEncounter(buyerId) {
     await db.query(`UPDATE mkt_sailing SET encounter_result = NULL, encounter_at = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// ── Gold Merchant actions ──────────────────────────────────────────────────────────────────────────────
+// The coin-catch minigame result. `collected` is what the client says you caught; clamped to [floor, ceil]
+// and paid ONCE (atomic guard on minigamePlayed). Owner-gated for now, so the client-reported score is fine.
+export async function merchantMinigame(buyerId, collected) {
+    const row = await readRow(buyerId);
+    const m = row?.merchant_json;
+    if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
+    const gold = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
+    const won = await db.queryOne(
+        `UPDATE mkt_sailing
+            SET merchant_json = jsonb_set(jsonb_set(merchant_json, '{minigamePlayed}', 'true'), '{goldWon}', to_jsonb($2::int)), updated_at = NOW()
+          WHERE buyer_id = $1 AND merchant_json IS NOT NULL AND (merchant_json->>'minigamePlayed')::boolean IS NOT TRUE
+          RETURNING buyer_id`,
+        [buyerId, gold]
+    ).catch(() => null);
+    if (!won) return { ok: false, error: "already_played", ...(await getSailingState(buyerId)) };
+    await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, gold]).catch(() => {});
+    return { ok: true, goldWon: gold, ...(await getSailingState(buyerId)) };
+}
+
+// Buy one of the merchant's discounted exclusive consumables. Price comes from HIS rolled offer (not the
+// client) so it can't be spoofed. Repeatable while he's here.
+export async function merchantBuy(buyerId, itemId) {
+    const row = await readRow(buyerId);
+    const m = row?.merchant_json;
+    if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
+    const item = (m.shop || []).find((s) => s.id === itemId);
+    if (!item) return { ok: false, error: "not_stocked", ...(await getSailingState(buyerId)) };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, item.price]).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    await grantConsumable(buyerId, itemId, 1).catch(() => {});
+    return { ok: true, bought: { id: item.id, name: item.name, emoji: item.emoji }, ...(await getSailingState(buyerId)) };
+}
+
+// Claim the merchant-exclusive elephant pet (free, once, only if he's offering it this visit).
+export async function merchantClaimPet(buyerId) {
+    const claimed = await db.queryOne(
+        `UPDATE mkt_sailing SET merchant_json = jsonb_set(merchant_json, '{petClaimed}', 'true'), updated_at = NOW()
+          WHERE buyer_id = $1 AND merchant_json IS NOT NULL
+            AND (merchant_json->>'petOffered')::boolean IS TRUE AND (merchant_json->>'petClaimed')::boolean IS NOT TRUE
+          RETURNING buyer_id`,
+        [buyerId]
+    ).catch(() => null);
+    if (!claimed) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
+    await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, MERCHANT_PET_ID]).catch(() => {});
+    return { ok: true, petGranted: MERCHANT_PET_ID, ...(await getSailingState(buyerId)) };
 }
 
 // Once-a-day favorable winds: shave an hour off the remaining voyage (clamped so it can only reach "arrived",
@@ -674,7 +776,8 @@ export async function beginDig(buyerId) {
     const state = decorate(row);
     if (state.status !== "arrived") return { ok: false, error: "not_arrived", ...(await getSailingState(buyerId)) };
     const board = newBoard(row);
-    await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
+    // Starting the dig leaves the merchant behind — clear his offer.
+    await db.query(`UPDATE mkt_sailing SET dig_state = $2, merchant_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 

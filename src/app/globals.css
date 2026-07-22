@@ -10694,6 +10694,36 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-enc-rewards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 6px; }
 .sail-enc-reward { font-weight: 800; font-size: 0.85rem; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); }
 .sail-enc-reward.is-bonus { color: #7cffb2; border-color: rgba(124,255,178,0.4); background: rgba(124,255,178,0.12); }
+
+/* ===== Gold Merchant island event (MerchantScene.js) ===== */
+.merchant { border: 1px solid rgba(255,215,94,0.5); background: radial-gradient(150% 120% at 50% -10%, rgba(255,215,94,0.16), rgba(20,16,8,0.2) 60%); }
+.merchant-head { display: flex; align-items: center; gap: 12px; }
+.merchant-art { width: clamp(72px, 22vw, 104px); height: auto; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); animation: merchantBob 2.6s ease-in-out infinite; }
+@keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } }
+.merchant-won { margin: 10px 0; text-align: center; font-weight: 800; color: #ffe08a; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); border-radius: 12px; padding: 8px 12px; }
+/* The coin-catch minigame field. */
+.mg-area { position: relative; width: 100%; height: clamp(300px, 60vw, 400px); margin: 12px 0; border-radius: 14px; overflow: hidden;
+    background: linear-gradient(180deg, #2a3d66 0%, #4a6a9e 45%, #d9b877 62%, #caa25f 100%); touch-action: none; user-select: none; cursor: pointer;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.35); }
+.mg-hud { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 4; display: flex; justify-content: space-between; font-weight: 800; font-size: 0.9rem; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.mg-gold { position: absolute; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; z-index: 2;
+    background: radial-gradient(circle at 35% 30%, #fff3b0, #ffcf4a 55%, #b8860b); box-shadow: 0 0 8px rgba(255,215,94,0.7), inset 0 -2px 2px rgba(140,90,0,0.6); }
+.mg-brick { position: absolute; width: 40px; height: 26px; margin-left: -20px; border-radius: 4px; z-index: 2;
+    background: linear-gradient(135deg, #ffe08a, #d4a017 55%, #9c6f10); box-shadow: 0 0 6px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.4), inset 0 -3px 3px rgba(90,60,0,0.5); }
+.mg-brick::after { content: "⚠"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.7rem; color: rgba(90,50,0,0.75); }
+.mg-player { position: absolute; width: 56px; height: 56px; margin-left: -28px; z-index: 3; display: grid; place-items: end center; font-size: 2.4rem; transition: filter 0.1s; }
+.mg-player img { height: 56px; width: auto; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
+.mg-player.is-hit { filter: brightness(1.8) drop-shadow(0 0 8px #ff5a5a); }
+.mg-hint { position: absolute; bottom: 4px; left: 0; right: 0; z-index: 4; text-align: center; font-size: 0.72rem; color: rgba(255,255,255,0.85); text-shadow: 0 1px 2px #000; pointer-events: none; }
+/* Pet offer + shop. */
+.merchant-pet { display: flex; gap: 12px; align-items: center; margin: 12px 0; padding: 10px; border-radius: 12px; border: 1px solid rgba(124,201,255,0.4); background: rgba(124,201,255,0.08); }
+.merchant-pet img { width: 72px; height: 72px; object-fit: contain; flex: none; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
+.merchant-shop { display: flex; flex-direction: column; gap: 8px; }
+.merchant-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+.merchant-item-emoji { font-size: 1.5rem; flex: none; }
+.merchant-item-body { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.merchant-off { font-size: 0.66rem; font-weight: 800; color: #0f2a12; background: #7cffb2; border-radius: 999px; padding: 1px 6px; vertical-align: middle; }
+@media (prefers-reduced-motion: reduce) { .merchant-art { animation: none; } }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }

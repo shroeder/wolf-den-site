@@ -65,6 +65,8 @@ export const PET_PERKS = {
     kraken: { name: "Tentacle Flurry", key: "chain_strike" },
     // Elite
     molten_phoenix: { name: "Rebirth Flame", key: "execute" }, eternal_wolf: { name: "Spirit Howl", key: "chain_strike" }, bounty_hound: { name: "On the Hunt", key: "fortune" },
+    // Merchant (its signature ability — boosting Gold-Merchant find chance — is applied in sailing.js, not combat)
+    elephant_spear: { name: "Merchant's Nose", key: "gold_find" },
 };
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.

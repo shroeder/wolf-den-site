@@ -11,7 +11,7 @@ import {
     GiPenguin, GiHedgehog, GiTurtle, GiParrotHead, GiMonkey, GiPanda, GiDolphin, GiCrab, GiSheep, GiKangaroo,
     GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiJellyfish,
     GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
-    GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp,
+    GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -40,6 +40,8 @@ export const PET_PASSIVE_STAT = {
     mammoth: "might", wyvern: "crit_power", sea_serpent: "crit_chance", fairy: "xp_gain", kraken: "ferocity",
     // Elite
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
+    // Merchant (sailing-exclusive)
+    elephant_spear: "gold_find",
 };
 // Active buff strength when a pet is EQUIPPED/featured, by rarity (percent).
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
@@ -140,6 +142,9 @@ export const COLLECTIBLES = [
     { id: "molten_phoenix", name: "Molten Phoenix", Icon: GiDragonSpiral, color: "#ff7a3c", rarity: "ascendant", source: "elite", eliteOnly: true, unlockRarity: "ascendant", unlockText: "Own an Ascendant+ item & win 3 boss raffles", activeStat: "ferocity", hint: "Reborn from Ascendant fire", spritePrompt: "a blazing molten phoenix wreathed in orange-gold fire and embers, radiating heat" },
     { id: "eternal_wolf", name: "Eternal Wolf Spirit", Icon: GiSpectre, color: "#ff5cc8", rarity: "eternal", source: "elite", eliteOnly: true, unlockRarity: "eternal", unlockText: "Own an Eternal item & win 5 boss raffles", activeStat: "might", hint: "Bound to an Eternal relic", spritePrompt: "a majestic ghostly wolf spirit glowing with impossible prismatic rainbow light, ethereal and translucent" },
     { id: "bounty_hound", name: "Bounty Hound", Icon: GiWolfHead, color: "#ffd75e", rarity: "legendary", source: "achievement", eliteOnly: true, activeStat: "fortune", achievement: "Fulfill 10 community bounties", spritePrompt: "a loyal rugged hound wearing a bounty hunter's bandana, alert and ready for the hunt" },
+
+    // ── Merchant (sailing-exclusive) — only ever gifted by the Gold Merchant island event ──────────────
+    { id: "elephant_spear", name: "Merchant's Guard", Icon: GiElephant, color: "#c9a24a", rarity: "legendary", source: "merchant", eliteOnly: true, activeStat: "gold_find", hint: "Boosts your chance to find the Gold Merchant at sea (+1% → +5% by level)", spritePrompt: "a standing cartoon elephant warrior holding a spear" },
 ];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));

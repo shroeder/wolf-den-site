@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import MerchantScene from "@/components/MerchantScene";
+
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
 const GUST_MS = 3000;
@@ -504,8 +506,9 @@ export default function SailingClient({ initial, hero, pet }) {
                                 {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
                             </div>
 
-                            {/* Primary action docked to the bottom of the animation window so it reads as part of the scene. */}
-                            {liveStatus === "arrived" && (
+                            {/* Primary action docked to the bottom of the animation window so it reads as part of the scene.
+                                Suppressed when the Gold Merchant is here — his own card carries the "dig" button. */}
+                            {liveStatus === "arrived" && !state.merchant && (
                                 <div className="sail-cta-dock">
                                     <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
                                         <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Dig for treasure"}
@@ -517,6 +520,21 @@ export default function SailingClient({ initial, hero, pet }) {
                             {celebrate === "depart" ? (<><div className="sail-bonvoyage">⚓ BON VOYAGE!</div><Confetti /></>) : null}
                             {gusting ? <WindGust key={gustNonce} /> : null}
                         </div>
+                        {/* Gold Merchant island event — the interstitial before the dig when he rolls in. */}
+                        {liveStatus === "arrived" && state.merchant ? (
+                            <MerchantScene
+                                merchant={state.merchant}
+                                gold={state.gold || 0}
+                                floor={state.merchantGold?.floor ?? 20}
+                                ceil={state.merchantGold?.ceil ?? 300}
+                                busy={busy}
+                                heroImg={hero?.spriteUrl || hero?.avatarUrl || null}
+                                onPlay={(collected) => act("merchant_play", { collected })}
+                                onBuy={(item) => act("merchant_buy", { item })}
+                                onClaimPet={() => act("merchant_claim_pet")}
+                                onLeave={() => act("begin_dig")}
+                            />
+                        ) : null}
                         {/* Voyage progress — only while actually at sea; a little boat creeping from port (⚓) to the island (🏝️). */}
                         {liveStatus === "sailing" && (
                             <div className="sail-voyage">
