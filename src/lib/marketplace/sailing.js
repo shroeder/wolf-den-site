@@ -6,8 +6,8 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
-import { grantItem } from "@/lib/marketplace/inventory.js";
-import { itemById } from "@/lib/marketplace/items.js";
+import { grantItem, getEquippedStats } from "@/lib/marketplace/inventory.js";
+import { itemById, STAT_META } from "@/lib/marketplace/items.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -784,7 +784,7 @@ export async function ackEncounter(buyerId) {
 }
 
 // ── RAIDS ──────────────────────────────────────────────────────────────────────────────────────────────
-const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
+const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
                 COALESCE(s.speed_level,0) AS speed_level, COALESCE(s.luck_level,0) AS luck_level,
                 COALESCE(s.rarity_level,0) AS rarity_level, COALESCE(s.find_level,0) AS find_level,
                 COALESCE(s.raid_level,0) AS raid_level`;
@@ -848,24 +848,47 @@ export async function getRaidTargets(buyerId, limit = 12) {
     return list.slice(0, limit);
 }
 
-// Simulate a ship-vs-ship auto-battle. Both open at 100 HP and trade cannon volleys; damage scales with boat
-// level so upgrades genuinely matter, with randomness so it's never a lock. The tier-11 perk lets you STUN the
-// foe once (they skip 2 volleys). Returns the full turn-by-turn script for the client to animate.
-function simulateRaid({ myLevel, foeLevel, canStun }) {
+// A fighter's non-zero equipped stats, in display order, for the battle card.
+function compactStats(stats = {}) {
+    const out = [];
+    for (const key of Object.keys(STAT_META)) {
+        const v = Math.round(Number(stats?.[key]) || 0);
+        if (v) out.push({ key, label: STAT_META[key].label, icon: STAT_META[key].icon, value: v, suffix: STAT_META[key].suffix || "" });
+    }
+    return out;
+}
+// Overall combat rating — boat level is the backbone, equipped GEAR tips the scales (so raiding a well-geared
+// player is riskier, and gear finally matters here too). Offense-weighted.
+function combatPower(stats = {}, level = 1) {
+    const might = Number(stats?.might) || 0, fero = Number(stats?.ferocity) || 0;
+    const critC = Number(stats?.crit_chance) || 0, critP = Number(stats?.crit_power) || 0;
+    return Math.max(1, level) + (might * 0.6 + fero * 0.5 + critC * 0.3 + critP * 0.25) / 6;
+}
+
+// Simulate a ship-vs-ship auto-battle. Both open at 100 HP and trade cannon volleys; damage scales with each
+// side's COMBAT POWER (boat level + gear) so upgrades AND loadout matter, with crits + randomness so it's never
+// a lock. The tier-11 perk lets you STUN the foe once (they skip 2 volleys). Returns the full turn-by-turn
+// script for the client to animate.
+function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, canStun }) {
     let my = 100, foe = 100;
     const events = [];
-    const volley = (lvl) => Math.round((7 + randInt(7)) * (1 + Math.max(0, lvl) * 0.012)); // 7–13 × level factor
+    const swing = (power, crit) => {
+        let dmg = (7 + randInt(7)) * (1 + Math.max(0, power) * 0.011);
+        const isCrit = Math.random() < Math.min(0.6, Math.max(0, crit) / 100);
+        if (isCrit) dmg *= 1.85;
+        return { dmg: Math.max(1, Math.round(dmg)), crit: isCrit };
+    };
     let foeStun = 0, stunUsed = false;
     for (let round = 0; round < 40 && my > 0 && foe > 0; round++) {
-        const d1 = volley(myLevel);
-        foe = Math.max(0, foe - d1);
-        events.push({ side: "me", dmg: d1, my, foe });
+        const a = swing(myPower, myCrit);
+        foe = Math.max(0, foe - a.dmg);
+        events.push({ side: "me", dmg: a.dmg, crit: a.crit, my, foe });
         if (foe <= 0) break;
         if (canStun && !stunUsed && round >= 1) { stunUsed = true; foeStun = 2; events.push({ side: "stun", dmg: 0, my, foe }); }
         if (foeStun > 0) { foeStun -= 1; continue; } // foe frozen this volley
-        const d2 = volley(foeLevel);
-        my = Math.max(0, my - d2);
-        events.push({ side: "foe", dmg: d2, my, foe });
+        const b = swing(foePower, foeCrit);
+        my = Math.max(0, my - b.dmg);
+        events.push({ side: "foe", dmg: b.dmg, crit: b.crit, my, foe });
     }
     const win = foe <= 0 ? my > 0 : my > 0 && my >= foe; // decisive KO, else higher HP after the cap (ties → me)
     return { win, events, myHp: my, foeHp: foe, stunUsed };
@@ -882,7 +905,19 @@ export async function doRaid(buyerId, targetId = null) {
 
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
-    const sim = simulateRaid({ myLevel, foeLevel, canStun: boatPerks(myLevel).raidStun });
+
+    // Presentation + combat inputs for BOTH fighters (their hero sprite, pet, and equipped gear stats).
+    const [me, petMap, myStats, foeStats] = await Promise.all([
+        db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        getPetSpriteData().catch(() => ({})),
+        getEquippedStats(buyerId).catch(() => ({})),
+        getEquippedStats(target.id).catch(() => ({})),
+    ]);
+    const canStun = boatPerks(myLevel).raidStun;
+    const sim = simulateRaid({
+        myPower: combatPower(myStats, myLevel), foePower: combatPower(foeStats, foeLevel),
+        myCrit: Number(myStats?.crit_chance) || 0, foeCrit: Number(foeStats?.crit_chance) || 0, canStun,
+    });
 
     // Consume the daily raid UNLESS raid-dodge procs (then it's free — you can raid again today).
     const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
@@ -907,14 +942,24 @@ export async function doRaid(buyerId, targetId = null) {
         goldDelta = -loss;
     }
 
+    const petView = (id) => { const p = id ? petMap[id] : null; return p?.url ? { url: p.url, flip: p.flip === true } : null; };
     const result = {
         outcome: sim.win ? "win" : "lose", gold: goldDelta, itemWon, dodged, stunUsed: sim.stunUsed,
         battle: sim.events, myHp: sim.myHp, foeHp: sim.foeHp, myLevel,
-        target: {
+        me: {
+            name: me?.display_name || me?.alias || "You", level: myLevel, boat: boatArt(myLevel),
+            rider: me?.avatar_sprite_url || me?.avatar_url || null,
+            riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
+            pet: petView(me?.featured_collectible), stats: compactStats(myStats), canStun,
+        },
+        foe: {
             name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel),
             rider: target.avatar_sprite_url || target.avatar_url || null,
             riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
+            pet: petView(target.featured_collectible), stats: compactStats(foeStats),
         },
+        // Back-compat shim for any older client build still reading .target.
+        target: { name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel) },
     };
     return { ok: true, raidResult: result, ...(await getSailingState(buyerId)) };
 }

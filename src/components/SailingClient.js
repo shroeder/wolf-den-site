@@ -1120,7 +1120,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {/* RAID — the full-screen auto-battle show, then reward reveal */}
             {raidPlay ? (
-                <RaidScene raid={raidPlay} myBoat={state.boatArt} hero={hero} captain={captain} onClose={() => setRaidPlay(null)} />
+                <RaidScene raid={raidPlay} myBoat={state.boatArt} hero={hero} pet={pet} captain={captain} onClose={() => setRaidPlay(null)} />
             ) : null}
         </div>
     );
