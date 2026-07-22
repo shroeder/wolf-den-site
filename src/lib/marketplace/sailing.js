@@ -50,15 +50,24 @@ const FORGE_TIER_ORDER = ["wooden", "iron", "gold"]; // ascending chest tiers, f
 const MILESTONES = [
     { level: 10, tier: 2, name: "Sturdy Sloop", perk: "+1 fragment buried on every island", buried: 1 },
     { level: 20, tier: 3, name: "Swift Cutter", perk: "Voyages are 10% faster", voyage: 0.9 },
-    { level: 30, tier: 4, name: "Trade Brig", perk: "+12% chest-upgrade chance", chest: 0.12 },
-    { level: 40, tier: 5, name: "Deep Schooner", perk: "+1 fragment buried on every island", buried: 1 },
+    { level: 30, tier: 4, name: "Trade Brig", perk: "+12% chance a forged chest is upgraded a tier", chest: 0.12 },
+    { level: 40, tier: 5, name: "Trade-Wind Schooner", perk: "15% chance a tailwind isn't used up", windSave: 0.15 },
     { level: 50, tier: 6, name: "Gilded Galleon", perk: "Your first dig each trip always strikes a fragment", surface: true },
     { level: 60, tier: 7, name: "Storm Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
-    { level: 70, tier: 8, name: "Leviathan", perk: "+12% chest-upgrade chance", chest: 0.12 },
-    { level: 80, tier: 8, name: "Ghost Galleon", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
+    { level: 70, tier: 8, name: "Leviathan", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
+    { level: 80, tier: 8, name: "Leviathan, Fully Rigged", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
 ];
 
-const BOAT_ART = { 1: "/images/sailing/boat-tier1-wood.png" };
+const BOAT_ART = {
+    1: "/images/sailing/boat-tier1-wood.png",
+    2: "/images/sailing/boat-tier2-sloop.png",
+    3: "/images/sailing/boat-tier3-cutter.png",
+    4: "/images/sailing/boat-tier4-brig.png",
+    5: "/images/sailing/boat-tier5-schooner.png",
+    6: "/images/sailing/boat-tier6-galleon.png",
+    7: "/images/sailing/boat-tier7-frigate.png",
+    8: "/images/sailing/boat-tier8-leviathan.png",
+};
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
 export const DIG_BG = "/images/sailing/dig-bg.png";
 export const ISLAND_ART = "/images/sailing/island.png";
@@ -73,7 +82,7 @@ export function boatArt(level) {
 }
 // Cumulative milestone perks unlocked at this boat level.
 function boatPerks(level) {
-    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST };
+    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0 };
     for (const m of MILESTONES) {
         if (level < m.level) break;
         if (m.buried) p.buried += m.buried;
@@ -81,6 +90,7 @@ function boatPerks(level) {
         if (m.chest) p.chestBonus += m.chest;
         if (m.surface) p.surface = true;
         if (m.forge) p.forgeCost = m.forge;
+        if (m.windSave) p.windSave = Math.max(p.windSave, m.windSave);
     }
     return p;
 }
@@ -278,7 +288,14 @@ export async function favorableWind(buyerId) {
         [buyerId]
     ).catch(() => null);
     if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
-    return { ok: true, ...(await getSailingState(buyerId)) };
+    // Milestone perk (Trade-Wind Schooner): chance the tailwind ISN'T consumed — clear wind_day so it's free again.
+    const save = boatPerks(decorate(await readRow(buyerId)).level).windSave;
+    let windRefunded = false;
+    if (save > 0 && Math.random() < save) {
+        await db.query(`UPDATE mkt_sailing SET wind_day = NULL WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+        windRefunded = true;
+    }
+    return { ok: true, windRefunded, ...(await getSailingState(buyerId)) };
 }
 
 // Paid re-use of the tailwind once the free daily one is spent: charge gold, then shave another hour off the

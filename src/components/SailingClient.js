@@ -143,6 +143,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
+    const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
     const [now, setNow] = useState(Date.now);
 
     const stateRef = useRef(state);
@@ -203,6 +204,7 @@ export default function SailingClient({ initial, hero, pet }) {
                     if (crossed) setFormUnlock(crossed); else setLevelUp(d.level);
                 }
                 if (d.forged) { sfx.win(); setForge(d.forged); }
+                if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
             }
         } finally { setBusy(false); }
     }, []);
@@ -365,6 +367,7 @@ export default function SailingClient({ initial, hero, pet }) {
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                     </div>
                 )}
+                {windSaved ? <div className="sail-windsave">🍃 Favorable! Your tailwind wasn&apos;t used up.</div> : null}
 
                 {/* Boat identity — level + form come from upgrades, not digging. */}
                 <div className="sail-boatline">

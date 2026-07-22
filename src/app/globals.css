@@ -10686,6 +10686,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     box-shadow: 0 7px 0 #2f6fae, 0 16px 34px rgba(90,180,255,0.55), 0 0 0 2px rgba(255,255,255,0.25), inset 0 1px 0 rgba(255,255,255,0.8); }
 .sail-cta-wind:not(:disabled):active { box-shadow: 0 2px 0 #2f6fae, 0 6px 14px rgba(90,180,255,0.4), inset 0 1px 0 rgba(255,255,255,0.7); }
 .sail-donepill { opacity: 0.75; }
+/* Tailwind-save perk flash. */
+.sail-windsave { margin-top: 8px; text-align: center; font-weight: 800; font-size: 0.82rem; color: #7cffb2;
+    background: rgba(124,255,178,0.12); border: 1px solid rgba(124,255,178,0.35); border-radius: 10px; padding: 7px 12px;
+    animation: cheerToast 0.3s ease-out both; }
 @keyframes sailCtaPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
 @keyframes sailCtaShine { 0% { left: -70%; } 55%,100% { left: 140%; } }
 @keyframes sailCtaBounce { 0% { transform: scale(0.6) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
