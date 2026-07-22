@@ -6,6 +6,9 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
+import { grantItem } from "@/lib/marketplace/inventory.js";
+import { itemById } from "@/lib/marketplace/items.js";
+import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
@@ -35,26 +38,39 @@ export const BASE_VOYAGE_MS = 4 * 60 * 60 * 1000; // 4h base (SHORT option); sta
 const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000;  // Speed shaves a FLAT 2 minutes off each voyage, per level
 const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
 const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
-// Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
-// → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (9) distinct arts, and each
-// form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-
-// find) in find_level.
+// FIVE boat upgrade tracks — all travel/loot/raid, NO dig count (that's a separate system). Each maxes at 20
+// → 100 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (11) distinct arts, and each
+// form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (now a
+// WAVES stat) in find_level; Raiding (raid-dodge) in raid_level.
 export const MAX_SPEED_LEVEL = 20;
 export const MAX_FORTUNE_LEVEL = 20;
 export const MAX_RARITY_LEVEL = 20;
 export const MAX_LUCK_LEVEL = 20;
+export const MAX_RAID_LEVEL = 20;
 const LEVELS_PER_FORM = 10;
-const BOAT_TIERS = 9;
+const BOAT_TIERS = 11;
+
+// ── RAIDS ── once/day you can raid a passing ship: a full-screen auto-battle. Win → gold (+ a rare item copy);
+// lose → shed some gold. The "Raiding" upgrade track gives a small chance the daily raid isn't consumed.
+const RAID_WIN_GOLD = () => 25 + randInt(51);   // 25–75 gold on a win
+const RAID_LOSS_MIN = 10, RAID_LOSS_MAX = 100;   // 10–100 gold lost on a loss
+const RAID_ITEM_COPY_CHANCE = 0.005;             // 0.5% to copy one random item of theirs (they keep it)
+const RAID_DODGE_BASE = 0.005, RAID_DODGE_PER = 0.0025; // 0.5% + 0.25%/level to NOT use up the daily raid
+const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_DODGE_PER;
+const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
 // the feature is in testing — set back to 500 before release.
 export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
 
 // ── Waves ── greet a passing member a few times a day for a little XP/coins + a small travel cut.
-const WAVES_PER_DAY = 3;
+const WAVES_PER_DAY = 3;               // base daily waves; LUCK adds more (see wavesPerDay)
+const WAVE_LUCK_PER = 4;               // Luck: +1 wave every this many Luck levels (max Luck 20 → +5 waves)
 const WAVE_XP = 25;
 const WAVE_COINS = 10;
 const WAVE_SHAVE_MS = 2 * 60 * 1000; // 2 minutes off the remaining voyage
+// Luck (find_level) is now a WAVES stat: more greetings per day, not a digging aid.
+const wavesPerDay = (luckLevel = 0) => WAVES_PER_DAY + Math.floor(Math.max(0, luckLevel) / WAVE_LUCK_PER);
 
 // ── Marine encounters ── FORTUNE now drives the chance a voyage rolls an encounter at its halfway mark
 // (repurposed from "+buried fragments"). No push / no travel pause — it resolves lazily on the member's next
@@ -171,8 +187,7 @@ const DIG_MAX_DEPTH = 3;      // layers of dirt over every tile — you chip str
 const BASE_STAMINA = 12;      // digs per voyage (flat; extend mid-dig with "buy more digs")
 const FRAGMENTS_BURIED = 3;   // base fragments scattered through the dirt; Fortune adds +1 buried per level
 const MAX_BURIED = 12;        // cap on buried fragments (of a 16-tile board)
-const RARITY_UPGRADE_PER_LEVEL = 0.045; // Rarity: chance/level that a forged chest is bumped up a tier
-const LUCK_PER_SHALLOW = 7;   // Luck: every this many levels, fragments sit one dirt-layer shallower
+const RARITY_UPGRADE_PER_LEVEL = 0.005; // Rarity: +0.5%/level chance that a forged chest is bumped up a tier
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
 const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to ~300 before release
 
@@ -247,6 +262,8 @@ const MILESTONES = [
     { level: 60, tier: 7, name: "Arcane Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
     { level: 70, tier: 8, name: "Dragon Ship", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
     { level: 80, tier: 9, name: "Ghost Ship", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
+    { level: 90, tier: 10, name: "Leviathan Dreadnought", perk: "5% chance a dig doesn't use up a charge", digSave: 0.05 },
+    { level: 100, tier: 11, name: "Celestial Warship", perk: "Once per raid, stun your foe for 2 attacks", raidStun: true },
 ];
 
 const BOAT_ART = {
@@ -259,6 +276,8 @@ const BOAT_ART = {
     7: "/images/sailing/boat-tier7-arcane.png",
     8: "/images/sailing/boat-tier8-dragon.png",
     9: "/images/sailing/boat-tier9-ghost.png",
+    10: "/images/sailing/boat-tier10-leviathan.png",
+    11: "/images/sailing/boat-tier11-celestial.png",
 };
 export const OCEAN_BG = "/images/sailing/ocean-bg.png";
 export const DIG_BG = "/images/sailing/dig-bg.png";
@@ -280,7 +299,7 @@ export function boatArt(level) {
 }
 // Cumulative milestone perks unlocked at this boat level.
 function boatPerks(level) {
-    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0 };
+    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0, digSave: 0, raidStun: false };
     for (const m of MILESTONES) {
         if (level < m.level) break;
         if (m.buried) p.buried += m.buried;
@@ -289,6 +308,8 @@ function boatPerks(level) {
         if (m.surface) p.surface = true;
         if (m.forge) p.forgeCost = m.forge;
         if (m.windSave) p.windSave = Math.max(p.windSave, m.windSave);
+        if (m.digSave) p.digSave = Math.max(p.digSave, m.digSave);
+        if (m.raidStun) p.raidStun = true;
     }
     return p;
 }
@@ -317,14 +338,16 @@ function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrac
 function fragmentsBuried(level = 1) {
     return Math.min(MAX_BURIED, FRAGMENTS_BURIED + boatPerks(level).buried);
 }
-// The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 4 tracks.
-function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0) { return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l); }
+// The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 5 tracks.
+function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
+    return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l) + Math.max(0, rd);
+}
 
 // --- dig board -----------------------------------------------------------------------------------------
 function randInt(n) { return Math.floor(Math.random() * n); }
 
-// Luck (find_level): how shallow the shallowest a fragment can sit — higher Luck = struck sooner.
-function fragMaxDepth(luckLevel = 0) { return Math.max(1, DIG_MAX_DEPTH - Math.floor(Math.max(0, luckLevel) / LUCK_PER_SHALLOW)); }
+// The shallowest a fragment can sit (in dirt layers). Luck no longer touches digging — this is a flat cap.
+function fragMaxDepth() { return DIG_MAX_DEPTH; }
 
 // ── DIG DIFFICULTY — a "steady & matched" ramp: the board, treasure count, dirt depth all grow with your
 // Excavation level (voyages completed), and your Sense budget grows too, so it stays a fair-but-hard hunt
@@ -338,9 +361,9 @@ function digTier(voyages = 0) { return Math.min(DIG_MAX_TIER, 1 + Math.floor(Mat
 function digSize(tier) { return Math.min(7, 4 + tier); } // t1=5 … t3=7 (capped)
 function digDepthMax(tier) { return tier >= 4 ? 4 : 3; }                          // deeper dirt at high tiers
 // Scan charges (the detector) — deliberately FEW ("a couple"), so a scan is a precious "feel it out" moment,
-// not a solve-the-grid tool. Luck (find_level) grants the odd extra. Tune freely.
-function digSenseBudget(tier, treasures, luckLevel = 0) {
-    return 3 + Math.floor(Math.max(0, luckLevel) / 4); // ~3 scans ("feel it out"), a few more with Luck
+// not a solve-the-grid tool. Scales with board difficulty (tier), NOT Luck. Tune freely.
+function digSenseBudget(tier) {
+    return 3 + Math.floor(Math.max(0, tier - 1) / 2); // t1-2: 3 scans, t3-4: 4, t5-6: 5
 }
 // A scan's HEAT for a tile: how CLOSE the nearest treasure is (Chebyshev distance) → 3 hot / 2 warm / 1 cool
 // / 0 cold. Feeling-based, not a neighbour-count — "am I close?" reads instantly.
@@ -375,7 +398,7 @@ const digItemCount = (tier) => Math.min(5, 2 + Math.floor(tier / 2)); // 2 (t1) 
 function newBoard(row) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
-    const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel);
+    const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
     // The hunt scales with Excavation level (voyages): bigger board, more treasure, deeper dirt at higher tiers.
     const tier = digTier(row?.voyages_completed || 0);
     const size = digSize(tier);
@@ -394,8 +417,8 @@ function newBoard(row) {
     const quality = row?.voyage_quality || "standard";
     const artifactTier = rollFragmentTier(quality, row?.rarity_level || 0, level);
     const fragTiers = frag.map(() => artifactTier);
-    // Luck caps how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
-    const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
+    // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
+    const cap = Math.min(fragMaxDepth(), maxDepth);
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
     // Scatter real consumable ITEMS (1×1) on random non-chest tiles — bonus finds you dig up along the way.
     const chestSet = new Set(frag.map(([fr, fc]) => `${fr},${fc}`));
@@ -406,13 +429,14 @@ function newBoard(row) {
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
     const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2; // a few more digs on the bigger boards
-    const maxSenses = digSenseBudget(tier, frag.length, luckLevel);
+    const maxSenses = digSenseBudget(tier);
     // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
     const up = {
         pierce: digTrackValue("pierce", row?.dig_pierce_level || 0),
         strike: digTrackValue("strike", row?.dig_strike_level || 0),
         efficient: digTrackValue("efficient", row?.dig_efficient_level || 0),
         detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
+        digSave: boatPerks(level).digSave, // Leviathan (tier 10) perk: chance a dig doesn't cost a charge
     };
     // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
     const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
@@ -436,8 +460,10 @@ function applyDig(board, r, c) {
     if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return board;
     if (board.depth[r][c] <= 0) return board; // already chipped to the bottom — never wastes a dig
     board.stamina -= 1;
-    board.dug[r][c] = true;
     const up = board.up || {};
+    board.chargeSaved = !!(up.digSave && Math.random() < up.digSave); // Leviathan perk: refund this dig's charge
+    if (board.chargeSaved) board.stamina += 1;
+    board.dug[r][c] = true;
     // Pierce: this dig breaks through EVERY remaining layer of the tile at once (else just one).
     if (up.pierce && Math.random() < up.pierce) board.depth[r][c] = 0;
     else board.depth[r][c] -= 1;
@@ -524,8 +550,9 @@ function decorate(row, chestArt = {}) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
-    const luckLevel = row?.find_level || 0;    // "Luck" = early-find (find_level column)
-    const level = boatLevelFromUpgrades(speedLevel, fortuneLevel, rarityLevel, luckLevel); // earned by upgrading, never digging
+    const luckLevel = row?.find_level || 0;    // "Luck" = Waves stat (find_level column)
+    const raidLevel = row?.raid_level || 0;    // "Raiding" = raid-dodge track (raid_level column)
+    const level = boatLevelFromUpgrades(speedLevel, fortuneLevel, rarityLevel, luckLevel, raidLevel); // earned by upgrading, never digging
 
     const departedAt = row?.departed_at ? new Date(row.departed_at).getTime() : null;
     const arrivesAt = row?.returns_at ? new Date(row.returns_at).getTime() : null; // returns_at = island arrival
@@ -546,7 +573,7 @@ function decorate(row, chestArt = {}) {
 
     const rarityPct = (lvl) => Math.min(90, Math.round((Math.max(0, lvl) * RARITY_UPGRADE_PER_LEVEL + boatPerks(level).chestBonus) * 100));
     return {
-        level, maxLevel: boatLevelFromUpgrades(MAX_SPEED_LEVEL, MAX_FORTUNE_LEVEL, MAX_RARITY_LEVEL, MAX_LUCK_LEVEL),
+        level, maxLevel: boatLevelFromUpgrades(MAX_SPEED_LEVEL, MAX_FORTUNE_LEVEL, MAX_RARITY_LEVEL, MAX_LUCK_LEVEL, MAX_RAID_LEVEL),
         tier: boatTier(level), boatTiers: BOAT_TIERS, boatArt: boatArt(level),
         forms: boatFormsView(level),
         oceanBg: OCEAN_BG, digBg: DIG_BGS[row?.voyage_quality] || DIG_BG, islandArt: ISLAND_ART,
@@ -578,7 +605,19 @@ function decorate(row, chestArt = {}) {
         },
         luck: {
             level: luckLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL,
-            depthNow: fragMaxDepth(luckLevel), depthNext: fragMaxDepth(luckLevel + 1),
+            wavesNow: wavesPerDay(luckLevel), wavesNext: wavesPerDay(luckLevel + 1),
+        },
+        raiding: {
+            level: raidLevel, max: MAX_RAID_LEVEL, cost: upgradeCost(raidLevel), maxed: raidLevel >= MAX_RAID_LEVEL,
+            pctNow: raidDodgePct(raidLevel), pctNext: raidDodgePct(raidLevel + 1),
+        },
+        // Once-a-day raid: whether it's available + the perks that shape it (shown on the raid button/modal).
+        raid: {
+            usedToday: !!row?.raid_used_today,
+            available: !row?.raid_used_today,
+            dodgePct: raidDodgePct(raidLevel),
+            canStun: boatPerks(level).raidStun,
+            winGold: [25, 75], loseGold: [RAID_LOSS_MIN, RAID_LOSS_MAX], itemChance: RAID_ITEM_COPY_CHANCE * 100,
         },
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
@@ -587,8 +626,8 @@ function decorate(row, chestArt = {}) {
         status, progress, departedAt, arrivesAt,
         // Waves — greet a passing sailor a few times a day (only meaningful mid-voyage).
         waves: {
-            max: WAVES_PER_DAY,
-            left: Math.max(0, WAVES_PER_DAY - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
+            max: wavesPerDay(luckLevel),
+            left: Math.max(0, wavesPerDay(luckLevel) - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
             xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000,
         },
         // A resolved-but-unacknowledged marine encounter, if any — the client shows it as a one-off recap modal.
@@ -609,7 +648,8 @@ async function readRow(buyerId) {
     // JS-Date-from-a-DATE-column timezone trap.
     return db.queryOne(
         `SELECT *, (wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wind_used_today,
-                (wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wave_is_today
+                (wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wave_is_today,
+                (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_used_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId]
     ).catch(() => null);
@@ -661,7 +701,8 @@ export async function getSailingState(buyerId) {
         db.query(
             `SELECT b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
                     COALESCE(s.speed_level, 0) AS speed_level, COALESCE(s.luck_level, 0) AS luck_level,
-                    COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level
+                    COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level,
+                    COALESCE(s.raid_level, 0) AS raid_level
                FROM mkt_buyer b
                LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
               WHERE b.id <> $1 AND b.alias IS NOT NULL
@@ -676,7 +717,7 @@ export async function getSailingState(buyerId) {
     const fleet = (others || []).map((o) => {
         const pet = o.featured_collectible ? petMap[o.featured_collectible] : null;
         return {
-            art: boatArt(boatLevelFromUpgrades(o.speed_level, o.luck_level, o.rarity_level, o.find_level)),
+            art: boatArt(boatLevelFromUpgrades(o.speed_level, o.luck_level, o.rarity_level, o.find_level, o.raid_level)),
             name: o.alias,
             rider: o.avatar_sprite_url || o.avatar_url || null,
             // Only the AI sprite needs the face-right mirror; the built avatar already faces forward.
@@ -716,8 +757,10 @@ export async function startVoyage(buyerId, optionId = "standard") {
 // Wave to a passing sailor — up to WAVES_PER_DAY/day, each a little XP + coins + a small travel-time cut.
 // Atomic: the WHERE enforces mid-voyage + the daily cap so rapid taps can't overspend.
 export async function waveAtSailor(buyerId) {
-    const state = decorate(await readRow(buyerId));
+    const row = await readRow(buyerId);
+    const state = decorate(row);
     if (state.status !== "sailing") return { ok: false, error: "not_sailing", ...(await getSailingState(buyerId)) };
+    const cap = wavesPerDay(row?.find_level || 0); // Luck raises the daily wave cap
     const waved = await db.queryOne(
         `UPDATE mkt_sailing
             SET wave_count = CASE WHEN wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN wave_count + 1 ELSE 1 END,
@@ -727,7 +770,7 @@ export async function waveAtSailor(buyerId) {
           WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at IS NOT NULL AND returns_at > NOW()
             AND (wave_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date OR wave_count < $3)
           RETURNING wave_count`,
-        [buyerId, String(WAVE_SHAVE_MS), WAVES_PER_DAY]
+        [buyerId, String(WAVE_SHAVE_MS), cap]
     ).catch(() => null);
     if (!waved) return { ok: false, error: "no_waves", ...(await getSailingState(buyerId)) };
     await awardXp(buyerId, "sail_wave", { points: WAVE_XP, gold: WAVE_COINS }).catch(() => {});
@@ -738,6 +781,93 @@ export async function waveAtSailor(buyerId) {
 export async function ackEncounter(buyerId) {
     await db.query(`UPDATE mkt_sailing SET encounter_result = NULL, encounter_at = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// ── RAIDS ──────────────────────────────────────────────────────────────────────────────────────────────
+// Pick a random passing player to raid — a real member with a hero. They're a target only; they lose nothing.
+async function pickRaidTarget(buyerId) {
+    return db.queryOne(
+        `SELECT b.id, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url,
+                COALESCE(s.speed_level,0) AS speed_level, COALESCE(s.luck_level,0) AS luck_level,
+                COALESCE(s.rarity_level,0) AS rarity_level, COALESCE(s.find_level,0) AS find_level,
+                COALESCE(s.raid_level,0) AS raid_level
+           FROM mkt_buyer b
+           LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+          WHERE b.id <> $1 AND b.alias IS NOT NULL
+            AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
+          ORDER BY random() LIMIT 1`,
+        [buyerId]
+    ).catch(() => null);
+}
+
+// Simulate a ship-vs-ship auto-battle. Both open at 100 HP and trade cannon volleys; damage scales with boat
+// level so upgrades genuinely matter, with randomness so it's never a lock. The tier-11 perk lets you STUN the
+// foe once (they skip 2 volleys). Returns the full turn-by-turn script for the client to animate.
+function simulateRaid({ myLevel, foeLevel, canStun }) {
+    let my = 100, foe = 100;
+    const events = [];
+    const volley = (lvl) => Math.round((7 + randInt(7)) * (1 + Math.max(0, lvl) * 0.012)); // 7–13 × level factor
+    let foeStun = 0, stunUsed = false;
+    for (let round = 0; round < 40 && my > 0 && foe > 0; round++) {
+        const d1 = volley(myLevel);
+        foe = Math.max(0, foe - d1);
+        events.push({ side: "me", dmg: d1, my, foe });
+        if (foe <= 0) break;
+        if (canStun && !stunUsed && round >= 1) { stunUsed = true; foeStun = 2; events.push({ side: "stun", dmg: 0, my, foe }); }
+        if (foeStun > 0) { foeStun -= 1; continue; } // foe frozen this volley
+        const d2 = volley(foeLevel);
+        my = Math.max(0, my - d2);
+        events.push({ side: "foe", dmg: d2, my, foe });
+    }
+    const win = foe <= 0 ? my > 0 : my > 0 && my >= foe; // decisive KO, else higher HP after the cap (ties → me)
+    return { win, events, myHp: my, foeHp: foe, stunUsed };
+}
+
+// Run the once-a-day raid. Win → gold (+0.5% to copy one random item of theirs; they keep it). Lose → 10–100
+// gold. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
+export async function doRaid(buyerId) {
+    const row = await readRow(buyerId);
+    if (row?.raid_used_today) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
+    const target = await pickRaidTarget(buyerId);
+    if (!target) return { ok: false, error: "no_target", ...(await getSailingState(buyerId)) };
+
+    const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
+    const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
+    const sim = simulateRaid({ myLevel, foeLevel, canStun: boatPerks(myLevel).raidStun });
+
+    // Consume the daily raid UNLESS raid-dodge procs (then it's free — you can raid again today).
+    const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    if (!dodged) await db.query(`UPDATE mkt_sailing SET raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+
+    let goldDelta = 0, itemWon = null;
+    if (sim.win) {
+        goldDelta = RAID_WIN_GOLD();
+        await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
+        if (Math.random() < RAID_ITEM_COPY_CHANCE) {
+            const it = await db.queryOne(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 ORDER BY random() LIMIT 1`, [target.id]).catch(() => null);
+            const item = it?.item_id ? itemById(it.item_id) : null;
+            if (item) {
+                const g = await grantItem(buyerId, item.id, "raid").catch(() => null);
+                itemWon = { id: item.id, name: item.name, rarity: item.rarity, image: await itemSpriteFor(item.id).catch(() => null), isNew: !!g?.granted };
+            }
+        }
+    } else {
+        const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
+        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
+        goldDelta = -loss;
+    }
+
+    const result = {
+        outcome: sim.win ? "win" : "lose", gold: goldDelta, itemWon, dodged, stunUsed: sim.stunUsed,
+        battle: sim.events, myHp: sim.myHp, foeHp: sim.foeHp, myLevel,
+        target: {
+            name: target.alias, level: foeLevel, boat: boatArt(foeLevel),
+            rider: target.avatar_sprite_url || target.avatar_url || null,
+            riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
+        },
+    };
+    return { ok: true, raidResult: result, ...(await getSailingState(buyerId)) };
 }
 
 // ── Gold Merchant actions ──────────────────────────────────────────────────────────────────────────────
@@ -1050,13 +1180,13 @@ export async function upgradeTool(buyerId, toolId) {
 // The four boat upgrade tracks → their DB columns + level caps. Fortune lives in the legacy luck_level column;
 // the "Luck" (early-find) lever lives in find_level.
 const UPGRADE_COLS = {
-    speed: "speed_level", fortune: "luck_level", rarity: "rarity_level", luck: "find_level",
+    speed: "speed_level", fortune: "luck_level", rarity: "rarity_level", luck: "find_level", raid: "raid_level",
     // Digging tracks (separate system):
     dig_stamina: "dig_stamina_level", dig_pierce: "dig_pierce_level", dig_strike: "dig_strike_level",
     dig_efficient: "dig_efficient_level", dig_detonator: "dig_detonator_level",
 };
 const UPGRADE_MAX = {
-    speed: MAX_SPEED_LEVEL, fortune: MAX_FORTUNE_LEVEL, rarity: MAX_RARITY_LEVEL, luck: MAX_LUCK_LEVEL,
+    speed: MAX_SPEED_LEVEL, fortune: MAX_FORTUNE_LEVEL, rarity: MAX_RARITY_LEVEL, luck: MAX_LUCK_LEVEL, raid: MAX_RAID_LEVEL,
     dig_stamina: DIG_TRACKS.stamina.max, dig_pierce: DIG_TRACKS.pierce.max, dig_strike: DIG_TRACKS.strike.max,
     dig_efficient: DIG_TRACKS.efficient.max, dig_detonator: DIG_TRACKS.detonator.max,
 };
@@ -1077,5 +1207,6 @@ async function buyUpgrade(buyerId, kind) {
 export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
 export const upgradeFortune = (buyerId) => buyUpgrade(buyerId, "fortune");
 export const upgradeRarity = (buyerId) => buyUpgrade(buyerId, "rarity");
-export const upgradeLuck = (buyerId) => buyUpgrade(buyerId, "luck"); // the "Luck" (early-find) lever
+export const upgradeLuck = (buyerId) => buyUpgrade(buyerId, "luck"); // the "Luck" (waves) lever
+export const upgradeRaid = (buyerId) => buyUpgrade(buyerId, "raid"); // the "Raiding" (raid-dodge) lever
 export const upgradeDig = (buyerId, track) => buyUpgrade(buyerId, `dig_${track}`); // digging tracks

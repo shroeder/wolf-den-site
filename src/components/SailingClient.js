@@ -6,6 +6,7 @@ import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
 import CrewCalibrator from "@/components/CrewCalibrator";
 import MerchantScene from "@/components/MerchantScene";
+import RaidScene from "@/components/RaidScene";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
@@ -188,7 +189,7 @@ function Stars({ level }) {
     return <span className="sail-stars">{Array.from({ length: 5 }, (_, i) => <span key={i} className={i < tier ? "on" : "off"}>★</span>)}</span>;
 }
 
-export default function SailingClient({ initial, hero, pet }) {
+export default function SailingClient({ initial, hero, pet, captain }) {
     const [state, setState] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
@@ -215,6 +216,8 @@ export default function SailingClient({ initial, hero, pet }) {
     // session (later state updates re-roll d.sky, but we keep this original).
     const [sky, setSky] = useState(() => initial?.sky || initial?.oceanBg || null);
     const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
+    const [raidConfirm, setRaidConfirm] = useState(false); // the "are you sure?" raid modal
+    const [raidPlay, setRaidPlay] = useState(null);        // the resolved raid → drives the full-screen battle scene
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -419,6 +422,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 if (d.forged) { sfx.hammer(); setForge(d.forged); } // metallic "ting" as the chest is forged
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
+                if (d.raidResult) { setRaidConfirm(false); setRaidPlay(d.raidResult); } // launch the full-screen auto-battle
             }
         } finally { setBusy(false); }
     }, [triggerGust]);
@@ -464,9 +468,12 @@ export default function SailingClient({ initial, hero, pet }) {
         { action: "upgrade_rarity", icon: "💎", name: "Rarity", data: state.rarity,
             desc: <>Better loot — a chance your forged chest is bumped up a tier.</>,
             effLabel: "Chest upgrade", now: `${state.rarity.pctNow}%`, next: `${state.rarity.pctNext}%` },
-        { action: "upgrade_luck", icon: "🎯", name: "Luck", data: state.luck,
-            desc: <>Strike sooner — fragments sit closer to the surface, found on your early digs.</>,
-            effLabel: "Buried within", now: `${state.luck.depthNow} layer${state.luck.depthNow === 1 ? "" : "s"}`, next: `${state.luck.depthNext} layer${state.luck.depthNext === 1 ? "" : "s"}` },
+        { action: "upgrade_luck", icon: "👋", name: "Luck", data: state.luck,
+            desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,
+            effLabel: "Waves / day", now: `${state.luck.wavesNow}`, next: `${state.luck.wavesNext}` },
+        { action: "upgrade_raid", icon: "🏴‍☠️", name: "Raiding", data: state.raiding,
+            desc: <>Sea-dog cunning — a chance a raid <b>doesn&apos;t use up</b> your daily raid (raid again!).</>,
+            effLabel: "Free-raid chance", now: `${state.raiding?.pctNow ?? 0}%`, next: `${state.raiding?.pctNext ?? 0}%` },
     ];
     // Digging upgrade tracks (separate system) — gold-leveled; the tools unlock via excavation level.
     const pct = (v) => `${Math.round((v || 0) * 100)}%`;
@@ -724,6 +731,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                 </button>
                             ))}
                         </div>
+                        <button className="sail-cta sail-cta-raid" disabled={busy || !state.raid?.available}
+                            onClick={() => setRaidConfirm(true)}>
+                            {state.raid?.available ? <>🏴‍☠️ Raid a passing ship</> : <>🏴‍☠️ Raided today — back tomorrow</>}
+                        </button>
                     </div>
                 )}
 
@@ -738,6 +749,12 @@ export default function SailingClient({ initial, hero, pet }) {
                                 </button>
                         )}
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
+                        {liveStatus === "sailing" && (
+                            <button className="sail-cta sail-cta-raid" disabled={busy || !state.raid?.available}
+                                onClick={() => setRaidConfirm(true)}>
+                                {state.raid?.available ? <>🏴‍☠️ Raid a passing ship</> : <>🏴‍☠️ Raided today</>}
+                            </button>
+                        )}
                     </div>
                 )}
                 {windSaved ? <div className="sail-windsave">🍃 Favorable! Your tailwind wasn&apos;t used up.</div> : null}
@@ -840,7 +857,7 @@ export default function SailingClient({ initial, hero, pet }) {
             {/* Excavation — the digging upgrade system (separate from the boat). */}
             <section className="card">
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
-                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Tools below unlock with <b>🎁 {state.digTools?.chestPoints ?? 0} chest-points</b> (earned forging chests — bigger chests count more){state.digTools?.nextUnlock ? <> · next: <b>{state.digTools.nextUnlock.name}</b> at {state.digTools.nextUnlock.unlockPoints}</> : ""}.</p>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Tools below unlock with <b>🎁 {state.digTools?.chestPoints ?? 0} chests unlocked</b> (earned forging chests — bigger chests count more){state.digTools?.nextUnlock ? <> · next: <b>{state.digTools.nextUnlock.name}</b> at {state.digTools.nextUnlock.unlockPoints}</> : ""}.</p>
                 <div className="sail-upgrades is-dig">
                     {digTracks.map((u) => (
                         <div className={`sail-upg${u.data?.maxed ? " is-maxed" : ""}${upgFlash === `dig:${u.track}` ? " is-bought" : ""}`} key={u.track}>
@@ -867,7 +884,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             <span className="sail-tool-emoji">{t.unlocked ? t.emoji : "🔒"}</span>
                             <div className="sail-tool-body">
                                 <div className="sail-tool-name">{t.name}{t.unlocked ? <span className="muted"> · {(t.procNow * 100).toFixed(1)}% proc</span> : null}</div>
-                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · unlock at 🎁 ${t.unlockPoints} chest-points`}</div>
+                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · unlock at 🎁 ${t.unlockPoints} chests unlocked`}</div>
                             </div>
                             {t.unlocked ? (
                                 t.maxed ? <button className="pill" disabled>✓ Max</button>
@@ -1036,6 +1053,32 @@ export default function SailingClient({ initial, hero, pet }) {
                         </div>
                     </div>
                 </div>
+            ) : null}
+
+            {/* RAID — confirm modal (make the stakes crystal clear + let them back out) */}
+            {raidConfirm ? (
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap sail-raid-confirm">
+                        <div className="sail-raid-crest" aria-hidden="true">🏴‍☠️</div>
+                        <h2 style={{ margin: "6px 0 2px" }}>Raid a passing ship?</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>You get <b>one raid a day</b>. Here&apos;s the deal:</p>
+                        <ul className="sail-raid-terms">
+                            <li><span>🏆 Win</span> — pocket <b>gold</b>, and a rare <b>{state.raid?.itemChance ?? 0.5}%</b> shot at a copy of one of their items. <em>They lose nothing.</em></li>
+                            <li><span>🏳️ Lose</span> — you drop <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>.</li>
+                            {state.raid?.dodgePct ? <li><span>🍃 Cunning</span> — {state.raid.dodgePct}% chance this <b>won&apos;t use up</b> today&apos;s raid.</li> : null}
+                            {state.raid?.canStun ? <li><span>💫 Warship</span> — your ship can <b>stun</b> the foe once this fight.</li> : null}
+                        </ul>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+                            <button className="sail-cta sail-cta-raid" disabled={busy} onClick={() => act("raid")}>{busy ? "Sailing in…" : "⚔️ Raid!"}</button>
+                            <button className="pill" disabled={busy} onClick={() => setRaidConfirm(false)}>Back out</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* RAID — the full-screen auto-battle show, then reward reveal */}
+            {raidPlay ? (
+                <RaidScene raid={raidPlay} myBoat={state.boatArt} hero={hero} captain={captain} onClose={() => setRaidPlay(null)} />
             ) : null}
         </div>
     );

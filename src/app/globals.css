@@ -10754,12 +10754,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Sized by max-width/max-height with width/height AUTO — an <img> scaled this way scales the WHOLE picture to
    fit and physically cannot crop (no object-fit games). The art also has ~12% transparent margin baked in on
    every side, so the merchant is never near an edge. */
-.merchant-figure { position: absolute; left: 50%; bottom: 1%; width: auto; height: auto; max-width: 92%; max-height: 98%; z-index: 3;
-    transform: translateX(-50%); filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45));
+.merchant-figure { position: absolute; left: 50%; top: 50%; width: auto; height: auto; max-width: 62%; max-height: 100%; z-index: 3;
+    transform: translate(-50%, -50%); filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45));
     animation: merchantFloat 2.8s ease-in-out infinite; }
-@keyframes merchantFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
+@keyframes merchantFloat { 0%,100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, calc(-50% - 5px)); } }
 @keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } } /* used by .sail-enc-art (encounter foe bob) */
-.merchant-stage.is-compact .merchant-figure { max-height: 100%; bottom: 0; }
+.merchant-stage.is-compact .merchant-figure { max-width: 46%; }
 /* Coins flying everywhere — a continuous spinning, drifting shower across the stage. */
 .merchant-coinfall { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .merchant-coin { position: absolute; top: 0; border-radius: 50%; opacity: 0;
@@ -11574,3 +11574,111 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     0% { opacity: 1; transform: rotate(calc(var(--i) * 42deg)) translateY(0) scale(1); }
     100% { opacity: 0; transform: rotate(calc(var(--i) * 42deg)) translateY(calc(-100px - var(--i) * 4px)) rotate(240deg) scale(0.5); } }
 @media (prefers-reduced-motion: reduce) { .sail-cta, .sail-cta::after, .sail-cta-dig, .sail-cta-svg, .sail-boat-inner.is-casting { animation: none; } .sail-confetti { display: none; } }
+
+/* ═══════════════════════ RAIDS ═══════════════════════ */
+/* Raid CTA — a dangerous crimson counterpart to the calm blue tailwind/dig CTAs. */
+.sail-cta-raid { background: linear-gradient(180deg, #b8324a, #7c1a2c); box-shadow: 0 6px 16px rgba(150,20,40,0.4), inset 0 1px 0 rgba(255,255,255,0.15); }
+.sail-cta-raid:disabled { filter: grayscale(0.5) brightness(0.8); }
+/* Confirm modal */
+.sail-raid-confirm { max-width: 420px; }
+.sail-raid-crest { font-size: 2.6rem; line-height: 1; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); animation: raidCrestSway 3s ease-in-out infinite; }
+@keyframes raidCrestSway { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+.sail-raid-terms { list-style: none; padding: 0; margin: 10px 0 12px; text-align: left; display: grid; gap: 7px; }
+.sail-raid-terms li { font-size: 0.86rem; line-height: 1.35; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 7px 10px; }
+.sail-raid-terms li span { font-weight: 800; margin-right: 4px; }
+
+/* Full-screen battle stage */
+.raid-scene { position: fixed; inset: 0; z-index: 4000; overflow: hidden; display: flex; flex-direction: column;
+    background: radial-gradient(120% 90% at 50% 10%, #1a2740 0%, #0c1526 55%, #060b16 100%); animation: raidFadeIn 0.35s ease; }
+@keyframes raidFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.raid-sky { position: absolute; inset: 0; pointer-events: none; }
+.raid-sky i { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%); opacity: 0.35; }
+.raid-sky i:nth-child(1) { width: 5px; height: 5px; top: 14%; left: 22%; } .raid-sky i:nth-child(2) { width: 4px; height: 4px; top: 22%; left: 68%; } .raid-sky i:nth-child(3) { width: 6px; height: 6px; top: 9%; left: 47%; }
+.raid-sea { position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+    background: linear-gradient(180deg, #14406a 0%, #0d2c4d 40%, #071a30 100%);
+    box-shadow: inset 0 8px 30px rgba(0,0,0,0.5); animation: raidSeaShift 6s ease-in-out infinite; }
+.raid-sea::before { content: ""; position: absolute; inset: 0; opacity: 0.25;
+    background: repeating-linear-gradient(90deg, transparent 0 28px, rgba(255,255,255,0.12) 28px 30px); }
+@keyframes raidSeaShift { 0%,100% { background-position: 0 0; } 50% { background-position: 0 6px; } }
+
+.raid-hud { position: relative; z-index: 3; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: max(14px, env(safe-area-inset-top)) 12px 0; }
+.raid-hpwrap { flex: 1; max-width: 44%; }
+.raid-hpwrap-foe { text-align: right; }
+.raid-hpname { font-size: 0.78rem; font-weight: 800; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.raid-lvl { font-size: 0.68rem; opacity: 0.75; font-weight: 700; }
+.raid-hpbar { position: relative; height: 12px; margin-top: 3px; border-radius: 7px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.18); overflow: hidden; }
+.raid-hpfill { position: absolute; inset: 0 auto 0 0; height: 100%; border-radius: 7px; transition: width 0.35s cubic-bezier(0.3,0.8,0.4,1); }
+.raid-hpwrap-foe .raid-hpbar { direction: rtl; }
+.raid-hpfill.is-me { background: linear-gradient(90deg, #35d07f, #7cf0a8); box-shadow: 0 0 8px rgba(60,220,130,0.6); }
+.raid-hpfill.is-foe { background: linear-gradient(90deg, #ff6a5a, #ffb199); box-shadow: 0 0 8px rgba(255,90,70,0.6); }
+.raid-vs-mini { font-size: 1.2rem; align-self: center; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+
+.raid-stage { position: relative; z-index: 2; flex: 1; }
+.raid-ship { position: absolute; bottom: 8%; width: min(46%, 260px); will-change: transform; }
+.raid-ship-me { left: 1%; }
+.raid-ship-foe { right: 1%; }
+.raid-boat { width: 100%; height: auto; display: block; filter: drop-shadow(0 12px 14px rgba(0,0,0,0.5)); animation: raidBob 3.4s ease-in-out infinite; }
+.raid-boat.is-mirror { transform: scaleX(-1); }
+.raid-rider { position: absolute; bottom: 34%; left: 40%; width: 26%; height: auto; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+.raid-rider.is-foe { left: auto; right: 40%; }
+.raid-rider.is-flip { transform: scaleX(-1); }
+@keyframes raidBob { 0%,100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(-8px) rotate(1.2deg); } }
+.raid-ship.is-hurt { animation: raidShake 0.4s ease; }
+@keyframes raidShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px) rotate(-2deg); } 45% { transform: translateX(7px) rotate(2deg); } 70% { transform: translateX(-4px); } }
+.raid-ship.is-hurt .raid-boat { filter: drop-shadow(0 12px 14px rgba(0,0,0,0.5)) brightness(1.8) sepia(0.4) saturate(3) hue-rotate(-30deg); }
+.raid-ship.is-firing { animation: raidRecoilMe 0.35s ease; }
+.raid-ship-foe.is-firing { animation: raidRecoilFoe 0.35s ease; }
+@keyframes raidRecoilMe { 0% { transform: translateX(0); } 40% { transform: translateX(-12px); } 100% { transform: translateX(0); } }
+@keyframes raidRecoilFoe { 0% { transform: translateX(0); } 40% { transform: translateX(12px); } 100% { transform: translateX(0); } }
+/* Muzzle flash at the bow when a ship fires */
+.raid-muzzle { position: absolute; top: 46%; width: 34px; height: 34px; border-radius: 50%; opacity: 0; pointer-events: none;
+    background: radial-gradient(circle, #fff 0%, #ffd36a 35%, rgba(255,120,40,0.6) 60%, transparent 72%); }
+.raid-muzzle-me { right: -6px; }
+.raid-muzzle-foe { left: -6px; }
+.raid-ship.is-firing .raid-muzzle { animation: raidMuzzle 0.34s ease; }
+@keyframes raidMuzzle { 0% { opacity: 0; transform: scale(0.3); } 30% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0; transform: scale(0.8); } }
+/* Cannonball tracer flying between ships */
+.raid-ball { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 35% 30%, #fff, #ffb14a 40%, #6b3410 75%); box-shadow: 0 0 10px rgba(255,160,60,0.9); }
+.raid-ball.to-foe { left: 24%; animation: raidBallToFoe 0.6s cubic-bezier(0.4,0,0.7,1) forwards; }
+.raid-ball.to-me { right: 24%; animation: raidBallToMe 0.6s cubic-bezier(0.4,0,0.7,1) forwards; }
+@keyframes raidBallToFoe { 0% { left: 24%; transform: translateY(0) scale(0.7); opacity: 0; } 15% { opacity: 1; } 50% { transform: translateY(-26px) scale(1); } 100% { left: 74%; transform: translateY(0) scale(0.9); opacity: 0.9; } }
+@keyframes raidBallToMe { 0% { right: 24%; transform: translateY(0) scale(0.7); opacity: 0; } 15% { opacity: 1; } 50% { transform: translateY(-26px) scale(1); } 100% { right: 74%; transform: translateY(0) scale(0.9); opacity: 0.9; } }
+/* Floating damage numbers / stun */
+.raid-float { position: absolute; top: 30%; z-index: 4; font-weight: 900; font-size: 1.5rem; color: #ffd86a; text-shadow: 0 2px 4px rgba(0,0,0,0.8); pointer-events: none; animation: raidFloat 0.85s ease-out forwards; }
+.raid-float.on-foe { right: 14%; color: #ff8a6a; }
+.raid-float.on-me { left: 14%; color: #ffd86a; }
+.raid-float.is-stun { color: #b0e0ff; font-size: 1.15rem; }
+@keyframes raidFloat { 0% { opacity: 0; transform: translateY(6px) scale(0.6); } 25% { opacity: 1; transform: translateY(-4px) scale(1.15); } 100% { opacity: 0; transform: translateY(-40px) scale(1); } }
+
+/* Intro splash */
+.raid-intro { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; pointer-events: none; }
+.raid-intro-vs { font-size: clamp(3rem, 16vw, 6rem); font-weight: 900; letter-spacing: 2px; color: #fff;
+    text-shadow: 0 0 24px rgba(255,80,60,0.8), 0 6px 10px rgba(0,0,0,0.6); animation: raidIntroPop 0.6s cubic-bezier(0.2,1.4,0.4,1) both; }
+.raid-intro-sub { font-size: 1rem; font-weight: 800; color: #eaf2ff; text-shadow: 0 2px 4px rgba(0,0,0,0.7); animation: raidIntroPop 0.6s 0.15s cubic-bezier(0.2,1.4,0.4,1) both; }
+.raid-intro-sub span { margin: 0 4px; }
+@keyframes raidIntroPop { 0% { opacity: 0; transform: scale(0.3) rotate(-6deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+
+/* Result card */
+.raid-result { position: absolute; inset: 0; z-index: 7; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(4,8,16,0.55); backdrop-filter: blur(3px); animation: raidFadeIn 0.4s ease; }
+.raid-result-card { max-width: 380px; width: 100%; text-align: center; }
+.raid-result-banner { font-size: 1.6rem; font-weight: 900; margin-bottom: 4px; }
+.raid-result-banner.is-win { color: #ffd86a; text-shadow: 0 0 18px rgba(255,200,80,0.6); }
+.raid-result-banner.is-lose { color: #ff8a7a; }
+.raid-result-line { margin: 2px 0 10px; font-size: 0.9rem; }
+.raid-result-rewards { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+.raid-reward { font-weight: 800; font-size: 0.85rem; padding: 5px 10px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); }
+.raid-reward.is-good { color: #7cf0a8; border-color: rgba(90,230,150,0.45); background: rgba(60,220,130,0.12); }
+.raid-reward.is-bad { color: #ff9a8a; border-color: rgba(255,120,90,0.45); background: rgba(255,90,70,0.12); }
+.raid-loot { display: flex; align-items: center; gap: 12px; text-align: left; margin: 4px 0 12px; padding: 10px; border-radius: 14px;
+    background: rgba(255,215,120,0.08); border: 1px solid rgba(255,215,120,0.35); animation: raidLootPop 0.5s cubic-bezier(0.2,1.4,0.4,1) both; }
+@keyframes raidLootPop { 0% { opacity: 0; transform: scale(0.7); } 100% { opacity: 1; transform: scale(1); } }
+.raid-loot-img { width: 62px; height: 62px; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+.raid-loot-emoji { font-size: 2.6rem; }
+.raid-loot-tag { font-size: 0.72rem; font-weight: 800; color: #ffd86a; text-transform: uppercase; letter-spacing: 0.5px; }
+.raid-loot-name { font-weight: 800; }
+.raid-loot-note { font-size: 0.76rem; }
+@media (prefers-reduced-motion: reduce) {
+    .raid-boat, .raid-sea, .raid-crest, .sail-raid-crest, .raid-ship, .raid-intro-vs, .raid-intro-sub, .raid-loot { animation: none !important; }
+}
