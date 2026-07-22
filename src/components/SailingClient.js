@@ -13,6 +13,12 @@ const GUST_MS = 3000;
 // higher on their deck. Tiers not listed fall back to the default in CSS. Tune per boat as forms are seen.
 const CREW_BOTTOM = { 1: 12, 2: 13 };
 
+// Where the ambient (background) sailors' rider + pet plant their feet, per boat FORM (tier). Same idea as
+// CREW_BOTTOM but for the small background boats, whose deck height varies by form — a single value can't fit
+// an open dinghy AND a tall galleon, which is why earlier single-value tweaks kept missing.
+const AMB_RIDER_B = { 1: 19, 2: 20, 3: 34, 4: 34, 5: 36, 6: 34, 7: 34, 8: 36, 9: 36 };
+const AMB_PET_B = { 1: 17, 2: 18, 3: 31, 4: 31, 5: 33, 6: 31, 7: 31, 8: 33, 9: 33 };
+
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
 // fail, you land back at port and can set sail again. Server is authoritative for digs + the fragment reward.
@@ -230,6 +236,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 const dur = boosting ? 2.8 + Math.random() * 1.4 : sailingNow ? 20 + Math.random() * 9 : 15 + Math.random() * 8;
                 setAmbient((a) => [...a, {
                     id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
+                    tier: Number((pick.art.match(/boat-tier(\d+)/) || [])[1]) || 1, // deck height differs by boat form
                     dir, faceLeft: dir === "left" && !sailingNow, top: 34 + Math.random() * 10, dur,
                 }]);
                 setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
@@ -456,7 +463,7 @@ export default function SailingClient({ initial, hero, pet }) {
                             <div className="sail-ambient">
                                 {ambient.map((b) => (
                                     <span key={b.id} className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
-                                        <span className="sail-ambient-hull">
+                                        <span className="sail-ambient-hull" style={{ "--rider-b": `${AMB_RIDER_B[b.tier] ?? 22}%`, "--pet-b": `${AMB_PET_B[b.tier] ?? 20}%` }}>
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={b.art} alt="" />
                                             {b.pet ? (
