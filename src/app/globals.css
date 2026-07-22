@@ -10751,12 +10751,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .merchant-stage.is-compact { height: clamp(130px, 32vw, 170px); }
 /* Merchant himself — the art fills its canvas edge-to-edge (hat at the very top pixel), so we scale to fit
    with clear headroom and DON'T bottom-anchor tight, or the hat clips. object-fit contain = never cropped. */
-.merchant-figure { position: absolute; left: 50%; bottom: 4%; height: 84%; width: 82%; max-width: 300px; z-index: 3;
-    object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45));
+/* Sized by max-width/max-height with width/height AUTO — an <img> scaled this way scales the WHOLE picture to
+   fit and physically cannot crop (no object-fit games). The art also has ~12% transparent margin baked in on
+   every side, so the merchant is never near an edge. */
+.merchant-figure { position: absolute; left: 50%; bottom: 1%; width: auto; height: auto; max-width: 92%; max-height: 98%; z-index: 3;
+    transform: translateX(-50%); filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45));
     animation: merchantFloat 2.8s ease-in-out infinite; }
 @keyframes merchantFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
 @keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } } /* used by .sail-enc-art (encounter foe bob) */
-.merchant-stage.is-compact .merchant-figure { height: 92%; bottom: 3%; }
+.merchant-stage.is-compact .merchant-figure { max-height: 100%; bottom: 0; }
 /* Coins flying everywhere — a continuous spinning, drifting shower across the stage. */
 .merchant-coinfall { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .merchant-coin { position: absolute; top: 0; border-radius: 50%; opacity: 0;
