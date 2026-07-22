@@ -11249,28 +11249,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-tip b { color: #ffd75e; }
 /* Dig tool bar + armed-tile cue. */
 .dig-tools { display: flex; gap: 6px; justify-content: center; margin: 8px 0 2px; flex-wrap: wrap; }
-.dig-tool-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 1.1rem; padding: 5px 11px; border-radius: 10px; cursor: pointer;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); color: #f2e8d6; }
+.dig-tool-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 800; padding: 9px 13px; border-radius: 12px; cursor: pointer;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); color: #f2e8d6; transition: transform 0.1s ease; }
+.dig-tool-btn:not(:disabled):active { transform: scale(0.96); }
 .dig-tool-btn:disabled { opacity: 0.4; cursor: default; }
-.dig-tool-btn.is-armed { background: rgba(255,120,50,0.22); border-color: #ff8c42; box-shadow: 0 0 0 2px rgba(255,140,66,0.4); }
-.dig-tool-cost { font-size: 0.72rem; font-weight: 800; color: #bfe9ff; }
+.dig-tool-btn.is-armed { background: rgba(255,120,50,0.24); border-color: #ff8c42; box-shadow: 0 0 0 2px rgba(255,140,66,0.45), 0 3px 12px rgba(255,120,50,0.4); }
+.dig-tool-cost { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: rgba(0,0,0,0.3); font-size: 0.7rem; font-weight: 800; color: #bfe9ff; }
 .dig-tool-cancel { background: none; border: none; color: #ff9f43; font-weight: 800; cursor: pointer; text-decoration: underline; font-size: 0.8rem; padding: 0; }
 .dig-tile.is-toolarm { cursor: crosshair; }
 .dig-tile.is-toolarm:not(:disabled):hover { box-shadow: inset 0 0 0 2px rgba(255,140,66,0.75); }
-/* Difficulty badge + Dig/Sense mode toggle. */
+/* Difficulty badge. */
 .dig-tier { color: #ffb86b; font-size: 0.78rem; padding: 1px 9px; border-radius: 999px; background: rgba(255,150,60,0.14); border: 1px solid rgba(255,150,60,0.4); }
-.dig-modes { display: flex; gap: 10px; justify-content: center; margin: 4px 0 8px; }
-.dig-mode-btn { flex: 1; max-width: 180px; display: flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer;
-    padding: 10px 12px; border-radius: 13px; color: #dbe7f5; background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.16); transition: transform 0.1s ease, box-shadow 0.15s ease; }
-.dig-mode-btn:not(:disabled):active { transform: scale(0.97); }
-.dig-mode-btn:disabled { opacity: 0.4; cursor: default; }
-.dig-mode-ico { font-size: 1.5rem; line-height: 1; }
-.dig-mode-txt { display: flex; flex-direction: column; align-items: flex-start; font-weight: 900; font-size: 1rem; line-height: 1.1; }
-.dig-mode-txt small { font-weight: 700; font-size: 0.66rem; opacity: 0.8; }
-.dig-mode-btn.is-on { color: #06121f; background: linear-gradient(180deg, #ffd98a, #ffb43c); border-color: #ffcf6b; box-shadow: 0 4px 16px rgba(255,180,60,0.45); }
-.dig-mode-btn.is-sense.is-on { background: linear-gradient(180deg, #8fe3ff, #45b6ff); border-color: #7cd3ff; color: #02121f; box-shadow: 0 4px 16px rgba(90,190,255,0.5); }
-.dig-mode-btn.is-sense.is-on .dig-mode-txt small { opacity: 0.9; }
+/* Action row: the one-shot SCAN button + any unlocked tools (dig itself is just tapping — no button). */
+.dig-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 6px 0 8px; }
+.dig-scan-btn { display: inline-flex; align-items: center; gap: 7px; font-weight: 900; font-size: 0.95rem; padding: 9px 16px; border-radius: 12px;
+    cursor: pointer; color: #02121f; background: linear-gradient(180deg, #8fe3ff, #45b6ff); border: 1px solid #7cd3ff;
+    box-shadow: 0 3px 12px rgba(90,190,255,0.45); transition: transform 0.1s ease, box-shadow 0.15s ease; }
+.dig-scan-btn:not(:disabled):active { transform: scale(0.96); }
+.dig-scan-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.dig-scan-btn.is-armed { animation: digScanPulse 0.8s ease-in-out infinite; }
+@keyframes digScanPulse { 0%,100% { box-shadow: 0 3px 12px rgba(90,190,255,0.45); } 50% { box-shadow: 0 3px 20px rgba(120,215,255,0.9); } }
+.dig-scan-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+    background: rgba(2,18,31,0.35); color: #eaf7ff; font-size: 0.78rem; }
 /* Sonar PING — a probe ripple that bursts from a tile when you Sense it. */
 .dig-ping { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 5; }
 .dig-ping i { position: absolute; width: 30%; height: 30%; border-radius: 50%; border: 2px solid rgba(130,215,255,0.95);
@@ -11283,10 +11283,21 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     background: linear-gradient(to top, rgba(255,215,94,0), rgba(255,225,120,0.95)); transform: rotate(calc(var(--i) * 45deg));
     animation: digBurst 0.7s ease-out both; }
 @keyframes digBurst { 0% { opacity: 0; height: 0; } 35% { opacity: 0.95; height: 42%; } 100% { opacity: 0; height: 46%; } }
-/* SENSE probe: armed tiles invite a tap; a probed tile shows its clue number in a cold→hot colour. */
-.dig-tile.is-sensearm:not(:disabled) { box-shadow: inset 0 0 0 2px rgba(90,190,255,0.55); cursor: help; }
-.dig-tile.is-sensearm:not(:disabled):hover { box-shadow: inset 0 0 0 2px rgba(120,211,255,0.95); }
-.dig-tile.is-sensed { background: radial-gradient(120% 120% at 50% 30%, #2a3a54, #141d2c); box-shadow: inset 0 0 0 1px rgba(120,190,255,0.25), inset 0 4px 7px rgba(0,0,0,0.5); }
+/* SCAN: armed tiles invite a tap; a scanned tile KEEPS its dirt (still needs digging) and gains a HEAT glow +
+   a 🔥/🧊 reading floating over the dirt, so it never looks already-mined. */
+.dig-tile.is-sensearm:not(:disabled) { box-shadow: inset 0 0 0 2px rgba(90,190,255,0.6); cursor: crosshair; }
+.dig-tile.is-sensearm:not(:disabled):hover { box-shadow: inset 0 0 0 3px rgba(120,211,255,0.95); }
+.dig-tile.is-sensed.heat-3 { box-shadow: inset 0 0 0 2px rgba(255,95,60,0.9), inset 0 0 16px rgba(255,90,40,0.55); }
+.dig-tile.is-sensed.heat-2 { box-shadow: inset 0 0 0 2px rgba(255,160,60,0.85), inset 0 0 14px rgba(255,150,50,0.4); }
+.dig-tile.is-sensed.heat-1 { box-shadow: inset 0 0 0 2px rgba(120,200,255,0.7), inset 0 0 12px rgba(90,180,255,0.3); }
+.dig-tile.is-sensed.heat-0 { box-shadow: inset 0 0 0 2px rgba(150,180,210,0.5); }
+/* The heat reading badge (emoji + word) sitting on top of the still-there dirt. */
+.dig-heat { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    line-height: 1; font-size: 1.15rem; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+    animation: digCluePop 0.28s cubic-bezier(0.2,1.5,0.4,1) both; }
+.dig-heat small { margin-top: 2px; font-size: 0.56rem; font-weight: 900; letter-spacing: 0.05em; color: #fff; }
+.dig-tile.heat-3 .dig-heat small { color: #ffcabf; } .dig-tile.heat-2 .dig-heat small { color: #ffe0b0; }
+.dig-tile.heat-1 .dig-heat small { color: #cfeaff; } .dig-tile.heat-0 .dig-heat small { color: #dbe6f2; }
 .dig-clue { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 1.15rem;
     text-shadow: 0 1px 3px rgba(0,0,0,0.8); animation: digCluePop 0.28s cubic-bezier(0.2,1.5,0.4,1) both; }
 .dig-clue-0 { color: #7fd0ff; }   /* cold — no treasure adjacent */

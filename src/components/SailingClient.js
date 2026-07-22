@@ -18,6 +18,8 @@ const GUST_MS = 3000;
 // ships seat higher. To retune a form or add a new boat, use the owner-only "🎯 Calibrate crew" overlay on
 // this page (renders all forms with a deck guide + live nudge) and paste the resulting numbers here.
 const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30 };
+// Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
+const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
 const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
@@ -184,8 +186,8 @@ export default function SailingClient({ initial, hero, pet }) {
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
     const [selectedTool, setSelectedTool] = useState(null); // an area-clear dig tool armed to tap a tile
-    const [digMode, setDigMode] = useState("dig"); // "dig" (chip a tile) | "sense" (probe a tile for a clue)
-    const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a sonar probe
+    const [scanArmed, setScanArmed] = useState(false); // Dig is the default; arming Scan makes the NEXT tap a one-shot scan
+    const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a scan pulse
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
@@ -362,11 +364,12 @@ export default function SailingClient({ initial, hero, pet }) {
         act("dig", { r, c });
     }, [act]);
 
-    // Probe a tile with the treasure sense: fire a sonar ripple instantly (tactile), then ask the server.
+    // Scan a tile: fire a sonar ripple instantly (tactile), disarm the one-shot, then ask the server for its heat.
     const senseTile = useCallback((r, c) => {
         const k = (chunkId.current += 1);
         setSensePing({ r, c, k });
         setTimeout(() => setSensePing((p) => (p?.k === k ? null : p)), 600);
+        setScanArmed(false);
         act("sense", { r, c });
     }, [act]);
 
@@ -382,8 +385,7 @@ export default function SailingClient({ initial, hero, pet }) {
         const k = (chunkId.current += 1);
         setChunk({ r, c, k });
         setTimeout(() => setChunk((cur) => (cur?.k === k ? null : cur)), 520);
-        setSelectedTool(null);
-        act("use_tool", { tool: tool.id, r, c });
+        act("use_tool", { tool: tool.id, r, c }); // stays armed — keep hammering the same tool without re-selecting
     }, [act]);
 
     const level = state.level;
@@ -448,56 +450,46 @@ export default function SailingClient({ initial, hero, pet }) {
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina}</span>
                         </div>
                         <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / Math.max(1, dig.maxStamina)) * 100)}%` }} /></div>
-                        {/* Mode toggle: DIG chips a tile; SENSE probes for a clue (how many treasures touch it). */}
-                        <div className="dig-modes">
-                            <button type="button" className={`dig-mode-btn${digMode === "dig" && !selectedTool ? " is-on" : ""}`}
-                                onClick={() => { setDigMode("dig"); setSelectedTool(null); }}>
-                                <span className="dig-mode-ico">⛏️</span><span className="dig-mode-txt">Dig<small>break dirt, grab loot</small></span>
+                        {/* Actions — DIG is the default (just tap dirt). SCAN is a one-shot "feel it out" probe.
+                            Tools stay armed so you can keep clearing without re-selecting. */}
+                        <div className="dig-actions">
+                            <button type="button" className={`dig-scan-btn${scanArmed ? " is-armed" : ""}`}
+                                disabled={busy || (dig.senses ?? 0) <= 0 || scanArmed}
+                                onClick={() => { setScanArmed(true); setSelectedTool(null); }}>
+                                🔍 Scan <span className="dig-scan-n">{dig.senses ?? 0}</span>
                             </button>
-                            <button type="button" className={`dig-mode-btn is-sense${digMode === "sense" && !selectedTool ? " is-on" : ""}`}
-                                disabled={busy || (dig.senses ?? 0) <= 0}
-                                onClick={() => { setDigMode("sense"); setSelectedTool(null); }}>
-                                <span className="dig-mode-ico">🔍</span><span className="dig-mode-txt">Sense<small>{dig.senses ?? 0} probes left</small></span>
-                            </button>
+                            {(dig.tools || []).map((t) => (
+                                <button key={t.id} type="button"
+                                    className={`dig-tool-btn${selectedTool?.id === t.id ? " is-armed" : ""}`}
+                                    disabled={busy || dig.stamina < 1}
+                                    onClick={() => { setSelectedTool(selectedTool?.id === t.id ? null : t); setScanArmed(false); }}
+                                    title={`${t.name}: clears ${t.cols}×${t.rows}${t.layers > 1 ? `, ${t.layers} layers` : ""} for ${t.stamina} stamina`}>
+                                    {t.emoji} {t.name} <span className="dig-tool-cost">{t.stamina}</span>
+                                </button>
+                            ))}
                         </div>
-                        {/* Tool bar — armed tools clear an area when you tap a tile. */}
-                        {(dig.tools || []).length ? (
-                            <div className="dig-tools">
-                                {dig.tools.map((t) => (
-                                    <button key={t.id} type="button"
-                                        className={`dig-tool-btn${selectedTool?.id === t.id ? " is-armed" : ""}`}
-                                        disabled={busy || dig.stamina < 1}
-                                        onClick={() => setSelectedTool(selectedTool?.id === t.id ? null : t)}
-                                        title={`${t.name}: clears ${t.cols}×${t.rows}${t.layers > 1 ? `, ${t.layers} layers` : ""} for ${t.stamina} stamina`}>
-                                        {t.emoji} <span className="dig-tool-cost">{t.stamina}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        ) : null}
                         <div className="dig-instruct">{selectedTool
-                            ? <>💥 <b>{selectedTool.name}</b> armed — tap a tile to clear a {selectedTool.cols}×{selectedTool.rows}{selectedTool.layers > 1 ? `, ${selectedTool.layers} layers` : ""} patch ({selectedTool.stamina} stamina). <button type="button" className="dig-tool-cancel" onClick={() => setSelectedTool(null)}>cancel</button></>
-                            : digMode === "sense"
-                                ? <>🔍 <b>Sense</b> a tile — the number = treasures in the 8 tiles around it. Cross-reference clues, then switch to ⛏️ Dig.</>
-                                : <>⛏️ <b>Dig</b> a tile to chip through the dirt. Use 🔍 <b>Sense</b> first to find WHERE the treasure is.</>}</div>
+                            ? <>💥 <b>{selectedTool.name}</b> armed — tap tiles to clear a {selectedTool.cols}×{selectedTool.rows} patch each. <button type="button" className="dig-tool-cancel" onClick={() => setSelectedTool(null)}>done</button></>
+                            : scanArmed
+                                ? <>🔍 <b>Tap a tile to scan it</b> — it&apos;ll tell you how close the treasure is (🔥 HOT → ❄️ COLD). <button type="button" className="dig-tool-cancel" onClick={() => setScanArmed(false)}>cancel</button></>
+                                : <>⛏️ <b>Tap dirt to dig.</b> Low on luck? Hit <b>🔍 Scan</b> to feel where the treasure&apos;s hiding first.</>}</div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
-                                const senseArmed = digMode === "sense" && !selectedTool;
-                                const disabled = busy || dig.status !== "active" || (selectedTool ? false : senseArmed ? (t.sense != null || (dig.senses ?? 0) <= 0) : bottomed);
+                                const disabled = busy || dig.status !== "active" || (selectedTool ? false : scanArmed ? (t.sense != null || (dig.senses ?? 0) <= 0) : bottomed);
                                 return (
                                     <button
                                         key={`${r}-${c}`}
                                         type="button"
-                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}${senseArmed && !bottomed && t.sense == null ? " is-sensearm" : ""}${t.sense != null ? " is-sensed" : ""}`}
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}${scanArmed && !bottomed && t.sense == null ? " is-sensearm" : ""}${t.sense != null && !bottomed ? ` is-sensed heat-${t.sense}` : ""}`}
                                         style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
                                         disabled={disabled}
-                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : senseArmed ? senseTile(r, c) : digTile(r, c))}
-                                        title={bottomed ? (t.found ? "Treasure!" : "Bare dirt — nothing here") : t.sense != null ? `${t.sense} treasure${t.sense === 1 ? "" : "s"} touching this tile` : senseArmed ? "Probe this tile" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
+                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : scanArmed ? senseTile(r, c) : digTile(r, c))}
+                                        title={bottomed ? (t.found ? "Treasure!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — treasure is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : scanArmed ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
-                                        {t.found ? <span className="dig-found"><span className="dig-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span><FragmentIcon size={30} /></span>
+                                        {t.found ? <span className="dig-found"><span className="dig-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span><FragmentIcon size={30} art={t.tier ? `/images/sailing/fragment-${t.tier}.png` : undefined} /></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
-                                                : t.sense != null ? <span className={`dig-clue dig-clue-${Math.min(3, t.sense)}`}>{t.sense}</span>
-                                                    : <span className="dig-dirt" aria-hidden="true" />}
+                                                : <><span className="dig-dirt" aria-hidden="true" />{t.sense != null ? <span className="dig-heat" aria-hidden="true">{t.sense >= 3 ? "🔥" : t.sense === 2 ? "♨️" : t.sense === 1 ? "❄️" : "🧊"}<small>{HEAT_WORD[t.sense]}</small></span> : null}</>}
                                         {chunk && chunk.r === r && chunk.c === c ? (
                                             <span className="dig-chunks" key={chunk.k} aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span>
                                         ) : null}
@@ -508,7 +500,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip"><b>{dig.buried} treasures</b> are buried here. <b>🔍 Sense</b> tiles to read the numbers (treasures nearby), deduce the spots, then <b>⛏️ Dig</b> them up — before your digs run out.</p>
+                        <p className="dig-tip"><b>{dig.buried} treasures</b> are buried here. <b>🔍 Scan</b> a spot to feel how close the loot is — 🔥 <b>HOT</b> means it&apos;s right nearby, 🧊 <b>COLD</b> means far — then <b>⛏️ dig</b> the warm spots before your digs run out.</p>
                         {dig.status === "active" ? (
                             <button
                                 className="btn-ghost sail-digbuy"

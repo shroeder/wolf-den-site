@@ -312,10 +312,17 @@ function digTreasureCount(tier, fortuneBuried) {                                
     const size = digSize(tier);
     return Math.min(Math.floor(size * size * 0.28), 3 + (tier - 1) + Math.max(0, fortuneBuried));
 }
-// Sense charges (the detector) — scale with the hunt so bigger boards get more probes, but never enough to
-// probe everything (you must deduce). Luck (find_level) grants a few extra, so it also helps the new game.
+// Scan charges (the detector) — deliberately FEW ("a couple"), so a scan is a precious "feel it out" moment,
+// not a solve-the-grid tool. Luck (find_level) grants the odd extra. Tune freely.
 function digSenseBudget(tier, treasures, luckLevel = 0) {
-    return Math.max(3, treasures + tier + 1 + Math.floor(Math.max(0, luckLevel) / 2));
+    return Math.max(2, 2 + Math.floor(tier / 2) + Math.floor(Math.max(0, luckLevel) / 4));
+}
+// A scan's HEAT for a tile: how CLOSE the nearest treasure is (Chebyshev distance) → 3 hot / 2 warm / 1 cool
+// / 0 cold. Feeling-based, not a neighbour-count — "am I close?" reads instantly.
+function senseHeat(board, r, c) {
+    let best = Infinity;
+    for (const [fr, fc] of board.frag) { const d = Math.max(Math.abs(fr - r), Math.abs(fc - c)); if (d < best) best = d; }
+    return best <= 1 ? 3 : best === 2 ? 2 : best === 3 ? 1 : 0;
 }
 
 function newBoard(row) {
@@ -336,6 +343,10 @@ function newBoard(row) {
     for (let i = cells.length - 1; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
     const nTreasure = digTreasureCount(tier, boatPerks(level).buried);
     const frag = cells.slice(0, nTreasure);
+    // Roll each buried treasure's tier NOW (from the voyage's duration weights + Rarity), so the tile shows the
+    // REAL fragment when unearthed — no more everything looking like a wooden shard.
+    const quality = row?.voyage_quality || "standard";
+    const fragTiers = frag.map(() => rollFragmentTier(quality, row?.rarity_level || 0, level));
     // Luck caps how deep a treasure tile can be; the "first strike guaranteed" perk forces one to the surface.
     const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
     const perks = boatPerks(level);
@@ -352,7 +363,7 @@ function newBoard(row) {
         detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
     };
     const tools = unlockedTools(row?.voyages_completed || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
@@ -395,17 +406,10 @@ function applySense(board, r, c) {
     if (board.status !== "active") return board;
     if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return board;
     if (!board.sensed) board.sensed = Array.from({ length: board.rows }, () => Array.from({ length: board.cols }, () => -1));
-    if (board.sensed[r][c] >= 0) return board;           // already probed
-    if ((board.senses || 0) <= 0) return board;          // out of probes
+    if (board.sensed[r][c] >= 0) return board;           // already scanned
+    if ((board.senses || 0) <= 0) return board;          // out of scans
     board.senses -= 1;
-    const fragSet = new Set(board.frag.map(([fr, fc]) => `${fr},${fc}`));
-    let clue = 0;
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols && fragSet.has(`${nr},${nc}`)) clue += 1;
-    }
-    board.sensed[r][c] = clue;
+    board.sensed[r][c] = senseHeat(board, r, c);         // 3 hot / 2 warm / 1 cool / 0 cold
     return board;
 }
 
@@ -437,16 +441,20 @@ function applyTool(board, toolId, r, c) {
 function boardView(board) {
     const maxDepth = board.maxDepth || DIG_MAX_DEPTH;
     const fragSet = new Set(board.frag.map(([r, c]) => `${r},${c}`));
+    const tierAt = new Map();
+    (board.fragTiers || []).forEach((t, i) => { const [fr, fc] = board.frag[i] || []; if (fr != null) tierAt.set(`${fr},${fc}`, t); });
     const tiles = [];
     for (let r = 0; r < board.rows; r++) {
         const row = [];
         for (let c = 0; c < board.cols; c++) {
+            const isFound = fragSet.has(`${r},${c}`) && board.depth[r][c] === 0;
             row.push({
                 depth: board.depth[r][c],   // rock layers still on top (drives the stacked-slab drawing)
                 maxDepth,
                 dug: board.dug[r][c],
-                found: fragSet.has(`${r},${c}`) && board.depth[r][c] === 0, // fragment unearthed at the bottom
-                sense: board.sensed && board.sensed[r][c] >= 0 ? board.sensed[r][c] : null, // probed clue, or null
+                found: isFound,             // treasure unearthed at the bottom
+                tier: isFound ? (tierAt.get(`${r},${c}`) || null) : null, // its real fragment tier → correct sprite
+                sense: board.sensed && board.sensed[r][c] >= 0 ? board.sensed[r][c] : null, // scan HEAT (0–3), or null
             });
         }
         tiles.push(row);
@@ -895,14 +903,17 @@ async function finishDig(buyerId, board) {
     const level = decorate(row).level;
     const quality = row?.voyage_quality || "standard";
     const rarityLevel = row?.rarity_level || 0;
-    const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
-    const earned = found + (board.bonus || 0);
+    // Collect the tiers of the treasures actually unearthed (their tiers were rolled at board creation, so the
+    // recap matches the sprites you saw pop out). Lucky Strike BONUS shards have no tile, so roll those fresh.
+    const foundTiers = [];
+    board.frag.forEach(([fr, fc], i) => { if (board.depth[fr][fc] === 0) foundTiers.push((board.fragTiers && board.fragTiers[i]) || rollFragmentTier(quality, rarityLevel, level)); });
+    for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level));
+    const earned = foundTiers.length;
     const won = earned > 0;
-    // Roll each earned shard's tier and merge into the current per-tier hold.
+    // Merge into the current per-tier hold.
     const counts = { ...((row && typeof row.fragments_json === "object" && row.fragments_json) || {}) };
     const byTier = {};
-    for (let i = 0; i < earned; i++) {
-        const t = rollFragmentTier(quality, rarityLevel, level);
+    for (const t of foundTiers) {
         byTier[t] = (byTier[t] || 0) + 1;
         counts[t] = (Number(counts[t]) || 0) + 1;
     }
