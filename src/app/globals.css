@@ -10637,9 +10637,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boat-aura-7 { filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45)) drop-shadow(0 0 12px rgba(150,110,255,0.9)) drop-shadow(0 0 22px rgba(110,80,240,0.4)) !important; } /* arcane — violet magic */
 .boat-aura-8 { filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45)) drop-shadow(0 0 12px rgba(255,120,40,0.9)) drop-shadow(0 0 22px rgba(255,90,20,0.4)) !important; } /* dragon — fire */
 .boat-aura-9 { filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45)) drop-shadow(0 0 12px rgba(90,255,210,0.85)) drop-shadow(0 0 22px rgba(60,220,180,0.4)) !important; } /* ghost — spirit */
-/* Crew ride the deck (roughly the lower-center of the hull). bottom nudged down from 25% so they sit DOWN in
-   the hull rather than risk floating above the deck across the different boat forms. */
-.sail-crew { position: absolute; left: 49%; bottom: 19%; transform: translateX(-50%);
+/* Crew ride the deck (roughly the lower-center of the hull). --crew-bottom is set per boat FORM (open boats
+   sit low so the crew isn't hovering in the hull; tall ships higher); 19% is the fallback for unlisted tiers. */
+.sail-crew { position: absolute; left: 49%; bottom: var(--crew-bottom, 19%); transform: translateX(-50%);
     display: flex; align-items: flex-end; gap: 2px; pointer-events: none; z-index: 2; }
 .sail-hero { height: clamp(60px, 17vw, 116px); width: auto; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.45)); }
 .sail-hero-avatar { border-radius: 50%; height: clamp(46px, 13vw, 84px); }

@@ -6,6 +6,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
 const GUST_MS = 3000;
 
+// Where the crew (hero + pet) plant their feet, per boat FORM (tier), as a `bottom` % of the hull art. Open
+// boats (tier 1–2) have a low floor so the crew must sit LOW or they hover in the open hull; taller ships seat
+// higher on their deck. Tiers not listed fall back to the default in CSS. Tune per boat as forms are seen.
+const CREW_BOTTOM = { 1: 12, 2: 13 };
+
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
 // fail, you land back at port and can set sail again. Server is authoritative for digs + the fragment reward.
@@ -457,7 +462,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                     ) : null}
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className={`sail-boat-img boat-aura-${state.tier}`} src={state.boatArt} alt="Your boat" />
-                                    <span className="sail-crew">
+                                    <span className="sail-crew" style={CREW_BOTTOM[state.tier] ? { "--crew-bottom": `${CREW_BOTTOM[state.tier]}%` } : undefined}>
                                         {pet?.url ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img className="sail-pet" src={pet.url} alt="" style={pet.flip ? { transform: "scaleX(-1)" } : undefined} />
