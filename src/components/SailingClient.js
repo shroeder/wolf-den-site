@@ -77,10 +77,10 @@ function Confetti() {
 
 // Real painted art for a treasure-chest fragment (AI-gen, cel-shaded to match the boat/ocean) — replaces the
 // flat 🧩 emoji everywhere. Same API at every call size.
-function FragmentIcon({ size = 20, className = "" }) {
+function FragmentIcon({ size = 20, className = "", art = "/images/sailing/fragment-wooden.png" }) {
     return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className={`frag-icon ${className}`.trim()} src="/images/sailing/fragment.png" alt=""
+        <img className={`frag-icon ${className}`.trim()} src={art} alt=""
             width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} draggable={false} />
     );
 }
@@ -410,13 +410,6 @@ export default function SailingClient({ initial, hero, pet }) {
                             </div>
 
                             {/* Primary action docked to the bottom of the animation window so it reads as part of the scene. */}
-                            {liveStatus === "idle" && (
-                                <div className="sail-cta-dock">
-                                    <button className="sail-cta" disabled={busy} onClick={() => act("start")}>
-                                        <HelmIcon /> {busy ? "Casting off…" : "Set sail"}
-                                    </button>
-                                </div>
-                            )}
                             {liveStatus === "arrived" && (
                                 <div className="sail-cta-dock">
                                     <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
@@ -443,6 +436,22 @@ export default function SailingClient({ initial, hero, pet }) {
                     </>
                 )}
 
+                {/* Embark: pick how long to be out — longer voyages roll better shard tiers. */}
+                {liveStatus === "idle" && (
+                    <div className="sail-embark">
+                        <div className="sail-embark-title"><HelmIcon /> Choose your voyage <span className="muted">— longer trips bring better shards</span></div>
+                        <div className="sail-embark-opts">
+                            {(state.voyageOptions || []).map((o) => (
+                                <button key={o.id} className="sail-embark-opt" disabled={busy} onClick={() => act("start", { duration: o.id })}>
+                                    <span className="sail-embark-opt-name">{o.label}</span>
+                                    <span className="sail-embark-opt-time">🧭 {fmtLeft(o.ms)}</span>
+                                    <span className="sail-embark-opt-loot">up to <FragmentIcon size={15} art={`/images/sailing/fragment-${o.topTier}.png`} /></span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* At-sea + digging controls below the scene. The tailwind is the one real action here, so it's a primary CTA. */}
                 {(liveStatus === "sailing" || liveStatus === "digging") && (
                     <div className="sail-actions">
@@ -465,22 +474,33 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             </section>
 
-            {/* Your fragment hold — sits right under the animation window: count + forge. */}
+            {/* Your fragment hold — one row per shard tier, each forging its matching chest. */}
             <section className="card sail-hold">
-                <div className="sail-hold-head">
-                    <FragmentIcon size={32} className="sail-hold-icon" />
-                    <div className="sail-hold-body">
-                        <div className="sail-hold-count">{state.fragments} treasure-chest fragment{state.fragments === 1 ? "" : "s"}</div>
-                        <div className="muted sail-hold-sub">Dig them up on the island. Every {state.fragmentsPerChest || 10} forms a treasure chest.</div>
-                    </div>
+                <div className="sail-hold-title">Your fragment hold</div>
+                <div className="muted sail-hold-sub">Dig shards on the island. <b>{state.fragmentsPerChest || 10}</b> of a kind forge that chest — better shards come from longer voyages.</div>
+                <div className="sail-hold-tiers">
+                    {(state.fragmentTiers || []).map((f) => {
+                        const per = f.perChest || 10;
+                        const toward = f.count % per;
+                        const ready = f.count >= per;
+                        return (
+                            <div className="sail-hold-tier" key={f.tier}>
+                                <FragmentIcon size={38} art={f.art} />
+                                <div className="sail-hold-tier-body">
+                                    <div className="sail-hold-tier-top">
+                                        <span className="sail-hold-tier-name" style={{ color: f.color }}>{f.name}</span>
+                                        <span className="sail-hold-tier-count">×{f.count}</span>
+                                    </div>
+                                    <div className="sail-hold-bar"><span style={{ width: `${Math.round((toward / per) * 100)}%`, background: f.color }} /></div>
+                                    <div className="muted sail-hold-note">{toward}/{per} toward a {f.chestLabel}{f.droppable ? "" : " · not found at sea yet"}</div>
+                                </div>
+                                {ready ? (
+                                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest", { tier: f.tier })}>🔨 {f.emoji}</button>
+                                ) : null}
+                            </div>
+                        );
+                    })}
                 </div>
-                <div className="sail-hold-bar"><span style={{ width: `${Math.round(((state.fragments % (state.fragmentsPerChest || 10)) / (state.fragmentsPerChest || 10)) * 100)}%` }} /></div>
-                <div className="muted sail-hold-note">{state.fragments % (state.fragmentsPerChest || 10)}/{state.fragmentsPerChest || 10} toward your next chest</div>
-                {state.fragments >= (state.fragmentsPerChest || 10) ? (
-                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest")}>
-                        🔨 Forge {state.chestReward?.emoji || "🎁"} {state.chestReward?.label || "a chest"} — {state.fragmentsPerChest || 10} fragments
-                    </button>
-                ) : null}
             </section>
 
             {/* Boat upgrades — 4 travel/loot levers. Buying any of them levels the boat; every 10 levels = new form. */}
@@ -563,22 +583,23 @@ export default function SailingClient({ initial, hero, pet }) {
                     <div className="card sail-recap">
                         {result.won ? <Confetti /> : null}
                         <div className={`sail-recap-hero ${result.won ? "is-win" : "is-fail"}`}>
-                            {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} /></span> : <span className="sail-recap-rock">🪨</span>}
+                            {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} art={(result.haul && result.haul[0]?.art) || "/images/sailing/fragment-wooden.png"} /></span> : <span className="sail-recap-rock">🪨</span>}
                         </div>
                         <h2 style={{ margin: "4px 0" }}>{result.won
-                            ? (result.earned >= result.buried ? "Full haul!" : result.earned > 1 ? "Fragments unearthed!" : "Fragment unearthed!")
+                            ? (result.earned >= result.buried ? "Full haul!" : result.earned > 1 ? "Shards unearthed!" : "Shard unearthed!")
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You dug up ${result.earned} fragment${result.earned === 1 ? "" : "s"}${result.bonus ? ` (incl. ${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ` of ${result.buried} buried`}.`
+                            ? `You dug up ${result.earned} shard${result.earned === 1 ? "" : "s"}${result.bonus ? ` (incl. ${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         <div className="sail-recap-rows">
-                            <div className="sail-recap-row"><span>Fragments this dig</span><b className="sail-recap-pos"><FragmentIcon size={15} /> +{result.earned}</b></div>
-                            <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {result.fragments}</b></div>
+                            {result.won && result.haul?.length ? result.haul.map((h) => (
+                                <div className="sail-recap-row" key={h.tier}>
+                                    <span><FragmentIcon size={16} art={h.art} /> {h.name} shard{h.n === 1 ? "" : "s"}</span>
+                                    <b className="sail-recap-pos" style={{ color: h.color }}>+{h.n}</b>
+                                </div>
+                            )) : null}
+                            <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {state.fragments}</b></div>
                             <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
-                        </div>
-                        <div className="sail-recap-chest">
-                            <div className="sail-hold-bar"><span style={{ width: `${Math.round(((result.fragments % 10) / 10) * 100)}%` }} /></div>
-                            <div className="muted sail-hold-note">{result.fragments % 10}/10 toward a treasure chest</div>
                         </div>
                         <button className="sail-cta" onClick={() => setResult(null)}>⚓ Back to port</button>
                     </div>

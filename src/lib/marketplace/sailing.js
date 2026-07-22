@@ -1,11 +1,23 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 
-// Fragments you dig up on the island fuse into a loot chest.
+// Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
+// 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
 const FRAGMENTS_PER_CHEST = 10;
-const CHEST_FROM_FRAGMENTS = "iron";
+// A dug shard's tier is rolled from the chosen voyage DURATION (longer = better), never above the cap for now.
+// wooden = common · iron = pretty rare · gold (the cap) = very rare. Higher tiers exist but don't drop yet.
+const FRAGMENT_TIER_CAP = "gold";
+const fragmentArt = (tier) => `/images/sailing/fragment-${tier}.png`;
+
+// Three embark durations: trip time = your (Speed-shortened) base voyage × mult; longer trips roll better
+// shards. `frag` = tier weights (only up to the cap). Plain consts (no env) so they're easy to tune.
+export const VOYAGE_OPTIONS = [
+    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 90, iron: 10 } },
+    { id: "standard", label: "Standard run", mult: 2, frag: { wooden: 74, iron: 22, gold: 4 } },
+    { id: "long", label: "Long expedition", mult: 3.5, frag: { wooden: 58, iron: 30, gold: 12 } },
+];
 
 // SAILING — dispatch your boat on a ONE-WAY voyage to a mysterious island; when it lands you play an
 // excavation dig minigame (ESO-style: a grid of dirt, a limited stamina budget, an Augur "hot/cold" locator)
@@ -43,7 +55,6 @@ const RARITY_UPGRADE_PER_LEVEL = 0.045; // Rarity: chance/level that a forged ch
 const LUCK_PER_SHALLOW = 7;   // Luck: every this many levels, fragments sit one dirt-layer shallower
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
 const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to ~300 before release
-const FORGE_TIER_ORDER = ["wooden", "iron", "gold"]; // ascending chest tiers, for Rarity's tier-bump
 
 // ── DIGGING UPGRADES (separate from the boat) ── five gold-leveled tracks. Each track's PER-LEVEL value ×
 // its MAX level = the cap Luke asked for.
@@ -307,9 +318,15 @@ function decorate(row) {
         forms: boatFormsView(level),
         oceanBg: OCEAN_BG, digBg: DIG_BG, islandArt: ISLAND_ART,
         voyagesCompleted: row?.voyages_completed || 0,
-        fragments: row?.fragments || 0,
+        fragments: totalFragments(row),
         fragmentsPerChest: boatPerks(level).forgeCost,
-        chestReward: { tier: CHEST_FROM_FRAGMENTS, label: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.label || "Chest", emoji: CHEST_TIERS[CHEST_FROM_FRAGMENTS]?.emoji || "🎁" },
+        fragmentTiers: fragmentsView(row, level),
+        // Embark duration choices — trip time + which shards each favours — for the "set sail" picker.
+        voyageOptions: VOYAGE_OPTIONS.map((o) => ({
+            id: o.id, label: o.label,
+            ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
+            topTier: Object.keys(o.frag)[Object.keys(o.frag).length - 1],
+        })),
         digRefill: { amount: DIG_REFILL, cost: DIG_REFILL_COST },
         // The boat's FOUR travel/loot levers — all boat-exclusive. Each carries its per-level effect + current/next value.
         speed: {
@@ -383,15 +400,16 @@ export async function getSailingState(buyerId) {
     return { ...decorate(row), gold: goldRow?.gold || 0, fleet };
 }
 
-export async function startVoyage(buyerId) {
+export async function startVoyage(buyerId, optionId = "standard") {
     const state = decorate(await readRow(buyerId));
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
-    const ms = voyageDurationMs(state.speed.level, state.level);
+    const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
+    const ms = Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult);
     await db.query(
-        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, updated_at)
-         VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, NOW())
-         ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval, dig_state = NULL, updated_at = NOW()`,
-        [buyerId, String(ms)]
+        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, updated_at)
+         VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval, dig_state = NULL, voyage_quality = $3, updated_at = NOW()`,
+        [buyerId, String(ms), opt.id]
     ).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
@@ -449,33 +467,49 @@ export async function rechargeWind(buyerId) {
 export async function grantFragment(buyerId, n = 1) {
     if (!buyerId || n <= 0) return;
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    await db.query(`UPDATE mkt_sailing SET fragments = fragments + $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, n]).catch(() => {});
+    // Granted shards are base (wooden) tier — merge into the per-tier hold.
+    await db.query(
+        `UPDATE mkt_sailing
+            SET fragments_json = jsonb_set(
+                    COALESCE(fragments_json, '{}'::jsonb), '{wooden}',
+                    to_jsonb(COALESCE((fragments_json->>'wooden')::int, 0) + $2)),
+                updated_at = NOW()
+          WHERE buyer_id = $1`,
+        [buyerId, n]
+    ).catch(() => {});
 }
 
 // Spend fragments to forge a loot chest. The cost is boatPerks().forgeCost (10, or 8 at the level-80 form).
 // Rarity (+ chest milestone perks) gives a chance the forged chest is BUMPED up a tier (Iron → Gold). Atomic —
 // the WHERE guards against forging with too few (or a double-tap racing the balance).
-export async function forgeChest(buyerId) {
+export async function forgeChest(buyerId, fragmentTier = "wooden") {
     const row = await readRow(buyerId);
     const level = decorate(row).level;
     const cost = boatPerks(level).forgeCost;
+    if (!CHEST_TIERS[fragmentTier]) return { ok: false, error: "bad_tier", ...(await getSailingState(buyerId)) };
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    // Atomic guarded spend of `cost` shards from THIS tier's hold (the WHERE stops a double-tap overdraw).
     const spent = await db.queryOne(
-        `UPDATE mkt_sailing SET fragments = fragments - $2, updated_at = NOW() WHERE buyer_id = $1 AND fragments >= $2 RETURNING fragments`,
-        [buyerId, cost]
+        `UPDATE mkt_sailing
+            SET fragments_json = jsonb_set(COALESCE(fragments_json, '{}'::jsonb), $3::text[],
+                    to_jsonb(COALESCE((fragments_json->>$4)::int, 0) - $2)),
+                updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE((fragments_json->>$4)::int, 0) >= $2
+          RETURNING fragments_json`,
+        [buyerId, cost, `{${fragmentTier}}`, fragmentTier]
     ).catch(() => null);
     if (!spent) return { ok: false, error: "not_enough", ...(await getSailingState(buyerId)) };
-    // Rarity roll: chance to bump the forged chest one tier up the FORGE_TIER_ORDER.
+    // Rarity roll: chance the forged chest comes out one tier ABOVE the shards you spent (a bonus, not capped).
     const upgradeChance = Math.min(0.9, (row?.rarity_level || 0) * RARITY_UPGRADE_PER_LEVEL + boatPerks(level).chestBonus);
-    let tierKey = CHEST_FROM_FRAGMENTS;
+    let tierKey = fragmentTier;
     if (Math.random() < upgradeChance) {
-        const i = FORGE_TIER_ORDER.indexOf(tierKey);
-        if (i >= 0 && i < FORGE_TIER_ORDER.length - 1) tierKey = FORGE_TIER_ORDER[i + 1];
+        const i = CHEST_ORDER.indexOf(tierKey);
+        if (i >= 0 && i < CHEST_ORDER.length - 1) tierKey = CHEST_ORDER[i + 1];
     }
     await addChests(buyerId, { [tierKey]: 1 }).catch(() => {});
     const tier = CHEST_TIERS[tierKey];
-    const upgraded = tierKey !== CHEST_FROM_FRAGMENTS;
-    return { ok: true, forged: { tier: tierKey, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁", upgraded }, ...(await getSailingState(buyerId)) };
+    const upgraded = tierKey !== fragmentTier;
+    return { ok: true, forged: { tier: tierKey, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁", upgraded, from: fragmentTier }, ...(await getSailingState(buyerId)) };
 }
 
 // Buy DIG_REFILL more digs for the active excavation with gold. Atomic gold spend; only valid mid-dig.
@@ -502,21 +536,88 @@ export async function beginDig(buyerId) {
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
-// Resolve a finished dig: fragments earned = tiles unearthed + lucky Strike bonuses. Clears the voyage + board.
+// The tier one step up the ladder, but never past the fragment cap.
+function nextTierCapped(tier) {
+    const capIdx = CHEST_ORDER.indexOf(FRAGMENT_TIER_CAP);
+    const i = CHEST_ORDER.indexOf(tier);
+    return i >= 0 && i < capIdx ? CHEST_ORDER[i + 1] : tier;
+}
+// Roll one dug shard's tier from the voyage's duration weights, with a small Rarity chance to bump it up a
+// tier (never past the cap).
+function rollFragmentTier(qualityId, rarityLevel = 0, level = 1) {
+    const opt = VOYAGE_OPTIONS.find((o) => o.id === qualityId) || VOYAGE_OPTIONS[1];
+    const weights = opt.frag;
+    const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
+    let r = Math.random() * total;
+    let tier = "wooden";
+    for (const [t, w] of Object.entries(weights)) { r -= w; if (r <= 0) { tier = t; break; } }
+    const bump = Math.min(0.9, Math.max(0, rarityLevel) * RARITY_UPGRADE_PER_LEVEL + boatPerks(level).chestBonus);
+    if (Math.random() < bump) tier = nextTierCapped(tier);
+    return tier;
+}
+// Per-tier shard holdings for the UI: every droppable tier (up to the cap) + any tier already held.
+function fragmentsView(row, level) {
+    const counts = (row && typeof row.fragments_json === "object" && row.fragments_json) || {};
+    const perChest = boatPerks(level).forgeCost;
+    const capIdx = CHEST_ORDER.indexOf(FRAGMENT_TIER_CAP);
+    return CHEST_ORDER
+        .map((t, i) => ({ t, i }))
+        .filter(({ t, i }) => i <= capIdx || (counts[t] || 0) > 0)
+        .map(({ t, i }) => {
+            const c = CHEST_TIERS[t] || {};
+            const count = Number(counts[t]) || 0;
+            return {
+                tier: t,
+                name: (c.label || t).replace(" Chest", ""),
+                chestLabel: c.label || "Chest",
+                emoji: c.emoji || "🎁",
+                color: c.color || "#b08a52",
+                art: fragmentArt(t),
+                count,
+                perChest,
+                canForge: count >= perChest,
+                droppable: i <= capIdx,
+            };
+        });
+}
+function totalFragments(row) {
+    const counts = (row && typeof row.fragments_json === "object" && row.fragments_json) || {};
+    return Object.values(counts).reduce((a, b) => a + (Number(b) || 0), 0);
+}
+
+// Resolve a finished dig: each shard unearthed (+ lucky Strike bonuses) rolls a TIER from the voyage's chosen
+// duration, then merges into the per-tier hold. Clears the voyage + board.
 async function finishDig(buyerId, board) {
+    const row = await readRow(buyerId);
+    const level = decorate(row).level;
+    const quality = row?.voyage_quality || "standard";
+    const rarityLevel = row?.rarity_level || 0;
     const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
     const earned = found + (board.bonus || 0);
     const won = earned > 0;
+    // Roll each earned shard's tier and merge into the current per-tier hold.
+    const counts = { ...((row && typeof row.fragments_json === "object" && row.fragments_json) || {}) };
+    const byTier = {};
+    for (let i = 0; i < earned; i++) {
+        const t = rollFragmentTier(quality, rarityLevel, level);
+        byTier[t] = (byTier[t] || 0) + 1;
+        counts[t] = (Number(counts[t]) || 0) + 1;
+    }
     // NOTE: digging does NOT level the boat — but voyages_completed drives the EXCAVATION level (tool unlocks).
     await db.query(
         `UPDATE mkt_sailing
-            SET dig_state = NULL, departed_at = NULL, returns_at = NULL,
-                fragments = fragments + $2, voyages_completed = voyages_completed + 1, updated_at = NOW()
+            SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL,
+                fragments_json = $2::jsonb, voyages_completed = voyages_completed + 1, updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, earned]
+        [buyerId, JSON.stringify(counts)]
     ).catch(() => {});
     const state = await getSailingState(buyerId);
-    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, fragments: state.fragments }, ...state };
+    // byTier decorated with art/label so the recap can show what kind of shards you hauled up.
+    const haul = Object.entries(byTier).map(([tier, n]) => {
+        const c = CHEST_TIERS[tier] || {};
+        return { tier, n, name: (c.label || tier).replace(" Chest", ""), emoji: c.emoji || "🎁", color: c.color || "#b08a52", art: fragmentArt(tier) };
+    }).sort((a, b) => CHEST_ORDER.indexOf(b.tier) - CHEST_ORDER.indexOf(a.tier));
+    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, haul }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

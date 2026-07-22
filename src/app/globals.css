@@ -10752,6 +10752,30 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-hold-bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .sail-hold-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f5b93c, #ffe6a0); transition: width 0.4s ease; }
 .sail-hold-note { font-size: 0.74rem; }
+.sail-hold-title { font-weight: 800; font-size: 1rem; }
+/* Per-tier shard rows — one row per shard type, each forging its matching chest. */
+.sail-hold-tiers { display: grid; gap: 10px; margin-top: 4px; }
+.sail-hold-tier { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 11px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); }
+.sail-hold-tier-body { min-width: 0; display: grid; gap: 4px; }
+.sail-hold-tier-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sail-hold-tier-name { font-weight: 800; font-size: 0.9rem; }
+.sail-hold-tier-count { font-weight: 800; font-size: 0.9rem; color: #eaf2ff; }
+.sail-hold-tier .sail-forge-btn { width: auto; margin-top: 0; padding: 8px 12px; font-size: 1.05rem; }
+/* Embark: choose a voyage length before setting sail. */
+.sail-embark { margin-top: 10px; display: grid; gap: 8px; }
+.sail-embark-title { font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sail-embark-title .muted { font-weight: 600; }
+.sail-embark-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sail-embark-opt { display: grid; gap: 3px; justify-items: center; padding: 10px 6px; border-radius: 12px; cursor: pointer;
+    background: linear-gradient(180deg, rgba(90,170,255,0.16), rgba(40,90,160,0.16)); border: 1px solid rgba(120,190,255,0.4);
+    color: #eaf6ff; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.sail-embark-opt:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(60,140,240,0.3); }
+.sail-embark-opt:disabled { opacity: 0.6; cursor: default; }
+.sail-embark-opt-name { font-weight: 800; font-size: 0.82rem; }
+.sail-embark-opt-time { font-size: 0.74rem; color: #bfe0ff; }
+.sail-embark-opt-loot { font-size: 0.7rem; color: #9fb4d8; display: inline-flex; align-items: center; gap: 3px; }
+@media (max-width: 420px) { .sail-embark-opt-name { font-size: 0.76rem; } }
 
 .sail-recap { max-width: 340px; text-align: center; position: relative; overflow: hidden; animation: sailPop 0.32s cubic-bezier(0.2,1.2,0.4,1) both; }
 .sail-recap-hero { display: grid; place-items: center; margin: 4px 0 8px; min-height: 88px; }

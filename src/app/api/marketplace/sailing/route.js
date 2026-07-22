@@ -39,7 +39,7 @@ export async function POST(request) {
             if (g.error) return g.error;
             const body = await request.json().catch(() => ({}));
             switch (body?.action) {
-                case "start": return noStore(await startVoyage(g.buyer.id));
+                case "start": return noStore(await startVoyage(g.buyer.id, body.duration));
                 case "wind": return noStore(await favorableWind(g.buyer.id));
                 case "recharge_wind": return noStore(await rechargeWind(g.buyer.id));
                 case "begin_dig": return noStore(await beginDig(g.buyer.id));
@@ -51,7 +51,7 @@ export async function POST(request) {
                 case "upgrade_luck": return noStore(await upgradeLuck(g.buyer.id));
                 case "upgrade_dig": return noStore(await upgradeDig(g.buyer.id, body.track));
                 case "use_tool": return noStore(await activateTool(g.buyer.id, body.tool, body.r, body.c));
-                case "forge_chest": return noStore(await forgeChest(g.buyer.id));
+                case "forge_chest": return noStore(await forgeChest(g.buyer.id, body.tier));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {
