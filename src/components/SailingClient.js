@@ -184,6 +184,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
     const [selectedTool, setSelectedTool] = useState(null); // an area-clear dig tool armed to tap a tile
+    const [digMode, setDigMode] = useState("dig"); // "dig" (chip a tile) | "sense" (probe a tile for a clue)
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
@@ -360,6 +361,9 @@ export default function SailingClient({ initial, hero, pet }) {
         act("dig", { r, c });
     }, [act]);
 
+    // Probe a tile with the treasure sense (reveals its neighbour-treasure clue).
+    const senseTile = useCallback((r, c) => { act("sense", { r, c }); }, [act]);
+
     // Buy an upgrade with a satisfying card pop: flash the card, then run the action.
     const buyUpgrade = useCallback((flashKey, action, payload) => {
         setUpgFlash(flashKey);
@@ -434,9 +438,18 @@ export default function SailingClient({ initial, hero, pet }) {
                     <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
                         <div className="dig-hud">
                             <span className="dig-frag"><FragmentIcon size={16} /> {dig.found}/{dig.buried} found</span>
-                            <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina} digs</span>
+                            {dig.tier ? <span className="dig-tier" title="Difficulty — climbs with your Excavation level">Depth {dig.tier}</span> : null}
+                            <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina}</span>
                         </div>
-                        <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / dig.maxStamina) * 100)}%` }} /></div>
+                        <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / Math.max(1, dig.maxStamina)) * 100)}%` }} /></div>
+                        {/* Mode toggle: DIG chips a tile; SENSE probes for a clue (how many treasures touch it). */}
+                        <div className="dig-modes">
+                            <button type="button" className={`dig-mode-btn${digMode === "dig" && !selectedTool ? " is-on" : ""}`}
+                                onClick={() => { setDigMode("dig"); setSelectedTool(null); }}>⛏️ Dig</button>
+                            <button type="button" className={`dig-mode-btn is-sense${digMode === "sense" && !selectedTool ? " is-on" : ""}`}
+                                disabled={busy || (dig.senses ?? 0) <= 0}
+                                onClick={() => { setDigMode("sense"); setSelectedTool(null); }}>🔍 Sense · {dig.senses ?? 0}</button>
+                        </div>
                         {/* Tool bar — armed tools clear an area when you tap a tile. */}
                         {(dig.tools || []).length ? (
                             <div className="dig-tools">
@@ -453,23 +466,28 @@ export default function SailingClient({ initial, hero, pet }) {
                         ) : null}
                         <div className="dig-instruct">{selectedTool
                             ? <>💥 <b>{selectedTool.name}</b> armed — tap a tile to clear a {selectedTool.cols}×{selectedTool.rows}{selectedTool.layers > 1 ? `, ${selectedTool.layers} layers` : ""} patch ({selectedTool.stamina} stamina). <button type="button" className="dig-tool-cancel" onClick={() => setSelectedTool(null)}>cancel</button></>
-                            : <>👆 Tap the dirt to dig — clear a tile to the bottom to see what it hides</>}</div>
+                            : digMode === "sense"
+                                ? <>🔍 <b>Sense</b> a tile — the number = treasures in the 8 tiles around it. Cross-reference clues, then switch to ⛏️ Dig.</>
+                                : <>⛏️ <b>Dig</b> a tile to chip through the dirt. Use 🔍 <b>Sense</b> first to find WHERE the treasure is.</>}</div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
+                                const senseArmed = digMode === "sense" && !selectedTool;
+                                const disabled = busy || dig.status !== "active" || (selectedTool ? false : senseArmed ? (t.sense != null || (dig.senses ?? 0) <= 0) : bottomed);
                                 return (
                                     <button
                                         key={`${r}-${c}`}
                                         type="button"
-                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}`}
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}${senseArmed && !bottomed && t.sense == null ? " is-sensearm" : ""}${t.sense != null ? " is-sensed" : ""}`}
                                         style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
-                                        disabled={busy || dig.status !== "active" || (!selectedTool && bottomed)}
-                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : digTile(r, c))}
-                                        title={bottomed ? (t.found ? "A fragment!" : "Bare dirt — nothing here") : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
+                                        disabled={disabled}
+                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : senseArmed ? senseTile(r, c) : digTile(r, c))}
+                                        title={bottomed ? (t.found ? "Treasure!" : "Bare dirt — nothing here") : t.sense != null ? `${t.sense} treasure${t.sense === 1 ? "" : "s"} touching this tile` : senseArmed ? "Probe this tile" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
                                         {t.found ? <span className="dig-found"><FragmentIcon size={30} /></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
-                                                : <span className="dig-dirt" aria-hidden="true" />}
+                                                : t.sense != null ? <span className={`dig-clue dig-clue-${Math.min(3, t.sense)}`}>{t.sense}</span>
+                                                    : <span className="dig-dirt" aria-hidden="true" />}
                                         {chunk && chunk.r === r && chunk.c === c ? (
                                             <span className="dig-chunks" key={chunk.k} aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span>
                                         ) : null}
@@ -477,7 +495,7 @@ export default function SailingClient({ initial, hero, pet }) {
                                 );
                             }))}
                         </div>
-                        <p className="dig-tip"><b>{dig.buried} fragments</b> are buried under this dirt — clear a tile all the way down to find out what it hides. Shallower dirt costs fewer swings, so spend your <b>{dig.stamina} digs</b> wisely.</p>
+                        <p className="dig-tip"><b>{dig.buried} treasures</b> are buried here. <b>🔍 Sense</b> tiles to read the numbers (treasures nearby), deduce the spots, then <b>⛏️ Dig</b> them up — before your digs run out.</p>
                         {dig.status === "active" ? (
                             <button
                                 className="btn-ghost sail-digbuy"

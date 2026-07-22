@@ -299,24 +299,51 @@ function randInt(n) { return Math.floor(Math.random() * n); }
 // Luck (find_level): how shallow the shallowest a fragment can sit — higher Luck = struck sooner.
 function fragMaxDepth(luckLevel = 0) { return Math.max(1, DIG_MAX_DEPTH - Math.floor(Math.max(0, luckLevel) / LUCK_PER_SHALLOW)); }
 
+// ── DIG DIFFICULTY — a "steady & matched" ramp: the board, treasure count, dirt depth all grow with your
+// Excavation level (voyages completed), and your Sense budget grows too, so it stays a fair-but-hard hunt
+// rather than trivialising as you unlock. All knobs are plain consts — tune freely, no env vars. ──
+const DIG_MAX_SIZE = 6;                 // biggest square board (mobile-friendly)
+const DIG_TIER_EVERY = 8;              // +1 difficulty tier per this many voyages
+const DIG_MAX_TIER = 6;
+function digTier(voyages = 0) { return Math.min(DIG_MAX_TIER, 1 + Math.floor(Math.max(0, voyages) / DIG_TIER_EVERY)); }
+function digSize(tier) { return Math.min(DIG_MAX_SIZE, 3 + tier); }              // t1=4 … t3=6 (capped)
+function digDepthMax(tier) { return tier >= 4 ? 4 : 3; }                          // deeper dirt at high tiers
+function digTreasureCount(tier, fortuneBuried) {                                  // more to find as you climb
+    const size = digSize(tier);
+    return Math.min(Math.floor(size * size * 0.28), 3 + (tier - 1) + Math.max(0, fortuneBuried));
+}
+// Sense charges (the detector) — scale with the hunt so bigger boards get more probes, but never enough to
+// probe everything (you must deduce). Luck (find_level) grants a few extra, so it also helps the new game.
+function digSenseBudget(tier, treasures, luckLevel = 0) {
+    return Math.max(3, treasures + tier + 1 + Math.floor(Math.max(0, luckLevel) / 2));
+}
+
 function newBoard(row) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel);
-    // Every tile is a stack of 1–DIG_MAX_DEPTH dirt layers you chip through. Fragments are scattered under
-    // random individual tiles — NO clusters, NO pointer, NO shimmer. Fortune enriches the island with more
-    // buried fragments; Luck buries them shallower (struck sooner). Never learn a tile's secret until the bottom.
-    const depth = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => 1 + randInt(DIG_MAX_DEPTH)));
+    // The hunt scales with Excavation level (voyages): bigger board, more treasure, deeper dirt at higher tiers.
+    const tier = digTier(row?.voyages_completed || 0);
+    const size = digSize(tier);
+    const rows = size, cols = size;
+    const maxDepth = digDepthMax(tier);
+    // Every tile is a stack of 1–maxDepth dirt layers you chip through. Treasure is scattered under random tiles;
+    // you never learn a tile's secret until the bottom — but SENSE probes reveal how many treasures neighbour a
+    // tile (Minesweeper-style), so it's deduction, not blind luck. Fortune = more buried; Luck = shallower.
+    const depth = Array.from({ length: rows }, () => Array.from({ length: cols }, () => 1 + randInt(maxDepth)));
     const cells = [];
-    for (let r = 0; r < DIG_ROWS; r++) for (let c = 0; c < DIG_COLS; c++) cells.push([r, c]);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push([r, c]);
     for (let i = cells.length - 1; i > 0; i--) { const j = randInt(i + 1); [cells[i], cells[j]] = [cells[j], cells[i]]; }
-    const frag = cells.slice(0, fragmentsBuried(level));
-    // Luck caps how deep a fragment tile can be; the "first strike guaranteed" perk forces one to the surface.
-    const cap = fragMaxDepth(luckLevel);
+    const nTreasure = digTreasureCount(tier, boatPerks(level).buried);
+    const frag = cells.slice(0, nTreasure);
+    // Luck caps how deep a treasure tile can be; the "first strike guaranteed" perk forces one to the surface.
+    const cap = Math.min(fragMaxDepth(luckLevel), maxDepth);
     const perks = boatPerks(level);
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
-    const dug = Array.from({ length: DIG_ROWS }, () => Array.from({ length: DIG_COLS }, () => false));
-    const stamina = digStamina(row?.dig_stamina_level || 0);
+    const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
+    const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-probed; else the clue
+    const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2; // a few more digs on the bigger boards
+    const maxSenses = digSenseBudget(tier, nTreasure, luckLevel);
     // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
     const up = {
         pierce: digTrackValue("pierce", row?.dig_pierce_level || 0),
@@ -325,7 +352,7 @@ function newBoard(row) {
         detonator: digTrackValue("detonator", row?.dig_detonator_level || 0),
     };
     const tools = unlockedTools(row?.voyages_completed || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, stamina: t.stamina, cols: t.cols, rows: t.rows, layers: t.layers }));
-    return { cols: DIG_COLS, rows: DIG_ROWS, depth, maxDepth: DIG_MAX_DEPTH, frag, dug, stamina, maxStamina: stamina, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
@@ -359,6 +386,26 @@ function applyDig(board, r, c) {
         }
     }
     resolveBoard(board);
+    return board;
+}
+
+// SENSE (the detector): spend one probe to reveal a tile's clue = how many treasures sit in its 8 neighbours
+// (Minesweeper-style). Doesn't dig, doesn't end the game — just information. Re-probing a tile is a free no-op.
+function applySense(board, r, c) {
+    if (board.status !== "active") return board;
+    if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return board;
+    if (!board.sensed) board.sensed = Array.from({ length: board.rows }, () => Array.from({ length: board.cols }, () => -1));
+    if (board.sensed[r][c] >= 0) return board;           // already probed
+    if ((board.senses || 0) <= 0) return board;          // out of probes
+    board.senses -= 1;
+    const fragSet = new Set(board.frag.map(([fr, fc]) => `${fr},${fc}`));
+    let clue = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols && fragSet.has(`${nr},${nc}`)) clue += 1;
+    }
+    board.sensed[r][c] = clue;
     return board;
 }
 
@@ -399,12 +446,13 @@ function boardView(board) {
                 maxDepth,
                 dug: board.dug[r][c],
                 found: fragSet.has(`${r},${c}`) && board.depth[r][c] === 0, // fragment unearthed at the bottom
+                sense: board.sensed && board.sensed[r][c] >= 0 ? board.sensed[r][c] : null, // probed clue, or null
             });
         }
         tiles.push(row);
     }
     const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
-    return { cols: board.cols, rows: board.rows, maxDepth, stamina: board.stamina, maxStamina: board.maxStamina, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, tools: board.tools || [] };
+    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, tools: board.tools || [] };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -885,6 +933,15 @@ export async function digAt(buyerId, r, c) {
     if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
     applyDig(board, Number(r), Number(c));
     return (board.status === "won" || board.status === "lost") ? finishDig(buyerId, board) : persistDig(buyerId, board);
+}
+
+// Probe a tile with the treasure sense (reveals its neighbour-treasure clue). Never ends the dig.
+export async function senseAt(buyerId, r, c) {
+    const row = await readRow(buyerId);
+    const board = row?.dig_state;
+    if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
+    applySense(board, Number(r), Number(c));
+    return persistDig(buyerId, board);
 }
 
 // Use an unlocked area-clear tool at (r,c).
