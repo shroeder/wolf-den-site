@@ -10751,12 +10751,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .merchant-stage.is-compact { height: clamp(130px, 32vw, 170px); }
 /* Merchant himself — the art fills its canvas edge-to-edge (hat at the very top pixel), so we scale to fit
    with clear headroom and DON'T bottom-anchor tight, or the hat clips. object-fit contain = never cropped. */
-.merchant-figure { position: absolute; left: 50%; bottom: 4%; height: 86%; width: 70%; max-width: 260px; z-index: 3;
+.merchant-figure { position: absolute; left: 50%; bottom: 2%; height: 98%; width: 80%; max-width: 300px; z-index: 3;
     object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 12px rgba(0,0,0,0.45));
     animation: merchantFloat 2.8s ease-in-out infinite; }
 @keyframes merchantFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-5px); } }
 @keyframes merchantBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } } /* used by .sail-enc-art (encounter foe bob) */
-.merchant-stage.is-compact .merchant-figure { height: 92%; bottom: 3%; }
+.merchant-stage.is-compact .merchant-figure { height: 104%; bottom: 1%; }
 /* Coins flying everywhere — a continuous spinning, drifting shower across the stage. */
 .merchant-coinfall { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .merchant-coin { position: absolute; top: 0; border-radius: 50%; opacity: 0;
@@ -10783,7 +10783,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .mg-hud { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 5; display: flex; justify-content: space-between; font-weight: 800; font-size: 0.9rem; color: #fff; text-shadow: 0 1px 4px #000; pointer-events: none; }
 .mg-hud-score { color: #ffe08a; }
 /* Merchant tucked in the top-left corner, FULLY visible (never cropped), flinging coins into play. */
-.mg-tosser { position: absolute; top: 4px; left: 4px; height: 30%; width: auto; z-index: 2; object-fit: contain; object-position: top left;
+.mg-tosser { position: absolute; top: -2%; left: 2px; height: 38%; width: auto; z-index: 2; object-fit: contain; object-position: top left;
     opacity: 0.96; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); transform-origin: bottom center; animation: mgToss 1.6s ease-in-out infinite; }
 @keyframes mgToss { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
 /* Combo badge. */
@@ -11330,6 +11330,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes digScanPulse { 0%,100% { box-shadow: 0 3px 12px rgba(90,190,255,0.45); } 50% { box-shadow: 0 3px 20px rgba(120,215,255,0.9); } }
 .dig-scan-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
     background: rgba(2,18,31,0.35); color: #eaf7ff; font-size: 0.78rem; }
+/* Post-dig REVEAL — a mini-map of where the relic actually was, so you learn how scanning maps to it. */
+.sail-reveal { margin: 10px auto 4px; text-align: center; }
+.sail-reveal-label { font-weight: 800; font-size: 0.82rem; color: #ffe9c4; margin-bottom: 6px; }
+.sail-reveal-grid { display: grid; gap: 3px; margin: 0 auto; }
+.sail-reveal-cell { aspect-ratio: 1; border-radius: 4px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+.sail-reveal-cell.is-got { background: linear-gradient(160deg, #ffe08a, #d9a636); box-shadow: 0 0 8px rgba(255,200,80,0.6); }
+.sail-reveal-cell.is-missed { background: rgba(255,215,94,0.22); box-shadow: inset 0 0 0 1px rgba(255,215,94,0.5); }
+.sail-reveal-key { margin-top: 6px; font-size: 0.7rem; color: #b9c6d6; display: flex; gap: 6px; align-items: center; justify-content: center; }
+.sail-reveal-key span { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.sail-reveal-key .is-got { background: linear-gradient(160deg, #ffe08a, #d9a636); }
+.sail-reveal-key .is-missed { background: rgba(255,215,94,0.22); box-shadow: inset 0 0 0 1px rgba(255,215,94,0.5); }
 /* Sonar PING — a probe ripple that bursts from a tile when you Sense it. */
 .dig-ping { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 5; }
 .dig-ping i { position: absolute; width: 30%; height: 30%; border-radius: 50%; border: 2px solid rgba(130,215,255,0.95);

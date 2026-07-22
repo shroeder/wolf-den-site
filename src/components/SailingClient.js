@@ -187,7 +187,6 @@ export default function SailingClient({ initial, hero, pet }) {
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
     const [selectedTool, setSelectedTool] = useState(null); // an area-clear dig tool armed to tap a tile
-    const [scanArmed, setScanArmed] = useState(false); // Dig is the default; arming Scan makes the NEXT tap a one-shot scan
     const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a scan pulse
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
@@ -407,12 +406,11 @@ export default function SailingClient({ initial, hero, pet }) {
         act("dig", { r, c });
     }, [act]);
 
-    // Scan a tile: fire a sonar ripple instantly (tactile), disarm the one-shot, then ask the server for its heat.
+    // Scan a tile: fire a sonar ripple instantly (tactile), then ask the server for its heat.
     const senseTile = useCallback((r, c) => {
         const k = (chunkId.current += 1);
         setSensePing({ r, c, k });
         setTimeout(() => setSensePing((p) => (p?.k === k ? null : p)), 600);
-        setScanArmed(false);
         act("sense", { r, c });
     }, [act]);
 
@@ -508,42 +506,40 @@ export default function SailingClient({ initial, hero, pet }) {
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina}</span>
                         </div>
                         <div className="dig-stambar"><span style={{ width: `${Math.round((dig.stamina / Math.max(1, dig.maxStamina)) * 100)}%` }} /></div>
-                        {/* Actions — DIG is the default (just tap dirt). SCAN is a one-shot "feel it out" probe.
-                            Tools stay armed so you can keep clearing without re-selecting. */}
-                        <div className="dig-actions">
-                            <button type="button" className={`dig-scan-btn${scanArmed ? " is-armed" : ""}`}
-                                disabled={busy || (dig.senses ?? 0) <= 0 || scanArmed}
-                                onClick={() => { setScanArmed(true); setSelectedTool(null); }}>
-                                🔍 Scan <span className="dig-scan-n">{dig.senses ?? 0}</span>
-                            </button>
-                            {(dig.tools || []).map((t) => (
-                                <button key={t.id} type="button"
-                                    className={`dig-tool-btn${selectedTool?.id === t.id ? " is-armed" : ""}`}
-                                    disabled={busy || dig.stamina < 1}
-                                    onClick={() => { setSelectedTool(selectedTool?.id === t.id ? null : t); setScanArmed(false); }}
-                                    title={`${t.name}: clears ${t.cols}×${t.rows}${t.layers > 1 ? `, ${t.layers} layers` : ""} for ${t.stamina} stamina`}>
-                                    {t.emoji} {t.name} <span className="dig-tool-cost">{t.stamina}</span>
-                                </button>
-                            ))}
-                        </div>
+                        {/* Fully automatic: while you have scans left, a tap SCANS; once they're gone, a tap DIGS.
+                            Nothing to select. (Tool buttons remain for now; a tools-as-procs rework is coming.) */}
+                        {(dig.tools || []).length ? (
+                            <div className="dig-actions">
+                                {(dig.tools || []).map((t) => (
+                                    <button key={t.id} type="button"
+                                        className={`dig-tool-btn${selectedTool?.id === t.id ? " is-armed" : ""}`}
+                                        disabled={busy || dig.stamina < 1}
+                                        onClick={() => setSelectedTool(selectedTool?.id === t.id ? null : t)}
+                                        title={`${t.name}: clears ${t.cols}×${t.rows}${t.layers > 1 ? `, ${t.layers} layers` : ""} for ${t.stamina} stamina`}>
+                                        {t.emoji} {t.name} <span className="dig-tool-cost">{t.stamina}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
                         <div className="dig-instruct">{selectedTool
                             ? <>💥 <b>{selectedTool.name}</b> armed — tap tiles to clear a {selectedTool.cols}×{selectedTool.rows} patch each. <button type="button" className="dig-tool-cancel" onClick={() => setSelectedTool(null)}>done</button></>
-                            : scanArmed
-                                ? <>🔍 <b>Tap a tile to scan it</b> — it&apos;ll tell you how close the relic is (🔥 HOT → 🧊 COLD). <button type="button" className="dig-tool-cancel" onClick={() => setScanArmed(false)}>cancel</button></>
-                                : <>⛏️ <b>Tap dirt to dig.</b> Hit <b>🔍 Scan</b> to feel where the buried relic is, then dig it out.</>}</div>
+                            : (dig.senses ?? 0) > 0
+                                ? <>🔍 <b>Tap to scan</b> ({dig.senses} left) — feel how close the relic is (🔥 HOT → 🧊 COLD).</>
+                                : <>⛏️ <b>Tap to dig it out.</b> Follow the heat — dig the HOT tiles to unearth the relic.</>}</div>
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
-                                const disabled = busy || dig.status !== "active" || (selectedTool ? false : scanArmed ? (t.sense != null || (dig.senses ?? 0) <= 0) : bottomed);
+                                const willScan = !selectedTool && (dig.senses ?? 0) > 0 && !bottomed && t.sense == null; // auto-scan phase
+                                const disabled = busy || dig.status !== "active" || (selectedTool ? false : bottomed);
                                 return (
                                     <button
                                         key={`${r}-${c}`}
                                         type="button"
-                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}${scanArmed && !bottomed && t.sense == null ? " is-sensearm" : ""}${t.sense != null && !bottomed ? ` is-sensed heat-${t.sense}` : ""}`}
+                                        className={`dig-tile${t.dug ? " is-dug" : ""}${bottomed ? " is-bottom" : ""}${t.found ? " is-found" : ""}${selectedTool ? " is-toolarm" : ""}${willScan ? " is-sensearm" : ""}${t.sense != null && !bottomed ? ` is-sensed heat-${t.sense}` : ""}`}
                                         style={{ "--depth": t.depth, "--maxdepth": t.maxDepth || 3 }}
                                         disabled={disabled}
-                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : scanArmed ? senseTile(r, c) : digTile(r, c))}
-                                        title={bottomed ? (t.found ? "Part of the relic!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the relic is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : scanArmed ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
+                                        onClick={() => (selectedTool ? runToolAt(selectedTool, r, c) : willScan ? senseTile(r, c) : digTile(r, c))}
+                                        title={bottomed ? (t.found ? "Part of the relic!" : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the relic is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : willScan ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
                                         {t.found ? <span className="dig-found"><span className="dig-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span><FragmentIcon size={30} art={t.tier ? `/images/sailing/fragment-${t.tier}.png` : undefined} /></span>
                                             : bottomed ? <span className="dig-hole" aria-hidden="true" />
@@ -886,6 +882,20 @@ export default function SailingClient({ initial, hero, pet }) {
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
                             ? `You uncovered ${result.earned} of ${result.buried} relic piece${result.buried === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}.`
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
+                        {result.reveal ? (
+                            <div className="sail-reveal">
+                                <div className="sail-reveal-label">🗺️ Where the {result.shape || "relic"} was buried:</div>
+                                <div className="sail-reveal-grid" style={{ gridTemplateColumns: `repeat(${result.reveal.cols}, 1fr)`, maxWidth: `${result.reveal.cols * 26}px` }}>
+                                    {Array.from({ length: result.reveal.rows * result.reveal.cols }, (_, i) => {
+                                        const rr = Math.floor(i / result.reveal.cols), cc = i % result.reveal.cols;
+                                        const inRelic = result.reveal.cells.some(([a, b]) => a === rr && b === cc);
+                                        const got = inRelic && result.reveal.dugCells.some(([a, b]) => a === rr && b === cc);
+                                        return <span key={i} className={`sail-reveal-cell${inRelic ? (got ? " is-got" : " is-missed") : ""}`} />;
+                                    })}
+                                </div>
+                                <div className="sail-reveal-key"><span className="is-got" /> you dug · <span className="is-missed" /> you missed</div>
+                            </div>
+                        ) : null}
                         <div className="sail-recap-rows">
                             {result.won && result.haul?.length ? result.haul.map((h) => (
                                 <div className="sail-recap-row" key={h.tier}>

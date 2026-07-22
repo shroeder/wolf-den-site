@@ -107,8 +107,8 @@ function pickWeighted(list) {
 // a coin-catch minigame for gold, a discounted exclusive shop, and a rare shot at his exclusive elephant pet.
 const MERCHANT_BASE_CHANCE = 1.0;    // ⚠️ TEST OVERRIDE (was 0.05) — always land the Gold Merchant
 const MERCHANT_GOLD_FLOOR = 10;      // minimum coin-minigame payout (just for playing)
-const MERCHANT_GOLD_CEIL = 150;      // payout cap (trimmed from 300 — was a bit too rich)
-const MERCHANT_PET_CHANCE = 1.0;     // ⚠️ TEST OVERRIDE (was 0.10) — 10% shot at the elephant pet on a PERFECT coin-catch run
+const MERCHANT_GOLD_CEIL = 200;      // safety cap only — the game's scoring is tuned to land ~150 on a great run
+const MERCHANT_PET_ENCOUNTERS = 10;  // the elephant pet unlocks on your 10th meeting with the Gold Merchant
 const MERCHANT_PET_ID = "elephant_spear";
 const MERCHANT_PET_RARITY = "legendary";
 // Elephant find bonus by EQUIPPED pet level (1..5): +1% → +5%.
@@ -146,12 +146,21 @@ async function rollMerchant(buyerId) {
             const c = CONSUMABLES[s.id] || {};
             return { id: s.id, name: c.name || s.id, emoji: c.emoji || "🧪", desc: c.desc || "", price: Math.max(1, Math.round(s.base * (1 - s.off))), off: Math.round(s.off * 100) };
         });
-        // The pet is NOT a free gift — it's a 10% drop on a PERFECT coin-catch run (see merchantMinigame).
+        // The pet is earned by MEETING the merchant MERCHANT_PET_ENCOUNTERS times (set below), not by the minigame.
         offer = { shop: stock, minigamePlayed: false, goldWon: 0, perfect: false, petGranted: null };
     }
     // Guard on merchant_json IS NULL so concurrent reads roll it exactly once.
     const rolled = await db.queryOne(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL RETURNING buyer_id`, [buyerId, JSON.stringify(offer)]).catch(() => null);
-    if (rolled && !offer.none) await grantEventBadge(buyerId, "merchant_met").catch(() => {}); // "Gold Rush" — met the merchant
+    if (rolled && !offer.none) {
+        await grantEventBadge(buyerId, "merchant_met").catch(() => {}); // "Gold Rush" — met the merchant
+        // Count the encounter; the exclusive elephant pet unlocks on the MERCHANT_PET_ENCOUNTERS-th meeting.
+        const cnt = await db.queryOne(`UPDATE mkt_sailing SET merchant_encounters = merchant_encounters + 1 WHERE buyer_id = $1 RETURNING merchant_encounters`, [buyerId]).catch(() => null);
+        if ((cnt?.merchant_encounters || 0) === MERCHANT_PET_ENCOUNTERS) {
+            await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, MERCHANT_PET_ID]).catch(() => {});
+            // Flag it on this offer so the merchant screen celebrates the unlock right now.
+            await db.query(`UPDATE mkt_sailing SET merchant_json = merchant_json || jsonb_build_object('petGranted', $2::text, 'petMilestone', TRUE) WHERE buyer_id = $1`, [buyerId, MERCHANT_PET_ID]).catch(() => {});
+        }
+    }
 }
 
 // Dig board.
@@ -315,7 +324,7 @@ function digTreasureCount(tier, fortuneBuried) {                                
 // Scan charges (the detector) — deliberately FEW ("a couple"), so a scan is a precious "feel it out" moment,
 // not a solve-the-grid tool. Luck (find_level) grants the odd extra. Tune freely.
 function digSenseBudget(tier, treasures, luckLevel = 0) {
-    return Math.max(2, 2 + Math.floor(tier / 2) + Math.floor(Math.max(0, luckLevel) / 4));
+    return 3 + Math.floor(Math.max(0, luckLevel) / 4); // ~3 scans ("feel it out"), a few more with Luck
 }
 // A scan's HEAT for a tile: how CLOSE the nearest treasure is (Chebyshev distance) → 3 hot / 2 warm / 1 cool
 // / 0 cold. Feeling-based, not a neighbour-count — "am I close?" reads instantly.
@@ -732,20 +741,20 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
     const gold = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
     const perfect = Boolean(perfectFlag);
-    const petGranted = perfect && Math.random() < MERCHANT_PET_CHANCE ? MERCHANT_PET_ID : null;
+    // The pet is NOT tied to the minigame anymore (it unlocks on the 10th encounter, in rollMerchant). A perfect
+    // run just earns the badge + the gold. Preserve any petGranted flag the offer already carries (10th meeting).
     const won = await db.queryOne(
         `UPDATE mkt_sailing
-            SET merchant_json = merchant_json || jsonb_build_object('minigamePlayed', TRUE, 'goldWon', $2::int, 'perfect', $3::boolean, 'petGranted', $4::text),
+            SET merchant_json = merchant_json || jsonb_build_object('minigamePlayed', TRUE, 'goldWon', $2::int, 'perfect', $3::boolean),
                 updated_at = NOW()
           WHERE buyer_id = $1 AND merchant_json IS NOT NULL AND (merchant_json->>'minigamePlayed')::boolean IS NOT TRUE
           RETURNING buyer_id`,
-        [buyerId, gold, perfect, petGranted]
+        [buyerId, gold, perfect]
     ).catch(() => null);
     if (!won) return { ok: false, error: "already_played", ...(await getSailingState(buyerId)) };
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, gold]).catch(() => {});
     if (perfect) await grantEventBadge(buyerId, "merchant_perfect").catch(() => {}); // "Coin Virtuoso"
-    if (petGranted) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, petGranted]).catch(() => {});
-    return { ok: true, goldWon: gold, perfect, petGranted, ...(await getSailingState(buyerId)) };
+    return { ok: true, goldWon: gold, perfect, ...(await getSailingState(buyerId)) };
 }
 
 // Buy one of the merchant's discounted exclusive consumables. Price comes from HIS rolled offer (not the
@@ -970,7 +979,9 @@ async function finishDig(buyerId, board) {
         return { tier, n, name: (c.label || tier).replace(" Chest", ""), emoji: c.emoji || "🎁", color: c.color || "#b08a52", art: fragmentArt(tier) };
     }).sort((a, b) => CHEST_ORDER.indexOf(b.tier) - CHEST_ORDER.indexOf(a.tier));
     const fullyUnearthed = board.frag.every(([fr, fc]) => board.depth[fr][fc] === 0);
-    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, haul, shape: board.shape || null, fullArtifact: fullyUnearthed }, ...state };
+    // Reveal where the relic actually was, so players learn how scanning maps to the buried shape.
+    const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
+    return { ok: true, result: { won, earned, buried: board.frag.length, bonus: board.bonus || 0, haul, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

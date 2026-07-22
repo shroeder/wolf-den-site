@@ -127,7 +127,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                 if (e.type === "gold") {
                     s.combo += 1; if (s.combo > s.bestCombo) s.bestCombo = s.combo;
                     const mult = comboMult(s.combo);
-                    const amt = Math.round((5 + Math.floor(Math.random() * 11)) * mult);
+                    const amt = Math.round((2 + Math.floor(Math.random() * 5)) * mult); // tuned so a great run lands ~150, not 300
                     s.score += amt;
                     s.floaters.push({ id: (s.fid += 1), x: e.x, y: catchY, txt: `+${amt}`, kind: mult > 1 ? "big" : "gold", born: now });
                     return false;
@@ -211,7 +211,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="mg-tosser" src={MERCHANT_ART} alt="" />
                         {render.combo >= 3 ? (
-                            <div className={`mg-combo${render.mult >= 2.5 ? " is-hot" : ""}`}>{render.combo}× combo · <b>{render.mult}×</b> gold</div>
+                            <div className={`mg-combo${render.mult >= 1.75 ? " is-hot" : ""}`}>{render.combo}× combo · <b>{render.mult}×</b> gold</div>
                         ) : null}
                         {render.entities.map((e) => (
                             <span key={e.id} className={e.type === "gold" ? "mg-gold" : "mg-brick"} style={{ left: `${e.x * 100}%`, top: `${e.y}px` }} />
@@ -248,9 +248,12 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                             <button type="button" className="sail-cta sail-cta-wind" onClick={start}>🪙 Catch the coin toss!</button>
                         )}
 
-                        {/* A compact persistent note once the recap's been dismissed. */}
+                        {/* 10th-meeting milestone: the exclusive elephant pet is yours (not tied to the minigame). */}
+                        {merchant.petGranted ? (
+                            <div className="merchant-won" style={{ borderColor: "rgba(124,201,255,0.5)", color: "#bfe3ff" }}>🐘 <strong>10th meeting!</strong> The Merchant&apos;s Guard is yours — equip it to find him more often.</div>
+                        ) : null}
                         {played && merchant.perfect ? (
-                            <div className="merchant-won" style={{ borderColor: "rgba(124,201,255,0.5)", color: "#bfe3ff" }}>✨ Perfect run!{merchant.petGranted ? " 🐘 You won the Merchant's Guard!" : ""}</div>
+                            <div className="merchant-won">✨ Perfect run — flawless coin catch!</div>
                         ) : null}
 
                         <h4 style={{ margin: "14px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own 🪙 {gold.toLocaleString()}</span></h4>
@@ -284,23 +287,19 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                             <div><span>💥 Hits taken</span><strong>{recap.hits}</strong></div>
                             <div><span>💨 Coins missed</span><strong>{recap.missed}</strong></div>
                         </div>
-                        {recap.perfect ? (
-                            !merchant.minigamePlayed ? (
-                                <p className="muted" style={{ margin: "4px 0 0" }}>Tallying your haul…</p>
-                            ) : merchant.petGranted ? (
-                                <div className="merchant-pet mg-recap-pet">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={ELEPHANT_ART} alt="Merchant's Guard" />
-                                    <div>
-                                        <strong>🐘 The Merchant&apos;s Guard is yours!</strong>
-                                        <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.8rem" }}>His exclusive elephant — equip it to find him more often.</p>
-                                    </div>
+                        {merchant.petGranted ? (
+                            <div className="merchant-pet mg-recap-pet">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={ELEPHANT_ART} alt="Merchant's Guard" />
+                                <div>
+                                    <strong>🐘 The Merchant&apos;s Guard is yours!</strong>
+                                    <p className="muted" style={{ margin: "2px 0 0", fontSize: "0.8rem" }}>Your 10th meeting with the merchant — his exclusive elephant. Equip it to find him more often.</p>
                                 </div>
-                            ) : (
-                                <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>Flawless! No pet this time — a perfect run is a 🐘 <strong>10%</strong> shot at his elephant.</p>
-                            )
+                            </div>
+                        ) : recap.perfect ? (
+                            <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>✨ Flawless run! Meet the merchant <strong>10 times</strong> to earn his exclusive elephant pet.</p>
                         ) : (
-                            <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>Catch <strong>every</strong> coin AND dodge <strong>every</strong> brick for a shot at his exclusive pet.</p>
+                            <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>Meet the merchant <strong>10 times</strong> to earn his exclusive elephant pet.</p>
                         )}
                         <button type="button" className="btn-gold mg-recap-btn" disabled={!recapReady} onClick={() => setRecap(null)}>
                             {recapReady ? "Continue" : "…"}
@@ -319,9 +318,9 @@ function hitClass(hitAt) {
 
 // Combo multiplier: catching coins in a row without a miss/hit ramps the payout, so skilled play pays more.
 function comboMult(combo) {
-    if (combo >= 15) return 3;
-    if (combo >= 10) return 2.5;
-    if (combo >= 6) return 2;
-    if (combo >= 3) return 1.5;
+    if (combo >= 15) return 2;
+    if (combo >= 10) return 1.75;
+    if (combo >= 6) return 1.5;
+    if (combo >= 3) return 1.25;
     return 1;
 }
