@@ -16,6 +16,8 @@ import {
     MIN_CREDIT_CENTS,
 } from "@/lib/marketplace/store-credit.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -57,7 +59,11 @@ export async function POST(request) {
 
             const feeCents = feeForCents(amountCents);
             const chargedCents = amountCents + feeCents;
-            const coins = coinsForCents(amountCents);
+            // Equipped "credit" gear grants guaranteed, additive bonus coins on the buy — locked in at purchase.
+            const baseCoins = coinsForCents(amountCents);
+            const creditBonus = creditPurchaseBonus(await getEquippedIds(buyer.id).catch(() => ({})));
+            const coins = Math.round(baseCoins * (1 + creditBonus));
+            const bonusCoins = coins - baseCoins;
             const idempotencyKey = randomUUID();
 
             const purchaseId = await createPendingCreditPurchase({ buyerId: buyer.id, amountCents, feeCents, chargedCents, coins, idempotencyKey });
@@ -126,6 +132,7 @@ export async function POST(request) {
                 feeCents,
                 chargedCents,
                 coins,
+                bonusCoins, // extra coins from equipped credit gear (0 if none)
                 balanceCents: result.balanceCents,
                 receiptUrl: payment?.receipt_url || null,
             });

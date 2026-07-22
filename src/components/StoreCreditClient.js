@@ -52,6 +52,7 @@ export default function StoreCreditClient({
     feeRate = 0.035,
     minCents = 500,
     maxCents = 50000,
+    coinBonus = 0,
 }) {
     const [balanceCents, setBalanceCents] = useState(initialBalanceCents);
     const [events, setEvents] = useState(initialEvents);
@@ -70,7 +71,9 @@ export default function StoreCreditClient({
     const missingSquareConfig = !squareApplicationId || !squareLocationId;
     const feeCents = Math.round(amountCents * feeRate);
     const chargedCents = amountCents + feeCents;
-    const coins = amountCents * coinsPerCent;
+    const baseCoins = amountCents * coinsPerCent;
+    const bonusCoins = Math.round(baseCoins * coinBonus); // guaranteed bonus from equipped credit gear
+    const coins = baseCoins + bonusCoins;
 
     // Mount the Square card field once payments are usable.
     useEffect(() => {
@@ -146,7 +149,7 @@ export default function StoreCreditClient({
             const d = await res.json().catch(() => null);
             if (!res.ok || !d?.ok) throw new Error(d?.error || "Purchase failed.");
             setBalanceCents(d.balanceCents ?? balanceCents + amountCents);
-            setDone({ amountCents: d.amountCents, coins: d.coins });
+            setDone({ amountCents: d.amountCents, coins: d.coins, bonusCoins: d.bonusCoins || 0 });
             refresh();
         } catch (e) {
             setErr(e instanceof Error ? e.message : "Purchase failed.");
@@ -188,7 +191,7 @@ export default function StoreCreditClient({
                 <section className="card credit-done">
                     <div style={{ fontSize: "2rem" }}>🎉</div>
                     <h2 style={{ margin: "4px 0" }}>Added {usd(done.amountCents)} credit!</h2>
-                    <p className="muted" style={{ marginTop: 0 }}>+{done.coins.toLocaleString()} coins dropped into your wallet. New balance: <strong>{usd(balanceCents)}</strong>.</p>
+                    <p className="muted" style={{ marginTop: 0 }}>+{done.coins.toLocaleString()} coins dropped into your wallet{done.bonusCoins > 0 ? <> (incl. <strong style={{ color: "#7cffb2" }}>+{done.bonusCoins.toLocaleString()}</strong> gear bonus)</> : null}. New balance: <strong>{usd(balanceCents)}</strong>.</p>
                     <button className="pill" onClick={() => setDone(null)}>Buy more</button>
                 </section>
             ) : (
@@ -203,7 +206,7 @@ export default function StoreCreditClient({
                                 onClick={() => pickPreset(c)}
                             >
                                 <span className="credit-chip-usd">{usd(c)}</span>
-                                <span className="credit-chip-coins">+{(c * coinsPerCent).toLocaleString()} 🪙</span>
+                                <span className="credit-chip-coins">+{Math.round(c * coinsPerCent * (1 + coinBonus)).toLocaleString()} 🪙</span>
                             </button>
                         ))}
                     </div>
@@ -224,6 +227,9 @@ export default function StoreCreditClient({
                     <div className="credit-summary">
                         <div><span className="muted">Credit added</span><strong>{usd(amountCents)}</strong></div>
                         <div><span className="muted">Coins earned</span><strong>{coins.toLocaleString()} 🪙</strong></div>
+                        {bonusCoins > 0 ? (
+                            <div><span className="muted">↳ Gear bonus (+{Math.round(coinBonus * 100)}%)</span><strong style={{ color: "#7cffb2" }}>+{bonusCoins.toLocaleString()} 🪙</strong></div>
+                        ) : null}
                         <div><span className="muted">Processing fee (3.5%)</span><strong>{usd(feeCents)}</strong></div>
                         <div className="credit-summary-total"><span>You pay</span><strong>{usd(chargedCents)}</strong></div>
                     </div>

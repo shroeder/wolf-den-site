@@ -117,7 +117,7 @@ export const ITEM_SIGNATURES = {
     golden_crown: { label: "Midas Touch", goldOnHit: true }, // mythic — gold
     ancient_halo: { label: "Sanctified", xpOnHit: true }, // mythic
     patrons_crown: { label: "Patron's Blessing", firstHitCrit: true }, // mythic
-    bigspender_crown: { label: "Big Spender", goldOnHit: true }, // mythic
+    bigspender_crown: { label: "Big Spender", creditBonus: 0.25 }, // mythic — +25% coins on store-credit buys
     whale_crown: { label: "Leviathan", giantSlayer: true }, // mythic
     gs_god_helm: { label: "Divine Sight", firstHitCrit: true }, // mythic
     gs_sovereign_crown: { label: "Sovereign", warbanner: true }, // mythic — rally the realm
@@ -199,8 +199,8 @@ export const ITEM_SIGNATURES = {
     warlord_ring: { label: "War Banner", packTactics: true }, // legendary
     highroller_ring: { label: "High Roller", dailySpin: true }, // legendary — a guaranteed extra wheel spin each day
     premium_signet: { label: "Prestige", loginPotion: true, cheerXp: true }, // legendary — daily gift consumable + bonus XP on cheers
-    credit25_ring: { label: "Investor", loginGold: true, cheerGold: true }, // legendary — daily gold on check-in + bonus gold on cheers
-    credit50_ring: { label: "Benefactor", loginPotion: true }, // legendary — daily gift consumable
+    credit25_ring: { label: "Investor", creditBonus: 0.10 }, // legendary — +10% coins on store-credit buys
+    credit50_ring: { label: "Benefactor", creditBonus: 0.20 }, // legendary — +20% coins on store-credit buys
     gs_royal_signet: { label: "Royal Seal", goldOnHit: true }, // legendary
     gs2_kings_band: { label: "Crown Jewel", ticketOnCrit: true }, // legendary
 
@@ -349,5 +349,14 @@ export function signatureFor(itemId) {
     if (s.cheerPetXp) parts.push(`${pct(CHEER.petXpChance[i])} chance when you cheer to feed your equipped pet ${CHEER.petXpAmt[i]} XP.`);
     if (s.cheerFirstStrike) parts.push(`Your FIRST cheer each day also strikes the boss for ${CHEER.firstStrike[i]}.`);
     if (s.cheerFragment) parts.push(`${pct(CHEER.fragmentChance[i])} chance on your first cheer each day to unearth a treasure-chest fragment.`);
+    if (s.creditBonus) parts.push(`+${pct(s.creditBonus)} bonus coins whenever you buy store credit.`);
     return { label: s.label, desc: parts.join(" ") };
+}
+
+// Total GUARANTEED bonus fraction on store-credit purchases from equipped "credit" gear — additive across
+// every equipped piece (e.g. Investor +10% + Big Spender +25% = +35%). Read at purchase time.
+export function creditPurchaseBonus(equipped) {
+    let b = 0;
+    for (const s of sigsOn(equipped)) if (s.creditBonus) b += s.creditBonus;
+    return b;
 }

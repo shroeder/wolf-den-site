@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { COINS_PER_CENT, ONLINE_FEE_RATE, MIN_CREDIT_CENTS, MAX_CREDIT_CENTS, getStoreCredit, listStoreCreditEvents } from "@/lib/marketplace/store-credit.js";
+import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -18,7 +20,11 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
-            const [balanceCents, events] = await Promise.all([getStoreCredit(buyer.id), listStoreCreditEvents(buyer.id, 20)]);
+            const [balanceCents, events, equipped] = await Promise.all([
+                getStoreCredit(buyer.id),
+                listStoreCreditEvents(buyer.id, 20),
+                getEquippedIds(buyer.id).catch(() => ({})),
+            ]);
             return noStore({
                 balanceCents,
                 events,
@@ -26,6 +32,7 @@ export async function GET(request) {
                 feeRate: ONLINE_FEE_RATE,
                 minCents: MIN_CREDIT_CENTS,
                 maxCents: MAX_CREDIT_CENTS,
+                coinBonus: creditPurchaseBonus(equipped), // fraction from equipped credit gear (0 if none)
             });
         } catch (error) {
             return internalError(error, { event: "marketplace.credit.get.failure" });

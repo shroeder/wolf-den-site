@@ -9,6 +9,8 @@ import {
     getStoreCredit,
     listStoreCreditEvents,
 } from "@/lib/marketplace/store-credit.js";
+import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -33,10 +35,12 @@ export default async function StoreCreditPage() {
     }
 
     const paymentsEnabled = process.env.PAYMENTS_ENABLED === "true" && process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
-    const [balanceCents, events] = await Promise.all([
+    const [balanceCents, events, equipped] = await Promise.all([
         getStoreCredit(buyer.id).catch(() => 0),
         listStoreCreditEvents(buyer.id, 20).catch(() => []),
+        getEquippedIds(buyer.id).catch(() => ({})),
     ]);
+    const coinBonus = creditPurchaseBonus(equipped); // bonus fraction from equipped credit gear
 
     return (
         <div className="stack reveal">
@@ -50,6 +54,7 @@ export default async function StoreCreditPage() {
                 feeRate={ONLINE_FEE_RATE}
                 minCents={MIN_CREDIT_CENTS}
                 maxCents={MAX_CREDIT_CENTS}
+                coinBonus={coinBonus}
             />
         </div>
     );
