@@ -139,7 +139,8 @@ export default function SailingClient({ initial, hero, pet }) {
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
     const [forge, setForge] = useState(null); // the chest just forged from fragments
-    const [levelUp, setLevelUp] = useState(null); // the new level, when a dig levels the boat up
+    const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
+    const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [now, setNow] = useState(Date.now);
@@ -194,8 +195,13 @@ export default function SailingClient({ initial, hero, pet }) {
             if (d && !d.error) {
                 setState(d);
                 const leveled = d.level > prevLevel;
-                if (d.result) { d.result.won ? (leveled ? sfx.levelUp() : sfx.win()) : sfx.fail(); setResult(d.result); }
-                if (leveled) { if (!d.result) sfx.levelUp(); setLevelUp(d.level); }
+                if (d.result) { d.result.won ? sfx.win() : sfx.fail(); setResult(d.result); }
+                if (leveled) {
+                    sfx.levelUp();
+                    // Crossing a 10-level milestone unlocks a new FORM — a bigger, special celebration.
+                    const crossed = (d.forms || []).find((f) => f.level > prevLevel && f.level <= d.level);
+                    if (crossed) setFormUnlock(crossed); else setLevelUp(d.level);
+                }
                 if (d.forged) { sfx.win(); setForge(d.forged); }
             }
         } finally { setBusy(false); }
@@ -213,6 +219,24 @@ export default function SailingClient({ initial, hero, pet }) {
     const dig = state.dig;
     const windCost = state.windRecharge?.cost ?? 0;
     const windTooPoor = windCost > 0 && state.gold < windCost;
+    // The boat's current form name = the highest unlocked milestone, else the base Wood Boat.
+    const curForm = (state.forms || []).filter((f) => f.unlocked).slice(-1)[0];
+    const boatName = curForm ? curForm.name : "Wood Boat";
+    // The four travel/loot upgrade levers, described with their per-level effect + current → next value.
+    const upgrades = [
+        { action: "upgrade_speed", icon: "💨", name: "Speed", data: state.speed,
+            desc: <>Faster voyages — cuts travel time <b>{state.speed.pctPerLevel}%</b> each level.</>,
+            effLabel: "Trip time", now: fmtLeft(state.speed.voyageNow), next: fmtLeft(state.speed.voyageNext) },
+        { action: "upgrade_fortune", icon: "🍀", name: "Fortune", data: state.fortune,
+            desc: <>Richer islands — <b>+1</b> fragment buried to dig up each trip, per level.</>,
+            effLabel: "Fragments buried", now: state.fortune.buriedNow, next: state.fortune.buriedNext },
+        { action: "upgrade_rarity", icon: "💎", name: "Rarity", data: state.rarity,
+            desc: <>Better loot — a chance your forged chest is bumped up a tier.</>,
+            effLabel: "Chest upgrade", now: `${state.rarity.pctNow}%`, next: `${state.rarity.pctNext}%` },
+        { action: "upgrade_luck", icon: "🎯", name: "Luck", data: state.luck,
+            desc: <>Strike sooner — fragments sit closer to the surface, found on your early digs.</>,
+            effLabel: "Buried within", now: `${state.luck.depthNow} layer${state.luck.depthNow === 1 ? "" : "s"}`, next: `${state.luck.depthNext} layer${state.luck.depthNext === 1 ? "" : "s"}` },
+    ];
 
     return (
         <div className="stack reveal sailing">
@@ -342,38 +366,47 @@ export default function SailingClient({ initial, hero, pet }) {
                     </div>
                 )}
 
-                {/* Boat identity — level comes from upgrades, not digging. */}
+                {/* Boat identity — level + form come from upgrades, not digging. */}
                 <div className="sail-boatline">
-                    <div><span className="sail-boatname">Wood Boat</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level}</span></div>
+                    <div><span className="sail-boatname">{boatName}</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level} · Form {state.tier}/{state.boatTiers}</span></div>
                     <span className="muted sail-boatline-frag"><FragmentIcon size={14} /> {state.fragments} · 🪙 {state.gold.toLocaleString()}</span>
                 </div>
             </section>
 
-            {/* Boat upgrades — the ONLY way the boat levels up. Two boat-exclusive stats, each explained. */}
+            {/* Boat upgrades — 4 travel/loot levers. Buying any of them levels the boat; every 10 levels = new form. */}
             <section className="card">
                 <h2 style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
-                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels up your boat ⭐ — it doesn&apos;t level from digging.</p>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels your boat ⭐ — every 10 levels it takes a new form and unlocks a perk. (Digging doesn&apos;t level the boat.)</p>
                 <div className="sail-upgrades">
-                    <div className="sail-upg">
-                        <div className="sail-upg-top"><span>💨 Speed</span><span className="muted">Lv {state.speed.level}/{state.speed.max}</span></div>
-                        <p className="muted sail-upg-desc">Faster voyages to the island — cuts travel time <b>{state.speed.pctPerLevel}%</b> each level.</p>
-                        <div className="sail-upg-effect">
-                            <span>Trip time</span>
-                            <b>{fmtLeft(state.speed.voyageNow)}{state.speed.maxed ? "" : <> → <span className="sail-upg-next">{fmtLeft(state.speed.voyageNext)}</span></>}</b>
+                    {upgrades.map((u) => (
+                        <div className="sail-upg" key={u.action}>
+                            <div className="sail-upg-top"><span>{u.icon} {u.name}</span><span className="muted">Lv {u.data.level}/{u.data.max}</span></div>
+                            <p className="muted sail-upg-desc">{u.desc}</p>
+                            <div className="sail-upg-effect">
+                                <span>{u.effLabel}</span>
+                                <b>{u.now}{u.data.maxed ? "" : <> → <span className="sail-upg-next">{u.next}</span></>}</b>
+                            </div>
+                            {u.data.maxed ? <button className="pill" disabled>Maxed</button>
+                                : <button className="btn-ghost" disabled={busy || state.gold < u.data.cost} onClick={() => act(u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
                         </div>
-                        {state.speed.maxed ? <button className="pill" disabled>Maxed</button>
-                            : <button className="btn-ghost" disabled={busy || state.gold < state.speed.cost} onClick={() => act("upgrade_speed")}>🪙 {state.speed.cost.toLocaleString()}</button>}
-                    </div>
-                    <div className="sail-upg">
-                        <div className="sail-upg-top"><span>🍀 Fortune</span><span className="muted">Lv {state.fortune.level}/{state.fortune.max}</span></div>
-                        <p className="muted sail-upg-desc">Sail to richer islands — <b>+1</b> fragment buried to dig up each trip, per level.</p>
-                        <div className="sail-upg-effect">
-                            <span>Fragments buried</span>
-                            <b><FragmentIcon size={13} /> {state.fortune.buriedNow}{state.fortune.maxed ? "" : <> → <span className="sail-upg-next">{state.fortune.buriedNext}</span></>}</b>
+                    ))}
+                </div>
+            </section>
+
+            {/* Boat forms — 8 milestones, each a new hull + a permanent perk unlocked every 10 levels. */}
+            <section className="card sail-forms">
+                <h2 style={{ margin: "0 0 2px" }}>Boat forms</h2>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Every 10 levels your boat takes a new form and unlocks a permanent perk. You&apos;re <b>Lv {level}</b> · Form <b>{state.tier}/{state.boatTiers}</b>.</p>
+                <div className="sail-forms-list">
+                    {(state.forms || []).map((f) => (
+                        <div className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level}>
+                            <span className="sail-form-badge">{f.unlocked ? "⚓" : "🔒"}</span>
+                            <div className="sail-form-body">
+                                <div className="sail-form-name">{f.name} <span className="muted">· Lv {f.level}</span>{f.current ? <span className="sail-form-cur">current</span> : null}</div>
+                                <div className="muted sail-form-perk">{f.perk}</div>
+                            </div>
                         </div>
-                        {state.fortune.maxed ? <button className="pill" disabled>Maxed</button>
-                            : <button className="btn-ghost" disabled={busy || state.gold < state.fortune.cost} onClick={() => act("upgrade_luck")}>🪙 {state.fortune.cost.toLocaleString()}</button>}
-                    </div>
+                    ))}
                 </div>
             </section>
 
@@ -430,9 +463,24 @@ export default function SailingClient({ initial, hero, pet }) {
                         <Confetti />
                         <div className="sail-recap-hero is-win"><span className="sail-levelup-badge">⛵</span></div>
                         <div className="sail-levelup-ribbon">⬆️ Boat leveled up!</div>
-                        <h2 style={{ margin: "8px 0 2px" }}>Wood Boat — Lv {levelUp}</h2>
-                        <p className="muted" style={{ marginTop: 0 }}>Keep upgrading Speed &amp; Fortune to make her stronger.</p>
+                        <h2 style={{ margin: "8px 0 2px" }}>{boatName} — Lv {levelUp}</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>Keep upgrading — every 10 levels she takes a new form.</p>
                         <button className="sail-cta" onClick={() => setLevelUp(null)}>⭐ Nice</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* NEW FORM — the "very special" unlock every 10 levels: new hull + a permanent perk. */}
+            {formUnlock ? (
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap sail-formcard">
+                        <Confetti />
+                        <div className="sail-recap-hero is-win"><span className="sail-form-hero">⛵</span></div>
+                        <div className="sail-levelup-ribbon">✨ NEW BOAT FORM ✨</div>
+                        <h2 style={{ margin: "8px 0 2px" }}>{formUnlock.name}</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>Form {formUnlock.tier} of {state.boatTiers} — reached at Lv {formUnlock.level}.</p>
+                        <div className="sail-form-perkbig">🎁 Perk unlocked: {formUnlock.perk}</div>
+                        <button className="sail-cta" onClick={() => setFormUnlock(null)}>Set sail ⛵</button>
                     </div>
                 </div>
             ) : null}
