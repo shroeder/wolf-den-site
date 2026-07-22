@@ -10565,7 +10565,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-levelup-badge { font-size: 3.4rem; display: inline-block; filter: drop-shadow(0 0 16px rgba(255,215,94,0.7)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
 /* Boat forms list + the "new form" unlock celebration. */
 .sail-forms-list { display: grid; gap: 6px; }
-.sail-form { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.03); opacity: 0.55;
+.sail-form { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.03); opacity: 0.88;
     width: 100%; border: 1px solid transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: background 0.12s ease, border-color 0.12s ease; }
 .sail-form:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
 .sail-form-chev { flex: 0 0 auto; color: #7f8794; font-size: 1.4rem; line-height: 1; padding-left: 4px; }
@@ -10573,21 +10573,21 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-form.is-current { background: rgba(255,215,94,0.12); box-shadow: inset 0 0 0 1px rgba(255,215,94,0.4); }
 .sail-form-art { position: relative; flex: 0 0 auto; width: 52px; height: 44px; display: grid; place-items: center; }
 .sail-form-art img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
-.sail-form-art img.is-locked { filter: grayscale(1) brightness(0.5); opacity: 0.7; }
-.sail-form-lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.1rem; }
+.sail-form-art img.is-locked { opacity: 0.9; }
+.sail-form-lock { position: absolute; right: -2px; bottom: -2px; font-size: 0.95rem; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.85)); }
 .sail-form-body { flex: 1; min-width: 0; }
 .sail-form-name { font-weight: 800; font-size: 0.88rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sail-form-cur { font-size: 0.64rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #0b0f1a; background: #ffd75e; padding: 1px 6px; border-radius: 999px; }
 .sail-form-perk { font-size: 0.78rem; }
 .sail-form-hero { font-size: 3.6rem; display: inline-block; filter: drop-shadow(0 0 18px rgba(120,200,255,0.75)); animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; }
 .sail-form-perkbig { margin: 10px 0 12px; padding: 9px 12px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; color: #eaf6ff; background: rgba(120,200,255,0.14); border: 1px solid rgba(120,200,255,0.35); }
-/* Inspect-a-form modal. */
-.sail-inspect { position: relative; max-width: 340px; text-align: center; }
-.sail-inspect-x { position: absolute; top: 8px; right: 10px; background: none; border: none; color: #9aa0a6; font-size: 1.5rem; line-height: 1; cursor: pointer; }
-.sail-inspect-art { position: relative; height: 150px; display: grid; place-items: center; margin: 4px 0 6px; }
+/* Inspect-a-form modal — OPAQUE so nothing bleeds through, and the hull shown in full COLOR (locked or not). */
+.sail-inspect { position: relative; max-width: 340px; text-align: center; background: #14181f; border: 1px solid #2b3038; }
+.sail-inspect-x { position: absolute; top: 8px; right: 10px; background: none; border: none; color: #9aa0a6; font-size: 1.5rem; line-height: 1; cursor: pointer; z-index: 2; }
+.sail-inspect-art { position: relative; height: 160px; display: grid; place-items: center; margin: 4px 0 6px; }
 .sail-inspect-art img { max-width: 92%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
-.sail-inspect-art img.is-locked { filter: grayscale(1) brightness(0.55); }
-.sail-inspect-lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 2.6rem; }
+/* Locked hulls stay in full color — just a small lock badge in the corner marks them locked. */
+.sail-inspect-lock { position: absolute; top: 6px; left: 8px; font-size: 1.9rem; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
 .sail-inspect-status { font-size: 0.82rem; font-weight: 800; color: #cbb27a; margin-bottom: 12px; }
 .sail-inspect-status.is-on { color: #7cffb2; }
 @media (prefers-reduced-motion: reduce) { .sail-levelup-badge, .sail-form-hero { animation: none; } }
