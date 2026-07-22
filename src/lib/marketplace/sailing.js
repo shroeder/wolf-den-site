@@ -64,29 +64,37 @@ const ENCOUNTER_CHANCE_CAP = 1.0;     // ⚠️ TEST OVERRIDE (was 0.65) — let
 function encounterChance(fortuneLevel = 0) {
     return Math.min(ENCOUNTER_CHANCE_CAP, ENCOUNTER_BASE + Math.max(0, fortuneLevel) * ENCOUNTER_PER_FORTUNE);
 }
-// Foes you can meet at sea — pure flavor; rewards are rolled separately so any foe can drop anything.
+// Reusable low-power loot items (nothing here swings the boss fight). `d(w, item)` = a weighted drop.
+const NONE = { kind: "none" };
+const FRAG1 = { kind: "fragment", n: 1, label: "a Wooden chest fragment", emoji: "🟫" };
+const FRAG2 = { kind: "fragment", n: 2, label: "2 Wooden chest fragments", emoji: "🟫" };
+const TREAT_BONE = { kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" };
+const TREAT_SNACK = { kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" };
+const CHEST_WOOD = { kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" };
+const CHEST_IRON = { kind: "chest", tier: "iron", label: "an Iron chest", emoji: "⚙️" };
+const SPIN = { kind: "consumable", id: "spin_lucky_coin", label: "a Lucky Coin (+2 spins)", emoji: "🎟️" };
+const STONE = { kind: "consumable", id: "stone_storm", label: "a Storm Crystal (+3 strikes)", emoji: "🔷" };
+const d = (w, item) => ({ w, ...item });
+
+// Foes you can meet at sea. Each has its OWN sprite (enc-<id>.png) + a themed `drops` table so the loot
+// matches the story — pirates hoard chests, the kraken sheds hide (pet treats), the ghost drops spectral luck.
 const ENCOUNTERS = [
-    { foe: "roaming pirates", emoji: "🏴‍☠️", loot: "looted their hold" },
-    { foe: "a lurking kraken", emoji: "🐙", loot: "salvaged its hide" },
-    { foe: "a giant clam", emoji: "🦪", loot: "prised a pearl from its shell" },
-    { foe: "a ghost galleon", emoji: "👻", loot: "plundered its spectral hold" },
-    { foe: "a sea serpent", emoji: "🐍", loot: "harvested its glittering scales" },
-    { foe: "a rogue leviathan", emoji: "🐋", loot: "carved a trove from the deep" },
-    { foe: "a smuggler's sloop", emoji: "⛵", loot: "seized their contraband" },
-    { foe: "a reef drake", emoji: "🐉", loot: "raided its sunken nest" },
-];
-// Bonus loot table (weighted). Always-on XP + coins are separate; this is the extra thrill. Deliberately
-// LOW-power (fragments, cheap pet treats, low chests, a spin token) — nothing that swings the boss fight.
-const ENCOUNTER_LOOT = [
-    { w: 40, kind: "none" },
-    { w: 28, kind: "fragment", n: 1, label: "a Wooden chest fragment", emoji: "🟫" },
-    { w: 8,  kind: "fragment", n: 2, label: "2 Wooden chest fragments", emoji: "🟫" },
-    { w: 8,  kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" },
-    { w: 4,  kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" },
-    { w: 6,  kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" },
-    { w: 2,  kind: "chest", tier: "iron", label: "an Iron chest", emoji: "⚙️" },
-    { w: 2,  kind: "consumable", id: "spin_lucky_coin", label: "a Lucky Coin (+2 spins)", emoji: "🎟️" },
-    { w: 2,  kind: "consumable", id: "stone_storm", label: "a Storm Crystal (+3 strikes)", emoji: "🔷" },
+    { id: "pirates",   foe: "roaming pirates",   emoji: "🏴‍☠️", loot: "looted their hold",
+      drops: [d(38, NONE), d(25, CHEST_WOOD), d(10, CHEST_IRON), d(15, FRAG1), d(5, FRAG2), d(7, SPIN)] },
+    { id: "kraken",    foe: "a lurking kraken",  emoji: "🐙", loot: "salvaged its hide",
+      drops: [d(38, NONE), d(26, TREAT_BONE), d(14, TREAT_SNACK), d(12, FRAG1), d(10, STONE)] },
+    { id: "clam",      foe: "a giant clam",      emoji: "🦪", loot: "prised a pearl from its shell",
+      drops: [d(35, NONE), d(22, FRAG1), d(10, FRAG2), d(13, CHEST_WOOD), d(12, SPIN), d(8, TREAT_SNACK)] },
+    { id: "ghost",     foe: "a ghost galleon",   emoji: "👻", loot: "plundered its spectral hold",
+      drops: [d(38, NONE), d(22, FRAG1), d(8, FRAG2), d(16, SPIN), d(10, STONE), d(6, CHEST_IRON)] },
+    { id: "serpent",   foe: "a sea serpent",     emoji: "🐍", loot: "harvested its glittering scales",
+      drops: [d(38, NONE), d(22, TREAT_BONE), d(12, TREAT_SNACK), d(14, STONE), d(14, FRAG1)] },
+    { id: "leviathan", foe: "a rogue leviathan", emoji: "🐋", loot: "carved a trove from the deep",
+      drops: [d(32, NONE), d(24, CHEST_WOOD), d(12, CHEST_IRON), d(16, FRAG2), d(8, FRAG1), d(8, TREAT_SNACK)] },
+    { id: "smuggler",  foe: "a smuggler's sloop", emoji: "⛵", loot: "seized their contraband",
+      drops: [d(38, NONE), d(18, SPIN), d(15, CHEST_WOOD), d(12, TREAT_SNACK), d(10, STONE), d(7, FRAG1)] },
+    { id: "drake",     foe: "a reef drake",      emoji: "🐉", loot: "raided its sunken nest",
+      drops: [d(38, NONE), d(22, FRAG1), d(10, FRAG2), d(14, TREAT_BONE), d(8, STONE), d(8, CHEST_WOOD)] },
 ];
 function pickWeighted(list) {
     const total = list.reduce((s, x) => s + x.w, 0) || 1;
@@ -510,9 +518,9 @@ async function resolveDueEncounter(buyerId) {
     const enc = ENCOUNTERS[randInt(ENCOUNTERS.length)];
     const xp = 40 + randInt(81);     // modest: 40–120 (was 150–360 — too rich for a ~1-in-5 event)
     const coins = 10 + randInt(21);  // small: 10–30
-    const loot = pickWeighted(ENCOUNTER_LOOT);
+    const loot = pickWeighted(enc.drops); // foe-themed loot
     const result = {
-        foe: enc.foe, emoji: enc.emoji, loot: enc.loot, xp, coins,
+        foe: enc.foe, emoji: enc.emoji, art: `/images/sailing/enc-${enc.id}.png`, loot: enc.loot, xp, coins,
         bonus: loot.kind === "none" ? null : { label: loot.label, emoji: loot.emoji },
     };
     // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.

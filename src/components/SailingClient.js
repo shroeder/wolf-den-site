@@ -811,7 +811,12 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap sail-encounter">
                         <Confetti />
-                        <div className="sail-recap-hero is-win"><span className="sail-enc-foe">{state.encounter.emoji}</span></div>
+                        <div className="sail-recap-hero is-win">
+                            {state.encounter.art ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={state.encounter.art} alt="" className="sail-enc-art" />
+                            ) : <span className="sail-enc-foe">{state.encounter.emoji}</span>}
+                        </div>
                         <div className="sail-enc-ribbon">⚔️ Marine encounter!</div>
                         <h2 style={{ margin: "6px 0 2px" }}>You defeated {state.encounter.foe}!</h2>
                         <p className="muted" style={{ marginTop: 0 }}>You {state.encounter.loot}.</p>

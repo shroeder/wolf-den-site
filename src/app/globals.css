@@ -10690,6 +10690,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes sailWaveFx { 0% { opacity: 0; transform: translate(-50%, 8px); } 12% { opacity: 1; transform: translate(-50%, 0); } 78% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -16px); } }
 /* Marine-encounter recap modal (reuses .sail-reward-overlay + .sail-recap). */
 .sail-enc-foe { font-size: 2.8rem; line-height: 1; }
+.sail-enc-art { width: clamp(120px, 40vw, 180px); height: auto; object-fit: contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6)); animation: merchantBob 2.8s ease-in-out infinite; }
 .sail-enc-ribbon { display: inline-block; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.78rem; color: #ffd75e; margin-bottom: 2px; }
 .sail-enc-rewards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 6px; }
 .sail-enc-reward { font-weight: 800; font-size: 0.85rem; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); }
