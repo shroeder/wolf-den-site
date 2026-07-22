@@ -73,6 +73,16 @@ function autoPerHour(level, stats = {}) {
     return Math.round(base * power * critEV);
 }
 
+// The offensive kit that drives passive auto-damage: a member's gear stats + their equipped pet's stats.
+function autoStats(gear = {}, petStats = {}) {
+    return {
+        might: (gear.might || 0) + (petStats.might || 0),
+        ferocity: (gear.ferocity || 0) + (petStats.ferocity || 0),
+        crit_chance: (gear.crit_chance || 0) + (petStats.crit_chance || 0),
+        crit_power: (gear.crit_power || 0) + (petStats.crit_power || 0),
+    };
+}
+
 // Expected damage a single member deals PER DAY: passive auto-attacks 24/7 (all gear stats boost these now)
 // plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375). manualMult inflates
 // the MANUAL portion by the member's gear + pet power so boss HP is sized off the pack's FULL power.
@@ -103,7 +113,7 @@ export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
             extra_strike: (g.extra_strike || 0) + (ps.extra_strike || 0),
         };
         const manualMult = manualStatMultiplier(combined) * procMultiplier(pb.proc, 1 + combined.extra_strike);
-        return sum + memberDailyDamage(lvl(m.xp), manualMult, g);
+        return sum + memberDailyDamage(lvl(m.xp), manualMult, autoStats(g, ps));
     }, 0);
     // Round to a clean-ish number and floor it so a tiny/empty pack still faces a real boss.
     const raw = Math.max(8000, Math.round(daily * Math.max(1, targetDays)));
@@ -392,11 +402,14 @@ export async function getBossState(buyerId = null) {
         const dailyCap = dailyStrikeCap({ extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0), equippedIds: myIds, bonusStrikes });
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
-        const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         // How much of this week's element the viewer is packing (drives the "your N 🔥 pieces: +X%" tip).
         const em = elementMult(myIds, boss.weakness);
+        // The viewer's real passive auto-damage/hour (gear + pet + element) — so gear changes visibly move it.
+        const myLevel = mine?.level || lvl(goldRow?.xp || 0);
+        const myAutoPerHour = Math.round(autoPerHour(myLevel, autoStats(myStats, myPet?.stats || {})) * em.mult);
         const cheerStatus = await getCheerStatus(buyerId).catch(() => ({ left: 0, perDay: CHEERS_PER_DAY }));
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -964,10 +977,11 @@ export async function runBossAutoTick() {
     if (hours <= 0) return { applied: 0, fighters: 0 };
 
     const members = await db.query(`SELECT id, xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
-    // Equipped Ferocity boosts each member's passive auto-damage.
-    const [statsByMember, idsByMember] = await Promise.all([
+    // Gear + equipped-pet stats both boost each member's passive auto-damage.
+    const [statsByMember, idsByMember, petByMember] = await Promise.all([
         getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map()),
         getEquippedIdsForMembers(members.map((m) => m.id)).catch(() => new Map()),
+        getPackPetBonuses().catch(() => new Map()),
     ]);
     const buffMult = await activeDamageMult().catch(() => 1);
     const rows = members
@@ -975,7 +989,8 @@ export async function runBossAutoTick() {
             // Elemental affinity now boosts PASSIVE auto-damage too (not just manual): matching-element gear
             // deals bonus damage vs a boss weak to that element.
             const elem = elementMult(idsByMember.get(m.id) || [], boss.weakness).mult;
-            return { id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), statsByMember.get(m.id) || {}) * hours * buffMult * elem) };
+            const stats = autoStats(statsByMember.get(m.id) || {}, petByMember.get(m.id)?.stats || {});
+            return { id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), stats) * hours * buffMult * elem) };
         })
         .filter((r) => r.damage > 0);
     if (!rows.length) return { applied: 0, fighters: 0 };

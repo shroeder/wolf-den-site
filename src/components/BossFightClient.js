@@ -232,11 +232,18 @@ export default function BossFightClient() {
                         <div className="boss2-spent">🕒 Strike used — your avatar keeps auto-attacking. Come back tomorrow for another.</div>
                     )}
                     {you ? (
-                        <div className="boss2-you">
-                            <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
-                            <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
-                            {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
-                        </div>
+                        <>
+                            <div className="boss2-you">
+                                <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
+                                <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
+                                {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
+                            </div>
+                            {you.autoPerHour ? (
+                                <div className="boss2-auto" title="Your passive auto-damage per hour, from gear + pet + element match. Upgrade gear to move it.">
+                                    ⚙️ Passive damage: <strong>{you.autoPerHour.toLocaleString()}/hr</strong> <span className="muted">· from gear + pet</span>
+                                </div>
+                            ) : null}
+                        </>
                     ) : null}
                     {you && (you.cheersLeft ?? 0) > 0 ? (
                         <div className="boss2-cheerhint">📣 Tap <b>Cheer</b> on the hero on stage — bonus damage for them, XP + coin for you. <b>{you.cheersLeft}</b> left today.</div>

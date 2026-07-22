@@ -9454,6 +9454,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss2-attack { width: 100%; max-width: 440px; text-align: center; justify-content: center; padding: 14px; font-size: 1.05rem; }
 .boss2-spent { padding: 12px; color: #cdbfa6; text-align: center; font-weight: 600; }
 .boss2-you { font-size: 0.85rem; }
+.boss2-auto { font-size: 0.82rem; margin-top: 3px; color: #cbd2da; }
+.boss2-auto strong { color: #7cffb2; }
 .boss2-xp { color: #ffd75e; font-weight: 800; }
 .boss2-board h3 { margin: 0 0 8px; }
 .boss2-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
