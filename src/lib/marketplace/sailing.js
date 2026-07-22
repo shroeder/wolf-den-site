@@ -499,9 +499,14 @@ async function readRow(buyerId) {
 // concurrent caller writes the result), then apply the grants. A no-op when nothing is pending/due.
 async function resolveDueEncounter(buyerId) {
     const row = await readRow(buyerId);
-    if (!row || !row.encounter_at || row.encounter_result) return;
+    if (!row || !row.encounter_at || row.encounter_result) return; // encounter_at non-null = one is pending this voyage
     if (row.dig_state) return; // already ashore digging — don't pop a mid-voyage encounter over the dig
-    if (new Date(row.encounter_at).getTime() > Date.now()) return; // halfway mark not reached yet
+    // Fire at the voyage's PROGRESS midpoint, not a fixed wall-clock time — so a tailwind (which jumps the boat
+    // forward by cutting the remaining time) still triggers it. Progress ≥ 50% ⟺ remaining ≤ half the trip.
+    const arrivesAt = row.returns_at ? new Date(row.returns_at).getTime() : 0;
+    const total = Number(row.voyage_ms) || 0;
+    if (!arrivesAt || total <= 0) return;
+    if (Date.now() < arrivesAt - total / 2) return; // not past the midpoint yet
     const enc = ENCOUNTERS[randInt(ENCOUNTERS.length)];
     const xp = 150 + randInt(211);   // decent: 150–360
     const coins = 20 + randInt(51);  // small: 20–70
@@ -513,7 +518,7 @@ async function resolveDueEncounter(buyerId) {
     // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.
     const claimed = await db.queryOne(
         `UPDATE mkt_sailing SET encounter_result = $2::jsonb, updated_at = NOW()
-          WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_at <= NOW() AND encounter_result IS NULL AND dig_state IS NULL
+          WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_result IS NULL AND dig_state IS NULL
           RETURNING buyer_id`,
         [buyerId, JSON.stringify(result)]
     ).catch(() => null);

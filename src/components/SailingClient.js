@@ -260,11 +260,11 @@ export default function SailingClient({ initial, hero, pet }) {
                 setCelebrate("arrive");
                 setTimeout(() => setCelebrate((c) => (c === "arrive" ? null : c)), 2600);
             }
-            // A voyage's encounter is scheduled at its ORIGINAL midpoint and resolves server-side on the next
-            // state read. Do ONE silent refetch the moment we cross that midpoint so an encounter pops live even
-            // while idle here (no continuous polling). departedAt + voyageTotalMs/2 = the fixed midpoint.
-            if (s.status === "sailing" && s.departedAt && s.voyageTotalMs > 0 && halfwayRef.current !== s.departedAt
-                && Date.now() >= s.departedAt + s.voyageTotalMs / 2) {
+            // A voyage's encounter fires at its PROGRESS midpoint (so a tailwind that jumps the boat forward
+            // still triggers it) and resolves server-side on the next state read. Do ONE silent refetch the
+            // moment progress crosses 50% — remaining ≤ half the planned trip — so it pops live even while idle.
+            if (s.status === "sailing" && s.arrivesAt && s.voyageTotalMs > 0 && halfwayRef.current !== s.departedAt
+                && Date.now() >= s.arrivesAt - s.voyageTotalMs / 2) {
                 halfwayRef.current = s.departedAt;
                 load();
             }
