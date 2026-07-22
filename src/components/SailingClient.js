@@ -203,7 +203,38 @@ export default function SailingClient({ initial, hero, pet }) {
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
     // correct on the very first render — no flicker from a default to the picked one. Held stable for the
     // session (later state updates re-roll d.sky, but we keep this original).
-    const [sky] = useState(() => initial?.sky || initial?.oceanBg || null);
+    const [sky, setSky] = useState(() => initial?.sky || initial?.oceanBg || null);
+    const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
+
+    // Ask for location, then set the sky to match the player's ACTUAL weather + time of day (Open-Meteo).
+    const requestAmbiance = useCallback((fromClick) => {
+        if (typeof navigator === "undefined" || !navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                try { localStorage.setItem("wolfden-sail-geo", "1"); } catch { /* ignore */ }
+                setGeoPrompt(false);
+                try {
+                    const r = await fetch(`/api/marketplace/sailing/ambiance?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`, { cache: "no-store" });
+                    const d = r.ok ? await r.json().catch(() => null) : null;
+                    if (d?.sky) setSky(d.sky); // mood is derived from the sky URL in render, so this is enough
+                } catch { /* keep the time-based sky */ }
+            },
+            () => { if (fromClick) setGeoPrompt(false); }, // denied
+            { timeout: 8000, maximumAge: 30 * 60 * 1000 },
+        );
+    }, []);
+
+    // On mount: match TIME of day right away (no permission needed); if location was granted before, pull real
+    // weather; otherwise offer the location prompt.
+    useEffect(() => {
+        const h = new Date().getHours();
+        const t = h < 5 ? "night" : h < 7 ? "sunrise" : h < 16 ? "clearday" : h < 18 ? "goldenhour" : h < 19 ? "sunset" : h < 21 ? "dusk" : "night";
+        setSky(`/images/sailing/sky-${t}.png`);
+        let pref = null;
+        try { pref = localStorage.getItem("wolfden-sail-geo"); } catch { /* ignore */ }
+        if (pref === "1") requestAmbiance(false);
+        else if (pref !== "no") setGeoPrompt(true);
+    }, [requestAmbiance]);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);
@@ -439,6 +470,21 @@ export default function SailingClient({ initial, hero, pet }) {
                         petFlip={Boolean(pet?.flip)}
                         onClose={() => setCalOpen(false)}
                     />
+                ) : null}
+
+                {/* Real-world ambiance opt-in: match the sky/weather/time to where the player actually is. */}
+                {geoPrompt ? (
+                    <div className="sail-geo-prompt">
+                        <span className="sail-geo-ico" aria-hidden="true">🌤️</span>
+                        <div className="sail-geo-body">
+                            <b>Sail in your real weather</b>
+                            <span>Turn on location and the sea matches your world — sunrise, sunset, night, storms & all.</span>
+                        </div>
+                        <div className="sail-geo-actions">
+                            <button type="button" className="sail-geo-yes" onClick={() => requestAmbiance(true)}>Enable</button>
+                            <button type="button" className="sail-geo-no" onClick={() => { setGeoPrompt(false); try { localStorage.setItem("wolfden-sail-geo", "no"); } catch { /* ignore */ } }}>Not now</button>
+                        </div>
+                    </div>
                 ) : null}
 
                 {liveStatus === "digging" && dig ? (
