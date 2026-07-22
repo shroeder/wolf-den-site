@@ -34,11 +34,47 @@ export default function RewardNudge() {
         };
         load();
         const onXp = () => load();
+        const onRefresh = () => load();
+        // Refresh when the tab regains focus (covers actions taken on another tab / after being away).
+        const onFocus = () => { if (document.visibilityState !== "hidden") load(); };
         window.addEventListener("wolfden-xp-updated", onXp);
+        window.addEventListener("wolfden-hud-refresh", onRefresh);
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onFocus);
+
+        // CENTRAL catch-all: any successful mutating (non-GET) call to a marketplace API means gold / XP /
+        // badges may have changed — so refresh the HUD (and tell the nav) without every component having to
+        // remember to. Debounced so a burst of actions triggers one reload. GETs are ignored (so the reload's
+        // own next-unlock fetch can't loop).
+        let refreshTimer = null;
+        const scheduleRefresh = () => {
+            if (refreshTimer) return;
+            // Dispatch the event; our own onRefresh listener (and the nav's) reload from there — single path.
+            refreshTimer = setTimeout(() => { refreshTimer = null; if (alive) window.dispatchEvent(new Event("wolfden-hud-refresh")); }, 350);
+        };
+        const origFetch = window.fetch;
+        const patchedFetch = function (input, init) {
+            const p = origFetch.apply(this, arguments);
+            try {
+                const url = typeof input === "string" ? input : (input && input.url) || "";
+                const method = ((init && init.method) || (input && input.method) || "GET").toUpperCase();
+                if (method !== "GET" && /\/api\/marketplace\//.test(url)) {
+                    p.then((res) => { if (res && res.ok) scheduleRefresh(); }).catch(() => {});
+                }
+            } catch { /* never let the interceptor break a fetch */ }
+            return p;
+        };
+        window.fetch = patchedFetch;
+
         return () => {
             alive = false;
             if (toastTimer) clearTimeout(toastTimer);
+            if (refreshTimer) clearTimeout(refreshTimer);
+            if (window.fetch === patchedFetch) window.fetch = origFetch; // restore only if still ours
             window.removeEventListener("wolfden-xp-updated", onXp);
+            window.removeEventListener("wolfden-hud-refresh", onRefresh);
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onFocus);
         };
     }, []);
 

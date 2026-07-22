@@ -39,14 +39,20 @@ export default function GameNav({ owner = false }) {
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
-        fetch("/api/marketplace/chests", { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => {
-                if (!alive) return;
-                setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
-            })
-            .catch(() => {});
-        return () => { alive = false; };
+        const loadChests = () => {
+            fetch("/api/marketplace/chests", { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => {
+                    if (!alive) return;
+                    setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
+                })
+                .catch(() => {});
+        };
+        loadChests();
+        // Live-update the chest badge after any action (opening a chest, earning one) — not just on nav.
+        const onRefresh = () => loadChests();
+        window.addEventListener("wolfden-hud-refresh", onRefresh);
+        return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
 
     if (!inGame) return null;
