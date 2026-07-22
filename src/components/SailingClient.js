@@ -141,6 +141,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const [forge, setForge] = useState(null); // the chest just forged from fragments
     const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
+    const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
@@ -408,6 +409,24 @@ export default function SailingClient({ initial, hero, pet }) {
                 </div>
             </section>
 
+            {/* Your fragment hold — sits right under the animation window: count + forge. */}
+            <section className="card sail-hold">
+                <div className="sail-hold-head">
+                    <FragmentIcon size={32} className="sail-hold-icon" />
+                    <div className="sail-hold-body">
+                        <div className="sail-hold-count">{state.fragments} treasure-chest fragment{state.fragments === 1 ? "" : "s"}</div>
+                        <div className="muted sail-hold-sub">Dig them up on the island. Every {state.fragmentsPerChest || 10} forms a treasure chest.</div>
+                    </div>
+                </div>
+                <div className="sail-hold-bar"><span style={{ width: `${Math.round(((state.fragments % (state.fragmentsPerChest || 10)) / (state.fragmentsPerChest || 10)) * 100)}%` }} /></div>
+                <div className="muted sail-hold-note">{state.fragments % (state.fragmentsPerChest || 10)}/{state.fragmentsPerChest || 10} toward your next chest</div>
+                {state.fragments >= (state.fragmentsPerChest || 10) ? (
+                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest")}>
+                        🔨 Forge {state.chestReward?.emoji || "🎁"} {state.chestReward?.label || "a chest"} — {state.fragmentsPerChest || 10} fragments
+                    </button>
+                ) : null}
+            </section>
+
             {/* Boat upgrades — 4 travel/loot levers. Buying any of them levels the boat; every 10 levels = new form. */}
             <section className="card">
                 <h2 style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
@@ -434,7 +453,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Every 10 levels your boat takes a new form and unlocks a permanent perk. You&apos;re <b>Lv {level}</b> · Form <b>{state.tier}/{state.boatTiers}</b>.</p>
                 <div className="sail-forms-list">
                     {(state.forms || []).map((f) => (
-                        <div className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level}>
+                        <button type="button" className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level} onClick={() => setInspectForm(f)}>
                             <span className="sail-form-art">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={f.art} alt="" className={f.unlocked ? "" : "is-locked"} />
@@ -444,27 +463,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                 <div className="sail-form-name">{f.name} <span className="muted">· Lv {f.level}</span>{f.current ? <span className="sail-form-cur">current</span> : null}</div>
                                 <div className="muted sail-form-perk">{f.perk}</div>
                             </div>
-                        </div>
+                            <span className="sail-form-chev" aria-hidden="true">›</span>
+                        </button>
                     ))}
                 </div>
-            </section>
-
-            {/* Your fragment hold — a clear home for the fragments you dig up. */}
-            <section className="card sail-hold">
-                <div className="sail-hold-head">
-                    <FragmentIcon size={32} className="sail-hold-icon" />
-                    <div className="sail-hold-body">
-                        <div className="sail-hold-count">{state.fragments} treasure-chest fragment{state.fragments === 1 ? "" : "s"}</div>
-                        <div className="muted sail-hold-sub">Dig them up on the island. Every 10 forms a treasure chest.</div>
-                    </div>
-                </div>
-                <div className="sail-hold-bar"><span style={{ width: `${Math.round(((state.fragments % (state.fragmentsPerChest || 10)) / (state.fragmentsPerChest || 10)) * 100)}%` }} /></div>
-                <div className="muted sail-hold-note">{state.fragments % (state.fragmentsPerChest || 10)}/{state.fragmentsPerChest || 10} toward your next chest</div>
-                {state.fragments >= (state.fragmentsPerChest || 10) ? (
-                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest")}>
-                        🔨 Forge {state.chestReward?.emoji || "🎁"} {state.chestReward?.label || "a chest"} — {state.fragmentsPerChest || 10} fragments
-                    </button>
-                ) : null}
             </section>
 
             {/* Win / fail RECAP — you confirm before it returns you to port. */}
@@ -520,6 +522,25 @@ export default function SailingClient({ initial, hero, pet }) {
                         <p className="muted" style={{ marginTop: 0 }}>Form {formUnlock.tier} of {state.boatTiers} — reached at Lv {formUnlock.level}.</p>
                         <div className="sail-form-perkbig">🎁 Perk unlocked: {formUnlock.perk}</div>
                         <button className="sail-cta" onClick={() => setFormUnlock(null)}>Set sail ⛵</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Inspect any boat form — locked or not — to see its hull + perk up close. */}
+            {inspectForm ? (
+                <div className="sail-reward-overlay" onClick={() => setInspectForm(null)}>
+                    <div className="card sail-recap sail-inspect" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="sail-inspect-x" onClick={() => setInspectForm(null)} aria-label="Close">×</button>
+                        <div className="sail-inspect-art">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={inspectForm.art} alt={inspectForm.name} className={inspectForm.unlocked ? "" : "is-locked"} />
+                            {inspectForm.unlocked ? null : <span className="sail-inspect-lock">🔒</span>}
+                        </div>
+                        <h2 style={{ margin: "6px 0 2px" }}>{inspectForm.name}</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>Form {inspectForm.tier} of {state.boatTiers} · unlocks at <b>Lv {inspectForm.level}</b></p>
+                        <div className="sail-form-perkbig">🎁 {inspectForm.perk}</div>
+                        <div className={`sail-inspect-status${inspectForm.unlocked ? " is-on" : ""}`}>{inspectForm.unlocked ? "✅ Unlocked" : `🔒 Reach Lv ${inspectForm.level} to unlock`}</div>
+                        <button className="sail-cta" onClick={() => setInspectForm(null)}>Close</button>
                     </div>
                 </div>
             ) : null}

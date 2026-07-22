@@ -112,13 +112,10 @@ const localBusinessSchema = {
     ],
     knowsAbout: ["Pokemon cards", "Magic: The Gathering", "trading card singles", "sealed product", "Commander", "local play"],
     openingHoursSpecification: [
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Monday", opens: "12:00", closes: "18:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Tuesday", opens: "12:00", closes: "18:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Wednesday", opens: "12:00", closes: "18:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "12:00", closes: "19:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "12:00", closes: "19:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "12:00", closes: "18:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "12:00", closes: "18:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "15:00", closes: "21:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "15:00", closes: "21:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "10:00", closes: "21:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "10:00", closes: "15:00" },
     ],
     sameAs: [
         "https://discord.gg/Pad8U2KVsD",

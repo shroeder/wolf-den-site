@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
 
 // Temporary new-hours announcement. The banner auto-hides once this moment
 // passes. Montgomery, MN is Central Time (CDT, -05:00 in summer). Put up
-// July 10, 2026 for one week — expires at the end of Friday, July 17, 2026.
-const EXPIRES_AT = new Date("2026-07-18T00:00:00-05:00").getTime();
+// July 21, 2026 — expires at the end of Sunday, August 10, 2026.
+const EXPIRES_AT = new Date("2026-08-11T00:00:00-05:00").getTime();
 
 // No external source to subscribe to — we only need a server/client-aware read
 // of the current time so the banner can disappear after it expires.
@@ -23,8 +23,8 @@ export default function AnnouncementBanner() {
     return (
         <div className="opening-banner" role="region" aria-label="Store announcement">
             <p className="opening-banner-text">
-                <strong>New hours:</strong> We&apos;re now open <strong>7 days a week</strong> &mdash; daily
-                <strong> 12&ndash;6 PM</strong>, with <strong>Thursday &amp; Friday until 7 PM</strong>.
+                <strong>New hours!</strong> Open <strong>Thursday&ndash;Sunday</strong> &mdash;
+                Thu &amp; Fri <strong>3&ndash;9 PM</strong> · Sat <strong>10 AM&ndash;9 PM</strong> · Sun <strong>10 AM&ndash;3 PM</strong>.
             </p>
         </div>
     );
