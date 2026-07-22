@@ -12,10 +12,11 @@ const CHEST_FROM_FRAGMENTS = "iron";
 // trying to unearth a treasure-chest FRAGMENT before you run out. Win or fail, you return to port and can set
 // sail again. Speed shortens the voyage; Luck adds dig stamina. Owner-gated while in development.
 
-// PROTOTYPE: a short voyage so the whole loop is testable in seconds. Bump toward hours before any real release.
-export const BASE_VOYAGE_MS = 20 * 1000;
-const SPEED_STEP = 0.90;
-const MIN_VOYAGE_MS = 5 * 1000;
+// Real base voyage = 4 hours. (Lower this one const for quick testing — e.g. 60*1000 for 1-min trips.)
+export const BASE_VOYAGE_MS = 4 * 60 * 60 * 1000;
+const SPEED_OFF_MS_PER_LEVEL = 2 * 60 * 1000; // Speed shaves a FLAT 2 minutes off each voyage, per level
+const SPEED_MIN_PER_LEVEL = 2;                 // ^ shown on the card
+const MIN_VOYAGE_MS = 30 * 60 * 1000;          // a voyage never dips below 30 minutes
 // Four boat upgrade tracks — all travel/loot, NO dig count (that's a separate future system). Each maxes at 20
 // → 80 upgrade levels → the boat changes FORM every 10 levels across BOAT_TIERS (8) distinct arts, and each
 // form unlocks a permanent perk (see MILESTONES). Fortune lives in the legacy luck_level column; Luck (early-
@@ -38,7 +39,6 @@ const DIG_MAX_DEPTH = 3;      // layers of dirt over every tile — you chip str
 const BASE_STAMINA = 12;      // digs per voyage (flat; extend mid-dig with "buy more digs")
 const FRAGMENTS_BURIED = 3;   // base fragments scattered through the dirt; Fortune adds +1 buried per level
 const MAX_BURIED = 12;        // cap on buried fragments (of a 16-tile board)
-const SPEED_PCT_PER_LEVEL = 10; // Speed shaves this % off each voyage per level (SPEED_STEP = 0.90)
 const RARITY_UPGRADE_PER_LEVEL = 0.045; // Rarity: chance/level that a forged chest is bumped up a tier
 const LUCK_PER_SHALLOW = 7;   // Luck: every this many levels, fragments sit one dirt-layer shallower
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
@@ -96,15 +96,15 @@ function boatPerks(level) {
 }
 // The 8 boat forms for the UI: each milestone with its unlock level, perk, and unlocked/current state.
 function boatFormsView(level) {
-    const tier = boatTier(level);
     return MILESTONES.map((m) => ({
         level: m.level, tier: m.tier, name: m.name, perk: m.perk,
+        art: BOAT_ART[m.tier] || BOAT_ART[1],
         unlocked: level >= m.level,
         current: level >= m.level && (m.level === 80 || level < m.level + LEVELS_PER_FORM), // the freshest unlocked form
     }));
 }
 function rawVoyageMs(speedLevel = 0) {
-    return Math.max(MIN_VOYAGE_MS, Math.round(BASE_VOYAGE_MS * Math.pow(SPEED_STEP, Math.max(0, speedLevel))));
+    return Math.max(MIN_VOYAGE_MS, BASE_VOYAGE_MS - Math.max(0, speedLevel) * SPEED_OFF_MS_PER_LEVEL);
 }
 // Voyage time including the boat's speed-perk milestones.
 export function voyageDurationMs(speedLevel = 0, level = 1) {
@@ -219,7 +219,7 @@ function decorate(row) {
         // The boat's FOUR travel/loot levers — all boat-exclusive. Each carries its per-level effect + current/next value.
         speed: {
             level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL,
-            pctPerLevel: SPEED_PCT_PER_LEVEL, voyageNow: voyageDurationMs(speedLevel, level), voyageNext: voyageDurationMs(speedLevel + 1, level),
+            minPerLevel: SPEED_MIN_PER_LEVEL, voyageNow: voyageDurationMs(speedLevel, level), voyageNext: voyageDurationMs(speedLevel + 1, level),
         },
         fortune: {
             level: fortuneLevel, max: MAX_FORTUNE_LEVEL, cost: upgradeCost(fortuneLevel), maxed: fortuneLevel >= MAX_FORTUNE_LEVEL,
@@ -254,11 +254,24 @@ async function readRow(buyerId) {
 }
 
 export async function getSailingState(buyerId) {
-    const [row, goldRow] = await Promise.all([
+    const [row, goldRow, others] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // Other members' boats to sail past in the background (by their form). Empty while owner-gated.
+        db.query(
+            `SELECT b.alias, s.speed_level, s.luck_level, s.rarity_level, s.find_level
+               FROM mkt_sailing s JOIN mkt_buyer b ON b.id = s.buyer_id
+              WHERE s.buyer_id <> $1 AND b.alias IS NOT NULL LIMIT 6`,
+            [buyerId]
+        ).catch(() => []),
     ]);
-    return { ...decorate(row), gold: goldRow?.gold || 0 };
+    const fleet = (others || []).map((o) => ({
+        art: boatArt(boatLevelFromUpgrades(o.speed_level || 0, o.luck_level || 0, o.rarity_level || 0, o.find_level || 0)),
+        name: o.alias,
+    }));
+    // Pad with a few generic hulls so the horizon is never empty (decorative until multiplayer sailing opens).
+    for (const t of [2, 4, 6, 8, 1]) if (fleet.length < 6) fleet.push({ art: BOAT_ART[t] || BOAT_ART[1], name: null });
+    return { ...decorate(row), gold: goldRow?.gold || 0, fleet };
 }
 
 export async function startVoyage(buyerId) {

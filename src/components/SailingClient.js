@@ -144,12 +144,34 @@ export default function SailingClient({ initial, hero, pet }) {
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
+    const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);
     const arrivedRef = useRef(false);
     const chunkId = useRef(0);
+    const ambientId = useRef(0);
+
+    // Every so often, send another sailor's boat drifting across the horizon behind yours.
+    useEffect(() => {
+        let alive = true;
+        let timer;
+        const spawn = () => {
+            if (!alive) return;
+            const fleet = stateRef.current?.fleet || [];
+            if (fleet.length) {
+                const pick = fleet[Math.floor(Math.random() * fleet.length)];
+                const id = (ambientId.current += 1);
+                const dur = 12 + Math.random() * 7;
+                setAmbient((a) => [...a, { id, art: pick.art, name: pick.name, flip: Math.random() < 0.5, top: 6 + Math.random() * 32, dur }]);
+                setTimeout(() => setAmbient((a) => a.filter((x) => x.id !== id)), dur * 1000 + 300);
+            }
+            timer = setTimeout(spawn, (13 + Math.random() * 11) * 1000);
+        };
+        timer = setTimeout(spawn, 2500);
+        return () => { alive = false; clearTimeout(timer); };
+    }, []);
 
     // Clock + arrival detection: when the voyage timer crosses arrival, fire the chime + Land-ho celebration.
     useEffect(() => {
@@ -227,7 +249,7 @@ export default function SailingClient({ initial, hero, pet }) {
     // The four travel/loot upgrade levers, described with their per-level effect + current → next value.
     const upgrades = [
         { action: "upgrade_speed", icon: "💨", name: "Speed", data: state.speed,
-            desc: <>Faster voyages — cuts travel time <b>{state.speed.pctPerLevel}%</b> each level.</>,
+            desc: <>Faster voyages — shaves <b>{state.speed.minPerLevel} min</b> off each trip, per level.</>,
             effLabel: "Trip time", now: fmtLeft(state.speed.voyageNow), next: fmtLeft(state.speed.voyageNext) },
         { action: "upgrade_fortune", icon: "🍀", name: "Fortune", data: state.fortune,
             desc: <>Richer islands — <b>+1</b> fragment buried to dig up each trip, per level.</>,
@@ -295,6 +317,16 @@ export default function SailingClient({ initial, hero, pet }) {
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
                     <>
                         <div className="sail-sea" style={{ backgroundImage: `url(${state.oceanBg})` }}>
+                            {/* Other sailors drifting across the horizon behind your boat. */}
+                            <div className="sail-ambient" aria-hidden="true">
+                                {ambient.map((b) => (
+                                    <span key={b.id} className={`sail-ambient-boat${b.flip ? " is-flip" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={b.art} alt="" />
+                                        {b.name ? <span className="sail-ambient-name">{b.name}</span> : null}
+                                    </span>
+                                ))}
+                            </div>
                             <div className="sail-boat">
                                 <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${celebrate === "gust" ? " is-gusting" : ""}`}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -403,7 +435,11 @@ export default function SailingClient({ initial, hero, pet }) {
                 <div className="sail-forms-list">
                     {(state.forms || []).map((f) => (
                         <div className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level}>
-                            <span className="sail-form-badge">{f.unlocked ? "⚓" : "🔒"}</span>
+                            <span className="sail-form-art">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={f.art} alt="" className={f.unlocked ? "" : "is-locked"} />
+                                {f.unlocked ? null : <span className="sail-form-lock">🔒</span>}
+                            </span>
                             <div className="sail-form-body">
                                 <div className="sail-form-name">{f.name} <span className="muted">· Lv {f.level}</span>{f.current ? <span className="sail-form-cur">current</span> : null}</div>
                                 <div className="muted sail-form-perk">{f.perk}</div>
