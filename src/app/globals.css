@@ -10557,9 +10557,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .coin-hud-amt { font-size: 0.92rem; font-weight: 900; letter-spacing: 0.01em; }
 .coin-hud-plus { display: inline-grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; font-size: 1.05rem; font-weight: 900; line-height: 1;
     color: #fff; background: linear-gradient(135deg, #ff8a44, #e8431f);
-    box-shadow: 0 1px 4px rgba(230,60,20,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
+    box-shadow: 0 1px 4px rgba(230,60,20,0.6), inset 0 1px 0 rgba(255,255,255,0.45); animation: coinPlusPulse 2.4s ease-in-out infinite; }
+/* The "+" gently pulses to invite a top-up. */
+@keyframes coinPlusPulse { 0%, 100% { transform: scale(1); box-shadow: 0 1px 4px rgba(230,60,20,0.6), inset 0 1px 0 rgba(255,255,255,0.45); } 50% { transform: scale(1.12); box-shadow: 0 0 10px rgba(255,120,40,0.85), inset 0 1px 0 rgba(255,255,255,0.45); } }
 .coin-hud:active { transform: scale(0.97); }
-@media (prefers-reduced-motion: reduce) { .coin-hud::after, .coin-hud-icon { animation: none; } }
+/* Low balance → the whole chip breathes an amber glow to nudge a top-up. */
+.coin-hud.is-low { animation: coinLowGlow 1.6s ease-in-out infinite; }
+@keyframes coinLowGlow { 0%, 100% { box-shadow: 0 2px 9px rgba(240,160,40,0.5), inset 0 1px 0 rgba(255,255,255,0.65); } 50% { box-shadow: 0 0 16px 2px rgba(255,150,40,0.95), inset 0 1px 0 rgba(255,255,255,0.65); } }
+.coin-hud.is-low .coin-hud-plus { animation-duration: 1.1s; }
+@media (prefers-reduced-motion: reduce) { .coin-hud::after, .coin-hud-icon, .coin-hud-plus, .coin-hud.is-low { animation: none; } }
 .boss2-sub { font-size: 0.78rem; text-align: center; margin: 2px 0 8px; }
 
 /* Active-heroes mini cards: dressed in each member's signature color + their equipped profile background,

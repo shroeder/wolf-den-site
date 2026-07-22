@@ -87,7 +87,7 @@ export default function RewardNudge() {
             <div className="hud-strip">
                 {/* Coins — the enticing currency chip (shimmering gold), tap the + to buy more store credit. */}
                 {typeof data.gold === "number" ? (
-                    <Link href="/marketplace/credit" className="coin-hud" aria-label={`${data.gold} coins — tap to get more`}>
+                    <Link href="/marketplace/credit" className={`coin-hud${data.gold < 300 ? " is-low" : ""}`} aria-label={`${data.gold} coins — tap to get more`}>
                         <span className="coin-hud-icon" aria-hidden="true">🪙</span>
                         <span className="coin-hud-amt">{data.gold.toLocaleString()}</span>
                         <span className="coin-hud-plus" aria-hidden="true">+</span>
