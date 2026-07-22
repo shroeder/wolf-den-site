@@ -10879,16 +10879,18 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes sailCastOff { 0% { transform: rotate(0) translateX(0); } 20% { transform: rotate(7deg) translateX(-7px); } 52% { transform: rotate(-5deg) translateX(12px); } 78% { transform: rotate(2deg) translateX(-3px); } 100% { transform: rotate(0) translateX(0); } }
 @keyframes sailHelmSpin { to { transform: rotate(360deg); } }
 
-/* Tailwind gust: hull rocks back as the sails catch, surges forward, then GLIDES smoothly home (no snap). */
+/* Tailwind gust: hull rocks back as the sails catch, surges forward, then GLIDES smoothly home (no snap).
+   Starts and ends at the cruise-rock resting angle (-2.4deg) so the hand-off to/from `sailCruiseRock` — which
+   shares this element while sailing — is seamless in both directions, with no jump when the classes trade. */
 .sail-boat-inner.is-gusting { animation: sailGust 3s ease-in-out both; }
 @keyframes sailGust {
-    0% { transform: rotate(0) translateX(0); }
+    0% { transform: rotate(-2.4deg) translateX(0); }
     10% { transform: rotate(9deg) translateX(-14px); }   /* rock back — wind slams the sails */
     30% { transform: rotate(-8deg) translateX(46px); }   /* surge forward */
     48% { transform: rotate(-5deg) translateX(34px); }
     66% { transform: rotate(-3deg) translateX(22px); }
     83% { transform: rotate(-1deg) translateX(10px); }
-    100% { transform: rotate(0) translateX(0); }          /* glide the last bit home, evenly */
+    100% { transform: rotate(-2.4deg) translateX(0); }    /* glide home, matching the cruise-rock rest angle */
 }
 
 /* Wind FX overlay: a quick screen flash + leaves/debris streaming across the scene. */

@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
+// passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
+const GUST_MS = 3000;
+
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
 // fail, you land back at port and can set sail again. Server is authoritative for digs + the fragment reward.
@@ -156,6 +160,8 @@ export default function SailingClient({ initial, hero, pet }) {
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
+    const [gusting, setGusting] = useState(false);     // the tailwind gust is currently playing
+    const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
@@ -170,6 +176,7 @@ export default function SailingClient({ initial, hero, pet }) {
     const ambientId = useRef(0);
     const fleetIdx = useRef(0);        // round-robin cursor so consecutive ships are DIFFERENT members
     const boostRef = useRef(0);        // Date.now() until which traffic is sped up (after a tailwind)
+    const gustTimer = useRef(null);    // safety timer that clears `gusting` if the animationend event is missed
 
     // Every so often, send another sailor's boat drifting across the horizon behind yours.
     useEffect(() => {
@@ -190,7 +197,8 @@ export default function SailingClient({ initial, hero, pet }) {
                 // them — so they drift right→left but stay facing right. Docked, they just pass by either way.
                 const dir = sailingNow ? "left" : (Math.random() < 0.5 ? "left" : "right");
                 // Slow crawl while sailing (distant ships shouldn't whip by); a tailwind briefly speeds them up.
-                const dur = boosting ? 7 + Math.random() * 3 : sailingNow ? 20 + Math.random() * 9 : 15 + Math.random() * 8;
+                // Boosting ships whip across within the gust window so the speed-up ends with the animation, not after.
+                const dur = boosting ? 2.8 + Math.random() * 1.4 : sailingNow ? 20 + Math.random() * 9 : 15 + Math.random() * 8;
                 setAmbient((a) => [...a, {
                     id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
                     dir, faceLeft: dir === "left" && !sailingNow, top: 34 + Math.random() * 10, dur,
@@ -230,6 +238,17 @@ export default function SailingClient({ initial, hero, pet }) {
         else progress = Math.max(0, Math.min(0.999, 1 - (arrivesAt - now) / state.voyageTotalMs));
     }
 
+    // Kick off the tailwind gust. Restart-safe: if a gust is already playing (you caught another one), drop the
+    // class for one paint then re-add it so the CSS animation replays from 0 instead of no-op'ing on the class it
+    // already has. Cleanup is driven by the boat's `onAnimationEnd`; the timer here is only a missed-event backstop.
+    const triggerGust = useCallback(() => {
+        if (gustTimer.current) clearTimeout(gustTimer.current);
+        setGustNonce((n) => n + 1);
+        setGusting(false);
+        requestAnimationFrame(() => requestAnimationFrame(() => setGusting(true)));
+        gustTimer.current = setTimeout(() => setGusting(false), GUST_MS + 150);
+    }, []);
+
     const act = useCallback(async (action, extra = {}) => {
         setBusy(true);
         if (action === "start") {
@@ -239,9 +258,9 @@ export default function SailingClient({ initial, hero, pet }) {
         }
         if (action === "wind" || action === "recharge_wind") {
             sfx.gust();
-            setCelebrate("gust");
-            boostRef.current = Date.now() + 6500; // speed up the passing fleet so it feels like you surged ahead
-            setTimeout(() => setCelebrate((c) => (c === "gust" ? null : c)), 3000);
+            triggerGust();
+            // Speed the passing fleet up for exactly the gust so it feels like you surged ahead, then reverts.
+            boostRef.current = Date.now() + GUST_MS;
         }
         if (action === "dig" || action === "begin_dig") sfx.dig();
         const prevLevel = stateRef.current?.level || 0;
@@ -263,7 +282,7 @@ export default function SailingClient({ initial, hero, pet }) {
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
             }
         } finally { setBusy(false); }
-    }, []);
+    }, [triggerGust]);
 
     // Dig a tile: spray rock chunks from it instantly (feels tactile), then send the dig to the server.
     const digTile = useCallback((r, c) => {
@@ -415,7 +434,10 @@ export default function SailingClient({ initial, hero, pet }) {
                                 ))}
                             </div>
                             <div className={`sail-boat${liveStatus === "sailing" ? " is-underway" : ""}`}>
-                                <div className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${celebrate === "gust" ? " is-gusting" : ""}${liveStatus === "sailing" ? " is-sailing" : ""}`}>
+                                <div
+                                    className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${gusting ? " is-gusting" : ""}${liveStatus === "sailing" ? " is-sailing" : ""}`}
+                                    onAnimationEnd={(e) => { if (e.animationName === "sailGust") setGusting(false); }}
+                                >
                                     {liveStatus === "sailing" ? (
                                         <>
                                             <span className="sail-wind" aria-hidden="true"><i /><i /><i /></span>
@@ -456,7 +478,7 @@ export default function SailingClient({ initial, hero, pet }) {
 
                             {celebrate === "arrive" ? (<><div className="sail-landho">🏝️ LAND HO!</div><Confetti /></>) : null}
                             {celebrate === "depart" ? (<><div className="sail-bonvoyage">⚓ BON VOYAGE!</div><Confetti /></>) : null}
-                            {celebrate === "gust" ? <WindGust /> : null}
+                            {gusting ? <WindGust key={gustNonce} /> : null}
                         </div>
                         {/* Voyage progress — only while actually at sea; a little boat creeping from port (⚓) to the island (🏝️). */}
                         {liveStatus === "sailing" && (
