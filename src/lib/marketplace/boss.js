@@ -61,9 +61,19 @@ const BOSS_TARGET_DAYS = 10;
 // A little headroom so the next boss isn't undersized by the pack leveling/growing between fights.
 const BOSS_PACK_GROWTH = 1.1;
 
-const autoPerHour = (level, stats = {}) => Math.round((250 + level * 50) * (1 + (stats.ferocity || 0) / 100));
+// Passive per-member hourly auto-damage. Now uses the FULL offensive kit (like the manual strike): Might +
+// Ferocity both add power, and crit gives an expected-value uplift — so ALL combat gear matters for the ~90%
+// of a fight that's passive, not just Ferocity. Boss HP is sized off this SAME formula (projectBossHp), so as
+// the pack gears up the next boss auto-scales to hold the target kill pace.
+function autoPerHour(level, stats = {}) {
+    const base = 250 + level * 50;
+    const power = 1 + ((stats.might || 0) + (stats.ferocity || 0)) / 100;
+    const critProb = Math.min(0.6, 0.03 + (stats.crit_chance || 0) / 100); // passives crit occasionally
+    const critEV = 1 + critProb * ((2.5 + (stats.crit_power || 0) / 100) - 1);
+    return Math.round(base * power * critEV);
+}
 
-// Expected damage a single member deals PER DAY: passive auto-attacks 24/7 (gear Ferocity boosts these)
+// Expected damage a single member deals PER DAY: passive auto-attacks 24/7 (all gear stats boost these now)
 // plus one daily manual strike (average roll × the 25%/×2.5 crit expectation = ×1.375). manualMult inflates
 // the MANUAL portion by the member's gear + pet power so boss HP is sized off the pack's FULL power.
 function memberDailyDamage(level, manualMult = 1, gearStats = {}) {
