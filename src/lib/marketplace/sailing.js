@@ -14,6 +14,7 @@ import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -834,6 +835,7 @@ export async function startVoyage(buyerId, optionId = "standard") {
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
+    await trackActivity(buyerId, "sail_voyage", { option: opt.id, hours: Math.round(ms / 3600000) }).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
@@ -1021,6 +1023,7 @@ export async function doRaid(buyerId, targetId = null) {
                 raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
           WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {}); // "Raid a passing ship" daily quest
+    await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta }).catch(() => {});
 
     let goldDelta = 0, itemWon = null;
     if (sim.win) {
@@ -1120,6 +1123,7 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     if (!won) return { ok: false, error: "already_played", ...(await getSailingState(buyerId)) };
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, gold]).catch(() => {});
     if (perfect) await grantEventBadge(buyerId, "merchant_perfect").catch(() => {}); // "Coin Virtuoso"
+    await trackActivity(buyerId, "sail_merchant", { gold, perfect }).catch(() => {});
     return { ok: true, goldWon: gold, perfect, ...(await getSailingState(buyerId)) };
 }
 
@@ -1231,6 +1235,7 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
         if (i >= 0 && i < CHEST_ORDER.length - 1) tierKey = CHEST_ORDER[i + 1];
     }
     await addChests(buyerId, { [tierKey]: 1 }).catch(() => {});
+    await trackActivity(buyerId, "sail_forge", { tier: tierKey, upgraded: tierKey !== fragmentTier }).catch(() => {});
     // Chest-points (tier-weighted 1–4) drive the dig-tool unlocks + their invest tiers.
     await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});
     // Achievement badges (hard): forge count + forging a gold-or-better chest.
@@ -1372,6 +1377,7 @@ async function finishDig(buyerId, board) {
     if ((row?.voyages_completed || 0) + 1 >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
+    await trackActivity(buyerId, "sail_dig", { frags: fragCount, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
     const state = await getSailingState(buyerId);
     // byTier decorated with art/label so the recap can show what kind of shards you hauled up.
     const haul = Object.entries(byTier).map(([tier, n]) => {

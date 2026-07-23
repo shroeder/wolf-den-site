@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { recordGift } from "@/lib/marketplace/gifts.js";
 import { broadcastWebPush, sendWebPush } from "@/lib/push/web-push.js";
 
 // Admin lever: RESET a member's (or everyone's) daily usage so a capped action is available again, or GRANT a
@@ -43,13 +44,25 @@ function pushFor(key, action, n = 0) {
     }
 }
 
-// Send the browser push for an awarded reset/grant. buyerId null = broadcast to every subscribed member.
-async function notifyPush(key, action, buyerId, n) {
+// Tell awarded players about a reset/grant TWO ways: an in-app gift modal (GiftWatcher — works with no VAPID)
+// AND a browser push. buyerId null = the whole server.
+async function announceAward(key, action, buyerId, n) {
     const c = pushFor(key, action, n);
     if (!c) return;
-    const payload = { ...c, tag: `award-${key}`, data: { type: "award", key } };
-    if (buyerId) await sendWebPush(buyerId, payload).catch(() => {});
-    else await broadcastWebPush(payload).catch(() => {});
+    const icon = RESET_CATALOG.find((x) => x.key === key)?.icon || "🎁";
+    const push = { ...c, tag: `award-${key}`, data: { type: "award", key } };
+    if (buyerId) {
+        await recordGift(buyerId, { kind: `award_${key}`, title: c.title, body: c.body, icon, url: c.url }).catch(() => {});
+        await sendWebPush(buyerId, push).catch(() => {});
+    } else {
+        // Whole server: one bulk gift-modal insert + a single broadcast push.
+        await db.query(
+            `INSERT INTO mkt_pending_gift (buyer_id, kind, title, body, icon, url)
+             SELECT id, $1, $2, $3, $4, $5 FROM mkt_buyer WHERE alias IS NOT NULL`,
+            [`award_${key}`, String(c.title).slice(0, 120), String(c.body).slice(0, 240), icon, c.url],
+        ).catch(() => {});
+        await broadcastWebPush(push).catch(() => {});
+    }
 }
 
 // Clear today's usage so the capped/daily action is available again. buyerId null = everyone.
@@ -68,7 +81,7 @@ export async function resetSystem(key, buyerId = null, notify = false) {
         case "gear_cooldowns": await db.query(`UPDATE mkt_user_item SET last_charge_at = NULL${one ? " WHERE buyer_id = $1" : ""}`, p); break;
         default: return { ok: false, error: "bad_key" };
     }
-    if (notify) await notifyPush(key, "reset", buyerId, 0);
+    if (notify) await announceAward(key, "reset", buyerId, 0);
     return { ok: true, scope: one ? "member" : "everyone", notified: Boolean(notify) };
 }
 
@@ -89,6 +102,6 @@ export async function grantUses(key, n = 1, buyerId = null, notify = false) {
             break;
         default: return { ok: false, error: "bad_key" };
     }
-    if (notify) await notifyPush(key, "grant", buyerId, amt);
+    if (notify) await announceAward(key, "grant", buyerId, amt);
     return { ok: true, amount: amt, scope: one ? "member" : "everyone", notified: Boolean(notify) };
 }
