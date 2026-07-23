@@ -76,6 +76,10 @@ const fieldBackground = (tod, condition) => {
     const g = grassStops(tod);
     return `linear-gradient(180deg, ${s[0]} 0%, ${s[1]} 36%, ${s[2]} 50%, ${g[0]} 60%, ${g[1]} 100%)`;
 };
+// Illustrated farm backdrops per time of day (generated via /api/admin/farm-bg). Mirror-tiled behind the pets;
+// falls back to the CSS gradient scene above until these are filled in. Storm/overcast reuse the base image +
+// the weather overlays on top.
+const FARM_BG = { day: null, dusk: null, night: null, dawn: null };
 
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
@@ -262,6 +266,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
     const fieldW = Math.max(150, pets.length * 36);
+    // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
+    const bgUrl = FARM_BG[weather.tod] || FARM_BG.day || null;
+    const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
         <div className="stack reveal">
@@ -283,6 +290,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-idle { animation: farmBob 2.8s ease-in-out infinite; transform-origin: bottom center; }
                 .farm-shadow-hop { animation-name: farmShadow; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
                 .farm-scroll { scrollbar-width: thin; }
+                /* Illustrated backdrop tiled with the mirror trick: [A A' A A'] — every other copy flipped, so
+                   each junction's edges match and there's no seam even with non-tiling art (same as the sailing sky). */
+                .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; }
+                .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; }
+                .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
             `}</style>
 
             <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -317,18 +329,28 @@ export default function FarmClient({ initial, viewingAlias }) {
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Drifting clouds (daytime, non-stormy) — spread across the field so some are always in view */}
-                        {["clear", "cloudy"].includes(weather.condition) && weather.tod !== "night"
+                        {/* Illustrated backdrop, mirror-tiled to fill the scrollable width seamlessly */}
+                        {bgUrl ? (
+                            <div className="farm-bg-strip" aria-hidden="true">
+                                {Array.from({ length: bgCopies }).map((_, k) => (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img key={k} src={bgUrl} alt="" />
+                                ))}
+                            </div>
+                        ) : null}
+                        {/* CSS-scene fallback (drifting clouds + fence) — only when no illustrated backdrop is set */}
+                        {!bgUrl && ["clear", "cloudy"].includes(weather.condition) && weather.tod !== "night"
                             ? Array.from({ length: weather.condition === "cloudy" ? 7 : 4 }).map((_, k) => (
                                 <div key={k} style={{ position: "absolute", top: `${8 + (k % 3) * 9}%`, left: `${(k * 23 + 6) % 96}%`, width: 78 + (k % 3) * 26, height: 22 + (k % 2) * 8, borderRadius: 22, background: weather.condition === "cloudy" ? "rgba(230,232,235,0.9)" : "rgba(255,255,255,0.82)", filter: "blur(1px)", animation: `farmCloud ${9 + (k % 4) * 2}s ease-in-out ${k * 0.6}s infinite alternate` }} />
                             ))
                             : null}
-                        {/* Fence at the grass horizon — posts + two rails, repeats seamlessly the full width */}
-                        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
-                            <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
-                            <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
-                            <div style={{ position: "absolute", left: 0, right: 0, top: 26, height: 6, background: "#b07a45" }} />
-                        </div>
+                        {!bgUrl ? (
+                            <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
+                                <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
+                                <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
+                                <div style={{ position: "absolute", left: 0, right: 0, top: 26, height: 6, background: "#b07a45" }} />
+                            </div>
+                        ) : null}
 
                         {pets.length === 0 ? (
                             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
