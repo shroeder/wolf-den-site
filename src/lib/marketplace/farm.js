@@ -8,6 +8,9 @@ import { petLevelInfo, petMaxXp } from "@/lib/marketplace/pet-level.js";
 import { CONSUMABLES, listConsumables, useConsumable as applyConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { ITEMS } from "@/lib/marketplace/items.js";
+import { grantItem } from "@/lib/marketplace/inventory.js";
+import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 
 // The Farm: a member's owned pets roam a little pasture. On your OWN farm you can PET pets — a shared daily
 // budget of 3 (rechargeable for gold at a doubling cost). Each pet can still only be petted once/day, but the
@@ -20,6 +23,18 @@ const PET_PETS_PER_DAY = 3; // free daily pettings (total, across all pets)
 const PET_RECHARGE_AMOUNT = 3; // extra pettings granted per paid recharge
 const PET_RECHARGE_BASE = 200; // gold cost of the FIRST recharge; doubles each time (200 → 400 → 800 …)
 const rechargeCost = (n) => PET_RECHARGE_BASE * 2 ** n;
+// Wild Loot Pig
+const PIG_GOLD_MIN = 100, PIG_GOLD_MAX = 250;
+const PIG_ITEM_CHANCE = 0.2; // chance the pig drops an item at all
+const PIG_RARITY_WEIGHTS = { common: 65, rare: 28, epic: 7 }; // up to 3rd tier, weighted toward the low end
+const randInt = (n) => Math.floor(Math.random() * n);
+const weightedPick = (weights) => {
+    const entries = Object.entries(weights);
+    const total = entries.reduce((s, [, w]) => s + w, 0);
+    let r = Math.random() * total;
+    for (const [k, w] of entries) { r -= w; if (r < 0) return k; }
+    return entries[0][0];
+};
 const treatXp = (id) => {
     const e = CONSUMABLES[id]?.effect;
     return e?.type === "pet_level" ? "level" : e?.amount || 0;
@@ -56,7 +71,7 @@ async function pettingBudget(buyerId) {
 async function farmMineBits(buyerId) {
     const [cons, wallet, petting] = await Promise.all([
         listConsumables(buyerId).catch(() => ({ owned: [], shop: [] })),
-        db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc, (pig_day IS DISTINCT FROM ${DAY}) AS pig_available FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         pettingBudget(buyerId),
     ]);
     const treats = (cons.owned || [])
@@ -65,7 +80,28 @@ async function farmMineBits(buyerId) {
     const treatShop = (cons.shop || [])
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), price: o.effectivePrice ?? o.price, canAfford: o.canAfford }));
-    return { treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting };
+    return { treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting, pigAvailable: Boolean(wallet?.pig_available) };
+}
+
+// The Wild Loot Pig payout — once per store-local day, guarded atomically. Rolls gold + a rare item drop.
+export async function claimPig(buyerId) {
+    if (!buyerId) return { ok: false, error: "bad_request" };
+    const claim = await db.queryOne(`UPDATE mkt_buyer SET pig_day = ${DAY} WHERE id = $1 AND pig_day IS DISTINCT FROM ${DAY} RETURNING id`, [buyerId]).catch(() => null);
+    if (!claim) return { ok: false, error: "already_claimed" };
+    const gold = PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1);
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
+    await logCoin(buyerId, gold, "loot_pig", { balanceAfter: paid?.gold }).catch(() => {});
+    let item = null;
+    if (Math.random() < PIG_ITEM_CHANCE) {
+        const rarity = weightedPick(PIG_RARITY_WEIGHTS);
+        const pool = ITEMS.filter((it) => it.rarity === rarity);
+        const def = pool.length ? pool[randInt(pool.length)] : null;
+        if (def) {
+            const g = await grantItem(buyerId, def.id, "loot_pig").catch(() => null);
+            item = { id: def.id, name: def.name, rarity: def.rarity, slot: def.slot || null, image: await itemSpriteFor(def.id).catch(() => null), isNew: Boolean(g?.granted) };
+        }
+    }
+    return { ok: true, gold, goldAfter: paid?.gold ?? null, item };
 }
 
 // A member's farm state. viewerId === ownerId ⟺ it's your farm (petting enabled + per-pet "petted today" flags).
@@ -101,7 +137,7 @@ export async function getFarm(ownerId, viewerId) {
             };
         })
         .filter((p) => p.spriteUrl);
-    const extras = mine ? await farmMineBits(ownerId) : { treats: [], treatShop: [], wallet: null, petting: null };
+    const extras = mine ? await farmMineBits(ownerId) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null },
         mine,

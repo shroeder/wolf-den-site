@@ -96,6 +96,23 @@ export default function FarmClient({ initial, viewingAlias }) {
     const floatId = useRef(0);
     const [busy, setBusy] = useState(null);
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
+    const [pig, setPig] = useState(null); // "running" while the loot pig is on screen
+    const [pigToast, setPigToast] = useState(false);
+    const [pigResult, setPigResult] = useState(null); // the haul modal after he leaves
+
+    // Wild Loot Pig: once/day, at a random moment after you land on YOUR farm, a crowned pig may rampage
+    // through dropping gold. The payout is server-guarded once/day; this just decides the dramatic entrance.
+    useEffect(() => {
+        if (!initial.mine || !initial.pigAvailable) return undefined;
+        const t = setTimeout(() => {
+            if (Math.random() < 0.7) {
+                setPig("running");
+                setPigToast(true);
+                setTimeout(() => setPigToast(false), 4200);
+            }
+        }, 2500 + Math.random() * 5000);
+        return () => clearTimeout(t);
+    }, [initial.mine, initial.pigAvailable]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -201,6 +218,16 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) setFarm((f) => ({ ...f, treats: r.treats, treatShop: r.treatShop, wallet: r.wallet }));
     }, [busy, post]);
 
+    // The pig ran off screen → claim the haul (server-guarded once/day) and show the juiced modal.
+    const onPigFinish = useCallback(async () => {
+        setPig(null);
+        const r = await post({ action: "pig_claim" });
+        if (r?.ok) {
+            setPigResult(r);
+            setFarm((f) => ({ ...f, pigAvailable: false, wallet: f.wallet && r.goldAfter != null ? { ...f.wallet, gold: r.goldAfter } : f.wallet }));
+        }
+    }, [post]);
+
     // Feed a treat (consumable) to a specific pet.
     const feedTreat = useCallback(async (pet, consumableId) => {
         if (!farm.canPet || busy) return;
@@ -238,6 +265,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes farmSnow { to { transform: translateY(470px) translateX(18px); } }
                 @keyframes farmFog { from { transform: translateX(-5%) } to { transform: translateX(5%) } }
                 @keyframes farmFlash { 0%,90%,100% { opacity: 0 } 91% { opacity: .55 } 93% { opacity: 0 } 95% { opacity: .38 } 96% { opacity: 0 } }
+                @keyframes pigRun { 0% { left: -14%; } 100% { left: 114%; } }
+                @keyframes pigBob { 0%,100% { transform: translateY(0) rotate(-3deg); } 25% { transform: translateY(-16px) rotate(4deg); } 50% { transform: translateY(0) rotate(-3deg); } 75% { transform: translateY(-9px) rotate(3deg); } }
+                @keyframes crownBounce { 0%,100% { transform: translate(-50%, 0) rotate(-12deg); } 50% { transform: translate(-50%, -13px) rotate(12deg); } }
+                @keyframes coinPop { 0% { opacity: 0; transform: translate(-50%, -22px) scale(.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(360deg); } }
+                @keyframes pigPop { 0% { opacity: 0; transform: scale(.82); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
                 .farm-hop { animation-name: farmHop; animation-timing-function: ease-in-out; animation-iteration-count: infinite; transform-origin: bottom center; }
                 .farm-idle { animation: farmBob 2.8s ease-in-out infinite; transform-origin: bottom center; }
                 .farm-shadow-hop { animation-name: farmShadow; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
@@ -345,6 +377,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={weather.condition} />
+                {/* Wild Loot Pig rampage + announce toast */}
+                {pig === "running" ? <LootPig onFinish={onPigFinish} /> : null}
+                {pigToast ? (
+                    <div style={{ position: "absolute", top: 44, left: "50%", transform: "translateX(-50%)", zIndex: 70, padding: "8px 16px", borderRadius: 999, background: "rgba(20,16,6,0.92)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,0.45)", animation: "pigPop .4s ease both" }}>
+                        🐷👑 The Wild Loot Pig appeared!
+                    </div>
+                ) : null}
                 {/* Live conditions label (unobtrusive, top-left) */}
                 <div style={{ position: "absolute", top: 8, left: 8, zIndex: 60, pointerEvents: "none", padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700, color: "#f2f6ee", background: "rgba(18,26,14,0.5)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(2px)" }}
                     title={weather.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
@@ -370,6 +409,57 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onClose={() => setInspect(null)}
                 />
             ) : null}
+
+            {pigResult ? (
+                <div onClick={() => setPigResult(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.62)", display: "grid", placeItems: "center", padding: 16 }}>
+                    <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Loot pig haul" style={{ width: "100%", maxWidth: 340, borderRadius: 18, overflow: "hidden", border: "2px solid #ffd75e", background: "linear-gradient(180deg, #2a2410, #17181c)", boxShadow: "0 20px 70px rgba(0,0,0,0.6), 0 0 40px rgba(255,215,94,0.25)", animation: "pigPop .5s cubic-bezier(.2,1.2,.3,1) both", textAlign: "center" }}>
+                        <div style={{ padding: "22px 18px 6px", background: "radial-gradient(120% 90% at 50% 0%, rgba(255,215,94,0.28), transparent 70%)" }}>
+                            <div style={{ fontSize: 52, lineHeight: 1 }}>🐷👑</div>
+                            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 4 }}>The Wild Loot Pig!</div>
+                            <div className="muted" style={{ fontSize: 13 }}>He rampaged through and left this behind:</div>
+                        </div>
+                        <div style={{ padding: "4px 18px 20px" }}>
+                            <div style={{ fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.45)" }}>+{(pigResult.gold || 0).toLocaleString()} 🪙</div>
+                            {pigResult.item ? (
+                                <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${RARITY_RING[pigResult.item.rarity] || "#9aa0a6"}`, background: "rgba(255,255,255,0.04)" }}>
+                                    <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>✨ Rare drop{pigResult.item.isNew ? " · NEW" : ""}!</div>
+                                    {pigResult.item.image ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={pigResult.item.image} alt={pigResult.item.name} width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain" }} />
+                                    ) : <div style={{ fontSize: 40 }}>🎁</div>}
+                                    <div style={{ fontWeight: 800 }}>{pigResult.item.name}</div>
+                                    <div style={{ fontSize: 12, color: RARITY_RING[pigResult.item.rarity] || "#9aa0a6", textTransform: "capitalize" }}>{pigResult.item.rarity}{pigResult.item.slot ? ` · ${String(pigResult.item.slot).replace("_", " ")}` : ""}</div>
+                                </div>
+                            ) : null}
+                            <button type="button" onClick={() => setPigResult(null)} style={{ width: "100%", marginTop: 16, padding: "11px", fontWeight: 800, background: "#ffd75e", color: "#2a2410", border: "none", borderRadius: 10, cursor: "pointer" }}>Collect the loot!</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+// The Wild Loot Pig: a crowned pig that rampages across the pasture dropping coins, then runs off screen.
+// Cosmetic only — the real haul is claimed server-side in onFinish.
+function LootPig({ onFinish }) {
+    const RUN_MS = 5600;
+    useEffect(() => {
+        const t = setTimeout(onFinish, RUN_MS);
+        return () => clearTimeout(t);
+    }, [onFinish]);
+    const coins = [8, 18, 27, 38, 48, 58, 68, 78, 88, 95];
+    return (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16, zIndex: 55 }}>
+            {coins.map((x, i) => (
+                <span key={i} style={{ position: "absolute", left: `${x}%`, bottom: `${9 + (i % 3) * 7}%`, fontSize: 20, animation: `coinPop .5s ease-out ${(((x + 14) / 128) * (RUN_MS / 1000)).toFixed(2)}s both` }}>🪙</span>
+            ))}
+            <div style={{ position: "absolute", top: "56%", left: "-14%", animation: `pigRun ${RUN_MS}ms linear forwards` }}>
+                <div style={{ position: "relative", animation: "pigBob .5s ease-in-out infinite" }}>
+                    <span style={{ position: "absolute", left: "50%", top: -24, fontSize: 22, animation: "crownBounce .5s ease-in-out infinite" }}>👑</span>
+                    <span style={{ fontSize: 62, display: "block", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }}>🐷</span>
+                </div>
+            </div>
         </div>
     );
 }
