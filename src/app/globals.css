@@ -11201,8 +11201,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Inspect-a-form modal — OPAQUE so nothing bleeds through, and the hull shown in full COLOR (locked or not). */
 .sail-inspect { position: relative; max-width: 340px; text-align: center; background: #14181f; border: 1px solid #2b3038; }
 .sail-inspect-x { position: absolute; top: 8px; right: 10px; background: none; border: none; color: #9aa0a6; font-size: 1.5rem; line-height: 1; cursor: pointer; z-index: 2; }
-.sail-inspect-art { position: relative; height: 160px; display: grid; place-items: center; margin: 4px 0 6px; }
-.sail-inspect-art img { max-width: 92%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
+/* height:auto + a PX max-height on the img (percentage max-height doesn't resolve on a grid item in mobile
+   Chrome, so the boat overflowed its box and covered the perk text). Container grows to fit → no overlap. */
+.sail-inspect-art { position: relative; min-height: 150px; display: grid; place-items: center; margin: 4px 0 8px; }
+.sail-inspect-art img { width: auto; height: auto; max-width: 86%; max-height: 210px; display: block; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
 /* Locked hulls stay in full color — just a small lock badge in the corner marks them locked. */
 .sail-inspect-lock { position: absolute; top: 6px; left: 8px; font-size: 1.9rem; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
 .sail-inspect-status { font-size: 0.82rem; font-weight: 800; color: #cbb27a; margin-bottom: 12px; }
