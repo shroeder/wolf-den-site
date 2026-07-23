@@ -27,6 +27,9 @@ const RARITY_RING = {
 };
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip off the field edges
+// Evenly-spaced home slot for pet i across the inner band [PAD, 100-PAD].
+const slotX = (i, n) => (n <= 1 ? 50 : FARM_PAD + (i / (n - 1)) * (100 - 2 * FARM_PAD));
 
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
@@ -34,9 +37,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     const pets = useMemo(() => farm.pets || [], [farm.pets]);
     // Each pet gets a "home" slot spread evenly across the (wide, scrollable) field and wanders around it.
     // Deterministic init so server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
-    const homeX = useCallback((i) => (pets.length ? ((i + 0.5) / pets.length) * 100 : 50), [pets.length]);
+    const homeX = useCallback((i) => slotX(i, pets.length), [pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => ({
-        x: pets.length ? ((i + 0.5) / pets.length) * 100 : 50,
+        x: slotX(i, pets.length),
         y: 80 + ((i * 7) % 12), // low on the grass
         flip: i % 2 === 1,
         dur: 2, // seconds for the current stroll (varies per move → different speeds)
@@ -56,7 +59,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         const timers = [];
         const push = (t) => timers.push(t);
         const step = (i) => {
-            const nx = clamp(homeX(i) + rand(-8, 8), 1, 99);
+            const nx = clamp(homeX(i) + rand(-5, 5), FARM_PAD, 100 - FARM_PAD);
             const ny = 78 + rand(0, 14); // stay low on the grass — never drift high
             const dur = rand(1.3, 3.8); // different speeds each hop
             setPos((prev) => {
@@ -107,9 +110,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [farm.canPet, busy, addFloater, pets]);
 
     const pettableLeft = farm.canPet ? pets.filter((p) => !p.petted).length : 0;
-    // Wider pasture as you own more pets → they spread out and the field scrolls sideways. ~24% of the
-    // viewport per pet gives each one plenty of elbow room.
-    const fieldW = Math.max(120, pets.length * 24);
+    // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
+    // viewport per pet gives each one lots of elbow room.
+    const fieldW = Math.max(150, pets.length * 36);
 
     return (
         <div className="stack reveal">
