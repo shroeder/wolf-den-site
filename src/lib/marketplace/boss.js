@@ -447,7 +447,9 @@ export async function getBossState(buyerId = null) {
         const myLevel = mine?.level || lvl(goldRow?.xp || 0);
         const myAutoPerHour = Math.round(autoPerHour(myLevel, autoStats(myStats, myPet?.stats || {})) * em.mult);
         const cheerStatus = await getCheerStatus(buyerId).catch(() => ({ left: 0, perDay: CHEERS_PER_DAY }));
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor), gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
+        // Fortune (raffle luck) from pets/gear now adds REAL bonus tickets on top of the damage-earned ones.
+        const fortuneTickets = Math.round(myPet?.stats?.fortune || 0);
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) + fortuneTickets, fortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -637,7 +639,14 @@ async function finalizeBossKill(bossId) {
     const parts = await db
         .query(`SELECT buyer_id, SUM(damage)::int AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
         .catch(() => []);
-    const pool = parts.map((p) => ({ id: p.buyer_id, dmg: p.dmg, tickets: Math.floor(p.dmg / divisor) }));
+    // Fortune (raffle luck) from pets/gear adds bonus lottery tickets on top of the damage-earned ones, so
+    // it genuinely improves prize odds (the effect the stat always advertised but never actually did).
+    const petBonuses = await getPackPetBonuses().catch(() => new Map());
+    const pool = parts.map((p) => ({
+        id: p.buyer_id,
+        dmg: p.dmg,
+        tickets: Math.floor(p.dmg / divisor) + Math.round(petBonuses.get(p.buyer_id)?.stats?.fortune || 0),
+    }));
     const ranked = pool.slice().sort((a, b) => b.dmg - a.dmg);
     const top1 = ranked[0] || null;
     const topDmg = top1?.dmg || 1;

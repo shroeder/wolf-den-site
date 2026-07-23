@@ -33,9 +33,9 @@ const STAT_EFFECT = {
     crit_chance: "Raises your chance to land a critical hit.",
     crit_power: "Increases your critical-hit damage.",
     ferocity: "Adds ferocious power to your strike.",
-    fortune: "More raffle tickets toward the weekly boss prize.",
-    xp_gain: "Earn more XP from everything you do.",
-    gold_find: "Find more gold from chests and sales.",
+    fortune: "Bonus raffle tickets in the weekly boss prize draw — real extra odds to win.",
+    xp_gain: "An earner: passively generates XP for you over time (paid out when you check in).",
+    gold_find: "An earner: passively generates gold for you over time (paid out when you check in).",
 };
 
 const SOURCE_LABEL = {
@@ -395,7 +395,7 @@ export default function PetsClient() {
                     <div>
                         <h1 style={{ margin: 0 }}>🐾 Pets</h1>
                         <p className="muted" style={{ margin: "4px 0 0" }}>
-                            Collect companions from leveling, the shop, achievements, chests, and boss drops. <strong>Every pet you own</strong> adds a passive Fortune bonus that stacks — <strong>equip one</strong> for a stronger active buff.
+                            Collect companions from leveling, the shop, achievements, chests, and boss drops. <strong>Every pet you own</strong> adds a passive bonus that stacks — fighters buff your boss strike, earners generate XP &amp; gold over time. <strong>Equip one</strong> for a much stronger active buff.
                         </p>
                     </div>
                 </div>
@@ -410,6 +410,21 @@ export default function PetsClient() {
                                 <span className="muted" style={{ fontSize: "0.8rem" }}>Menagerie passive bonuses:</span>
                                 {passiveEntries.map(([stat, val]) => <span key={stat} className="pet-passive-chip">{statText({ stat })} +{val}</span>)}
                             </div>
+                        ) : null}
+                        {state.income && (state.income.xpPerHour > 0 || state.income.goldPerHour > 0 || state.income.raffleTickets > 0) ? (
+                            <div className="pets-passives" style={{ marginTop: 8 }}>
+                                <span className="muted" style={{ fontSize: "0.8rem" }}>Your earner pets generate:</span>
+                                {state.income.xpPerHour > 0 ? <span className="pet-passive-chip">✨ +{state.income.xpPerHour} XP/hr</span> : null}
+                                {state.income.goldPerHour > 0 ? <span className="pet-passive-chip">🪙 +{state.income.goldPerHour} gold/hr</span> : null}
+                                {state.income.raffleTickets > 0 ? <span className="pet-passive-chip">🎟️ +{state.income.raffleTickets} boss raffle tickets</span> : null}
+                            </div>
+                        ) : null}
+                        {state.incomeEarned && (state.incomeEarned.xp > 0 || state.incomeEarned.gold > 0) ? (
+                            <p style={{ margin: "8px 0 0", color: "#ffd75e", fontWeight: 600 }}>
+                                🐾 Your pets earned you {state.incomeEarned.xp > 0 ? `+${state.incomeEarned.xp} XP` : ""}
+                                {state.incomeEarned.xp > 0 && state.incomeEarned.gold > 0 ? " and " : ""}
+                                {state.incomeEarned.gold > 0 ? `+${state.incomeEarned.gold} gold` : ""} since your last visit!
+                            </p>
                         ) : null}
                     </>
                 ) : null}

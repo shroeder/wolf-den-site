@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare } from "@/lib/marketplace/pets.js";
+import { settlePetIncome, petIncomeRate } from "@/lib/marketplace/pet-income.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -12,8 +13,11 @@ export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/pets", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
+            // Settle passive pet income BEFORE reading state so the gold/xp shown is already up to date.
+            const incomeEarned = buyer?.id ? await settlePetIncome(buyer.id).catch(() => ({ xp: 0, gold: 0 })) : { xp: 0, gold: 0 };
             const state = await petsState(buyer?.id || null, { sync: true });
-            return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
+            const income = buyer?.id ? await petIncomeRate(buyer.id).catch(() => null) : null;
+            return NextResponse.json({ ...state, income, incomeEarned }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.pets.state.failure" });
         }
