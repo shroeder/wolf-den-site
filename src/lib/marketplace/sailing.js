@@ -60,14 +60,14 @@ const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_D
 const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
 // Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
 // RAID_RESET_PAID true (+ tune base) before release.
-const RAID_RESET_PAID = false;      // TODO(luke): true before launch so resets actually cost gold
+const RAID_RESET_PAID = true;       // resets cost gold now (testing freebies concluded)
 const RAID_RESET_BASE = 300;        // first same-day reset costs this, then doubles each time
 const RAID_RESET_MULT = 2;
 const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RESET_BASE * Math.pow(RAID_RESET_MULT, Math.max(0, resetsToday))) : 0);
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
 // the feature is in testing — set back to 500 before release.
-export const WIND_RECHARGE_COST = 0; // TODO(luke): bump to 500 after testing
+export const WIND_RECHARGE_COST = 500; // extra tailwinds cost gold (testing freebies concluded)
 
 // ── Waves ── greet a passing member a few times a day for a little XP/coins + a small travel cut.
 const WAVES_PER_DAY = 3;               // base daily waves; LUCK adds more (see wavesPerDay)
@@ -81,9 +81,9 @@ const wavesPerDay = (luckLevel = 0) => WAVES_PER_DAY + Math.floor(Math.max(0, lu
 // ── Marine encounters ── FORTUNE now drives the chance a voyage rolls an encounter at its halfway mark
 // (repurposed from "+buried fragments"). No push / no travel pause — it resolves lazily on the member's next
 // check-in and shows a one-off recap modal.
-const ENCOUNTER_BASE = 1.0;           // ⚠️ TEST OVERRIDE (was 0.20) — always roll a marine encounter
+const ENCOUNTER_BASE = 0.20;          // base chance to roll a marine encounter at the voyage midpoint
 const ENCOUNTER_PER_FORTUNE = 0.015;  // +1.5% per Fortune level → +30% at max (20)
-const ENCOUNTER_CHANCE_CAP = 1.0;     // ⚠️ TEST OVERRIDE (was 0.65) — let the forced 100% through the cap
+const ENCOUNTER_CHANCE_CAP = 0.65;    // Fortune can raise the encounter chance up to this cap
 function encounterChance(fortuneLevel = 0) {
     return Math.min(ENCOUNTER_CHANCE_CAP, ENCOUNTER_BASE + Math.max(0, fortuneLevel) * ENCOUNTER_PER_FORTUNE);
 }
@@ -128,7 +128,7 @@ function pickWeighted(list) {
 
 // ── Gold Merchant island event ── a rare gold-clad showman who greets you when you LAND (before the dig):
 // a coin-catch minigame for gold, a discounted exclusive shop, and a rare shot at his exclusive elephant pet.
-const MERCHANT_BASE_CHANCE = 1.0;    // ⚠️ TEST OVERRIDE (was 0.05) — always land the Gold Merchant
+const MERCHANT_BASE_CHANCE = 0.05;   // base chance the Gold Merchant appears on a landing
 const MERCHANT_GOLD_FLOOR = 10;      // minimum coin-minigame payout (just for playing)
 const MERCHANT_GOLD_CEIL = 200;      // safety cap only — the game's scoring is tuned to land ~150 on a great run
 const MERCHANT_PET_ENCOUNTERS = 10;  // the elephant pet unlocks on your 10th meeting with the Gold Merchant
@@ -195,7 +195,7 @@ const FRAGMENTS_BURIED = 3;   // base fragments scattered through the dirt; Fort
 const MAX_BURIED = 12;        // cap on buried fragments (of a 16-tile board)
 const RARITY_UPGRADE_PER_LEVEL = 0.005; // Rarity: +0.5%/level chance that a forged chest is bumped up a tier
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
-const DIG_REFILL_COST = 0;    // gold per refill — FREE while testing; set to ~300 before release
+const DIG_REFILL_COST = 300;  // gold per dig refill (testing freebies concluded)
 
 // ── DIGGING UPGRADES (separate from the boat) ── five gold-leveled tracks. Each track's PER-LEVEL value ×
 // its MAX level = the cap Luke asked for.

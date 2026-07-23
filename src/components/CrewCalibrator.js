@@ -17,8 +17,10 @@ const BOAT_ART = {
     7: "/images/sailing/boat-tier7-arcane.png",
     8: "/images/sailing/boat-tier8-dragon.png",
     9: "/images/sailing/boat-tier9-ghost.png",
+    10: "/images/sailing/boat-tier10-leviathan.png",
+    11: "/images/sailing/boat-tier11-celestial.png",
 };
-const NAMES = { 1: "Wood", 2: "Cutter", 3: "Brig", 4: "Schooner", 5: "Galleon", 6: "Man-o'-war", 7: "Arcane", 8: "Dragon", 9: "Ghost" };
+const NAMES = { 1: "Wood", 2: "Cutter", 3: "Brig", 4: "Schooner", 5: "Galleon", 6: "Man-o'-war", 7: "Arcane", 8: "Dragon", 9: "Ghost", 10: "Leviathan", 11: "Celestial" };
 const TIERS = Object.keys(BOAT_ART).map(Number);
 const clampPct = (n) => Math.max(0, Math.min(100, Math.round(n * 10) / 10));
 
