@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resolveFarmOwner } from "@/lib/marketplace/farm.js";
+import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner } from "@/lib/marketplace/farm.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -43,6 +43,7 @@ export async function POST(request) {
             else if (b?.action === "buy_treat") res = await buyTreat(buyer.id, String(b?.consumableId || ""));
             else if (b?.action === "recharge") res = await rechargePetting(buyer.id);
             else if (b?.action === "pig_claim") res = await claimPig(buyer.id);
+            else if (b?.action === "pig_reset") res = await resetPig(buyer.id);
             else return NextResponse.json({ error: "bad_action" }, { status: 400 });
             // Return the whole result either way (so error responses still carry budget/cost/wallet for the UI).
             return NextResponse.json(res, { status: res?.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });

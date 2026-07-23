@@ -83,6 +83,13 @@ async function farmMineBits(buyerId) {
     return { treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting, pigAvailable: Boolean(wallet?.pig_available) };
 }
 
+// Debug (owner-only, gated by the farm route): clear today's pig claim so the Loot Pig can be re-tested.
+export async function resetPig(buyerId) {
+    if (!buyerId) return { ok: false };
+    await db.query(`UPDATE mkt_buyer SET pig_day = NULL WHERE id = $1`, [buyerId]).catch(() => {});
+    return { ok: true, pigAvailable: true };
+}
+
 // The Wild Loot Pig payout — once per store-local day, guarded atomically. Rolls gold + a rare item drop.
 export async function claimPig(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };

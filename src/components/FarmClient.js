@@ -218,6 +218,16 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) setFarm((f) => ({ ...f, treats: r.treats, treatShop: r.treatShop, wallet: r.wallet }));
     }, [busy, post]);
 
+    // Owner debug: clear today's pig guard and force him to spawn now (repeatable testing).
+    const spawnPigDebug = useCallback(async () => {
+        if (pig) return;
+        await post({ action: "pig_reset" });
+        setFarm((f) => ({ ...f, pigAvailable: true }));
+        setPig("running");
+        setPigToast(true);
+        setTimeout(() => setPigToast(false), 4200);
+    }, [pig, post]);
+
     // The pig ran off screen → claim the haul (server-guarded once/day) and show the juiced modal.
     const onPigFinish = useCallback(async () => {
         setPig(null);
@@ -283,7 +293,12 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings left today` : ""}
                     </p>
                 </div>
-                <div style={{ marginLeft: "auto" }}>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+                    {farm.mine ? (
+                        <button type="button" onClick={spawnPigDebug} disabled={Boolean(pig)} title="Owner debug: force-spawn the Loot Pig now (repeatable)" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pig ? "default" : "pointer", opacity: pig ? 0.5 : 1 }}>
+                            🐷 debug: spawn pig
+                        </button>
+                    ) : null}
                     {!farm.mine ? (
                         <button type="button" className="btn" onClick={() => router.push("/marketplace/farm")}>← My farm</button>
                     ) : null}
