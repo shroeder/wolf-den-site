@@ -34,6 +34,7 @@ export default function GameNav() {
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
     const [chests, setChests] = useState(0);
+    const [sailAttn, setSailAttn] = useState(false); // boat landed & waiting to dig → red-alert dot on Sailing
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
@@ -44,6 +45,10 @@ export default function GameNav() {
                     if (!alive) return;
                     setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
                 })
+                .catch(() => {});
+            fetch("/api/marketplace/sailing/status", { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); })
                 .catch(() => {});
         };
         loadChests();
@@ -61,10 +66,12 @@ export default function GameNav() {
             <div className="game-nav-scroll">
                 {links.map((l) => {
                     const badge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
+                    const dot = l.href === "/marketplace/sailing" && sailAttn;
                     return (
-                        <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}`}>
+                        <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
                             {l.Icon ? <l.Icon className="game-nav-ico" aria-hidden="true" /> : <span aria-hidden="true">{l.emoji}</span>} {l.label}
                             {badge ? <span className="game-nav-badge" title={`${badge} chest${badge === 1 ? "" : "s"} to open`}>{badge}</span> : null}
+                            {dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
                         </Link>
                     );
                 })}

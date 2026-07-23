@@ -19,6 +19,7 @@ import { getBadgeBoard } from "@/lib/marketplace/badges.js";
 import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
+import { sailingNeedsAttention } from "@/lib/marketplace/sailing.js";
 import { getStoreState } from "@/lib/marketplace/store.js";
 import { getRewardsProgress } from "@/lib/marketplace/xp.js";
 import { countIncomingTrades } from "@/lib/marketplace/trade.js";
@@ -59,7 +60,7 @@ export default async function ProfileHubPage() {
         );
     }
 
-    const [profile, progress, track, bossSummary, badgeBoard, tradeCount, store] = await Promise.all([
+    const [profile, progress, track, bossSummary, badgeBoard, tradeCount, store, sailAttention] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         getRewardsProgress(buyer.id).catch(() => ({})),
         getRewardsTrack(buyer.id).catch(() => null),
@@ -67,6 +68,7 @@ export default async function ProfileHubPage() {
         getBadgeBoard(buyer.id).catch(() => null),
         countIncomingTrades(buyer.id).catch(() => 0),
         getStoreState(buyer.id).catch(() => ({ gold: 0, purchased: { pet: [], border: [], frame: [], cosmetic: [] } })),
+        sailingNeedsAttention(buyer.id).catch(() => false),
     ]);
     const level = profile?.level || null;
     // Staff can equip any border regardless of level (matches the server-side bypass).
@@ -105,9 +107,11 @@ export default async function ProfileHubPage() {
                 <div className="hub-tiles">
                     {TILES.map((t) => {
                         const badge = t.href === "/marketplace/trade" && tradeCount > 0 ? tradeCount : null;
+                        const dot = t.href === "/marketplace/sailing" && sailAttention;
                         return (
-                            <Link key={t.href} href={t.href} className="hub-tile">
+                            <Link key={t.href} href={t.href} className={`hub-tile${dot ? " has-dot" : ""}`}>
                                 {badge ? <span className="hub-tile-badge">{badge}</span> : null}
+                                {dot ? <span className="hub-tile-dot" title="Your boat has landed — time to dig!" /> : null}
                                 <span className="hub-tile-icon" aria-hidden="true">{t.icon}</span>
                                 <span className="hub-tile-label">{t.label}</span>
                                 <span className="hub-tile-sub muted">{t.sub}</span>

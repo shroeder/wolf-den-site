@@ -217,6 +217,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [raidOpen, setRaidOpen] = useState(false);       // the raid target-picker modal is open
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidPlay, setRaidPlay] = useState(null);        // the resolved raid → drives the full-screen battle scene
+    const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -360,6 +361,19 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         }, 1000);
         return () => clearInterval(id);
     }, [load]);
+
+    // Pop the "you reached the island!" modal once per voyage — whether the timer crossed live or the player
+    // returned to find it already landed. Deduped by this voyage's departedAt so a refresh doesn't re-pop it.
+    const arrivedNow = Boolean(state.arrivesAt && now >= state.arrivesAt && state.status !== "digging" && !state.dig);
+    useEffect(() => {
+        if (!arrivedNow || !state.departedAt) return;
+        try {
+            const k = "wolfden-sail-arrived";
+            if (localStorage.getItem(k) === String(state.departedAt)) return;
+            localStorage.setItem(k, String(state.departedAt));
+        } catch { /* ignore */ }
+        setArriveModal(true);
+    }, [arrivedNow, state.departedAt]);
 
     const { arrivesAt } = state;
     let liveStatus = state.status;
@@ -1120,6 +1134,21 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             ))}
                         </div>
                         <button className="pill" disabled={busy} onClick={() => { setRaidOpen(false); setRaidTargets(null); }}>Back out</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Arrival — "you reached the island!" modal (pops once per voyage, live or on return) */}
+            {arriveModal ? (
+                <div className="sail-reward-overlay">
+                    <div className="card sail-recap sail-arrive-modal">
+                        <Confetti />
+                        <div className="sail-arrive-emoji" aria-hidden="true">🏝️</div>
+                        <h2 style={{ margin: "6px 0 2px" }}>Land ho — you&apos;ve reached the island!</h2>
+                        <p className="muted" style={{ marginTop: 0 }}>
+                            Your boat has landed{state.merchant ? " and a Gold Merchant is waiting on the beach" : ""}. Time to head ashore and dig for buried treasure.
+                        </p>
+                        <button className="sail-cta sail-cta-dig" onClick={() => setArriveModal(false)}>Go ashore →</button>
                     </div>
                 </div>
             ) : null}

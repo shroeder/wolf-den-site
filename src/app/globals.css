@@ -9913,6 +9913,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 .hub-tile { position: relative; }
 .hub-tile-badge { position: absolute; top: 6px; right: 8px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0443a; color: #fff; font-size: 0.72rem; font-weight: 800; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.hub-tile-dot { position: absolute; top: 7px; right: 9px; width: 11px; height: 11px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 2px rgba(255,77,77,0.25), 0 0 7px rgba(255,77,77,0.8); animation: rar-pulse 1.6s ease-in-out infinite; }
+.hub-tile.has-dot { border-color: rgba(255,77,77,0.5); }
 
 /* ============ Daily quests ============ */
 .quests-card { border-color: rgba(120, 180, 255, 0.28); }
@@ -10133,6 +10135,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Unopened-chest reminder badge on the Gear pill. */
 .game-nav-link.has-badge { border-color: rgba(255,215,94,0.6); color: #ffd75e; }
 .game-nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px; border-radius: 999px; background: #ff4d4d; color: #fff; font-size: 0.72rem; font-weight: 900; line-height: 1; box-shadow: 0 0 0 2px rgba(255,77,77,0.25); animation: rar-pulse 2s ease-in-out infinite; }
+/* Red-alert dot: the boat has landed and needs tending (Sailing pill). */
+.game-nav-link.has-dot { border-color: rgba(255,77,77,0.6); color: #ffb3b3; }
+.game-nav-dot { width: 9px; height: 9px; margin-left: 2px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 2px rgba(255,77,77,0.25), 0 0 6px rgba(255,77,77,0.7); animation: rar-pulse 1.6s ease-in-out infinite; }
 
 /* Badge passive summary on the badges hub. */
 .badge-passive-strip { margin: 8px 0 0; padding: 7px 12px; border-radius: 10px; font-size: 0.84rem; color: #ffe9a8;
@@ -11465,6 +11470,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-recap-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.86rem; padding: 6px 10px; border-radius: 9px; background: rgba(255,255,255,0.04); }
 .sail-recap-row > span { color: #b9c2cf; }
 .sail-recap-row b { display: inline-flex; align-items: center; gap: 5px; }
+.sail-arrive-modal { text-align: center; }
+.sail-arrive-emoji { font-size: 3.4rem; line-height: 1; animation: raidLootPop 0.5s cubic-bezier(0.2,1.5,0.4,1) both; }
 .sail-recap-relic { background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
 .sail-recap-relic > span { color: #ffe08a; }
 .sail-recap-pos { color: #7cffb2; }

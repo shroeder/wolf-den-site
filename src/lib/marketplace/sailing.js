@@ -15,6 +15,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -831,12 +832,53 @@ export async function startVoyage(buyerId, optionId = "standard") {
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
-                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, updated_at = NOW()`,
+                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, arrival_notified = FALSE, updated_at = NOW()`,
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
     await trackActivity(buyerId, "sail_voyage", { option: opt.id, hours: Math.round(ms / 3600000) }).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// Does sailing need the player's attention? (Landed & waiting to dig, or an unacknowledged encounter.) Drives
+// the red-alert dot on the Sailing nav pill + hub tile.
+export async function sailingNeedsAttention(buyerId) {
+    if (!buyerId) return false;
+    const row = await db.queryOne(
+        `SELECT (departed_at IS NOT NULL AND returns_at IS NOT NULL AND returns_at <= NOW() AND dig_state IS NULL) AS landed,
+                (encounter_result IS NOT NULL) AS enc
+           FROM mkt_sailing WHERE buyer_id = $1`,
+        [buyerId],
+    ).catch(() => null);
+    return Boolean(row && (row.landed || row.enc));
+}
+
+// CRON: push members whose voyage just LANDED (once each) so they come back to dig. Voyages resolve lazily on
+// read, so this is the only place that can nudge a player whose app is closed. Atomic claim per row = no dupes.
+export async function runSailingArrivals() {
+    const due = await db.query(
+        `SELECT buyer_id FROM mkt_sailing
+          WHERE departed_at IS NOT NULL AND returns_at IS NOT NULL AND returns_at <= NOW()
+            AND dig_state IS NULL AND arrival_notified = FALSE
+          LIMIT 500`,
+    ).catch(() => []);
+    let pushed = 0;
+    for (const r of due) {
+        const claimed = await db.queryOne(
+            `UPDATE mkt_sailing SET arrival_notified = TRUE
+              WHERE buyer_id = $1 AND arrival_notified = FALSE AND returns_at <= NOW() AND dig_state IS NULL
+              RETURNING buyer_id`,
+            [r.buyer_id],
+        ).catch(() => null);
+        if (!claimed) continue;
+        await sendWebPush(r.buyer_id, {
+            title: "🏝️ Land ho!",
+            body: "Your boat reached the island — head ashore and dig for buried treasure.",
+            url: "/marketplace/sailing", tag: "sail-arrival", data: { type: "sail_arrival" },
+        }).catch(() => {});
+        pushed += 1;
+    }
+    return { checked: due.length, pushed };
 }
 
 // Wave to a passing sailor — up to WAVES_PER_DAY/day, each a little XP + coins + a small travel-time cut.
