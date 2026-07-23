@@ -3,6 +3,8 @@ import { FaDharmachakra } from "react-icons/fa6";
 
 import GameHubStats from "@/components/GameHubStats";
 import ViewPing from "@/components/ViewPing";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +28,11 @@ const FEATURES = [
     { href: "/marketplace/bounties", emoji: "🎯", title: "Bounties", desc: "Post gold for real-world help — or claim someone else's.", tone: "bounty" },
 ];
 
-export default function GamePlayHub() {
+export default async function GamePlayHub() {
+    // Owner-only preview features (hidden from everyone else) surface an extra tile here.
+    const buyer = await getAuthenticatedBuyer().catch(() => null);
+    const owner = Boolean(buyer && isOwner(buyer.id));
+
     return (
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
@@ -44,6 +50,13 @@ export default function GamePlayHub() {
                         <span className="game-tile-desc">{f.desc}</span>
                     </Link>
                 ))}
+                {owner ? (
+                    <Link href="/marketplace/farm" className="game-tile tone-pets">
+                        <span className="game-tile-emoji" aria-hidden="true">🌾</span>
+                        <span className="game-tile-title">Farm <span className="muted" style={{ fontSize: "0.7em" }}>· owner</span></span>
+                        <span className="game-tile-desc">Watch your pets roam — pet them for XP, and visit other farms.</span>
+                    </Link>
+                ) : null}
             </div>
         </div>
     );
