@@ -442,7 +442,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 }
 
 // The Wild Loot Pig sprite (crown overlaid separately). Generated once via /api/admin/loot-pig-sprite.
-const PIG_SPRITE_URL = null;
+const PIG_SPRITE_URL = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm/1784834882238-913206.png";
 
 // The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping gold,
 // then wanders off an edge. Cosmetic only — the haul is claimed server-side in onFinish.
