@@ -297,11 +297,13 @@ export default function RaidScene({ raid, myBoat, hero, pet, captain, onClose })
                             {win ? <>You raked <b>{target.name || "the rival ship"}</b> and boarded with the spoils.</>
                                  : <>They out-gunned you — you broke off and fled with your hull intact.</>}
                         </p>
+                        {raid.dodged ? (
+                            <div className="raid-freebanner">🎉 Free raid! Your daily raid <b>wasn&apos;t used up</b> — go raid again!</div>
+                        ) : null}
                         <div className="raid-result-rewards">
                             {win ? <span className="raid-reward is-good">🪙 +{Math.abs(raid.gold)} gold</span>
                                  : <span className="raid-reward is-bad">🪙 −{Math.abs(raid.gold)} gold</span>}
                             {raid.stunUsed ? <span className="raid-reward">💫 Stun landed</span> : null}
-                            {raid.dodged ? <span className="raid-reward is-good">🏴‍☠️ Daily raid not used!</span> : null}
                         </div>
                         {raid.itemWon ? (
                             <div className={`raid-loot rar-${raid.itemWon.rarity || "common"}`}>

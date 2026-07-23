@@ -11783,6 +11783,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .raid-result-banner.is-win { color: #ffd86a; text-shadow: 0 0 20px rgba(255,200,80,0.7); }
 .raid-result-banner.is-lose { color: #ff8a7a; }
 .raid-result-line { margin: 2px 0 10px; font-size: 0.9rem; }
+/* "Free raid!" — the raid-dodge perk fired; prominent so the player clearly knows the daily raid was refunded. */
+.raid-freebanner { margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; font-size: 0.9rem; font-weight: 800; color: #063;
+    background: linear-gradient(135deg, #b9f6cd, #6fe6a0); border: 1px solid rgba(60,200,120,0.6);
+    box-shadow: 0 4px 14px rgba(60,210,130,0.35); animation: raidLootPop 0.5s cubic-bezier(0.2,1.5,0.4,1) both; }
+.raid-freebanner b { color: #024; }
 .raid-result-rewards { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
 .raid-reward { font-weight: 800; font-size: 0.85rem; padding: 5px 10px; border-radius: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); }
 .raid-reward.is-good { color: #7cf0a8; border-color: rgba(90,230,150,0.45); background: rgba(60,220,130,0.12); }
