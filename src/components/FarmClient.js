@@ -31,6 +31,43 @@ const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip of
 // Evenly-spaced home slot for pet i across the inner band [PAD, 100-PAD].
 const slotX = (i, n) => (n <= 1 ? 50 : FARM_PAD + (i / (n - 1)) * (100 - 2 * FARM_PAD));
 
+// ── Real-world sky + weather ──────────────────────────────────────────────────────────────────────────────
+const hourToTod = (h, isDay = true) => {
+    if (!isDay) return "night";
+    if (h >= 5 && h < 7) return "dawn";
+    if (h >= 7 && h < 17) return "day";
+    if (h >= 17 && h < 20) return "dusk";
+    return "night";
+};
+// WMO weather codes (Open-Meteo) → a simple condition bucket.
+const wmoToCondition = (code) => {
+    if (code == null) return "clear";
+    if ([45, 48].includes(code)) return "fog";
+    if ([95, 96, 99].includes(code)) return "storm";
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return "snow";
+    if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "rain";
+    if ([1, 2, 3].includes(code)) return "cloudy";
+    return "clear";
+};
+const SKY = {
+    dawn: ["#f7b267", "#f9dcb0", "#bfe0ee"],
+    day: ["#7ec2f0", "#a9d8f5", "#d7eefb"],
+    dusk: ["#e08a54", "#c77b9e", "#5b6fa8"],
+    night: ["#0c1830", "#152343", "#26365f"],
+};
+const skyStops = (tod, condition) => {
+    if (condition === "storm") return ["#3a4048", "#4a5058", "#727a84"];
+    return SKY[tod] || SKY.day;
+};
+const grassStops = (tod) => (tod === "night" ? ["#3f6b3a", "#274c28"] : tod === "dusk" ? ["#6fa858", "#4d8c3c"] : ["#86ce69", "#63b048"]);
+// Full field background: sky (top) blending into grass at the horizon. Uniform across the width, so it tiles
+// seamlessly no matter how far you scroll.
+const fieldBackground = (tod, condition) => {
+    const s = skyStops(tod, condition);
+    const g = grassStops(tod);
+    return `linear-gradient(180deg, ${s[0]} 0%, ${s[1]} 36%, ${s[2]} 50%, ${g[0]} 60%, ${g[1]} 100%)`;
+};
+
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
     const [farm, setFarm] = useState(initial);
@@ -50,6 +87,28 @@ export default function FarmClient({ initial, viewingAlias }) {
     const floatId = useRef(0);
     const [busy, setBusy] = useState(null);
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
+    // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
+    // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
+    const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
+    useEffect(() => {
+        const t0 = setTimeout(() => setWeather((w) => ({ ...w, tod: hourToTod(new Date().getHours()) })), 0);
+        if (typeof navigator === "undefined" || !navigator.geolocation) return () => clearTimeout(t0);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const { latitude, longitude } = pos.coords || {};
+                if (latitude == null) return;
+                const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(2)}&longitude=${longitude.toFixed(2)}&current=weather_code,is_day&timezone=auto`)
+                    .then((x) => (x.ok ? x.json() : null))
+                    .catch(() => null);
+                const cur = r?.current;
+                if (!cur) return;
+                const isDay = cur.is_day === 1;
+                setWeather({ tod: hourToTod(new Date().getHours(), isDay), condition: wmoToCondition(cur.weather_code), isDay, located: true });
+            },
+            () => {},
+            { timeout: 8000, maximumAge: 1800000 }
+        );
+    }, []);
 
     // INDEPENDENT wander: every pet runs its OWN loop — random start delay, random stroll distance around its
     // home slot, random duration (speed), then a random pause before the next hop. So they never move/stop in
@@ -142,8 +201,14 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes farmHop { 0% { transform: translateY(0) scaleY(1) } 25% { transform: translateY(-13px) scaleY(1.05) } 55% { transform: translateY(0) scaleY(0.92) } 70% { transform: translateY(-4px) } 100% { transform: translateY(0) scaleY(1) } }
                 @keyframes farmFloat { 0% { opacity: 0; transform: translate(-50%, 0) scale(.8) } 15% { opacity: 1 } 100% { opacity: 0; transform: translate(-50%, -46px) scale(1.1) } }
                 @keyframes farmCloud { from { transform: translateX(0) } to { transform: translateX(40px) } }
+                @keyframes farmShadow { 0%,100% { transform: translateX(-50%) scale(1); opacity: .34 } 30% { transform: translateX(-50%) scale(.66); opacity: .55 } }
+                @keyframes farmRain { to { transform: translateY(480px); } }
+                @keyframes farmSnow { to { transform: translateY(470px) translateX(18px); } }
+                @keyframes farmFog { from { transform: translateX(-5%) } to { transform: translateX(5%) } }
+                @keyframes farmFlash { 0%,90%,100% { opacity: 0 } 91% { opacity: .55 } 93% { opacity: 0 } 95% { opacity: .38 } 96% { opacity: 0 } }
                 .farm-hop { animation-name: farmHop; animation-timing-function: ease-in-out; animation-iteration-count: infinite; transform-origin: bottom center; }
                 .farm-idle { animation: farmBob 2.8s ease-in-out infinite; transform-origin: bottom center; }
+                .farm-shadow-hop { animation-name: farmShadow; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
                 .farm-scroll { scrollbar-width: thin; }
             `}</style>
 
@@ -164,83 +229,90 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             <FarmInspect current={viewingAlias} />
 
-            {/* The pasture — scrolls sideways when there are lots of pets */}
-            <div className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden", borderRadius: 16 }}>
-                <div
-                    style={{
-                        position: "relative", width: `${fieldW}%`, minWidth: "100%", height: "min(52vh, 420px)",
-                        background: "linear-gradient(180deg, #8fd0ff 0%, #bfe6f5 40%, #cdeeda 54%, #86ce69 60%, #63b048 100%)",
-                        boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none",
-                    }}
-                >
-                    {/* Sun + clouds (kept near the start so they're visible before you scroll) */}
-                    <div style={{ position: "absolute", top: 20, left: 28, width: 60, height: 60, borderRadius: "50%", background: "radial-gradient(circle, #fff3b0 0%, #ffd75e 70%, rgba(255,215,94,0) 72%)" }} />
-                    <div style={{ position: "absolute", top: 34, left: "22%", width: 84, height: 24, borderRadius: 20, background: "rgba(255,255,255,0.85)", filter: "blur(1px)", animation: "farmCloud 9s ease-in-out infinite alternate" }} />
-                    <div style={{ position: "absolute", top: 62, left: "58%", width: 60, height: 18, borderRadius: 16, background: "rgba(255,255,255,0.7)", filter: "blur(1px)", animation: "farmCloud 12s ease-in-out infinite alternate" }} />
-                    {/* Fence at the grass horizon — posts + two rails */}
-                    <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
-                        <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
-                        <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
-                        <div style={{ position: "absolute", left: 0, right: 0, top: 26, height: 6, background: "#b07a45" }} />
-                    </div>
-
-                    {pets.length === 0 ? (
-                        <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#3a5f2a", fontWeight: 600 }}>
-                            No pets yet — collect some and they&apos;ll roam here.
+            {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
+            <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
+                <div className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden" }}>
+                    <div
+                        style={{
+                            position: "relative", width: `${fieldW}%`, minWidth: "100%", height: "min(52vh, 420px)",
+                            background: fieldBackground(weather.tod, weather.condition),
+                            boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
+                        }}
+                    >
+                        {/* Drifting clouds (daytime, non-stormy) — spread across the field so some are always in view */}
+                        {["clear", "cloudy"].includes(weather.condition) && weather.tod !== "night"
+                            ? Array.from({ length: weather.condition === "cloudy" ? 7 : 4 }).map((_, k) => (
+                                <div key={k} style={{ position: "absolute", top: `${8 + (k % 3) * 9}%`, left: `${(k * 23 + 6) % 96}%`, width: 78 + (k % 3) * 26, height: 22 + (k % 2) * 8, borderRadius: 22, background: weather.condition === "cloudy" ? "rgba(230,232,235,0.9)" : "rgba(255,255,255,0.82)", filter: "blur(1px)", animation: `farmCloud ${9 + (k % 4) * 2}s ease-in-out ${k * 0.6}s infinite alternate` }} />
+                            ))
+                            : null}
+                        {/* Fence at the grass horizon — posts + two rails, repeats seamlessly the full width */}
+                        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
+                            <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
+                            <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
+                            <div style={{ position: "absolute", left: 0, right: 0, top: 26, height: 6, background: "#b07a45" }} />
                         </div>
-                    ) : null}
 
-                    {pets.map((pet, i) => {
-                        const p = pos[i] || { x: 50, y: 82, flip: false, dur: 2, moving: false, hopMs: 500 };
-                        const canTap = farm.canPet && !pet.petted;
-                        return (
-                            <button
-                                key={pet.id}
-                                type="button"
-                                onClick={() => setInspect(pet)}
-                                title={`${pet.name} · Lv ${pet.level} · tap to inspect`}
-                                style={{
-                                    position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -100%)",
-                                    transition: `left ${p.dur}s linear, top ${p.dur}s linear`,
-                                    background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(p.y),
-                                }}
-                            >
-                                <span
-                                    className={p.moving ? "farm-hop" : "farm-idle"}
-                                    style={{ display: "block", position: "relative", animationDuration: p.moving ? `${p.hopMs}ms` : undefined }}
+                        {pets.length === 0 ? (
+                            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
+                                No pets yet — collect some and they&apos;ll roam here.
+                            </div>
+                        ) : null}
+
+                        {pets.map((pet, i) => {
+                            const p = pos[i] || { x: 50, y: 82, flip: false, dur: 2, moving: false, hopMs: 500 };
+                            const canTap = farm.canPet && !pet.petted;
+                            return (
+                                <button
+                                    key={pet.id}
+                                    type="button"
+                                    onClick={() => setInspect(pet)}
+                                    title={`${pet.name} · Lv ${pet.level} · tap to inspect`}
+                                    style={{
+                                        position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -100%)",
+                                        transition: `left ${p.dur}s linear, top ${p.dur}s linear`,
+                                        background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(p.y),
+                                    }}
                                 >
-                                    {/* soft ground shadow */}
-                                    <span style={{ position: "absolute", left: "50%", bottom: -5, width: 36, height: 10, transform: "translateX(-50%)", background: "radial-gradient(ellipse, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 70%)" }} />
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={pet.spriteUrl}
-                                        alt={pet.name}
-                                        width={58}
-                                        height={58}
-                                        style={{
-                                            width: 58, height: 58, objectFit: "contain",
-                                            transform: p.flip ? "scaleX(-1)" : "none",
-                                            filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
-                                        }}
-                                    />
-                                    {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
-                                </span>
-                                <span style={{ display: "flex", justifyContent: "center", marginTop: 3 }}>
-                                    <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.74)", border: "1px solid rgba(255,255,255,0.12)", fontSize: 10, fontWeight: 700, color: "#f2f6ee", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.35)" }}>
-                                        {pet.name} <span style={{ color: RARITY_RING[pet.rarity] || "#cdd9c6" }}>·L{pet.level}</span>
+                                    {/* fixed-size sprite stage: the shadow stays planted on the ground while the sprite hops above it */}
+                                    <span style={{ position: "relative", display: "block", width: 58, height: 58, margin: "0 auto" }}>
+                                        <span
+                                            className={p.moving ? "farm-shadow-hop" : ""}
+                                            style={{ position: "absolute", left: "50%", bottom: -2, width: 42, height: 9, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", animationDuration: p.moving ? `${p.hopMs}ms` : undefined, zIndex: 0 }}
+                                        />
+                                        <span
+                                            className={p.moving ? "farm-hop" : "farm-idle"}
+                                            style={{ position: "absolute", inset: 0, display: "block", animationDuration: p.moving ? `${p.hopMs}ms` : undefined }}
+                                        >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={pet.spriteUrl}
+                                                alt={pet.name}
+                                                width={58}
+                                                height={58}
+                                                style={{ width: 58, height: 58, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "none" }}
+                                            />
+                                            {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
+                                        </span>
                                     </span>
-                                </span>
-                            </button>
-                        );
-                    })}
+                                    <span style={{ display: "flex", justifyContent: "center", marginTop: 3 }}>
+                                        <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.74)", border: "1px solid rgba(255,255,255,0.12)", fontSize: 10, fontWeight: 700, color: "#f2f6ee", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.35)" }}>
+                                            {pet.name} <span style={{ color: RARITY_RING[pet.rarity] || "#cdd9c6" }}>·L{pet.level}</span>
+                                        </span>
+                                    </span>
+                                </button>
+                            );
+                        })}
 
-                    {/* XP / heart floaters */}
-                    {floaters.map((f) => (
-                        <span key={f.id} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, transform: "translate(-50%, -120%)", fontWeight: 800, fontSize: 15, color: f.color || "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.5)", pointerEvents: "none", animation: "farmFloat 1.3s ease-out forwards", zIndex: 9999 }}>
-                            {f.text}
-                        </span>
-                    ))}
+                        {/* XP / heart floaters */}
+                        {floaters.map((f) => (
+                            <span key={f.id} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, transform: "translate(-50%, -120%)", fontWeight: 800, fontSize: 15, color: f.color || "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.5)", pointerEvents: "none", animation: "farmFloat 1.3s ease-out forwards", zIndex: 9999 }}>
+                                {f.text}
+                            </span>
+                        ))}
+                    </div>
                 </div>
+                {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
+                <FarmWeather condition={weather.condition} />
             </div>
 
             {inspect ? (
@@ -364,6 +436,33 @@ function PetInspect({ pet, canPet, petXp, treats = [], busyKey, onPet, onUseTrea
                     ) : null}
                 </div>
             </div>
+        </div>
+    );
+}
+
+// Weather effects layered over the VISIBLE pasture (doesn't scroll with the field). Rain/snow are cheap,
+// index-positioned particles (deterministic → no hydration mismatch); fog + storm add drifting haze + flashes.
+function FarmWeather({ condition }) {
+    const rain = condition === "rain" || condition === "storm";
+    const snow = condition === "snow";
+    const fog = condition === "fog";
+    const haze = condition === "cloudy" || condition === "storm" || fog;
+    if (!rain && !snow && !fog && !haze) return null;
+    const drops = rain ? 60 : snow ? 55 : 0;
+    return (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16, zIndex: 40 }}>
+            {haze ? <div style={{ position: "absolute", inset: 0, background: fog ? "rgba(206,210,214,0.42)" : "rgba(84,94,104,0.16)" }} /> : null}
+            {Array.from({ length: drops }).map((_, i) => {
+                const left = (i * 37) % 100;
+                if (rain) {
+                    const dur = 0.5 + ((i * 13) % 5) / 10;
+                    return <span key={i} style={{ position: "absolute", left: `${left}%`, top: -30, width: 2, height: 15, borderRadius: 2, background: "linear-gradient(rgba(180,198,226,0), rgba(180,198,226,0.85))", animation: `farmRain ${dur}s linear ${((i * 7) % 10) / 10}s infinite` }} />;
+                }
+                const dur = 3 + ((i * 13) % 4);
+                return <span key={i} style={{ position: "absolute", left: `${left}%`, top: -20, width: 5, height: 5, borderRadius: "50%", background: "rgba(255,255,255,0.92)", boxShadow: "0 0 3px rgba(255,255,255,0.5)", animation: `farmSnow ${dur}s linear ${((i * 9) % 20) / 10}s infinite` }} />;
+            })}
+            {fog ? [0, 1, 2].map((k) => <div key={k} style={{ position: "absolute", left: "-10%", right: "-10%", top: `${18 + k * 24}%`, height: 80, background: "rgba(224,228,232,0.55)", filter: "blur(16px)", animation: `farmFog ${8 + k * 3}s ease-in-out ${k}s infinite alternate` }} />) : null}
+            {condition === "storm" ? <div style={{ position: "absolute", inset: 0, background: "#eaf0ff", animation: "farmFlash 9s linear infinite" }} /> : null}
         </div>
     );
 }
