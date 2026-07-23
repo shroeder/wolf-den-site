@@ -98,7 +98,7 @@ export async function storePng(buffer, pathPrefix = "marketplace/ai") {
     return blob.url;
 }
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false } = {}) {
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -118,6 +118,12 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     let buffer = Buffer.from(b64, "base64");
     // Enforce a consistent right-facing orientation (e.g. pets/companions that fight toward the boss).
     if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;
+    // Optionally downscale before storing (e.g. badges render at ~24px — no need to ship a 1024px, ~1.5MB PNG).
+    // Preserves transparency; sharp is loaded lazily so callers that don't resize don't pull it in.
+    if (resizeTo) {
+        const sharp = (await import("sharp")).default;
+        buffer = await sharp(buffer).resize(resizeTo, resizeTo, { fit: "inside", withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer();
+    }
     const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
     const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
     return blob.url;
