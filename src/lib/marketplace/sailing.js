@@ -956,13 +956,13 @@ export async function doRaid(buyerId, targetId = null) {
         outcome: sim.win ? "win" : "lose", gold: goldDelta, itemWon, dodged, stunUsed: sim.stunUsed,
         battle: sim.events, myHp: sim.myHp, foeHp: sim.foeHp, myLevel,
         me: {
-            name: me?.display_name || me?.alias || "You", level: myLevel, boat: boatArt(myLevel),
+            name: me?.display_name || me?.alias || "You", level: myLevel, tier: boatTier(myLevel), boat: boatArt(myLevel),
             rider: me?.avatar_sprite_url || me?.avatar_url || null,
             riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
             pet: petView(me?.featured_collectible), stats: compactStats(myStats), canStun,
         },
         foe: {
-            name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel),
+            name: target.display_name || target.alias, level: foeLevel, tier: boatTier(foeLevel), boat: boatArt(foeLevel),
             rider: target.avatar_sprite_url || target.avatar_url || null,
             riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
             pet: petView(target.featured_collectible), stats: compactStats(foeStats),

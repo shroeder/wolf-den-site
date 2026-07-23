@@ -105,6 +105,11 @@ function createBattleAudio() {
 
 const BGS = ["/images/sailing/raid-bg-day.png", "/images/sailing/raid-bg-night.png"];
 
+// Same feet-line map the main sailing scene uses (see DECK in SailingClient) so the crew plants ON the deck of
+// each boat FORM instead of floating. Extended with the two new top-tier hulls (10 leviathan, 11 celestial).
+const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 28, 11: 30 };
+const deckPct = (tier) => DECK[tier] ?? 30;
+
 function StatChips({ stats = [] }) {
     if (!stats.length) return <div className="raid-stats raid-stats-empty">no gear equipped</div>;
     return (
@@ -121,17 +126,25 @@ function Fighter({ f, side, fx, hp }) {
     const firing = fx?.side === (side === "me" ? "me" : "foe");
     const hurt = fx && fx.side !== "stun" && fx.side !== (side === "me" ? "me" : "foe");
     const low = hp <= 25;
+    // On my ship the crew faces right (sprite default → flip only if flagged); on the foe ship they face LEFT
+    // toward me (flip the opposite way). The crew rides the deck via the shared DECK feet-line map.
+    const riderFlip = side === "foe" ? !f?.riderFlip : !!f?.riderFlip;
+    const petFlip = side === "foe" ? !f?.pet?.flip : !!f?.pet?.flip;
     return (
         <div className={`raid-ship raid-ship-${side} ${firing ? "is-firing" : ""} ${hurt ? "is-hurt" : ""} ${low ? "is-low" : ""}`}>
-            {f?.boat ? /* eslint-disable-next-line @next/next/no-img-element */ (
-                <img src={f.boat} alt="" className={`raid-boat ${side === "foe" ? "is-mirror" : ""}`} />
-            ) : null}
-            {f?.pet?.url ? /* eslint-disable-next-line @next/next/no-img-element */ (
-                <img src={f.pet.url} alt="" className={`raid-pet ${side === "foe" ? (f.pet.flip ? "" : "is-flip") : (f.pet.flip ? "is-flip" : "")}`} />
-            ) : null}
-            {f?.rider ? /* eslint-disable-next-line @next/next/no-img-element */ (
-                <img src={f.rider} alt="" className={`raid-rider ${side === "foe" ? (f.riderFlip ? "" : "is-flip") : (f.riderFlip ? "is-flip" : "")}`} />
-            ) : null}
+            <div className="raid-hull">
+                {f?.boat ? /* eslint-disable-next-line @next/next/no-img-element */ (
+                    <img src={f.boat} alt="" className={`raid-boat ${side === "foe" ? "is-mirror" : ""}`} />
+                ) : null}
+                <span className="raid-crew" style={{ "--crew-b": `${deckPct(f?.tier)}%` }}>
+                    {f?.pet?.url ? /* eslint-disable-next-line @next/next/no-img-element */ (
+                        <img src={f.pet.url} alt="" className="raid-pet" style={petFlip ? { transform: "scaleX(-1)" } : undefined} />
+                    ) : null}
+                    {f?.rider ? /* eslint-disable-next-line @next/next/no-img-element */ (
+                        <img src={f.rider} alt="" className="raid-rider" style={riderFlip ? { transform: "scaleX(-1)" } : undefined} />
+                    ) : null}
+                </span>
+            </div>
             <span className="raid-muzzle" aria-hidden="true" />
             <span className="raid-wake" aria-hidden="true" />
         </div>
