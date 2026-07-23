@@ -125,6 +125,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
+    const [wxOverride, setWxOverride] = useState({ tod: null, condition: null }); // owner debug: force tod/weather
     useEffect(() => {
         const t0 = setTimeout(() => setWeather((w) => ({ ...w, tod: hourToTod(new Date().getHours()) })), 0);
         if (typeof navigator === "undefined" || !navigator.geolocation) return () => clearTimeout(t0);
@@ -271,8 +272,16 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
     const fieldW = Math.max(150, pets.length * 36);
+    // Effective sky = detected weather, unless the owner has forced a value via the debug controls.
+    const wx = {
+        tod: wxOverride.tod || weather.tod,
+        condition: wxOverride.condition || weather.condition,
+        located: wxOverride.tod || wxOverride.condition ? true : weather.located,
+        forced: Boolean(wxOverride.tod || wxOverride.condition),
+    };
+    const chip = (active) => ({ padding: "3px 9px", borderRadius: 999, border: `1px solid ${active ? "#ffd75e" : "rgba(128,128,128,0.4)"}`, background: active ? "rgba(255,215,94,0.16)" : "transparent", color: active ? "#ffd75e" : "inherit", fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 400 });
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
-    const bgUrl = FARM_BG[weather.tod] || FARM_BG.day || null;
+    const bgUrl = FARM_BG[wx.tod] || FARM_BG.day || null;
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
@@ -322,6 +331,24 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             </section>
 
+            {farm.mine ? (
+                <section className="card" style={{ padding: "8px 12px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#ffd75e", marginBottom: 5 }}>🛠️ Debug · force sky {wx.forced ? "(override active)" : ""}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                        <span className="muted" style={{ fontSize: 11, width: 52 }}>Time</span>
+                        {[["Auto", null], ["Dawn", "dawn"], ["Day", "day"], ["Dusk", "dusk"], ["Night", "night"]].map(([label, val]) => (
+                            <button key={label} type="button" onClick={() => setWxOverride((o) => ({ ...o, tod: val }))} style={chip(wxOverride.tod === val)}>{label}</button>
+                        ))}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
+                        <span className="muted" style={{ fontSize: 11, width: 52 }}>Weather</span>
+                        {[["Auto", null], ["Clear", "clear"], ["Cloudy", "cloudy"], ["Rain", "rain"], ["Snow", "snow"], ["Fog", "fog"], ["Storm", "storm"]].map(([label, val]) => (
+                            <button key={label} type="button" onClick={() => setWxOverride((o) => ({ ...o, condition: val }))} style={chip(wxOverride.condition === val)}>{label}</button>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
+
             <FarmInspect current={viewingAlias} />
 
             {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
@@ -330,7 +357,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <div
                         style={{
                             position: "relative", width: `${fieldW}%`, minWidth: "100%", height: "min(52vh, 420px)",
-                            background: fieldBackground(weather.tod, weather.condition),
+                            background: fieldBackground(wx.tod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
@@ -344,9 +371,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             </div>
                         ) : null}
                         {/* CSS-scene fallback (drifting clouds + fence) — only when no illustrated backdrop is set */}
-                        {!bgUrl && ["clear", "cloudy"].includes(weather.condition) && weather.tod !== "night"
-                            ? Array.from({ length: weather.condition === "cloudy" ? 7 : 4 }).map((_, k) => (
-                                <div key={k} style={{ position: "absolute", top: `${8 + (k % 3) * 9}%`, left: `${(k * 23 + 6) % 96}%`, width: 78 + (k % 3) * 26, height: 22 + (k % 2) * 8, borderRadius: 22, background: weather.condition === "cloudy" ? "rgba(230,232,235,0.9)" : "rgba(255,255,255,0.82)", filter: "blur(1px)", animation: `farmCloud ${9 + (k % 4) * 2}s ease-in-out ${k * 0.6}s infinite alternate` }} />
+                        {!bgUrl && ["clear", "cloudy"].includes(wx.condition) && wx.tod !== "night"
+                            ? Array.from({ length: wx.condition === "cloudy" ? 7 : 4 }).map((_, k) => (
+                                <div key={k} style={{ position: "absolute", top: `${8 + (k % 3) * 9}%`, left: `${(k * 23 + 6) % 96}%`, width: 78 + (k % 3) * 26, height: 22 + (k % 2) * 8, borderRadius: 22, background: wx.condition === "cloudy" ? "rgba(230,232,235,0.9)" : "rgba(255,255,255,0.82)", filter: "blur(1px)", animation: `farmCloud ${9 + (k % 4) * 2}s ease-in-out ${k * 0.6}s infinite alternate` }} />
                             ))
                             : null}
                         {!bgUrl ? (
@@ -420,7 +447,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     </div>
                 </div>
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
-                <FarmWeather condition={weather.condition} />
+                <FarmWeather condition={wx.condition} />
                 {/* Wild Loot Pig announce toast (the pig himself lives inside the scrolling field, below) */}
                 {pigToast ? (
                     <div style={{ position: "absolute", top: 44, left: "50%", transform: "translateX(-50%)", zIndex: 70, padding: "8px 16px", borderRadius: 999, background: "rgba(20,16,6,0.92)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,0.45)", animation: "pigPop .4s ease both" }}>
@@ -429,8 +456,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 ) : null}
                 {/* Live conditions label (unobtrusive, top-left) */}
                 <div style={{ position: "absolute", top: 8, left: 8, zIndex: 60, pointerEvents: "none", padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700, color: "#f2f6ee", background: "rgba(18,26,14,0.5)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(2px)" }}
-                    title={weather.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
-                    {weatherLabel(weather)}
+                    title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
+                    {weatherLabel(wx)}
                 </div>
             </div>
 
