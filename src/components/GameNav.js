@@ -29,11 +29,13 @@ const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${hre
 
 // Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them
 // so you don't get dumped out of the game when you (e.g.) tap into another player's profile or the badge list.
-const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplace/rewards"];
+const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm"];
 
 export default function GameNav() {
     const pathname = usePathname() || "";
-    const links = LINKS;
+    const [owner, setOwner] = useState(false); // owner-only preview links (e.g. Farm) appended when true
+    // Farm is an owner-only preview — append it to the menu only for the owner account.
+    const links = owner ? [...LINKS, { href: "/marketplace/farm", emoji: "🌾", label: "Farm" }] : LINKS;
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
@@ -52,7 +54,7 @@ export default function GameNav() {
                 .catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" })
                 .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); })
+                .then((d) => { if (alive) { setSailAttn(Boolean(d?.attention)); setOwner(Boolean(d?.owner)); } })
                 .catch(() => {});
         };
         loadChests();
