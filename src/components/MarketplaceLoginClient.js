@@ -103,8 +103,8 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                             {mode === "register" ? (
                                 <>
                                     <div style={{ display: "flex", gap: 10 }}>
-                                        <input name="firstname" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" required style={{ flex: 1 }} />
-                                        <input name="lastname" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" required style={{ flex: 1 }} />
+                                        <input name="firstname" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" required style={{ flex: 1, minWidth: 0 }} />
+                                        <input name="lastname" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" required style={{ flex: 1, minWidth: 0 }} />
                                     </div>
                                     <input name="fullname" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" />
                                 </>
