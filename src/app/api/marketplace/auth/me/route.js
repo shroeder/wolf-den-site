@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { awardXp, claimPendingPurchases, dailyKey } from "@/lib/marketplace/xp.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
@@ -27,7 +28,7 @@ export async function GET(request) {
                 // Enrich with the first-class profile (name/alias/avatar/badges) so every surface can
                 // show it. Keep displayName for back-compat with existing consumers.
                 const profile = await getProfile(account.id);
-                const buyer = { ...account, ...(profile || {}), displayName: profile?.displayLabel || account.displayName || null };
+                const buyer = { ...account, ...(profile || {}), displayName: profile?.displayLabel || account.displayName || null, owner: isOwner(account.id) };
                 const vendorId = await getAccountLinkedVendorId(account.id);
                 if (vendorId) {
                     const vendor = await getVendorById(vendorId);
