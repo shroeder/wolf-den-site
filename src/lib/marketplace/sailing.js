@@ -69,9 +69,10 @@ const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RE
 // Sailing achievement badge thresholds — kept HIGH on purpose (these are meant to be a grind / rare feats).
 const BADGE_RAID_MARAUDER = 25, BADGE_RAID_SCOURGE = 100, BADGE_DIG_EXCAVATOR = 50, BADGE_VOYAGER = 100;
 
-// After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
-// the feature is in testing — set back to 500 before release.
-export const WIND_RECHARGE_COST = 500; // extra tailwinds cost gold (testing freebies concluded)
+// After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold — and the price DOUBLES
+// for each extra one caught this voyage (wind_recharges), so spamming tailwinds gets expensive fast.
+export const WIND_RECHARGE_COST = 500; // base cost of the FIRST extra tailwind
+const windRechargeCost = (n = 0) => WIND_RECHARGE_COST * Math.pow(2, Math.max(0, n));
 
 // ── Waves ── greet a passing member a few times a day for a little XP/coins + a small travel cut.
 const WAVES_PER_DAY = 3;               // base daily waves; LUCK adds more (see wavesPerDay)
@@ -238,7 +239,8 @@ const FRAGMENTS_BURIED = 3;   // base fragments scattered through the dirt; Fort
 const MAX_BURIED = 12;        // cap on buried fragments (of a 16-tile board)
 const RARITY_UPGRADE_PER_LEVEL = 0.005; // Rarity: +0.5%/level chance that a forged chest is bumped up a tier
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
-const DIG_REFILL_COST = 300;  // gold per dig refill (testing freebies concluded)
+const DIG_REFILL_COST = 300;  // base cost of the FIRST refill; DOUBLES per refill bought this dig (board.refills)
+const digRefillCost = (n = 0) => DIG_REFILL_COST * Math.pow(2, Math.max(0, n));
 
 // ── DIGGING UPGRADES (separate from the boat) ── five gold-leveled tracks. Each track's PER-LEVEL value ×
 // its MAX level = the cap Luke asked for.
@@ -638,7 +640,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0) {
             ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
             topTier: Object.keys(o.frag)[Object.keys(o.frag).length - 1],
         })),
-        digRefill: { amount: DIG_REFILL, cost: DIG_REFILL_COST },
+        digRefill: { amount: DIG_REFILL, cost: digRefillCost(row?.dig_state?.refills || 0) },
         // The boat's FOUR travel/loot levers — all boat-exclusive. Each carries its per-level effect + current/next value.
         speed: {
             level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL,
@@ -689,7 +691,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0) {
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
         // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
-        windRecharge: { cost: WIND_RECHARGE_COST },
+        windRecharge: { cost: windRechargeCost(row?.wind_recharges || 0) },
         dig: status === "digging" ? boardView(dig) : null,
     };
 }
@@ -797,13 +799,13 @@ export async function startVoyage(buyerId, optionId = "standard") {
     // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark; reset any prior encounter.
     const encMs = Math.random() < encounterChance(state.fortune.level) ? String(Math.round(ms / 2)) : null;
     await db.query(
-        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, encounter_at, encounter_result, updated_at)
+        `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, encounter_at, encounter_result, wind_recharges, updated_at)
          VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4,
-                 CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END, NULL, NOW())
+                 CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END, NULL, 0, NOW())
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
-                 encounter_result = NULL, merchant_json = NULL, updated_at = NOW()`,
+                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, updated_at = NOW()`,
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
@@ -1023,7 +1025,7 @@ export async function doRaid(buyerId, targetId = null) {
             name: me?.display_name || me?.alias || "You", level: myLevel, tier: boatTier(myLevel), boat: boatArt(myLevel),
             rider: me?.avatar_sprite_url || me?.avatar_url || null,
             riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
-            pet: petView(me?.featured_collectible), stats: compactStats(myStats), canStun,
+            pet: petView(me?.featured_collectible), stats: compactStats(myStats), canStun: perks.raidStun,
         },
         foe: {
             name: target.display_name || target.alias, level: foeLevel, tier: boatTier(foeLevel), boat: boatArt(foeLevel),
@@ -1133,22 +1135,23 @@ export async function rechargeWind(buyerId) {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "sailing") return { ok: false, error: "not_sailing", ...(await getSailingState(buyerId)) };
-    if (WIND_RECHARGE_COST > 0 && (state.gold || 0) < WIND_RECHARGE_COST) {
+    const cost = windRechargeCost(row?.wind_recharges || 0); // escalates: each extra tailwind this voyage costs double
+    if (cost > 0 && (state.gold || 0) < cost) {
         return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
     }
     // Apply the hour first (also validates a voyage is actually in progress) so we never charge with no effect.
     const updated = await db.queryOne(
         `UPDATE mkt_sailing
-            SET returns_at = GREATEST(NOW(), returns_at - interval '1 hour'), updated_at = NOW()
+            SET returns_at = GREATEST(NOW(), returns_at - interval '1 hour'), wind_recharges = COALESCE(wind_recharges, 0) + 1, updated_at = NOW()
           WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at IS NOT NULL AND returns_at > NOW()
           RETURNING returns_at`,
         [buyerId]
     ).catch(() => null);
     if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
-    if (WIND_RECHARGE_COST > 0) {
-        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2) WHERE id = $1`, [buyerId, WIND_RECHARGE_COST]).catch(() => {});
+    if (cost > 0) {
+        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2) WHERE id = $1`, [buyerId, cost]).catch(() => {});
     }
-    return { ok: true, spent: WIND_RECHARGE_COST, ...(await getSailingState(buyerId)) };
+    return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 
 // Grant treasure-chest fragment(s) to a member (used by the Cheer first-of-day item proc). Upserts the sailing
@@ -1213,14 +1216,16 @@ export async function buyDigs(buyerId) {
     const row = await readRow(buyerId);
     const board = row?.dig_state;
     if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
-    if (DIG_REFILL_COST > 0) {
-        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, DIG_REFILL_COST]).catch(() => null);
+    const cost = digRefillCost(board.refills || 0); // escalates: each refill this dig costs double the last
+    if (cost > 0) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
         if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
     }
     board.stamina += DIG_REFILL;
     board.maxStamina += DIG_REFILL;
+    board.refills = (board.refills || 0) + 1;
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
-    return { ok: true, spent: DIG_REFILL_COST, ...(await getSailingState(buyerId)) };
+    return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 
 export async function beginDig(buyerId) {
