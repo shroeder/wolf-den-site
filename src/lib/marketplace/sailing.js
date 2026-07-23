@@ -60,6 +60,9 @@ const RAID_ITEM_COPY_CHANCE = 0.005;             // 0.5% to copy one random item
 const RAID_DODGE_BASE = 0.005, RAID_DODGE_PER = 0.0025; // 0.5% + 0.25%/level to NOT use up the daily raid
 const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_DODGE_PER;
 const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
+// Daily raid allowance: 1 base + ship perks (Celestial Sovereign +1) + set bonus (later). Count-based so >1/day works.
+const raidsPerDay = (level = 1, setBonus = 0) => 1 + boatPerks(level).bonusRaids + Math.max(0, setBonus);
+const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) : 0); // count only counts if it's TODAY's
 // Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
 // RAID_RESET_PAID true (+ tune base) before release.
 const RAID_RESET_PAID = true;       // resets cost gold now (testing freebies concluded)
@@ -313,8 +316,8 @@ const MILESTONES = [
     { level: 60, tier: 7, name: "Arcane Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
     { level: 70, tier: 8, name: "Dragon Ship", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
     { level: 80, tier: 9, name: "Ghost Ship", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
-    { level: 90, tier: 10, name: "Leviathan Dreadnought", perk: "5% chance a dig doesn't use up a charge", digSave: 0.05 },
-    { level: 100, tier: 11, name: "Celestial Warship", perk: "Once per raid, stun your foe for 2 attacks", raidStun: true },
+    { level: 90, tier: 10, name: "Leviathan Dreadnought", perk: "Maw of the Deep — voyages haul back +2 bonus fragments; 5% chance a dig doesn't use a charge", voyageFrags: 2, digSave: 0.05 },
+    { level: 100, tier: 11, name: "Celestial Warship", perk: "Celestial Sovereign — +1 raid per day, a guaranteed opening critical, and a stun each fight", bonusRaids: 1, openingCrit: true, raidStun: true },
 ];
 
 const BOAT_ART = {
@@ -350,7 +353,8 @@ export function boatArt(level) {
 }
 // Cumulative milestone perks unlocked at this boat level.
 function boatPerks(level) {
-    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0, digSave: 0, raidStun: false };
+    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0,
+        digSave: 0, raidStun: false, voyageFrags: 0, openingCrit: false, bonusRaids: 0 };
     for (const m of MILESTONES) {
         if (level < m.level) break;
         if (m.buried) p.buried += m.buried;
@@ -361,6 +365,9 @@ function boatPerks(level) {
         if (m.windSave) p.windSave = Math.max(p.windSave, m.windSave);
         if (m.digSave) p.digSave = Math.max(p.digSave, m.digSave);
         if (m.raidStun) p.raidStun = true;
+        if (m.voyageFrags) p.voyageFrags += m.voyageFrags;
+        if (m.openingCrit) p.openingCrit = true;
+        if (m.bonusRaids) p.bonusRaids += m.bonusRaids;
     }
     return p;
 }
@@ -662,16 +669,19 @@ function decorate(row, chestArt = {}, bonusWaves = 0) {
             level: raidLevel, max: MAX_RAID_LEVEL, cost: upgradeCost(raidLevel), maxed: raidLevel >= MAX_RAID_LEVEL,
             pctNow: raidDodgePct(raidLevel), pctNext: raidDodgePct(raidLevel + 1),
         },
-        // Once-a-day raid: whether it's available + the perks that shape it (shown on the raid button/modal).
-        raid: {
-            usedToday: !!row?.raid_used_today,
-            available: !row?.raid_used_today,
-            dodgePct: raidDodgePct(raidLevel),
-            canStun: boatPerks(level).raidStun,
-            winGold: [25, 75], loseGold: [RAID_LOSS_MIN, RAID_LOSS_MAX], itemChance: RAID_ITEM_COPY_CHANCE * 100,
-            // Buy-another-raid: cost escalates with each reset that day (free while testing).
-            reset: { cost: raidResetCost(row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0), free: !RAID_RESET_PAID },
-        },
+        // Daily raids (count-based so the Celestial Sovereign / set perks can grant more than one).
+        raid: (() => {
+            const cap = raidsPerDay(level);
+            const used = raidsUsedToday(row);
+            return {
+                usedToday: used >= cap, available: used < cap, used, cap,
+                dodgePct: raidDodgePct(raidLevel),
+                canStun: boatPerks(level).raidStun,
+                winGold: [25, 75], loseGold: [RAID_LOSS_MIN, RAID_LOSS_MAX], itemChance: RAID_ITEM_COPY_CHANCE * 100,
+                // Buy-another-raid: cost escalates with each reset that day (free while testing).
+                reset: { cost: raidResetCost(row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0), free: !RAID_RESET_PAID },
+            };
+        })(),
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -960,12 +970,12 @@ function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, myCritPow = 
 // gold. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
 export async function doRaid(buyerId, targetId = null) {
     const row = await readRow(buyerId);
-    if (row?.raid_used_today) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
+    const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
+    if (raidsUsedToday(row) >= raidsPerDay(myLevel)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
     // Raid the CHOSEN target if one was picked (validated); otherwise fall back to a random passing ship.
     const target = (await raidTargetById(buyerId, targetId)) || (targetId ? null : await pickRaidTarget(buyerId));
     if (!target) return { ok: false, error: "no_target", ...(await getSailingState(buyerId)) };
 
-    const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
 
     // Presentation + combat inputs for BOTH fighters (their hero sprite, pet, and equipped gear stats).
@@ -989,7 +999,11 @@ export async function doRaid(buyerId, targetId = null) {
     // Consume the daily raid UNLESS raid-dodge procs (then it's free — you can raid again today).
     const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    if (!dodged) await db.query(`UPDATE mkt_sailing SET raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    if (!dodged) await db.query(
+        `UPDATE mkt_sailing
+            SET raid_count = CASE WHEN raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN raid_count + 1 ELSE 1 END,
+                raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
+          WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {}); // "Raid a passing ship" daily quest
 
     let goldDelta = 0, itemWon = null;
@@ -1043,7 +1057,8 @@ export async function doRaid(buyerId, targetId = null) {
 // raid_day so the raid is available again, and bumps the per-day reset counter that drives the escalating price.
 export async function resetRaid(buyerId) {
     const row = await readRow(buyerId);
-    if (!row?.raid_used_today) return { ok: false, error: "not_used", ...(await getSailingState(buyerId)) }; // nothing to reset
+    const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
+    if (raidsUsedToday(row) < raidsPerDay(myLevel)) return { ok: false, error: "not_used", ...(await getSailingState(buyerId)) }; // still have raids left
     const resetsToday = row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0;
     const cost = raidResetCost(resetsToday);
     if (cost > 0) {
@@ -1052,7 +1067,7 @@ export async function resetRaid(buyerId) {
     }
     await db.query(
         `UPDATE mkt_sailing
-            SET raid_day = NULL,
+            SET raid_count = GREATEST(0, raid_count - 1),
                 raid_resets = CASE WHEN raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN raid_resets + 1 ELSE 1 END,
                 raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
                 updated_at = NOW()
