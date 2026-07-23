@@ -172,11 +172,15 @@ async function merchantFindBonus(buyerId) {
     return MERCHANT_PET_FIND[Math.max(1, Math.min(5, lvl))] || 0;
 }
 
-// ── SEA AFFINITY ── equipped GEAR + PET grant sailing-only effects (plunder/dredge/bulwark/tailwind POINTS).
+// ── SEA AFFINITY ── equipped GEAR + PET grant sailing-only effect POINTS (broadside/ironclad/plunder/bounty/dredge/trove/tailwind).
 // Aggregated here and converted to real effects by seaEffects(). Never touches boss power. Pet points scale by
 // the equipped pet's level (1..5 → ~0.36x..1.0x), mirroring the elephant's merchant-find bonus.
 async function equippedSeaAffinity(buyerId) {
-    const sea = { plunder: 0, dredge: 0, bulwark: 0, tailwind: 0 };
+    // Must list EVERY real SEA_META effect key — the merges below use `for (k in sea)`, so any key missing here
+    // is silently dropped. (This previously seeded only plunder/dredge/bulwark/tailwind, so broadside, ironclad,
+    // bounty and trove were always 0 for BOTH gear and pets — Turtle/Marlin/Anglerfish etc. did nothing. The
+    // old `bulwark` key wasn't a real effect and is removed.)
+    const sea = { broadside: 0, ironclad: 0, plunder: 0, bounty: 0, dredge: 0, trove: 0, tailwind: 0 };
     if (!buyerId) return sea;
     const [bySlot, me] = await Promise.all([
         getEquippedIds(buyerId).catch(() => ({})),

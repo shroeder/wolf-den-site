@@ -65,7 +65,10 @@ export async function getRewardsTrack(buyerId) {
     const unlockableBackgrounds = BACKGROUNDS.filter((b) => b.id !== "none");
     const unlockableFrames = FRAMES.filter((f) => f.id !== "none" && !f.requiresBadges);
     const unlockableCosmetics = AVATAR_COSMETICS.filter((c) => !c.requiresBadges);
-    const unlockableCollectibles = COLLECTIBLES;
+    // Only LEVEL-gated pets belong on the level spine. Shop/chest/boss/achievement/elite pets have no `level`,
+    // so including them all seeded the notableLevels set with `undefined` — which sorts to the very end and
+    // produced a phantom "Level (blank)" node after 100 that dumped EVERY non-level pet into one confusing pile.
+    const unlockableCollectibles = COLLECTIBLES.filter((c) => c.source === "level" && typeof c.level === "number");
     const notableLevels = Array.from(
         new Set([
             ...RANKS.map((r) => r.level),

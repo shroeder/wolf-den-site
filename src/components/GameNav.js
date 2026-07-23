@@ -27,10 +27,14 @@ const LINKS = [
 
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
+// Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them
+// so you don't get dumped out of the game when you (e.g.) tap into another player's profile or the badge list.
+const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplace/rewards"];
+
 export default function GameNav() {
     const pathname = usePathname() || "";
     const links = LINKS;
-    const inGame = links.some((l) => isOn(pathname, l.href));
+    const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
     const [chests, setChests] = useState(0);

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
 
 import SailingClient from "@/components/SailingClient";
+import SailingLanding from "@/components/SailingLanding";
 import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
@@ -10,11 +10,15 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { getSailingState } from "@/lib/marketplace/sailing.js";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Sailing | The Wolf Den" };
+export const metadata = {
+    title: "Sailing — a free treasure-hunting adventure | The Wolf Den",
+    description: "Captain your ship, dig for buried treasure, and raid rival vessels. Build a free character at The Wolf Den and level up for real store rewards.",
+};
 
 export default async function SailingPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    if (!buyer) notFound(); // sign-in required (the nav/hub links only appear inside the authed game)
+    // Cold ad traffic lands here logged-out — show a hook + signup that returns them to sailing, not a 404.
+    if (!buyer) return <SailingLanding />;
 
     const [state, me, petBase, petLevels] = await Promise.all([
         getSailingState(buyer.id),
