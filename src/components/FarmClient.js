@@ -80,12 +80,12 @@ const fieldBackground = (tod, condition) => {
 // falls back to the CSS gradient scene above until these are filled in. Storm/overcast reuse the base image +
 // the weather overlays on top.
 const FARM_BG = {
-    day: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837312818-809150.png",
-    dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837334517-905734.png",
-    night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837358204-514417.png",
-    dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837381622-831520.png",
-    storm: null,
-    snow: null,
+    day: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838066440-671862.png",
+    dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838089019-734565.png",
+    night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838349373-318702.png",
+    dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838132569-798406.png",
+    storm: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838156570-858112.png",
+    snow: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838178566-149863.png",
 };
 // Storm/snow get their own painted scene when available; otherwise use the time-of-day image + weather overlays.
 const pickFarmBg = (tod, condition) =>
