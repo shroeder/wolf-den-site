@@ -127,6 +127,13 @@ export default function FarmClient({ initial, viewingAlias }) {
         }, 2500 + Math.random() * 5000);
         return () => clearTimeout(t);
     }, [initial.mine, initial.pigAvailable]);
+    // Lock the page behind any open modal so the background doesn't scroll under it.
+    useEffect(() => {
+        if (typeof document === "undefined" || !(inspect || pigResult)) return undefined;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [inspect, pigResult]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -318,7 +325,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div>
-                    <h1 style={{ margin: 0 }}>🌾 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
+                    <h1 style={{ margin: 0 }}>🏡 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
                     <p className="muted" style={{ margin: "4px 0 0" }}>
                         {pets.length} pet{pets.length === 1 ? "" : "s"} roaming · tap one to inspect
                         {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings left today` : ""}
@@ -331,7 +338,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         </button>
                     ) : null}
                     {!farm.mine ? (
-                        <button type="button" className="btn" onClick={() => router.push("/marketplace/farm")}>← My farm</button>
+                        <button type="button" className="btn" onClick={() => window.location.assign("/marketplace/farm")}>← My farm</button>
                     ) : null}
                 </div>
             </section>
@@ -354,7 +361,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </section>
             ) : null}
 
-            <FarmInspect current={viewingAlias} />
+            <FarmDirectory current={viewingAlias} />
 
             {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
             <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
@@ -426,7 +433,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                                 alt={pet.name}
                                                 width={58}
                                                 height={58}
-                                                style={{ width: 58, height: 58, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "none" }}
+                                                style={{ width: 58, height: 58, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "none" }}
                                             />
                                             {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                         </span>
@@ -588,7 +595,7 @@ function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [],
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-label={`${pet.name} details`}
-                style={{ width: "100%", maxWidth: 360, borderRadius: 16, background: "var(--card-bg, #17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden" }}
+                style={{ width: "100%", maxWidth: 360, maxHeight: "90dvh", overflowY: "auto", overflowX: "hidden", borderRadius: 16, background: "var(--card-bg, #17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
             >
                 <div style={{ position: "relative", padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}22 0%, transparent 70%)` }}>
                     <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", color: "inherit", fontSize: 20, cursor: "pointer", opacity: 0.7 }}>×</button>
@@ -733,65 +740,76 @@ function FarmWeather({ condition }) {
     );
 }
 
-// Owner tool: browse members (quick chips) or search by @alias to walk over and watch their farm.
-function FarmInspect({ current }) {
-    const router = useRouter();
+// Owner tool: a scrollable directory of member HERO CARDS (avatar + featured pet + level + pet count) to walk
+// over and visit their farm. Clean search (no emoji), avatars instead of verbose @handles.
+const SearchIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5l-4-4" />
+    </svg>
+);
+function HeroCard({ m, onClick }) {
+    const avatar = m.spriteUrl || m.avatarUrl;
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "8px 12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "linear-gradient(100deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))", color: "inherit", cursor: "pointer", textAlign: "left" }}
+        >
+            <span style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)", border: "2px solid rgba(255,215,94,0.55)", display: "grid", placeItems: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.35)" }}>
+                {avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatar} alt="" width={46} height={46} style={{ width: 46, height: 46, objectFit: "cover", transform: m.spriteFlip ? "scaleX(-1)" : "none" }} />
+                ) : <span style={{ fontSize: 20 }}>🐾</span>}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+                <span className="muted" style={{ fontSize: 12 }}>Lv {m.level} · 🐾 {m.petCount} pet{m.petCount === 1 ? "" : "s"}</span>
+            </span>
+            {m.petSpriteUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.petSpriteUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, objectFit: "contain", transform: m.petSpriteFlip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.4))" }} />
+            ) : null}
+            <span style={{ opacity: 0.45, fontSize: 20, fontWeight: 700 }}>›</span>
+        </button>
+    );
+}
+function FarmDirectory({ current }) {
     const [q, setQ] = useState("");
-    const [results, setResults] = useState([]);
-    const [recent, setRecent] = useState([]); // a default set of members to jump to without typing
-    const go = (alias) => router.push(`/marketplace/farm?u=${encodeURIComponent(alias)}`);
-
-    // Seed a default member list on mount so you can visit a farm in one tap (no search needed).
+    const [members, setMembers] = useState([]);
+    const [loading, setLoading] = useState(true);
     useEffect(() => {
         let alive = true;
-        fetch("/api/marketplace/members?q=", { cache: "no-store" })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((d) => { if (alive) setRecent((d?.members || []).filter((m) => m.alias).slice(0, 12)); })
-            .catch(() => {});
-        return () => { alive = false; };
-    }, []);
-
-    useEffect(() => {
-        const term = q.trim().replace(/^@/, "");
-        const t = setTimeout(async () => {
-            if (term.length < 2) { setResults([]); return; }
-            const r = await fetch(`/api/marketplace/members?q=${encodeURIComponent(term)}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
-            setResults((r?.members || []).filter((m) => m.alias).slice(0, 10));
-        }, 250);
-        return () => clearTimeout(t);
+        const t = setTimeout(() => {
+            fetch(`/api/marketplace/farm?list=1&q=${encodeURIComponent(q.trim())}`, { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => { if (alive) { setMembers(d?.members || []); setLoading(false); } })
+                .catch(() => { if (alive) setLoading(false); });
+        }, q.trim() ? 250 : 0);
+        return () => { alive = false; clearTimeout(t); };
     }, [q]);
-
-    const list = q.trim().length >= 2 ? results : recent;
+    const visit = (alias) => window.location.assign(`/marketplace/farm?u=${encodeURIComponent(alias)}`);
     return (
         <section className="card">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <strong style={{ fontSize: 14 }}>🔎 Visit another farm</strong>
-                <span className="muted" style={{ fontSize: 12 }}>Owner-only</span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+                <strong style={{ fontSize: 16 }}>Visit a farm</strong>
+                <span className="muted" style={{ fontSize: 11 }}>owner-only</span>
             </div>
-            <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search a member by @alias or name…"
-                style={{ width: "100%", marginTop: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(128,128,128,0.4)", background: "transparent", color: "inherit" }}
-            />
-            {list.length ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                    {list.map((m) => (
-                        <button
-                            key={m.id || m.alias}
-                            type="button"
-                            onClick={() => go(m.alias)}
-                            style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", fontSize: 13 }}
-                        >
-                            🌾 {m.displayLabel || m.alias} <span className="muted">@{m.alias}</span>
-                        </button>
-                    ))}
-                </div>
-            ) : q.trim().length >= 2 ? (
-                <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>No members match “{q.trim()}”.</p>
-            ) : null}
-            {current ? <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
+            <div style={{ position: "relative", marginBottom: 10 }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.5, display: "flex" }}><SearchIcon /></span>
+                <input
+                    type="text"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search members…"
+                    style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: 12, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.04)", color: "inherit" }}
+                />
+            </div>
+            <div style={{ maxHeight: 360, overflowY: "auto", display: "grid", gap: 8, paddingRight: 2 }}>
+                {members.map((m) => <HeroCard key={m.id} m={m} onClick={() => visit(m.alias)} />)}
+                {loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>Loading farms…</div> : null}
+                {!loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>No farms found.</div> : null}
+            </div>
+            {current ? <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
         </section>
     );
 }

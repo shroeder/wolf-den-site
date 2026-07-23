@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner } from "@/lib/marketplace/farm.js";
+import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -15,7 +15,12 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer || !isOwner(buyer.id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
-            const u = new URL(request.url).searchParams.get("u");
+            const params = new URL(request.url).searchParams;
+            if (params.get("list")) {
+                const members = await farmDirectory(buyer.id, { q: params.get("q") || "" });
+                return NextResponse.json({ members }, { headers: { "Cache-Control": "no-store" } });
+            }
+            const u = params.get("u");
             let ownerId = buyer.id;
             if (u) {
                 const o = await resolveFarmOwner(u);
