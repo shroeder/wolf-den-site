@@ -12,7 +12,7 @@ export const maxDuration = 180;
 const VARIANT = {
     day: { sky: "a bright blue midday sky with a few soft white clouds and warm sunlight" },
     dusk: { sky: "a glowing golden-orange sunset sky with long warm dusk light and purple clouds" },
-    night: { sky: "a deep indigo starry night sky with a bright moon and cool blue moonlight" },
+    night: { sky: "a deep indigo star-filled night sky with cool blue moonlit ambiance and soft glow near the horizon, but absolutely NO visible moon anywhere" },
     dawn: { sky: "a soft pink and peach sunrise sky with gentle early-morning light and low mist" },
     storm: { sky: "a dark, heavy, dramatic storm sky with thick grey-blue clouds and a moody overcast gloom" },
     snow: { sky: "a soft pale grey overcast winter sky with gently falling snow", ground: "a snow-covered white winter pasture with snow dusting the fence and hills, and bare frosted trees" },
