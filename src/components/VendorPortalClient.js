@@ -2500,7 +2500,7 @@ export default function VendorPortalClient({
                                                 href={`/marketplace/product/${m.catalogProductId}`}
                                                 className="mkt-mission-source"
                                             >
-                                                🔁 Source it from {m.sellerCount} vendor{m.sellerCount === 1 ? "" : "s"} →
+                                                🛒 Source it from {m.sellerCount} vendor{m.sellerCount === 1 ? "" : "s"} →
                                             </Link>
                                         ) : null}
                                     </div>

@@ -132,7 +132,7 @@ function OrderCard({ order: o, onUpdate }) {
             <p className="muted">
                 👤 {o.customerName || o.shipping.name || "—"} · {o.customerEmail || o.shipping.email || "—"}
                 {o.shipping.phone ? ` · ${o.shipping.phone}` : ""}
-                {o.refundAmountCents ? <><br />↩️ Refunded {money(o.refundAmountCents)}{o.cancellationReason ? ` — ${o.cancellationReason}` : ""}</> : null}
+                {o.refundAmountCents ? <><br />💸 Refunded {money(o.refundAmountCents)}{o.cancellationReason ? ` — ${o.cancellationReason}` : ""}</> : null}
                 {!isPickup && o.shipping.addressLine1 ? (
                     <>
                         <br />

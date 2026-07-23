@@ -505,7 +505,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         { track: "stamina", icon: "⛏️", name: "Stamina", data: dg.stamina, desc: <>More digs each trip — <b>+1</b> per level.</>, effLabel: "Digs / trip", now: dg.stamina?.digsNow, next: dg.stamina?.digsNext },
         { track: "pierce", icon: "🪨", name: "Pierce", data: dg.pierce, desc: <>Chance a dig breaks through <b>every layer</b> of a tile at once.</>, effLabel: "Pierce chance", now: pct(dg.pierce?.valueNow), next: pct(dg.pierce?.valueNext) },
         { track: "strike", icon: "✨", name: "Strike", data: dg.strike, desc: <>Chance a dig <b>strikes a lucky bonus</b> fragment.</>, effLabel: "Strike chance", now: pct(dg.strike?.valueNow), next: pct(dg.strike?.valueNext) },
-        { track: "efficient", icon: "♻️", name: "Tinker", data: dg.efficient, desc: <>Adds to <b>every tool&apos;s proc chance</b> while you dig.</>, effLabel: "Tool proc bonus", now: pct(dg.efficient?.valueNow), next: pct(dg.efficient?.valueNext) },
+        { track: "efficient", icon: "🔧", name: "Tinker", data: dg.efficient, desc: <>Adds to <b>every tool&apos;s proc chance</b> while you dig.</>, effLabel: "Tool proc bonus", now: pct(dg.efficient?.valueNow), next: pct(dg.efficient?.valueNext) },
         { track: "detonator", icon: "💥", name: "Detonator", data: dg.detonator, desc: <>Chance a dig <b>spawns an explosion</b> (clears a 3×3, one layer).</>, effLabel: "Explosion chance", now: pct(dg.detonator?.valueNow), next: pct(dg.detonator?.valueNext) },
     ];
 
@@ -758,7 +758,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
                         ) : (
                             <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
-                                {busy ? "…" : resetCost > 0 ? <>🔄 Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>🔄 Buy another raid — free (testing)</>}
+                                {busy ? "…" : resetCost > 0 ? <>⚔️ Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>⚔️ Buy another raid — free (testing)</>}
                             </button>
                         )}
                     </div>
@@ -780,7 +780,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
                             ) : (
                                 <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
-                                    {busy ? "…" : resetCost > 0 ? <>🔄 Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>🔄 Buy another raid — free</>}
+                                    {busy ? "…" : resetCost > 0 ? <>⚔️ Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>⚔️ Buy another raid — free</>}
                                 </button>
                             )
                         )}
