@@ -79,7 +79,12 @@ const fieldBackground = (tod, condition) => {
 // Illustrated farm backdrops per time of day (generated via /api/admin/farm-bg). Mirror-tiled behind the pets;
 // falls back to the CSS gradient scene above until these are filled in. Storm/overcast reuse the base image +
 // the weather overlays on top.
-const FARM_BG = { day: null, dusk: null, night: null, dawn: null };
+const FARM_BG = {
+    day: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837312818-809150.png",
+    dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837334517-905734.png",
+    night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837358204-514417.png",
+    dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837381622-831520.png",
+};
 
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
