@@ -109,6 +109,27 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok && i >= 0) addFloater(i, `+${r.xpGained} XP`, "#ffe27a");
     }, [farm.canPet, busy, addFloater, pets]);
 
+    // Feed a treat (consumable) to a specific pet.
+    const feedTreat = useCallback(async (pet, consumableId) => {
+        if (!farm.canPet || busy) return;
+        const i = pets.findIndex((p) => p.id === pet.id);
+        setBusy(consumableId);
+        const r = await fetch("/api/marketplace/farm", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "use_item", petId: pet.id, consumableId }),
+        }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
+        setBusy(null);
+        if (!r?.ok) return;
+        const patch = { level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed };
+        setFarm((f) => ({
+            ...f,
+            pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)),
+            treats: (f.treats || []).map((t) => (t.id === consumableId ? { ...t, count: t.count - 1 } : t)).filter((t) => t.count > 0),
+        }));
+        setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
+        if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : `+${r.petXpGain || ""} XP`, "#ffe27a");
+    }, [farm.canPet, busy, addFloater, pets]);
+
     const pettableLeft = farm.canPet ? pets.filter((p) => !p.petted).length : 0;
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
@@ -227,8 +248,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                     pet={inspect}
                     canPet={farm.canPet}
                     petXp={farm.petXp}
-                    busy={busy === inspect.id}
+                    treats={farm.treats || []}
+                    busyKey={busy}
                     onPet={() => petIt(inspect)}
+                    onUseTreat={(cid) => feedTreat(inspect, cid)}
                     onClose={() => setInspect(null)}
                 />
             ) : null}
@@ -238,7 +261,8 @@ export default function FarmClient({ initial, viewingAlias }) {
 
 // Detail card for a single pet: big sprite, rarity/level, XP progress, what it does, and — on your own farm —
 // the once-a-day "pet for XP" action.
-function PetInspect({ pet, canPet, petXp, busy, onPet, onClose }) {
+function PetInspect({ pet, canPet, petXp, treats = [], busyKey, onPet, onUseTreat, onClose }) {
+    const busy = Boolean(busyKey);
     const def = collectibleById(pet.id);
     const perk = def ? petPerk(def) : null; // active (equipped) signature
     const passive = def ? petPassive(def) : null; // owned bonus
@@ -308,9 +332,35 @@ function PetInspect({ pet, canPet, petXp, busy, onPet, onClose }) {
                                 className="btn"
                                 style={{ width: "100%", marginTop: 4, padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}
                             >
-                                {busy ? "Petting…" : `❤️ Pet ${pet.name} (+${petXp} XP)`}
+                                {busyKey === pet.id ? "Petting…" : `❤️ Pet ${pet.name} (+${petXp} XP)`}
                             </button>
                         )
+                    ) : null}
+
+                    {/* Treats — feed a consumable to THIS pet (own farm only) */}
+                    {canPet && treats.length ? (
+                        <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🍖 Feed a treat</div>
+                            {pet.maxed ? (
+                                <div className="muted" style={{ fontSize: 12 }}>{pet.name} is max level — treats won&apos;t add more.</div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {treats.map((t) => (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => onUseTreat(t.id)}
+                                            disabled={busy}
+                                            title={t.desc}
+                                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "inherit", cursor: busy ? "default" : "pointer", opacity: busy && busyKey !== t.id ? 0.5 : 1 }}
+                                        >
+                                            <span style={{ fontSize: 13, fontWeight: 600 }}>{t.emoji} {t.name}</span>
+                                            <span className="muted" style={{ fontSize: 12 }}>{busyKey === t.id ? "feeding…" : `×${t.count}`}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     ) : null}
                 </div>
             </div>

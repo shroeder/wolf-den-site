@@ -126,6 +126,48 @@ export async function levelUpEquippedPet(buyerId) {
     return { ok: true, petId, level: level + 1, leveled: true };
 }
 
+// Add pet-XP to a SPECIFIC pet (not necessarily equipped) — used by treats fed to a chosen pet on the farm.
+// Caller is responsible for verifying ownership. (buyer_id is TEXT; params cast ::int to avoid text coercion.)
+export async function addPetXp(buyerId, petId, amount) {
+    const add = Math.round(Number(amount) || 0);
+    if (!buyerId || !petId || add <= 0) return { ok: false };
+    const rarity = rarityOf(petId);
+    const maxXp = petMaxXp(rarity);
+    const before = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+    const prevLevel = petLevelForXp(before?.xp || 0, rarity);
+    const row = await db
+        .queryOne(
+            `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at)
+             VALUES ($1::text, $2, LEAST($3::int, $4::int), NOW(), NOW())
+             ON CONFLICT (buyer_id, pet_id)
+             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3::int, $4::int), updated_at = NOW()
+             RETURNING xp`,
+            [buyerId, petId, add, maxXp]
+        )
+        .catch(() => null);
+    const xp = row?.xp ?? Math.min(maxXp, (before?.xp || 0) + add);
+    const level = petLevelForXp(xp, rarity);
+    return { ok: true, petId, xp, level, leveled: level > prevLevel };
+}
+
+// Instantly bump a SPECIFIC pet to the start of its next level (for the "instant level" treat).
+export async function levelUpPet(buyerId, petId) {
+    if (!buyerId || !petId) return { ok: false };
+    const rarity = rarityOf(petId);
+    const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+    const level = petLevelForXp(row?.xp || 0, rarity);
+    if (level >= PET_MAX_LEVEL) return { ok: false, error: "already_max", petId, level };
+    const targetXp = petThresholds(rarity)[level];
+    await db
+        .query(
+            `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at) VALUES ($1::text, $2, $3::int, NOW(), NOW())
+             ON CONFLICT (buyer_id, pet_id) DO UPDATE SET xp = GREATEST(mkt_pet_level.xp, $3::int), updated_at = NOW()`,
+            [buyerId, petId, targetXp]
+        )
+        .catch(() => {});
+    return { ok: true, petId, level: level + 1, leveled: true };
+}
+
 // Credit the member's EQUIPPED pet its share (25%) of an XP award. Best-effort. Called from awardXp so every
 // XP the member earns trickles into their active pet.
 export async function creditEquippedPetXp(buyerId, memberXp) {

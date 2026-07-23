@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getFarm, petPet, resolveFarmOwner } from "@/lib/marketplace/farm.js";
+import { getFarm, petPet, feedPetItem, resolveFarmOwner } from "@/lib/marketplace/farm.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -39,6 +39,11 @@ export async function POST(request) {
             const b = await request.json().catch(() => ({}));
             if (b?.action === "pet") {
                 const res = await petPet(buyer.id, String(b?.petId || ""));
+                if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
+                return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });
+            }
+            if (b?.action === "use_item") {
+                const res = await feedPetItem(buyer.id, String(b?.petId || ""), String(b?.consumableId || ""));
                 if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
                 return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });
             }

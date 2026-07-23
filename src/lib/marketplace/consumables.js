@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
-import { addEquippedPetXp, levelUpEquippedPet } from "@/lib/marketplace/pet-level.js";
+import { addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -152,7 +152,7 @@ export async function buyConsumable(buyerId, id) {
 
 // Use one from the stash. Targeted relics (recharge / reset) take a charged item id; validated BEFORE the
 // consumable is spent so a bad target never wastes it.
-export async function useConsumable(buyerId, id, targetItemId = null) {
+export async function useConsumable(buyerId, id, targetItemId = null, targetPetId = null) {
     const c = CONSUMABLES[id];
     if (!buyerId || !c) return { ok: false, error: "unknown" };
     const e = c.effect;
@@ -180,19 +180,24 @@ export async function useConsumable(buyerId, id, targetItemId = null) {
         return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied: `${def.name} cooldown reset — ready to redeem now` };
     }
 
-    // Pet treats feed the EQUIPPED pet — validate one's equipped BEFORE spending so a treat is never wasted.
+    // Pet treats feed a pet — the EQUIPPED one by default, or a specific `targetPetId` (e.g. fed from the
+    // farm). Validate a pet is chosen BEFORE spending so a treat is never wasted. (The caller is responsible
+    // for verifying the target pet is owned.)
     if (e.type === "pet_xp" || e.type === "pet_level") {
-        const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-        const petId = buyer?.featured_collectible;
+        let petId = targetPetId || null;
+        if (!petId) {
+            const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+            petId = buyer?.featured_collectible;
+        }
         if (!petId) return { ok: false, error: "no_pet_equipped" };
         const petName = collectibleById(petId)?.name || "your pet";
         const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
         if (!dec) return { ok: false, error: "none_owned" };
         let res;
         if (e.type === "pet_level") {
-            res = await levelUpEquippedPet(buyerId).catch(() => ({ ok: false }));
+            res = await levelUpPet(buyerId, petId).catch(() => ({ ok: false }));
         } else {
-            res = await addEquippedPetXp(buyerId, e.amount).catch(() => ({ ok: false }));
+            res = await addPetXp(buyerId, petId, e.amount).catch(() => ({ ok: false }));
         }
         await trackActivity(buyerId, "use_consumable", { id, name: c.name, petId }).catch(() => {});
         const leveled = e.type === "pet_level" ? Boolean(res?.ok) : Boolean(res?.leveled);

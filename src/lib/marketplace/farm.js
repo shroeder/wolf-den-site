@@ -5,6 +5,7 @@ import { petsState } from "@/lib/marketplace/pets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelInfo, petMaxXp } from "@/lib/marketplace/pet-level.js";
+import { CONSUMABLES, listConsumables, useConsumable as applyConsumable } from "@/lib/marketplace/consumables.js";
 
 // The Farm: a member's owned pets roam a little pasture. On your OWN farm you can pet each pet once a day for a
 // small XP bump; other members' farms are view-only. (mkt_pet_level.buyer_id is TEXT — always cast ::text.)
@@ -51,13 +52,39 @@ export async function getFarm(ownerId, viewerId) {
             };
         })
         .filter((p) => p.spriteUrl); // only pets that have art can roam the pasture
+    // Your own pet TREATS (consumables that feed a pet) — usable on any pet from the inspect card.
+    let treats = [];
+    if (mine) {
+        const cons = await listConsumables(ownerId).catch(() => ({ owned: [] }));
+        treats = (cons.owned || [])
+            .filter((o) => o.kind === "treat")
+            .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, desc: o.desc, count: o.count }));
+    }
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null },
         mine,
         canPet: mine,
         petXp: PET_PET_XP,
         pets,
+        treats,
     };
+}
+
+// Use a pet TREAT on a specific owned pet (feed it XP or instant-level it). Verifies ownership + that the
+// consumable is actually a pet treat, then routes through useConsumable with the chosen pet as the target.
+export async function feedPetItem(buyerId, petId, consumableId) {
+    if (!buyerId || !petId || !consumableId) return { ok: false, error: "bad_request" };
+    const c = CONSUMABLES[consumableId];
+    if (!c || (c.effect?.type !== "pet_xp" && c.effect?.type !== "pet_level")) return { ok: false, error: "not_a_treat" };
+    const state = await petsState(buyerId).catch(() => null);
+    if (!state || !(state.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
+    const res = await applyConsumable(buyerId, consumableId, null, petId);
+    if (!res.ok) return res;
+    // Re-read the pet's fresh level so the inspect card's XP bar + level update immediately.
+    const def = collectibleById(petId);
+    const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+    const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
+    return { ...res, petId, level: info.level, xp: row?.xp || 0, into: info.into, span: info.span, maxed: info.maxed };
 }
 
 // Pet one of YOUR pets: +PET_PET_XP, once per store-local day. Replay/race-safe via the petted_day guard in the
