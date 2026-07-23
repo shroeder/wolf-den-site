@@ -890,42 +890,57 @@ function HeroCard({ m, onClick }) {
     );
 }
 function FarmDirectory({ current }) {
+    const [open, setOpen] = useState(false); // collapsed by default — opens only when the owner wants it
     const [q, setQ] = useState("");
     const [members, setMembers] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     useEffect(() => {
+        if (!open) return undefined; // don't fetch until the directory is opened
         let alive = true;
         const t = setTimeout(() => {
+            if (alive) setLoading(true);
             fetch(`/api/marketplace/farm?list=1&q=${encodeURIComponent(q.trim())}`, { cache: "no-store" })
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => { if (alive) { setMembers(d?.members || []); setLoading(false); } })
                 .catch(() => { if (alive) setLoading(false); });
         }, q.trim() ? 250 : 0);
         return () => { alive = false; clearTimeout(t); };
-    }, [q]);
+    }, [q, open]);
     const visit = (alias) => window.location.assign(`/marketplace/farm?u=${encodeURIComponent(alias)}`);
     return (
-        <section className="card">
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+        <section className="card" style={{ padding: open ? undefined : 0 }}>
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: open ? "0 0 10px" : "14px 16px", background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left" }}
+            >
+                <span style={{ display: "flex", opacity: 0.6 }}><SearchIcon /></span>
                 <strong style={{ fontSize: 16 }}>Visit a farm</strong>
                 <span className="muted" style={{ fontSize: 11 }}>owner-only</span>
-            </div>
-            <div style={{ position: "relative", marginBottom: 10 }}>
-                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.5, display: "flex" }}><SearchIcon /></span>
-                <input
-                    type="text"
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search members…"
-                    style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: 12, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.04)", color: "inherit" }}
-                />
-            </div>
-            <div style={{ maxHeight: 360, overflowY: "auto", display: "grid", gap: 8, paddingRight: 2 }}>
-                {members.map((m) => <HeroCard key={m.id} m={m} onClick={() => visit(m.alias)} />)}
-                {loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>Loading farms…</div> : null}
-                {!loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>No farms found.</div> : null}
-            </div>
-            {current ? <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
+                <span aria-hidden="true" style={{ marginLeft: "auto", transition: "transform .2s ease", transform: open ? "rotate(90deg)" : "none", opacity: 0.6, fontSize: 18, lineHeight: 1 }}>›</span>
+            </button>
+            {open ? (
+                <>
+                    <div style={{ position: "relative", marginBottom: 10 }}>
+                        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.5, display: "flex" }}><SearchIcon /></span>
+                        <input
+                            type="text"
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            placeholder="Search members…"
+                            autoFocus
+                            style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: 12, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.04)", color: "inherit" }}
+                        />
+                    </div>
+                    <div style={{ maxHeight: 360, overflowY: "auto", display: "grid", gap: 8, paddingRight: 2 }}>
+                        {members.map((m) => <HeroCard key={m.id} m={m} onClick={() => visit(m.alias)} />)}
+                        {loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>Loading farms…</div> : null}
+                        {!loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>No farms found.</div> : null}
+                    </div>
+                    {current ? <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
+                </>
+            ) : null}
         </section>
     );
 }
