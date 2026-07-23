@@ -425,6 +425,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
                 if (d.raidResult) { setRaidOpen(false); setRaidTargets(null); setRaidPlay(d.raidResult); } // launch the full-screen auto-battle
             }
+            return d;
         } finally { setBusy(false); }
     }, [triggerGust]);
 
@@ -464,10 +465,18 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         } catch { setRaidTargets([]); }
     }, []);
 
+    // Buy back today's raid (escalating cost) and jump straight into the target picker on success.
+    const buyRaidReset = useCallback(async () => {
+        const d = await act("raid_reset");
+        if (d && !d.error) openRaid();
+    }, [act, openRaid]);
+
     const level = state.level;
     const dig = state.dig;
     const windCost = state.windRecharge?.cost ?? 0;
     const windTooPoor = windCost > 0 && state.gold < windCost;
+    const resetCost = state.raid?.reset?.cost ?? 0;
+    const raidResetTooPoor = resetCost > 0 && state.gold < resetCost;
     // The boat's current form name = the highest unlocked milestone, else the base Wood Boat.
     const curForm = (state.forms || []).filter((f) => f.unlocked).slice(-1)[0];
     const boatName = curForm ? curForm.name : "Wood Boat";
@@ -745,10 +754,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </button>
                             ))}
                         </div>
-                        <button className="sail-cta sail-cta-raid" disabled={busy || !state.raid?.available}
-                            onClick={openRaid}>
-                            {state.raid?.available ? <>🏴‍☠️ Raid a passing ship</> : <>🏴‍☠️ Raided today — back tomorrow</>}
-                        </button>
+                        {state.raid?.available ? (
+                            <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
+                        ) : (
+                            <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
+                                {busy ? "…" : resetCost > 0 ? <>🔄 Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>🔄 Buy another raid — free (testing)</>}
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -764,10 +776,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         )}
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                         {liveStatus === "sailing" && (
-                            <button className="sail-cta sail-cta-raid" disabled={busy || !state.raid?.available}
-                                onClick={openRaid}>
-                                {state.raid?.available ? <>🏴‍☠️ Raid a passing ship</> : <>🏴‍☠️ Raided today</>}
-                            </button>
+                            state.raid?.available ? (
+                                <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
+                            ) : (
+                                <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
+                                    {busy ? "…" : resetCost > 0 ? <>🔄 Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>🔄 Buy another raid — free</>}
+                                </button>
+                            )
                         )}
                     </div>
                 )}

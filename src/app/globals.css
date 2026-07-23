@@ -11579,6 +11579,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Raid CTA — a dangerous crimson counterpart to the calm blue tailwind/dig CTAs. */
 .sail-cta-raid { background: linear-gradient(180deg, #b8324a, #7c1a2c); box-shadow: 0 6px 16px rgba(150,20,40,0.4), inset 0 1px 0 rgba(255,255,255,0.15); }
 .sail-cta-raid:disabled { filter: grayscale(0.5) brightness(0.8); }
+.sail-cta-raid.is-reset { background: linear-gradient(180deg, #8a5a2c, #5c3a18); box-shadow: 0 6px 16px rgba(120,80,30,0.4), inset 0 1px 0 rgba(255,255,255,0.15); }
 /* Confirm modal */
 .sail-raid-confirm { max-width: 420px; }
 .sail-raid-crest { font-size: 2.6rem; line-height: 1; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); animation: raidCrestSway 3s ease-in-out infinite; }

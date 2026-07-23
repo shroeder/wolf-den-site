@@ -58,6 +58,12 @@ const RAID_ITEM_COPY_CHANCE = 0.005;             // 0.5% to copy one random item
 const RAID_DODGE_BASE = 0.005, RAID_DODGE_PER = 0.0025; // 0.5% + 0.25%/level to NOT use up the daily raid
 const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_DODGE_PER;
 const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
+// Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
+// RAID_RESET_PAID true (+ tune base) before release.
+const RAID_RESET_PAID = false;      // TODO(luke): true before launch so resets actually cost gold
+const RAID_RESET_BASE = 300;        // first same-day reset costs this, then doubles each time
+const RAID_RESET_MULT = 2;
+const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RESET_BASE * Math.pow(RAID_RESET_MULT, Math.max(0, resetsToday))) : 0);
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
 // the feature is in testing — set back to 500 before release.
@@ -618,6 +624,8 @@ function decorate(row, chestArt = {}) {
             dodgePct: raidDodgePct(raidLevel),
             canStun: boatPerks(level).raidStun,
             winGold: [25, 75], loseGold: [RAID_LOSS_MIN, RAID_LOSS_MAX], itemChance: RAID_ITEM_COPY_CHANCE * 100,
+            // Buy-another-raid: cost escalates with each reset that day (free while testing).
+            reset: { cost: raidResetCost(row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0), free: !RAID_RESET_PAID },
         },
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
@@ -649,7 +657,8 @@ async function readRow(buyerId) {
     return db.queryOne(
         `SELECT *, (wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wind_used_today,
                 (wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wave_is_today,
-                (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_used_today
+                (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_used_today,
+                (raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_reset_is_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId]
     ).catch(() => null);
@@ -962,6 +971,29 @@ export async function doRaid(buyerId, targetId = null) {
         target: { name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel) },
     };
     return { ok: true, raidResult: result, ...(await getSailingState(buyerId)) };
+}
+
+// Buy back your daily raid after it's spent. Cost DOUBLES with each reset that day (free while testing). Clears
+// raid_day so the raid is available again, and bumps the per-day reset counter that drives the escalating price.
+export async function resetRaid(buyerId) {
+    const row = await readRow(buyerId);
+    if (!row?.raid_used_today) return { ok: false, error: "not_used", ...(await getSailingState(buyerId)) }; // nothing to reset
+    const resetsToday = row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0;
+    const cost = raidResetCost(resetsToday);
+    if (cost > 0) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, updated_at = NOW() WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
+        if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    }
+    await db.query(
+        `UPDATE mkt_sailing
+            SET raid_day = NULL,
+                raid_resets = CASE WHEN raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN raid_resets + 1 ELSE 1 END,
+                raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
+                updated_at = NOW()
+          WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => {});
+    return { ok: true, raidReset: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 
 // ── Gold Merchant actions ──────────────────────────────────────────────────────────────────────────────
