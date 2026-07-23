@@ -84,7 +84,12 @@ const FARM_BG = {
     dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837334517-905734.png",
     night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837358204-514417.png",
     dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784837381622-831520.png",
+    storm: null,
+    snow: null,
 };
+// Storm/snow get their own painted scene when available; otherwise use the time-of-day image + weather overlays.
+const pickFarmBg = (tod, condition) =>
+    (condition === "storm" && FARM_BG.storm) || (condition === "snow" && FARM_BG.snow) || FARM_BG[tod] || FARM_BG.day || null;
 
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
@@ -281,7 +286,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     };
     const chip = (active) => ({ padding: "3px 9px", borderRadius: 999, border: `1px solid ${active ? "#ffd75e" : "rgba(128,128,128,0.4)"}`, background: active ? "rgba(255,215,94,0.16)" : "transparent", color: active ? "#ffd75e" : "inherit", fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 400 });
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
-    const bgUrl = FARM_BG[wx.tod] || FARM_BG.day || null;
+    const bgUrl = pickFarmBg(wx.tod, wx.condition);
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
@@ -307,7 +312,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 /* Illustrated backdrop tiled with the mirror trick: [A A' A A'] — every other copy flipped, so
                    each junction's edges match and there's no seam even with non-tiling art (same as the sailing sky). */
                 .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; }
-                .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; }
+                .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
             `}</style>
 
