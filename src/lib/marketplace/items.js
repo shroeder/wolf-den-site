@@ -140,7 +140,7 @@ export const ITEMS = [
 
     // --- Rings (some charged with real-world perks) ---
     { id: "ring_of_might", name: "Ring of Might", slot: "ring", rarity: "common", icon: "GiPowerRing", flavor: "A small edge.", stats: { might: 10 }, reqLevel: 8, source: "level", sort: 80 },
-    { id: "ring_of_fortune", name: "Ring of Fortune", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Luck on your finger.", stats: { fortune: 16 }, reqLevel: 20, source: "level", sort: 82 },
+    { id: "ring_of_fortune", name: "Ring of Fortune", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Luck on your finger.", stats: { fortune: 16 }, sea: { bounty: 3 }, reqLevel: 20, source: "level", sort: 82 },
     { id: "collectors_signet", name: "Collector's Signet", slot: "ring", rarity: "legendary", icon: "GiSkullSignet", flavor: "The store remembers its own.", stats: { might: 5, fortune: 8 }, reqLevel: 25, source: "admin", charged: true, charges: 3, cooldownDays: 30, chargeReward: "free_pack_10", chargeRewardLabel: REWARDS.free_pack_10, sort: 84 },
     { id: "merchants_band", name: "Merchant's Band", slot: "ring", rarity: "epic", icon: "GiDiamondRing", flavor: "A friend of the house.", stats: { fortune: 10 }, reqLevel: 30, source: "admin", charged: true, charges: 1, cooldownDays: 30, chargeReward: "discount_10_over_100", chargeRewardLabel: REWARDS.discount_10_over_100, sort: 86 },
 
@@ -206,8 +206,8 @@ export const ITEMS = [
     { id: "steel_dagger", name: "Steel Dagger", slot: "main_hand", rarity: "common", icon: "GiPlainDagger", flavor: "Quick and quiet.", stats: { crit_chance: 10 }, reqLevel: 4, source: "chest", sort: 200 },
     { id: "twin_fangs", name: "Twin Fangs", slot: "main_hand", rarity: "rare", icon: "GiDaggers", flavor: "Two edges, twice the trouble.", stats: { might: 6, crit_chance: 10 }, reqLevel: 16, source: "chest", sort: 201 },
     { id: "war_pick", name: "War Pick", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Finds the gap in any armor.", stats: { might: 15, crit_chance: 7 }, reqLevel: 30, source: "chest", sort: 202 },
-    { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, reqLevel: 34, source: "chest", sort: 203 },
-    { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, reqLevel: 60, source: "chest", sort: 204 },
+    { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, sea: { broadside: 5 }, reqLevel: 34, source: "chest", sort: 203 },
+    { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, sea: { broadside: 6 }, reqLevel: 60, source: "chest", sort: 204 },
     { id: "reapers_scythe", name: "Reaper's Scythe", slot: "main_hand", rarity: "legendary", icon: "GiScythe", flavor: "It only asks once.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 66, source: "chest", sort: 205 },
     { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, sea: { plunder: 8 }, reqLevel: 92, source: "chest", sort: 206 },
     // -- Off hand --
@@ -253,7 +253,7 @@ export const ITEMS = [
     // -- Rings --
     { id: "band_valor", name: "Band of Valor", slot: "ring", rarity: "common", icon: "GiRing", flavor: "A soldier's first ring.", stats: { might: 10 }, reqLevel: 6, source: "chest", sort: 270 },
     { id: "ring_embers", name: "Ring of Embers", slot: "ring", rarity: "rare", icon: "GiFireRing", flavor: "Warm to the touch.", stats: { might: 11, crit_chance: 5 }, reqLevel: 24, source: "chest", sort: 271 },
-    { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, reqLevel: 36, source: "chest", sort: 272 },
+    { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, sea: { bounty: 6 }, reqLevel: 36, source: "chest", sort: 272 },
     { id: "ring_titans", name: "Ring of Titans", slot: "ring", rarity: "legendary", icon: "GiPowerRing", flavor: "Power beyond measure.", stats: { might: 16, crit_power: 14 }, reqLevel: 66, source: "chest", sort: 273 },
     { id: "kings_eternal", name: "Eternal King's Ring", slot: "ring", rarity: "mythic", icon: "GiBigDiamondRing", flavor: "Worn by every ruler who mattered.", stats: { might: 13, fortune: 27 }, reqLevel: 98, source: "chest", sort: 274 },
 
@@ -303,7 +303,7 @@ export const ITEMS = [
     // -- Belt --
     { id: "chain_belt", name: "Chain Belt", slot: "belt", rarity: "common", icon: "GiBelt", flavor: "Links that hold.", stats: { might: 5, ferocity: 5 }, reqLevel: 6, source: "chest", sort: 360 },
     { id: "runners_sash", name: "Runner's Sash", slot: "belt", rarity: "rare", icon: "GiBlackBelt", flavor: "Light on the waist.", stats: { ferocity: 16 }, reqLevel: 20, source: "chest", sort: 361 },
-    { id: "girded_plate", name: "Girded Plate", slot: "belt", rarity: "epic", icon: "GiBeltArmor", flavor: "Cinch the armor down.", stats: { might: 22 }, reqLevel: 40, source: "chest", sort: 362 },
+    { id: "girded_plate", name: "Girded Plate", slot: "belt", rarity: "epic", icon: "GiBeltArmor", flavor: "Cinch the armor down.", stats: { might: 22 }, sea: { trove: 5 }, reqLevel: 40, source: "chest", sort: 362 },
     { id: "kings_sash", name: "King's Sash", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Gilded and grand.", stats: { might: 14, fortune: 16 }, reqLevel: 62, source: "chest", sort: 363 },
     { id: "world_girdle", name: "Girdle of the World", slot: "belt", rarity: "mythic", icon: "GiBlackBelt", flavor: "It holds up more than your pants.", stats: { ferocity: 40 }, reqLevel: 92, source: "chest", sort: 364 },
     // -- Rings --
@@ -323,7 +323,7 @@ export const ITEMS = [
     { id: "meteor_hammer", name: "Meteor Hammer", slot: "main_hand", rarity: "mythic", icon: "GiMeteorImpact", flavor: "Called down from the sky.", stats: { might: 24, crit_power: 16 }, reqLevel: 94, source: "chest", sort: 405 },
     // -- Off hand --
     { id: "fire_ward", name: "Fire Ward", slot: "off_hand", rarity: "common", icon: "GiFireShield", flavor: "Warm to hold.", stats: { ferocity: 10 }, reqLevel: 5, source: "chest", sort: 410 },
-    { id: "frost_barrier", name: "Frost Barrier", slot: "off_hand", rarity: "rare", icon: "GiIceGolem", flavor: "A wall of ice.", stats: { might: 5, ferocity: 11 }, sea: { bulwark: 4 }, reqLevel: 20, source: "chest", sort: 411 },
+    { id: "frost_barrier", name: "Frost Barrier", slot: "off_hand", rarity: "rare", icon: "GiIceGolem", flavor: "A wall of ice.", stats: { might: 5, ferocity: 11 }, sea: { ironclad: 5 }, reqLevel: 20, source: "chest", sort: 411 },
     { id: "orb_of_tides", name: "Orb of Tides", slot: "off_hand", rarity: "epic", icon: "GiFloatingCrystal", flavor: "The sea answers it.", stats: { ferocity: 8, fortune: 14 }, sea: { dredge: 5 }, reqLevel: 34, source: "chest", sort: 412 },
     { id: "worldshield", name: "Worldshield", slot: "off_hand", rarity: "mythic", icon: "GiWorld", flavor: "It carries the sky.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 92, source: "chest", sort: 413 },
     // -- Helmet --
@@ -545,10 +545,13 @@ export function describeStats(stats = {}) {
 // OUT of `stats` so it never touches boss combat or inflates boss power. Gear + pets carry these small integer
 // "points"; sailing.js converts points → real effect. See seaEffects() there.
 export const SEA_META = {
+    broadside: { label: "Broadside", icon: "🗡️", desc: "Your ship's cannons hit harder in a raid." },
+    ironclad: { label: "Ironclad", icon: "🛡️", desc: "Your hull takes less damage from enemy volleys in a raid." },
     plunder: { label: "Plunder", icon: "⚓", desc: "Better odds to copy a foe's item when you win a raid." },
+    bounty: { label: "Bounty", icon: "💰", desc: "More gold from raid wins and the Gold Merchant." },
     dredge: { label: "Dredge", icon: "⛏️", desc: "Higher chance your dig tools proc while excavating." },
-    bulwark: { label: "Bulwark", icon: "🛡️", desc: "Lose less gold when you lose a raid." },
-    tailwind: { label: "Tailwind", icon: "🌬️", desc: "Greet more passing sailors each day (extra waves)." },
+    trove: { label: "Trove", icon: "🔱", desc: "Dig up more treasure fragments per excavation." },
+    tailwind: { label: "Tailwind", icon: "🌬️", desc: "Faster voyages, and more sailors to greet each day." },
 };
 export function sumItemSea(itemIds = []) {
     const total = {};

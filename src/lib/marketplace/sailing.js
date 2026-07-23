@@ -180,13 +180,21 @@ async function equippedSeaAffinity(buyerId) {
     }
     return sea;
 }
-// Sea-affinity POINTS → real effects. Plain tunable numbers (no env).
+// Sea-affinity POINTS → real effects. Plain tunable numbers (no env). Stackers are CAPPED so the rare gear that
+// carries them stays special and can't trivialise a system.
 function seaEffects(sea = {}) {
     return {
-        raidCopyBonus: (sea.plunder || 0) * 0.0025,                  // +0.25% raid item-copy per Plunder point
-        digProcBonus: (sea.dredge || 0) * 0.01,                      // +1% dig-tool proc per Dredge point
-        raidLossMult: Math.max(0.4, 1 - (sea.bulwark || 0) * 0.03),  // −3% raid gold loss per Bulwark (max −60%)
-        bonusWaves: Math.floor((sea.tailwind || 0) / 4),             // +1 daily wave per 4 Tailwind points
+        // Raiding
+        raidDmgMult: 1 + Math.min(0.4, (sea.broadside || 0) * 0.02),     // Broadside: +2% raid volley damage/pt (cap +40%)
+        raidDmgReduction: Math.min(0.45, (sea.ironclad || 0) * 0.015),   // Ironclad: −1.5% incoming raid damage/pt (cap −45%)
+        raidCopyBonus: (sea.plunder || 0) * 0.0025,                      // Plunder: +0.25% item-copy/pt (total capped in doRaid)
+        goldBonus: Math.min(0.6, (sea.bounty || 0) * 0.03),             // Bounty: +3% raid/merchant gold/pt (cap +60%)
+        // Digging
+        digProcBonus: Math.min(0.18, (sea.dredge || 0) * 0.01),         // Dredge: +1% dig-tool proc/pt (cap +18%)
+        fragBonus: Math.min(0.6, (sea.trove || 0) * 0.03),             // Trove: +3% dig fragment yield/pt (cap +60%)
+        // Voyages
+        voyageSpeed: Math.min(0.15, (sea.tailwind || 0) * 0.01),        // Tailwind: −1% voyage time/pt (cap −15%)
+        bonusWaves: Math.floor((sea.tailwind || 0) / 4),                // Tailwind: +1 daily wave per 4 points
     };
 }
 
@@ -784,7 +792,8 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const state = decorate(await readRow(buyerId));
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
     const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
-    const ms = Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult);
+    const voyageSpeed = seaEffects(await equippedSeaAffinity(buyerId)).voyageSpeed; // Tailwind shortens the trip
+    const ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
     // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark; reset any prior encounter.
     const encMs = Math.random() < encounterChance(state.fortune.level) ? String(Math.round(ms / 2)) : null;
     await db.query(
@@ -917,26 +926,29 @@ function combatPower(stats = {}, level = 1) {
 // side's COMBAT POWER (boat level + gear) so upgrades AND loadout matter, with crits + randomness so it's never
 // a lock. The tier-11 perk lets you STUN the foe once (they skip 2 volleys). Returns the full turn-by-turn
 // script for the client to animate.
-function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, canStun }) {
+function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, myCritPow = 35, foeCritPow = 35,
+                       myDmgMult = 1, foeDmgMult = 1, myDmgReduction = 0, canStun = false, openingCrit = false }) {
     let my = 100, foe = 100;
     const events = [];
-    const swing = (power, crit) => {
-        let dmg = (7 + randInt(7)) * (1 + Math.max(0, power) * 0.011);
-        const isCrit = Math.random() < Math.min(0.6, Math.max(0, crit) / 100);
-        if (isCrit) dmg *= 1.85;
+    // crit magnitude comes from crit_power now (1.5x floor + 1%/point → ~1.85x at 35, the old flat value).
+    const swing = (power, crit, critPow, dmgMult, forceCrit = false) => {
+        let dmg = (7 + randInt(7)) * (1 + Math.max(0, power) * 0.011) * dmgMult;
+        const isCrit = forceCrit || Math.random() < Math.min(0.6, Math.max(0, crit) / 100);
+        if (isCrit) dmg *= 1.5 + Math.max(0, critPow) / 100;
         return { dmg: Math.max(1, Math.round(dmg)), crit: isCrit };
     };
     let foeStun = 0, stunUsed = false;
     for (let round = 0; round < 40 && my > 0 && foe > 0; round++) {
-        const a = swing(myPower, myCrit);
+        const a = swing(myPower, myCrit, myCritPow, myDmgMult, openingCrit && round === 0); // Sovereign: guaranteed opening crit
         foe = Math.max(0, foe - a.dmg);
         events.push({ side: "me", dmg: a.dmg, crit: a.crit, my, foe });
         if (foe <= 0) break;
         if (canStun && !stunUsed && round >= 1) { stunUsed = true; foeStun = 2; events.push({ side: "stun", dmg: 0, my, foe }); }
         if (foeStun > 0) { foeStun -= 1; continue; } // foe frozen this volley
-        const b = swing(foePower, foeCrit);
-        my = Math.max(0, my - b.dmg);
-        events.push({ side: "foe", dmg: b.dmg, crit: b.crit, my, foe });
+        const b = swing(foePower, foeCrit, foeCritPow, foeDmgMult);
+        const taken = Math.max(1, Math.round(b.dmg * (1 - myDmgReduction))); // Ironclad softens incoming hits
+        my = Math.max(0, my - taken);
+        events.push({ side: "foe", dmg: taken, crit: b.crit, my, foe });
     }
     const win = foe <= 0 ? my > 0 : my > 0 && my >= foe; // decisive KO, else higher HP after the cap (ties → me)
     return { win, events, myHp: my, foeHp: foe, stunUsed };
@@ -962,11 +974,14 @@ export async function doRaid(buyerId, targetId = null) {
         getEquippedStats(target.id).catch(() => ({})),
         equippedSeaAffinity(buyerId),
     ]);
-    const seaEff = seaEffects(mySea); // Plunder → item-copy odds, Bulwark → smaller gold loss
-    const canStun = boatPerks(myLevel).raidStun;
+    const seaEff = seaEffects(mySea); // Broadside/Ironclad → combat, Plunder → copy odds, Bounty → gold
+    const perks = boatPerks(myLevel);
     const sim = simulateRaid({
         myPower: combatPower(myStats, myLevel), foePower: combatPower(foeStats, foeLevel),
-        myCrit: Number(myStats?.crit_chance) || 0, foeCrit: Number(foeStats?.crit_chance) || 0, canStun,
+        myCrit: Number(myStats?.crit_chance) || 0, foeCrit: Number(foeStats?.crit_chance) || 0,
+        myCritPow: Number(myStats?.crit_power) || 35, foeCritPow: Number(foeStats?.crit_power) || 35,
+        myDmgMult: seaEff.raidDmgMult, myDmgReduction: seaEff.raidDmgReduction,
+        canStun: perks.raidStun, openingCrit: perks.openingCrit,
     });
 
     // Consume the daily raid UNLESS raid-dodge procs (then it's free — you can raid again today).
@@ -977,9 +992,9 @@ export async function doRaid(buyerId, targetId = null) {
 
     let goldDelta = 0, itemWon = null;
     if (sim.win) {
-        goldDelta = RAID_WIN_GOLD();
+        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus)); // Bounty boosts raid-win gold
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
-        if (Math.random() < RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus) { // Plunder raises the copy odds
+        if (Math.random() < Math.min(0.05, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 5%)
             const it = await db.queryOne(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 ORDER BY random() LIMIT 1`, [target.id]).catch(() => null);
             const item = it?.item_id ? itemById(it.item_id) : null;
             if (item) {
@@ -995,8 +1010,7 @@ export async function doRaid(buyerId, targetId = null) {
         if (sim.myHp >= 100) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {}); // never got hit
         if (itemWon) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
     } else {
-        const rawLoss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
-        const loss = Math.max(1, Math.round(rawLoss * seaEff.raidLossMult)); // Bulwark softens the gold loss
+        const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1); // Ironclad reduces losses by winning more, not by softening the bill
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
         goldDelta = -loss;
     }
@@ -1055,7 +1069,9 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     const row = await readRow(buyerId);
     const m = row?.merchant_json;
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
-    const gold = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
+    const bounty = seaEffects(await equippedSeaAffinity(buyerId)).goldBonus; // Bounty boosts merchant payout too
+    const base = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
+    const gold = Math.round(base * (1 + bounty));
     const perfect = Boolean(perfectFlag);
     // The pet is NOT tied to the minigame anymore (it unlocks on the 10th encounter, in rollMerchant). A perfect
     // run just earns the badge + the gold. Preserve any petGranted flag the offer already carries (10th meeting).
@@ -1283,7 +1299,9 @@ async function finishDig(buyerId, board) {
     const uncovered = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
     const chestTier = (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
     const maxFrags = 2 + ((board.tier || 1) >= 3 ? 1 : 0); // a full chest = 2 fragments (3 at high tiers) — not a pile
-    const fragCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total))) : 0;
+    const digSea = seaEffects(await equippedSeaAffinity(buyerId)); // Trove boosts yield; Maw (ship perk) adds flat frags
+    const baseCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total) * (1 + digSea.fragBonus))) : 0;
+    const fragCount = baseCount + (baseCount > 0 ? (boatPerks(level).voyageFrags || 0) : 0);
     const foundTiers = Array.from({ length: fragCount }, () => chestTier);
     for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level)); // lucky Strike bonuses
     const earned = foundTiers.length;

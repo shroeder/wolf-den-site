@@ -98,7 +98,7 @@ export const COLLECTIBLES = [
     { id: "hedgehog", name: "Hedgehog", Icon: GiHedgehog, color: "#c9a36a", rarity: "common", source: "shop", activeStat: "fortune", hint: "Prickly good luck", spritePrompt: "a tiny round hedgehog" },
     { id: "sheep", name: "Sheep", Icon: GiSheep, color: "#e2e8f0", rarity: "common", source: "shop", activeStat: "gold_find", hint: "Counts your gold", spritePrompt: "a fluffy white sheep" },
     { id: "crab", name: "Crab", Icon: GiCrab, color: "#ff7a4d", rarity: "common", source: "shop", activeStat: "crit_power", sea: { dredge: 4 }, hint: "Pinchy — digs up more at sea", spritePrompt: "a little red crab" },
-    { id: "turtle", name: "Turtle", Icon: GiTurtle, color: "#6ad07a", rarity: "rare", source: "shop", activeStat: "ferocity", sea: { bulwark: 5 }, hint: "Slow, steady, hard to sink", spritePrompt: "a small green turtle" },
+    { id: "turtle", name: "Turtle", Icon: GiTurtle, color: "#6ad07a", rarity: "rare", source: "shop", activeStat: "ferocity", sea: { ironclad: 5 }, hint: "Slow, steady, hard to sink", spritePrompt: "a small green turtle" },
     { id: "parrot", name: "Parrot", Icon: GiParrotHead, color: "#6bf0ff", rarity: "rare", source: "shop", activeStat: "xp_gain", hint: "Repeats your wisdom", spritePrompt: "a colorful tropical parrot" },
     { id: "dolphin", name: "Dolphin", Icon: GiDolphin, color: "#5ad0d0", rarity: "rare", source: "shop", activeStat: "fortune", sea: { tailwind: 5 }, hint: "Rides your luck — and the wind", spritePrompt: "a leaping dolphin" },
     { id: "monkey", name: "Monkey", Icon: GiMonkey, color: "#b07a4a", rarity: "epic", source: "shop", activeStat: "crit_chance", hint: "Cheeky and quick", spritePrompt: "a playful monkey" },
