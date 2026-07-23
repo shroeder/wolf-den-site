@@ -5372,6 +5372,9 @@ body.tv-mode .shop-mobile-cart-fab {
     gap: 1rem;
     flex-wrap: wrap;
 }
+.user-profile-dps { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 4px 11px; border-radius: 999px;
+    font-size: 0.82rem; font-weight: 700; color: #ff9a6a; background: rgba(255,90,60,0.12); border: 1px solid rgba(255,90,60,0.35); }
+.user-profile-dps strong { color: #ffd0b0; font-size: 0.9rem; }
 .user-profile-meta h1 {
     margin: 0 0 0.15rem;
 }

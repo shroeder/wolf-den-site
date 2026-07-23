@@ -257,8 +257,8 @@ export default function BossFightClient() {
                                 {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
                             </div>
                             {you.autoPerHour ? (
-                                <div className="boss2-auto" title="Your passive auto-damage per hour, from gear + pet + element match. Upgrade gear to move it.">
-                                    ⚙️ Passive damage: <strong>{you.autoPerHour.toLocaleString()}/hr</strong> <span className="muted">· from gear + pet</span>
+                                <div className="boss2-auto" title="Your passive auto-damage — dealt to the boss 24/7 from your gear + pet (+ element match). Upgrade gear/pets to raise it.">
+                                    ⚔️ Your DPS: <strong>{you.autoPerHour.toLocaleString()}/hr</strong> · <strong>{(you.autoPerHour * 24).toLocaleString()}/day</strong> <span className="muted">passive, gear + pet</span>
                                 </div>
                             ) : null}
                         </>

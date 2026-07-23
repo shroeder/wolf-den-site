@@ -140,6 +140,9 @@ export default async function UserProfilePage({ params }) {
                         <UserBadges badges={profile.displayBadges || profile.badges} />
                         {profile.featuredCollectibleId ? <FeaturedCollectible id={profile.featuredCollectibleId} size="sm" /> : null}
                         <UserLevel level={profile.level} />
+                        <div className="user-profile-dps" title="Passive boss damage per day from equipped gear + pet (before the boss's element bonus)">
+                            ⚔️ <strong>{(profile.damagePerDay || 0).toLocaleString()}</strong> boss dmg/day
+                        </div>
                     </div>
                 </div>
                 <ProfileActions targetId={profile.id} targetAlias={profile.alias} relation={relation} signedIn={Boolean(viewer)} />

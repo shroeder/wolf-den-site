@@ -10,6 +10,7 @@ import { sanitizeGameInterests } from "@/lib/marketplace/games.js";
 import { MAX_SHOWCASE, pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { DEFAULT_AVATAR_URL, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { avatarImageUrl, COSMETIC_SLOTS, cosmeticById, isCosmeticUnlocked, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
+import { memberAutoPerHour } from "@/lib/marketplace/boss.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { purchasedSet } from "@/lib/marketplace/store.js";
 
@@ -381,7 +382,10 @@ export async function getPublicProfileByAlias(alias) {
         [a]
     );
     if (!row) return null;
-    const profile = mapProfile(row, await getUserBadges(row.id));
+    const [badges, autoPerHour] = await Promise.all([getUserBadges(row.id), memberAutoPerHour(row.id).catch(() => 0)]);
+    const profile = mapProfile(row, badges);
+    profile.autoPerHour = autoPerHour;            // passive boss damage / hour (gear + pet)
+    profile.damagePerDay = autoPerHour * 24;      // headline "DPS" figure for the inspect view
     // Public view: strip every private field. The @handle / display name is the only public identity.
     delete profile.email;
     delete profile.phone;

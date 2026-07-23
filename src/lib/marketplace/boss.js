@@ -92,9 +92,38 @@ function memberDailyDamage(level, manualMult = 1, gearStats = {}) {
     return autoDaily + manualExpected;
 }
 
-// Size a boss so the CURRENT pack takes ~targetDays to bring it down, from their level + GEAR + PET power.
-// Assumes everyone lands their daily strike (upper bound), so real fights tend to run a touch longer.
-// Used at create time so HP scales with the pack's real strength instead of a fixed guess. { hp, members }.
+// A member's passive auto-damage per HOUR from gear + equipped pet (no boss-specific element bonus) — for
+// showing their DPS on the boss screen and when inspecting them. ×24 = damage/day.
+export async function memberAutoPerHour(buyerId) {
+    if (!buyerId) return 0;
+    const [row, gear, pet] = await Promise.all([
+        db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        getEquippedStats(buyerId).catch(() => ({})),
+        getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
+    ]);
+    return Math.round(autoPerHour(lvl(row?.xp || 0), autoStats(gear, pet?.stats || {})));
+}
+
+// The pack's OBSERVED real damage/day from the most recent boss — this includes EVERYTHING the theoretical
+// projection misses (cheers, damage potions, Happy Hour, timed buffs, manual procs). Null if no measurable fight.
+async function observedDailyDamage() {
+    const o = await db
+        .queryOne(
+            `SELECT EXTRACT(EPOCH FROM (COALESCE(defeated_at, NOW()) - started_at)) / 86400.0 AS days,
+                    (SELECT COALESCE(SUM(damage), 0) FROM boss_hit WHERE boss_id = be.id) AS dmg
+               FROM boss_event be
+              WHERE started_at IS NOT NULL
+              ORDER BY started_at DESC LIMIT 1`,
+        )
+        .catch(() => null);
+    const days = Number(o?.days) || 0;
+    const dmg = Number(o?.dmg) || 0;
+    return days >= 0.5 && dmg > 0 ? dmg / days : null;
+}
+
+// Size a boss so the CURRENT pack takes ~targetDays to bring it down. Sizes off the pack's OBSERVED real damage
+// pace (what they actually did to the last boss, buffs and all) when available, with the theoretical gear+pet
+// projection as a floor. Returns the numbers so the admin screen can show the math.
 export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
     const members = await db.query(`SELECT id, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
     const [gearStats, petBonuses] = await Promise.all([
@@ -115,10 +144,17 @@ export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
         const manualMult = manualStatMultiplier(combined) * procMultiplier(pb.proc, 1 + combined.extra_strike);
         return sum + memberDailyDamage(lvl(m.xp), manualMult, autoStats(g, ps));
     }, 0);
-    // Round to a clean-ish number and floor it so a tiny/empty pack still faces a real boss.
-    const raw = Math.max(8000, Math.round(daily * Math.max(1, targetDays)));
+    // Size off the LARGER of observed real damage (buffs & all, +10% growth headroom) and the theoretical
+    // projection — so a buffed-up pack can't one-shot the boss, but a first-ever boss still gets a real size.
+    const observed = await observedDailyDamage();
+    const perDay = Math.max(daily, (observed || 0) * BOSS_PACK_GROWTH);
+    const raw = Math.max(8000, Math.round(perDay * Math.max(1, targetDays)));
     const hp = Math.round(raw / 500) * 500;
-    return { hp, members: members.length, targetDays };
+    return {
+        hp, members: members.length, targetDays,
+        packDaily: Math.round(daily), observedDaily: observed ? Math.round(observed) : null, perDay: Math.round(perDay),
+        basis: observed && observed * BOSS_PACK_GROWTH > daily ? "observed" : "projected",
+    };
 }
 
 // Passive auto-damage accrues CONTINUOUSLY so the HP bar is never frozen between settle-ticks.
