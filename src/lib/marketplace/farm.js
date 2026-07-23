@@ -39,7 +39,12 @@ export async function getFarm(ownerId, viewerId) {
                 id,
                 name: def?.name || id,
                 rarity: def?.rarity || "common",
+                source: def?.source || null,
                 level: lvl?.level || 1,
+                xp: lvl?.xp || 0,
+                into: lvl?.into || 0, // XP into the current level
+                span: lvl?.span || 0, // XP needed for this level band
+                maxed: Boolean(lvl?.maxed),
                 spriteUrl: sp?.url || null,
                 flip: sp?.flip === true,
                 petted: pettedToday.has(id), // only meaningful on your own farm
