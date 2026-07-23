@@ -383,3 +383,48 @@ export async function sourceDrill({ kind = null, source = null, hours = 168, lim
         })),
     };
 }
+
+// Real-time firehose: the newest activity events across the WHOLE site (members + anonymous), keyed by the
+// row id so a client can poll incrementally. Pass `sinceId` to get only events newer than the last one you
+// saw (returns them newest-first); omit it for the initial page. Powers the admin "Live Feed" screen.
+export async function liveFeed({ sinceId = null, limit = 60 } = {}) {
+    const lim = Math.min(200, Math.max(1, Number(limit) || 60));
+    const since = sinceId == null ? null : String(sinceId);
+    const rows = await db
+        .query(
+            `SELECT a.id, a.event, a.path, a.meta, a.created_at, a.buyer_id, a.anon_id, a.device, a.browser, a.os,
+                    a.ip, a.city, a.region, a.country, b.display_name, b.alias
+               FROM mkt_activity_event a LEFT JOIN mkt_buyer b ON b.id = a.buyer_id
+              WHERE ($1::bigint IS NULL OR a.id > $1::bigint)
+              ORDER BY a.id DESC LIMIT $2`,
+            [since, lim]
+        )
+        .catch(() => []);
+    const events = rows.map((r) => {
+        let meta = r.meta;
+        if (typeof meta === "string") {
+            try {
+                meta = JSON.parse(meta);
+            } catch {
+                meta = null;
+            }
+        }
+        return {
+            id: Number(r.id),
+            event: r.event,
+            path: r.path || null,
+            meta,
+            at: r.created_at,
+            who: r.display_name || r.alias || (r.buyer_id ? "Member" : "Anonymous"),
+            buyerId: r.buyer_id || null,
+            anonId: r.buyer_id ? null : r.anon_id || null,
+            anon: !r.display_name && !r.alias,
+            device: r.device || null,
+            browser: r.browser || null,
+            os: r.os || null,
+            ip: r.ip || null,
+            place: [r.city, r.region, r.country].filter(Boolean).join(", ") || null,
+        };
+    });
+    return { events, lastId: events.length ? Math.max(...events.map((e) => e.id)) : sinceId == null ? 0 : Number(sinceId) };
+}
