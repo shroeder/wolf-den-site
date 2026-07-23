@@ -209,7 +209,9 @@ async function rollMerchant(buyerId) {
     if (!row || row.dig_state || row.merchant_json != null) return;
     const arrived = row.departed_at && row.returns_at && Date.now() >= new Date(row.returns_at).getTime();
     if (!arrived) return;
-    const chance = MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId);
+    const forced = row.force_merchant === true; // Treasure Map guarantees the merchant this landing
+    if (forced) await db.query(`UPDATE mkt_sailing SET force_merchant = FALSE WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    const chance = forced ? 1 : MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId);
     let offer = { none: true };
     if (Math.random() < chance) {
         const stock = [...MERCHANT_STOCK].sort(() => Math.random() - 0.5).slice(0, 3).map((s) => {
@@ -452,6 +454,8 @@ const DIG_ITEM_POOL = [
     "spin_lucky_coin", "treat_wild", "pot_secondwind", "treat_feast",
 ];
 const digItemCount = (tier) => Math.min(5, 2 + Math.floor(tier / 2)); // 2 (t1) … 5 (t6)
+// One-shot SAILING RELICS that can drop (rarely) at the end of a dig — the map/drum/lure/etc.
+const SAIL_RELIC_DROPS = ["sail_war_drum", "sail_treasure_map", "sail_lucky_lure", "sail_storm_bottle", "sail_kraken_bait"];
 
 function newBoard(row) {
     const fortuneLevel = row?.luck_level || 0;
@@ -801,13 +805,15 @@ export async function getSailingState(buyerId) {
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
-    const state = decorate(await readRow(buyerId));
+    const row = await readRow(buyerId);
+    const state = decorate(row);
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
     const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
     const voyageSpeed = seaEffects(await equippedSeaAffinity(buyerId)).voyageSpeed; // Tailwind shortens the trip
     const ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
-    // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark; reset any prior encounter.
-    const encMs = Math.random() < encounterChance(state.fortune.level) ? String(Math.round(ms / 2)) : null;
+    // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark (Kraken Bait guarantees one).
+    const forcedEnc = row?.force_encounter === true;
+    const encMs = (forcedEnc || Math.random() < encounterChance(state.fortune.level)) ? String(Math.round(ms / 2)) : null;
     await db.query(
         `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, encounter_at, encounter_result, wind_recharges, updated_at)
          VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4,
@@ -815,7 +821,7 @@ export async function startVoyage(buyerId, optionId = "standard") {
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
-                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, updated_at = NOW()`,
+                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, updated_at = NOW()`,
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
@@ -1320,7 +1326,8 @@ async function finishDig(buyerId, board) {
     const chestTier = (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
     const maxFrags = 2 + ((board.tier || 1) >= 3 ? 1 : 0); // a full chest = 2 fragments (3 at high tiers) — not a pile
     const digSea = seaEffects(await equippedSeaAffinity(buyerId)); // Trove boosts yield; Maw (ship perk) adds flat frags
-    const baseCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total) * (1 + digSea.fragBonus))) : 0;
+    const lureMult = row?.dig_lure === true ? 1.5 : 1; // Lucky Lure: +50% fragments this dig
+    const baseCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total) * (1 + digSea.fragBonus) * lureMult)) : 0;
     const fragCount = baseCount + (baseCount > 0 ? (boatPerks(level).voyageFrags || 0) : 0);
     const foundTiers = Array.from({ length: fragCount }, () => chestTier);
     for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level)); // lucky Strike bonuses
@@ -1342,11 +1349,14 @@ async function finishDig(buyerId, board) {
     // NOTE: digging does NOT level the boat — but voyages_completed drives the EXCAVATION level (tool unlocks).
     await db.query(
         `UPDATE mkt_sailing
-            SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL,
+            SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL, dig_lure = FALSE,
                 fragments_json = $2::jsonb, voyages_completed = voyages_completed + 1, updated_at = NOW()
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(counts)]
     ).catch(() => {});
+    // Rare bonus find: a one-shot SAILING RELIC (kept uncommon so they stay special) — the treasure-map/drum/etc.
+    let relicFound = null;
+    if (won && Math.random() < 0.08) { relicFound = SAIL_RELIC_DROPS[randInt(SAIL_RELIC_DROPS.length)]; await grantConsumable(buyerId, relicFound, 1).catch(() => {}); }
     // Achievement badges (hard): 100 voyages, and fully uncovering a deep chest (tier 3+) in one dig.
     if ((row?.voyages_completed || 0) + 1 >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
@@ -1360,7 +1370,8 @@ async function finishDig(buyerId, board) {
     const fullyUnearthed = uncovered >= total;
     // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
-    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
+    const relic = relicFound ? { id: relicFound, name: CONSUMABLES[relicFound]?.name || relicFound, emoji: CONSUMABLES[relicFound]?.emoji || "🎁", desc: CONSUMABLES[relicFound]?.desc || "" } : null;
+    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, relic, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

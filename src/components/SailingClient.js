@@ -966,6 +966,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     <b className="sail-recap-pos" style={{ color: "#7cffb2" }}>+{it.n}</b>
                                 </div>
                             )) : null}
+                            {result.relic ? (
+                                <div className="sail-recap-row sail-recap-relic" title={result.relic.desc}>
+                                    <span><span style={{ fontSize: "1rem" }}>{result.relic.emoji}</span> {result.relic.name} <span className="muted">· rare relic!</span></span>
+                                    <b className="sail-recap-pos" style={{ color: "#ffd75e" }}>+1</b>
+                                </div>
+                            ) : null}
                             <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {state.fragments}</b></div>
                             <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
                         </div>

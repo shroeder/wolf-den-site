@@ -11463,6 +11463,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-recap-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.86rem; padding: 6px 10px; border-radius: 9px; background: rgba(255,255,255,0.04); }
 .sail-recap-row > span { color: #b9c2cf; }
 .sail-recap-row b { display: inline-flex; align-items: center; gap: 5px; }
+.sail-recap-relic { background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
+.sail-recap-relic > span { color: #ffe08a; }
 .sail-recap-pos { color: #7cffb2; }
 .sail-recap-chest { margin: 6px 0 12px; display: grid; gap: 5px; }
 .sail-forge-btn { width: 100%; justify-content: center; font-size: 0.98rem; margin-top: 4px; }

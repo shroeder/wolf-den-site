@@ -44,6 +44,13 @@ export const CONSUMABLES = {
     treat_marrow: { name: "Ancient Marrow", emoji: "🍥", kind: "treat", price: null, desc: "Feed your equipped pet +800 pet XP.", effect: { type: "pet_xp", amount: 800 } },
     treat_mythic: { name: "Mythic Morsel", emoji: "💎", kind: "treat", price: null, desc: "Feed your equipped pet +1,500 pet XP.", effect: { type: "pet_xp", amount: 1500 } },
     treat_ambrosia: { name: "Ambrosia", emoji: "🍯", kind: "treat", price: null, desc: "Instantly LEVEL UP your equipped pet.", effect: { type: "pet_level" } },
+    // SAILING relics — drop-only one-shots that bend the sailing systems. Used from your stash; effects land on
+    // your next voyage / dig / raid (see the sail_* handlers in useConsumable).
+    sail_war_drum: { name: "War Drum", emoji: "🥁", kind: "relic", price: null, desc: "Beat the drums to regain one spent daily raid.", effect: { type: "sail_raid" } },
+    sail_treasure_map: { name: "Treasure Map", emoji: "🗺️", kind: "relic", price: null, desc: "Your next voyage is guaranteed to meet the Gold Merchant.", effect: { type: "sail_merchant" } },
+    sail_lucky_lure: { name: "Lucky Lure", emoji: "🎣", kind: "relic", price: null, desc: "Your next dig unearths +50% more fragments.", effect: { type: "sail_lure" } },
+    sail_storm_bottle: { name: "Storm in a Bottle", emoji: "🌪️", kind: "relic", price: null, desc: "Uncork mid-voyage to HALVE the remaining sail time.", effect: { type: "sail_storm" } },
+    sail_kraken_bait: { name: "Kraken Bait", emoji: "🦑", kind: "relic", price: null, desc: "Your next voyage is guaranteed a marine encounter.", effect: { type: "sail_encounter" } },
     // SPIN charges — feed the daily wheel. Tokens = extra spins; a rewind refreshes your free daily spin.
     spin_lucky_coin: { name: "Lucky Coin", emoji: "🎟️", kind: "spin", desc: "Gain +2 wheel spins.", price: 1500, effect: { type: "spin_token", amount: 2 } },
     spin_golden_ticket: { name: "Golden Ticket", emoji: "🎫", kind: "spin", price: null, desc: "Gain +5 wheel spins.", effect: { type: "spin_token", amount: 5 } },
@@ -193,6 +200,24 @@ export async function useConsumable(buyerId, id, targetItemId = null) {
         // Structured level-up payload so the client can fire the full celebration (not a tiny text line).
         const petLevelUp = leveled ? { petId, petName, level: res.level, rarity: collectibleById(petId)?.rarity || "common", maxed: res.level >= 5 } : null;
         return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied, petLevelUp, petXpGain: e.type === "pet_xp" ? e.amount : null };
+    }
+
+    // Sailing relics — effects land on the sailing row. Validate context BEFORE spending so a relic is never wasted.
+    if (e.type?.startsWith("sail_")) {
+        await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+        const s = await db.queryOne(`SELECT returns_at, dig_state, raid_count, (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_today FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+        if (e.type === "sail_raid" && !(s?.raid_today && (s?.raid_count || 0) > 0)) return { ok: false, error: "no_raid_used" };
+        if (e.type === "sail_storm" && !(s?.returns_at && !s?.dig_state && new Date(s.returns_at).getTime() > Date.now())) return { ok: false, error: "not_sailing" };
+        const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
+        if (!dec) return { ok: false, error: "none_owned" };
+        let applied = "";
+        if (e.type === "sail_raid") { await db.query(`UPDATE mkt_sailing SET raid_count = GREATEST(0, raid_count - 1) WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "One daily raid restored — go raiding!"; }
+        else if (e.type === "sail_merchant") { await db.query(`UPDATE mkt_sailing SET force_merchant = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next voyage will meet the Gold Merchant."; }
+        else if (e.type === "sail_lure") { await db.query(`UPDATE mkt_sailing SET dig_lure = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next dig will turn up +50% fragments."; }
+        else if (e.type === "sail_storm") { await db.query(`UPDATE mkt_sailing SET returns_at = NOW() + (returns_at - NOW()) / 2 WHERE buyer_id = $1 AND returns_at > NOW()`, [buyerId]).catch(() => {}); applied = "The storm hurls you homeward — sail time halved!"; }
+        else if (e.type === "sail_encounter") { await db.query(`UPDATE mkt_sailing SET force_encounter = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Something stirs the deep — your next voyage brings an encounter."; }
+        await trackActivity(buyerId, "use_consumable", { id, name: c.name }).catch(() => {});
+        return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied };
     }
 
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
