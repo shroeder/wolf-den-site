@@ -66,7 +66,7 @@ export const PET_PERKS = {
     // Elite
     molten_phoenix: { name: "Rebirth Flame", key: "execute" }, eternal_wolf: { name: "Spirit Howl", key: "chain_strike" }, bounty_hound: { name: "On the Hunt", key: "fortune" },
     // Merchant (its signature ability — boosting Gold-Merchant find chance — is applied in sailing.js, not combat)
-    elephant_spear: { name: "Merchant's Nose", key: "gold_find" },
+    elephant_spear: { name: "Merchant's Nose", key: "gold_find", note: "Unique: while equipped, boosts your chance to find the Gold Merchant at sea (+1% per pet level, up to +5%)." },
 };
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.
@@ -86,15 +86,17 @@ function perkDesc(key, v) {
         case "crit_chance": return `+${v}% crit chance`;
         case "crit_power": return `+${v}% crit damage`;
         case "ferocity": return `+${v}% ferocious strike damage`;
-        case "fortune": return `+${v} raffle luck`;
+        case "fortune": return `+${v} bonus tickets in the weekly boss-prize draw`;
         case "extra_strike": return `+${v} boss attack${v > 1 ? "s" : ""} per day`;
         case "first_hit": return `Your first strike each day deals ×${v} damage`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
         case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
         case "execute": return `+${Math.round(v * 100)}% damage when the boss is below 30% HP`;
         case "first_blood": return `+${Math.round(v * 100)}% damage if you're among the first 3 to hit the boss today`;
-        case "xp_gain": return `+${v}% XP gained`;
-        case "gold_find": return `+${v}% gold found`;
+        // Earner stats generate passive income over time (see pet-income.js: 1 xp-pt→1 XP/hr, 1 gold-pt→2 gold/hr
+        // at the equipped rate, and more as the pet levels), paid out when you next check in.
+        case "xp_gain": return `Earns you passive XP — about +${v}/hr while equipped (more as it levels), paid when you check in`;
+        case "gold_find": return `Earns you passive gold — about +${v * 2}/hr while equipped (more as it levels), paid when you check in`;
         default: return "";
     }
 }
@@ -104,7 +106,8 @@ export function petPerk(pet) {
     const def = PET_PERKS[pet.id] || { name: "Companion", key: pet.activeStat || "fortune" };
     const value = petPerkValue(pet.rarity, def.key);
     const meta = PERK_META[def.key] || { icon: "🐾" };
-    return { name: def.name, key: def.key, icon: meta.icon, value, desc: perkDesc(def.key, value) };
+    const desc = perkDesc(def.key, value) + (def.note ? ` ${def.note}` : "");
+    return { name: def.name, key: def.key, icon: meta.icon, value, desc, note: def.note || null };
 }
 
 // A handful of marquee pets carry a REAL-WORLD store perk (honor/staff-honored, like the charged-item
