@@ -60,6 +60,15 @@ const skyStops = (tod, condition) => {
     return SKY[tod] || SKY.day;
 };
 const grassStops = (tod) => (tod === "night" ? ["#3f6b3a", "#274c28"] : tod === "dusk" ? ["#6fa858", "#4d8c3c"] : ["#86ce69", "#63b048"]);
+const CONDITION_META = { clear: ["☀️", "Clear"], cloudy: ["☁️", "Cloudy"], rain: ["🌧️", "Rain"], snow: ["❄️", "Snow"], fog: ["🌫️", "Fog"], storm: ["⛈️", "Storm"] };
+const TOD_LABEL = { dawn: "Dawn", day: "Day", dusk: "Dusk", night: "Night" };
+// A short label for the current sky: real weather when we have the visitor's location, else just time of day.
+const weatherLabel = (w) => {
+    const tod = TOD_LABEL[w.tod] || "Day";
+    if (!w.located) return `${w.tod === "night" ? "🌙" : "🕐"} ${tod}`;
+    const [emoji, label] = CONDITION_META[w.condition] || CONDITION_META.clear;
+    return `${w.tod === "night" && w.condition === "clear" ? "🌙" : emoji} ${label} · ${tod}`;
+};
 // Full field background: sky (top) blending into grass at the horizon. Uniform across the width, so it tiles
 // seamlessly no matter how far you scroll.
 const fieldBackground = (tod, condition) => {
@@ -336,6 +345,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={weather.condition} />
+                {/* Live conditions label (unobtrusive, top-left) */}
+                <div style={{ position: "absolute", top: 8, left: 8, zIndex: 60, pointerEvents: "none", padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700, color: "#f2f6ee", background: "rgba(18,26,14,0.5)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(2px)" }}
+                    title={weather.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
+                    {weatherLabel(weather)}
+                </div>
             </div>
 
             {inspect ? (
