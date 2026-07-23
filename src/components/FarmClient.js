@@ -193,8 +193,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                                     />
                                     {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                 </span>
-                                <span style={{ display: "block", textAlign: "center", marginTop: 1, fontSize: 10, fontWeight: 700, color: "#243b16", textShadow: "0 1px 2px rgba(255,255,255,0.6)", whiteSpace: "nowrap" }}>
-                                    {pet.name} <span style={{ color: RARITY_RING[pet.rarity] || "#243b16" }}>·L{pet.level}</span>
+                                <span style={{ display: "flex", justifyContent: "center", marginTop: 3 }}>
+                                    <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.74)", border: "1px solid rgba(255,255,255,0.12)", fontSize: 10, fontWeight: 700, color: "#f2f6ee", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.35)" }}>
+                                        {pet.name} <span style={{ color: RARITY_RING[pet.rarity] || "#cdd9c6" }}>·L{pet.level}</span>
+                                    </span>
                                 </span>
                             </button>
                         );
