@@ -99,8 +99,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [farm.canPet, busy, addFloater, pets]);
 
     const pettableLeft = farm.canPet ? pets.filter((p) => !p.petted).length : 0;
-    // Wider pasture as you own more pets → they spread out and the field scrolls sideways.
-    const fieldW = Math.max(100, pets.length * 13);
+    // Wider pasture as you own more pets → they spread out and the field scrolls sideways. ~24% of the
+    // viewport per pet gives each one plenty of elbow room.
+    const fieldW = Math.max(120, pets.length * 24);
 
     return (
         <div className="stack reveal">
