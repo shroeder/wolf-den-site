@@ -27,11 +27,13 @@ export async function badgeSpriteMap() {
 function buildBadgePrompt(badge) {
     const theme = [badge.label, badge.description].filter(Boolean).join(" — ");
     return (
-        `A small game achievement badge icon representing: "${theme}". ` +
-        `Style: a single bold emblem / medallion, clean flat vector look with a subtle metallic sheen, ` +
-        `strong simple silhouette, thick readable shapes, centered, filling the frame. ` +
-        `Fantasy trading-card-game / RPG achievement aesthetic. Dominant accent color ${badge.color || "#c8a24a"}. ` +
-        `Transparent background. NO text, NO letters, NO numbers, NO border ring. Must stay legible shrunk to 24 pixels.`
+        `Flat 2D game achievement badge emblem representing: "${theme}". ` +
+        `A single bold centered emblem / crest that fills most of the frame, clean confident outlines, ` +
+        `cel-shaded flat vibrant colors, strong readable silhouette, fantasy trading-card-game / RPG achievement ` +
+        `art style. Dominant accent color ${badge.color || "#c8a24a"}. ` +
+        `Die-cut on a FULLY TRANSPARENT background — nothing behind it: no backdrop, no scene, no glow, no ` +
+        `vignette, no drop shadow, no card, no frame. No text, no letters, no numbers, no logo, no watermark, ` +
+        `no border ring. Must stay clearly legible shrunk to 24 pixels.`
     );
 }
 
