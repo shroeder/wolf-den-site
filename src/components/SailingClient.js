@@ -19,7 +19,7 @@ const GUST_MS = 3000;
 // float while the main crew looked fine). Open boats (tier 1–2) have a low floor so figures sit LOW; taller
 // ships seat higher. To retune a form or add a new boat, use the owner-only "🎯 Calibrate crew" overlay on
 // this page (renders all forms with a deck guide + live nudge) and paste the resulting numbers here.
-const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 28, 11: 30 };
+const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 34, 11: 26 };
 // Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
 // An uncovered chest cell shows ITS SLICE of the real chest sprite (positioned like a sprite-sheet), so the

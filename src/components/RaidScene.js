@@ -107,7 +107,7 @@ const BGS = ["/images/sailing/raid-bg-day.png", "/images/sailing/raid-bg-night.p
 
 // Same feet-line map the main sailing scene uses (see DECK in SailingClient) so the crew plants ON the deck of
 // each boat FORM instead of floating. Extended with the two new top-tier hulls (10 leviathan, 11 celestial).
-const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 28, 11: 30 };
+const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 34, 11: 26 };
 const deckPct = (tier) => DECK[tier] ?? 30;
 
 function StatChips({ stats = [] }) {
