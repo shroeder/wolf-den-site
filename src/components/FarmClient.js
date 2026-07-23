@@ -265,9 +265,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes farmSnow { to { transform: translateY(470px) translateX(18px); } }
                 @keyframes farmFog { from { transform: translateX(-5%) } to { transform: translateX(5%) } }
                 @keyframes farmFlash { 0%,90%,100% { opacity: 0 } 91% { opacity: .55 } 93% { opacity: 0 } 95% { opacity: .38 } 96% { opacity: 0 } }
-                @keyframes pigRun { 0% { left: -14%; } 100% { left: 114%; } }
-                @keyframes pigBob { 0%,100% { transform: translateY(0) rotate(-3deg); } 25% { transform: translateY(-16px) rotate(4deg); } 50% { transform: translateY(0) rotate(-3deg); } 75% { transform: translateY(-9px) rotate(3deg); } }
-                @keyframes crownBounce { 0%,100% { transform: translate(-50%, 0) rotate(-12deg); } 50% { transform: translate(-50%, -13px) rotate(12deg); } }
+                @keyframes pigBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+                @keyframes crownJiggle { 0%,100% { transform: translateX(-50%) rotate(-11deg); } 50% { transform: translateX(-50%) rotate(11deg); } }
                 @keyframes coinPop { 0% { opacity: 0; transform: translate(-50%, -22px) scale(.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(360deg); } }
                 @keyframes pigPop { 0% { opacity: 0; transform: scale(.82); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
                 .farm-hop { animation-name: farmHop; animation-timing-function: ease-in-out; animation-iteration-count: infinite; transform-origin: bottom center; }
@@ -367,6 +366,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             );
                         })}
 
+                        {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
+                        {pig === "running" ? <LootPig onFinish={onPigFinish} /> : null}
+
                         {/* XP / heart floaters */}
                         {floaters.map((f) => (
                             <span key={f.id} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, transform: "translate(-50%, -120%)", fontWeight: 800, fontSize: 15, color: f.color || "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.5)", pointerEvents: "none", animation: "farmFloat 1.3s ease-out forwards", zIndex: 9999 }}>
@@ -377,8 +379,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={weather.condition} />
-                {/* Wild Loot Pig rampage + announce toast */}
-                {pig === "running" ? <LootPig onFinish={onPigFinish} /> : null}
+                {/* Wild Loot Pig announce toast (the pig himself lives inside the scrolling field, below) */}
                 {pigToast ? (
                     <div style={{ position: "absolute", top: 44, left: "50%", transform: "translateX(-50%)", zIndex: 70, padding: "8px 16px", borderRadius: 999, background: "rgba(20,16,6,0.92)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,0.45)", animation: "pigPop .4s ease both" }}>
                         🐷👑 The Wild Loot Pig appeared!
@@ -440,27 +441,57 @@ export default function FarmClient({ initial, viewingAlias }) {
     );
 }
 
-// The Wild Loot Pig: a crowned pig that rampages across the pasture dropping coins, then runs off screen.
-// Cosmetic only — the real haul is claimed server-side in onFinish.
+// The Wild Loot Pig sprite (crown overlaid separately). Generated once via /api/admin/loot-pig-sprite.
+const PIG_SPRITE_URL = null;
+
+// The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping gold,
+// then wanders off an edge. Cosmetic only — the haul is claimed server-side in onFinish.
 function LootPig({ onFinish }) {
-    const RUN_MS = 5600;
+    const [pos, setPos] = useState({ x: 4, y: 84, flip: false, dur: 1.6 });
+    const [coins, setCoins] = useState([]);
+    const coinId = useRef(0);
     useEffect(() => {
-        const t = setTimeout(onFinish, RUN_MS);
-        return () => clearTimeout(t);
+        let alive = true;
+        const timers = [];
+        let step = 0;
+        const MAX_STEPS = 7; // meander waypoints before he leaves
+        const drop = (x, y) => setCoins((c) => [...c, { id: ++coinId.current, x: x + rand(-3, 3), y: y + rand(-1, 5) }]);
+        const move = () => {
+            if (!alive) return;
+            step += 1;
+            if (step > MAX_STEPS) {
+                setPos((p) => { const exitX = Math.random() < 0.5 ? -12 : 112; return { x: exitX, y: 84, flip: exitX < p.x, dur: 2.4 }; });
+                timers.push(setTimeout(() => { if (alive) onFinish(); }, 2500));
+                return;
+            }
+            const nx = rand(8, 90);
+            const ny = 80 + rand(0, 10);
+            const dur = rand(1.5, 2.7);
+            setPos((p) => ({ x: nx, y: ny, flip: nx < p.x, dur }));
+            drop(nx, ny);
+            timers.push(setTimeout(move, dur * 1000 + rand(350, 1000))); // amble, then pause, then wander again
+        };
+        drop(4, 84);
+        timers.push(setTimeout(move, 1500));
+        return () => { alive = false; timers.forEach(clearTimeout); };
     }, [onFinish]);
-    const coins = [8, 18, 27, 38, 48, 58, 68, 78, 88, 95];
     return (
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16, zIndex: 55 }}>
-            {coins.map((x, i) => (
-                <span key={i} style={{ position: "absolute", left: `${x}%`, bottom: `${9 + (i % 3) * 7}%`, fontSize: 20, animation: `coinPop .5s ease-out ${(((x + 14) / 128) * (RUN_MS / 1000)).toFixed(2)}s both` }}>🪙</span>
+        <>
+            {coins.map((c) => (
+                <span key={c.id} style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", fontSize: 18, zIndex: 50, pointerEvents: "none", animation: "coinPop .5s ease-out both" }}>🪙</span>
             ))}
-            <div style={{ position: "absolute", top: "56%", left: "-14%", animation: `pigRun ${RUN_MS}ms linear forwards` }}>
-                <div style={{ position: "relative", animation: "pigBob .5s ease-in-out infinite" }}>
-                    <span style={{ position: "absolute", left: "50%", top: -24, fontSize: 22, animation: "crownBounce .5s ease-in-out infinite" }}>👑</span>
-                    <span style={{ fontSize: 62, display: "block", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }}>🐷</span>
+            <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
+                <div style={{ position: "relative", animation: "pigBob .55s ease-in-out infinite" }}>
+                    <span style={{ position: "absolute", left: "50%", top: -2, fontSize: 20, zIndex: 2, transformOrigin: "bottom center", animation: "crownJiggle .34s ease-in-out infinite" }}>👑</span>
+                    {PIG_SPRITE_URL ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />
+                    ) : (
+                        <span style={{ display: "block", fontSize: 58, lineHeight: 1, transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }}>🐷</span>
+                    )}
                 </div>
             </div>
-        </div>
+        </>
     );
 }
 
