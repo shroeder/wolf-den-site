@@ -241,7 +241,11 @@ export default function BossFightClient() {
             ) : (
                 <div className="boss2-actions">
                     {!you ? (
-                        <Link href="/marketplace/login?returnTo=/marketplace/boss" className="btn-gold boss2-attack">Sign in to join the fight</Link>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}>
+                            <div className="muted" style={{ textAlign: "center", maxWidth: 340 }}>Land the finishing blow, earn XP &amp; real store rewards at The Wolf Den — free to play.</div>
+                            <Link href="/marketplace/login?returnTo=/marketplace/boss&signup=1" className="btn-gold boss2-attack">⚔️ Create a free account to strike</Link>
+                            <Link href="/marketplace/login?returnTo=/marketplace/boss" style={{ fontSize: "0.85rem", textDecoration: "underline", opacity: 0.85 }}>Already have an account? Sign in</Link>
+                        </div>
                     ) : you.attacksLeft > 0 ? (
                         <button type="button" className="btn-gold boss2-attack" onClick={attack} disabled={busy}>
                             {busy ? "Unleashing…" : "⚔️ Unleash your daily strike"}

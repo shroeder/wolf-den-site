@@ -171,6 +171,16 @@ export default async function MarketplaceProductPage({ params }) {
                 />
             </section>
 
+            {/* Hook for search/shop traffic that lands here and would otherwise bounce → the free game. */}
+            <Link href="/marketplace/play" className="card" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: "inherit", borderColor: "rgba(255,215,94,0.4)" }}>
+                <span style={{ fontSize: 30 }} aria-hidden="true">🎮</span>
+                <span style={{ flex: 1 }}>
+                    <strong>New here? Play The Wolf Den — free.</strong>
+                    <span className="muted" style={{ display: "block", fontSize: "0.9rem" }}>Fight the weekly boss, collect pets, and earn XP &amp; store credit toward cards like this one.</span>
+                </span>
+                <span className="btn-gold" style={{ whiteSpace: "nowrap" }}>Play now →</span>
+            </Link>
+
             {jsonLd ? (
                 <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
             ) : null}
