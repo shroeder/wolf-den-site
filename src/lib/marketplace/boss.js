@@ -24,6 +24,7 @@ import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-bro
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -925,6 +926,7 @@ export async function attackBoss(buyerId) {
         ? { effectiveHp: 0, autoDps: 0 }
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
     const elemProc = elem.matches > 0 ? `${weaknessInfo(boss.weakness)?.emoji || "✨"} ${weaknessInfo(boss.weakness)?.label || ""} weakness +${elem.bonusPct}%` : null;
+    await trackActivity(buyerId, "boss_attack", { damage, crit, boss: boss.name, defeated }).catch(() => {});
     return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
@@ -980,6 +982,7 @@ export async function cheer(buyerId, targetId) {
     const xpGain = CHEER_XP + (procs.xp || 0);
     const goldGain = CHEER_GOLD + (procs.gold || 0);
     await awardXp(buyerId, "cheer", { points: xpGain, gold: goldGain }).catch(() => {});
+    await trackActivity(buyerId, "cheer", { xp: xpGain, gold: goldGain }).catch(() => {});
     if (procs.petXp > 0) await addEquippedPetXp(buyerId, procs.petXp).catch(() => {});
     if (procs.fragment) await grantFragment(buyerId, 1).catch(() => {});
 
