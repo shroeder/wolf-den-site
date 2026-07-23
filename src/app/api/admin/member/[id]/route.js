@@ -11,7 +11,7 @@ import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collec
 import { CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
-import { levelForXp } from "@/lib/marketplace/xp.js";
+import { levelForXp, SPEND_XP_PER_DOLLAR } from "@/lib/marketplace/xp.js";
 import { coinLedger, coinBreakdown } from "@/lib/marketplace/coins.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -103,7 +103,7 @@ export async function GET(request, { params }) {
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, pendingPurchases, creditEvents] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, purchaseXpRows, creditEvents] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
@@ -134,11 +134,14 @@ export async function GET(request, { params }) {
                        FROM mkt_activity_event WHERE buyer_id = $1`,
                     [id]
                 ).catch(() => null),
-                // Real in-store purchases attributed to this member (Square sale → loyalty claim, by QR/email).
+                // Real in-store purchases attributed to this member. The authoritative record is the
+                // per-order purchase_spend XP event (deduped by order id); its meta carries the merchandise
+                // amount (older rows reconstruct it from points ÷ SPEND_XP_PER_DOLLAR). Covers both walk-in
+                // sales auto-credited to their account and pre-account purchases they later claimed.
                 db.query(
-                    `SELECT amount_cents, order_id, created_at, redeemed_at
-                       FROM mkt_pending_purchase WHERE redeemed_buyer_id = $1
-                      ORDER BY COALESCE(redeemed_at, created_at) DESC LIMIT 60`,
+                    `SELECT points, meta, created_at
+                       FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'
+                      ORDER BY created_at DESC LIMIT 80`,
                     [id]
                 ).catch(() => []),
                 // Store-credit money movements: bought credit, spent in-store (QR), applied online, refunds.
@@ -202,18 +205,31 @@ export async function GET(request, { params }) {
                 refund: "💵 Store-credit refund",
                 adjust: "⚙️ Store-credit adjustment",
             };
+            // The merchandise amount for a purchase_spend event: prefer the stamped meta amount (exact, new
+            // rows). Older rows only have points, which already had the Happy-Hour multiplier baked in, so we
+            // estimate whole dollars (spend was always whole dollars) — flagged approx so the UI can mark it.
+            const purchaseAmount = (row) => {
+                let m = row.meta;
+                if (typeof m === "string") { try { m = JSON.parse(m); } catch { m = null; } }
+                if (m && m.amountCents != null) return { cents: Math.max(0, Number(m.amountCents) || 0), approx: false };
+                return { cents: Math.max(0, Math.round((Number(row.points) || 0) / SPEND_XP_PER_DOLLAR) * 100), approx: true };
+            };
+            const instorePurchases = (purchaseXpRows || []).map((r) => {
+                const { cents, approx } = purchaseAmount(r);
+                return { kind: "instore", label: "🛒 In-store purchase", amountCents: cents, approx, at: iso(r.created_at) };
+            });
             const purchases = [
-                ...(pendingPurchases || []).map((r) => ({ kind: "instore", label: "🛒 In-store purchase", amountCents: Number(r.amount_cents) || 0, at: iso(r.redeemed_at || r.created_at) })),
+                ...instorePurchases,
                 ...(creditEvents || []).map((r) => ({ kind: "credit", reason: r.reason, label: CREDIT_REASON[r.reason] || String(r.reason || "").replace(/_/g, " "), amountCents: Number(r.delta_cents) || 0, balanceAfterCents: Number(r.balance_after_cents) || 0, at: iso(r.created_at) })),
             ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 80);
             const purchaseSummary = {
                 // Real money spent in-store (loyalty-attributed Square sales).
-                instoreCents: (pendingPurchases || []).reduce((s, r) => s + (Number(r.amount_cents) || 0), 0),
+                instoreCents: instorePurchases.reduce((s, r) => s + r.amountCents, 0),
                 // Store credit they bought online (real money).
                 creditBoughtCents: (creditEvents || []).filter((r) => r.reason === "purchase").reduce((s, r) => s + (Number(r.delta_cents) || 0), 0),
                 // Store credit they've redeemed/spent (in-store QR + online).
                 creditSpentCents: (creditEvents || []).filter((r) => r.reason === "spend_store" || r.reason === "spend_online").reduce((s, r) => s + Math.abs(Number(r.delta_cents) || 0), 0),
-                count: (pendingPurchases || []).length + (creditEvents || []).length,
+                count: instorePurchases.length + (creditEvents || []).length,
             };
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));

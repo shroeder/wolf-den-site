@@ -218,11 +218,14 @@ export async function awardPurchaseXp({ email = null, phone = null, buyerId = nu
         return id;
     }
 
+    // Stamp the real merchandise amount into the event meta so the admin purchase history reads exact dollars
+    // (older events without it fall back to reconstructing from points ÷ SPEND_XP_PER_DOLLAR).
+    const amt = Math.max(0, Number(amountCents) || 0);
     if (dollars > 0 && oid) {
-        await awardXp(id, "purchase_spend", { points: dollars * SPEND_XP_PER_DOLLAR, dedupeKey: `spend:${oid}`, meta: { orderId: oid } });
+        await awardXp(id, "purchase_spend", { points: dollars * SPEND_XP_PER_DOLLAR, dedupeKey: `spend:${oid}`, meta: { orderId: oid, amountCents: amt } });
     }
     if (oid) {
-        await awardXp(id, "purchase_flat", { dedupeKey: `purchase_flat:${oid}`, dailyCap: 1, meta: { orderId: oid } });
+        await awardXp(id, "purchase_flat", { dedupeKey: `purchase_flat:${oid}`, dailyCap: 1, meta: { orderId: oid, amountCents: amt } });
     }
     await awardXp(id, "first_purchase", { dedupeKey: `first_purchase:${id}`, meta: { orderId: oid } });
 
