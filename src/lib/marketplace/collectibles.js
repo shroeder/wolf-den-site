@@ -97,10 +97,10 @@ export const COLLECTIBLES = [
     { id: "penguin", name: "Penguin", Icon: GiPenguin, color: "#bfe0ff", rarity: "common", source: "shop", activeStat: "gold_find", hint: "Dressed to impress", spritePrompt: "a dapper little penguin" },
     { id: "hedgehog", name: "Hedgehog", Icon: GiHedgehog, color: "#c9a36a", rarity: "common", source: "shop", activeStat: "fortune", hint: "Prickly good luck", spritePrompt: "a tiny round hedgehog" },
     { id: "sheep", name: "Sheep", Icon: GiSheep, color: "#e2e8f0", rarity: "common", source: "shop", activeStat: "gold_find", hint: "Counts your gold", spritePrompt: "a fluffy white sheep" },
-    { id: "crab", name: "Crab", Icon: GiCrab, color: "#ff7a4d", rarity: "common", source: "shop", activeStat: "crit_power", hint: "Pinchy", spritePrompt: "a little red crab" },
-    { id: "turtle", name: "Turtle", Icon: GiTurtle, color: "#6ad07a", rarity: "rare", source: "shop", activeStat: "ferocity", hint: "Slow and steady", spritePrompt: "a small green turtle" },
+    { id: "crab", name: "Crab", Icon: GiCrab, color: "#ff7a4d", rarity: "common", source: "shop", activeStat: "crit_power", sea: { dredge: 4 }, hint: "Pinchy — digs up more at sea", spritePrompt: "a little red crab" },
+    { id: "turtle", name: "Turtle", Icon: GiTurtle, color: "#6ad07a", rarity: "rare", source: "shop", activeStat: "ferocity", sea: { bulwark: 5 }, hint: "Slow, steady, hard to sink", spritePrompt: "a small green turtle" },
     { id: "parrot", name: "Parrot", Icon: GiParrotHead, color: "#6bf0ff", rarity: "rare", source: "shop", activeStat: "xp_gain", hint: "Repeats your wisdom", spritePrompt: "a colorful tropical parrot" },
-    { id: "dolphin", name: "Dolphin", Icon: GiDolphin, color: "#5ad0d0", rarity: "rare", source: "shop", activeStat: "fortune", hint: "Rides your luck", spritePrompt: "a leaping dolphin" },
+    { id: "dolphin", name: "Dolphin", Icon: GiDolphin, color: "#5ad0d0", rarity: "rare", source: "shop", activeStat: "fortune", sea: { tailwind: 5 }, hint: "Rides your luck — and the wind", spritePrompt: "a leaping dolphin" },
     { id: "monkey", name: "Monkey", Icon: GiMonkey, color: "#b07a4a", rarity: "epic", source: "shop", activeStat: "crit_chance", hint: "Cheeky and quick", spritePrompt: "a playful monkey" },
     { id: "panda", name: "Panda", Icon: GiPanda, color: "#e2e8f0", rarity: "epic", source: "shop", activeStat: "might", hint: "Gentle giant", spritePrompt: "a cute panda cub" },
     { id: "kangaroo", name: "Kangaroo", Icon: GiKangaroo, color: "#d9a86a", rarity: "epic", source: "shop", activeStat: "might", hint: "Packs a punch", spritePrompt: "a bounding kangaroo" },
@@ -124,7 +124,7 @@ export const COLLECTIBLES = [
     { id: "butterfly", name: "Butterfly", Icon: GiButterfly, color: "#b45aff", rarity: "rare", source: "chest", chestTier: "gold", activeStat: "fortune", hint: "Fragile magic", spritePrompt: "a shimmering iridescent butterfly" },
     { id: "squid", name: "Squid", Icon: GiSquid, color: "#5a9bff", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_chance", hint: "Ink and speed", spritePrompt: "a bioluminescent glowing squid" },
     { id: "jellyfish", name: "Jellyfish", Icon: GiJellyfish, color: "#b45aff", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "crit_power", hint: "Drifting current", spritePrompt: "a glowing translucent jellyfish" },
-    { id: "octopus", name: "Octopus", Icon: GiOctopus, color: "#ff5a7a", rarity: "legendary", source: "chest", chestTier: "ascendant", activeStat: "ferocity", hint: "Eight-armed genius", spritePrompt: "a clever deep-sea octopus" },
+    { id: "octopus", name: "Octopus", Icon: GiOctopus, color: "#ff5a7a", rarity: "legendary", source: "chest", chestTier: "ascendant", activeStat: "ferocity", sea: { plunder: 6 }, hint: "Eight arms, eight grabs of plunder", spritePrompt: "a clever deep-sea octopus" },
 
     // ── Boss-battle-only drops ─────────────────────────────────────────────────────────────────────
     { id: "vulture", name: "Vulture", Icon: GiVulture, color: "#8794a3", rarity: "rare", source: "boss", activeStat: "crit_chance", hint: "Circles the fallen", spritePrompt: "a circling bald vulture" },

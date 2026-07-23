@@ -6,8 +6,9 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
-import { grantItem, getEquippedStats } from "@/lib/marketplace/inventory.js";
-import { itemById, STAT_META } from "@/lib/marketplace/items.js";
+import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { itemById, STAT_META, sumItemSea } from "@/lib/marketplace/items.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -153,6 +154,37 @@ async function merchantFindBonus(buyerId) {
     const xpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, MERCHANT_PET_ID]).catch(() => null);
     const lvl = petLevelForXp(xpRow?.xp || 0, MERCHANT_PET_RARITY);
     return MERCHANT_PET_FIND[Math.max(1, Math.min(5, lvl))] || 0;
+}
+
+// ── SEA AFFINITY ── equipped GEAR + PET grant sailing-only effects (plunder/dredge/bulwark/tailwind POINTS).
+// Aggregated here and converted to real effects by seaEffects(). Never touches boss power. Pet points scale by
+// the equipped pet's level (1..5 → ~0.36x..1.0x), mirroring the elephant's merchant-find bonus.
+async function equippedSeaAffinity(buyerId) {
+    const sea = { plunder: 0, dredge: 0, bulwark: 0, tailwind: 0 };
+    if (!buyerId) return sea;
+    const [bySlot, me] = await Promise.all([
+        getEquippedIds(buyerId).catch(() => ({})),
+        db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+    ]);
+    const gear = sumItemSea(Object.values(bySlot || {}));
+    for (const k in sea) sea[k] += gear[k] || 0;
+    const petId = me?.featured_collectible;
+    const pet = petId ? collectibleById(petId) : null;
+    if (pet?.sea) {
+        const xpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+        const lvl = Math.max(1, Math.min(5, petLevelForXp(xpRow?.xp || 0, pet.rarity)));
+        for (const k in sea) sea[k] += Math.round((pet.sea[k] || 0) * (0.2 + 0.16 * lvl));
+    }
+    return sea;
+}
+// Sea-affinity POINTS → real effects. Plain tunable numbers (no env).
+function seaEffects(sea = {}) {
+    return {
+        raidCopyBonus: (sea.plunder || 0) * 0.0025,                  // +0.25% raid item-copy per Plunder point
+        digProcBonus: (sea.dredge || 0) * 0.01,                      // +1% dig-tool proc per Dredge point
+        raidLossMult: Math.max(0.4, 1 - (sea.bulwark || 0) * 0.03),  // −3% raid gold loss per Bulwark (max −60%)
+        bonusWaves: Math.floor((sea.tailwind || 0) / 4),             // +1 daily wave per 4 Tailwind points
+    };
 }
 
 // Roll the merchant ONCE per voyage, lazily, at the "arrived" interstitial (landed, no dig yet, not rolled).
@@ -552,7 +584,7 @@ function boardView(board) {
 }
 
 // --- state ---------------------------------------------------------------------------------------------
-function decorate(row, chestArt = {}) {
+function decorate(row, chestArt = {}, bonusWaves = 0) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -634,8 +666,8 @@ function decorate(row, chestArt = {}) {
         status, progress, departedAt, arrivesAt,
         // Waves — greet a passing sailor a few times a day (only meaningful mid-voyage).
         waves: {
-            max: wavesPerDay(luckLevel),
-            left: Math.max(0, wavesPerDay(luckLevel) - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
+            max: wavesPerDay(luckLevel) + bonusWaves, // Tailwind sea-affinity adds bonus daily waves
+            left: Math.max(0, wavesPerDay(luckLevel) + bonusWaves - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
             xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000,
         },
         // A resolved-but-unacknowledged marine encounter, if any — the client shows it as a one-off recap modal.
@@ -701,7 +733,7 @@ async function resolveDueEncounter(buyerId) {
 export async function getSailingState(buyerId) {
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, petMap, chestArt] = await Promise.all([
+    const [row, goldRow, others, petMap, chestArt, sea] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
@@ -722,7 +754,9 @@ export async function getSailingState(buyerId) {
         ).catch(() => []),
         getPetSpriteData().catch(() => ({})),
         getChestArt().catch(() => ({})),
+        equippedSeaAffinity(buyerId),
     ]);
+    const seaEff = seaEffects(sea);
     const fleet = (others || []).map((o) => {
         const pet = o.featured_collectible ? petMap[o.featured_collectible] : null;
         return {
@@ -740,7 +774,7 @@ export async function getSailingState(buyerId) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt), gold: goldRow?.gold || 0, fleet, sky };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -769,7 +803,7 @@ export async function waveAtSailor(buyerId) {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "sailing") return { ok: false, error: "not_sailing", ...(await getSailingState(buyerId)) };
-    const cap = wavesPerDay(row?.find_level || 0); // Luck raises the daily wave cap
+    const cap = wavesPerDay(row?.find_level || 0) + seaEffects(await equippedSeaAffinity(buyerId)).bonusWaves; // Luck + Tailwind raise the daily wave cap
     const waved = await db.queryOne(
         `UPDATE mkt_sailing
             SET wave_count = CASE WHEN wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN wave_count + 1 ELSE 1 END,
@@ -916,12 +950,14 @@ export async function doRaid(buyerId, targetId = null) {
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
 
     // Presentation + combat inputs for BOTH fighters (their hero sprite, pet, and equipped gear stats).
-    const [me, petMap, myStats, foeStats] = await Promise.all([
+    const [me, petMap, myStats, foeStats, mySea] = await Promise.all([
         db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getPetSpriteData().catch(() => ({})),
         getEquippedStats(buyerId).catch(() => ({})),
         getEquippedStats(target.id).catch(() => ({})),
+        equippedSeaAffinity(buyerId),
     ]);
+    const seaEff = seaEffects(mySea); // Plunder → item-copy odds, Bulwark → smaller gold loss
     const canStun = boatPerks(myLevel).raidStun;
     const sim = simulateRaid({
         myPower: combatPower(myStats, myLevel), foePower: combatPower(foeStats, foeLevel),
@@ -937,7 +973,7 @@ export async function doRaid(buyerId, targetId = null) {
     if (sim.win) {
         goldDelta = RAID_WIN_GOLD();
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
-        if (Math.random() < RAID_ITEM_COPY_CHANCE) {
+        if (Math.random() < RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus) { // Plunder raises the copy odds
             const it = await db.queryOne(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 ORDER BY random() LIMIT 1`, [target.id]).catch(() => null);
             const item = it?.item_id ? itemById(it.item_id) : null;
             if (item) {
@@ -946,7 +982,8 @@ export async function doRaid(buyerId, targetId = null) {
             }
         }
     } else {
-        const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
+        const rawLoss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
+        const loss = Math.max(1, Math.round(rawLoss * seaEff.raidLossMult)); // Bulwark softens the gold loss
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
         goldDelta = -loss;
     }
@@ -1158,6 +1195,9 @@ export async function beginDig(buyerId) {
     const state = decorate(row);
     if (state.status !== "arrived") return { ok: false, error: "not_arrived", ...(await getSailingState(buyerId)) };
     const board = newBoard(row);
+    // Sea affinity (Dredge, from equipped gear/pet) raises every dig-tool's proc chance for this excavation.
+    const eff = seaEffects(await equippedSeaAffinity(buyerId));
+    if (eff.digProcBonus && board.up) board.up.efficient = (board.up.efficient || 0) + eff.digProcBonus;
     // Starting the dig leaves the merchant behind — clear his offer.
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, merchant_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };

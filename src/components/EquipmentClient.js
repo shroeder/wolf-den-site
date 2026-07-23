@@ -8,7 +8,7 @@ import ChestOpener from "@/components/ChestOpener";
 import CoinCta from "@/components/CoinCta";
 import ItemArt from "@/components/ItemArt";
 import { trackClient } from "@/lib/marketplace/track-client";
-import { EQUIP_SLOTS, STAT_META, describeStats, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
 // An item's elemental affinity chip — matters against a boss weak to that element (bonus damage).
@@ -288,6 +288,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
+                                {i.sea ? <span className="equip-card-sea">{describeSea(i.sea)}</span> : null}
                                 <ElBadge id={i.id} />
                             </button>
                         ))}
@@ -416,6 +417,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
+                        {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setName ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p> : null}

@@ -209,7 +209,7 @@ export const ITEMS = [
     { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, reqLevel: 34, source: "chest", sort: 203 },
     { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, reqLevel: 60, source: "chest", sort: 204 },
     { id: "reapers_scythe", name: "Reaper's Scythe", slot: "main_hand", rarity: "legendary", icon: "GiScythe", flavor: "It only asks once.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 66, source: "chest", sort: 205 },
-    { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, reqLevel: 92, source: "chest", sort: 206 },
+    { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, sea: { plunder: 8 }, reqLevel: 92, source: "chest", sort: 206 },
     // -- Off hand --
     { id: "oak_buckler", name: "Oak Buckler", slot: "off_hand", rarity: "common", icon: "GiWoodFrame", flavor: "Humble but honest.", stats: { ferocity: 10 }, reqLevel: 5, source: "chest", sort: 210 },
     { id: "spiked_shield", name: "Spiked Shield", slot: "off_hand", rarity: "rare", icon: "GiShieldBash", flavor: "Defense that bites back.", stats: { might: 5, ferocity: 11 }, reqLevel: 20, source: "chest", sort: 211 },
@@ -264,14 +264,14 @@ export const ITEMS = [
     { id: "heavy_cleaver", name: "Heavy Cleaver", slot: "main_hand", rarity: "epic", icon: "GiCleaver", flavor: "One swing, one problem solved.", stats: { might: 22 }, reqLevel: 28, source: "chest", sort: 302 },
     { id: "chakram", name: "Whirling Chakram", slot: "main_hand", rarity: "epic", icon: "GiChakram", flavor: "Round and merciless.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 32, source: "chest", sort: 303 },
     { id: "executioner_axe", name: "Executioner's Axe", slot: "main_hand", rarity: "legendary", icon: "GiWarAxe", flavor: "No second swing needed.", stats: { might: 16, crit_power: 14 }, reqLevel: 58, source: "chest", sort: 304 },
-    { id: "tidebreaker", name: "Tidebreaker", slot: "main_hand", rarity: "legendary", icon: "GiWaveStrike", flavor: "It parts the sea.", stats: { might: 20, crit_chance: 10 }, reqLevel: 64, source: "chest", sort: 305 },
+    { id: "tidebreaker", name: "Tidebreaker", slot: "main_hand", rarity: "legendary", icon: "GiWaveStrike", flavor: "It parts the sea.", stats: { might: 20, crit_chance: 10 }, sea: { plunder: 6 }, reqLevel: 64, source: "chest", sort: 305 },
     { id: "worldflame_maul", name: "Worldflame Maul", slot: "main_hand", rarity: "mythic", icon: "GiFlatHammer", flavor: "The mountains remember it.", stats: { might: 40 }, reqLevel: 94, source: "chest", sort: 306 },
     // -- Off hand --
     { id: "eye_shield", name: "Eye Shield", slot: "off_hand", rarity: "common", icon: "GiEyeShield", flavor: "It watches back.", stats: { ferocity: 10 }, reqLevel: 5, source: "chest", sort: 310 },
     { id: "suns_ward", name: "Sun's Ward", slot: "off_hand", rarity: "rare", icon: "GiHeraldicSun", flavor: "Blinding to your foes.", stats: { might: 5, ferocity: 11 }, reqLevel: 18, source: "chest", sort: 311 },
     { id: "concentration_orb", name: "Orb of Focus", slot: "off_hand", rarity: "epic", icon: "GiConcentrationOrb", flavor: "Steady the mind.", stats: { crit_chance: 8, ferocity: 14 }, reqLevel: 34, source: "chest", sort: 312 },
     { id: "spiked_wall", name: "Spiked Wall", slot: "off_hand", rarity: "legendary", icon: "GiSpikedShield", flavor: "Approach and regret it.", stats: { might: 10, ferocity: 20 }, reqLevel: 60, source: "chest", sort: 313 },
-    { id: "void_maelstrom", name: "Void Maelstrom", slot: "off_hand", rarity: "mythic", icon: "GiVortex", flavor: "It devours all it touches.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 92, source: "chest", sort: 314 },
+    { id: "void_maelstrom", name: "Void Maelstrom", slot: "off_hand", rarity: "mythic", icon: "GiVortex", flavor: "It devours all it touches.", stats: { ferocity: 20, fortune: 20 }, sea: { dredge: 8 }, reqLevel: 92, source: "chest", sort: 314 },
     // -- Helmet --
     { id: "spartan_helm", name: "Spartan Helm", slot: "helmet", rarity: "common", icon: "GiSpartanHelmet", flavor: "Hold the line.", stats: { ferocity: 10 }, reqLevel: 4, source: "chest", sort: 320 },
     { id: "dwarf_helm", name: "Dwarven Helm", slot: "helmet", rarity: "rare", icon: "GiDwarfHelmet", flavor: "Forged deep under the mountain.", stats: { might: 6, ferocity: 10 }, reqLevel: 20, source: "chest", sort: 321 },
@@ -323,8 +323,8 @@ export const ITEMS = [
     { id: "meteor_hammer", name: "Meteor Hammer", slot: "main_hand", rarity: "mythic", icon: "GiMeteorImpact", flavor: "Called down from the sky.", stats: { might: 24, crit_power: 16 }, reqLevel: 94, source: "chest", sort: 405 },
     // -- Off hand --
     { id: "fire_ward", name: "Fire Ward", slot: "off_hand", rarity: "common", icon: "GiFireShield", flavor: "Warm to hold.", stats: { ferocity: 10 }, reqLevel: 5, source: "chest", sort: 410 },
-    { id: "frost_barrier", name: "Frost Barrier", slot: "off_hand", rarity: "rare", icon: "GiIceGolem", flavor: "A wall of ice.", stats: { might: 5, ferocity: 11 }, reqLevel: 20, source: "chest", sort: 411 },
-    { id: "orb_of_tides", name: "Orb of Tides", slot: "off_hand", rarity: "epic", icon: "GiFloatingCrystal", flavor: "The sea answers it.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 34, source: "chest", sort: 412 },
+    { id: "frost_barrier", name: "Frost Barrier", slot: "off_hand", rarity: "rare", icon: "GiIceGolem", flavor: "A wall of ice.", stats: { might: 5, ferocity: 11 }, sea: { bulwark: 4 }, reqLevel: 20, source: "chest", sort: 411 },
+    { id: "orb_of_tides", name: "Orb of Tides", slot: "off_hand", rarity: "epic", icon: "GiFloatingCrystal", flavor: "The sea answers it.", stats: { ferocity: 8, fortune: 14 }, sea: { dredge: 5 }, reqLevel: 34, source: "chest", sort: 412 },
     { id: "worldshield", name: "Worldshield", slot: "off_hand", rarity: "mythic", icon: "GiWorld", flavor: "It carries the sky.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 92, source: "chest", sort: 413 },
     // -- Helmet --
     { id: "iron_hood", name: "Iron Hood", slot: "helmet", rarity: "common", icon: "GiHood", flavor: "Keeps your head down.", stats: { ferocity: 10 }, reqLevel: 4, source: "chest", sort: 420 },
@@ -350,10 +350,10 @@ export const ITEMS = [
     { id: "spectre_locket", name: "Spectre Locket", slot: "amulet", rarity: "mythic", icon: "GiSpectre", flavor: "A soul kept close.", stats: { crit_chance: 16, crit_power: 24 }, reqLevel: 95, source: "chest", sort: 455 },
     // -- Belt --
     { id: "leaf_sash", name: "Leaf Sash", slot: "belt", rarity: "common", icon: "GiOakLeaf", flavor: "Green and simple.", stats: { ferocity: 4, fortune: 6 }, reqLevel: 6, source: "chest", sort: 460 },
-    { id: "waterflow_belt", name: "Waterflow Belt", slot: "belt", rarity: "rare", icon: "GiWaterDrop", flavor: "Move like the river.", stats: { crit_chance: 16 }, reqLevel: 20, source: "chest", sort: 461 },
+    { id: "waterflow_belt", name: "Waterflow Belt", slot: "belt", rarity: "rare", icon: "GiWaterDrop", flavor: "Move like the river.", stats: { crit_chance: 16 }, sea: { dredge: 4 }, reqLevel: 20, source: "chest", sort: 461 },
     // -- Rings --
     { id: "bone_ring", name: "Bone Ring", slot: "ring", rarity: "common", icon: "GiFangedSkull", flavor: "A grim little band.", stats: { might: 10 }, reqLevel: 5, source: "chest", sort: 470 },
-    { id: "droplet_ring", name: "Droplet Ring", slot: "ring", rarity: "rare", icon: "GiDropletSplash", flavor: "A bead of pure luck.", stats: { fortune: 16 }, reqLevel: 20, source: "chest", sort: 471 },
+    { id: "droplet_ring", name: "Droplet Ring", slot: "ring", rarity: "rare", icon: "GiDropletSplash", flavor: "A bead of pure luck.", stats: { fortune: 16 }, sea: { plunder: 3 }, reqLevel: 20, source: "chest", sort: 471 },
 
     // ===== REAL-WORLD PERK ITEMS (source: "admin", charged) — the owner hands these out; they never drop
     // from loot. Redeemed in-store via the admin app (burns a charge + starts the cooldown). Modest stats:
@@ -490,7 +490,7 @@ export const ITEMS = [
     { id: "wings_of_dawn", name: "Wings of Dawn", slot: "back", rarity: "legendary", icon: "GiAngelWings", flavor: "First light, given form.", stats: { fortune: 15, crit_chance: 15 }, reqLevel: 48, source: "chest", sort: 815 },
     { id: "oblivion_wings", name: "Wings of Oblivion", slot: "back", rarity: "mythic", icon: "GiBatwingEmblem", flavor: "They blot out the sun.", stats: { ferocity: 25, crit_power: 15 }, reqLevel: 92, source: "chest", sort: 816 },
     // -- Gold shop --
-    { id: "merchants_cape", name: "Merchant's Cape", slot: "back", rarity: "rare", icon: "GiWingCloak", flavor: "Lined with lucky coin.", stats: { fortune: 16 }, reqLevel: 10, source: "xp_shop", xpCost: 1400, sort: 820 },
+    { id: "merchants_cape", name: "Merchant's Cape", slot: "back", rarity: "rare", icon: "GiWingCloak", flavor: "Lined with lucky coin.", stats: { fortune: 16 }, sea: { tailwind: 4 }, reqLevel: 10, source: "xp_shop", xpCost: 1400, sort: 820 },
     { id: "gilded_mantle", name: "Gilded Mantle", slot: "back", rarity: "epic", icon: "GiCondorEmblem", flavor: "Wealth worn well.", stats: { might: 12, fortune: 10 }, reqLevel: 26, source: "xp_shop", xpCost: 3200, sort: 821 },
     { id: "celestial_cloak", name: "Celestial Cloak", slot: "back", rarity: "legendary", icon: "GiCurlyWing", flavor: "Cut from the night sky.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 46, source: "xp_shop", xpCost: 14000, sort: 822 },
     { id: "void_shroud", name: "Void Shroud", slot: "back", rarity: "mythic", icon: "GiFalconMoon", flavor: "It drinks the light.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 90, source: "xp_shop", xpCost: 90000, sort: 823 },
@@ -538,5 +538,29 @@ export function describeStats(stats = {}) {
             const m = STAT_META[k];
             return m ? `+${v}${m.suffix} ${m.label}` : `+${v} ${k}`;
         })
+        .join(" · ");
+}
+
+// ── SEA AFFINITY ── a separate effect layer that ONLY the Sailing systems read (raids/digging/voyages) — kept
+// OUT of `stats` so it never touches boss combat or inflates boss power. Gear + pets carry these small integer
+// "points"; sailing.js converts points → real effect. See seaEffects() there.
+export const SEA_META = {
+    plunder: { label: "Plunder", icon: "⚓", desc: "Better odds to copy a foe's item when you win a raid." },
+    dredge: { label: "Dredge", icon: "⛏️", desc: "Higher chance your dig tools proc while excavating." },
+    bulwark: { label: "Bulwark", icon: "🛡️", desc: "Lose less gold when you lose a raid." },
+    tailwind: { label: "Tailwind", icon: "🌬️", desc: "Greet more passing sailors each day (extra waves)." },
+};
+export function sumItemSea(itemIds = []) {
+    const total = {};
+    for (const id of itemIds) {
+        const it = itemById(id);
+        if (!it?.sea) continue;
+        for (const [k, v] of Object.entries(it.sea)) total[k] = (total[k] || 0) + (Number(v) || 0);
+    }
+    return total;
+}
+export function describeSea(sea = {}) {
+    return Object.entries(sea).filter(([, v]) => v)
+        .map(([k, v]) => { const m = SEA_META[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
         .join(" · ");
 }

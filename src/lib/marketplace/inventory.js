@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, describeStats, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
@@ -234,7 +234,7 @@ export async function getInventory(buyerId) {
             const effectiveCost = couponedPrice(coupon, cost);
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-                stats: i.stats, statsText: describeStats(i.stats), signature: signatureFor(i.id),
+                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, signature: signatureFor(i.id),
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
             };
         })

@@ -9852,6 +9852,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .equip-card.rar-mythic, .equip-slot.filled.rar-mythic { animation: none; } }
 .equip-card-name { font-size: 0.78rem; font-weight: 700; line-height: 1.15; }
 .equip-card-stats { font-size: 0.68rem; color: #b7ab90; line-height: 1.2; }
+.equip-card-sea { font-size: 0.66rem; font-weight: 700; color: #7fd8ff; line-height: 1.2; margin-top: 1px; }
 .equip-card-sig { font-size: 0.64rem; line-height: 1.2; font-weight: 700; color: var(--rar, #ffd75e); text-shadow: 0 0 8px color-mix(in srgb, var(--rar, #ffd75e) 55%, transparent); margin-top: 2px; }
 
 /* Charged in-store perks */
