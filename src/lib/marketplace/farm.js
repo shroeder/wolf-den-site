@@ -71,9 +71,9 @@ export async function petPet(buyerId, petId) {
     const row = await db
         .queryOne(
             `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, petted_day, last_tick_at, updated_at)
-             VALUES ($1::text, $2, LEAST($3, $4), ${DAY}, NOW(), NOW())
+             VALUES ($1::text, $2, LEAST($3::int, $4::int), ${DAY}, NOW(), NOW())
              ON CONFLICT (buyer_id, pet_id)
-             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3, $4), petted_day = ${DAY}, updated_at = NOW()
+             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3::int, $4::int), petted_day = ${DAY}, updated_at = NOW()
               WHERE mkt_pet_level.petted_day IS DISTINCT FROM ${DAY}
              RETURNING xp`,
             [buyerId, petId, PET_PET_XP, maxXp]
@@ -81,5 +81,5 @@ export async function petPet(buyerId, petId) {
         .catch(() => null);
     if (!row) return { ok: false, error: "already_petted" };
     const info = petLevelInfo(row.xp, def?.rarity || "common");
-    return { ok: true, petId, xpGained: PET_PET_XP, level: info.level, xp: row.xp, maxed: info.maxed };
+    return { ok: true, petId, xpGained: PET_PET_XP, level: info.level, xp: row.xp, into: info.into, span: info.span, maxed: info.maxed };
 }

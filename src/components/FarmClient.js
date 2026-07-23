@@ -92,7 +92,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
         setBusy(null);
         // Mark it petted everywhere (roaming list + open inspect card); apply the new level/xp on success.
-        const patch = r?.ok ? { petted: true, level: r.level, xp: r.xp } : { petted: true };
+        const patch = r?.ok ? { petted: true, level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed } : { petted: true };
         setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)) }));
         setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
         if (r?.ok && i >= 0) addFloater(i, `+${r.xpGained} XP`, "#ffe27a");
