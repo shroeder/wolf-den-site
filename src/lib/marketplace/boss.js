@@ -906,13 +906,11 @@ export async function attackBoss(buyerId) {
         `INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'manual') RETURNING id`,
         [boss.id, buyerId, damage]
     );
-    // XP for the first 3 swings/day only, gated on the ATOMIC swing number (slot.n is this swing's 1-based
-    // count) — extra strikes (gear/pets/potions) still deal damage + earn tickets, but can't print unlimited
-    // XP even under a concurrent burst. dailyCap:3 kept as a backstop. (Strike-stacking was dominating the
-    // leaderboard; slot.n ties the XP cap to the same row-locked counter that enforces the swing cap.)
-    if (slot.n <= 3) {
-        await awardXp(buyerId, "boss_attack", { dailyCap: 3, dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${slot.n}`}` }).catch(() => {});
-    }
+    // Every swing earns XP — the old "first 3 swings/day only" cap was removed so extra strikes (earned via
+    // gear/pets/potions) are actually rewarded, not just damage + tickets. The dedupeKey is per-swing (keyed to
+    // the atomic swing number / hit id) so a retried or double-fired request can't double-award for one swing;
+    // total swings/day is still bounded by dailyStrikeCap, so this rewards extra-strike investment, not spam.
+    await awardXp(buyerId, "boss_attack", { dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${slot.n}`}` }).catch(() => {});
     // Signature rewards: Scholar XP + Prospector gold on this hit.
     if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
     if (onHit.gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, onHit.gold]).catch(() => {});

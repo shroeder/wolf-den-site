@@ -58,7 +58,7 @@ export const XP_ACTIONS = {
     first_friend: 40, // make your first friend
     first_wishlist: 30, // add your first card to your Looking For list
     first_equip: 20, // customize your look — equip a border or background
-    boss_attack: 30, // one swing at the boss — XP is capped to the first few swings/day (see awardXp dailyCap)
+    boss_attack: 30, // one swing at the boss — every swing earns XP (bounded by your daily strike cap)
     boss_participated: 30, // your avatar took part in a boss that the pack slayed (once per boss)
     boss_won: 150, // won the boss-fight raffle prize (once per boss)
     // Bounty board (each deduped once per bounty — see bounties.js).
