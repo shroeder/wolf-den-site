@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
@@ -26,6 +27,11 @@ export const QUEST_TEMPLATES = [
     { key: "spin_wheel", label: "Spin the daily wheel", metric: "spin", target: 1, gold: 100, area: "/marketplace/spin", cta: "Spin the wheel" },
     { key: "cheer_once", label: "Cheer a teammate in the boss fight", metric: "cheer", target: 1, gold: 90, area: "/marketplace/boss", cta: "Cheer a hero" },
     { key: "cheer_thrice", label: "Cheer 3 times today", metric: "cheer", target: 3, gold: 180, chest: "wooden", area: "/marketplace/boss", cta: "Cheer a hero" },
+    // ── Sailing quests (gated: only appear for members who can actually sail — see eligibleTemplates) ──
+    { key: "sail_voyage", label: "Set sail on a voyage", metric: "voyage_start", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Set sail", gate: "sailing" },
+    { key: "sail_wave", label: "Greet a passing sailor at sea", metric: "wave", target: 1, gold: 90, area: "/marketplace/sailing", cta: "Go sailing", gate: "sailing" },
+    { key: "sail_raid", label: "Raid a passing ship", metric: "raid_do", target: 1, gold: 150, area: "/marketplace/sailing", cta: "Go raiding", gate: "sailing" },
+    { key: "sail_dig", label: "Dig up buried treasure", metric: "dig_done", target: 1, gold: 160, chest: "wooden", area: "/marketplace/sailing", cta: "Go digging", gate: "sailing" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
@@ -43,11 +49,17 @@ function hashStr(s) {
     return h >>> 0;
 }
 
+// Which templates this member is eligible for. Gated quests (e.g. sailing) only appear for members who can
+// actually do them — sailing is owner-gated for now, so non-owners never get a sailing bounty they can't reach.
+function eligibleTemplates(buyerId) {
+    return QUEST_TEMPLATES.filter((t) => !t.gate || (t.gate === "sailing" && isOwner(buyerId)));
+}
+
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
 // paid re-roll produces a different set.
 function pickDaily(buyerId, day, reset = false) {
     const salt = reset ? ":r" : "";
-    return QUEST_TEMPLATES
+    return eligibleTemplates(buyerId)
         .map((t) => ({ t, h: hashStr(`${buyerId}:${day}${salt}:${t.key}`) }))
         .sort((a, b) => a.h - b.h)
         .slice(0, 3)

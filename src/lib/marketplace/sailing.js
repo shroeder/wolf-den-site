@@ -12,6 +12,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -65,6 +66,8 @@ const RAID_RESET_PAID = true;       // resets cost gold now (testing freebies co
 const RAID_RESET_BASE = 300;        // first same-day reset costs this, then doubles each time
 const RAID_RESET_MULT = 2;
 const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RESET_BASE * Math.pow(RAID_RESET_MULT, Math.max(0, resetsToday))) : 0);
+// Sailing achievement badge thresholds — kept HIGH on purpose (these are meant to be a grind / rare feats).
+const BADGE_RAID_MARAUDER = 25, BADGE_RAID_SCOURGE = 100, BADGE_DIG_EXCAVATOR = 50, BADGE_VOYAGER = 100;
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold. Temporarily FREE while
 // the feature is in testing — set back to 500 before release.
@@ -794,6 +797,7 @@ export async function startVoyage(buyerId, optionId = "standard") {
                  encounter_result = NULL, merchant_json = NULL, updated_at = NOW()`,
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
+    await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
@@ -817,6 +821,7 @@ export async function waveAtSailor(buyerId) {
     ).catch(() => null);
     if (!waved) return { ok: false, error: "no_waves", ...(await getSailingState(buyerId)) };
     await awardXp(buyerId, "sail_wave", { points: WAVE_XP, gold: WAVE_COINS }).catch(() => {});
+    await bumpQuestProgress(buyerId, "wave", 1).catch(() => {}); // "Greet a passing sailor" daily quest
     return { ok: true, waved: { xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000 }, ...(await getSailingState(buyerId)) };
 }
 
@@ -968,6 +973,7 @@ export async function doRaid(buyerId, targetId = null) {
     const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     if (!dodged) await db.query(`UPDATE mkt_sailing SET raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {}); // "Raid a passing ship" daily quest
 
     let goldDelta = 0, itemWon = null;
     if (sim.win) {
@@ -981,6 +987,13 @@ export async function doRaid(buyerId, targetId = null) {
                 itemWon = { id: item.id, name: item.name, rarity: item.rarity, image: await itemSpriteFor(item.id).catch(() => null), isNew: !!g?.granted };
             }
         }
+        // Achievement badges (hard): raid-win milestones, a flawless (no-damage) win, and a rare plunder.
+        const wonRow = await db.queryOne(`UPDATE mkt_sailing SET raids_won = COALESCE(raids_won, 0) + 1 WHERE buyer_id = $1 RETURNING raids_won`, [buyerId]).catch(() => null);
+        const wins = wonRow?.raids_won || 0;
+        if (wins >= BADGE_RAID_MARAUDER) await grantEventBadge(buyerId, "raid_marauder").catch(() => {});
+        if (wins >= BADGE_RAID_SCOURGE) await grantEventBadge(buyerId, "raid_scourge").catch(() => {});
+        if (sim.myHp >= 100) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {}); // never got hit
+        if (itemWon) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
     } else {
         const rawLoss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
         const loss = Math.max(1, Math.round(rawLoss * seaEff.raidLossMult)); // Bulwark softens the gold loss
@@ -1169,6 +1182,10 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
     await addChests(buyerId, { [tierKey]: 1 }).catch(() => {});
     // Chest-points (tier-weighted 1–4) drive the dig-tool unlocks + their invest tiers.
     await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});
+    // Achievement badges (hard): forge count + forging a gold-or-better chest.
+    const forgedRow = await db.queryOne(`UPDATE mkt_sailing SET chests_forged = COALESCE(chests_forged, 0) + 1 WHERE buyer_id = $1 RETURNING chests_forged`, [buyerId]).catch(() => null);
+    if ((forgedRow?.chests_forged || 0) >= BADGE_DIG_EXCAVATOR) await grantEventBadge(buyerId, "dig_excavator").catch(() => {});
+    if (CHEST_ORDER.indexOf(tierKey) >= CHEST_ORDER.indexOf("gold")) await grantEventBadge(buyerId, "dig_goldtouch").catch(() => {});
     const tier = CHEST_TIERS[tierKey];
     const upgraded = tierKey !== fragmentTier;
     const chestArt = await getChestArt().catch(() => ({}));
@@ -1292,6 +1309,10 @@ async function finishDig(buyerId, board) {
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(counts)]
     ).catch(() => {});
+    // Achievement badges (hard): 100 voyages, and fully uncovering a deep chest (tier 3+) in one dig.
+    if ((row?.voyages_completed || 0) + 1 >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
+    if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
+    await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
     const state = await getSailingState(buyerId);
     // byTier decorated with art/label so the recap can show what kind of shards you hauled up.
     const haul = Object.entries(byTier).map(([tier, n]) => {
@@ -1368,6 +1389,11 @@ async function buyUpgrade(buyerId, kind) {
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
     await db.query(`UPDATE mkt_sailing SET ${col} = ${col} + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    // Achievement badges (hard): commanding the two apex hulls (Leviathan tier 10 @ lvl 90, Celestial tier 11 @ lvl 100).
+    const lv = boatLevelFromUpgrades((row?.speed_level || 0) + (kind === "speed" ? 1 : 0), (row?.luck_level || 0) + (kind === "fortune" ? 1 : 0), (row?.rarity_level || 0) + (kind === "rarity" ? 1 : 0), (row?.find_level || 0) + (kind === "luck" ? 1 : 0), (row?.raid_level || 0) + (kind === "raid" ? 1 : 0));
+    const tier = boatTier(lv);
+    if (tier >= 10) await grantEventBadge(buyerId, "sail_leviathan").catch(() => {});
+    if (tier >= 11) await grantEventBadge(buyerId, "sail_admiral").catch(() => {});
     return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
