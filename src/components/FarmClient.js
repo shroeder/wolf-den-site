@@ -17,7 +17,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const pets = farm.pets || [];
     // Deterministic initial spread (so server & client HTML match — no hydration mismatch); the wander effect
     // takes over on mount and moves everyone to random spots.
-    const [pos, setPos] = useState(() => pets.map((_, i) => ({ x: 8 + ((i * 17) % 82), y: 48 + ((i * 11) % 36), flip: i % 2 === 0 })));
+    const [pos, setPos] = useState(() => pets.map((_, i) => ({ x: 8 + ((i * 17) % 82), y: 64 + ((i * 11) % 24), flip: i % 2 === 0 })));
     const [floaters, setFloaters] = useState([]);
     const floatId = useRef(0);
     const [busy, setBusy] = useState(null);
@@ -29,7 +29,8 @@ export default function FarmClient({ initial, viewingAlias }) {
         const retarget = () =>
             setPos((prev) => prev.map((p) => {
                 const nx = rand(5, 90);
-                return { x: nx, y: rand(46, 86), flip: nx < p.x };
+                // Keep feet on the grass (grass starts ~60%) so pets never drift up into the sky.
+                return { x: nx, y: rand(64, 90), flip: nx < p.x };
             }));
         const first = setTimeout(retarget, 350);
         const t = setInterval(retarget, 3600);
@@ -103,8 +104,12 @@ export default function FarmClient({ initial, viewingAlias }) {
                 <div style={{ position: "absolute", top: 24, right: 40, width: 64, height: 64, borderRadius: "50%", background: "radial-gradient(circle, #fff3b0 0%, #ffd75e 70%, rgba(255,215,94,0) 72%)" }} />
                 <div style={{ position: "absolute", top: 40, left: "12%", width: 90, height: 26, borderRadius: 20, background: "rgba(255,255,255,0.85)", filter: "blur(1px)", animation: "farmCloud 9s ease-in-out infinite alternate" }} />
                 <div style={{ position: "absolute", top: 74, left: "48%", width: 64, height: 20, borderRadius: 16, background: "rgba(255,255,255,0.7)", filter: "blur(1px)", animation: "farmCloud 12s ease-in-out infinite alternate" }} />
-                {/* Fence line at the grass horizon */}
-                <div style={{ position: "absolute", top: "58%", left: 0, right: 0, height: 14, background: "repeating-linear-gradient(90deg, #b07a45 0 6px, transparent 6px 34px)", borderTop: "3px solid #8a5c31", opacity: 0.85 }} />
+                {/* Fence at the grass horizon — posts + two rails */}
+                <div style={{ position: "absolute", top: "52%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
+                    <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
+                    <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
+                    <div style={{ position: "absolute", left: 0, right: 0, top: 26, height: 6, background: "#b07a45" }} />
+                </div>
 
                 {pets.length === 0 ? (
                     <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#3a5f2a", fontWeight: 600 }}>
