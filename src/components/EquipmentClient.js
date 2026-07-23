@@ -265,7 +265,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             </div>
                             {s.tiers.map((t, i) => (
                                 <div key={i} style={{ fontSize: "0.82rem", marginTop: 3, color: t.active ? "#ffd75e" : "#9aa7b5", fontWeight: t.active ? 700 : 400 }}>
-                                    {t.active ? "✓" : "○"} {t.need}-piece: {describeStats(t.stats)}
+                                    {t.active ? "✓" : "○"} {t.need}-piece: {describeStats(t.stats)}{t.sea ? <span style={{ color: "#7fd8ff" }}> {describeSea(t.sea)}</span> : null}
                                 </div>
                             ))}
                         </div>

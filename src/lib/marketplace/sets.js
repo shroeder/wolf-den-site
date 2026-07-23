@@ -68,6 +68,16 @@ export const ITEM_SETS = [
         capstone: { execute: 0.5, desc: "Full set: +50% damage while the boss is under 25% HP." },
         weakness: "frail",
     },
+    {
+        // The aspirational SAILING set — bonuses are SEA affinity (raids/digging/voyages), NOT boss power, and the
+        // capstone is a build-defining raid boon. Pieces are scattered sea-themed gear (a real collect-them-all chase).
+        id: "corsair", name: "Dread Corsair's Regalia",
+        items: ["heavens_trident", "orb_of_tides", "girded_plate", "merchants_cape", "fortune_signet"],
+        bonuses: [{ need: 2, sea: { plunder: 4 } }, { need: 4, sea: { broadside: 6, ironclad: 6 } }],
+        capstone: { bonusRaids: 1, doubleRaidGold: true, sea: { plunder: 6, bounty: 6 },
+            desc: "The Dread Pirate: +1 raid every day, raid wins pay DOUBLE gold, and a surge of Plunder & Bounty." },
+        weakness: null,
+    },
 ];
 
 const SET_BY_ITEM = {};
@@ -103,10 +113,37 @@ export function setBonusStats(equippedIds) {
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
         for (const tier of set.bonuses) {
-            if (n >= tier.need) for (const [k, v] of Object.entries(tier.stats)) total[k] = (total[k] || 0) + v;
+            if (n >= tier.need && tier.stats) for (const [k, v] of Object.entries(tier.stats)) total[k] = (total[k] || 0) + v;
         }
     }
     return total;
+}
+
+// Aggregate SEA affinity granted by active set-bonus tiers + full-set capstones (read by sailing.js — never boss).
+export function setSeaBonus(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    const total = {};
+    for (const set of ITEM_SETS) {
+        const n = counts.get(set.id) || 0;
+        for (const tier of set.bonuses) {
+            if (n >= tier.need && tier.sea) for (const [k, v] of Object.entries(tier.sea)) total[k] = (total[k] || 0) + v;
+        }
+        if (set.capstone?.sea && n >= set.items.length) for (const [k, v] of Object.entries(set.capstone.sea)) total[k] = (total[k] || 0) + v;
+    }
+    return total;
+}
+// Extra daily RAIDS from full-set capstones (Dread Corsair +1).
+export function setRaidBonus(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    let n = 0;
+    for (const set of ITEM_SETS) if (set.capstone?.bonusRaids && (counts.get(set.id) || 0) >= set.items.length) n += set.capstone.bonusRaids;
+    return n;
+}
+// Does a full-set capstone DOUBLE raid-win gold?
+export function setDoublesRaidGold(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    for (const set of ITEM_SETS) if (set.capstone?.doubleRaidGold && (counts.get(set.id) || 0) >= set.items.length) return true;
+    return false;
 }
 
 // A display view of every set the loadout touches: equipped count + each tier with an active flag.
@@ -118,7 +155,7 @@ export function activeSetBonuses(equippedIds) {
             const n = counts.get(set.id) || 0;
             return {
                 id: set.id, name: set.name, equipped: n, total: set.items.length,
-                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats })),
+                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea })),
                 capstone: set.capstone ? { desc: set.capstone.desc, active: n >= set.items.length } : null,
             };
         });

@@ -12,6 +12,7 @@ import {
     GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiJellyfish,
     GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
     GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant,
+    GiAnglerFish, GiSeaDragon, GiFishMonster,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -35,6 +36,7 @@ export const PET_PASSIVE_STAT = {
     flamingo: "xp_gain", toucan: "gold_find",
     // Chest
     tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
+    corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
     // Boss
     vulture: "might", minotaur: "ferocity", centaur: "might", imp: "crit_chance", polar_bear: "ferocity",
     mammoth: "might", wyvern: "crit_power", sea_serpent: "crit_chance", fairy: "xp_gain", kraken: "ferocity",
@@ -125,6 +127,11 @@ export const COLLECTIBLES = [
     { id: "squid", name: "Squid", Icon: GiSquid, color: "#5a9bff", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_chance", hint: "Ink and speed", spritePrompt: "a bioluminescent glowing squid" },
     { id: "jellyfish", name: "Jellyfish", Icon: GiJellyfish, color: "#b45aff", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "crit_power", hint: "Drifting current", spritePrompt: "a glowing translucent jellyfish" },
     { id: "octopus", name: "Octopus", Icon: GiOctopus, color: "#ff5a7a", rarity: "legendary", source: "chest", chestTier: "ascendant", activeStat: "ferocity", sea: { plunder: 6 }, hint: "Eight arms, eight grabs of plunder", spritePrompt: "a clever deep-sea octopus" },
+    // ── Sailing pets — dug up from forged chests; each carries a strong SEA affinity for raids/digging/voyages ──
+    { id: "corsair_parrot", name: "Corsair Parrot", Icon: GiParrotHead, color: "#ff5a4d", rarity: "rare", source: "chest", chestTier: "iron", activeStat: "crit_chance", sea: { plunder: 4 }, hint: "Spots the loot before you do", spritePrompt: "a colorful pirate's parrot perched with a tiny gold hoop and a red feather" },
+    { id: "marlin", name: "Marlin", Icon: GiFishMonster, color: "#3a9bd8", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_power", sea: { broadside: 6 }, hint: "A living cannonball", spritePrompt: "a sleek blue marlin with a long spear-like bill, mid-leap" },
+    { id: "anglerfish", name: "Anglerfish", Icon: GiAnglerFish, color: "#5ad0c0", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "fortune", sea: { trove: 6 }, hint: "Its lure finds buried treasure", spritePrompt: "a deep-sea anglerfish with a glowing lure" },
+    { id: "sea_wyrm", name: "Sea Wyrm", Icon: GiSeaDragon, color: "#35d07f", rarity: "ascendant", source: "chest", chestTier: "ascendant", activeStat: "ferocity", sea: { plunder: 5, broadside: 5 }, hint: "A leviathan in miniature — master of the raid", spritePrompt: "a majestic coiling sea dragon wyrm wreathed in glowing water, awe-inspiring" },
 
     // ── Boss-battle-only drops ─────────────────────────────────────────────────────────────────────
     { id: "vulture", name: "Vulture", Icon: GiVulture, color: "#8794a3", rarity: "rare", source: "boss", activeStat: "crit_chance", hint: "Circles the fallen", spritePrompt: "a circling bald vulture" },

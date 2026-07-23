@@ -9,6 +9,7 @@ import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, STAT_META, sumItemSea } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -63,6 +64,11 @@ const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; 
 // Daily raid allowance: 1 base + ship perks (Celestial Sovereign +1) + set bonus (later). Count-based so >1/day works.
 const raidsPerDay = (level = 1, setBonus = 0) => 1 + boatPerks(level).bonusRaids + Math.max(0, setBonus);
 const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) : 0); // count only counts if it's TODAY's
+// Full-set raid extras (Dread Corsair capstone): +1 raid/day and double raid-win gold. One equipped-gear read.
+async function equippedRaidExtras(buyerId) {
+    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
+    return { bonusRaids: setRaidBonus(bySlot), doubleGold: setDoublesRaidGold(bySlot) };
+}
 // Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
 // RAID_RESET_PAID true (+ tune base) before release.
 const RAID_RESET_PAID = true;       // resets cost gold now (testing freebies concluded)
@@ -175,6 +181,8 @@ async function equippedSeaAffinity(buyerId) {
     ]);
     const gear = sumItemSea(Object.values(bySlot || {}));
     for (const k in sea) sea[k] += gear[k] || 0;
+    const setSea = setSeaBonus(bySlot); // Dread Corsair set bonuses grant sea affinity too
+    for (const k in sea) sea[k] += setSea[k] || 0;
     const petId = me?.featured_collectible;
     const pet = petId ? collectibleById(petId) : null;
     if (pet?.sea) {
@@ -608,7 +616,7 @@ function boardView(board) {
 }
 
 // --- state ---------------------------------------------------------------------------------------------
-function decorate(row, chestArt = {}, bonusWaves = 0) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -675,7 +683,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0) {
         },
         // Daily raids (count-based so the Celestial Sovereign / set perks can grant more than one).
         raid: (() => {
-            const cap = raidsPerDay(level);
+            const cap = raidsPerDay(level, raidSetBonus);
             const used = raidsUsedToday(row);
             return {
                 usedToday: used >= cap, available: used < cap, used, cap,
@@ -760,7 +768,7 @@ async function resolveDueEncounter(buyerId) {
 export async function getSailingState(buyerId) {
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, petMap, chestArt, sea] = await Promise.all([
+    const [row, goldRow, others, petMap, chestArt, sea, raidExtras] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
@@ -782,6 +790,7 @@ export async function getSailingState(buyerId) {
         getPetSpriteData().catch(() => ({})),
         getChestArt().catch(() => ({})),
         equippedSeaAffinity(buyerId),
+        equippedRaidExtras(buyerId),
     ]);
     const seaEff = seaEffects(sea);
     const fleet = (others || []).map((o) => {
@@ -801,7 +810,7 @@ export async function getSailingState(buyerId) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt, seaEff.bonusWaves), gold: goldRow?.gold || 0, fleet, sky, sea };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -977,7 +986,8 @@ function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, myCritPow = 
 export async function doRaid(buyerId, targetId = null) {
     const row = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
-    if (raidsUsedToday(row) >= raidsPerDay(myLevel)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
+    const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
+    if (raidsUsedToday(row) >= raidsPerDay(myLevel, raidExtras.bonusRaids)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
     // Raid the CHOSEN target if one was picked (validated); otherwise fall back to a random passing ship.
     const target = (await raidTargetById(buyerId, targetId)) || (targetId ? null : await pickRaidTarget(buyerId));
     if (!target) return { ok: false, error: "no_target", ...(await getSailingState(buyerId)) };
@@ -1014,7 +1024,7 @@ export async function doRaid(buyerId, targetId = null) {
 
     let goldDelta = 0, itemWon = null;
     if (sim.win) {
-        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus)); // Bounty boosts raid-win gold
+        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus) * (raidExtras.doubleGold ? 2 : 1)); // Bounty + Dread Corsair double
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
         if (Math.random() < Math.min(0.05, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 5%)
             const it = await db.queryOne(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 ORDER BY random() LIMIT 1`, [target.id]).catch(() => null);
@@ -1064,7 +1074,8 @@ export async function doRaid(buyerId, targetId = null) {
 export async function resetRaid(buyerId) {
     const row = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
-    if (raidsUsedToday(row) < raidsPerDay(myLevel)) return { ok: false, error: "not_used", ...(await getSailingState(buyerId)) }; // still have raids left
+    const { bonusRaids } = await equippedRaidExtras(buyerId);
+    if (raidsUsedToday(row) < raidsPerDay(myLevel, bonusRaids)) return { ok: false, error: "not_used", ...(await getSailingState(buyerId)) }; // still have raids left
     const resetsToday = row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0;
     const cost = raidResetCost(resetsToday);
     if (cost > 0) {
