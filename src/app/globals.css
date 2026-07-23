@@ -11333,6 +11333,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-tip { margin: 12px 0 2px; font-size: 0.82rem; line-height: 1.45; color: #f2e8d6;
     background: rgba(12,16,24,0.78); padding: 9px 12px; border-radius: 10px; }
 .dig-tip b { color: #ffd75e; }
+.dig-chestdone { margin: 10px 0 2px; font-size: 0.86rem; line-height: 1.4; font-weight: 600; color: #063; text-align: center;
+    background: linear-gradient(135deg, #b9f6cd, #6fe6a0); border: 1px solid rgba(60,200,120,0.6); padding: 9px 12px; border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(60,210,130,0.3); animation: raidLootPop 0.5s cubic-bezier(0.2,1.5,0.4,1) both; }
+.dig-chestdone b { color: #024; }
+.sail-digdone { margin-top: 10px; }
 /* Dig tool bar + armed-tile cue. */
 .dig-tools { display: flex; gap: 6px; justify-content: center; margin: 8px 0 2px; flex-wrap: wrap; }
 .dig-tool-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 800; padding: 9px 13px; border-radius: 12px; cursor: pointer;

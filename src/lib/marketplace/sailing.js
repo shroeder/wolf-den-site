@@ -516,13 +516,30 @@ function newBoard(row) {
     return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
-// Resolve the board's status after a mutation. Win = every buried fragment unearthed, OR out of digs with at
-// least one fragment (unearthed or a lucky Strike bonus) to your name.
+// Resolve the board's status after a mutation. Finding the chest NO LONGER ends the dig on its own — you keep
+// digging for the scattered buried items until you're out of stamina, everything's uncovered, or you tap Finish.
+// Win = you unearthed at least one thing (chest cell, lucky Strike bonus, or a buried item).
 function resolveBoard(board) {
     const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
-    if (found >= board.frag.length) board.status = "won";
-    else if (board.stamina <= 0) board.status = (found + (board.bonus || 0)) >= 1 ? "won" : "lost";
+    const chestDone = found >= board.frag.length;
+    const itemsLeft = (board.items || []).filter((it) => (board.depth[it.r]?.[it.c] ?? 0) > 0).length;
+    const gotItem = (board.items || []).some((it) => (board.depth[it.r]?.[it.c] ?? 1) === 0);
+    board.chestDone = chestDone;
+    board.itemsLeft = itemsLeft;
+    if (board.stamina <= 0) {
+        board.status = (found + (board.bonus || 0)) >= 1 || gotItem ? "won" : "lost";
+    } else if (chestDone && itemsLeft === 0) {
+        board.status = "won"; // chest fully uncovered AND nothing else is buried — there's nothing left to dig
+    }
+    // else: stay ACTIVE — the chest may be done, but buried items remain to find (or nothing's found yet).
     return found;
+}
+// Finish the dig early (the player taps "Finish"): resolve as a win if anything was unearthed, else a loss.
+function forceResolve(board) {
+    const found = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
+    const gotItem = (board.items || []).some((it) => (board.depth[it.r]?.[it.c] ?? 1) === 0);
+    board.status = (found + (board.bonus || 0)) >= 1 || gotItem ? "won" : "lost";
+    return board;
 }
 
 // Server-authoritative dig — chips one layer off a tile, plus the digging-upgrade procs (pierce / strike /
@@ -614,7 +631,9 @@ function boardView(board) {
         tiles.push(row);
     }
     const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
-    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null };
+    const chestDone = found >= board.frag.length;
+    const itemsLeft = (board.items || []).filter((it) => (board.depth[it.r]?.[it.c] ?? 0) > 0).length;
+    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null, chestDone, itemsLeft };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -1443,6 +1462,15 @@ export async function digAt(buyerId, r, c) {
     if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
     applyDig(board, Number(r), Number(c));
     return (board.status === "won" || board.status === "lost") ? finishDig(buyerId, board) : persistDig(buyerId, board);
+}
+
+// The player taps "Finish" to end the dig early (e.g. they've got the chest + what items they want).
+export async function endDig(buyerId) {
+    const row = await readRow(buyerId);
+    const board = row?.dig_state;
+    if (!board || board.status !== "active") return { ok: false, error: "not_digging", ...(await getSailingState(buyerId)) };
+    forceResolve(board);
+    return finishDig(buyerId, board);
 }
 
 // Probe a tile with the treasure sense (reveals its neighbour-treasure clue). Never ends the dig.

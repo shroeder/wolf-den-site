@@ -587,6 +587,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             }))}
                         </div>
                         <p className="dig-tip">A <b>buried treasure chest</b> is down here. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> to uncover it. <b>Grab any items 🧪 you dig up</b> along the way too, before your digs run out.</p>
+                        {dig.status === "active" && dig.chestDone && dig.itemsLeft > 0 ? (
+                            <div className="dig-chestdone">🎉 <b>Chest secured!</b> {dig.itemsLeft} buried item{dig.itemsLeft === 1 ? "" : "s"} still down here — keep digging to grab {dig.itemsLeft === 1 ? "it" : "them"}, or finish up whenever you like.</div>
+                        ) : null}
+                        {dig.status === "active" && dig.chestDone ? (
+                            <button className="sail-cta sail-cta-dig sail-digdone" disabled={busy} onClick={() => act("end_dig")}>✅ Finish digging</button>
+                        ) : null}
                         {dig.status === "active" ? (
                             (state.digRefill?.cost ?? 0) > 0 && state.gold < (state.digRefill?.cost ?? 0) ? (
                                 <CoinCta price={state.digRefill?.cost ?? 0} have={state.gold} label={`Get coins for ${state.digRefill?.amount ?? 5} more digs`} className="sail-digbuy-cta" />
