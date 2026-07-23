@@ -10,6 +10,14 @@ const statText = (stat) => {
     const m = PET_STAT_META[stat] || { label: stat, icon: "" };
     return `${m.icon} ${m.label}`.trim();
 };
+// Plain-language description of a pet's OWNED (just-by-having-it) bonus. Earner stats no longer read as a raw
+// "+6 Gold Find" number — they explain the actual effect.
+const ownedBonusText = (p) => {
+    if (p.stat === "gold_find") return "💰 Adds to your passive gold income — earns you gold over time (all pets stack).";
+    if (p.stat === "xp_gain") return "✨ Adds to your passive XP income — earns you XP over time (all pets stack).";
+    if (p.stat === "fortune") return `🍀 +${p.value} bonus tickets in the weekly boss-prize draw.`;
+    return `+${p.value} ${statText(p.stat)} — buffs your boss damage (stacks across your whole menagerie).`;
+};
 
 // Owner-only Farm: your owned pets wander a little pasture. On your own farm you can pet each one once a day
 // for a small XP bump; you can also look up another member and watch their pets roam (view-only).
@@ -281,7 +289,7 @@ function PetInspect({ pet, canPet, petXp, busy, onPet, onClose }) {
                     ) : null}
                     {passive ? (
                         <div style={{ marginBottom: 8, fontSize: 12 }}>
-                            <span style={{ fontWeight: 700 }}>Owned bonus:</span> <span className="muted">+{passive.value} {statText(passive.stat)} (stacks with your whole menagerie)</span>
+                            <span style={{ fontWeight: 700 }}>Owned bonus:</span> <span className="muted">{ownedBonusText(passive)}</span>
                         </div>
                     ) : null}
 
