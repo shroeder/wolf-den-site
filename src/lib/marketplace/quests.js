@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
@@ -49,10 +48,9 @@ function hashStr(s) {
     return h >>> 0;
 }
 
-// Which templates this member is eligible for. Gated quests (e.g. sailing) only appear for members who can
-// actually do them — sailing is owner-gated for now, so non-owners never get a sailing bounty they can't reach.
-function eligibleTemplates(buyerId) {
-    return QUEST_TEMPLATES.filter((t) => !t.gate || (t.gate === "sailing" && isOwner(buyerId)));
+// Which templates this member is eligible for. Sailing has launched publicly, so its quests are open to all.
+function eligibleTemplates() {
+    return QUEST_TEMPLATES;
 }
 
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a

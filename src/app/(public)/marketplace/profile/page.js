@@ -15,7 +15,6 @@ import RewardsTrackPreview from "@/components/RewardsTrackPreview";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getBadgeBoard } from "@/lib/marketplace/badges.js";
 import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
@@ -32,6 +31,7 @@ export const metadata = {
 
 const TILES = [
     { href: "/marketplace/boss", icon: "⚔️", label: "Boss Fight", sub: "Join the raid" },
+    { href: "/marketplace/sailing", icon: "⛵", label: "Sailing", sub: "Voyage, dig & raid" },
     { href: "/marketplace/quests", icon: "📜", label: "Daily Quests", sub: "Earn gold daily" },
     { href: "/marketplace/bounties", icon: "🎯", label: "Bounty Board", sub: "Post & claim" },
     { href: "/marketplace/pets", icon: "🐾", label: "Pets", sub: "Collect & equip" },
@@ -103,7 +103,7 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Jump in</h2>
                 <div className="hub-tiles">
-                    {(isOwner(buyer.id) ? [...TILES, { href: "/marketplace/sailing", icon: "⛵", label: "Sailing", sub: "Owner preview" }] : TILES).map((t) => {
+                    {TILES.map((t) => {
                         const badge = t.href === "/marketplace/trade" && tradeCount > 0 ? tradeCount : null;
                         return (
                             <Link key={t.href} href={t.href} className="hub-tile">

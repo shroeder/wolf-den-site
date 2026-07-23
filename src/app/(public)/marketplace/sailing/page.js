@@ -6,17 +6,15 @@ import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { getSailingState } from "@/lib/marketplace/sailing.js";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Sailing | The Wolf Den", robots: { index: false, follow: false } };
+export const metadata = { title: "Sailing | The Wolf Den" };
 
 export default async function SailingPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    // Owner-only while in development — everyone else gets a normal 404.
-    if (!buyer || !isOwner(buyer.id)) notFound();
+    if (!buyer) notFound(); // sign-in required (the nav/hub links only appear inside the authed game)
 
     const [state, me, petBase, petLevels] = await Promise.all([
         getSailingState(buyer.id),

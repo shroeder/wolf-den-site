@@ -12,6 +12,7 @@ const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
     { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
+    { href: "/marketplace/sailing", emoji: "⛵", label: "Sailing" },
     { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Spin" },
     { href: "/marketplace/pets", emoji: "🐾", label: "Pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", label: "Gear" },
@@ -24,14 +25,11 @@ const LINKS = [
     { href: "/marketplace/credit", emoji: "💳", label: "Credit" },
 ];
 
-// Owner-only in-development areas, appended to the menu just for the owner account.
-const OWNER_LINKS = [{ href: "/marketplace/sailing", emoji: "⛵", label: "Sailing" }];
-
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
-export default function GameNav({ owner = false }) {
+export default function GameNav() {
     const pathname = usePathname() || "";
-    const links = owner ? [...LINKS, ...OWNER_LINKS] : LINKS;
+    const links = LINKS;
     const inGame = links.some((l) => isOn(pathname, l.href));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.

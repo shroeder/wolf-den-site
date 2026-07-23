@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
-import CrewCalibrator from "@/components/CrewCalibrator";
 import MerchantScene from "@/components/MerchantScene";
 import RaidScene from "@/components/RaidScene";
 
@@ -209,7 +208,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [encReady, setEncReady] = useState(false);   // encounter recap accepts its dismiss click (anti-misclick delay)
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
-    const [calOpen, setCalOpen] = useState(false); // owner-only crew-position calibrator overlay
     const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade card just bought (brief level-up pop)
     // The horizon backdrop is chosen server-side (in getSailingState) and delivered in `initial`, so it's
     // correct on the very first render — no flicker from a default to the picked one. Held stable for the
@@ -514,20 +512,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             <section className="card" style={{ overflow: "hidden" }}>
                 <div className="sail-head">
                     <h1 style={{ margin: 0 }}>⛵ Sailing</h1>
-                    <span className="sail-owner-pill">Owner preview</span>
-                    {/* Owner-only: dial crew feet-position on every boat form at once (⚠️ dev tool, hide at public launch). */}
-                    <button type="button" className="sail-cal-btn" onClick={() => setCalOpen(true)}>🎯 Calibrate crew</button>
                 </div>
-                {calOpen ? (
-                    <CrewCalibrator
-                        initial={DECK}
-                        heroImg={hero?.spriteUrl || hero?.avatarUrl || null}
-                        heroFlip={Boolean(hero?.spriteUrl && hero?.spriteFlip)}
-                        petImg={pet?.url || null}
-                        petFlip={Boolean(pet?.flip)}
-                        onClose={() => setCalOpen(false)}
-                    />
-                ) : null}
 
                 {/* Real-world ambiance opt-in: match the sky/weather/time to where the player actually is. */}
                 {geoPrompt ? (

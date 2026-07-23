@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -12,11 +11,10 @@ function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
 
-// Gate every entry point on the owner allow-list — the feature is invisible/unreachable for everyone else.
+// Require a signed-in member (the feature is public now that Sailing has launched).
 async function gate() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) return { error: noStore({ error: "unauthorized" }, { status: 401 }) };
-    if (!isOwner(buyer.id)) return { error: noStore({ error: "not_found" }, { status: 404 }) };
     return { buyer };
 }
 
