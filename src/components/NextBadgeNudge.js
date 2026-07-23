@@ -1,11 +1,13 @@
 import Link from "next/link";
 
+import BadgeArt from "@/components/BadgeArt";
+
 // A compact "next badge to earn" strip + link to the Badges hub. Presentational — drop it anywhere the
 // board data is available (profile, rewards) to make earning + customizing badges obvious.
 export default function NextBadgeNudge({ next, earnedCount = 0, totalCount = 0, href = "/marketplace/badges" }) {
     return (
         <Link href={href} className="badge-nudge">
-            <span className="badge-nudge-icon" aria-hidden="true">{next ? next.icon || "🎖️" : "🏆"}</span>
+            <span className="badge-nudge-icon">{next ? <BadgeArt slug={next.slug} icon={next.icon || "🎖️"} /> : "🏆"}</span>
             {next ? (
                 <span className="badge-nudge-body">
                     <span className="badge-nudge-label">Next badge: {next.label}</span>

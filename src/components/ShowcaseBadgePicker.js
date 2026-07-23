@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import BadgeArt from "@/components/BadgeArt";
+
 const MAX = 3;
 
 // Lets a member choose which badges (up to 3) show on their card. The top-ranked of the chosen set
@@ -68,7 +70,7 @@ export default function ShowcaseBadgePicker({ badges = [], current = [] }) {
                             aria-pressed={isSel}
                             title={b.label}
                         >
-                            <span aria-hidden="true">{b.icon || "🏅"}</span> {b.label}
+                            <BadgeArt slug={b.slug} icon={b.icon || "🏅"} /> {b.label}
                         </button>
                     );
                 })}

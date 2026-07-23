@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import BadgeArt from "@/components/BadgeArt";
 import CoinCta from "@/components/CoinCta";
 
 // The gold badge shop — prestige badges you can just buy. Lives on the Badges page.
@@ -67,7 +68,7 @@ export default function BadgeShopClient() {
             <div className="badge-board">
                 {badges.map((b) => (
                     <div key={b.slug} className={`badge-tile${b.owned ? " is-earned" : " is-locked"}`} style={b.owned && b.color ? { borderColor: b.color } : undefined}>
-                        <span className="badge-tile-icon" style={{ background: b.owned ? b.color || "#333" : undefined }} aria-hidden="true">{b.icon || "🏅"}</span>
+                        <span className="badge-tile-icon" style={{ background: b.owned ? b.color || "#333" : undefined }}><BadgeArt slug={b.slug} icon={b.icon || "🏅"} /></span>
                         <span className="badge-tile-label">{b.label}</span>
                         {b.description ? <span className="badge-tile-desc muted">{b.description}</span> : null}
                         {b.owned ? (

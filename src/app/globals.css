@@ -9670,6 +9670,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fb-caption-sub { font-weight: 700; font-size: 0.9rem; color: #e6d3b0; margin-top: 3px; text-shadow: 0 1px 3px #000; }
 .fb-actions { position: absolute; bottom: 6%; right: 6%; z-index: 7; display: flex; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
 .fb-actions.is-on { opacity: 1; pointer-events: auto; }
+/* Narrow phones: the sprites are sized off the scene HEIGHT, so on a tall/thin screen they get huge and pile
+   on top of each other with a heavy zoom. Shrink both, push the boss UP-and-BACK (background) and the hero
+   DOWN-and-LEFT (foreground) so they read as separated depth, and ease the zoom so it's not so tight. */
+@media (max-width: 700px) {
+    .fb-boss { height: 54%; right: -6%; bottom: 34%; }
+    .fb-hero { height: 46%; left: 3%; bottom: 5%; }
+    .fb-shards { right: 24%; top: 30%; }
+    .fb-dmg { right: 18%; top: 18%; }
+    .fb-scene { animation-name: fbZoomMobile; }
+}
+@keyframes fbZoomMobile { 0% { transform: scale(1); } 36% { transform: scale(1); } 62% { transform: scale(1.12); } 80% { transform: scale(1.09); } 100% { transform: scale(1.02); } }
 @media (prefers-reduced-motion: reduce) {
     .fb-scene, .fb-arena, .fb-boss, .fb-hero, .fb-flash, .fb-shards span, .fb-dmg, .fb-title, .fb-slain, .fb-caption { animation: none !important; }
     .fb-flash, .fb-shards, .fb-dmg, .fb-title { display: none; }
