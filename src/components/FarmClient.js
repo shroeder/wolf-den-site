@@ -13,8 +13,10 @@ const statText = (stat) => {
 // Plain-language description of a pet's OWNED (just-by-having-it) bonus. Earner stats no longer read as a raw
 // "+6 Gold Find" number — they explain the actual effect.
 const ownedBonusText = (p) => {
-    if (p.stat === "gold_find") return "💰 Adds to your passive gold income — earns you gold over time (all pets stack).";
-    if (p.stat === "xp_gain") return "✨ Adds to your passive XP income — earns you XP over time (all pets stack).";
+    // Passive income rate mirrors pet-income.js: 1 gold_find pt → +2 gold/hr, 1 xp_gain pt → +1 XP/hr (Lv1
+    // base rate; each pet's share scales up as it levels, and every owned pet stacks).
+    if (p.stat === "gold_find") return `💰 +${p.value * 2} gold/hr passive income — more as it levels (all your pets stack).`;
+    if (p.stat === "xp_gain") return `✨ +${p.value} XP/hr passive income — more as it levels (all your pets stack).`;
     if (p.stat === "fortune") return `🍀 +${p.value} bonus tickets in the weekly boss-prize draw.`;
     return `+${p.value} ${statText(p.stat)} — buffs your boss damage (stacks across your whole menagerie).`;
 };

@@ -106,7 +106,7 @@ export function petPerk(pet) {
     const def = PET_PERKS[pet.id] || { name: "Companion", key: pet.activeStat || "fortune" };
     const value = petPerkValue(pet.rarity, def.key);
     const meta = PERK_META[def.key] || { icon: "🐾" };
-    const desc = perkDesc(def.key, value) + (def.note ? ` ${def.note}` : "");
+    const desc = perkDesc(def.key, value) + (def.note ? `. ${def.note}` : "");
     return { name: def.name, key: def.key, icon: meta.icon, value, desc, note: def.note || null };
 }
 
