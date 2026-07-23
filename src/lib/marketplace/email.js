@@ -127,6 +127,35 @@ export async function sendBadgeAwardedEmail(email, { label, icon = "", descripti
     return true;
 }
 
+// One-time announcement to every member: the Sailing feature has launched.
+export async function sendSailingLaunchEmail(email, { name = "" } = {}) {
+    if (!email) return false;
+    if (!process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    const hi = name ? `Hey ${name},` : "Hey there,";
+    const url = `${baseUrl()}/marketplace/sailing`;
+    await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: "⛵ A new adventure: Sailing has launched in The Wolf Den",
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#171008;">
+                <p>${hi}</p>
+                <div style="text-align:center;padding:26px 18px;margin:14px 0;border:1px solid #7cc4ff;border-radius:16px;background:linear-gradient(160deg,#0d2c4d,#0a1420);color:#eaf2ff;">
+                    <div style="font-size:48px;line-height:1;">⛵</div>
+                    <div style="font-size:22px;font-weight:800;margin-top:10px;">Sailing has launched!</div>
+                    <div style="color:#b9c6d6;margin-top:8px;">A whole new adventure in the game.</div>
+                </div>
+                <p>Dispatch your boat on <b>voyages</b> to mysterious islands, <b>dig up</b> buried treasure fragments, and <b>forge</b> them into loot chests. Meet the <b>Gold Merchant</b>, greet passing sailors, and <b>raid other members' ships</b> in full-screen ship-to-ship battles.</p>
+                <p>Upgrade your hull across <b>11 boat tiers</b>, chase new gear, pets, and hard-earned badges — it all ties into the systems you already play.</p>
+                <p style="text-align:center;margin-top:20px;"><a href="${url}" style="display:inline-block;padding:12px 22px;background:#45b6ff;color:#02121f;text-decoration:none;border-radius:999px;font-weight:800;">Set sail →</a></p>
+                <p style="color:#777;font-size:13px;margin-top:20px;">See you on the water. 🐺</p>
+            </div>
+        `,
+    });
+    return true;
+}
+
 // Sent to every member when the weekly boss is slain. Winners get the "come claim your prize" version.
 export async function sendBossDefeatedEmail(email, { bossId = "", bossName, winnerLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
     if (!email) return false;
