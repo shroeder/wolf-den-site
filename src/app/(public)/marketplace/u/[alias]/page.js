@@ -149,7 +149,7 @@ export default async function UserProfilePage({ params }) {
                 <ProfileActions targetId={profile.id} targetAlias={profile.alias} relation={relation} signedIn={Boolean(viewer)} />
                 {viewer && isOwner(viewer.id) && profile.alias ? (
                     <div style={{ marginTop: 10 }}>
-                        <a href={`/marketplace/farm?u=${encodeURIComponent(profile.alias)}`} className="pill" style={{ display: "inline-block", fontWeight: 700 }}>🌾 Visit {profile.displayLabel}&apos;s farm</a>
+                        <a href={`/marketplace/farm?u=${encodeURIComponent(profile.alias)}`} className="pill" style={{ display: "inline-block", fontWeight: 700 }}>🏡 Visit {profile.displayLabel}&apos;s farm</a>
                     </div>
                 ) : null}
             </section>

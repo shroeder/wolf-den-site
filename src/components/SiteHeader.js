@@ -42,7 +42,7 @@ export default function SiteHeader() {
     const [mktName, setMktName] = useState(null);
     const [mktBorder, setMktBorder] = useState("none");
     const [mktAuthed, setMktAuthed] = useState(false);
-    const [owner, setOwner] = useState(false); // gates owner-only preview links (e.g. 🌾 Farm)
+    const [owner, setOwner] = useState(false); // gates owner-only preview links (e.g. 🏡 Farm)
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
@@ -142,7 +142,7 @@ export default function SiteHeader() {
             ))}
             {owner ? (
                 <Link href="/marketplace/farm" className="nav-link" onClick={() => setOpen(false)} title="Owner-only preview">
-                    🌾 Farm
+                    🏡 Farm
                 </Link>
             ) : null}
             <a className="nav-link nav-link-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>

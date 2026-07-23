@@ -52,7 +52,7 @@ export default async function GamePlayHub() {
                 ))}
                 {owner ? (
                     <Link href="/marketplace/farm" className="game-tile tone-pets">
-                        <span className="game-tile-emoji" aria-hidden="true">🌾</span>
+                        <span className="game-tile-emoji" aria-hidden="true">🏡</span>
                         <span className="game-tile-title">Farm <span className="muted" style={{ fontSize: "0.7em" }}>· owner</span></span>
                         <span className="game-tile-desc">Watch your pets roam — pet them for XP, and visit other farms.</span>
                     </Link>

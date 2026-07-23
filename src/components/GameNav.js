@@ -35,7 +35,7 @@ export default function GameNav() {
     const pathname = usePathname() || "";
     const [owner, setOwner] = useState(false); // owner-only preview links (e.g. Farm) appended when true
     // Farm is an owner-only preview — append it to the menu only for the owner account.
-    const links = owner ? [...LINKS, { href: "/marketplace/farm", emoji: "🌾", label: "Farm" }] : LINKS;
+    const links = owner ? [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }] : LINKS;
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.

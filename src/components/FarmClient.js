@@ -28,8 +28,96 @@ const RARITY_RING = {
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip off the field edges
+// Fixed ring of coins that burst outward behind the pig on the haul modal (deterministic → SSR-safe).
+const PIG_BURST = Array.from({ length: 12 }, (_, i) => ({ a: i * 30, d: 74 + (i % 3) * 16, t: 0.7 + (i % 4) * 0.12 }));
 // Evenly-spaced home slot for pet i across the inner band [PAD, 100-PAD].
 const slotX = (i, n) => (n <= 1 ? 50 : FARM_PAD + (i / (n - 1)) * (100 - 2 * FARM_PAD));
+
+// ── Procedural sound (Web Audio, no asset files → CSP-safe) ─────────────────────────────────────────────────
+// A tiny synth: the Loot Pig event gets a squeal, a coin-jingle per drop, a bouncy chase loop while he rampages,
+// and a victory fanfare on the haul. Browsers gate audio behind a user gesture, so the farm primes the context
+// on first tap (see FarmClient) and every play is best-effort — silence, never an error, if it can't start.
+let _ac = null;
+function audioCtx() {
+    if (typeof window === "undefined") return null;
+    if (!_ac) {
+        const C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        try { _ac = new C(); } catch { return null; }
+    }
+    if (_ac.state === "suspended") _ac.resume().catch(() => {});
+    return _ac;
+}
+function tone(freq, at, dur, type = "sine", peak = 0.14) {
+    const a = audioCtx();
+    if (!a) return;
+    const o = a.createOscillator();
+    const g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(peak, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g).connect(a.destination);
+    o.start(at);
+    o.stop(at + dur + 0.03);
+}
+let _pigMusic = null;
+const SFX = {
+    prime() { audioCtx(); },
+    coin() {
+        const a = audioCtx();
+        if (!a) return;
+        const t = a.currentTime;
+        tone(1180, t, 0.11, "square", 0.06);
+        tone(1760, t + 0.045, 0.12, "square", 0.045);
+    },
+    oink() {
+        const a = audioCtx();
+        if (!a) return;
+        const t = a.currentTime;
+        const o = a.createOscillator();
+        const g = a.createGain();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(300, t);
+        o.frequency.linearRampToValueAtTime(780, t + 0.09);
+        o.frequency.linearRampToValueAtTime(210, t + 0.28);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+        o.connect(g).connect(a.destination);
+        o.start(t);
+        o.stop(t + 0.36);
+    },
+    fanfare() {
+        const a = audioCtx();
+        if (!a) return;
+        const t = a.currentTime;
+        [0, 4, 7, 12].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), t + i * 0.11, 0.34, "triangle", 0.13));
+        tone(1046.5, t + 0.52, 0.55, "triangle", 0.1);
+    },
+    startPigMusic() {
+        SFX.stopPigMusic();
+        const a = audioCtx();
+        if (!a) return;
+        const bass = [130.81, 130.81, 196.0, 174.61]; // bouncy C–C–G–F chase motif
+        let i = 0;
+        const beat = () => {
+            const c = audioCtx();
+            if (!c) return;
+            const t = c.currentTime;
+            const f = bass[i % bass.length];
+            tone(f, t, 0.15, "triangle", 0.05);
+            tone(f * 2, t + 0.085, 0.09, "square", 0.028);
+            i += 1;
+        };
+        beat();
+        _pigMusic = setInterval(beat, 250);
+    },
+    stopPigMusic() {
+        if (_pigMusic) { clearInterval(_pigMusic); _pigMusic = null; }
+    },
+};
 
 // ── Real-world sky + weather ──────────────────────────────────────────────────────────────────────────────
 const hourToTod = (h, isDay = true) => {
@@ -122,11 +210,22 @@ export default function FarmClient({ initial, viewingAlias }) {
             if (Math.random() < 0.7) {
                 setPig("running");
                 setPigToast(true);
+                SFX.oink();
+                SFX.startPigMusic();
                 setTimeout(() => setPigToast(false), 4200);
             }
         }, 2500 + Math.random() * 5000);
         return () => clearTimeout(t);
     }, [initial.mine, initial.pigAvailable]);
+    // Kill the pig chase-music if we unmount mid-rampage.
+    useEffect(() => () => SFX.stopPigMusic(), []);
+    // Prime the audio context on the visitor's first interaction (browsers gate Web Audio behind a gesture).
+    useEffect(() => {
+        const prime = () => SFX.prime();
+        window.addEventListener("pointerdown", prime, { once: true });
+        window.addEventListener("keydown", prime, { once: true });
+        return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
+    }, []);
     // Lock the page behind any open modal so the background doesn't scroll under it.
     useEffect(() => {
         if (typeof document === "undefined" || !(inspect || pigResult)) return undefined;
@@ -247,15 +346,19 @@ export default function FarmClient({ initial, viewingAlias }) {
         setFarm((f) => ({ ...f, pigAvailable: true }));
         setPig("running");
         setPigToast(true);
+        SFX.oink();
+        SFX.startPigMusic();
         setTimeout(() => setPigToast(false), 4200);
     }, [pig, post]);
 
     // The pig ran off screen → claim the haul (server-guarded once/day) and show the juiced modal.
     const onPigFinish = useCallback(async () => {
         setPig(null);
+        SFX.stopPigMusic();
         const r = await post({ action: "pig_claim" });
         if (r?.ok) {
             setPigResult(r);
+            SFX.fanfare();
             setFarm((f) => ({ ...f, pigAvailable: false, wallet: f.wallet && r.goldAfter != null ? { ...f.wallet, gold: r.goldAfter } : f.wallet }));
         }
     }, [post]);
@@ -312,6 +415,12 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes crownJiggle { 0%,100% { transform: translateX(-50%) rotate(-11deg); } 50% { transform: translateX(-50%) rotate(11deg); } }
                 @keyframes coinPop { 0% { opacity: 0; transform: translate(-50%, -22px) scale(.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(360deg); } }
                 @keyframes pigPop { 0% { opacity: 0; transform: scale(.82); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+                @keyframes haulShake { 0%,100% { transform: translate(0,0) } 15% { transform: translate(-6px,2px) rotate(-1deg) } 30% { transform: translate(6px,-2px) rotate(1deg) } 45% { transform: translate(-5px,1px) } 60% { transform: translate(5px,-1px) } 75% { transform: translate(-3px,1px) } 90% { transform: translate(2px,0) } }
+                @keyframes haulGlow { 0% { transform: scale(.4); opacity: .9 } 100% { transform: scale(2.4); opacity: 0 } }
+                @keyframes haulSweep { 0% { transform: translateX(-160%) skewX(-18deg) } 100% { transform: translateX(260%) skewX(-18deg) } }
+                @keyframes haulBurst { 0% { opacity: 1; transform: translate(-50%,-50%) rotate(var(--r)) translateY(0) scale(.5) } 70% { opacity: 1 } 100% { opacity: 0; transform: translate(-50%,-50%) rotate(var(--r)) translateY(var(--d)) scale(1.15) } }
+                @keyframes goldCount { 0% { transform: scale(.4); opacity: 0 } 55% { transform: scale(1.25) } 100% { transform: scale(1); opacity: 1 } }
+                @keyframes overlayFade { from { opacity: 0 } to { opacity: 1 } }
                 .farm-hop { animation-name: farmHop; animation-timing-function: ease-in-out; animation-iteration-count: infinite; transform-origin: bottom center; }
                 .farm-idle { animation: farmBob 2.8s ease-in-out infinite; transform-origin: bottom center; }
                 .farm-shadow-hop { animation-name: farmShadow; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
@@ -493,15 +602,22 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {pigResult ? (
-                <div onClick={() => setPigResult(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.62)", display: "grid", placeItems: "center", padding: 16 }}>
-                    <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Loot pig haul" style={{ width: "100%", maxWidth: 340, borderRadius: 18, overflow: "hidden", border: "2px solid #ffd75e", background: "linear-gradient(180deg, #2a2410, #17181c)", boxShadow: "0 20px 70px rgba(0,0,0,0.6), 0 0 40px rgba(255,215,94,0.25)", animation: "pigPop .5s cubic-bezier(.2,1.2,.3,1) both", textAlign: "center" }}>
-                        <div style={{ padding: "22px 18px 6px", background: "radial-gradient(120% 90% at 50% 0%, rgba(255,215,94,0.28), transparent 70%)" }}>
-                            <div style={{ fontSize: 52, lineHeight: 1 }}>🐷👑</div>
-                            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 4 }}>The Wild Loot Pig!</div>
-                            <div className="muted" style={{ fontSize: 13 }}>He rampaged through and left this behind:</div>
+                <div onClick={() => setPigResult(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "radial-gradient(120% 100% at 50% 40%, rgba(60,45,8,0.72), rgba(0,0,0,0.7))", display: "grid", placeItems: "center", padding: 16, animation: "overlayFade .25s ease both", overflow: "hidden" }}>
+                    <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Loot pig haul" style={{ position: "relative", width: "100%", maxWidth: 340, maxHeight: "90dvh", overflowY: "auto", overflowX: "hidden", borderRadius: 18, border: "2px solid #ffd75e", background: "linear-gradient(180deg, #2a2410, #17181c)", boxShadow: "0 20px 70px rgba(0,0,0,0.6), 0 0 40px rgba(255,215,94,0.25)", animation: "pigPop .5s cubic-bezier(.2,1.2,.3,1) both, haulShake .6s ease .12s both", textAlign: "center" }}>
+                        {/* shimmer sweep across the card */}
+                        <div aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, width: "60%", height: "100%", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)", animation: "haulSweep 1.1s ease .3s both", pointerEvents: "none", zIndex: 3 }} />
+                        <div style={{ position: "relative", padding: "22px 18px 6px", background: "radial-gradient(120% 90% at 50% 0%, rgba(255,215,94,0.28), transparent 70%)" }}>
+                            {/* radial glow pulse + coin burst behind the pig */}
+                            <div aria-hidden="true" style={{ position: "absolute", top: 34, left: "50%", width: 90, height: 90, marginLeft: -45, marginTop: -45, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,215,94,0.6), transparent 60%)", animation: "haulGlow .8s ease-out both", pointerEvents: "none" }} />
+                            {PIG_BURST.map((b, i) => (
+                                <span key={i} aria-hidden="true" style={{ position: "absolute", top: 40, left: "50%", fontSize: 16, "--r": `${b.a}deg`, "--d": `${b.d}px`, animation: `haulBurst ${b.t}s ease-out ${0.05 * (i % 4)}s both`, pointerEvents: "none", zIndex: 2 }}>🪙</span>
+                            ))}
+                            <div style={{ position: "relative", fontSize: 52, lineHeight: 1, zIndex: 2, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))" }}>🐷👑</div>
+                            <div style={{ position: "relative", fontSize: 20, fontWeight: 900, marginTop: 4, zIndex: 2 }}>The Wild Loot Pig!</div>
+                            <div className="muted" style={{ position: "relative", fontSize: 13, zIndex: 2 }}>He rampaged through and left this behind:</div>
                         </div>
-                        <div style={{ padding: "4px 18px 20px" }}>
-                            <div style={{ fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.45)" }}>+{(pigResult.gold || 0).toLocaleString()} 🪙</div>
+                        <div style={{ position: "relative", padding: "4px 18px 20px", zIndex: 2 }}>
+                            <div style={{ display: "inline-block", fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.55)", animation: "goldCount .5s cubic-bezier(.2,1.4,.3,1) .25s both" }}>+{(pigResult.gold || 0).toLocaleString()} 🪙</div>
                             {pigResult.item ? (
                                 <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${RARITY_RING[pigResult.item.rarity] || "#9aa0a6"}`, background: "rgba(255,255,255,0.04)" }}>
                                     <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>✨ Rare drop{pigResult.item.isNew ? " · NEW" : ""}!</div>
@@ -536,7 +652,7 @@ function LootPig({ onFinish }) {
         const timers = [];
         let step = 0;
         const MAX_STEPS = 7; // meander waypoints before he leaves
-        const drop = (x, y) => setCoins((c) => [...c, { id: ++coinId.current, x: x + rand(-3, 3), y: y + rand(-1, 5) }]);
+        const drop = (x, y) => { SFX.coin(); setCoins((c) => [...c, { id: ++coinId.current, x: x + rand(-3, 3), y: y + rand(-1, 5) }]); };
         const move = () => {
             if (!alive) return;
             step += 1;
