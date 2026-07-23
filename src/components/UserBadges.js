@@ -1,4 +1,7 @@
+import BadgeArt from "@/components/BadgeArt";
+
 // Presentational badge pills — usable from server or client components. Colors come from the badge def.
+// The icon slot renders the badge's AI sprite when one exists, falling back to its emoji (BadgeArt handles it).
 export default function UserBadges({ badges }) {
     if (!badges || badges.length === 0) return null;
     return (
@@ -11,8 +14,8 @@ export default function UserBadges({ badges }) {
                     title={b.description || b.label}
                 >
                     {b.icon ? (
-                        <span className="user-badge-icon" aria-hidden="true">
-                            {b.icon}
+                        <span className="user-badge-icon">
+                            <BadgeArt slug={b.slug} icon={b.icon} />
                         </span>
                     ) : null}
                     {b.label}

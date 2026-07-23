@@ -1,3 +1,4 @@
+import BadgeArt from "@/components/BadgeArt";
 import UserLevel from "@/components/UserLevel";
 
 // The rewards track: a level roadmap (ranks + badges + future perks at each notable level) and an
@@ -63,7 +64,7 @@ export default function RewardsTrack({ track }) {
                     {achievements.map((a) => (
                         <div key={a.slug} className={`track-ach${a.done ? " is-done" : ""}`}>
                             <div className="track-ach-top">
-                                <span className="track-ach-icon" aria-hidden="true">{a.done ? "✅" : a.icon}</span>
+                                <span className="track-ach-icon" aria-hidden="true">{a.done ? "✅" : <BadgeArt slug={a.slug} icon={a.icon} />}</span>
                                 <span className="track-ach-label">{a.label}</span>
                                 {a.done ? <span className="track-ach-check">Unlocked</span> : null}
                             </div>

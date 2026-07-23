@@ -80,6 +80,9 @@ const RAID_RESET_MULT = 2;
 const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RESET_BASE * Math.pow(RAID_RESET_MULT, Math.max(0, resetsToday))) : 0);
 // Sailing achievement badge thresholds — kept HIGH on purpose (these are meant to be a grind / rare feats).
 const BADGE_RAID_MARAUDER = 25, BADGE_RAID_SCOURGE = 100, BADGE_DIG_EXCAVATOR = 50, BADGE_VOYAGER = 100;
+// Milestone thresholds for the newer sailing badges (waving, marine encounters, early voyages).
+const BADGE_WAVE_FRIENDLY = 25, BADGE_WAVE_AMBASSADOR = 100, BADGE_WAVE_BELOVED = 500;
+const BADGE_ENC_TESTED = 10, BADGE_ENC_VETERAN = 50, BADGE_FIRST_VOYAGE = 1, BADGE_SAIL_REGULAR = 25;
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold — and the price DOUBLES
 // for each extra one caught this voyage (wind_recharges), so spamming tailwinds gets expensive fast.
@@ -779,13 +782,17 @@ async function resolveDueEncounter(buyerId) {
     };
     // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.
     const claimed = await db.queryOne(
-        `UPDATE mkt_sailing SET encounter_result = $2::jsonb, updated_at = NOW()
+        `UPDATE mkt_sailing SET encounter_result = $2::jsonb, encounters_total = COALESCE(encounters_total, 0) + 1, updated_at = NOW()
           WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_result IS NULL AND dig_state IS NULL
-          RETURNING buyer_id`,
+          RETURNING encounters_total`,
         [buyerId, JSON.stringify(result)]
     ).catch(() => null);
     if (!claimed) return;
     await awardXp(buyerId, "sail_encounter", { points: xp, gold: coins }).catch(() => {});
+    // Milestone badges for weathering the open sea (cumulative encounters).
+    const et = claimed.encounters_total || 0;
+    if (et >= BADGE_ENC_TESTED) await grantEventBadge(buyerId, "sea_tested").catch(() => {});
+    if (et >= BADGE_ENC_VETERAN) await grantEventBadge(buyerId, "sea_veteran").catch(() => {});
     if (loot.kind === "fragment") await grantFragment(buyerId, loot.n || 1).catch(() => {});
     else if (loot.kind === "chest") await addChests(buyerId, { [loot.tier]: 1 }).catch(() => {});
     else if (loot.kind === "consumable") await grantConsumable(buyerId, loot.id, 1).catch(() => {});
@@ -917,17 +924,23 @@ export async function waveAtSailor(buyerId) {
         `UPDATE mkt_sailing
             SET wave_count = CASE WHEN wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN wave_count + 1 ELSE 1 END,
                 wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
+                waves_total = COALESCE(waves_total, 0) + 1,
                 returns_at = GREATEST(NOW(), returns_at - ($2 || ' milliseconds')::interval),
                 updated_at = NOW()
           WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at IS NOT NULL AND returns_at > NOW()
             AND (wave_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date OR wave_count < $3)
-          RETURNING wave_count`,
+          RETURNING wave_count, waves_total`,
         [buyerId, String(WAVE_SHAVE_MS), cap]
     ).catch(() => null);
     if (!waved) return { ok: false, error: "no_waves", ...(await getSailingState(buyerId)) };
     await awardXp(buyerId, "sail_wave", { points: WAVE_XP, gold: WAVE_COINS }).catch(() => {});
     await bumpQuestProgress(buyerId, "wave", 1).catch(() => {}); // "Greet a passing sailor" daily quest
     await trackActivity(buyerId, "sail_wave", {}).catch(() => {});
+    // Milestone badges for friendliness (cumulative waves).
+    const wt = waved.waves_total || 0;
+    if (wt >= BADGE_WAVE_FRIENDLY) await grantEventBadge(buyerId, "wave_friendly").catch(() => {});
+    if (wt >= BADGE_WAVE_AMBASSADOR) await grantEventBadge(buyerId, "wave_ambassador").catch(() => {});
+    if (wt >= BADGE_WAVE_BELOVED) await grantEventBadge(buyerId, "wave_beloved").catch(() => {});
     return { ok: true, waved: { xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000 }, ...(await getSailingState(buyerId)) };
 }
 
@@ -1454,8 +1467,11 @@ async function finishDig(buyerId, board) {
     // Rare bonus find: a one-shot SAILING RELIC (kept uncommon so they stay special) — the treasure-map/drum/etc.
     let relicFound = null;
     if (won && Math.random() < 0.08) { relicFound = SAIL_RELIC_DROPS[randInt(SAIL_RELIC_DROPS.length)]; await grantConsumable(buyerId, relicFound, 1).catch(() => {}); }
-    // Achievement badges (hard): 100 voyages, and fully uncovering a deep chest (tier 3+) in one dig.
-    if ((row?.voyages_completed || 0) + 1 >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
+    // Achievement badges: voyage milestones (first, 25, 100) + fully uncovering a deep chest (tier 3+) in one dig.
+    const voyagesNow = (row?.voyages_completed || 0) + 1;
+    if (voyagesNow >= BADGE_FIRST_VOYAGE) await grantEventBadge(buyerId, "first_voyage").catch(() => {});
+    if (voyagesNow >= BADGE_SAIL_REGULAR) await grantEventBadge(buyerId, "sail_regular").catch(() => {});
+    if (voyagesNow >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
     await trackActivity(buyerId, "sail_dig", { frags: fragCount, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
