@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { broadcastWebPush, sendWebPush } from "@/lib/push/web-push.js";
 
 // Admin lever: RESET a member's (or everyone's) daily usage so a capped action is available again, or GRANT a
 // number of free uses. Powers the "Resets & Free Uses" admin screen. buyerId null = the whole server.
@@ -22,8 +23,37 @@ export const RESET_CATALOG = [
     { key: "gear_cooldowns", label: "Charged-gear cooldowns", icon: "⏳", can: ["reset"],           note: "Clears the cooldown on charged gear items." },
 ];
 
+// Browser-push copy so awarded players know their perk is ready. `n` = grant amount (for grants).
+function pushFor(key, action, n = 0) {
+    switch (key) {
+        case "spin":           return { title: "🎡 Free spin!", body: "Your daily wheel spin is ready — come spin it.", url: "/marketplace/spin" };
+        case "spin_tokens":    return { title: `🎟️ +${n} wheel spins!`, body: `You've got ${n} extra spin${n === 1 ? "" : "s"} on the wheel.`, url: "/marketplace/spin" };
+        case "checkin":        return { title: "📅 Check-in ready", body: "Your daily check-in is available again — keep your streak going.", url: "/marketplace/play" };
+        case "quests":         return { title: "📜 Fresh quests!", body: "A new set of daily quests is waiting for you.", url: "/marketplace/quests" };
+        case "quest_reroll":   return { title: "🔀 Free re-roll", body: "You can re-roll today's quests for free.", url: "/marketplace/quests" };
+        case "boss_strikes":   return { title: `⚔️ +${n} boss attacks!`, body: `You've got ${n} bonus attack${n === 1 ? "" : "s"} on the boss today.`, url: "/marketplace/boss" };
+        case "cheers":         return { title: "📣 Cheers refreshed", body: "Your boss-fight cheers are ready again today.", url: "/marketplace/boss" };
+        case "raid":           return action === "grant"
+            ? { title: `🏴‍☠️ +${n} raids!`, body: `You've got ${n} extra raid${n === 1 ? "" : "s"} — go plunder a passing ship.`, url: "/marketplace/sailing" }
+            : { title: "🏴‍☠️ Raid ready!", body: "Your daily raid is available again — set upon a passing ship.", url: "/marketplace/sailing" };
+        case "waves":          return { title: "👋 Waves refreshed", body: "You can greet passing sailors again today.", url: "/marketplace/sailing" };
+        case "wind":           return { title: "🌬️ Tailwind ready", body: "Your free tailwind is available again.", url: "/marketplace/sailing" };
+        case "gear_cooldowns": return { title: "⏳ Gear ready", body: "Your charged-gear cooldowns were cleared — redeem away.", url: "/marketplace/inventory" };
+        default: return null;
+    }
+}
+
+// Send the browser push for an awarded reset/grant. buyerId null = broadcast to every subscribed member.
+async function notifyPush(key, action, buyerId, n) {
+    const c = pushFor(key, action, n);
+    if (!c) return;
+    const payload = { ...c, tag: `award-${key}`, data: { type: "award", key } };
+    if (buyerId) await sendWebPush(buyerId, payload).catch(() => {});
+    else await broadcastWebPush(payload).catch(() => {});
+}
+
 // Clear today's usage so the capped/daily action is available again. buyerId null = everyone.
-export async function resetSystem(key, buyerId = null) {
+export async function resetSystem(key, buyerId = null, notify = false) {
     const one = Boolean(buyerId);
     const p = one ? [buyerId] : [];
     switch (key) {
@@ -38,11 +68,12 @@ export async function resetSystem(key, buyerId = null) {
         case "gear_cooldowns": await db.query(`UPDATE mkt_user_item SET last_charge_at = NULL${one ? " WHERE buyer_id = $1" : ""}`, p); break;
         default: return { ok: false, error: "bad_key" };
     }
-    return { ok: true, scope: one ? "member" : "everyone" };
+    if (notify) await notifyPush(key, "reset", buyerId, 0);
+    return { ok: true, scope: one ? "member" : "everyone", notified: Boolean(notify) };
 }
 
 // Grant N free uses. buyerId null = everyone.
-export async function grantUses(key, n = 1, buyerId = null) {
+export async function grantUses(key, n = 1, buyerId = null, notify = false) {
     const amt = Math.max(1, Math.min(50, Math.round(Number(n) || 0)));
     const one = Boolean(buyerId);
     switch (key) {
@@ -58,5 +89,6 @@ export async function grantUses(key, n = 1, buyerId = null) {
             break;
         default: return { ok: false, error: "bad_key" };
     }
-    return { ok: true, amount: amt, scope: one ? "member" : "everyone" };
+    if (notify) await notifyPush(key, "grant", buyerId, amt);
+    return { ok: true, amount: amt, scope: one ? "member" : "everyone", notified: Boolean(notify) };
 }

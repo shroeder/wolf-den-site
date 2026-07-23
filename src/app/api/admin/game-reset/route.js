@@ -34,9 +34,10 @@ export async function POST(request) {
             const action = String(body?.action || "");
             const key = String(body?.key || "");
             const buyerId = body?.buyerId ? String(body.buyerId) : null;
+            const notify = body?.notify !== false; // default: push the awarded players
             if (!RESET_CATALOG.some((c) => c.key === key)) return noStore({ error: "unknown_key" }, { status: 400 });
-            if (action === "reset") return noStore(await resetSystem(key, buyerId));
-            if (action === "grant") return noStore(await grantUses(key, body.n, buyerId));
+            if (action === "reset") return noStore(await resetSystem(key, buyerId, notify));
+            if (action === "grant") return noStore(await grantUses(key, body.n, buyerId, notify));
             return noStore({ error: "unknown_action" }, { status: 400 });
         } catch (error) {
             return internalError(error, { event: "admin.gamereset.action.failure" });
