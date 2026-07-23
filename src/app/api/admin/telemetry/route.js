@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { telemetryDashboard, recentVisitors } from "@/lib/marketplace/activity.js";
+import { telemetryDashboard, recentVisitors, eventDrill, sourceDrill } from "@/lib/marketplace/activity.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -23,6 +23,18 @@ export async function GET(request) {
             const hours = Number(searchParams.get("hours")) || 168;
             const aud = searchParams.get("audience");
             const audience = aud === "members" || aud === "anon" ? aud : "all";
+            // Drill-in: tap a category (event) to see WHO did it, or a traffic source to see who arrived via it.
+            const eventKey = searchParams.get("event");
+            if (eventKey) {
+                const drill = await eventDrill({ event: eventKey, hours, audience });
+                return NextResponse.json(drill, { headers: { "Cache-Control": "no-store" } });
+            }
+            const sourceKind = searchParams.get("sourceKind");
+            const sourceLabel = searchParams.get("source");
+            if (sourceKind || sourceLabel) {
+                const drill = await sourceDrill({ kind: sourceKind || null, source: sourceLabel || null, hours });
+                return NextResponse.json(drill, { headers: { "Cache-Control": "no-store" } });
+            }
             const data = await telemetryDashboard({ hours, audience });
             return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {

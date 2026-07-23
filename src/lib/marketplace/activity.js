@@ -181,7 +181,7 @@ export async function telemetryDashboard({ hours = 168, feedLimit = 120, audienc
     const audA = audience === "members" ? " AND a.buyer_id IS NOT NULL" : audience === "anon" ? " AND a.buyer_id IS NULL" : "";
     const wantMembers = audience !== "anon";
     const wantAnon = audience !== "members";
-    const [feed, topEvents, topPages, totals, hourly, devices, countries, cities, sourceKinds, topSources, campaigns, memberPeople, anonPeople] = await Promise.all([
+    const [feed, topEvents, topPages, totals, hourly, devices, countries, cities, sourceKinds, topSources, campaigns, memberPeople, anonPeople, bucketRow] = await Promise.all([
         db.query(
             `SELECT a.event, a.path, a.meta, a.created_at, a.buyer_id, a.anon_id, a.device, a.browser, a.os,
                     a.country, a.region, a.city, b.display_name, b.alias
@@ -231,13 +231,23 @@ export async function telemetryDashboard({ hours = 168, feedLimit = 120, audienc
         wantAnon
             ? db.query(
                   `SELECT anon_id, COUNT(*)::int AS n, MAX(created_at) AS last_at,
-                          MAX(device) AS device, MAX(city) AS city, MAX(region) AS region, MAX(country) AS country
+                          MAX(device) AS device, MAX(browser) AS browser, MAX(os) AS os, MAX(ip) AS ip,
+                          MAX(city) AS city, MAX(region) AS region, MAX(country) AS country
                      FROM mkt_activity_event
                     WHERE buyer_id IS NULL AND anon_id IS NOT NULL AND created_at > NOW() - $1::interval
                     GROUP BY anon_id ORDER BY n DESC LIMIT 60`,
                   [win]
               ).catch(() => [])
             : Promise.resolve([]),
+        // Activity-volume buckets (respecting the audience lens): today (store-local) + rolling 3/7/30 days.
+        db.queryOne(
+            `SELECT
+                COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date)::int AS today,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '3 days')::int  AS d3,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::int  AS d7,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS d30
+               FROM mkt_activity_event WHERE TRUE${aud}`
+        ).catch(() => null),
     ]);
     return {
         feed: feed.map((r) => {
@@ -254,6 +264,8 @@ export async function telemetryDashboard({ hours = 168, feedLimit = 120, audienc
         topEvents: topEvents.map((r) => ({ event: r.event, n: r.n })),
         topPages: topPages.map((r) => ({ path: r.path, n: r.n })),
         totals: { events: totals?.events || 0, users: totals?.users || 0, anons: totals?.anons || 0 },
+        // Rolling windows over the SAME audience lens (the top-of-dashboard "today / 3d / 7d / 30d" counts).
+        buckets: { today: bucketRow?.today || 0, d3: bucketRow?.d3 || 0, d7: bucketRow?.d7 || 0, d30: bucketRow?.d30 || 0 },
         hourly: hourly.map((r) => ({ bucket: r.bucket, n: r.n })),
         devices: devices.map((r) => ({ device: r.device, n: r.n })),
         topCountries: countries.map((r) => ({ country: r.country, n: r.n })),
@@ -269,8 +281,105 @@ export async function telemetryDashboard({ hours = 168, feedLimit = 120, audienc
                 n: r.n,
                 lastAt: r.last_at,
                 device: r.device || null,
+                browser: r.browser || null,
+                os: r.os || null,
+                ip: r.ip || null,
                 place: [r.city, r.region, r.country].filter(Boolean).join(", ") || null,
             })),
         },
+    };
+}
+
+// Drill-in: WHO performed a specific action over the window (powers "tap a category → itemized who-did-what").
+export async function eventDrill({ event, hours = 168, audience = "all", limit = 200 } = {}) {
+    if (!event) return { event: null, rows: [] };
+    const win = `${Math.max(1, Math.min(720, Number(hours) || 168))} hours`;
+    const audA = audience === "members" ? " AND a.buyer_id IS NOT NULL" : audience === "anon" ? " AND a.buyer_id IS NULL" : "";
+    const rows = await db
+        .query(
+            `SELECT a.event, a.path, a.meta, a.created_at, a.buyer_id, a.anon_id, a.device, a.ip, a.city, a.region, a.country,
+                    b.display_name, b.alias
+               FROM mkt_activity_event a LEFT JOIN mkt_buyer b ON b.id = a.buyer_id
+              WHERE a.event = $1 AND a.created_at > NOW() - $2::interval${audA}
+              ORDER BY a.created_at DESC LIMIT $3`,
+            [event, win, Math.min(500, Number(limit) || 200)]
+        )
+        .catch(() => []);
+    return {
+        event,
+        rows: rows.map((r) => {
+            let meta = r.meta;
+            if (typeof meta === "string") {
+                try {
+                    meta = JSON.parse(meta);
+                } catch {
+                    meta = null;
+                }
+            }
+            return {
+                who: r.display_name || r.alias || (r.buyer_id ? "Member" : "Anonymous"),
+                buyerId: r.buyer_id || null,
+                anonId: r.buyer_id ? null : r.anon_id || null,
+                anon: !r.display_name && !r.alias,
+                meta,
+                path: r.path || null,
+                at: r.created_at,
+                device: r.device || null,
+                ip: r.ip || null,
+                place: [r.city, r.region, r.country].filter(Boolean).join(", ") || null,
+            };
+        }),
+    };
+}
+
+// Drill-in: the visitors who arrived via a given traffic source / channel (click a source → who came from it).
+// Pass `kind` (a source_kind bucket like paid/social/direct) OR `source` (the utm_source/referrer label shown
+// in the Top sources list).
+export async function sourceDrill({ kind = null, source = null, hours = 168, limit = 200 } = {}) {
+    const win = `${Math.max(1, Math.min(720, Number(hours) || 168))} hours`;
+    let where = "v.last_seen > NOW() - $1::interval";
+    const params = [win];
+    if (kind) {
+        if (kind === "direct") {
+            where += ` AND COALESCE(NULLIF(v.source_kind,''),'direct') = 'direct'`;
+        } else {
+            params.push(kind);
+            where += ` AND v.source_kind = $${params.length}`;
+        }
+    } else if (source) {
+        params.push(source);
+        where += ` AND COALESCE(NULLIF(v.utm_source,''), NULLIF(v.referrer,''), 'direct') = $${params.length}`;
+    }
+    params.push(Math.min(500, Number(limit) || 200));
+    const rows = await db
+        .query(
+            `SELECT v.anon_id, v.buyer_id, v.first_seen, v.last_seen, v.events, v.landing_path, v.referrer,
+                    v.utm_source, v.utm_campaign, v.source_kind, v.device, v.browser, v.os, v.ip, v.city, v.region, v.country,
+                    b.display_name, b.alias
+               FROM mkt_visitor v LEFT JOIN mkt_buyer b ON b.id = v.buyer_id
+              WHERE ${where}
+              ORDER BY v.last_seen DESC LIMIT $${params.length}`,
+            params
+        )
+        .catch(() => []);
+    return {
+        kind: kind || null,
+        source: source || null,
+        visitors: rows.map((r) => ({
+            anonId: r.anon_id,
+            becameMember: r.buyer_id ? { id: r.buyer_id, name: r.display_name || r.alias || "Member" } : null,
+            events: r.events || 0,
+            firstSeen: r.first_seen,
+            lastSeen: r.last_seen,
+            landingPath: r.landing_path || null,
+            referrer: r.referrer || null,
+            source: r.utm_source || r.referrer || r.source_kind || "direct",
+            campaign: r.utm_campaign || null,
+            device: r.device || null,
+            browser: r.browser || null,
+            os: r.os || null,
+            ip: r.ip || null,
+            place: [r.city, r.region, r.country].filter(Boolean).join(", ") || null,
+        })),
     };
 }

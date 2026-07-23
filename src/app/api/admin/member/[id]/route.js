@@ -9,9 +9,10 @@ import { petsState } from "@/lib/marketplace/pets.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collectibles.js";
 import { CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
-import { describeStats } from "@/lib/marketplace/items.js";
+import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
+import { coinLedger, coinBreakdown } from "@/lib/marketplace/coins.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -62,6 +63,26 @@ const ACTIVITY_LABEL = {
     view_boss: () => "⚔️ Viewed the boss",
     view_leaderboard: () => "🏆 Viewed the leaderboard",
     view_vendor: () => "🏪 Viewed a shop",
+    buy_pet: (m) => `🐾 Bought a pet${m?.price ? ` (${m.price}g)` : ""}`,
+    buy_daily_deal: () => "🏷️ Bought a daily deal",
+    daily_spin: (m) => `🎡 Spun the wheel${m?.prize ? ` → ${m.prize}` : ""}`,
+    daily_checkin: (m) => `📆 Daily check-in${m?.streak ? ` (streak ${m.streak})` : ""}`,
+    equip_pet: () => "🐾 Equipped a pet",
+    happy_hour_donate: (m) => `🎉 Donated ${m?.gold || m?.amount || ""}g to Happy Hour`,
+    cheer: (m) => `📣 Cheered ${m?.toName || "a teammate"}${m?.damage ? ` (+${m.damage} dmg)` : ""}`,
+    boss_attack: (m) => `⚔️ Hit the boss${m?.damage ? ` for ${m.damage}` : ""}${m?.crit ? " 💥CRIT" : ""}${m?.defeated ? " ☠️KILL" : ""}`,
+    sail_voyage: (m) => `⛵ Set sail${m?.option ? ` (${m.option})` : ""}`,
+    sail_dig: (m) => `⛏️ Dug up ${m?.frags ?? 0} fragment(s)${m?.relic ? " + a relic!" : ""}`,
+    sail_forge: (m) => `🔨 Forged a ${m?.tier || ""} chest`,
+    sail_raid: (m) => `🏴‍☠️ Raided ${m?.foe || "a ship"}${m?.outcome ? ` — ${m.outcome}` : ""}${m?.item ? ` (won ${m.item})` : ""}`,
+    sail_merchant: () => "💰 Met the Gold Merchant",
+    sail_merchant_buy: (m) => `🛒 Bought ${m?.name || "an item"} from the Merchant`,
+    sail_wave: () => "👋 Waved at a passing sailor",
+    sail_encounter: (m) => `🌊 Sailing encounter${m?.type ? `: ${String(m.type).replace(/_/g, " ")}` : ""}`,
+    buy_upgrade: (m) => `⬆️ Upgraded ${m?.track || m?.kind || "boat"}${m?.level ? ` to Lv${m.level}` : ""}`,
+    buy_digs: () => "⛏️ Bought extra digs",
+    buy_spin: () => "🎡 Bought an extra spin",
+    cooldown_skip: (m) => `⏩ Skipped a cooldown${m?.kind ? ` (${String(m.kind).replace(/_/g, " ")})` : ""}`,
 };
 const activityLabel = (event, meta, path) => {
     if (event === "page_view") return `📄 Viewed ${path || "a page"}`;
@@ -82,22 +103,44 @@ export async function GET(request, { params }) {
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
                 db.query(`SELECT reward_label, redeemed_at FROM mkt_item_redemption WHERE buyer_id = $1 ORDER BY redeemed_at DESC LIMIT 12`, [id]).catch(() => []),
-                db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 80`, [id]).catch(() => []),
+                db.query(`SELECT action, points, created_at FROM mkt_xp_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 500`, [id]).catch(() => []),
                 memberPetPerks(id).catch(() => []),
                 petsState(id).catch(() => null),
                 getPetSpriteData().catch(() => ({})),
+                // Coin (gold) ledger — all-time, newest first — and a per-reason coin breakdown.
+                coinLedger(id, { limit: 400 }).catch(() => ({ events: [], earned: 0, spent: 0 })),
+                coinBreakdown(id).catch(() => []),
+                // Player-to-player trades (both directions), pending + resolved, with full give/get.
+                db.query(
+                    `SELECT id, from_buyer_id, to_buyer_id, offered_items, offered_gold, offered_pets,
+                            requested_items, requested_gold, requested_pets, status, note, created_at, resolved_at
+                       FROM mkt_trade_offer WHERE from_buyer_id = $1 OR to_buyer_id = $1
+                      ORDER BY created_at DESC LIMIT 50`,
+                    [id]
+                ).catch(() => []),
+                // Activity-volume buckets: today (store-local), last 3/7/30 days, and all-time.
+                db.queryOne(
+                    `SELECT
+                        COUNT(*) FILTER (WHERE (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date)::int AS today,
+                        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '3 days')::int  AS d3,
+                        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days')::int  AS d7,
+                        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS d30,
+                        COUNT(*)::int AS all_time
+                       FROM mkt_activity_event WHERE buyer_id = $1`,
+                    [id]
+                ).catch(() => null),
             ]);
             // Hero-card visuals + a featured-pet + pets summary.
             const featuredPet = row.featured_collectible ? collectibleById(row.featured_collectible) : null;
             const petSpriteUrl = (row.featured_collectible && petSprites[row.featured_collectible]?.url) || null;
             const petSpriteFlip = (row.featured_collectible && petSprites[row.featured_collectible]?.flip) || false;
             // Granular activity telemetry, merged with the XP ledger into one detailed timeline.
-            const activityRows = await db.query(`SELECT event, meta, path, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 120`, [id]).catch(() => []);
+            const activityRows = await db.query(`SELECT event, meta, path, created_at FROM mkt_activity_event WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 500`, [id]).catch(() => []);
             const history = [
                 ...(historyRows || []).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: r.created_at })),
                 ...(activityRows || []).map((r) => {
@@ -105,9 +148,36 @@ export async function GET(request, { params }) {
                     if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = null; } }
                     return { label: activityLabel(r.event, meta, r.path), points: 0, at: r.created_at };
                 }),
-            ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 120);
+            ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 500);
             // Clean XP-only ledger (no view/telemetry noise) — shows exactly how the member is leveling.
             const xpLedger = (historyRows || []).filter((r) => Number(r.points)).map((r) => ({ label: actionLabel(r.action), points: Number(r.points) || 0, at: iso(r.created_at) }));
+
+            // Resolve trade give/get into human names. `direction` is relative to THIS member: out = they
+            // proposed it, in = it was proposed TO them. give/get are always from this member's point of view.
+            const itemNm = (iid) => itemById(iid)?.name || iid;
+            const petNm = (pid) => collectibleById(pid)?.name || pid;
+            const partyIds = [...new Set((tradeRows || []).map((t) => (t.from_buyer_id === id ? t.to_buyer_id : t.from_buyer_id)))];
+            const partyRows = partyIds.length
+                ? await db.query(`SELECT id, display_name, alias FROM mkt_buyer WHERE id = ANY($1)`, [partyIds]).catch(() => [])
+                : [];
+            const partyName = new Map((partyRows || []).map((p) => [p.id, p.display_name || p.alias || "Member"]));
+            const arr = (v) => (Array.isArray(v) ? v : []);
+            const trades = (tradeRows || []).map((t) => {
+                const iAmProposer = t.from_buyer_id === id;
+                const mineSide = { items: arr(iAmProposer ? t.offered_items : t.requested_items).map(itemNm), pets: arr(iAmProposer ? t.offered_pets : t.requested_pets).map(petNm), gold: Number(iAmProposer ? t.offered_gold : t.requested_gold) || 0 };
+                const theirSide = { items: arr(iAmProposer ? t.requested_items : t.offered_items).map(itemNm), pets: arr(iAmProposer ? t.requested_pets : t.offered_pets).map(petNm), gold: Number(iAmProposer ? t.requested_gold : t.offered_gold) || 0 };
+                return {
+                    id: t.id,
+                    direction: iAmProposer ? "out" : "in",
+                    status: t.status,
+                    with: partyName.get(iAmProposer ? t.to_buyer_id : t.from_buyer_id) || "Member",
+                    give: mineSide, // what this member gives up
+                    get: theirSide, // what this member receives
+                    note: t.note || null,
+                    at: iso(t.created_at),
+                    resolvedAt: iso(t.resolved_at),
+                };
+            });
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));
             const gear = (inv?.items || []).map((i) => ({
@@ -177,6 +247,22 @@ export async function GET(request, { params }) {
                 petPerks: (petPerks || []).map((p) => ({ petId: p.petId, name: p.name, reward: p.reward, available: p.available, cooldownUntil: p.cooldownUntil })),
                 history: history.map((x) => ({ label: x.label, points: x.points, at: iso(x.at) })),
                 xpLedger,
+                // Activity volume by window (today = store-local calendar day).
+                buckets: {
+                    today: buckets?.today || 0,
+                    d3: buckets?.d3 || 0,
+                    d7: buckets?.d7 || 0,
+                    d30: buckets?.d30 || 0,
+                    allTime: buckets?.all_time || 0,
+                },
+                // Coin (gold) statement — all-time, newest first — plus earned/spent totals + per-reason breakdown.
+                coinLedger: {
+                    earned: coins?.earned || 0,
+                    spent: coins?.spent || 0,
+                    events: (coins?.events || []).map((e) => ({ delta: e.delta, balanceAfter: e.balanceAfter, reason: e.reason, meta: e.meta, at: iso(e.at) })),
+                    breakdown: (coinBd || []).map((b) => ({ reason: b.reason, n: b.n, earned: b.earned, spent: b.spent })),
+                },
+                trades,
             }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.member.detail.failure" });
