@@ -14,6 +14,7 @@ import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { collectibleById, petActive, petPassive, petSpecialPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
@@ -146,6 +147,11 @@ export default async function UserProfilePage({ params }) {
                     </div>
                 </div>
                 <ProfileActions targetId={profile.id} targetAlias={profile.alias} relation={relation} signedIn={Boolean(viewer)} />
+                {viewer && isOwner(viewer.id) && profile.alias ? (
+                    <div style={{ marginTop: 10 }}>
+                        <a href={`/marketplace/farm?u=${encodeURIComponent(profile.alias)}`} className="pill" style={{ display: "inline-block", fontWeight: 700 }}>🌾 Visit {profile.displayLabel}&apos;s farm</a>
+                    </div>
+                ) : null}
             </section>
 
             <PublicGear inventory={inventory} displayLabel={profile.displayLabel} canTrade={Boolean(viewer && viewer.id !== profile.id)} targetAlias={profile.alias} />

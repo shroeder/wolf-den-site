@@ -151,22 +151,46 @@ export default function FarmClient({ initial, viewingAlias }) {
         setTimeout(() => setFloaters((f) => f.filter((x) => x.id !== id)), 1300);
     }, [pos]);
 
+    const post = useCallback(async (body) => {
+        const res = await fetch("/api/marketplace/farm", {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+        }).catch(() => null);
+        return res ? res.json().catch(() => null) : null;
+    }, []);
+
     const petIt = useCallback(async (pet) => {
         if (!farm.canPet || pet.petted || busy) return;
         const i = pets.findIndex((p) => p.id === pet.id);
         setBusy(pet.id);
-        if (i >= 0) addFloater(i, "❤️");
-        const r = await fetch("/api/marketplace/farm", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "pet", petId: pet.id }),
-        }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
+        const r = await post({ action: "pet", petId: pet.id });
         setBusy(null);
-        // Mark it petted everywhere (roaming list + open inspect card); apply the new level/xp on success.
-        const patch = r?.ok ? { petted: true, level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed } : { petted: true };
-        setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)) }));
-        setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
-        if (r?.ok && i >= 0) addFloater(i, `+${r.xpGained} XP`, "#ffe27a");
-    }, [farm.canPet, busy, addFloater, pets]);
+        if (r?.petting) setFarm((f) => ({ ...f, petting: r.petting }));
+        if (r?.ok) {
+            const patch = { petted: true, level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed };
+            setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)), wallet: f.wallet ? { ...f.wallet, gold: f.wallet.gold + (r.goldGained || 0) } : f.wallet }));
+            setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
+            if (i >= 0) addFloater(i, `+${r.xpGained} XP · +${r.goldGained}g`, "#ffe27a");
+        } else if (r?.error === "already_petted") {
+            setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, petted: true } : p)) }));
+            setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, petted: true } : cur));
+        }
+    }, [farm.canPet, busy, addFloater, pets, post]);
+
+    const rechargeBudget = useCallback(async () => {
+        if (busy) return;
+        setBusy("recharge");
+        const r = await post({ action: "recharge" });
+        setBusy(null);
+        if (r?.petting) setFarm((f) => ({ ...f, petting: r.petting, wallet: r.wallet ? { ...f.wallet, ...r.wallet } : f.wallet }));
+    }, [busy, post]);
+
+    const buyTreatItem = useCallback(async (consumableId) => {
+        if (busy) return;
+        setBusy(consumableId);
+        const r = await post({ action: "buy_treat", consumableId });
+        setBusy(null);
+        if (r?.ok) setFarm((f) => ({ ...f, treats: r.treats, treatShop: r.treatShop, wallet: r.wallet }));
+    }, [busy, post]);
 
     // Feed a treat (consumable) to a specific pet.
     const feedTreat = useCallback(async (pet, consumableId) => {
@@ -189,7 +213,6 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : `+${r.petXpGain || ""} XP`, "#ffe27a");
     }, [farm.canPet, busy, addFloater, pets]);
 
-    const pettableLeft = farm.canPet ? pets.filter((p) => !p.petted).length : 0;
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
     const fieldW = Math.max(150, pets.length * 36);
@@ -217,7 +240,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <h1 style={{ margin: 0 }}>🌾 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
                     <p className="muted" style={{ margin: "4px 0 0" }}>
                         {pets.length} pet{pets.length === 1 ? "" : "s"} roaming · tap one to inspect
-                        {farm.canPet && pettableLeft > 0 ? ` · ${pettableLeft} to pet today` : farm.canPet ? " · all petted today ❤️" : ""}
+                        {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings left today` : ""}
                     </p>
                 </div>
                 <div style={{ marginLeft: "auto" }}>
@@ -320,10 +343,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                     pet={inspect}
                     canPet={farm.canPet}
                     petXp={farm.petXp}
+                    petGold={farm.petGold}
+                    petting={farm.petting}
+                    wallet={farm.wallet}
                     treats={farm.treats || []}
+                    treatShop={farm.treatShop || []}
                     busyKey={busy}
                     onPet={() => petIt(inspect)}
+                    onRecharge={rechargeBudget}
                     onUseTreat={(cid) => feedTreat(inspect, cid)}
+                    onBuyTreat={buyTreatItem}
                     onClose={() => setInspect(null)}
                 />
             ) : null}
@@ -333,7 +362,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
 // Detail card for a single pet: big sprite, rarity/level, XP progress, what it does, and — on your own farm —
 // the once-a-day "pet for XP" action.
-function PetInspect({ pet, canPet, petXp, treats = [], busyKey, onPet, onUseTreat, onClose }) {
+function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [], treatShop = [], busyKey, onPet, onRecharge, onUseTreat, onBuyTreat, onClose }) {
     const busy = Boolean(busyKey);
     const def = collectibleById(pet.id);
     const perk = def ? petPerk(def) : null; // active (equipped) signature
@@ -392,24 +421,37 @@ function PetInspect({ pet, canPet, petXp, treats = [], busyKey, onPet, onUseTrea
                         </div>
                     ) : null}
 
-                    {/* Pet action (own farm only) */}
+                    {/* Pet action (own farm only) — shared daily budget, rechargeable for gold */}
                     {canPet ? (
-                        pet.petted ? (
-                            <div style={{ textAlign: "center", padding: "10px 0 2px", color: "#ff9ec2", fontWeight: 600 }}>❤️ Petted today — come back tomorrow</div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={onPet}
-                                disabled={busy}
-                                className="btn"
-                                style={{ width: "100%", marginTop: 4, padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}
-                            >
-                                {busyKey === pet.id ? "Petting…" : `❤️ Pet ${pet.name} (+${petXp} XP)`}
-                            </button>
-                        )
+                        <div style={{ marginTop: 4 }}>
+                            {pet.petted ? (
+                                <div style={{ textAlign: "center", padding: "8px 0 2px", color: "#ff9ec2", fontWeight: 600 }}>❤️ Petted today — come back tomorrow</div>
+                            ) : petting && petting.left <= 0 ? (
+                                <div>
+                                    <div className="muted" style={{ fontSize: 12, textAlign: "center", marginBottom: 6 }}>Out of pets for today.</div>
+                                    {wallet && wallet.gold >= petting.rechargeCost ? (
+                                        <button type="button" onClick={onRecharge} disabled={busy} style={{ width: "100%", padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+                                            {busyKey === "recharge" ? "Recharging…" : `Recharge +${petting.rechargeAmount} for ${petting.rechargeCost.toLocaleString()}g`}
+                                        </button>
+                                    ) : (
+                                        <div style={{ textAlign: "center" }}>
+                                            <div className="muted" style={{ fontSize: 12 }}>Recharge is {petting.rechargeCost.toLocaleString()}g — you have {(wallet?.gold || 0).toLocaleString()}g.</div>
+                                            <a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 6, fontWeight: 700, color: "#ffd75e" }}>Get store credit &amp; coins →</a>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    <button type="button" onClick={onPet} disabled={busy} style={{ width: "100%", padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+                                        {busyKey === pet.id ? "Petting…" : `❤️ Pet ${pet.name} (+${petXp} XP, +${petGold}g)`}
+                                    </button>
+                                    {petting ? <div className="muted" style={{ fontSize: 11, textAlign: "center", marginTop: 4 }}>{petting.left} of {petting.allowance} pettings left today</div> : null}
+                                </>
+                            )}
+                        </div>
                     ) : null}
 
-                    {/* Treats — feed a consumable to THIS pet (own farm only) */}
+                    {/* Feed a treat you own */}
                     {canPet && treats.length ? (
                         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
                             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🍖 Feed a treat</div>
@@ -418,20 +460,35 @@ function PetInspect({ pet, canPet, petXp, treats = [], busyKey, onPet, onUseTrea
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                     {treats.map((t) => (
-                                        <button
-                                            key={t.id}
-                                            type="button"
-                                            onClick={() => onUseTreat(t.id)}
-                                            disabled={busy}
-                                            title={t.desc}
-                                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "inherit", cursor: busy ? "default" : "pointer", opacity: busy && busyKey !== t.id ? 0.5 : 1 }}
-                                        >
-                                            <span style={{ fontSize: 13, fontWeight: 600 }}>{t.emoji} {t.name}</span>
+                                        <button key={t.id} type="button" onClick={() => onUseTreat(t.id)} disabled={busy} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "inherit", cursor: busy ? "default" : "pointer", opacity: busy && busyKey !== t.id ? 0.5 : 1 }}>
+                                            <span style={{ fontSize: 13, fontWeight: 600 }}>{t.emoji} {t.name} <span className="muted" style={{ fontWeight: 400 }}>· {t.xp === "level" ? "instant level" : `+${t.xp} XP`}</span></span>
                                             <span className="muted" style={{ fontSize: 12 }}>{busyKey === t.id ? "feeding…" : `×${t.count}`}</span>
                                         </button>
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    ) : null}
+
+                    {/* Buy treats + store-credit CTA (own farm) */}
+                    {canPet && treatShop.length ? (
+                        <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700 }}>🛒 Buy treats</span>
+                                <span className="muted" style={{ fontSize: 12 }}>{(wallet?.gold ?? 0).toLocaleString()}g</span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {treatShop.map((t) => {
+                                    const afford = (wallet?.gold ?? 0) >= t.price;
+                                    return (
+                                        <button key={t.id} type="button" onClick={() => afford && onBuyTreat(t.id)} disabled={busy || !afford} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "inherit", cursor: busy || !afford ? "default" : "pointer", opacity: !afford ? 0.55 : busy && busyKey !== t.id ? 0.5 : 1 }}>
+                                            <span style={{ fontSize: 13, fontWeight: 600 }}>{t.emoji} {t.name} <span className="muted" style={{ fontWeight: 400 }}>· +{t.xp} XP</span></span>
+                                            <span style={{ fontSize: 12, color: afford ? "#ffd75e" : "#9aa0a6" }}>{busyKey === t.id ? "buying…" : `${t.price.toLocaleString()}g`}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <a href="/marketplace/credit" style={{ display: "block", textAlign: "center", marginTop: 8, fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>Low on gold? Get store credit &amp; coins →</a>
                         </div>
                     ) : null}
                 </div>
@@ -467,53 +524,65 @@ function FarmWeather({ condition }) {
     );
 }
 
-// Owner tool: type a member's @alias (live search) to walk over and watch their farm.
+// Owner tool: browse members (quick chips) or search by @alias to walk over and watch their farm.
 function FarmInspect({ current }) {
     const router = useRouter();
     const [q, setQ] = useState("");
     const [results, setResults] = useState([]);
-    const [open, setOpen] = useState(false);
+    const [recent, setRecent] = useState([]); // a default set of members to jump to without typing
+    const go = (alias) => router.push(`/marketplace/farm?u=${encodeURIComponent(alias)}`);
+
+    // Seed a default member list on mount so you can visit a farm in one tap (no search needed).
+    useEffect(() => {
+        let alive = true;
+        fetch("/api/marketplace/members?q=", { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((d) => { if (alive) setRecent((d?.members || []).filter((m) => m.alias).slice(0, 12)); })
+            .catch(() => {});
+        return () => { alive = false; };
+    }, []);
 
     useEffect(() => {
         const term = q.trim().replace(/^@/, "");
         const t = setTimeout(async () => {
             if (term.length < 2) { setResults([]); return; }
             const r = await fetch(`/api/marketplace/members?q=${encodeURIComponent(term)}`, { cache: "no-store" }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
-            setResults((r?.members || []).filter((m) => m.alias).slice(0, 8));
+            setResults((r?.members || []).filter((m) => m.alias).slice(0, 10));
         }, 250);
         return () => clearTimeout(t);
     }, [q]);
 
+    const list = q.trim().length >= 2 ? results : recent;
     return (
         <section className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <strong style={{ fontSize: 14 }}>🔎 Visit another farm</strong>
                 <span className="muted" style={{ fontSize: 12 }}>Owner-only</span>
             </div>
-            <div style={{ position: "relative", marginTop: 8 }}>
-                <input
-                    type="text"
-                    value={q}
-                    onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-                    placeholder="Search a member by @alias or name…"
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(128,128,128,0.4)", background: "transparent", color: "inherit" }}
-                />
-                {open && results.length ? (
-                    <div style={{ position: "absolute", zIndex: 50, left: 0, right: 0, marginTop: 4, borderRadius: 8, overflow: "hidden", border: "1px solid rgba(128,128,128,0.35)", background: "var(--card-bg, #17181c)" }}>
-                        {results.map((m) => (
-                            <button
-                                key={m.id || m.alias}
-                                type="button"
-                                onClick={() => { setOpen(false); setQ(""); router.push(`/marketplace/farm?u=${encodeURIComponent(m.alias)}`); }}
-                                style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", background: "none", border: "none", cursor: "pointer", color: "inherit" }}
-                            >
-                                {m.displayLabel || m.alias} <span className="muted">@{m.alias}</span>
-                            </button>
-                        ))}
-                    </div>
-                ) : null}
-            </div>
-            {current ? <p className="muted" style={{ margin: "6px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
+            <input
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search a member by @alias or name…"
+                style={{ width: "100%", marginTop: 8, padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(128,128,128,0.4)", background: "transparent", color: "inherit" }}
+            />
+            {list.length ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                    {list.map((m) => (
+                        <button
+                            key={m.id || m.alias}
+                            type="button"
+                            onClick={() => go(m.alias)}
+                            style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", fontSize: 13 }}
+                        >
+                            🌾 {m.displayLabel || m.alias} <span className="muted">@{m.alias}</span>
+                        </button>
+                    ))}
+                </div>
+            ) : q.trim().length >= 2 ? (
+                <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>No members match “{q.trim()}”.</p>
+            ) : null}
+            {current ? <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
         </section>
     );
 }
