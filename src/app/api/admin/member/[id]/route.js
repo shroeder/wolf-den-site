@@ -103,7 +103,7 @@ export async function GET(request, { params }) {
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, pendingPurchases, creditEvents] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
@@ -134,6 +134,20 @@ export async function GET(request, { params }) {
                        FROM mkt_activity_event WHERE buyer_id = $1`,
                     [id]
                 ).catch(() => null),
+                // Real in-store purchases attributed to this member (Square sale → loyalty claim, by QR/email).
+                db.query(
+                    `SELECT amount_cents, order_id, created_at, redeemed_at
+                       FROM mkt_pending_purchase WHERE redeemed_buyer_id = $1
+                      ORDER BY COALESCE(redeemed_at, created_at) DESC LIMIT 60`,
+                    [id]
+                ).catch(() => []),
+                // Store-credit money movements: bought credit, spent in-store (QR), applied online, refunds.
+                db.query(
+                    `SELECT delta_cents, balance_after_cents, reason, ref, created_at
+                       FROM mkt_store_credit_event WHERE buyer_id = $1
+                      ORDER BY created_at DESC LIMIT 120`,
+                    [id]
+                ).catch(() => []),
             ]);
             // Hero-card visuals + a featured-pet + pets summary.
             const featuredPet = row.featured_collectible ? collectibleById(row.featured_collectible) : null;
@@ -178,6 +192,29 @@ export async function GET(request, { params }) {
                     resolvedAt: iso(t.resolved_at),
                 };
             });
+
+            // Unified purchase & redemption feed: real in-store Square sales + every store-credit money move
+            // (buying credit online, spending it in-store via QR, applying it at online checkout, refunds).
+            const CREDIT_REASON = {
+                purchase: "💳 Bought store credit",
+                spend_store: "🧾 Spent credit in-store (QR)",
+                spend_online: "🛒 Applied credit at online checkout",
+                refund: "💵 Store-credit refund",
+                adjust: "⚙️ Store-credit adjustment",
+            };
+            const purchases = [
+                ...(pendingPurchases || []).map((r) => ({ kind: "instore", label: "🛒 In-store purchase", amountCents: Number(r.amount_cents) || 0, at: iso(r.redeemed_at || r.created_at) })),
+                ...(creditEvents || []).map((r) => ({ kind: "credit", reason: r.reason, label: CREDIT_REASON[r.reason] || String(r.reason || "").replace(/_/g, " "), amountCents: Number(r.delta_cents) || 0, balanceAfterCents: Number(r.balance_after_cents) || 0, at: iso(r.created_at) })),
+            ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 80);
+            const purchaseSummary = {
+                // Real money spent in-store (loyalty-attributed Square sales).
+                instoreCents: (pendingPurchases || []).reduce((s, r) => s + (Number(r.amount_cents) || 0), 0),
+                // Store credit they bought online (real money).
+                creditBoughtCents: (creditEvents || []).filter((r) => r.reason === "purchase").reduce((s, r) => s + (Number(r.delta_cents) || 0), 0),
+                // Store credit they've redeemed/spent (in-store QR + online).
+                creditSpentCents: (creditEvents || []).filter((r) => r.reason === "spend_store" || r.reason === "spend_online").reduce((s, r) => s + Math.abs(Number(r.delta_cents) || 0), 0),
+                count: (pendingPurchases || []).length + (creditEvents || []).length,
+            };
 
             const equippedIds = new Set(Object.values(inv?.equipped || {}));
             const gear = (inv?.items || []).map((i) => ({
@@ -244,6 +281,9 @@ export async function GET(request, { params }) {
                 chestTiers: CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji })),
                 badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
+                // Real purchases + store-credit money moves (incl. in-store QR redemptions).
+                purchases,
+                purchaseSummary,
                 petPerks: (petPerks || []).map((p) => ({ petId: p.petId, name: p.name, reward: p.reward, available: p.available, cooldownUntil: p.cooldownUntil })),
                 history: history.map((x) => ({ label: x.label, points: x.points, at: iso(x.at) })),
                 xpLedger,
