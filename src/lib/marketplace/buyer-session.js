@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { DEFAULT_AVATAR } from "@/lib/marketplace/avatar-options.js";
 import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
 import { ensureAlias } from "@/lib/marketplace/profile.js";
+import { attachReferrer } from "@/lib/marketplace/referral.js";
 import { claimPendingPurchases } from "@/lib/marketplace/xp.js";
 
 // Buyer accounts + token sessions for the marketplace phone app. Mirrors the vendor-session shape
@@ -48,7 +49,7 @@ function mapBuyer(row) {
 }
 
 // Register a new buyer. Throws on duplicate email / invalid input.
-export async function createBuyer({ email, password, displayName = null, firstName = null, lastName = null }) {
+export async function createBuyer({ email, password, displayName = null, firstName = null, lastName = null, refCode = null }) {
     const normalized = normalizeEmail(email);
     if (!isValidBuyerEmail(email)) {
         throw new Error("Enter a valid email address.");
@@ -103,6 +104,8 @@ export async function createBuyer({ email, password, displayName = null, firstNa
     await db
         .query(`UPDATE mkt_buyer SET avatar_config = $2::jsonb WHERE id = $1 AND avatar_config IS NULL AND avatar_url IS NULL`, [row.id, JSON.stringify(DEFAULT_AVATAR)])
         .catch(() => {});
+    // Record who referred them (if they arrived via an invite link). Reward waits for email verification.
+    if (refCode) await attachReferrer(row.id, refCode).catch(() => {});
     return mapBuyer(row);
 }
 

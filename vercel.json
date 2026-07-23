@@ -86,6 +86,10 @@
         {
             "path": "/api/jobs/marketplace-square-sync",
             "schedule": "15 * * * *"
+        },
+        {
+            "path": "/api/jobs/daily-strike-nudge",
+            "schedule": "0 22 * * *"
         }
     ]
 }

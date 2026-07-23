@@ -12,6 +12,8 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
     const goAfterAuth = () => window.location.assign(redirectTo);
     // Land straight on the sign-up form when linked from a "create account" CTA (?signup=1).
     const [mode, setMode] = useState(signup || searchParams?.get("signup") ? "register" : "login"); // login | register | verify | forgot
+    // Referral @handle from an invite link (?ref=). Carried into the register call so both sides earn a bonus.
+    const ref = (searchParams?.get("ref") || "").trim().replace(/^@/, "");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [displayName, setDisplayName] = useState("");
@@ -58,7 +60,7 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                 }
             } else if (mode === "register") {
                 if (!firstVal || !lastVal) { setError("Enter your first and last name."); setBusy(false); return; }
-                const { ok, d } = await post("/api/marketplace/auth/register", { email: emailVal, password: passVal, displayName: nameVal, firstName: firstVal, lastName: lastVal });
+                const { ok, d } = await post("/api/marketplace/auth/register", { email: emailVal, password: passVal, displayName: nameVal, firstName: firstVal, lastName: lastVal, ref: ref || null });
                 if (ok) {
                     setMode("verify");
                     setInfo("We emailed you a 6-digit code.");
@@ -93,6 +95,14 @@ export default function MarketplaceLoginClient({ redirectTo = "/marketplace/prof
                         ? "Enter your account email and we'll send you a link to set a new password."
                         : "The same account you use in the Wolf Den Marketplace app — for buy orders and messages."}
                 </p>
+                {ref && mode === "register" ? (
+                    <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.08)", display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 22 }} aria-hidden="true">🎁</span>
+                        <span style={{ fontSize: "0.9rem" }}>
+                            Invited by <strong>@{ref}</strong> — verify your email and you&apos;ll <strong>both</strong> earn bonus gold + a chest.
+                        </span>
+                    </div>
+                ) : null}
                 <form onSubmit={submit} className="stack" style={{ gap: 10, marginTop: 14 }}>
                     {mode === "verify" ? (
                         <input name="code" placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" inputMode="numeric" />

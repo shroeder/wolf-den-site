@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyEmailCode, createBuyerSession, setBuyerSessionCookie } from "@/lib/marketplace/buyer-session.js";
+import { maybeGrantReferral } from "@/lib/marketplace/referral.js";
 import { bridgeMarketplaceToShop } from "@/lib/marketplace/shop-bridge.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -28,6 +29,8 @@ export async function POST(request) {
             const { token, expiresAt } = await createBuyerSession(result.buyer.id, { deviceLabel: "app" });
             await setBuyerSessionCookie(token);
             await bridgeMarketplaceToShop(result.buyer.email).catch(() => {});
+            // If they arrived via an invite link, pay out the one-time both-sides referral reward now.
+            await maybeGrantReferral(result.buyer.id).catch(() => {});
             logger.info("marketplace.buyer.verified", { buyerId: result.buyer.id });
             return NextResponse.json({ ok: true, token, expiresAt, role: "buyer", buyer: result.buyer });
         } catch (error) {

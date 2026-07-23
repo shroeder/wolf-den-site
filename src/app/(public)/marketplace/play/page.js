@@ -2,8 +2,11 @@ import Link from "next/link";
 import { FaDharmachakra } from "react-icons/fa6";
 
 import GameHubStats from "@/components/GameHubStats";
+import ReferralInvite from "@/components/ReferralInvite";
 import ViewPing from "@/components/ViewPing";
+import { db } from "@/lib/db";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { REF_REFERRER_GOLD, REF_JOINER_GOLD } from "@/lib/marketplace/referral.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
 export const runtime = "nodejs";
@@ -28,10 +31,14 @@ const FEATURES = [
     { href: "/marketplace/bounties", emoji: "🎯", title: "Bounties", desc: "Post gold for real-world help — or claim someone else's.", tone: "bounty" },
 ];
 
-export default async function GamePlayHub() {
+export default async function GamePlayHub({ searchParams }) {
     // Owner-only preview features (hidden from everyone else) surface an extra tile here.
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     const owner = Boolean(buyer && isOwner(buyer.id));
+    // A logged-in member gets their shareable invite card; a logged-out visitor who followed one gets a
+    // ref-carrying signup CTA (so the referral survives the account they're about to make).
+    const alias = buyer ? (await db.queryOne(`SELECT alias FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null))?.alias || null : null;
+    const ref = String((await searchParams)?.ref || "").trim().replace(/^@/, "");
 
     return (
         <div className="stack reveal game-hub">
@@ -41,6 +48,21 @@ export default async function GamePlayHub() {
                 <p className="muted" style={{ margin: "4px 0 0" }}>Level up, fight the boss, collect pets & gear, and spin the wheel — all in one place.</p>
                 <GameHubStats />
             </section>
+
+            {!buyer ? (
+                <Link href={`/marketplace/login?signup=1${ref ? `&ref=${encodeURIComponent(ref)}` : ""}`} className="card" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", color: "inherit", borderColor: "rgba(255,215,94,0.45)" }}>
+                    <span style={{ fontSize: 30 }} aria-hidden="true">🐺</span>
+                    <span style={{ flex: 1 }}>
+                        <strong>{ref ? `@${ref} invited you — join free` : "Create a free account to play"}</strong>
+                        <span className="muted" style={{ display: "block", fontSize: "0.9rem" }}>
+                            {ref ? "Verify your email and you both earn bonus gold + a chest." : "Fight the weekly boss, collect pets, and earn XP & store credit."}
+                        </span>
+                    </span>
+                    <span className="btn-gold" style={{ whiteSpace: "nowrap" }}>Get started →</span>
+                </Link>
+            ) : null}
+
+            {alias ? <ReferralInvite alias={alias} referrerGold={REF_REFERRER_GOLD} joinerGold={REF_JOINER_GOLD} /> : null}
 
             <div className="game-hub-grid">
                 {FEATURES.map((f) => (

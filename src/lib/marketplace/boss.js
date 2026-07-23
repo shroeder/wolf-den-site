@@ -23,6 +23,7 @@ import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/
 import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -193,6 +194,37 @@ export async function getActiveBoss() {
     return db
         .queryOne(`SELECT * FROM boss_event WHERE status = 'live' AND defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`)
         .catch(() => null);
+}
+
+// Daily nudge: web-push the recently-active members who still have their free manual strike waiting on the
+// live boss. Opt-in only (they have a browser subscription), skips dormant accounts, and is naturally
+// idempotent per store-local day (the swing counter is what we check). Called once a day by the cron job.
+export async function runDailyStrikeNudge() {
+    const boss = await getActiveBoss();
+    if (!boss) return { attempted: 0, reason: "no_live_boss" };
+    const rows = await db
+        .query(
+            `SELECT DISTINCT w.buyer_id
+               FROM mkt_web_push w
+               JOIN mkt_buyer b ON b.id = w.buyer_id
+              WHERE b.last_seen_at > NOW() - INTERVAL '14 days'
+                AND NOT EXISTS (
+                    SELECT 1 FROM mkt_boss_swing s
+                     WHERE s.buyer_id = w.buyer_id AND s.boss_id = $1
+                       AND s.day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                )`,
+            [boss.id]
+        )
+        .catch(() => []);
+    for (const r of rows) {
+        await sendWebPush(r.buyer_id, {
+            title: "⚔️ Your daily strike is ready",
+            body: `${boss.name} is still standing — land your free hit for XP & raffle tickets.`,
+            url: "/marketplace/boss",
+            tag: "daily-strike",
+        }).catch(() => {});
+    }
+    return { attempted: rows.length, boss: boss.name };
 }
 
 // Manual swings used today AGAINST THE CURRENT BOSS (auto ticks don't count against the daily limit).

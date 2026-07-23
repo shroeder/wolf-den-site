@@ -20,6 +20,7 @@ export async function POST(request) {
                     displayName: body.displayName ?? null,
                     firstName: body.firstName ?? null,
                     lastName: body.lastName ?? null,
+                    refCode: body.ref ?? body.refCode ?? null, // referral @handle from an invite link
                 });
                 const verification = await createEmailVerification(buyer.email);
                 if (verification) {
