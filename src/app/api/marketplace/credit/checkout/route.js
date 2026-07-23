@@ -119,7 +119,7 @@ export async function POST(request) {
                 sendAdminPush({
                     title: "💳 Store credit purchased",
                     body: `${buyer.alias ? `@${buyer.alias}` : "A member"} bought $${(amountCents / 100).toFixed(2)} credit (+${coins.toLocaleString()} coins).`,
-                    route: "members",
+                    route: `storeCredit:${buyer.id}`, // tapping opens the Store Credit area focused on this buyer
                     data: { type: "credit_purchase", buyerId: buyer.id, amountCents },
                 }).catch(() => {});
                 // Grant any newly-earned store-credit badges from the higher lifetime total.
