@@ -13,6 +13,7 @@ import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signatures.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
 // is consecutive days claimed; miss a day and it resets. Rewards escalate over a 7-day cycle, with a big
@@ -98,6 +99,7 @@ async function resolveLoginProcs(buyerId) {
     for (const p of procs) {
         if (p.kind === "gold") {
             await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, p.amount]).catch(() => {});
+            await logCoin(buyerId, p.amount, "checkin", { meta: { proc: p.label } }).catch(() => {});
             out.push({ emoji: "🪙", text: `${p.label} found ${p.amount} gold!` });
         } else if (p.kind === "potion") {
             const pool = Object.entries(CONSUMABLES).filter(([, c]) => c.price != null);
@@ -146,6 +148,7 @@ export async function claimDailyCheckin(buyerId) {
 
     const reward = rewardForStreak(nextStreak);
     if (reward.gold) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, reward.gold]).catch(() => {});
+    if (reward.gold) await logCoin(buyerId, reward.gold, "checkin", { meta: { streak: nextStreak } }).catch(() => {});
     if (reward.treat && CONSUMABLES[reward.treat]) await grantConsumable(buyerId, reward.treat, 1).catch(() => {});
     if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }).catch(() => {});
     await trackActivity(buyerId, "daily_checkin", { streak: nextStreak }).catch(() => {});

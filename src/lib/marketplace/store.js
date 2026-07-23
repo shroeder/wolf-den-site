@@ -9,6 +9,7 @@ import { BACKGROUNDS } from "@/lib/marketplace/backgrounds.js";
 import { cosmeticPrice } from "@/lib/marketplace/cosmetic-price.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // The gold cosmetics store: buy pets / borders / frames / auras early with gold. Role-locked (badge)
 // cosmetics are never for sale. Purchases are recorded in mkt_cosmetic_unlock; the unlock helpers + equip
@@ -73,6 +74,7 @@ export async function buyCosmetic(buyerId, category, ref) {
     const price = cosmeticPrice(category, def.level || 1);
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -price, "buy_gear", { meta: { category, ref, name: def.label }, balanceAfter: row.gold }).catch(() => {});
     await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [buyerId, category, ref]).catch(() => {});
     await trackActivity(buyerId, "buy_cosmetic", { category, ref, name: def.label, price });
     return { ok: true, gold: row.gold, category, ref, price };

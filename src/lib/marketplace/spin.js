@@ -9,6 +9,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. A pity counter guarantees a rare prize every PITY spins. Gold
@@ -98,6 +99,7 @@ async function grantPrize(buyerId, prize) {
     if (prize.kind === "gold" || prize.kind === "jackpot") {
         const amt = Math.round(prize.amount * (prize.kind === "gold" ? hh : 1)); // jackpot is already huge; don't HH-stack it
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
+        await logCoin(buyerId, amt, "spin_prize", { meta: { prize: prize.label } }).catch(() => {});
         if (prize.kind === "jackpot") await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
         const tag = prize.kind === "jackpot" ? " — JACKPOT! 💎" : prize.mini ? " — MINI JACKPOT! 🎰" : "";
         return { emoji: prize.emoji, text: `${amt.toLocaleString()} gold${tag}` };
@@ -113,7 +115,7 @@ async function grantPrize(buyerId, prize) {
     if (prize.kind === "pet") {
         const owned = new Set((await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => [])).map((r) => r.ref));
         const pool = COLLECTIBLES.filter((p) => p.source !== "level" && !owned.has(p.id));
-        if (!pool.length) { await db.query(`UPDATE mkt_buyer SET gold = gold + 500 WHERE id = $1`, [buyerId]).catch(() => {}); return { emoji: "🪙", text: "500 gold (all pets owned)" }; }
+        if (!pool.length) { await db.query(`UPDATE mkt_buyer SET gold = gold + 500 WHERE id = $1`, [buyerId]).catch(() => {}); await logCoin(buyerId, 500, "spin_prize", { meta: { prize: prize.label } }).catch(() => {}); return { emoji: "🪙", text: "500 gold (all pets owned)" }; }
         const won = pool[Math.floor(Math.random() * pool.length)];
         await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});
         return { emoji: "🐾", text: `${won.name} pet!` };
@@ -196,6 +198,8 @@ const nextSpinCost = (boughtToday) => (Math.max(0, boughtToday) + 1) * SPIN_BUY_
 // Buy one extra spin token with gold. Cost escalates per day (atomic — one UPDATE computes cost + counter).
 export async function buySpinToken(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const preSpinState = await getSpinState(buyerId).catch(() => null);
+    const spinCost = preSpinState?.tokenCost ?? null;
     const paid = await db
         .queryOne(
             `UPDATE mkt_buyer SET
@@ -210,5 +214,7 @@ export async function buySpinToken(buyerId) {
         )
         .catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold" };
+    if (spinCost) await logCoin(buyerId, -spinCost, "buy_spin", { balanceAfter: paid.gold }).catch(() => {});
+    await trackActivity(buyerId, "buy_spin", spinCost ? { cost: spinCost } : {}).catch(() => {});
     return { ok: true, ...(await getSpinState(buyerId)) };
 }

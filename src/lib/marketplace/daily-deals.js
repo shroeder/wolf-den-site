@@ -7,6 +7,7 @@ import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { COLLECTIBLES, collectibleById, petPrice, petActive } from "@/lib/marketplace/collectibles.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // A short "what it does" line for a deal, so the shop is inspectable (gear stats / pet buff / consumable effect).
 function dealDescription(d) {
@@ -173,6 +174,7 @@ export async function buyDailyDeal(buyerId, dealId) {
         await db.query(`DELETE FROM mkt_daily_deal_purchase WHERE buyer_id = $1 AND day = $2 AND item_id = $3`, [buyerId, dayKey, deal.id]).catch(() => {});
         return { ok: false, error: "not_enough_gold" };
     }
+    await logCoin(buyerId, -deal.price, "buy_daily_deal", { meta: { id: deal.id, kind: deal.kind }, balanceAfter: paid.gold }).catch(() => {});
 
     // Deliver the goods.
     if (deal.kind === "gear") await grantItem(buyerId, deal.id, "daily_deal").catch(() => {});
@@ -200,5 +202,7 @@ export async function resetDailyDeals(buyerId) {
         const b = await db.queryOne(`SELECT deal_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         return { ok: false, error: b?.d === dayKey ? "already_reset" : "not_enough_gold" };
     }
+    await logCoin(buyerId, -DEAL_RESET_COST, "cooldown_skip", { meta: { kind: "deal_reroll" }, balanceAfter: paid.gold }).catch(() => {});
+    await trackActivity(buyerId, "cooldown_skip", { kind: "deal_reroll", cost: DEAL_RESET_COST }).catch(() => {});
     return { ok: true, ...(await getDailyDeals(buyerId)) };
 }

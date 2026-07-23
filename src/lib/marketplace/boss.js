@@ -25,6 +25,7 @@ import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -914,6 +915,7 @@ export async function attackBoss(buyerId) {
     // Signature rewards: Scholar XP + Prospector gold on this hit.
     if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
     if (onHit.gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, onHit.gold]).catch(() => {});
+    if (onHit.gold > 0) await logCoin(buyerId, onHit.gold, "boss_reward", { meta: { boss: boss.name } }).catch(() => {});
 
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});
@@ -980,7 +982,7 @@ export async function cheer(buyerId, targetId) {
     const xpGain = CHEER_XP + (procs.xp || 0);
     const goldGain = CHEER_GOLD + (procs.gold || 0);
     await awardXp(buyerId, "cheer", { points: xpGain, gold: goldGain }).catch(() => {});
-    await trackActivity(buyerId, "cheer", { xp: xpGain, gold: goldGain }).catch(() => {});
+    await trackActivity(buyerId, "cheer", { xp: xpGain, gold: goldGain, toId: targetId, toName: target.display_name || target.alias, damage: dmg }).catch(() => {});
     if (procs.petXp > 0) await addEquippedPetXp(buyerId, procs.petXp).catch(() => {});
     if (procs.fragment) await grantFragment(buyerId, 1).catch(() => {});
 

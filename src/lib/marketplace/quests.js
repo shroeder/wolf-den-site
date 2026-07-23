@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
 const ALL_QUESTS_XP = 300;
@@ -102,6 +104,8 @@ export async function resetDailyQuests(buyerId) {
         const b = await db.queryOne(`SELECT quest_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         return { ok: false, error: b?.d === day ? "already_reset" : "not_enough_gold" };
     }
+    await logCoin(buyerId, -QUEST_RESET_COST, "cooldown_skip", { meta: { kind: "quest_reroll" }, balanceAfter: paid.gold }).catch(() => {});
+    await trackActivity(buyerId, "cooldown_skip", { kind: "quest_reroll", cost: QUEST_RESET_COST }).catch(() => {});
     await db.query(`DELETE FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, day]).catch(() => {});
     await insertQuests(buyerId, day, pickDaily(buyerId, day, true));
     return { ok: true, gold: paid.gold, ...(await getDailyQuests(buyerId)) };
@@ -168,6 +172,7 @@ export async function claimQuest(buyerId, questKey) {
         .catch(() => null);
     if (!row) return { ok: false, error: "not_claimable" };
     if (row.reward_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, row.reward_gold]).catch(() => {});
+    if (row.reward_gold > 0) await logCoin(buyerId, row.reward_gold, "quest_reward", { meta: { quest: questKey } }).catch(() => {});
     if (row.reward_chest) await addChests(buyerId, { [row.reward_chest]: 1 }).catch(() => {});
     // Clearing ALL of today's quests earns a bonus spin token + a chunk of bonus XP (deduped per day).
     let bonusSpin = false;

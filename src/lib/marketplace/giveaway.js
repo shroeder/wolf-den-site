@@ -7,6 +7,7 @@ import { itemById } from "@/lib/marketplace/items.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { sendBuyerPush } from "@/lib/push/send.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // "Currently active heroes" = every member who has built a hero (alias set). A giveaway is a one-time drop
 // to THIS roster only — future signups are not retroactively included, exactly as Luke wants. We snapshot
@@ -71,6 +72,7 @@ export async function giveawayGold({ amount = 100 } = {}) {
     const ids = await activeHeroIds();
     for (const id of ids) {
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [id, gold]).catch(() => {});
+        await logCoin(id, gold, "giveaway").catch(() => {});
         await recordGift(id, { kind: "gold", title: "💰 Free gold!", body: `${gold.toLocaleString()} gold landed in your purse — spend it in the gear shop!`, icon: "💰" });
     }
     await pushAll(ids, {

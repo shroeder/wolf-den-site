@@ -5,6 +5,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -143,6 +144,7 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
         const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts, goldDelta]);
         // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).
         if (row) {
+            if (goldDelta !== 0) await logCoin(buyerId, goldDelta, "xp_accrual", { meta: { action } }).catch(() => {});
             const newXp = Number(row.xp) || 0;
             const newLevel = levelForXp(newXp).level;
             const oldLevel = levelForXp(newXp - pts).level;

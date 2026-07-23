@@ -9,6 +9,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { awardXp, getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // The admin app loads avatars over the network, so it needs an ABSOLUTE url (the built DiceBear avatar is
 // served relative). Prefer the built avatar (what the website shows), fall back to any uploaded one.
@@ -202,6 +203,7 @@ async function rewardBadgeEarned(buyerId, slug) {
     // dedupeKey keys off the slug so re-syncs never double-pay, even though the INSERT is idempotent.
     await awardXp(buyerId, "badge_earned", { points: BADGE_REWARD_XP, dedupeKey: `badge_reward:${slug}` }).catch(() => {});
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, BADGE_REWARD_GOLD]).catch(() => {});
+    await logCoin(buyerId, BADGE_REWARD_GOLD, "badge_reward", { meta: { slug } }).catch(() => {});
 }
 
 // PASSIVE combat effects per badge — they buff your DAILY BOSS STRIKE (Might / Crit Chance / Crit Power)
@@ -510,6 +512,7 @@ export async function buyBadge(buyerId, slug) {
     if (owned) return { ok: false, error: "already_owned" };
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, def.gold_price]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -def.gold_price, "buy_badge", { meta: { slug }, balanceAfter: row.gold }).catch(() => {});
     await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'purchase') ON CONFLICT DO NOTHING`, [buyerId, slug]).catch(() => {});
     await pushBadgeEarned(buyerId, def).catch(() => {});
     await trackActivity(buyerId, "buy_badge", { slug, name: def.label });

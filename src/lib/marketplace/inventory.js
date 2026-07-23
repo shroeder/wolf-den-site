@@ -9,6 +9,7 @@ import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/s
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // Equipped item stats merged with any active set-bonus stats (the single source combat + the UI read).
 function withSetBonuses(ids) {
@@ -255,6 +256,7 @@ export async function buyItem(buyerId, itemId) {
     const cost = cp.price;
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -cost, "buy_gear", { meta: { name: item.name }, balanceAfter: row.gold }).catch(() => {});
     if (cp.pct > 0) await consumeShopCoupon(buyerId);
     await grantItem(buyerId, itemId, "xp_shop");
     await trackActivity(buyerId, "buy_gear", { itemId, name: item.name, cost, couponPct: cp.pct || 0 });
@@ -278,6 +280,7 @@ export async function sellItem(buyerId, itemId) {
     // The item is gone — void any pending trades that were counting on it (refunds their escrow).
     await voidPendingTradesForItem(buyerId, itemId).catch(() => {});
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, value]).catch(() => null);
+    await logCoin(buyerId, value, "sell_gear", { meta: { name: item.name }, balanceAfter: row?.gold }).catch(() => {});
     await bumpEquipment(buyerId); // a slot may have emptied — re-gear the sprite
     await trackActivity(buyerId, "sell_gear", { itemId, name: item.name, value });
     return { ok: true, sold: value, gold: row?.gold ?? null };

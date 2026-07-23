@@ -16,6 +16,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -784,6 +785,7 @@ async function resolveDueEncounter(buyerId) {
     if (loot.kind === "fragment") await grantFragment(buyerId, loot.n || 1).catch(() => {});
     else if (loot.kind === "chest") await addChests(buyerId, { [loot.tier]: 1 }).catch(() => {});
     else if (loot.kind === "consumable") await grantConsumable(buyerId, loot.id, 1).catch(() => {});
+    await trackActivity(buyerId, "sail_encounter", { type: enc.id, outcome: loot.kind, gold: coins }).catch(() => {});
 }
 
 export async function getSailingState(buyerId) {
@@ -921,6 +923,7 @@ export async function waveAtSailor(buyerId) {
     if (!waved) return { ok: false, error: "no_waves", ...(await getSailingState(buyerId)) };
     await awardXp(buyerId, "sail_wave", { points: WAVE_XP, gold: WAVE_COINS }).catch(() => {});
     await bumpQuestProgress(buyerId, "wave", 1).catch(() => {}); // "Greet a passing sailor" daily quest
+    await trackActivity(buyerId, "sail_wave", {}).catch(() => {});
     return { ok: true, waved: { xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000 }, ...(await getSailingState(buyerId)) };
 }
 
@@ -1084,7 +1087,6 @@ export async function doRaid(buyerId, targetId = null) {
                 raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
           WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {}); // "Raid a passing ship" daily quest
-    await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta }).catch(() => {});
 
     let goldDelta = 0, itemWon = null;
     if (sim.win) {
@@ -1108,8 +1110,12 @@ export async function doRaid(buyerId, targetId = null) {
     } else {
         const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1); // Ironclad reduces losses by winning more, not by softening the bill
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
+        await logCoin(buyerId, -loss, "raid_loss", { meta: { foe: target.display_name || target.alias } }).catch(() => {});
         goldDelta = -loss;
     }
+    // Log the raid AFTER resolution so gold + the copied item carry real values (this call used to sit before
+    // goldDelta/itemWon were assigned, which threw in the temporal dead zone and dropped the event entirely).
+    await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
 
     const petView = (id) => { const p = id ? petMap[id] : null; return p?.url ? { url: p.url, flip: p.flip === true } : null; };
     const result = {
@@ -1145,7 +1151,9 @@ export async function resetRaid(buyerId) {
     if (cost > 0) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, updated_at = NOW() WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
         if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+        await logCoin(buyerId, -cost, "cooldown_skip", { meta: { kind: "raid_reset" }, balanceAfter: paid.gold }).catch(() => {});
     }
+    await trackActivity(buyerId, "cooldown_skip", { kind: "raid_reset", cost }).catch(() => {});
     await db.query(
         `UPDATE mkt_sailing
             SET raid_count = GREATEST(0, raid_count - 1),
@@ -1183,6 +1191,7 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     ).catch(() => null);
     if (!won) return { ok: false, error: "already_played", ...(await getSailingState(buyerId)) };
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, gold]).catch(() => {});
+    await logCoin(buyerId, gold, "merchant_minigame", { meta: { perfect } }).catch(() => {});
     if (perfect) await grantEventBadge(buyerId, "merchant_perfect").catch(() => {}); // "Coin Virtuoso"
     await trackActivity(buyerId, "sail_merchant", { gold, perfect }).catch(() => {});
     return { ok: true, goldWon: gold, perfect, ...(await getSailingState(buyerId)) };
@@ -1198,7 +1207,9 @@ export async function merchantBuy(buyerId, itemId) {
     if (!item) return { ok: false, error: "not_stocked", ...(await getSailingState(buyerId)) };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, item.price]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    await logCoin(buyerId, -item.price, "merchant_buy", { meta: { name: item.name }, balanceAfter: paid.gold }).catch(() => {});
     await grantConsumable(buyerId, itemId, 1).catch(() => {});
+    await trackActivity(buyerId, "sail_merchant_buy", { name: item.name, cost: item.price }).catch(() => {});
     return { ok: true, bought: { id: item.id, name: item.name, emoji: item.emoji }, ...(await getSailingState(buyerId)) };
 }
 
@@ -1216,6 +1227,7 @@ export async function favorableWind(buyerId) {
         [buyerId]
     ).catch(() => null);
     if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
+    await trackActivity(buyerId, "cooldown_skip", { kind: "favorable_wind" }).catch(() => {});
     // Milestone perk (Trade-Wind Schooner): chance the tailwind ISN'T consumed — clear wind_day so it's free again.
     const save = boatPerks(decorate(await readRow(buyerId)).level).windSave;
     let windRefunded = false;
@@ -1247,7 +1259,9 @@ export async function rechargeWind(buyerId) {
     if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
     if (cost > 0) {
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2) WHERE id = $1`, [buyerId, cost]).catch(() => {});
+        await logCoin(buyerId, -cost, "cooldown_skip", { meta: { kind: "wind_recharge" } }).catch(() => {});
     }
+    await trackActivity(buyerId, "cooldown_skip", { kind: "wind_recharge", cost }).catch(() => {});
     return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 
@@ -1318,11 +1332,13 @@ export async function buyDigs(buyerId) {
     if (cost > 0) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
         if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+        await logCoin(buyerId, -cost, "buy_digs", { balanceAfter: paid.gold }).catch(() => {});
     }
     board.stamina += DIG_REFILL;
     board.maxStamina += DIG_REFILL;
     board.refills = (board.refills || 0) + 1;
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
+    await trackActivity(buyerId, "buy_digs", { cost, refills: board.refills }).catch(() => {});
     return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 
@@ -1494,9 +1510,11 @@ export async function upgradeTool(buyerId, toolId) {
     const cost = toolUpgradeCost(lvl);
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, updated_at = NOW() WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    await logCoin(buyerId, -cost, "upgrade", { meta: { kind: "dig_tool", tool: tool.id }, balanceAfter: paid.gold }).catch(() => {});
     const next = { ...levels, [tool.id]: lvl + 1 };
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     await db.query(`UPDATE mkt_sailing SET dig_tool_levels = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
+    await trackActivity(buyerId, "buy_upgrade", { kind: "dig_tool", tool: tool.id, level: lvl + 1, cost }).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 
@@ -1524,6 +1542,8 @@ async function buyUpgrade(buyerId, kind) {
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    await logCoin(buyerId, -cost, "upgrade", { meta: { kind }, balanceAfter: paid.gold }).catch(() => {});
+    await trackActivity(buyerId, "buy_upgrade", { track: kind, level: cur + 1, cost }).catch(() => {});
     await db.query(`UPDATE mkt_sailing SET ${col} = ${col} + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     // Achievement badges (hard): commanding the two apex hulls (Leviathan tier 10 @ lvl 90, Celestial tier 11 @ lvl 100).
     const lv = boatLevelFromUpgrades((row?.speed_level || 0) + (kind === "speed" ? 1 : 0), (row?.luck_level || 0) + (kind === "fortune" ? 1 : 0), (row?.rarity_level || 0) + (kind === "rarity" ? 1 : 0), (row?.find_level || 0) + (kind === "luck" ? 1 : 0), (row?.raid_level || 0) + (kind === "raid" ? 1 : 0));

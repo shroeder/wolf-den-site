@@ -9,6 +9,7 @@ import { maybeGrantChestPet } from "@/lib/marketplace/pet-drops.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
@@ -175,5 +176,6 @@ export async function openChest(buyerId, tier) {
     }
     const gold = DUST[rarity] || 25;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
+    await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
     return { ok: true, remaining: dec.count, gold, rarity };
 }

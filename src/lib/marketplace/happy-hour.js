@@ -9,6 +9,7 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getActiveEvent, getHappyHourState, startHappyHour, invalidateEventCache, RALLY_KEY, RALLY_TRIGGER } from "@/lib/marketplace/happy-hour-core.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // Donate action for Happy Hour (imports the item/badge/quest systems, so it lives OUTSIDE happy-hour-core
 // which the awardXp path depends on). Personal reward tiers within a live event; the rally that triggers one.
@@ -39,6 +40,7 @@ export async function donateToHappyHour(buyerId, amount) {
     const gold = Math.max(1, Math.floor(Number(amount) || 0));
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2, event_gold_donated = event_gold_donated + $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, gold]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -gold, "happy_hour", { balanceAfter: paid.gold }).catch(() => {});
     // 1 XP per 4 gold donated (quartered — it was too rich, esp. since it also rides the Happy Hour
     // multiplier). Gold is already spent, so award XP only (no gold back).
     await awardXp(buyerId, "donate_event", { points: Math.round(gold / 4), gold: 0 }).catch(() => {});

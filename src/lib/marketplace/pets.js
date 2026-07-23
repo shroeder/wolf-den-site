@@ -9,6 +9,7 @@ import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 const nameOf = (r) => r?.display_name || r?.alias || "Member";
 
@@ -143,6 +144,7 @@ export async function buyPet(buyerId, petId) {
     const price = petPrice(pet);
     const deducted = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
     if (!deducted) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -price, "buy_pet", { meta: { petId }, balanceAfter: deducted.gold }).catch(() => {});
     await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, petId]).catch(() => {});
     await trackActivity(buyerId, "buy_pet", { petId, price });
     return { ok: true, gold: deducted.gold };

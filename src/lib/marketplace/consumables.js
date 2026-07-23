@@ -7,6 +7,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp, levelUpEquippedPet } from "@/lib/marketplace/pet-level.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
 // Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
@@ -142,6 +143,7 @@ export async function buyConsumable(buyerId, id) {
     const cp = await previewShopCoupon(buyerId, c.price); // apply a login coupon if one's active
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cp.price]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -cp.price, "buy_consumable", { meta: { name: c.name }, balanceAfter: row.gold }).catch(() => {});
     if (cp.pct > 0) await consumeShopCoupon(buyerId);
     await grantConsumable(buyerId, id, 1);
     await trackActivity(buyerId, "buy_consumable", { id, name: c.name, couponPct: cp.pct || 0 });

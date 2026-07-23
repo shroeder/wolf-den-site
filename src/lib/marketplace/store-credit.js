@@ -3,6 +3,7 @@ import "server-only";
 import { randomBytes, randomUUID } from "crypto";
 
 import { db } from "@/lib/db";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // ── Store credit: a real dollar balance on the member's marketplace account (mkt_buyer.store_credit_cents),
 // bought online through Square. Buying it also grants coins. Double-entry: the column is the running total,
@@ -101,6 +102,7 @@ export async function grantCoins(buyerId, coins) {
     } else {
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold + $2), updated_at = NOW() WHERE id = $1`, [buyerId, n]).catch(() => {});
     }
+    await logCoin(buyerId, n, "coin_grant").catch(() => {});
 }
 
 // ── Refunds ──────────────────────────────────────────────────────────────────────────────────────────

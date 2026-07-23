@@ -6,6 +6,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
 
@@ -181,6 +182,7 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
     if (oGold > 0) {
         const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [fromId, oGold]).catch(() => null);
         if (!row) return { ok: false, error: "not_enough_gold" };
+        await logCoin(fromId, -oGold, "trade_escrow", { balanceAfter: row.gold }).catch(() => {});
     }
     const offer = await db.queryOne(
         `INSERT INTO mkt_trade_offer (from_buyer_id, to_buyer_id, offered_items, offered_gold, requested_items, requested_gold, offered_pets, requested_pets, note)
@@ -198,7 +200,7 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
             tag: `trade-${offer.id}`,
             data: { type: "trade", offerId: offer.id },
         }).catch(() => {});
-        await trackActivity(fromId, "trade_propose", { toId, offerId: offer.id });
+        await trackActivity(fromId, "trade_propose", { toId, offerId: offer.id, giveItems: oItems.length, giveGold: oGold, givePets: oPets.length, getItems: rItems.length, getGold: rGold, getPets: rPets.length });
     }
     return offer ? { ok: true, offerId: offer.id } : { ok: false, error: "failed" };
 }
@@ -227,7 +229,7 @@ export async function countIncomingTrades(userId) {
 async function loadPending(offerId) {
     return db.queryOne(`SELECT * FROM mkt_trade_offer WHERE id = $1 AND status = 'pending'`, [offerId]).catch(() => null);
 }
-const refund = (o) => (o.offered_gold > 0 ? db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [o.from_buyer_id, o.offered_gold]).catch(() => {}) : Promise.resolve());
+const refund = (o) => (o.offered_gold > 0 ? (logCoin(o.from_buyer_id, o.offered_gold, "trade_refund", { meta: { offerId: o.id } }).catch(() => {}), db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [o.from_buyer_id, o.offered_gold]).catch(() => {})) : Promise.resolve());
 
 // Recipient accepts or declines. Cancel is the proposer's version (see cancelTrade).
 export async function respondTrade(userId, offerId, action) {
@@ -286,6 +288,7 @@ export async function respondTrade(userId, offerId, action) {
     if (o.requested_gold > 0) {
         const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [userId, o.requested_gold]).catch(() => null);
         if (!row) return { ok: false, error: "you_lack_gold" };
+        await logCoin(userId, -o.requested_gold, "trade", { meta: { offerId }, balanceAfter: row.gold }).catch(() => {});
     }
     // Move items both ways.
     for (const id of offeredItems) await moveItem(o.from_buyer_id, userId, id);
@@ -295,13 +298,15 @@ export async function respondTrade(userId, offerId, action) {
     for (const id of requestedPets) await sharePetLockBoth(userId, o.from_buyer_id, id);
     // Settle gold: recipient receives the escrowed offered gold; proposer receives the requested gold.
     if (o.offered_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [userId, o.offered_gold]);
+    if (o.offered_gold > 0) await logCoin(userId, o.offered_gold, "trade", { meta: { offerId } }).catch(() => {});
     if (o.requested_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [o.from_buyer_id, o.requested_gold]);
+    if (o.requested_gold > 0) await logCoin(o.from_buyer_id, o.requested_gold, "trade", { meta: { offerId } }).catch(() => {});
     await db.query(`UPDATE mkt_trade_offer SET status='accepted', resolved_at=NOW() WHERE id=$1`, [offerId]);
     // The swapped items just changed hands — void any OTHER pending offers that referenced them.
     for (const id of offeredItems) await voidPendingTradesForItem(o.from_buyer_id, id);
     for (const id of requestedItems) await voidPendingTradesForItem(userId, id);
     await Promise.all([bumpGear(o.from_buyer_id), bumpGear(userId)]);
-    await trackActivity(userId, "trade_accept", { offerId, from: o.from_buyer_id });
+    await trackActivity(userId, "trade_accept", { offerId, from: o.from_buyer_id, giveItems: offeredItems.length, giveGold: o.offered_gold, givePets: offeredPets.length, getItems: requestedItems.length, getGold: o.requested_gold, getPets: requestedPets.length });
     return { ok: true, status: "accepted" };
 }
 

@@ -7,6 +7,7 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { grantBountyRewards } from "@/lib/marketplace/bounty-rewards.js";
 import { BOUNTY_TYPES, BOUNTY_TYPE_BY_ID as TYPE_BY_ID, MIN_BOUNTY, MAX_BOUNTY, BOUNTY_DAYS } from "@/lib/marketplace/bounty-types.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // The Bounty Board. Members post a bounty (a request for real-world help) and reserve their OWN gold on it;
 // the gold is escrowed out of their balance until the bounty resolves. Others "take it on"; the creator
@@ -36,6 +37,7 @@ export async function expireBounties() {
             .queryOne(`UPDATE mkt_bounty SET status = 'expired', resolved_at = NOW() WHERE id = $1 AND status = 'open' RETURNING creator_id, reward_gold`, [r.id])
             .catch(() => null);
         if (flipped) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [flipped.creator_id, flipped.reward_gold]).catch(() => {});
+        if (flipped) await logCoin(flipped.creator_id, flipped.reward_gold, "bounty_refund", { meta: { bountyId: r.id, reason: "expired" } }).catch(() => {});
     }
 }
 
@@ -67,6 +69,7 @@ export async function createBounty({ creatorId, type, title, description = null,
     } catch (e) {
         // Insert failed — give the reserved gold back so nothing is lost.
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [creatorId, amount]).catch(() => {});
+        await logCoin(creatorId, amount, "bounty_refund", { meta: { reason: "create_failed" } }).catch(() => {});
         return { ok: false, error: "create_failed" };
     }
 
@@ -139,6 +142,7 @@ export async function completeBounty(bountyId, creatorId, winnerIds = []) {
         const wid = winners[i];
         const share = shares[i];
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [wid, share]).catch(() => {});
+        await logCoin(wid, share, "bounty_win", { meta: { bountyId } }).catch(() => {});
         await db.query(`UPDATE mkt_bounty_claim SET is_winner = TRUE, payout = $3 WHERE bounty_id = $1 AND buyer_id = $2`, [bountyId, wid, share]).catch(() => {});
         await awardXp(wid, "bounty_win", { dedupeKey: `bounty_win:${bountyId}:${wid}` }).catch(() => {});
         await syncEarnedBadges(wid).catch(() => {});
@@ -159,6 +163,7 @@ export async function cancelBounty(bountyId, creatorId) {
         .catch(() => null);
     if (!flipped) return { ok: false, error: "not_cancellable" };
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [creatorId, flipped.reward_gold]).catch(() => {});
+    await logCoin(creatorId, flipped.reward_gold, "bounty_refund", { meta: { bountyId, reason: "cancelled" } }).catch(() => {});
     await trackActivity(creatorId, "bounty_cancel", { bountyId, refund: flipped.reward_gold });
     return { ok: true };
 }
