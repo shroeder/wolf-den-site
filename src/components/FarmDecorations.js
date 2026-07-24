@@ -9,44 +9,58 @@ const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legen
 // a Shop button, and Done. This is the "grab from a drawer while watching the farm" flow.
 export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }) {
     const { owned = [], placedTotal = 0, placedCap = 500 } = deco || {};
-    const [drag, setDrag] = useState(null); // { decoId, emoji, spriteUrl, x, y, pointerId, ok }
     const atCap = placedTotal >= placedCap;
+    // Imperative ghost: we set the sprite ONCE on drag-start (one render), then move the ghost by writing
+    // .style directly on every pointermove — no per-move React re-render, so it tracks the finger 1:1.
+    const ghostRef = useRef(null);
+    const dragRef = useRef(null); // { decoId, pointerId, el }
+    const [ghost, setGhost] = useState(null); // { emoji, spriteUrl, x0, y0 } — initial paint only
 
     const insideField = (cx, cy) => {
         const r = fieldRef?.current?.getBoundingClientRect();
         return r ? cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom : false;
     };
+    const positionGhost = (cx, cy) => {
+        const g = ghostRef.current;
+        if (!g) return;
+        g.style.left = `${cx}px`;
+        g.style.top = `${cy}px`;
+        g.style.filter = insideField(cx, cy) ? "drop-shadow(0 0 9px #7ed57e)" : "none";
+    };
     const startDrag = (e, o) => {
         if (atCap || busy) return;
         e.preventDefault();
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
-        setDrag({ decoId: o.id, emoji: o.emoji, spriteUrl: o.spriteUrl, x: e.clientX, y: e.clientY, pointerId: e.pointerId, ok: false });
+        dragRef.current = { decoId: o.id, pointerId: e.pointerId, el: e.currentTarget };
+        setGhost({ emoji: o.emoji, spriteUrl: o.spriteUrl, x0: e.clientX, y0: e.clientY });
     };
     const onMove = (e) => {
-        setDrag((d) => (d && e.pointerId === d.pointerId ? { ...d, x: e.clientX, y: e.clientY, ok: insideField(e.clientX, e.clientY) } : d));
+        const d = dragRef.current;
+        if (d && e.pointerId === d.pointerId) positionGhost(e.clientX, e.clientY);
     };
     const endDrag = (e) => {
-        setDrag((d) => {
-            if (!d || e.pointerId !== d.pointerId) return d;
-            const r = fieldRef?.current?.getBoundingClientRect();
-            if (r && insideField(e.clientX, e.clientY)) {
-                const xPct = ((e.clientX - r.left) / r.width) * 100;
-                const yPct = ((e.clientY - r.top) / r.height) * 100;
-                onPlaceAt(d.decoId, xPct, yPct);
-            }
-            return null;
-        });
+        const d = dragRef.current;
+        if (!d || e.pointerId !== d.pointerId) return;
+        try { d.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+        const r = fieldRef?.current?.getBoundingClientRect();
+        if (r && insideField(e.clientX, e.clientY)) {
+            const xPct = ((e.clientX - r.left) / r.width) * 100;
+            const yPct = ((e.clientY - r.top) / r.height) * 100;
+            onPlaceAt(d.decoId, xPct, yPct);
+        }
+        dragRef.current = null;
+        setGhost(null);
     };
 
     return (
         <>
-            {/* drag ghost following the finger; green when it's over a droppable spot */}
-            {drag ? (
-                <div style={{ position: "fixed", left: drag.x, top: drag.y, transform: "translate(-50%, -80%)", zIndex: 10060, pointerEvents: "none", opacity: 0.9, filter: drag.ok ? "drop-shadow(0 0 6px #7ed57e)" : "none" }}>
-                    {drag.spriteUrl ? (
+            {/* drag ghost — base sits at the finger (matches the placed anchor), glows green over a droppable spot */}
+            {ghost ? (
+                <div ref={ghostRef} style={{ position: "fixed", left: ghost.x0, top: ghost.y0, transform: "translate(-50%, -100%)", zIndex: 10060, pointerEvents: "none", opacity: 0.92 }}>
+                    {ghost.spriteUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={drag.spriteUrl} alt="" width={54} height={54} style={{ width: 54, height: 54, objectFit: "contain" }} />
-                    ) : <span style={{ fontSize: 40 }}>{drag.emoji}</span>}
+                        <img src={ghost.spriteUrl} alt="" width={58} height={58} style={{ width: 58, height: 58, objectFit: "contain" }} />
+                    ) : <span style={{ fontSize: 46 }}>{ghost.emoji}</span>}
                 </div>
             ) : null}
 
@@ -89,28 +103,36 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }
     );
 }
 
-// ── Scene layer: renders a member's PLACED decorations inside the pasture field. On your own farm, toggling
-// "edit" makes them draggable (pointer drag maps to field %) and shows a pick-up ✕. Read-only elsewhere.
-export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onPickup }) {
-    const [drag, setDrag] = useState(null); // { id, x, y } live position while dragging
-    const startDrag = (e, p) => {
+// ── Scene layer: renders a member's PLACED decorations inside the pasture field. TAP any decoration to open its
+// inspect modal (details/effects + pick up). When "editing" (decorate mode), you can also DRAG to reposition —
+// a short movement is treated as a tap (inspect), a longer one as a drag (move). No always-visible ✕.
+export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect }) {
+    const [drag, setDrag] = useState(null); // { id, x, y } live position during an actual drag
+    const gr = useRef({}); // gesture: { id, pointerId, sx, sy, moved, x, y, el }
+    const start = (e, p) => {
         if (!editing) return;
         e.preventDefault();
         e.stopPropagation();
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
-        setDrag({ id: p.id, x: p.x, y: p.y });
+        gr.current = { id: p.id, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, x: p.x, y: p.y, el: e.currentTarget };
     };
-    const onDrag = (e) => {
-        if (!drag || !fieldRef?.current) return;
+    const move = (e) => {
+        const g = gr.current;
+        if (!g.id || e.pointerId !== g.pointerId || !fieldRef?.current) return;
+        if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 7) return; // still a tap until it moves enough
+        g.moved = true;
         const rect = fieldRef.current.getBoundingClientRect();
-        const x = Math.max(2, Math.min(98, ((e.clientX - rect.left) / rect.width) * 100));
-        const y = Math.max(4, Math.min(98, ((e.clientY - rect.top) / rect.height) * 100));
-        setDrag((d) => (d ? { ...d, x, y } : d));
+        g.x = Math.max(2, Math.min(98, ((e.clientX - rect.left) / rect.width) * 100));
+        g.y = Math.max(4, Math.min(98, ((e.clientY - rect.top) / rect.height) * 100));
+        setDrag({ id: g.id, x: g.x, y: g.y });
     };
-    const endDrag = (e) => {
-        if (!drag) return;
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-        onMove?.(drag.id, drag.x, drag.y);
+    const end = (e) => {
+        const g = gr.current;
+        if (!g.id || e.pointerId !== g.pointerId) return;
+        try { g.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+        if (g.moved) onMove?.(g.id, g.x, g.y);
+        else onInspect?.(placements.find((p) => p.id === g.id));
+        gr.current = {};
         setDrag(null);
     };
     return (
@@ -121,38 +143,64 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                 return (
                     <div
                         key={p.id}
-                        onPointerDown={(e) => startDrag(e, p)}
-                        onPointerMove={onDrag}
-                        onPointerUp={endDrag}
+                        onPointerDown={editing ? (e) => start(e, p) : undefined}
+                        onPointerMove={editing ? move : undefined}
+                        onPointerUp={editing ? end : undefined}
+                        onClick={editing ? undefined : () => onInspect?.(p)}
                         style={{
                             position: "absolute", left: `${live.x}%`, top: `${live.y}%`, transform: "translate(-50%, -100%)",
-                            zIndex: Math.round(live.y), cursor: editing ? "grab" : "default", touchAction: editing ? "none" : "auto",
-                            filter: editing ? "drop-shadow(0 0 0 rgba(0,0,0,0))" : "none",
+                            zIndex: Math.round(live.y), cursor: "pointer", touchAction: editing ? "none" : "auto",
                             transition: drag && drag.id === p.id ? "none" : "left .15s ease, top .15s ease",
                         }}
-                        title={p.name}
+                        title={editing ? `${p.name} — drag to move, tap for details` : `${p.name} — tap for details`}
                     >
-                        <div style={{ position: "relative", width: size, display: "flex", justifyContent: "center" }}>
-                            {p.spriteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={p.spriteUrl} alt={p.name} width={size} height={size} style={{ width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }} />
-                            ) : (
-                                <span style={{ fontSize: 40, filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }}>{p.emoji}</span>
-                            )}
-                            {editing ? (
-                                <button
-                                    type="button"
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => { e.stopPropagation(); onPickup?.(p.id); }}
-                                    aria-label={`Pick up ${p.name}`}
-                                    style={{ position: "absolute", top: -6, right: 2, width: 22, height: 22, borderRadius: "50%", border: "none", background: "#e0559a", color: "#fff", fontWeight: 900, fontSize: 13, cursor: "pointer", boxShadow: "0 2px 6px rgba(0,0,0,0.45)", lineHeight: 1 }}
-                                >×</button>
-                            ) : null}
-                        </div>
+                        {p.spriteUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} style={{ width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }} />
+                        ) : (
+                            <span style={{ fontSize: 40, filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }}>{p.emoji}</span>
+                        )}
                     </div>
                 );
             })}
         </>
+    );
+}
+
+// ── Inspect modal for a PLACED decoration: what it is, its effect, and (your farm) a Pick up button.
+export function DecoInspect({ placement, mine = false, busy, onPickup, onClose }) {
+    if (!placement) return null;
+    const ring = RARITY_RING[placement.rarity] || "#8fbf6a";
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${placement.name} details`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .35s ease both" }}>
+                <div style={{ padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}33, transparent 70%)` }}>
+                    <span style={{ display: "grid", placeItems: "center", width: 96, height: 96, margin: "0 auto", borderRadius: 16, background: "rgba(0,0,0,0.22)" }}>
+                        {placement.spriteUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={placement.spriteUrl} alt={placement.name} width={84} height={84} style={{ width: 84, height: 84, objectFit: "contain" }} />
+                        ) : <span style={{ fontSize: 54 }}>{placement.emoji}</span>}
+                    </span>
+                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 8 }}>{placement.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{placement.rarity}{placement.source === "special" ? " · premium" : ""}</div>
+                </div>
+                <div style={{ padding: "8px 16px 4px" }}>
+                    {placement.buffText ? (
+                        <div style={{ padding: "10px 12px", borderRadius: 11, background: "rgba(126,213,126,0.14)", border: "1px solid rgba(126,213,126,0.5)", color: "#a7e6a7", fontSize: 13, fontWeight: 800, textAlign: "center" }}>
+                            While placed: {placement.buffText}
+                        </div>
+                    ) : (
+                        <div className="muted" style={{ fontSize: 12.5, textAlign: "center", padding: "6px 0" }}>Cosmetic — looks great, no farming buff. (Epic+ decorations carry buffs.)</div>
+                    )}
+                </div>
+                <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {mine ? (
+                        <button type="button" disabled={busy} onClick={() => { onPickup(placement.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ff9ec2,#e0559a)", color: "#3a0a22", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #a83b73", opacity: busy ? 0.6 : 1 }}>✋ Pick up (back to your tray)</button>
+                    ) : null}
+                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
+                </div>
+            </div>
+        </div>
     );
 }
 

@@ -73,8 +73,8 @@ export async function getPlacements(buyerId) {
         const def = decorationById(r.deco_id);
         return {
             id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true,
-            name: def?.name || r.deco_id, emoji: def?.emoji || "🏵️", rarity: def?.rarity || "common",
-            spriteUrl: sprites[r.deco_id] || null,
+            name: def?.name || r.deco_id, emoji: def?.emoji || "🏵️", rarity: def?.rarity || "common", rarityColor: DECO_RARITY[def?.rarity]?.color,
+            spriteUrl: sprites[r.deco_id] || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || null,
         };
     });
 }
@@ -105,7 +105,7 @@ export async function decoState(buyerId) {
         .sort((a, b) => (DECO_RARITY[b.rarity]?.rank || 0) - (DECO_RARITY[a.rarity]?.rank || 0));
     const placements = (placeRows || []).map((r) => {
         const def = decorationById(r.deco_id);
-        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, name: def?.name || r.deco_id, emoji: def?.emoji || "🏵️", rarity: def?.rarity || "common", spriteUrl: sprites[r.deco_id] || null };
+        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, name: def?.name || r.deco_id, emoji: def?.emoji || "🏵️", rarity: def?.rarity || "common", rarityColor: DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || null };
     });
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import CoinCta from "@/components/CoinCta";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
-import { DecoLayer, DecoManager, DecoDock } from "@/components/FarmDecorations";
+import { DecoLayer, DecoManager, DecoDock, DecoInspect } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -218,6 +218,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [decoOpen, setDecoOpen] = useState(false); // decoration manager drawer open
+    const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
     const rainedRef = useRef(false);
 
@@ -249,7 +250,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || decoOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || decoOpen || inspectDeco)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -266,7 +267,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot, decoOpen]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot, decoOpen, inspectDeco]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -660,7 +661,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             editing={farm.mine && decoEditing}
                             fieldRef={fieldRef}
                             onMove={decoMove}
-                            onPickup={decoPickup}
+                            onInspect={(p) => { if (p) setInspectDeco(p); }}
                         />
 
                         {pets.length === 0 ? (
@@ -775,6 +776,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onPlaceAt={decoPlaceAt}
                     onOpenShop={() => setDecoOpen(true)}
                     onDone={stopDecorating}
+                />
+            ) : null}
+
+            {inspectDeco ? (
+                <DecoInspect
+                    placement={inspectDeco}
+                    mine={farm.mine}
+                    busy={decoBusy}
+                    onPickup={decoPickup}
+                    onClose={() => setInspectDeco(null)}
                 />
             ) : null}
 
