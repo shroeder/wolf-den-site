@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import CoinCta from "@/components/CoinCta";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
+import { DecoLayer, DecoManager } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -216,6 +217,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [gardenBusy, setGardenBusy] = useState(null);
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
+    const [decoOpen, setDecoOpen] = useState(false); // decoration manager drawer open
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
     const rainedRef = useRef(false);
 
@@ -247,7 +249,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || decoOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -264,7 +266,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot, decoOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -458,6 +460,30 @@ export default function FarmClient({ initial, viewingAlias }) {
         SFX.coin();
         setFarm((f) => ({ ...f, rating: { ...f.rating, total: r.total, byTier: r.byTier, myTier: r.myTier, charge: r.charge } }));
     }, [farm.rating, farm.owner, rateBusy, post]);
+
+    // Decorations — buy / place / drag-move / pick-up. Every action returns the fresh decoration state, which we
+    // fold into both `decorations` (inventory) and `placements` (what renders in the scene).
+    const [decoEditing, setDecoEditing] = useState(false);
+    const [decoBusy, setDecoBusy] = useState(false);
+    const decoAct = useCallback(async (body) => {
+        setDecoBusy(true);
+        const r = await post(body);
+        setDecoBusy(false);
+        if (r?.ok && r.owned) {
+            setFarm((f) => ({
+                ...f,
+                placements: r.placements || f.placements,
+                decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, shop: r.shop },
+                wallet: f.wallet && r.gold != null ? { ...f.wallet, gold: r.gold } : f.wallet,
+            }));
+        }
+        return r;
+    }, [post]);
+    const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
+    const decoPlace = useCallback((decoId) => { decoAct({ action: "deco_place", decoId, x: 52 + Math.random() * 36, y: 26 + Math.random() * 38 }); setDecoEditing(true); }, [decoAct]);
+    const decoMove = useCallback((placementId, x, y) => decoAct({ action: "deco_move", placementId, x, y }), [decoAct]);
+    const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
+    const fieldRef = useRef(null);
     const gardenDebug = useCallback((action) => gardenAct({ action }, action), [gardenAct]);
 
     // Logging in during rain surges every growing crop closer to harvest (server-guarded once per plot per 6h).
@@ -546,7 +572,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings ${farm.mine ? "for your own pets" : "for their pets"} today` : ""}
                     </p>
                 </div>
-                <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    {farm.mine && farm.decorations ? (
+                        <button type="button" className="farm-jbtn" onClick={() => setDecoOpen(true)}>🎀 Decorate</button>
+                    ) : null}
                     {farm.mine ? (
                         <button type="button" onClick={spawnPigDebug} disabled={Boolean(pig)} title="Owner debug: force-spawn the Loot Pig now (repeatable)" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pig ? "default" : "pointer", opacity: pig ? 0.5 : 1 }}>
                             🐷 debug: spawn pig
@@ -568,6 +597,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
                 <div className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden" }}>
                     <div
+                        ref={fieldRef}
                         style={{
                             position: "relative", width: `${fieldW}%`, minWidth: "100%", height: "min(52vh, 420px)",
                             background: fieldBackground(wx.tod, wx.condition),
@@ -608,6 +638,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                                 onInspect={(slot) => setInspectSlot(slot)}
                             />
                         ) : null}
+
+                        {/* Placed decorations — part of the world, scroll with the pasture. Draggable when you're
+                            arranging your own farm; read-only when visiting. */}
+                        <DecoLayer
+                            placements={farm.placements || []}
+                            editing={farm.mine && decoEditing}
+                            fieldRef={fieldRef}
+                            onMove={decoMove}
+                            onPickup={decoPickup}
+                        />
 
                         {pets.length === 0 ? (
                             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
@@ -703,6 +743,19 @@ export default function FarmClient({ initial, viewingAlias }) {
                         🐷👑 The Wild Loot Pig appeared!
                     </div>
                 </div>
+            ) : null}
+
+            {decoOpen && farm.mine && farm.decorations ? (
+                <DecoManager
+                    deco={farm.decorations}
+                    gold={farm.wallet?.gold || 0}
+                    busy={decoBusy}
+                    editing={decoEditing}
+                    onToggleEdit={() => setDecoEditing((v) => !v)}
+                    onBuy={decoBuy}
+                    onPlace={decoPlace}
+                    onClose={() => setDecoOpen(false)}
+                />
             ) : null}
 
             {planting != null && garden ? (
