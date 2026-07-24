@@ -72,8 +72,11 @@ export default function LevelUpWatcher() {
             if (document.visibilityState === "visible") check();
         };
         // Fire the celebration the moment an action awards XP (no refresh needed). XP-earning actions
-        // dispatch `wolfden-xp-updated`; we re-check shortly after so the server has recorded the level.
-        const onXp = () => setTimeout(check, 900);
+        // dispatch `wolfden-xp-updated`; we re-check a few times so a slightly-slow server write still
+        // celebrates immediately (in-session) instead of only when you navigate away and back. `check`
+        // guards with activeRef, so the repeats are harmless once one fires.
+        const xpTimers = [];
+        const onXp = () => { [400, 1200, 2600, 4500].forEach((ms) => xpTimers.push(setTimeout(check, ms))); };
         // Safety net so leveling from ANY source still celebrates within ~30s even if it didn't emit the event.
         const poll = setInterval(() => { if (document.visibilityState === "visible") check(); }, 30000);
         document.addEventListener("visibilitychange", onVisible);
@@ -81,6 +84,7 @@ export default function LevelUpWatcher() {
         return () => {
             alive = false;
             clearInterval(poll);
+            xpTimers.forEach(clearTimeout);
             document.removeEventListener("visibilitychange", onVisible);
             window.removeEventListener("wolfden-xp-updated", onXp);
         };

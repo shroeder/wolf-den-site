@@ -30,7 +30,7 @@ const LINKS = [
     { href: "/marketplace/sets", sprite: "helmet", label: "Sets" },
     { href: "/marketplace/quests", emoji: "📜", label: "Quests" },
     { href: "/marketplace/track", emoji: "🏆", label: "Rewards" },
-    { href: "/marketplace/badges", emoji: "🏅", label: "Badges" },
+    { href: "/marketplace/badges", emoji: "🎖️", label: "Badges" },
     { href: "/marketplace/leaderboard", emoji: "🥇", label: "Ranks" },
     { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties" },
     { href: "/marketplace/credit", emoji: "💳", label: "Credit" },

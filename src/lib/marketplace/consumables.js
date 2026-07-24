@@ -82,12 +82,18 @@ export async function memberBonusStrikes(buyerId) {
 export async function activeBoosts(buyerId) {
     if (!buyerId) return [];
     const rows = await db.query(`SELECT kind, magnitude, expires_at FROM mkt_user_boost WHERE buyer_id = $1 AND expires_at > NOW() ORDER BY expires_at ASC`, [buyerId]).catch(() => []);
-    return rows.map((r) => ({
-        kind: r.kind,
-        magnitude: Number(r.magnitude),
-        expiresAt: r.expires_at,
-        label: r.kind === "damage" ? `${Number(r.magnitude)}× damage` : `+${Number(r.magnitude)} attacks today`,
-    }));
+    // Combine same-effect boosts into ONE line so multiple of the same thing read cleanly (e.g. two "+5
+    // attacks" show as "+10 attacks today", not two identical badges).
+    let strikeTotal = 0; let strikeExpiry = null;
+    const damage = new Map(); // magnitude → { count, expiresAt }
+    for (const r of rows) {
+        if (r.kind === "strikes") { strikeTotal += Number(r.magnitude) || 0; strikeExpiry = r.expires_at; }
+        else if (r.kind === "damage") { const m = Number(r.magnitude); const cur = damage.get(m) || { count: 0, expiresAt: r.expires_at }; cur.count += 1; cur.expiresAt = r.expires_at; damage.set(m, cur); }
+    }
+    const out = [];
+    if (strikeTotal > 0) out.push({ kind: "strikes", magnitude: strikeTotal, expiresAt: strikeExpiry, label: `+${strikeTotal} attacks today` });
+    for (const [m, info] of damage) out.push({ kind: "damage", magnitude: m, expiresAt: info.expiresAt, label: `${m}× damage${info.count > 1 ? ` (×${info.count})` : ""}` });
+    return out;
 }
 
 // --- Stash + shop -----------------------------------------------------------------------------------

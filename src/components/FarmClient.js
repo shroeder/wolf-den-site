@@ -900,10 +900,11 @@ function ScenePlots({ garden, busy, onPlant, onHarvest, onFertilize }) {
     return (
         <>
             {plots.map((p, i) => {
-                // Cluster the plots together on the left of the field; stagger the rows slightly so a big garden
-                // reads as a little tilled patch on the grass rather than a rigid line.
-                const left = n === 1 ? 20 : 9 + (i / (n - 1)) * 30;
-                const top = 85 + (i % 2) * 5; // 85–90% — sitting right on the grass, front of the pasture
+                // Cluster the plots CLOSE together on the left of the field; stagger the rows slightly so the
+                // garden reads as a tight little tilled patch on the grass rather than a spread-out line.
+                const span = Math.min(6 * (n - 1), 20); // tight cluster — ~6% between mounds, capped
+                const left = n === 1 ? 18 : 15 + (i / (n - 1)) * span;
+                const top = 84 + (i % 2) * 6; // 84–90% — sitting right on the grass, front of the pasture
                 return (
                     <ScenePlot
                         key={p.slot} p={p} left={left} top={top} now={now} busy={busy}

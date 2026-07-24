@@ -256,7 +256,7 @@ export default function BossFightClient() {
                         </div>
                     ) : you.attacksLeft > 0 ? (
                         <button type="button" className="btn-gold boss2-attack" onClick={attack} disabled={busy}>
-                            {busy ? "Unleashing…" : "⚔️ Unleash your daily strike"}
+                            {busy ? "Unleashing…" : you.attacksLeft > 1 ? `⚔️ Unleash a strike · ${you.attacksLeft} ready` : "⚔️ Unleash your daily strike"}
                         </button>
                     ) : (
                         <div className="boss2-spent">🕒 Strike used — your avatar keeps auto-attacking. Come back tomorrow for another.</div>

@@ -29,7 +29,7 @@ const FEATURES = [
     { href: "/marketplace/sets", emoji: "🪖", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
     { href: "/marketplace/quests", emoji: "📜", title: "Quests", desc: "Fresh daily bounties → gold, chests & tokens.", tone: "quests" },
     { href: "/marketplace/track", emoji: "🏆", title: "Rewards Track", desc: "See your next unlock and everything you've earned.", tone: "track" },
-    { href: "/marketplace/badges", emoji: "🏅", title: "Badges", desc: "Every badge you've earned — pick 3 to show on your card.", tone: "track" },
+    { href: "/marketplace/badges", emoji: "🎖️", title: "Badges", desc: "Every badge you've earned — pick 3 to show on your card.", tone: "track" },
     { href: "/marketplace/leaderboard", emoji: "🥇", title: "Leaderboard", desc: "Where you rank against the whole pack.", tone: "leader" },
     { href: "/marketplace/bounties", emoji: "🎯", title: "Bounties", desc: "Post gold for real-world help — or claim someone else's.", tone: "bounty" },
 ];

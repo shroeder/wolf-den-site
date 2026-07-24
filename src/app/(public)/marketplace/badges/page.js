@@ -39,15 +39,17 @@ export default async function BadgesPage() {
                 <p className="muted" style={{ marginTop: 0 }}>
                     You&apos;ve earned <strong>{board?.earnedCount || 0}</strong> of {board?.totalCount || 0}. Each badge grants a little XP + gold — and many add a passive that buffs your daily boss strike. Choose up to 3 to show on your card.
                 </p>
-                {(() => {
-                    const p = board?.passives || {};
-                    const bits = [];
-                    if (p.might) bits.push(`⚔️ +${p.might} Might`);
-                    if (p.crit_chance) bits.push(`🎯 +${p.crit_chance}% Crit Chance`);
-                    if (p.crit_power) bits.push(`💥 +${p.crit_power}% Crit Power`);
-                    return bits.length ? <div className="badge-passive-strip">🎖️ Your badges buff your strike: <strong>{bits.join(" · ")}</strong></div> : null;
-                })()}
-                <NextBadgeNudge next={board?.next} earnedCount={board?.earnedCount || 0} totalCount={board?.totalCount || 0} href="#customize" />
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                    {(() => {
+                        const p = board?.passives || {};
+                        const bits = [];
+                        if (p.might) bits.push(`⚔️ +${p.might} Might`);
+                        if (p.crit_chance) bits.push(`🎯 +${p.crit_chance}% Crit Chance`);
+                        if (p.crit_power) bits.push(`💥 +${p.crit_power}% Crit Power`);
+                        return bits.length ? <div className="badge-passive-strip" style={{ margin: 0 }}>🎖️ Your badges buff your strike: <strong>{bits.join(" · ")}</strong></div> : null;
+                    })()}
+                    <NextBadgeNudge next={board?.next} earnedCount={board?.earnedCount || 0} totalCount={board?.totalCount || 0} href="#customize" />
+                </div>
             </section>
 
             <section className="card" id="customize">
