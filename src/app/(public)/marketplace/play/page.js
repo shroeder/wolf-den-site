@@ -46,7 +46,7 @@ export default async function GamePlayHub({ searchParams }) {
     return (
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
-            {buyer ? <RaidDefenseReport /> : null}
+            {buyer ? <RaidDefenseReport owner={owner} /> : null}
             {buyer ? <SpinNudge /> : null}
             <section className="card game-hub-hero">
                 <h1 style={{ margin: 0 }}>🎮 The Wolf Den Game</h1>
