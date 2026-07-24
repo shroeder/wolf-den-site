@@ -1,6 +1,7 @@
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import BossCelebrationWatcher from "@/components/BossCelebrationWatcher";
 import GiftWatcher from "@/components/GiftWatcher";
+import HappyHourWatcher from "@/components/HappyHourWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
 import LocationPrompt from "@/components/LocationPrompt";
 import RewardNudge from "@/components/RewardNudge";
@@ -22,6 +23,8 @@ export default function PublicLayout({ children }) {
             <LevelUpWatcher />
             {/* Every member who fought a boss sees its defeat celebration once, not just the finisher. */}
             <BossCelebrationWatcher />
+            {/* When Happy Hour goes live, everyone gets the "it started!" modal once (with a donor recap). */}
+            <HappyHourWatcher />
             {/* Pops up admin gifts (item/chest/gold) on next visit — reliable even without browser push. */}
             <GiftWatcher />
             {/* Ever-present social hub (friends + discover + messaging) for signed-in members, every page. */}

@@ -63,9 +63,16 @@ export async function getHappyHourState(buyerId) {
         const rally = Number(rallyRaw) || 0;
         return { active: false, gold: goldRow?.gold || 0, rally: { pool: rally, trigger: RALLY_TRIGGER, remaining: Math.max(0, RALLY_TRIGGER - rally) } };
     }
-    const [mine, gold] = await Promise.all([
+    const [mine, gold, donorRows] = await Promise.all([
         buyerId ? db.queryOne(`SELECT gold FROM mkt_happy_hour_donation WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : null,
         buyerId ? db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null) : null,
+        // Who chipped in to summon it — for the "Happy Hour started!" recap everyone sees.
+        db.query(
+            `SELECT COALESCE(NULLIF(b.display_name,''), b.alias, 'A member') AS name, b.alias, d.gold
+               FROM mkt_happy_hour_donation d JOIN mkt_buyer b ON b.id = d.buyer_id
+              WHERE d.event_id = $1 AND d.gold > 0 ORDER BY d.gold DESC LIMIT 8`,
+            [ev.id]
+        ).catch(() => []),
     ]);
     const myDonation = Number(mine?.gold || 0);
     // Next personal reward tier (mirrors REWARD_TIERS in happy-hour.js).
@@ -73,6 +80,7 @@ export async function getHappyHourState(buyerId) {
     const nextReward = tiers.find((t) => myDonation < t) || null;
     return {
         active: true,
+        id: ev.id,
         resource: ev.resource,
         endsAt: ev.ends_at,
         endsInSecs: Math.max(0, Math.floor((new Date(ev.ends_at).getTime() - Date.now()) / 1000)),
@@ -83,6 +91,7 @@ export async function getHappyHourState(buyerId) {
         myDonation,
         nextReward,
         gold: gold?.gold || 0,
+        donors: (donorRows || []).map((r) => ({ name: r.name, alias: r.alias || null, gold: Number(r.gold) || 0 })),
     };
 }
 
