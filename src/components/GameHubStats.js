@@ -32,7 +32,7 @@ export default function GameHubStats() {
         <div className="game-hub-stats">
             <div className="game-hub-chips">
                 <span className="game-hub-chip">⭐ {(unlock.xp || 0).toLocaleString()} XP</span>
-                {spin?.signedIn ? <span className="game-hub-chip">🎟️ {spin.tokens || 0}</span> : null}
+                {spin?.signedIn && (spin.tokens || 0) > 0 ? <Link href="/marketplace/spin" className="game-hub-chip"><FaDharmachakra className="spin-ico" aria-hidden="true" /> {spin.tokens} spin{spin.tokens === 1 ? "" : "s"}</Link> : null}
                 {spin?.freeAvailable ? <Link href="/marketplace/spin" className="game-hub-chip is-live"><FaDharmachakra className="spin-ico" aria-hidden="true" /> Free spin ready!</Link> : null}
             </div>
             {!unlock.maxed && unlock.label ? (

@@ -52,6 +52,7 @@ export default function GameNav() {
     // each in-game navigation so the count drops as soon as you open them.
     const [chests, setChests] = useState(0);
     const [spins, setSpins] = useState(0); // unused spins (free + tokens) → red badge on the Spin tab
+    const [questsReady, setQuestsReady] = useState(0); // completed-but-unclaimed quests → red badge on Quests
     const [sailAttn, setSailAttn] = useState(false); // boat landed & waiting to dig → red-alert dot on Sailing
     useEffect(() => {
         if (!inGame) return undefined;
@@ -67,6 +68,10 @@ export default function GameNav() {
             fetch("/api/marketplace/spin", { cache: "no-store" })
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => { if (alive && d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); })
+                .catch(() => {});
+            fetch("/api/marketplace/quests", { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); })
                 .catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" })
                 .then((r) => (r.ok ? r.json() : null))
@@ -89,8 +94,9 @@ export default function GameNav() {
                 {links.map((l) => {
                     const chestBadge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
                     const spinBadge = l.href === "/marketplace/spin" && spins > 0 ? spins : null;
-                    const badge = chestBadge ?? spinBadge;
-                    const badgeTitle = chestBadge ? `${chestBadge} chest${chestBadge === 1 ? "" : "s"} to open` : spinBadge ? `${spinBadge} spin${spinBadge === 1 ? "" : "s"} ready` : null;
+                    const questBadge = l.href === "/marketplace/quests" && questsReady > 0 ? questsReady : null;
+                    const badge = chestBadge ?? spinBadge ?? questBadge;
+                    const badgeTitle = chestBadge ? `${chestBadge} chest${chestBadge === 1 ? "" : "s"} to open` : spinBadge ? `${spinBadge} spin${spinBadge === 1 ? "" : "s"} ready` : questBadge ? `${questBadge} quest${questBadge === 1 ? "" : "s"} ready to claim` : null;
                     const dot = l.href === "/marketplace/sailing" && sailAttn;
                     return (
                         <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
