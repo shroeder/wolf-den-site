@@ -331,7 +331,7 @@ export default function BossFightClient() {
 
             {roster.length ? (
                 <div className="boss2-board">
-                    <h3>🛡️ Active heroes</h3>
+                    <h3>🏆 Hall of Heroes</h3>
                     <div className="hero-strip">
                         {roster.map((f) => {
                             // Each member's signature color tints their chip; the avatar carries their equipped
@@ -346,6 +346,7 @@ export default function BossFightClient() {
                                         {f.dmgRank ? <span className={`herochip-rank rank-${f.dmgRank}`} title={`#${f.dmgRank} damage dealer`} aria-label={`Number ${f.dmgRank} damage`}>{["🥇", "🥈", "🥉"][f.dmgRank - 1]}</span> : null}
                                     </div>
                                     <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>
+                                    <span className="herochip-dps" title="Total damage dealt">⚔️ {(f.dmg || 0).toLocaleString()} <span className="herochip-dps-unit">dmg</span></span>
                                     <span className="herochip-meta">Lv {f.level} · 🎟️ {f.tickets}</span>
                                 </>
                             );

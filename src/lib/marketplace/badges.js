@@ -364,28 +364,12 @@ export async function grantEventBadge(buyerId, slug) {
     return true;
 }
 
-// Keep the live 1st/2nd/3rd-place badges in sync with the leaderboard: grant place_N to the current
-// rank-N member (by XP) and revoke it from everyone else. Idempotent — run on a cron. Unlike normal auto
-// badges these are REVOCABLE (you lose your medal when someone overtakes you).
+// RETIRED. The 1st/2nd/3rd-place leaderboard badges kept hijacking members' chosen showcase (they carried the
+// top sort_order). Top-damage recognition now lives on the boss "Hall of Heroes" as live rank medals (UI only).
+// Kept as a harmless cleanup so the existing cron just sweeps up any stragglers.
 export async function syncLeaderboardBadges() {
-    const rows = await db
-        .query(`SELECT id FROM mkt_buyer WHERE alias IS NOT NULL AND COALESCE(xp, 0) > 0 ORDER BY xp DESC, created_at ASC LIMIT 3`)
-        .catch(() => []);
-    const changed = [];
-    for (let i = 0; i < 3; i++) {
-        const slug = `place_${i + 1}`;
-        const winner = rows[i]?.id || null;
-        if (!winner) {
-            await db.query(`DELETE FROM mkt_user_badge WHERE badge_slug = $1`, [slug]).catch(() => {});
-            continue;
-        }
-        await db.query(`DELETE FROM mkt_user_badge WHERE badge_slug = $1 AND buyer_id <> $2`, [slug, winner]).catch(() => {});
-        const ins = await db
-            .query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'system') ON CONFLICT DO NOTHING RETURNING buyer_id`, [winner, slug])
-            .catch(() => []);
-        if (ins.length) { changed.push({ slug, buyerId: winner }); await pushBadgeEarned(winner, { slug, label: `${i + 1}${["st", "nd", "rd"][i]} Place`, icon: ["🥇", "🥈", "🥉"][i] }).catch(() => {}); }
-    }
-    return { top: rows.map((r) => r.id), changed };
+    await db.query(`DELETE FROM mkt_user_badge WHERE badge_slug IN ('place_1', 'place_2', 'place_3')`).catch(() => {});
+    return { retired: true };
 }
 
 // ---- Admin management ----
