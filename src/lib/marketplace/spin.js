@@ -32,11 +32,11 @@ const WHEELS = [
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
             { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
-            { label: "200 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 200 },
+            { label: "100 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 100 },
             { label: "Pet Treat", emoji: "🦴", weight: 16, kind: "treat", treat: "treat_bone" },
             { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
-            { label: "500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 500 },
+            { label: "250 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 250 },
             { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             { label: "500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 500 },
             { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },

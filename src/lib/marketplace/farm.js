@@ -144,13 +144,15 @@ function flatBudget(b, own) {
 // and after a buy/recharge so the client can patch without a full refetch.
 async function farmMineBits(buyerId, mine = true) {
     const [cons, wallet, rawBudget] = await Promise.all([
-        listConsumables(buyerId).catch(() => ({ owned: [], shop: [] })),
+        listConsumables(buyerId).catch(() => ({ stash: [], shop: [] })),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc, (pig_day IS DISTINCT FROM ${DAY}) AS pig_available FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         pettingBudget(buyerId),
     ]);
     // Show the budget for the pets you're actually looking at: your own pool on your farm, the others pool on a friend's.
     const petting = flatBudget(rawBudget, mine);
-    const treats = (cons.owned || [])
+    // listConsumables returns owned items under `stash` (NOT `owned`) — reading the wrong key is why banked
+    // treats never showed and you could only buy. Feed from your real stash.
+    const treats = (cons.stash || [])
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), count: o.count }));
     const treatShop = (cons.shop || [])
@@ -271,6 +273,8 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
     await awardXp(feederId, "feed_other", { points: FEED_OTHER_PLAYER_XP, gold: FEED_OTHER_GOLD }).catch(() => {});
     await trackActivity(feederId, "feed_other", { petId, owner: petOwner }).catch(() => {});
     await bumpQuestProgress(feederId, "feed_pet", 1).catch(() => {});
+    // Feeds count as love too → show up in the owner's "who petted your pets" recap, crediting the pet-XP fed.
+    await db.query(`INSERT INTO mkt_pet_visit (owner_id, petter_id, pet_id, xp) VALUES ($1, $2, $3, $4)`, [petOwner, feederId, petId, c.effect?.amount || 0]).catch(() => {});
     const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
     const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
     return {
