@@ -9785,8 +9785,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     grid-template-areas:
         "helm  hero  amul"
         "main  hero  off"
-        "chest hero  belt"
-        "ring1 boots ring2";
+        "chest hero  back"
+        "ring1 belt  ring2"
+        ".     boots .";
     gap: 8px;
     padding: 14px;
     max-width: 460px;
@@ -9800,6 +9801,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .slot-helmet { grid-area: helm; } .slot-amulet { grid-area: amul; }
 .slot-main_hand { grid-area: main; } .slot-off_hand { grid-area: off; }
 .slot-chest { grid-area: chest; } .slot-belt { grid-area: belt; }
+.slot-back { grid-area: back; }
 .slot-ring1 { grid-area: ring1; } .slot-ring2 { grid-area: ring2; }
 .slot-boots { grid-area: boots; }
 

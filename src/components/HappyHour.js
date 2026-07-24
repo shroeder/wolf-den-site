@@ -82,30 +82,21 @@ export default function HappyHour({ compact = false }) {
         );
     }
 
-    const next = st.next;
-    const span = next ? next.at - next.from : 1;
-    const into = next ? Math.max(0, st.pool - next.from) : 1;
-    const pct = next ? Math.min(100, Math.round((into / span) * 100)) : 100;
-
+    // Happy Hour is LIVE — no more donating (it's already summoned); show the effect + timer in gold instead.
     return (
-        <section className={`card hh-card${compact ? " hh-compact" : ""}`}>
+        <section className={`card hh-card hh-live${compact ? " hh-compact" : ""}`} style={{ borderColor: "rgba(255,215,94,0.6)", boxShadow: "0 0 22px -6px rgba(255,215,94,0.45)" }}>
             <div className="hh-head">
                 <div className="hh-title">⏰ Happy Hour <span className="hh-mult">×{st.multiplier} XP &amp; gold</span></div>
                 <span className="hh-timer">{fmtLeft(secs)} left</span>
             </div>
-            {next ? (
-                <>
-                    <div className="hh-meter"><span style={{ width: `${pct}%` }} /></div>
-                    <div className="hh-meter-label">🪙 {st.pool.toLocaleString()} donated · {next.remaining.toLocaleString()} more to <strong>×{next.mult}</strong></div>
-                </>
-            ) : (
-                <div className="hh-meter-label">🔥 MAXED at ×{st.multiplier}! The pack went all in.</div>
-            )}
-            <div className="hh-donate">
-                {compact ? null : <span className="muted" style={{ fontSize: "0.78rem" }}>Donate to strengthen it{st.myDonation ? ` · you've given ${st.myDonation.toLocaleString()}` : ""}{st.nextReward ? ` · reward at ${st.nextReward.toLocaleString()}` : ""}:</span>}
-                {donateRow}
-                {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"}>{msg.text}</span> : null}
+            <div style={{ marginTop: 8, padding: "11px 13px", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,215,94,0.18), rgba(255,255,255,0.02))", border: "1px solid rgba(255,215,94,0.5)" }}>
+                <div style={{ fontWeight: 800, color: "#ffe9a8" }}>🎉 It&apos;s LIVE for the whole pack!</div>
+                <div style={{ fontSize: "0.84rem", marginTop: 4, color: "#e9dcb8", lineHeight: 1.45 }}>
+                    Every <strong style={{ color: "#ffd75e" }}>XP</strong> and <strong style={{ color: "#ffd75e" }}>gold</strong> reward across the whole game is <strong style={{ color: "#ffd75e" }}>×{st.multiplier}</strong> right now — boss strikes, spins, harvests, sailing, everything. Just play and rack it up before the timer runs out.
+                    {st.pool ? <span className="muted"> The pack donated 🪙 {st.pool.toLocaleString()} to summon it.</span> : null}
+                </div>
             </div>
+            {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"} style={{ display: "block", marginTop: 6 }}>{msg.text}</span> : null}
         </section>
     );
 }

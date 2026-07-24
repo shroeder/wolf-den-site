@@ -23,7 +23,7 @@ function ElBadge({ id }) {
 // The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
 // the owned-item bag, and any charged in-store perks. Tapping a slot opens a picker of fitting items.
 const SLOT_ICON = {
-    main_hand: "⚔️", off_hand: "🛡️", helmet: "🪖", chest: "🥋", belt: "🎗️", boots: "🥾", amulet: "📿", ring1: "💍", ring2: "💍",
+    main_hand: "⚔️", off_hand: "🛡️", helmet: "🪖", chest: "🥋", belt: "🎗️", boots: "🥾", amulet: "📿", ring1: "💍", ring2: "💍", back: "🧣",
 };
 
 // Gold-shop categories, in display order — the shop groups its gear by slot into collapsible sections. Any

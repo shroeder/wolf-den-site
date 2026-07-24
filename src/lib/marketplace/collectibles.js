@@ -52,13 +52,13 @@ export const SHOP_PRICE_BY_RARITY = { common: 600, rare: 1400, epic: 3000, legen
 
 // Buff stats a pet can grant (combat + economy). Passive is always Fortune (a menagerie brings luck).
 export const PET_STAT_META = {
-    might: { label: "Might", icon: "⚔️" },
-    crit_chance: { label: "Crit Chance", icon: "🎯" },
-    crit_power: { label: "Crit Power", icon: "💥" },
-    ferocity: { label: "Ferocity", icon: "🔥" },
-    fortune: { label: "Fortune", icon: "🍀" },
-    xp_gain: { label: "XP Gain", icon: "✨" },
-    gold_find: { label: "Gold Find", icon: "💰" },
+    might: { label: "Might", icon: "⚔️", desc: "More base damage on your daily boss strike." },
+    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "Higher chance your boss strike lands a critical hit." },
+    crit_power: { label: "Crit Power", icon: "💥", desc: "Your critical hits on the boss deal more damage." },
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "More base damage on your boss strike." },
+    fortune: { label: "Fortune", icon: "🍀", desc: "Banks extra weekly-boss raffle tickets every day — better odds to win the prize." },
+    xp_gain: { label: "XP Gain", icon: "✨", desc: "You level up faster — more XP from everything you do." },
+    gold_find: { label: "Gold Find", icon: "💰", desc: "More gold from everything you earn (boss, spins, sales)." },
 };
 
 const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal", celestial: "Celestial", primordial: "Primordial" };

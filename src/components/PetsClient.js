@@ -54,7 +54,7 @@ function MenagerieGroup({ title, sub, tiles, accent = "#ffd75e" }) {
             <div className="muted" style={{ fontSize: "0.68rem", margin: "1px 0 8px" }}>{sub}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {tiles.map((t) => (
-                    <div key={t.key} style={{ display: "flex", flexDirection: "column", minWidth: 70, padding: "5px 10px", borderRadius: 10, background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div key={t.key} title={t.hint || undefined} style={{ display: "flex", flexDirection: "column", minWidth: 70, padding: "5px 10px", borderRadius: 10, background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         <span style={{ fontWeight: 900, fontSize: "1.02rem", color: accent, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{t.value}</span>
                         <span className="muted" style={{ fontSize: "0.72rem", whiteSpace: "nowrap" }}>{t.label}</span>
                     </div>
@@ -434,7 +434,7 @@ export default function PetsClient() {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
                             <MenagerieGroup
                                 title="Passive bonuses" sub="every pet you own stacks these" accent="#ffd75e"
-                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, label: statText({ stat }), value: `+${val}` }))}
+                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, label: statText({ stat }), value: `+${val}`, hint: PET_STAT_META[stat]?.desc }))}
                             />
                             <MenagerieGroup
                                 title="Earning" sub="your earner pets, automatically" accent="#8fe39a"
@@ -452,6 +452,22 @@ export default function PetsClient() {
                                 {state.incomeEarned.gold > 0 ? `+${state.incomeEarned.gold} gold` : ""} since your last visit!
                             </div>
                         ) : null}
+                        {/* Plain-English guide so it's clear what each bonus actually does for your hero. */}
+                        <details style={{ borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "8px 12px" }}>
+                            <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: "0.85rem" }}>❔ What each bonus does</summary>
+                            <ul style={{ listStyle: "none", padding: 0, margin: "10px 0 0", display: "grid", gap: 8 }}>
+                                {Object.entries(PET_STAT_META).map(([k, m]) => (
+                                    <li key={k} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: "0.82rem" }}>
+                                        <strong style={{ minWidth: 108, whiteSpace: "nowrap" }}>{m.icon} {m.label}</strong>
+                                        <span className="muted">{m.desc}</span>
+                                    </li>
+                                ))}
+                                <li style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: "0.82rem" }}>
+                                    <strong style={{ minWidth: 108, whiteSpace: "nowrap" }}>⭐ Equipped</strong>
+                                    <span className="muted">Your equipped pet also fights beside you and adds a much bigger active buff on top.</span>
+                                </li>
+                            </ul>
+                        </details>
                     </div>
                 ) : null}
             </section>
