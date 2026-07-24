@@ -4,10 +4,10 @@ import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
-import { awardXp } from "@/lib/marketplace/xp.js";
+import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
-import { itemById, STAT_META, sumItemSea } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, STAT_META, sumItemSea } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -81,6 +81,12 @@ const RAID_RESET_MULT = 2;
 const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RESET_BASE * Math.pow(RAID_RESET_MULT, Math.max(0, resetsToday))) : 0);
 // Sailing achievement badge thresholds — kept HIGH on purpose (these are meant to be a grind / rare feats).
 const BADGE_RAID_MARAUDER = 25, BADGE_RAID_SCOURGE = 100, BADGE_DIG_EXCAVATOR = 50, BADGE_VOYAGER = 100;
+// Raid DEFENSE: when an attacker loses, the defender earns this cut of what the attacker lost, plus a small
+// chance at gear (rarity weighted toward the bottom, up to epic). Badges are hard — you must be raided + win.
+const DEFENSE_GOLD_PCT = 0.20;
+const DEFENSE_GEAR_CHANCE = 0.05;
+const DEFENSE_GEAR_WEIGHTS = { common: 70, rare: 24, epic: 6 };
+const BADGE_RAID_DEFENDER = 10, BADGE_RAID_BASTION = 50;
 // Milestone thresholds for the newer sailing badges (waving, marine encounters, early voyages).
 const BADGE_WAVE_FRIENDLY = 25, BADGE_WAVE_AMBASSADOR = 100, BADGE_WAVE_BELOVED = 500;
 const BADGE_ENC_TESTED = 10, BADGE_ENC_VETERAN = 50, BADGE_FIRST_VOYAGE = 1, BADGE_SAIL_REGULAR = 25;
@@ -424,6 +430,12 @@ function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
 
 // --- dig board -----------------------------------------------------------------------------------------
 function randInt(n) { return Math.floor(Math.random() * n); }
+function weightedPickW(weights) {
+    const total = Object.values(weights).reduce((s, w) => s + w, 0);
+    let r = Math.random() * total;
+    for (const [k, w] of Object.entries(weights)) { if ((r -= w) < 0) return k; }
+    return Object.keys(weights)[0];
+}
 
 // The shallowest a fragment can sit (in dirt layers). Luck no longer touches digging — this is a flat cap.
 function fragMaxDepth() { return DIG_MAX_DEPTH; }
@@ -1130,6 +1142,30 @@ export async function doRaid(buyerId, targetId = null) {
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
         await logCoin(buyerId, -loss, "raid_loss", { meta: { foe: target.display_name || target.alias } }).catch(() => {});
         goldDelta = -loss;
+
+        // ── The DEFENDER repelled the raid — reward them (20% of what the attacker lost + a small gear chance)
+        // and record it so they see who they beat when they next log in. ──
+        const bounty = Math.round(loss * DEFENSE_GOLD_PCT);
+        if (bounty > 0) {
+            await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [target.id, bounty]).catch(() => {});
+            await logCoin(target.id, bounty, "raid_defense", { meta: { attacker: me?.display_name || me?.alias } }).catch(() => {});
+        }
+        let defGear = null;
+        if (Math.random() < DEFENSE_GEAR_CHANCE) {
+            const rarity = weightedPickW(DEFENSE_GEAR_WEIGHTS);
+            const pool = ITEMS.filter((it) => it.rarity === rarity);
+            const gearDef = pool.length ? pool[randInt(pool.length)] : null;
+            if (gearDef) { await grantItem(target.id, gearDef.id, "raid_defense").catch(() => {}); defGear = gearDef.id; }
+        }
+        await db.query(`INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, gear_item_id) VALUES ($1, $2, $3, $4)`, [target.id, buyerId, bounty, defGear]).catch(() => {});
+        const defRow = await db.queryOne(
+            `INSERT INTO mkt_sailing (buyer_id, raids_defended) VALUES ($1, 1)
+             ON CONFLICT (buyer_id) DO UPDATE SET raids_defended = COALESCE(mkt_sailing.raids_defended, 0) + 1 RETURNING raids_defended`,
+            [target.id]
+        ).catch(() => null);
+        const defended = defRow?.raids_defended || 0;
+        if (defended >= BADGE_RAID_DEFENDER) await grantEventBadge(target.id, "raid_defender").catch(() => {});
+        if (defended >= BADGE_RAID_BASTION) await grantEventBadge(target.id, "raid_bastion").catch(() => {});
     }
     // Log the raid AFTER resolution so gold + the copied item carry real values (this call used to sit before
     // goldDelta/itemWon were assigned, which threw in the temporal dead zone and dropped the event entirely).
@@ -1156,6 +1192,51 @@ export async function doRaid(buyerId, targetId = null) {
         target: { name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel) },
     };
     return { ok: true, raidResult: result, ...(await getSailingState(buyerId)) };
+}
+
+// The "you got raided (and won)" welcome-back report: every raid you repelled since you last saw it, grouped
+// by attacker, with their hero card, how many times you beat them, gold earned, and any gear you took. Reading
+// it marks the entries seen so it only pops once.
+export async function getUnseenRaidDefenses(buyerId) {
+    if (!buyerId) return { defenses: [], totalGold: 0, totalWins: 0 };
+    const rows = await db
+        .query(
+            `SELECT attacker_id, COUNT(*)::int AS n, COALESCE(SUM(gold), 0)::int AS gold,
+                    array_remove(array_agg(gear_item_id), NULL) AS gears
+               FROM mkt_raid_defense WHERE defender_id = $1 AND seen_at IS NULL
+              GROUP BY attacker_id ORDER BY n DESC, gold DESC`,
+            [buyerId]
+        )
+        .catch(() => []);
+    if (!rows.length) return { defenses: [], totalGold: 0, totalWins: 0 };
+    const ids = rows.map((r) => r.attacker_id);
+    const [buyers, petMap] = await Promise.all([
+        db.query(`SELECT id, display_name, alias, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
+        getPetSpriteData().catch(() => ({})),
+    ]);
+    const byId = new Map((buyers || []).map((b) => [b.id, b]));
+    const defenses = rows.map((r) => {
+        const b = byId.get(r.attacker_id) || {};
+        const pet = b.featured_collectible ? petMap[b.featured_collectible] : null;
+        const gear = (r.gears || []).map((id) => { const d = itemById(id); return d ? { name: d.name, rarity: d.rarity } : null; }).filter(Boolean);
+        return {
+            attacker: {
+                name: b.display_name || b.alias || "A raider",
+                alias: b.alias || null,
+                level: levelForXp(b.xp || 0).level,
+                avatarUrl: b.avatar_sprite_url || null,
+                avatarFlip: b.avatar_sprite_url ? b.avatar_sprite_flip === true : false,
+                border: b.equipped_border && b.equipped_border !== "none" ? b.equipped_border : null,
+                petUrl: pet?.url || null,
+                petFlip: pet?.flip === true,
+            },
+            count: r.n,
+            gold: r.gold,
+            gear,
+        };
+    });
+    await db.query(`UPDATE mkt_raid_defense SET seen_at = NOW() WHERE defender_id = $1 AND seen_at IS NULL`, [buyerId]).catch(() => {});
+    return { defenses, totalGold: rows.reduce((s, r) => s + r.gold, 0), totalWins: rows.reduce((s, r) => s + r.n, 0) };
 }
 
 // Buy back your daily raid after it's spent. Cost DOUBLES with each reset that day (free while testing). Clears
