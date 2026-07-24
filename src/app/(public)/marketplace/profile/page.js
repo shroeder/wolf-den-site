@@ -12,6 +12,7 @@ import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import NextBadgeNudge from "@/components/NextBadgeNudge";
 import RewardsHubHero from "@/components/RewardsHubHero";
 import RewardsTrackPreview from "@/components/RewardsTrackPreview";
+import SignOutButton from "@/components/SignOutButton";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -180,6 +181,10 @@ export default async function ProfileHubPage() {
                         <MarketplaceProfileClient embedded />
                     </div>
                 </details>
+            </section>
+
+            <section className="card">
+                <SignOutButton />
             </section>
         </div>
     );
