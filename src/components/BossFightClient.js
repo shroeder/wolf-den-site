@@ -22,6 +22,7 @@ export default function BossFightClient() {
     const [floaters, setFloaters] = useState([]);
     const [burst, setBurst] = useState(null);
     const [victory, setVictory] = useState(null);
+    const [whack, setWhack] = useState(null); // your own "big hit" cinematic on each daily strike (reuses BossFinalBlow)
     const [xpFlash, setXpFlash] = useState(false);
     const [liveHp, setLiveHp] = useState(null);
     const [cheerToast, setCheerToast] = useState(null);
@@ -164,6 +165,9 @@ export default function BossFightClient() {
                 if (deadBossId) fetch("/api/marketplace/boss-celebrate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ bossId: deadBossId }) }).catch(() => {});
                 load(); // refresh in the background so the freshly-rotated boss is ready when they close
             } else {
+                // Not a kill → play YOUR "big hit" cinematic so landing a strike feels like a real moment.
+                const mineRoster = (data.roster || []).find((r) => r.you);
+                setWhack({ key: floatId.current++, name: "You", dmg: res.damage, spriteUrl: mineRoster?.spriteUrl || data.defaultSpriteUrl || null, spriteFlip: Boolean(mineRoster?.spriteFlip), avatarUrl: mineRoster?.avatarUrl || null, you: true });
                 load();
             }
         } finally {
@@ -404,6 +408,9 @@ export default function BossFightClient() {
                     </div>
                 </div>
             ) : null}
+
+            {/* Your own "big hit" cinematic — auto-plays the instant you unleash a (non-killing) strike. */}
+            {whack ? <BossFinalBlow key={whack.key} variant="strike" auto mvp={whack} boss={{ name: boss.name, imageUrl: boss.imageUrl }} onClose={() => setWhack(null)} /> : null}
         </div>
     );
 }
