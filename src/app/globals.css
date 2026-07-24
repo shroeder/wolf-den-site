@@ -9909,7 +9909,45 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petfeed-stars { font-size: 1.4rem; color: #ffd75e; letter-spacing: 2px; margin-bottom: 10px; }
 .petfeed-max { font-weight: 900; color: #ff9a3c; margin-bottom: 8px; }
 .petfeed-burst { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.petfeed-burst span { position: absolute; top: 42%; left: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--rar, #ffd75e); animation: buyspark 0.8s ease-out forwards; }
+.petfeed-burst span { position: absolute; top: 42%; left: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--rar, #ffd75e); animation: buyspark 0.9s ease-out 1s forwards; opacity: 0; }
+
+/* ── Dramatic pet level-up reveal ──────────────────────────────────────────────────────────────────────
+   The pet starts as a black silhouette that rattles, then a light-burst reveals it in full colour while
+   rays of light spin out from behind — and the newly-earned star pops out and settles. */
+.petfeed-rays { position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; transform: translate(-50%, -50%); z-index: 0; pointer-events: none; opacity: 0;
+    background: conic-gradient(from 0deg, transparent 0 7deg, color-mix(in srgb, var(--rar, #ffd75e) 60%, transparent) 7deg 15deg, transparent 15deg 30deg);
+    -webkit-mask: radial-gradient(circle, transparent 30%, #000 40%, #000 68%, transparent 80%);
+            mask: radial-gradient(circle, transparent 30%, #000 40%, #000 68%, transparent 80%);
+    animation: petRaysIn 0.5s ease-out 0.85s forwards, petRaysSpin 10s linear infinite; }
+.petfeed-reveal { position: relative; z-index: 1; display: block; width: 100%; height: 100%; transform-origin: center bottom;
+    animation: petRevealMotion 1.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.petfeed-reveal img, .petfeed-reveal .pet-art { display: block; width: 100%; height: 100%; object-fit: contain;
+    animation: petRevealBright 1.45s ease-out both; }
+.petfeed-star { display: inline-block; }
+.petfeed-star.is-new { animation: petStarPop 0.7s cubic-bezier(0.2, 1.6, 0.4, 1) 1.2s both; }
+@keyframes petRaysIn { to { opacity: 0.9; } }
+@keyframes petRaysSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes petRevealMotion {
+    0% { transform: scale(0.55); }
+    12% { transform: scale(0.6) translateX(-4px); } 18% { transform: scale(0.62) translateX(4px); }
+    24% { transform: scale(0.6) translateX(-4px); } 30% { transform: scale(0.64) translateX(4px); }
+    36% { transform: scale(0.62) translateX(-3px); } 44% { transform: scale(0.66) translateX(0); }
+    72% { transform: scale(1.18); } 100% { transform: scale(1); }
+}
+@keyframes petRevealBright {
+    0%, 44% { filter: brightness(0); }
+    66% { filter: brightness(3) saturate(0.15) drop-shadow(0 0 34px #fff); }
+    100% { filter: brightness(1) drop-shadow(0 0 18px color-mix(in srgb, var(--rar, #ffd75e) 70%, transparent)); }
+}
+@keyframes petStarPop {
+    0% { transform: scale(1); } 30% { transform: scale(2.4); filter: drop-shadow(0 0 12px #ffd75e); }
+    60% { transform: scale(0.8); } 100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .petfeed-reveal, .petfeed-reveal img, .petfeed-rays, .petfeed-star.is-new { animation: none !important; }
+    .petfeed-reveal img { filter: brightness(1) drop-shadow(0 0 14px color-mix(in srgb, var(--rar, #ffd75e) 70%, transparent)); }
+    .petfeed-rays { opacity: 0.7; }
+}
 
 .equip-gold { float: right; font-size: 0.85rem; font-weight: 800; color: #ffd75e; }
 
