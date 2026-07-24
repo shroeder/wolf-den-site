@@ -52,7 +52,7 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }
 
             <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10040, background: "rgba(18,24,16,0.98)", borderTop: "2px solid #7ed57e", boxShadow: "0 -10px 30px rgba(0,0,0,0.55)", paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px 2px" }}>
-                    <strong style={{ fontSize: 14 }}>🎀 Decorating</strong>
+                    <strong style={{ fontSize: 14 }}>🪴 Decorating</strong>
                     <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
                     <span style={{ marginLeft: "auto" }} />
                     <button type="button" onClick={onOpenShop} style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,214,110,0.5)", background: "rgba(255,214,110,0.12)", color: "#ffd75e", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>🛒 Shop</button>
@@ -168,8 +168,8 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Farm decorations" style={{ width: "100%", maxWidth: 560, maxHeight: "82dvh", display: "flex", flexDirection: "column", borderRadius: "18px 18px 0 0", background: "var(--card-bg,#17181c)", border: "2px solid #7ed57e", borderBottom: "none", boxShadow: "0 -12px 40px rgba(0,0,0,0.5)", animation: "pigPop .35s ease both" }}>
                 <div style={{ padding: "14px 16px 8px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <strong style={{ fontSize: 17 }}>🎀 Decorate your farm</strong>
-                        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }} title="Total items placed on your farm">🎀 {placedTotal}/{placedCap}</span>
+                        <strong style={{ fontSize: 17 }}>🪴 Decorate your farm</strong>
+                        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }} title="Total items placed on your farm">🪴 {placedTotal}/{placedCap}</span>
                         <span style={{ fontWeight: 800, color: "#ffd75e", fontSize: 14 }}>🪙 {gold.toLocaleString()}</span>
                         <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7, lineHeight: 1 }}>×</button>
                     </div>

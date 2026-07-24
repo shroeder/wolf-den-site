@@ -559,6 +559,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-jbtn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px; font-weight: 800; font-size: 14px; cursor: pointer; border: 1px solid rgba(255,214,110,0.6); background: linear-gradient(180deg, #ffe488, #f3b23a); color: #3a2c08; box-shadow: 0 3px 0 #b57f22, 0 6px 14px rgba(0,0,0,0.35); transition: transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s ease, filter .12s ease; }
                 .farm-jbtn:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 0 #b57f22, 0 9px 18px rgba(0,0,0,0.42); }
                 .farm-jbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22, 0 3px 8px rgba(0,0,0,0.35); }
+                /* Floating in-scene decorate button — a gentle bob to invite the tap. */
+                .farm-deco-fab { transition: transform .12s ease, filter .12s ease, box-shadow .12s ease; }
+                @media (hover: hover) { .farm-deco-fab:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 7px 20px rgba(0,0,0,0.5); } }
+                .farm-deco-fab:active { transform: translateY(1px) scale(0.97); }
+                @media (prefers-reduced-motion: no-preference) { .farm-deco-fab { animation: farmBob 3.4s ease-in-out infinite; } }
                 /* Visit-a-farm opener: an inviting, tappable bar (not a flat box). */
                 .farm-visit { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.3); background: linear-gradient(180deg, rgba(255,214,110,0.1), rgba(255,255,255,0.02)); color: inherit; cursor: pointer; text-align: left; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
                 .farm-visit:hover { transform: translateY(-1px); border-color: rgba(255,214,110,0.55); background: linear-gradient(180deg, rgba(255,214,110,0.16), rgba(255,255,255,0.03)); }
@@ -583,7 +588,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     {farm.mine && farm.decorations ? (
-                        <button type="button" className="farm-jbtn" onClick={decorating ? stopDecorating : startDecorating}>{decorating ? "✓ Done" : "🎀 Decorate"}</button>
+                        <button type="button" className="farm-jbtn" onClick={decorating ? stopDecorating : startDecorating}>{decorating ? "✓ Done" : "🪴 Decorate"}</button>
                     ) : null}
                     {farm.mine ? (
                         <button type="button" onClick={spawnPigDebug} disabled={Boolean(pig)} title="Owner debug: force-spawn the Loot Pig now (repeatable)" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pig ? "default" : "pointer", opacity: pig ? 0.5 : 1 }}>
@@ -726,6 +731,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={wx.condition} />
+                {/* Floating decorate button, right in the scene — the fast way in (own farm, when not already decorating) */}
+                {farm.mine && farm.decorations && !decorating ? (
+                    <button type="button" onClick={startDecorating} className="farm-deco-fab" aria-label="Decorate your farm" title="Decorate your farm"
+                        style={{ position: "absolute", right: 10, bottom: 10, zIndex: 66, display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px 9px 12px", borderRadius: 999, border: "1px solid rgba(126,213,126,0.55)", background: "linear-gradient(180deg, rgba(28,44,26,0.92), rgba(18,30,16,0.92))", color: "#c8f0c8", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}>
+                        <span style={{ fontSize: 17 }} aria-hidden="true">🪴</span>Decorate
+                    </button>
+                ) : null}
                 {/* Live conditions label (unobtrusive, top-left) */}
                 <div style={{ position: "absolute", top: 8, left: 8, zIndex: 60, pointerEvents: "none", padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700, color: "#f2f6ee", background: "rgba(18,26,14,0.5)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(2px)" }}
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>

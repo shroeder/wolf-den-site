@@ -39,7 +39,7 @@ const WHEELS = [
             { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
             { label: "250 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 250 },
-            { label: "Farm Decoration", emoji: "🎀", weight: 7, rare: true, tier: "rare", kind: "deco" },
+            { label: "Farm Decoration", emoji: "🪴", weight: 7, rare: true, tier: "rare", kind: "deco" },
             { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             { label: "500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 500 },
             { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
@@ -93,7 +93,7 @@ async function grantPrize(buyerId, prize) {
         const pool = DECORATIONS.filter((d) => (d.source === "spin" || d.source === "level") && !owned.has(d.id));
         const list = pool.length ? pool : DECORATIONS.filter((d) => d.source === "spin");
         const won = list[Math.floor(Math.random() * list.length)];
-        if (won) { await grantDecoration(buyerId, won.id, 1, "spin").catch(() => {}); return { emoji: won.emoji || "🎀", text: `${won.name} decoration!` }; }
+        if (won) { await grantDecoration(buyerId, won.id, 1, "spin").catch(() => {}); return { emoji: won.emoji || "🪴", text: `${won.name} decoration!` }; }
         await db.query(`UPDATE mkt_buyer SET gold = gold + 300 WHERE id = $1`, [buyerId]).catch(() => {});
         return { emoji: "🪙", text: "300 gold" };
     }
