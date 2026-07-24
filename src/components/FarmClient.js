@@ -200,6 +200,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const floatId = useRef(0);
     const [busy, setBusy] = useState(null);
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
+    const [ownerMenu, setOwnerMenu] = useState(false); // farmer character tapped → connect menu
     const [pig, setPig] = useState(null); // "running" while the loot pig is on screen
     const [pigToast, setPigToast] = useState(false);
     const [pigResult, setPigResult] = useState(null); // the haul modal after he leaves
@@ -587,6 +588,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             );
                         })}
 
+                        {/* The farmer (farm owner) strolls their pasture — tap to connect */}
+                        {farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} onTap={() => setOwnerMenu(true)} /> : null}
+
                         {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
                         {pig === "running" ? <LootPig onFinish={onPigFinish} /> : null}
 
@@ -633,6 +637,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onClose={() => setInspect(null)}
                 />
             ) : null}
+
+            {ownerMenu ? <OwnerMenu owner={farm.owner} mine={farm.mine} onClose={() => setOwnerMenu(false)} /> : null}
 
             {pigResult ? (
                 <div onClick={() => setPigResult(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "radial-gradient(120% 100% at 50% 40%, rgba(60,45,8,0.72), rgba(0,0,0,0.7))", display: "grid", placeItems: "center", padding: 16, animation: "overlayFade .25s ease both", overflow: "hidden" }}>
@@ -727,6 +733,102 @@ function LootPig({ onFinish }) {
                 </div>
             </div>
         </>
+    );
+}
+
+// The farm owner's avatar strolling their own pasture. Taps open a connect menu (profile / message / trade /
+// add friend). On your OWN farm it's just you (tap → your profile).
+function OwnerWalker({ owner, mine, onTap }) {
+    const [pos, setPos] = useState({ x: 20, y: 86, flip: false, dur: 3, moving: false });
+    useEffect(() => {
+        let alive = true;
+        const timers = [];
+        const glide = (dur) => { timers.push(setTimeout(() => { if (alive) setPos((p) => ({ ...p, moving: false })); }, dur * 1000)); };
+        const step = () => {
+            if (!alive) return;
+            const nx = rand(10, 88);
+            const dur = rand(2.6, 4.2);
+            setPos((p) => ({ x: nx, y: 82 + rand(0, 8), flip: nx < p.x, dur, moving: true }));
+            glide(dur);
+            timers.push(setTimeout(step, dur * 1000 + rand(1400, 3200))); // stroll, pause, stroll
+        };
+        timers.push(setTimeout(step, 900));
+        return () => { alive = false; timers.forEach(clearTimeout); };
+    }, []);
+    const flip = Boolean(pos.flip) !== Boolean(owner.avatarFlip);
+    return (
+        <button
+            type="button"
+            onClick={onTap}
+            title={mine ? "You" : `Tap to connect with ${owner.name}`}
+            style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s linear, top ${pos.dur}s linear`, background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(pos.y) + 1 }}
+        >
+            <span style={{ position: "relative", display: "block", width: 66, height: 66, margin: "0 auto" }}>
+                <span className={pos.moving ? "farm-shadow-hop" : ""} style={{ position: "absolute", left: "50%", bottom: -2, width: 46, height: 10, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0 }} />
+                <span className={pos.moving ? "farm-hop" : "farm-idle"} style={{ position: "absolute", inset: 0, display: "block" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={owner.avatarUrl} alt={owner.name} width={66} height={66} style={{ width: 66, height: 66, objectFit: "contain", transform: flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.5))" }} />
+                </span>
+            </span>
+            <span style={{ display: "flex", justifyContent: "center", marginTop: 3 }}>
+                <span style={{ padding: "1px 8px", borderRadius: 9, background: "rgba(30,20,46,0.82)", border: "1px solid rgba(255,215,110,0.45)", fontSize: 10, fontWeight: 800, color: "#ffe9b0", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.35)" }}>
+                    {mine ? "🧑‍🌾 You" : `👋 ${owner.name}`}
+                </span>
+            </span>
+        </button>
+    );
+}
+
+// Tap-the-farmer connect sheet: view profile, message, propose a trade, add friend.
+function OwnerMenu({ owner, mine, onClose }) {
+    const [busy, setBusy] = useState(false);
+    const [msg, setMsg] = useState("");
+    const menuBtn = { display: "flex", justifyContent: "center", alignItems: "center", gap: 6, width: "100%", padding: "11px 12px", fontWeight: 700, borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer" };
+    async function addFriend() {
+        setBusy(true); setMsg("");
+        try {
+            const r = await fetch("/api/marketplace/friends/request", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: owner.id }) });
+            const d = await r.json().catch(() => ({}));
+            setMsg(r.ok ? "Friend request sent! 🐺" : (d?.error || "Couldn't send request."));
+        } finally { setBusy(false); }
+    }
+    async function message() {
+        setBusy(true); setMsg("");
+        try {
+            const r = await fetch("/api/marketplace/dm/start", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toUserId: owner.id }) });
+            const d = await r.json().catch(() => ({}));
+            if (r.ok && d?.threadId) window.location.assign(`/marketplace/dm/${d.threadId}`);
+            else setMsg(d?.error || "Couldn't open chat.");
+        } finally { setBusy(false); }
+    }
+    const profileHref = owner.alias ? `/marketplace/u/${encodeURIComponent(owner.alias)}` : null;
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10002, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`Connect with ${owner.name}`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "1px solid rgba(255,215,110,0.45)", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: 14, background: "radial-gradient(120% 90% at 50% 0%, rgba(255,215,110,0.16), transparent 70%)" }}>
+                    {owner.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={owner.avatarUrl} alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,215,110,0.6)" }} />
+                    ) : null}
+                    <div>
+                        <div style={{ fontWeight: 800, fontSize: 16 }}>{owner.name}</div>
+                        {owner.alias ? <div className="muted" style={{ fontSize: 12 }}>@{owner.alias}</div> : null}
+                    </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14 }}>
+                    {profileHref ? <a href={profileHref} className="farm-jbtn" style={{ justifyContent: "center", textDecoration: "none" }}>👤 View profile</a> : null}
+                    {!mine ? (
+                        <>
+                            <button type="button" onClick={message} disabled={busy} style={{ ...menuBtn, opacity: busy ? 0.6 : 1 }}>💬 Message</button>
+                            {owner.alias ? <a href={`/marketplace/trade/new?to=${encodeURIComponent(owner.alias)}`} style={{ ...menuBtn, textDecoration: "none" }}>🤝 Propose trade</a> : null}
+                            <button type="button" onClick={addFriend} disabled={busy} style={{ ...menuBtn, opacity: busy ? 0.6 : 1 }}>➕ Add friend</button>
+                        </>
+                    ) : null}
+                    {msg ? <div className="muted" style={{ fontSize: 12, textAlign: "center" }}>{msg}</div> : null}
+                    <button type="button" onClick={onClose} style={{ ...menuBtn, background: "transparent", border: "none", opacity: 0.7 }}>Close</button>
+                </div>
+            </div>
+        </div>
     );
 }
 

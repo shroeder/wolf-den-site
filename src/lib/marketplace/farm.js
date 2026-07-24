@@ -170,7 +170,7 @@ export async function claimPig(buyerId) {
 export async function getFarm(ownerId, viewerId) {
     if (!ownerId) return null;
     const [owner, state, sprites, pettedRows] = await Promise.all([
-        db.queryOne(`SELECT id, display_name, alias FROM mkt_buyer WHERE id = $1`, [ownerId]).catch(() => null),
+        db.queryOne(`SELECT id, display_name, alias, avatar_sprite_url, avatar_sprite_flip, equipped_border FROM mkt_buyer WHERE id = $1`, [ownerId]).catch(() => null),
         petsState(ownerId).catch(() => null),
         getPetSpriteData().catch(() => ({})),
         db.query(`SELECT pet_id FROM mkt_pet_level WHERE buyer_id = $1::text AND petted_day = ${DAY}`, [ownerId]).catch(() => []),
@@ -204,7 +204,7 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     return {
-        owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null },
+        owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
         mine,
         canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
         canFeed: Boolean(viewerId), // feed with your own treats
