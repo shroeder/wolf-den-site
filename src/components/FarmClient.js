@@ -678,6 +678,7 @@ const PIG_SPRITE_URL = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/
 // then wanders off an edge. Cosmetic only — the haul is claimed server-side in onFinish.
 function LootPig({ onFinish }) {
     const [pos, setPos] = useState({ x: 4, y: 84, flip: false, dur: 1.6 });
+    const [moving, setMoving] = useState(false); // true only while ambling between waypoints (gates the crown shake)
     const [coins, setCoins] = useState([]);
     const coinId = useRef(0);
     useEffect(() => {
@@ -686,11 +687,14 @@ function LootPig({ onFinish }) {
         let step = 0;
         const MAX_STEPS = 7; // meander waypoints before he leaves
         const drop = (x, y) => { SFX.coin(); setCoins((c) => [...c, { id: ++coinId.current, x: x + rand(-3, 3), y: y + rand(-1, 5) }]); };
+        // Mark moving for the duration of a glide, then still while he pauses before the next amble.
+        const glide = (dur) => { setMoving(true); timers.push(setTimeout(() => { if (alive) setMoving(false); }, dur * 1000)); };
         const move = () => {
             if (!alive) return;
             step += 1;
             if (step > MAX_STEPS) {
                 setPos((p) => { const exitX = Math.random() < 0.5 ? -12 : 112; return { x: exitX, y: 84, flip: exitX < p.x, dur: 2.4 }; });
+                glide(2.4);
                 timers.push(setTimeout(() => { if (alive) onFinish(); }, 2500));
                 return;
             }
@@ -698,6 +702,7 @@ function LootPig({ onFinish }) {
             const ny = 80 + rand(0, 10);
             const dur = rand(1.5, 2.7);
             setPos((p) => ({ x: nx, y: ny, flip: nx < p.x, dur }));
+            glide(dur);
             drop(nx, ny);
             timers.push(setTimeout(move, dur * 1000 + rand(350, 1000))); // amble, then pause, then wander again
         };
@@ -711,8 +716,8 @@ function LootPig({ onFinish }) {
                 <span key={c.id} style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", fontSize: 18, zIndex: 50, pointerEvents: "none", animation: "coinPop .5s ease-out both" }}>🪙</span>
             ))}
             <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
-                <div style={{ position: "relative", animation: "pigBob .55s ease-in-out infinite" }}>
-                    <span style={{ position: "absolute", left: "50%", top: -2, fontSize: 20, zIndex: 2, transformOrigin: "bottom center", animation: "crownJiggle .34s ease-in-out infinite" }}>👑</span>
+                <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
+                    <span style={{ position: "absolute", left: pos.flip ? "40%" : "60%", top: 9, fontSize: 27, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
                     {PIG_SPRITE_URL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />
@@ -798,7 +803,7 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                                     <div className="muted" style={{ fontSize: 12, textAlign: "center", marginBottom: 6 }}>Out of pets for today.</div>
                                     {wallet && wallet.gold >= petting.rechargeCost ? (
                                         <button type="button" onClick={onRecharge} disabled={busy} style={{ width: "100%", padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
-                                            {busyKey === "recharge" ? "Recharging…" : `Recharge +${petting.rechargeAmount} for ${petting.rechargeCost.toLocaleString()}g`}
+                                            {busyKey === "recharge" ? "Recharging…" : `🪙 Recharge +${petting.rechargeAmount} · spend ${petting.rechargeCost.toLocaleString()}g`}
                                         </button>
                                     ) : (
                                         <div style={{ textAlign: "center" }}>

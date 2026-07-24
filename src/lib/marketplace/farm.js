@@ -33,7 +33,7 @@ const PET_OTHER_PLAYER_XP = 5;
 const FEED_OTHER_GOLD = 15;
 const FEED_OTHER_PLAYER_XP = 8;
 const PET_RECHARGE_AMOUNT = 3; // extra pettings granted per paid recharge
-const PET_RECHARGE_BASE = 200; // gold cost of the FIRST recharge; doubles each time (200 → 400 → 800 …)
+const PET_RECHARGE_BASE = 500; // gold cost of the FIRST recharge each day; doubles every recharge (500 → 1000 → 2000 …), resets daily
 const rechargeCost = (n) => PET_RECHARGE_BASE * 2 ** n;
 // Wild Loot Pig
 const PIG_GOLD_MIN = 100, PIG_GOLD_MAX = 250;
