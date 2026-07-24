@@ -358,6 +358,8 @@ export async function petPet(petterId, petId, ownerId = null) {
         }
         const r = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
         newXp = r?.xp || 0;
+        // Log it so the owner sees who petted which of their pets (and the XP it earned) on their next visit.
+        await db.query(`INSERT INTO mkt_pet_visit (owner_id, petter_id, pet_id, xp) VALUES ($1, $2, $3, $4)`, [petOwner, petterId, petId, PET_PET_XP]).catch(() => {});
     }
 
     // Reward the petter: your own pet pays a bit more (the bond); a friend's pet a small thank-you.
@@ -382,6 +384,56 @@ export async function petPet(petterId, petId, ownerId = null) {
         maxed: info.maxed,
         petting: flatBudget(await pettingBudget(petterId), own),
     };
+}
+
+// "Who petted your pets" welcome-back recap. Returns every unseen petting on YOUR pets, grouped by the visitor
+// (and, under each visitor, which pets they petted + the XP each gained). Fetching it marks the rows seen so it
+// pops once — same contract as the raid-defense report.
+export async function getUnseenPetVisits(ownerId) {
+    if (!ownerId) return { visits: [], totalXp: 0, totalVisits: 0, petterCount: 0 };
+    const rows = await db
+        .query(
+            `SELECT petter_id, pet_id, COUNT(*)::int AS n, COALESCE(SUM(xp), 0)::int AS xp
+               FROM mkt_pet_visit WHERE owner_id = $1 AND seen_at IS NULL
+              GROUP BY petter_id, pet_id`,
+            [ownerId]
+        )
+        .catch(() => []);
+    if (!rows.length) return { visits: [], totalXp: 0, totalVisits: 0, petterCount: 0 };
+    const ids = [...new Set(rows.map((r) => r.petter_id))];
+    const [buyers, petMap] = await Promise.all([
+        db.query(`SELECT id, display_name, alias, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip, equipped_border FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
+        getPetSpriteData().catch(() => ({})),
+    ]);
+    const byId = new Map((buyers || []).map((b) => [b.id, b]));
+    const grouped = new Map();
+    for (const r of rows) {
+        if (!grouped.has(r.petter_id)) grouped.set(r.petter_id, []);
+        const def = collectibleById(r.pet_id);
+        const sp = petMap[r.pet_id] || {};
+        grouped.get(r.petter_id).push({
+            petId: r.pet_id, name: def?.name || r.pet_id, rarity: def?.rarity || "common",
+            spriteUrl: sp.url || null, spriteFlip: sp.flip === true, count: r.n, xp: r.xp,
+        });
+    }
+    const visits = [...grouped.entries()].map(([pid, pets]) => {
+        const b = byId.get(pid) || {};
+        return {
+            petter: {
+                name: b.display_name || b.alias || "A visitor",
+                alias: b.alias || null,
+                level: levelForXp(b.xp || 0).level,
+                avatarUrl: b.avatar_sprite_url || null,
+                avatarFlip: b.avatar_sprite_url ? b.avatar_sprite_flip === true : false,
+                border: b.equipped_border && b.equipped_border !== "none" ? b.equipped_border : null,
+            },
+            pets: pets.sort((a, c) => c.xp - a.xp),
+            xp: pets.reduce((s, p) => s + p.xp, 0),
+            count: pets.reduce((s, p) => s + p.count, 0),
+        };
+    }).sort((a, b) => b.xp - a.xp);
+    await db.query(`UPDATE mkt_pet_visit SET seen_at = NOW() WHERE owner_id = $1 AND seen_at IS NULL`, [ownerId]).catch(() => {});
+    return { visits, totalXp: rows.reduce((s, r) => s + r.xp, 0), totalVisits: rows.reduce((s, r) => s + r.n, 0), petterCount: ids.length };
 }
 
 // Pay gold to recharge the daily petting budget. Cost doubles each recharge that day.

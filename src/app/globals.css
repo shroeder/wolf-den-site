@@ -11196,6 +11196,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; --accent: #ffd75e; --accent-soft: rgba(255,215,94,0.45); }
 .sail-upgrades.is-boat { --accent: #6fd0ff; --accent-soft: rgba(111,208,255,0.45); } /* sea-blue for travel/loot levers */
 .sail-upgrades.is-dig { --accent: #ffc061; --accent-soft: rgba(255,192,97,0.45); }  /* warm amber for excavation */
+.sail-upgrades.is-farm { --accent: #7ed57e; --accent-soft: rgba(126,213,126,0.45); } /* pasture-green for the farm */
 /* Glassy, depth-y upgrade card with a tinted accent edge + icon chip (was a flat outline). */
 .sail-upg { position: relative; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px 12px 12px 14px;
     display: flex; flex-direction: column; gap: 7px; overflow: hidden;

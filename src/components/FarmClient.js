@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import CoinCta from "@/components/CoinCta";
+import PetVisitReport from "@/components/PetVisitReport";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -505,6 +507,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
             `}</style>
 
+            {/* Welcome-back recap: who petted your pets while you were away (own farm only). */}
+            {farm.mine ? <PetVisitReport /> : null}
+
             <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div>
                     <h1 style={{ margin: 0 }}>🏡 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
@@ -591,6 +596,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                         position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -100%)",
                                         transition: `left ${p.dur}s linear, top ${p.dur}s linear`,
                                         background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(p.y),
+                                        WebkitTapHighlightColor: "transparent", outline: "none", WebkitTouchCallout: "none",
                                     }}
                                 >
                                     {/* fixed-size sprite stage: the shadow stays planted on the ground while the sprite hops above it */}
@@ -639,13 +645,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={wx.condition} />
-                {/* Wild Loot Pig announce toast — pinned over the TOP of the pasture (absolute within this
-                    container, which is the viewport width) so it's always centered and never runs off-screen. */}
-                {pigToast ? (
-                    <div style={{ position: "absolute", top: 44, left: "50%", transform: "translateX(-50%)", zIndex: 70, width: "max-content", maxWidth: "88%", textAlign: "center", padding: "8px 16px", borderRadius: 999, background: "rgba(20,16,6,0.95)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.25, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", animation: "pigPop .4s ease both", pointerEvents: "none" }}>
-                        🐷👑 The Wild Loot Pig appeared!
-                    </div>
-                ) : null}
                 {/* Live conditions label (unobtrusive, top-left) */}
                 <div style={{ position: "absolute", top: 8, left: 8, zIndex: 60, pointerEvents: "none", padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700, color: "#f2f6ee", background: "rgba(18,26,14,0.5)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(2px)" }}
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
@@ -661,6 +660,17 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onUpgrade={buyUpgradeKey}
                     onDebug={gardenDebug}
                 />
+            ) : null}
+
+            {/* Wild Loot Pig announce banner — rendered at the ROOT (outside the pasture's overflow:hidden scene) as a
+                position:fixed, FLEX-centered overlay. Centering lives on the outer wrapper so the pill's own pigPop
+                scale animation can never knock it off-center or clip it (the old bug). */}
+            {pigToast ? (
+                <div style={{ position: "fixed", top: 72, left: 0, right: 0, zIndex: 9998, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
+                    <div style={{ maxWidth: "min(92vw, 440px)", textAlign: "center", padding: "9px 18px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.25, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", animation: "pigPop .4s ease both" }}>
+                        🐷👑 The Wild Loot Pig appeared!
+                    </div>
+                </div>
             ) : null}
 
             {planting != null && garden ? (
@@ -787,7 +797,9 @@ function LootPig({ onFinish }) {
             ))}
             <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
                 <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
-                    <span style={{ position: "absolute", left: "50%", top: 4, fontSize: 22, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
+                    {/* Crown sits a touch higher (up) and toward the back of the head (away from the snout, so it
+                        follows the flip). Positioned via top/left — NOT transform — so crownJiggle can't reset it. */}
+                    <span style={{ position: "absolute", left: pos.flip ? "56%" : "44%", top: -3, fontSize: 22, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
                     {PIG_SPRITE_URL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />
@@ -825,7 +837,7 @@ function OwnerWalker({ owner, mine, minX = FARM_PAD, onTap }) {
             type="button"
             onClick={onTap}
             title={mine ? "You" : `Tap to connect with ${owner.name}`}
-            style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s linear, top ${pos.dur}s linear`, background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(pos.y) + 1 }}
+            style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s linear, top ${pos.dur}s linear`, background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(pos.y) + 1, WebkitTapHighlightColor: "transparent", outline: "none", WebkitTouchCallout: "none" }}
         >
             <span style={{ position: "relative", display: "block", width: 66, height: 66, margin: "0 auto" }}>
                 <span className={pos.moving ? "farm-shadow-hop" : ""} style={{ position: "absolute", left: "50%", bottom: -2, width: 46, height: 10, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0, animationDuration: pos.moving ? "480ms" : undefined }} />
@@ -1012,6 +1024,8 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
 
 function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
     const [showDebug, setShowDebug] = useState(false);
+    const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade just bought → brief celebratory pop
+    const buyUpgrade = (key) => { setUpgFlash(key); setTimeout(() => setUpgFlash(null), 620); onUpgrade(key); };
     const g = garden;
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
     const canBuyFert = g.gold >= g.fertilizerPrice;
@@ -1052,28 +1066,37 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
                 <button type="button" onClick={onBuyFertilizer} disabled={busy || !canBuyFert} style={{ padding: "9px 14px", borderRadius: 11, border: "none", background: canBuyFert ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.1)", color: canBuyFert ? "#3a2c08" : "inherit", fontSize: 13, fontWeight: 900, cursor: canBuyFert ? "pointer" : "default", whiteSpace: "nowrap", opacity: canBuyFert ? 1 : 0.6, boxShadow: canBuyFert ? "0 3px 0 #b57f22" : "none" }}>🪙 Buy · {g.fertilizerPrice}g</button>
             </div>
 
-            {/* Farm upgrades — expanded, styled like the SHIP upgrades so the whole game reads consistently. */}
-            <div style={{ marginTop: 16 }}>
-                <h3 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⬆️ Farm upgrades</h3>
+            {/* Farm upgrades — styled exactly like the SHIP/DIG upgrades (effect line, coin CTA, buy-pop) so the
+                whole game reads consistently. Earthy-green themed to match the pasture. */}
+            <section style={{ marginTop: 16, borderRadius: 14, border: "1px solid rgba(120,200,120,0.4)", background: "linear-gradient(180deg, rgba(90,180,90,0.1), transparent 42%)", padding: "12px 12px 14px" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(120,200,120,0.16)", border: "1px solid rgba(120,200,120,0.5)", color: "#9fe4a0", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>🌾 Farmstead</div>
+                <h3 className="sail-upg-h" style={{ margin: "0 0 2px" }}>Upgrade your farm</h3>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Spend gold to grow faster, find more seeds, raise the petting cap, and pull better loot from every harvest.</p>
-                <div className="sail-upgrades is-boat">
+                <div className="sail-upgrades is-farm">
                     {g.upgrades.map((u) => {
                         const affordable = u.cost != null && g.gold >= u.cost;
                         return (
-                            <div className={`sail-upg${u.cost == null ? " is-maxed" : ""}`} key={u.key}>
+                            <div className={`sail-upg${u.cost == null ? " is-maxed" : ""}${upgFlash === u.key ? " is-bought" : ""}`} key={u.key}>
                                 <div className="sail-upg-top">
                                     <span className="sail-upg-title"><span className="sail-upg-ico">{u.emoji}</span>{u.name}</span>
                                     <span className="muted sail-upg-lv">Lv {u.level}/{u.max}</span>
                                 </div>
                                 <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.max ? Math.min(100, (u.level / u.max) * 100) : 0}%` }} /></div>
                                 <p className="muted sail-upg-desc">{u.desc}</p>
+                                {u.eff ? (
+                                    <div className="sail-upg-effect">
+                                        <span>{u.eff.label}</span>
+                                        <b>{u.eff.now}{u.cost == null ? "" : <> → <span className="sail-upg-next">{u.eff.next}</span></>}</b>
+                                    </div>
+                                ) : null}
                                 {u.cost == null ? <button className="pill" disabled>✓ Maxed</button>
-                                    : <button className="btn-ghost sail-upg-buy" disabled={busy || !affordable} onClick={() => onUpgrade(u.key)}>🪙 {u.cost.toLocaleString()}</button>}
+                                    : !affordable ? <CoinCta price={u.cost} have={g.gold} className="sail-upg-cta" />
+                                        : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(u.key)}>🪙 {u.cost.toLocaleString()}</button>}
                             </div>
                         );
                     })}
                 </div>
-            </div>
+            </section>
 
             {/* Owner debug (collapsible) */}
             <PanelToggle title="🛠️ Debug · seeds & growth" open={showDebug} onToggle={() => setShowDebug((v) => !v)} accent="#ffd75e" note="owner-only" />
@@ -1290,15 +1313,18 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                                 <div style={{ textAlign: "center", padding: "8px 0 2px", color: "#ff9ec2", fontWeight: 600 }}>{mine ? "❤️ Petted today — come back tomorrow" : "❤️ You petted this pet — spread the love!"}</div>
                             ) : petting && petting.left <= 0 ? (
                                 <div>
-                                    <div className="muted" style={{ fontSize: 12, textAlign: "center", marginBottom: 6 }}>Out of pets for today.</div>
+                                    {/* LOCKED — deliberately reads as "you can't pet" so a stray tap is never mistaken for a free
+                                        petting. The recharge below is styled as an obvious GOLD purchase, not the pink Pet button. */}
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px dashed rgba(255,255,255,0.22)", color: "#c7ccd1", fontWeight: 800, fontSize: 13 }}>
+                                        🔒 Out of {mine ? "free pettings" : "visits"} today
+                                    </div>
                                     {wallet && wallet.gold >= petting.rechargeCost ? (
-                                        <button type="button" onClick={onRecharge} disabled={busy} style={{ width: "100%", padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
-                                            {busyKey === "recharge" ? "Recharging…" : `🪙 Recharge +${petting.rechargeAmount} · spend ${petting.rechargeCost.toLocaleString()}g`}
+                                        <button type="button" onClick={onRecharge} disabled={busy} style={{ width: "100%", marginTop: 8, padding: "11px 12px", fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.7 : 1 }}>
+                                            {busyKey === "recharge" ? "Recharging…" : `🪙 Buy ${petting.rechargeAmount} more pettings · ${petting.rechargeCost.toLocaleString()}g`}
                                         </button>
                                     ) : (
-                                        <div style={{ textAlign: "center" }}>
-                                            <div className="muted" style={{ fontSize: 12 }}>Recharge is {petting.rechargeCost.toLocaleString()}g — you have {(wallet?.gold || 0).toLocaleString()}g.</div>
-                                            <a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 6, fontWeight: 700, color: "#ffd75e" }}>Get store credit &amp; coins →</a>
+                                        <div style={{ marginTop: 8 }}>
+                                            <CoinCta price={petting.rechargeCost} have={wallet?.gold || 0} label={`coins for ${petting.rechargeAmount} more`} />
                                         </div>
                                     )}
                                 </div>

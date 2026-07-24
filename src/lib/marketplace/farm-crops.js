@@ -55,18 +55,38 @@ const SEED_SOURCES = {
     chest_gold: { chance: 0.8, rarities: { common: 14, rare: 38, epic: 33, legendary: 14, mythic: 1 } },
 };
 
-// Upgrade tracks — each 5 levels, cost doubles per level. Effects applied in the helpers below.
+// Upgrade tracks — each 5 levels. Effects applied in the helpers below.
 export const FARM_UPGRADES = {
-    plots: { name: "Extra Plot", emoji: "🟫", max: 5, base: 800, desc: "+1 planting plot" },
-    grow: { name: "Green Thumb", emoji: "🌱", max: 5, base: 1200, desc: "−8% grow time per level" },
-    seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 1000, desc: "+25% seeds found across the games" },
-    petcap: { name: "Pet Whisperer", emoji: "🐾", max: 5, base: 1500, desc: "+1 free petting every day" },
-    chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 2500, desc: "better harvest-loot odds (bumps the drop tier)" },
-    seedsaver: { name: "Seed Saver", emoji: "🌰", max: 5, base: 1800, desc: "+1% to keep the seed when you harvest" },
+    plots: { name: "Extra Plot", emoji: "🟫", max: 5, base: 150, desc: "+1 planting plot" },
+    grow: { name: "Green Thumb", emoji: "🌱", max: 5, base: 220, desc: "−8% grow time per level" },
+    seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 160, desc: "+25% seeds found across the games" },
+    petcap: { name: "Pet Whisperer", emoji: "🐾", max: 5, base: 240, desc: "+1 free petting every day" },
+    chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 300, desc: "better harvest-loot odds (bumps the drop tier)" },
+    seedsaver: { name: "Seed Saver", emoji: "🌰", max: 5, base: 200, desc: "+1% to keep the seed when you harvest" },
 };
-export const upgradeCost = (key, level) => Math.round((FARM_UPGRADES[key]?.base || 1000) * 2 ** level);
+// Cost curve mirrors Sailing's boat/dig upgrades: quadratic in the NEXT level (base × (level+1)²), not doubling —
+// so a full track totals a few thousand gold instead of tens of thousands. base is the level 0→1 price.
+export const upgradeCost = (key, level) => Math.round((FARM_UPGRADES[key]?.base || 150) * (level + 1) ** 2);
 
 export const BASE_PLOTS = 3;
+
+// The concrete current→next effect of a track — powers the "now → next" line on each upgrade card.
+export function upgradeEffect(key, level) {
+    const at = (l) => {
+        switch (key) {
+            case "plots": return `${BASE_PLOTS + l} plots`;
+            case "grow": return `−${8 * l}%`;
+            case "seedluck": return `+${25 * l}%`;
+            case "petcap": return `+${l}/day`;
+            case "chest": return `+${6 * l}%`;
+            case "seedsaver": return `${l}%`;
+            default: return `Lv ${l}`;
+        }
+    };
+    const labels = { plots: "Plots", grow: "Grow time", seedluck: "Seed find", petcap: "Free pettings", chest: "Loot boost", seedsaver: "Seed saved" };
+    const max = FARM_UPGRADES[key]?.max || 0;
+    return { label: labels[key] || FARM_UPGRADES[key]?.name || key, now: at(Math.min(max, level)), next: at(Math.min(max, level + 1)) };
+}
 const FERTILIZER_PRICE = 350; // gold per fertilizer
 const FERTILIZER_CUT = 0.4; // fertilizer removes 40% of the REMAINING grow time
 const RAIN_CUT = 0.3; // logging in during rain removes 30% of remaining time (once per plot per 6h)
@@ -180,7 +200,7 @@ export async function getGarden(buyerId) {
         .filter((s) => SEEDS[s.id]);
     const upgrades = Object.entries(FARM_UPGRADES).map(([key, def]) => {
         const level = lvl(up, key);
-        return { key, name: def.name, emoji: def.emoji, desc: def.desc, level, max: def.max, cost: level >= def.max ? null : upgradeCost(key, level) };
+        return { key, name: def.name, emoji: def.emoji, desc: def.desc, level, max: def.max, cost: level >= def.max ? null : upgradeCost(key, level), eff: upgradeEffect(key, level) };
     });
     return {
         plots: gardenPlots,
