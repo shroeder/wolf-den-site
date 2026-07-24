@@ -140,7 +140,31 @@ export async function getAiCosts({ days = 30 } = {}) {
         .map(([label, { cost, feature }]) => ({ label, feature, cost: round2(cost), pct: total ? Math.round((cost / total) * 1000) / 10 : 0 }))
         .sort((a, b) => b.cost - a.cost);
     const total7d = round2(daily.slice(-7).reduce((s, x) => s + x.cost, 0));
+    const prev7d = round2(daily.slice(-14, -7).reduce((s, x) => s + x.cost, 0));
     const totalToday = daily.length ? daily[daily.length - 1].cost : 0;
+    const avgDaily = daily.length ? round2(total / daily.length) : 0;
+    const peak = daily.reduce((best, d) => (!best || d.cost > best.cost ? d : best), null) || { date: null, cost: 0 };
+    const trendPct = prev7d > 0 ? Math.round(((total7d - prev7d) / prev7d) * 100) : null;
+    const monthlyRunRate = round2((total7d / 7) * 30); // current pace, annualized-to-month
+
+    // Itemize image spend by source (blob-attributed) so flags + the screen can name what the art dollars drew.
+    const features = await getImageSpendByFeature();
+
+    // ── Auto-flagged findings — the "so what" ─────────────────────────────────────────────────────────────
+    const flags = [];
+    if (trendPct != null) {
+        if (trendPct >= 15) flags.push({ sev: "warn", text: `Spend is UP ${trendPct}% week-over-week (${total7d.toFixed(2)} vs ${prev7d.toFixed(2)} the prior week).` });
+        else if (trendPct <= -15) flags.push({ sev: "good", text: `Spend is DOWN ${Math.abs(trendPct)}% week-over-week — trending cheaper.` });
+        else flags.push({ sev: "info", text: `Spend is roughly flat week-over-week (${trendPct >= 0 ? "+" : ""}${trendPct}%).` });
+    }
+    const topModel = byModel[0];
+    if (topModel) flags.push({ sev: "info", text: `${topModel.label} is ${topModel.pct}% of all spend ($${topModel.cost.toFixed(2)}).` });
+    const topFeat = features.rows[0];
+    if (topFeat) flags.push({ sev: "info", text: `${topFeat.label} is your biggest image cost (~$${topFeat.est.toFixed(2)}, ${topFeat.count} images).` });
+    if (peak.cost > avgDaily * 2.5 && peak.date) flags.push({ sev: "warn", text: `Biggest day was ${peak.date} at $${peak.cost.toFixed(2)} — ${(peak.cost / (avgDaily || 1)).toFixed(1)}× the daily average (a mass-generation day).` });
+    const scanner = byModel.find((m) => /gpt-4o$/i.test(m.label) || /scanner/i.test(m.feature));
+    if (scanner && scanner.cost < 1) flags.push({ sev: "good", text: `The card scanner costs ~$${scanner.cost.toFixed(2)} — effectively free.` });
+    if (oneTimeArt.est > 0) flags.push({ sev: "info", text: `Plus ~$${oneTimeArt.est.toFixed(2)} of bundled AI art (sailing, etc.) billed once earlier — not in this 30-day window.` });
 
     return {
         ok: true,
@@ -149,7 +173,27 @@ export async function getAiCosts({ days = 30 } = {}) {
         total: round2(total),
         total7d,
         totalToday,
+        trend: { prev7d, trendPct, avgDaily, peak: { date: peak.date, cost: peak.cost }, monthlyRunRate },
+        flags,
+        oneTimeArt,
         byModel,
+        byFeature: features,
         daily,
     };
 }
+
+// One-time AI art that was generated earlier and COMMITTED to the repo (public/images) rather than stored in
+// Blob — so it's invisible to both the blob scan and the rolling-30d Costs API, but it was a real (historical)
+// spend. Hand-inventoried (these change rarely); est per-image from the high-res quality they were drawn at.
+const STATIC_AI_ART = [
+    { label: "Sailing — boat hulls (tiers 1–11)", count: 11, unit: 0.17 },
+    { label: "Sailing — backgrounds (sky / ocean / raid / dig / merchant)", count: 19, unit: 0.19 },
+    { label: "Sailing — encounters & fragments", count: 16, unit: 0.13 },
+    { label: "Sailing — island / merchant / pet", count: 3, unit: 0.15 },
+];
+const oneTimeArt = {
+    note: "Generated once and committed to the repo — billed in an earlier period, so NOT included in the 30-day totals above.",
+    rows: STATIC_AI_ART.map((r) => ({ label: r.label, count: r.count, est: Math.round(r.count * r.unit * 100) / 100 })),
+    count: STATIC_AI_ART.reduce((s, r) => s + r.count, 0),
+    est: Math.round(STATIC_AI_ART.reduce((s, r) => s + r.count * r.unit, 0) * 100) / 100,
+};

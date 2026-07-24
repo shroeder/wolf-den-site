@@ -15,6 +15,9 @@ const PLOT_KEEPOUT = { xMax: 42, yMin: 74 };
 export function nearPlots(x, y) {
     return Number(x) <= PLOT_KEEPOUT.xMax && Number(y) >= PLOT_KEEPOUT.yMin;
 }
+// Owning a decoration is a PERMANENT unlock — you can place it as many times as you like (reusable, never
+// consumed). The only limit is a global cap on how many items you can have placed at once.
+export const PLACE_CAP = 500;
 export const decoKeepout = () => ({ ...PLOT_KEEPOUT });
 
 // The sprite-url map for a set of decoration ids (or all, if none given).
@@ -94,7 +97,7 @@ export async function decoState(buyerId) {
             const placed = placedCount[r.deco_id] || 0;
             return {
                 id: def.id, name: def.name, emoji: def.emoji, rarity: def.rarity, rarityColor: DECO_RARITY[def.rarity]?.color,
-                spriteUrl: sprites[def.id] || null, qty: r.qty, placed, free: Math.max(0, r.qty - placed),
+                spriteUrl: sprites[def.id] || null, owned: true, placed, // owning = permanent; place as many as you like
                 buff: def.buff, buffText: def.buff ? buffText(def.buff) : null,
             };
         })
@@ -115,21 +118,23 @@ export async function decoState(buyerId) {
             buff: d.buff, buffText: d.buff ? buffText(d.buff) : null, owned: ownedSet.has(d.id),
         }))
         .sort((a, b) => (DECO_RARITY[a.rarity]?.rank || 0) - (DECO_RARITY[b.rarity]?.rank || 0) || a.price - b.price);
-    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), shop };
+    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), shop, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
 }
 
 const clampPct = (v, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(2, Math.min(98, n)) : def; };
 
-// Place an owned decoration at (x, y). Guards: you own a free (unplaced) copy, and the spot isn't over the plots.
+// Place a decoration you OWN at (x, y). Owning is a permanent unlock, so you can place the same decoration as
+// many times as you like (reusable). Guards: you own it, the spot isn't over the plots, and you're under the
+// global 500-item placement cap.
 export async function placeDecoration(buyerId, decoId, x, y) {
     if (!buyerId || !isDecoration(decoId)) return { ok: false, error: "bad_decoration" };
     const px = clampPct(x, 50);
     const py = clampPct(y, 55);
     if (nearPlots(px, py)) return { ok: false, error: "too_close_to_plots" };
-    const owned = await db.queryOne(`SELECT qty FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = $2`, [buyerId, decoId]).catch(() => null);
-    if (!owned || owned.qty < 1) return { ok: false, error: "not_owned" };
-    const placed = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1 AND deco_id = $2`, [buyerId, decoId]).catch(() => ({ n: 0 }));
-    if ((placed?.n || 0) >= owned.qty) return { ok: false, error: "all_placed" };
+    const owned = await db.queryOne(`SELECT 1 FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = $2 AND qty > 0`, [buyerId, decoId]).catch(() => null);
+    if (!owned) return { ok: false, error: "not_owned" };
+    const total = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ n: 0 }));
+    if ((total?.n || 0) >= PLACE_CAP) return { ok: false, error: "placement_limit", ...(await decoState(buyerId)) };
     const topZ = await db.queryOne(`SELECT COALESCE(MAX(z), 0) AS z FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ z: 0 }));
     await db.query(`INSERT INTO mkt_deco_placement (buyer_id, deco_id, x, y, z) VALUES ($1, $2, $3, $4, $5)`, [buyerId, decoId, px, py, (topZ?.z || 0) + 1]).catch(() => {});
     return { ok: true, ...(await decoState(buyerId)) };

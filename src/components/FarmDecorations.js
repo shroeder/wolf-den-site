@@ -75,16 +75,17 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
 // farm's "Decorate" button. Placing drops the piece into an open spot on the right of the field; drag to move.
 export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy, onPlace, onClose }) {
     const [tab, setTab] = useState("mine");
-    const { owned = [], shop = [], buffs = {}, buffMeta = {} } = deco || {};
+    const { owned = [], shop = [], buffs = {}, buffMeta = {}, placedTotal = 0, placedCap = 500 } = deco || {};
     const activeBuffs = Object.entries(buffs).filter(([, v]) => v > 0);
-    const freeToPlace = owned.filter((o) => o.free > 0);
+    const atCap = placedTotal >= placedCap;
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "end center", padding: 0 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Farm decorations" style={{ width: "100%", maxWidth: 560, maxHeight: "82dvh", display: "flex", flexDirection: "column", borderRadius: "18px 18px 0 0", background: "var(--card-bg,#17181c)", border: "2px solid #7ed57e", borderBottom: "none", boxShadow: "0 -12px 40px rgba(0,0,0,0.5)", animation: "pigPop .35s ease both" }}>
                 <div style={{ padding: "14px 16px 8px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <strong style={{ fontSize: 17 }}>🎀 Decorate your farm</strong>
-                        <span style={{ marginLeft: "auto", fontWeight: 800, color: "#ffd75e", fontSize: 14 }}>🪙 {gold.toLocaleString()}</span>
+                        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }} title="Total items placed on your farm">🎀 {placedTotal}/{placedCap}</span>
+                        <span style={{ fontWeight: 800, color: "#ffd75e", fontSize: 14 }}>🪙 {gold.toLocaleString()}</span>
                         <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7, lineHeight: 1 }}>×</button>
                     </div>
                     {activeBuffs.length ? (
@@ -108,10 +109,15 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
                 <div style={{ overflowY: "auto", padding: 12 }}>
                     {tab === "mine" ? (
                         owned.length === 0 ? (
-                            <Empty>No decorations yet — win them on the wheel, the level track, or buy some in the Shop tab.</Empty>
+                            <div style={{ textAlign: "center", padding: "20px 12px" }}>
+                                <p className="muted" style={{ fontSize: 13, margin: "0 0 12px" }}>No decorations yet — win them on the wheel or level track, or buy some now. Once you own one, place it as many times as you like.</p>
+                                <button type="button" onClick={() => setTab("shop")} style={{ padding: "10px 20px", borderRadius: 11, border: "none", fontWeight: 900, fontSize: 14, cursor: "pointer", background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", boxShadow: "0 3px 0 #b57f22" }}>🛒 Browse the shop</button>
+                            </div>
                         ) : (
                             <>
-                                {editing ? <p className="muted" style={{ margin: "0 0 10px", fontSize: 12, textAlign: "center" }}>Drag pieces around the field to arrange them; tap the ✕ to pick one up. (Not over your crops.)</p> : null}
+                                <p className="muted" style={{ margin: "0 0 10px", fontSize: 12, textAlign: "center" }}>
+                                    {editing ? "Drag pieces around the field to arrange them; tap the ✕ to pick one up (not over your crops)." : "Place a decoration as many times as you like — you own it forever. Tap “✋ Arrange” to move or pick up placed pieces."}
+                                </p>
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
                                     {owned.map((o) => (
                                         <div key={o.id} style={{ padding: 10, borderRadius: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${(RARITY_RING[o.rarity] || "#555")}55` }}>
@@ -119,12 +125,12 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
                                                 <DecoIcon o={o} />
                                                 <div style={{ minWidth: 0, flex: 1 }}>
                                                     <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</div>
-                                                    <div style={{ fontSize: 10.5, color: RARITY_RING[o.rarity] || "#9aa0a6", textTransform: "capitalize" }}>{o.rarity}{o.qty > 1 ? ` ·×${o.qty}` : ""}</div>
+                                                    <div style={{ fontSize: 10.5, color: RARITY_RING[o.rarity] || "#9aa0a6", textTransform: "capitalize" }}>{o.rarity}{o.placed ? ` · ${o.placed} placed` : ""}</div>
                                                 </div>
                                             </div>
                                             {o.buffText ? <div style={{ fontSize: 10.5, marginTop: 4, color: "#a7e6a7", fontWeight: 700 }}>{o.buffText}</div> : null}
-                                            <button type="button" disabled={busy || o.free <= 0} onClick={() => onPlace(o.id)} style={{ width: "100%", marginTop: 8, padding: "7px 8px", borderRadius: 9, border: "none", fontWeight: 800, fontSize: 12, cursor: o.free > 0 && !busy ? "pointer" : "default", background: o.free > 0 ? "linear-gradient(180deg,#8fe39a,#4bbf6a)" : "rgba(255,255,255,0.08)", color: o.free > 0 ? "#06311f" : "#9aa0a6", opacity: o.free > 0 ? 1 : 0.7 }}>
-                                                {o.free > 0 ? `Place${o.placed ? ` (${o.free} left)` : ""}` : "All placed"}
+                                            <button type="button" disabled={busy || atCap} onClick={() => onPlace(o.id)} style={{ width: "100%", marginTop: 8, padding: "7px 8px", borderRadius: 9, border: "none", fontWeight: 800, fontSize: 12, cursor: !atCap && !busy ? "pointer" : "default", background: !atCap ? "linear-gradient(180deg,#8fe39a,#4bbf6a)" : "rgba(255,255,255,0.08)", color: !atCap ? "#06311f" : "#9aa0a6", opacity: !atCap ? 1 : 0.7 }}>
+                                                {atCap ? "Farm full (500)" : "＋ Place"}
                                             </button>
                                         </div>
                                     ))}
@@ -178,8 +184,4 @@ function TabBtn({ active, onClick, children }) {
     return (
         <button type="button" onClick={onClick} style={{ padding: "6px 12px", borderRadius: 10, border: "none", background: active ? "rgba(126,213,126,0.18)" : "rgba(255,255,255,0.05)", color: active ? "#a7e6a7" : "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>{children}</button>
     );
-}
-
-function Empty({ children }) {
-    return <p className="muted" style={{ textAlign: "center", fontSize: 13, padding: "24px 12px" }}>{children}</p>;
 }

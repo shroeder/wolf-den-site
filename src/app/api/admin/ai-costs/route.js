@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { getAiCosts, getImageSpendByFeature } from "@/lib/marketplace/openai-usage.js";
+import { getAiCosts } from "@/lib/marketplace/openai-usage.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -15,8 +15,8 @@ export async function GET(request) {
         if (authError) return authError;
         try {
             const days = Math.max(1, Math.min(90, Number(new URL(request.url).searchParams.get("days")) || 30));
-            const [data, byFeature] = await Promise.all([getAiCosts({ days }), getImageSpendByFeature()]);
-            return NextResponse.json({ ...data, byFeature }, { status: data.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
+            const data = await getAiCosts({ days });
+            return NextResponse.json(data, { status: data.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.ai_costs.failure" });
         }

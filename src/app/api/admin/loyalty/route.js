@@ -80,7 +80,64 @@ export async function GET(request) {
                 `),
             ]);
 
+            // ── Derived INSIGHT (activation funnel, growth trend, profile gaps, XP economy, store funnel, flags) ──
+            const pct = (n, dn) => (dn ? Math.round((n / dn) * 100) : 0);
+            const S = summary || {};
+            const members = S.total_members || 0;
+            const earning = S.earning_members || 0;
+            const a7 = active?.active_7d || 0;
+            const a30 = active?.active_30d || 0;
+            const sig = (signups || []).map((r) => r.count || 0);
+            const sig7 = sig.slice(-7).reduce((s, x) => s + x, 0);
+            const sigPrev7 = sig.slice(-14, -7).reduce((s, x) => s + x, 0);
+            const sigTrendPct = sigPrev7 > 0 ? Math.round(((sig7 - sigPrev7) / sigPrev7) * 100) : null;
+            const fn = funnel || {};
+            const totalActionPoints = (byAction || []).reduce((s, r) => s + Number(r.points || 0), 0);
+
+            const flags = [];
+            flags.push({ sev: earning >= members * 0.6 ? "good" : "warn", text: `${pct(earning, members)}% of members have earned XP (activation) — ${earning} of ${members}.` });
+            flags.push({ sev: a7 >= members * 0.3 ? "good" : "warn", text: `Weekly active: ${a7} of ${members} (${pct(a7, members)}%). Monthly active: ${a30} (${pct(a30, members)}%).` });
+            if (sigTrendPct != null) flags.push({ sev: sigTrendPct >= 0 ? "good" : "warn", text: `${sig7} new members in the last 7 days (${sigTrendPct >= 0 ? "+" : ""}${sigTrendPct}% vs ${sigPrev7} the prior week).` });
+            else flags.push({ sev: "info", text: `${sig7} new members in the last 7 days.` });
+            if (fn.claims_created > 0) flags.push({ sev: "info", text: `In-store QR: ${fn.claims_created} claims shown, ${fn.claims_redeemed} redeemed (${pct(fn.claims_redeemed, fn.claims_created)}% redemption).` });
+            if (fn.pending_purchases > 0) flags.push({ sev: "warn", text: `${fn.pending_purchases} store-credit purchases are waiting to be claimed.` });
+            if (pct(S.discord_linked, members) < 40) flags.push({ sev: "info", text: `Only ${pct(S.discord_linked, members)}% have linked Discord — a reach gap for announcements.` });
+
+            const insights = {
+                kpis: {
+                    activationPct: pct(earning, members),
+                    weeklyActivePct: pct(a7, members),
+                    monthlyActivePct: pct(a30, members),
+                    new7d: S.new_7d || 0,
+                    signups7d: sig7,
+                    signupTrendPct: sigTrendPct,
+                },
+                funnel: [
+                    { label: "Members", value: members, pct: 100 },
+                    { label: "Earned XP", value: earning, pct: pct(earning, members) },
+                    { label: "Active 30d", value: a30, pct: pct(a30, members) },
+                    { label: "Active 7d", value: a7, pct: pct(a7, members) },
+                ],
+                profile: [
+                    { label: "Has @handle", n: S.with_handle || 0, pct: pct(S.with_handle, members) },
+                    { label: "Has avatar", n: S.with_avatar || 0, pct: pct(S.with_avatar, members) },
+                    { label: "Discord linked", n: S.discord_linked || 0, pct: pct(S.discord_linked, members) },
+                    { label: "Phone on file", n: S.phone_on_file || 0, pct: pct(S.phone_on_file, members) },
+                    { label: "Square linked", n: S.square_linked || 0, pct: pct(S.square_linked, members) },
+                ],
+                xpSources: (byAction || []).slice(0, 6).map((r) => ({ action: r.action, points: Number(r.points || 0), pct: pct(Number(r.points || 0), totalActionPoints) })),
+                store: {
+                    claimsCreated: fn.claims_created || 0,
+                    claimsRedeemed: fn.claims_redeemed || 0,
+                    claimRedeemPct: pct(fn.claims_redeemed, fn.claims_created),
+                    pendingPurchases: fn.pending_purchases || 0,
+                    redeemedPurchases: fn.redeemed_purchases || 0,
+                },
+                flags,
+            };
+
             const body = {
+                insights,
                 summary: {
                     totalMembers: summary?.total_members || 0,
                     withHandle: summary?.with_handle || 0,

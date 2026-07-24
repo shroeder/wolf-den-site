@@ -473,7 +473,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             setFarm((f) => ({
                 ...f,
                 placements: r.placements || f.placements,
-                decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, shop: r.shop },
+                decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, shop: r.shop, placedTotal: r.placedTotal, placedCap: r.placedCap },
                 wallet: f.wallet && r.gold != null ? { ...f.wallet, gold: r.gold } : f.wallet,
             }));
         }
