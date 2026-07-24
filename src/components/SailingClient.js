@@ -614,12 +614,18 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             {/* Random horizon backdrop; scrolls right→left while you're underway. FOUR copies with
                                 every other one mirrored (CSS) so the strip tiles SEAMLESSLY — the art isn't
                                 edge-matched, but a mirrored copy's edge always equals its neighbor's, killing the seam. */}
-                            <div className={`sail-sky-scroll${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true">
-                                {[0, 1, 2, 3].map((n) => (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img key={n} src={sky || state.oceanBg} alt="" />
-                                ))}
-                            </div>
+                            {skyType === "night" ? (
+                                // A pure-CSS moonless night sky (dark gradient + a starfield). Tiles seamlessly with
+                                // no moon to mirror — the painted sky-night art put a moon on every mirrored copy.
+                                <div className="sail-nightsky" aria-hidden="true" />
+                            ) : (
+                                <div className={`sail-sky-scroll${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true">
+                                    {[0, 1, 2, 3].map((n) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img key={n} src={sky || state.oceanBg} alt="" />
+                                    ))}
+                                </div>
+                            )}
                             {/* Clouds drifting across the sky, independent of the horizon scroll (screen-blended so
                                 they pick up the art's warmth — sunset vs night). */}
                             <div className={`sail-clouds${liveStatus === "sailing" ? " is-fast" : ""}`} aria-hidden="true"><i /><i /><i /></div>

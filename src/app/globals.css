@@ -10756,6 +10756,33 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-sky-scroll.is-scrolling { animation: skyScroll 55s linear infinite; }
 @keyframes skyScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .sail-sky-scroll.is-scrolling { animation: none; } }
+/* Moonless CSS night sky — a deep-blue gradient with a hand-scattered starfield in the upper sky. No moon
+   (the painted night art's moon mirror-tiled onto every copy), and it's uniform so there's zero seam. */
+.sail-nightsky { position: absolute; inset: 0; z-index: 0;
+    background:
+        radial-gradient(2px 2px at 15% 12%, #fff, transparent 100%),
+        radial-gradient(1.5px 1.5px at 42% 20%, rgba(255,255,255,0.9), transparent 100%),
+        radial-gradient(1px 1px at 68% 9%, #fff, transparent 100%),
+        radial-gradient(1.5px 1.5px at 83% 24%, rgba(210,225,255,0.85), transparent 100%),
+        radial-gradient(1px 1px at 30% 7%, #cfe0ff, transparent 100%),
+        radial-gradient(1px 1px at 55% 28%, #fff, transparent 100%),
+        radial-gradient(1.5px 1.5px at 91% 7%, #fff, transparent 100%),
+        radial-gradient(1px 1px at 7% 30%, rgba(255,255,255,0.75), transparent 100%),
+        radial-gradient(1px 1px at 48% 6%, #fff, transparent 100%),
+        radial-gradient(1px 1px at 74% 34%, rgba(200,220,255,0.85), transparent 100%),
+        radial-gradient(1px 1px at 24% 26%, #fff, transparent 100%),
+        radial-gradient(1.5px 1.5px at 62% 16%, #fff, transparent 100%),
+        linear-gradient(180deg, #060d24 0%, #0c1738 34%, #14244c 52%, #1a2f5c 64%, #16294f 100%);
+    background-repeat: no-repeat; }
+.sail-nightsky::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+        radial-gradient(1px 1px at 22% 16%, #fff, transparent 100%),
+        radial-gradient(1px 1px at 60% 13%, #fff, transparent 100%),
+        radial-gradient(1px 1px at 88% 30%, #fff, transparent 100%),
+        radial-gradient(1px 1px at 37% 33%, #fff, transparent 100%);
+    background-repeat: no-repeat; animation: sailStarTwinkle 3.6s ease-in-out infinite alternate; }
+@keyframes sailStarTwinkle { from { opacity: 0.25; } to { opacity: 0.95; } }
+@media (prefers-reduced-motion: reduce) { .sail-nightsky::after { animation: none; opacity: 0.6; } }
 /* Ambient traffic — other sailors drifting across the horizon behind your boat. */
 .sail-ambient { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .sail-ambient-boat { position: absolute; left: -22%; opacity: 0; will-change: left, opacity;
