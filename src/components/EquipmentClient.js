@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 
 import ChestOpener from "@/components/ChestOpener";
 import CoinCta from "@/components/CoinCta";
+import HelmetSprite from "@/components/HelmetSprite";
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
@@ -66,11 +67,11 @@ function SetBonusCard({ set, onOpen }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ display: "flex", gap: 3 }}>
                     {set.pieces.map((p) => (
-                        <span key={p.id} title={p.name} style={{ width: 8, height: 8, borderRadius: "50%", background: p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : p.owned ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.13)", boxShadow: p.equipped ? `0 0 5px ${SET_RARITY[p.rarity] || "#ffd75e"}` : "none" }} />
+                        <span key={p.id} title={p.equipped ? `${p.name} — equipped` : p.owned ? `${p.name} — owned, not equipped` : `${p.name} — locked`} style={{ width: 9, height: 9, borderRadius: "50%", boxSizing: "border-box", background: p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : "transparent", border: p.equipped ? "none" : p.owned ? "1.5px solid rgba(255,255,255,0.55)" : "1.5px solid rgba(255,255,255,0.16)", boxShadow: p.equipped ? `0 0 6px ${SET_RARITY[p.rarity] || "#ffd75e"}` : "none" }} />
                     ))}
                 </span>
                 <strong style={{ flex: 1, minWidth: 0 }}>{set.name}{complete ? " ✨" : ""}</strong>
-                <span className="muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total}</span>
+                <span className="muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total} worn{set.owned > set.equipped ? ` · ${set.owned} owned` : ""}</span>
                 <span aria-hidden="true" style={{ opacity: 0.5 }}>›</span>
             </div>
             <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 8 }}>
@@ -104,7 +105,7 @@ function SetDetailSheet({ set, onClose }) {
         <div className="equip-sheet-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.8)", padding: 16 }}>
             <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, margin: 0, maxHeight: "88dvh", overflowY: "auto", borderColor: complete ? "rgba(255,215,94,0.5)" : "rgba(143,216,255,0.4)", borderWidth: 2 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 22 }} aria-hidden="true">🪖</span>
+                    <span aria-hidden="true"><HelmetSprite size={22} /></span>
                     <h3 style={{ margin: 0, flex: 1 }}>{set.name}{complete ? " ✨" : ""}</h3>
                     <span className="muted" style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total} equipped</span>
                 </div>
@@ -352,7 +353,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 return (
                     <div className="card">
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <h3 style={{ margin: 0, flex: 1 }}>🪖 Set bonuses</h3>
+                            <h3 style={{ margin: 0, flex: 1, display: "inline-flex", alignItems: "center", gap: 7 }}><HelmetSprite size={20} /> Set bonuses</h3>
                             <a href="/marketplace/sets" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff" }}>all sets →</a>
                         </div>
                         <p className="muted" style={{ margin: "4px 0 0" }}>Matching pieces stack extra stats on top of your gear — and a <strong style={{ color: "#ffd75e" }}>full set</strong> unlocks a game-changing capstone. Tap a set for the full breakdown.</p>
