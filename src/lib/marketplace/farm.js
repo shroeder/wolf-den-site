@@ -13,6 +13,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
+import { getGarden, farmPetCapBonus } from "@/lib/marketplace/farm-crops.js";
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
 // (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
@@ -111,13 +112,14 @@ async function pettingBudget(buyerId) {
                     pet_farm_recharges = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_recharges ELSE 0 END,
                     pet_farm_day = ${DAY}
               WHERE id = $1
-              RETURNING pet_farm_used, pet_farm_recharges`,
+              RETURNING pet_farm_used, pet_farm_recharges, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades`,
             [buyerId]
         )
         .catch(() => null);
     const used = b?.pet_farm_used || 0;
     const recharges = b?.pet_farm_recharges || 0;
-    const allowance = PET_PETS_PER_DAY + recharges * PET_RECHARGE_AMOUNT;
+    // Base 3/day + the permanent "Pet Whisperer" farm upgrade + any gold recharges bought today.
+    const allowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + recharges * PET_RECHARGE_AMOUNT;
     return { used, allowance, left: Math.max(0, allowance - used), recharges, rechargeCost: rechargeCost(recharges), rechargeAmount: PET_RECHARGE_AMOUNT };
 }
 
@@ -203,9 +205,12 @@ export async function getFarm(ownerId, viewerId) {
     // on their own farm or a friend's. (On a friend's farm you can still pet, spending your budget, and feed
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
+    // Your crops only show on your own farm (you tend your own garden).
+    const garden = mine ? await getGarden(ownerId).catch(() => null) : null;
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
         mine,
+        garden,
         canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
         canFeed: Boolean(viewerId), // feed with your own treats
         petXp: PET_PET_XP,

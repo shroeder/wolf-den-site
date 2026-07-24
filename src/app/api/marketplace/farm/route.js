@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
+import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, applyRainBoost, debugGrantAllSeeds, debugGrowAll, debugGrantFertilizer } from "@/lib/marketplace/farm-crops.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -56,6 +57,16 @@ export async function POST(request) {
             else if (b?.action === "recharge") res = await rechargePetting(buyer.id);
             else if (b?.action === "pig_claim") res = await claimPig(buyer.id);
             else if (b?.action === "pig_reset") res = await resetPig(buyer.id);
+            // ── Farming ──
+            else if (b?.action === "plant") res = await plantSeed(buyer.id, Number(b?.slot), String(b?.seedId || ""));
+            else if (b?.action === "harvest") res = await harvestPlot(buyer.id, Number(b?.slot));
+            else if (b?.action === "fertilizer_buy") res = await buyFertilizer(buyer.id);
+            else if (b?.action === "fertilizer_use") res = await applyFertilizer(buyer.id, Number(b?.slot));
+            else if (b?.action === "farm_upgrade") res = await buyUpgrade(buyer.id, String(b?.key || ""));
+            else if (b?.action === "rain") res = await applyRainBoost(buyer.id);
+            else if (b?.action === "farm_debug_seeds") res = await debugGrantAllSeeds(buyer.id);
+            else if (b?.action === "farm_debug_grow") res = await debugGrowAll(buyer.id);
+            else if (b?.action === "farm_debug_fertilizer") res = await debugGrantFertilizer(buyer.id);
             else return NextResponse.json({ error: "bad_action" }, { status: 400 });
             // Return the whole result either way (so error responses still carry budget/cost/wallet for the UI).
             return NextResponse.json(res, { status: res?.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
