@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 
 // Buy store credit (real dollars on your account) with a card, and spend it in-store via a QR staff scan.
-// $1 = 100 coins on top of the credit. Card capture uses the Square Web Payments SDK, same as shop checkout.
+// $1 = 200 coins on top of the credit. Card capture uses the Square Web Payments SDK, same as shop checkout.
 
 const PRESETS_CENTS = [500, 1000, 2500, 5000, 10000];
 
@@ -48,7 +48,7 @@ export default function StoreCreditClient({
     squareLocationId,
     initialBalanceCents = 0,
     initialEvents = [],
-    coinsPerCent = 1,
+    coinsPerCent = 2,
     feeRate = 0.035,
     minCents = 500,
     maxCents = 50000,

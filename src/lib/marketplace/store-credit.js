@@ -9,7 +9,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // bought online through Square. Buying it also grants coins. Double-entry: the column is the running total,
 // mkt_store_credit_event is the append-only ledger. All mutations here are atomic + race-safe.
 
-export const COINS_PER_CENT = 1; // 1 coin per cent purchased → 100 coins per $1 (20× the in-store rate).
+export const COINS_PER_CENT = 2; // 2 coins per cent purchased → 200 coins per $1 (doubled 2026-07; 40× in-store).
 export const ONLINE_FEE_RATE = 0.035; // processing surcharge passed to the buyer on credit top-ups.
 export const MIN_CREDIT_CENTS = 500; // $5 minimum top-up.
 export const MAX_CREDIT_CENTS = 50000; // $500 maximum single top-up.

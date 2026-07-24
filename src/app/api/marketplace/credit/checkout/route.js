@@ -35,7 +35,7 @@ function isPaymentsEnabled() {
 const OK_STATUSES = new Set(["COMPLETED", "APPROVED"]);
 
 // POST — buy store credit. Body: { sourceId, amountCents }. The card is charged amount + a 3.5% processing
-// surcharge; the amount lands in the member's store credit and they're granted 100 coins per $1. Crediting
+// surcharge; the amount lands in the member's store credit and they're granted 200 coins per $1. Crediting
 // is idempotent (guarded by the pending→paid transition on mkt_credit_purchase).
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/credit/checkout", async ({ logger, internalError }) => {
