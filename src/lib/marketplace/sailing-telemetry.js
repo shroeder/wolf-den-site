@@ -33,12 +33,18 @@ export async function getSailingTelemetry() {
     }
 
     const now = Date.now();
+    const daysSince = (isoStr) => (isoStr ? (now - new Date(isoStr).getTime()) / 86400000 : Infinity);
     const users = (rows || []).map((s) => {
         const level = boatLevel(s.speed_level, s.find_level, s.rarity_level, s.luck_level, s.raid_level);
         const loss = lossByAttacker.get(s.buyer_id);
         const extraTools = s.dig_tool_levels && typeof s.dig_tool_levels === "object" ? s.dig_tool_levels : {};
         const upgradesSum = num(s.speed_level) + num(s.find_level) + num(s.rarity_level) + num(s.luck_level) + num(s.raid_level);
         const digSum = num(s.dig_stamina_level) + num(s.dig_pierce_level) + num(s.dig_strike_level) + num(s.dig_efficient_level) + num(s.dig_detonator_level);
+        const lastActive = iso(s.updated_at);
+        const idle = daysSince(lastActive);
+        const sailing = s.returns_at ? new Date(s.returns_at).getTime() > now : false;
+        // A single "status" so the roster reads at a glance: at sea / active / cooling off / dormant.
+        const status = sailing ? "sailing" : idle < 2 ? "active" : idle < 7 ? "idle" : "dormant";
         return {
             id: s.buyer_id,
             name: s.display_name || s.alias || "Member",
@@ -47,7 +53,7 @@ export async function getSailingTelemetry() {
             boatForm: boatTier(level),
             upgrades: { speed: num(s.speed_level), fortune: num(s.find_level), rarity: num(s.rarity_level), luck: num(s.luck_level), raid: num(s.raid_level) },
             neverUpgraded: upgradesSum === 0,
-            voyages: { completed: num(s.voyages_completed), quality: s.voyage_quality || null, sailing: s.returns_at ? new Date(s.returns_at).getTime() > now : false, returnsAt: iso(s.returns_at) },
+            voyages: { completed: num(s.voyages_completed), quality: s.voyage_quality || null, sailing, returnsAt: iso(s.returns_at) },
             raids: { done: num(s.raid_count), won: num(s.raids_won), lost: num(loss?.losses), defended: num(s.raids_defended), resets: num(s.raid_resets), goldLost: num(loss?.gold_lost), lostTo: whoByAttacker.get(s.buyer_id) || [] },
             windRecharges: num(s.wind_recharges),
             waves: num(s.waves_total),
@@ -58,15 +64,19 @@ export async function getSailingTelemetry() {
                 toolLevels: { stamina: num(s.dig_stamina_level), pierce: num(s.dig_pierce_level), strike: num(s.dig_strike_level), efficient: num(s.dig_efficient_level), detonator: num(s.dig_detonator_level), ...extraTools },
                 neverDug: digSum === 0 && num(s.fragments) === 0 && num(s.chests_forged) === 0,
             },
-            lastActive: iso(s.updated_at),
+            lastActive,
+            daysIdle: Number.isFinite(idle) ? Math.floor(idle) : null,
+            status,
         };
     });
 
     const sum = (fn) => users.reduce((a, u) => a + fn(u), 0);
+    const sailorsN = users.length;
+    const membersN = num(memberRow?.n);
     const summary = {
-        totalMembers: num(memberRow?.n),
-        sailors: users.length,
-        ignored: Math.max(0, num(memberRow?.n) - users.length),
+        totalMembers: membersN,
+        sailors: sailorsN,
+        ignored: Math.max(0, membersN - sailorsN),
         neverUpgraded: users.filter((u) => u.neverUpgraded).length,
         neverDug: users.filter((u) => u.digging.neverDug).length,
         currentlySailing: users.filter((u) => u.voyages.sailing).length,
@@ -85,5 +95,70 @@ export async function getSailingTelemetry() {
             chestsForged: sum((u) => u.digging.chestsForged),
         },
     };
-    return { summary, users };
+
+    // ── Derived INSIGHT (rates, funnel, retention, adoption gaps, leaderboards, action lists) ──────────────
+    const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
+    const round1 = (n) => Math.round(n * 10) / 10;
+    const raided = users.filter((u) => u.raids.done > 0).length;
+    const dug = sailorsN - summary.neverDug;
+    const upgraded = sailorsN - summary.neverUpgraded;
+    const metMerchant = users.filter((u) => u.merchant.encounters > 0).length;
+    const forged = users.filter((u) => u.digging.chestsForged > 0).length;
+    const repeat = users.filter((u) => u.voyages.completed >= 2).length;
+    const oneAndDone = users.filter((u) => u.voyages.completed === 1).length;
+    const top = (val, n = 5) => [...users].filter((u) => val(u) > 0).sort((a, b) => val(b) - val(a)).slice(0, n).map((u) => ({ name: u.name, value: val(u) }));
+
+    const insights = {
+        funnel: [
+            { label: "Members", value: membersN, pct: 100 },
+            { label: "Tried sailing", value: sailorsN, pct: pct(sailorsN, membersN) },
+            { label: "Sailed 2+ times", value: repeat, pct: pct(repeat, membersN) },
+            { label: "At sea now", value: summary.currentlySailing, pct: pct(summary.currentlySailing, membersN) },
+        ],
+        kpis: {
+            adoptionPct: pct(sailorsN, membersN),
+            repeatPct: pct(repeat, sailorsN),
+            raidWinRate: pct(summary.totals.raidsWon, summary.totals.raidsWon + summary.totals.raidsLost),
+            avgVoyages: sailorsN ? round1(summary.totals.voyages / sailorsN) : 0,
+            avgBoatLevel: sailorsN ? round1(sum((u) => u.boatLevel) / sailorsN) : 0,
+        },
+        // Feature adoption among sailors — surfaces which sea systems are underused.
+        adoption: [
+            { label: "Raided a ship", n: raided, pct: pct(raided, sailorsN) },
+            { label: "Dug an island", n: dug, pct: pct(dug, sailorsN) },
+            { label: "Upgraded a boat", n: upgraded, pct: pct(upgraded, sailorsN) },
+            { label: "Met the merchant", n: metMerchant, pct: pct(metMerchant, sailorsN) },
+            { label: "Forged a chest", n: forged, pct: pct(forged, sailorsN) },
+        ],
+        retention: { repeat, repeatPct: pct(repeat, sailorsN), oneAndDone, oneAndDonePct: pct(oneAndDone, sailorsN) },
+        activity: {
+            activeToday: users.filter((u) => (u.daysIdle ?? 99) < 1).length,
+            active7d: users.filter((u) => (u.daysIdle ?? 99) < 7).length,
+            atSea: summary.currentlySailing,
+            dormant: users.filter((u) => (u.daysIdle ?? 99) >= 7).length,
+        },
+        economy: {
+            chestsForged: summary.totals.chestsForged,
+            fragments: summary.totals.fragments,
+            windRecharges: summary.totals.windRecharges,
+            raidResets: summary.totals.raidResets,
+            merchantDeals: summary.totals.merchantEncounters,
+        },
+        leaderboards: {
+            voyages: top((u) => u.voyages.completed),
+            boatLevel: top((u) => u.boatLevel),
+            raidsWon: top((u) => u.raids.won),
+            chests: top((u) => u.digging.chestsForged),
+            fragments: top((u) => u.digging.fragments),
+        },
+        // Actionable segments (who to nudge). Names only, capped.
+        action: {
+            dormant: users.filter((u) => u.status === "dormant").sort((a, b) => (b.daysIdle || 0) - (a.daysIdle || 0)).slice(0, 12).map((u) => ({ name: u.name, days: u.daysIdle })),
+            oneAndDone: users.filter((u) => u.voyages.completed === 1).slice(0, 12).map((u) => u.name),
+            neverDug: users.filter((u) => u.digging.neverDug).slice(0, 12).map((u) => u.name),
+            neverUpgraded: users.filter((u) => u.neverUpgraded).slice(0, 12).map((u) => u.name),
+        },
+    };
+
+    return { summary, insights, users };
 }
