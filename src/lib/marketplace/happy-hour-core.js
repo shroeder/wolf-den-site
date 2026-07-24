@@ -55,8 +55,13 @@ export async function activeXpMultiplier() {
 export async function getHappyHourState(buyerId) {
     const ev = await getActiveEvent();
     if (!ev) {
-        const rally = Number(await getSetting(RALLY_KEY).catch(() => 0)) || 0;
-        return { active: false, rally: { pool: rally, trigger: RALLY_TRIGGER, remaining: Math.max(0, RALLY_TRIGGER - rally) } };
+        // Include the viewer's gold here too — without it the rally-screen donate buttons were always disabled.
+        const [rallyRaw, goldRow] = await Promise.all([
+            getSetting(RALLY_KEY).catch(() => 0),
+            buyerId ? db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null) : null,
+        ]);
+        const rally = Number(rallyRaw) || 0;
+        return { active: false, gold: goldRow?.gold || 0, rally: { pool: rally, trigger: RALLY_TRIGGER, remaining: Math.max(0, RALLY_TRIGGER - rally) } };
     }
     const [mine, gold] = await Promise.all([
         buyerId ? db.queryOne(`SELECT gold FROM mkt_happy_hour_donation WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : null,

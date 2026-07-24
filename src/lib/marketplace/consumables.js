@@ -5,6 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
+import { getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -211,7 +212,12 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
             ? (res?.ok ? `${petName} leveled up to Lv ${res.level}! ⬆️` : `${petName} is already max level`)
             : `+${e.amount.toLocaleString()} pet XP to ${petName}${res?.leveled ? ` — Lv ${res.level}! ⬆️` : ""}`;
         // Structured level-up payload so the client can fire the full celebration (not a tiny text line).
-        const petLevelUp = leveled ? { petId, petName, level: res.level, rarity: collectibleById(petId)?.rarity || "common", maxed: res.level >= 5 } : null;
+        // Include the LEVEL-appropriate sprite so the reveal shows the pet you just evolved into, not the Lv1 base.
+        let petLevelUp = null;
+        if (leveled) {
+            const art = await getPetLevelSprite(petId, res.level).catch(() => null);
+            petLevelUp = { petId, petName, level: res.level, rarity: collectibleById(petId)?.rarity || "common", maxed: res.level >= 5, spriteUrl: art?.url || null, spriteFlip: Boolean(art?.flip) };
+        }
         return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied, petLevelUp, petXpGain: e.type === "pet_xp" ? e.amount : null };
     }
 

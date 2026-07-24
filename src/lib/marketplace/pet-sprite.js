@@ -177,6 +177,13 @@ export function pickPetSpriteForLevel(base, levelMap, level) {
     return base || null;
 }
 
+// The level-appropriate sprite {url, flip} for ONE pet at a given level (base Lv1 → evolved 2–5). Used by the
+// level-up celebration so it shows the sprite you JUST evolved into, not the Lv1 base.
+export async function getPetLevelSprite(petId, level) {
+    const [base, levels] = await Promise.all([getPetSpriteData(), getPetSpriteLevelData()]);
+    return pickPetSpriteForLevel(base[petId], levels[petId], level) || null;
+}
+
 // Generate one (pet, level) evolved sprite (level 2–5) and store it.
 export async function generatePetSpriteLevel(petId, level) {
     const lv = Math.floor(Number(level) || 0);

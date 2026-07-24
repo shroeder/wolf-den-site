@@ -175,7 +175,10 @@ export default function ConsumablesClient() {
                     <div className="petfeed-flash" />
                     <div className={`petfeed-card rar-${petCele.rarity}`} onClick={(e) => e.stopPropagation()}>
                         <div className="petfeed-burst" aria-hidden="true">{Array.from({ length: 18 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>
-                        <span className="petfeed-art"><PetArt id={petCele.petId} /></span>
+                        <span className="petfeed-art">{petCele.spriteUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={petCele.spriteUrl} alt={petCele.petName} className="pet-art-img" style={petCele.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
+                            : <PetArt id={petCele.petId} />}</span>
                         <div className="petfeed-tag">⬆️ Level up!</div>
                         <div className="petfeed-title">{petCele.petName} reached Lv {petCele.level}</div>
                         <div className="petfeed-stars">{"★".repeat(petCele.level)}<span style={{ opacity: 0.3 }}>{"★".repeat(Math.max(0, 5 - petCele.level))}</span></div>
