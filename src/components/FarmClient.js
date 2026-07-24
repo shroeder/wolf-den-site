@@ -882,9 +882,10 @@ function LootPig({ onFinish }) {
             ))}
             <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
                 <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
-                    {/* Crown sits a touch higher (up) and toward the back of the head (away from the snout, so it
-                        follows the flip). Positioned via top/left — NOT transform — so crownJiggle can't reset it. */}
-                    <span style={{ position: "absolute", left: pos.flip ? "56%" : "44%", top: -3, fontSize: 22, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
+                    {/* Crown rests ON the head: lowered onto the crown of the skull and nudged toward the facing
+                        side (the head, away from the rump). Positioned via top/left — NOT transform — so
+                        crownJiggle can't reset it. */}
+                    <span style={{ position: "absolute", left: pos.flip ? "58%" : "42%", top: 9, fontSize: 22, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
                     {PIG_SPRITE_URL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />
