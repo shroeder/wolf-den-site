@@ -26,13 +26,6 @@ export default async function StorePage() {
     return (
         <div className="stack reveal">
             <ViewPing event="view_store" />
-            <section className="card">
-                <h1 style={{ marginTop: 0 }}>🛒 Store</h1>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    Spend your gold — daily deals, consumables, and gear by slot. Equip what you buy over on <a href="/marketplace/inventory" style={{ color: "#8fd8ff", fontWeight: 700 }}>Gear</a>.
-                </p>
-            </section>
-
             <DailyDeals />
             <ConsumablesClient />
             <EquipmentClient view="store" />

@@ -18,12 +18,6 @@ export default async function QuestsPage() {
     return (
         <div className="stack reveal">
             <ViewPing event="view_boss" meta={{ section: "quests" }} />
-            <section className="card">
-                <h1 style={{ marginTop: 0 }}>📜 Daily Quests</h1>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    Three fresh bounties every day — complete them for gold and loot. They reset at midnight.
-                </p>
-            </section>
             {buyer ? (
                 <QuestsClient />
             ) : (

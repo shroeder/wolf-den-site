@@ -104,7 +104,7 @@ function SetDetailSheet({ set, onClose }) {
         <div className="equip-sheet-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.8)", padding: 16 }}>
             <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, margin: 0, maxHeight: "88dvh", overflowY: "auto", borderColor: complete ? "rgba(255,215,94,0.5)" : "rgba(143,216,255,0.4)", borderWidth: 2 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 22 }} aria-hidden="true">🧩</span>
+                    <span style={{ fontSize: 22 }} aria-hidden="true">🪖</span>
                     <h3 style={{ margin: 0, flex: 1 }}>{set.name}{complete ? " ✨" : ""}</h3>
                     <span className="muted" style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total} equipped</span>
                 </div>
@@ -352,7 +352,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 return (
                     <div className="card">
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <h3 style={{ margin: 0, flex: 1 }}>🧩 Set bonuses</h3>
+                            <h3 style={{ margin: 0, flex: 1 }}>🪖 Set bonuses</h3>
                             <a href="/marketplace/sets" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff" }}>all sets →</a>
                         </div>
                         <p className="muted" style={{ margin: "4px 0 0" }}>Matching pieces stack extra stats on top of your gear — and a <strong style={{ color: "#ffd75e" }}>full set</strong> unlocks a game-changing capstone. Tap a set for the full breakdown.</p>
@@ -512,10 +512,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setId && (data.setsOverview || []).some((s) => s.id === detailItem.setId) ? (
                             <button type="button" onClick={() => { const s = (data.setsOverview || []).find((x) => x.id === detailItem.setId); if (s) setSetDetail(s); }} style={{ margin: "8px 0 0", padding: "7px 11px", borderRadius: 8, border: "1px solid rgba(143,216,255,0.45)", background: "rgba(143,216,255,0.08)", color: "#8fd8ff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                                🧩 Part of the {detailItem.setName} set <span style={{ opacity: 0.7 }}>· view set ›</span>
+                                🪖 Part of the {detailItem.setName} set <span style={{ opacity: 0.7 }}>· view set ›</span>
                             </button>
                         ) : detailItem.setName ? (
-                            <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p>
+                            <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🪖 Part of the {detailItem.setName} set</p>
                         ) : null}
                         {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {detailItem.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(detailItem.cost || 0).toLocaleString()}</span> {(detailItem.effectiveCost || 0).toLocaleString()}</> : (detailItem.cost || 0).toLocaleString()} gold{detailItem.discounted ? ` · ${data.coupon?.pct || 50}% off` : ""}{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>

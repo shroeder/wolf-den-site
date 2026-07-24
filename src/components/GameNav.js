@@ -5,6 +5,16 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
+import { useItemSprite } from "@/components/ItemArt";
+
+// The Sets menu icon: the die-cut Warplate Helm sprite (falls back to a helmet emoji until it loads) — a real
+// piece of gear reads far better here than the old puzzle-piece glyph.
+function SetsHelmet() {
+    const sprite = useItemSprite("warplate_helm");
+    if (sprite) return <img src={sprite} alt="" width={18} height={18} style={{ width: 18, height: 18, objectFit: "contain", verticalAlign: "-0.28em" }} />;
+    return <span aria-hidden="true">🪖</span>;
+}
+
 // In-game menu bar: a horizontal, scrollable strip of the game areas, shown at the top of every game page
 // so you can hop Boss → Spin → Pets → Gear etc. without going back to the hub. Mounted once in the
 // marketplace layout; it self-hides on non-game pages (vendor marketplace, social, profile, checkout…).
@@ -17,9 +27,10 @@ const LINKS = [
     { href: "/marketplace/pets", emoji: "🐾", label: "Pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", label: "Gear" },
     { href: "/marketplace/store", emoji: "🛒", label: "Store" },
-    { href: "/marketplace/sets", emoji: "🧩", label: "Sets" },
+    { href: "/marketplace/sets", sprite: "helmet", label: "Sets" },
     { href: "/marketplace/quests", emoji: "📜", label: "Quests" },
     { href: "/marketplace/track", emoji: "🏆", label: "Rewards" },
+    { href: "/marketplace/badges", emoji: "🏅", label: "Badges" },
     { href: "/marketplace/leaderboard", emoji: "🥇", label: "Ranks" },
     { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties" },
     { href: "/marketplace/credit", emoji: "💳", label: "Credit" },
@@ -83,7 +94,7 @@ export default function GameNav() {
                     const dot = l.href === "/marketplace/sailing" && sailAttn;
                     return (
                         <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
-                            {l.Icon ? <l.Icon className="game-nav-ico" aria-hidden="true" /> : <span aria-hidden="true">{l.emoji}</span>} {l.label}
+                            {l.Icon ? <l.Icon className="game-nav-ico" aria-hidden="true" /> : l.sprite === "helmet" ? <SetsHelmet /> : <span aria-hidden="true">{l.emoji}</span>} {l.label}
                             {badge ? <span className="game-nav-badge" title={badgeTitle}>{badge}</span> : null}
                             {dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
                         </Link>

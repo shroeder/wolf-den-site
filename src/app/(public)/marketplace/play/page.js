@@ -26,9 +26,10 @@ const FEATURES = [
     { href: "/marketplace/spin", Icon: FaDharmachakra, title: "Daily Spin", desc: "One free spin a day — gold, XP, chests… and the jackpot.", tone: "spin" },
     { href: "/marketplace/pets", emoji: "🐾", title: "Pets", desc: "Collect companions, equip one, and level it up.", tone: "pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", title: "Gear", desc: "Your loadout, the gold shop, and loot chests.", tone: "gear" },
-    { href: "/marketplace/sets", emoji: "🧩", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
+    { href: "/marketplace/sets", emoji: "🪖", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
     { href: "/marketplace/quests", emoji: "📜", title: "Quests", desc: "Fresh daily bounties → gold, chests & tokens.", tone: "quests" },
     { href: "/marketplace/track", emoji: "🏆", title: "Rewards Track", desc: "See your next unlock and everything you've earned.", tone: "track" },
+    { href: "/marketplace/badges", emoji: "🏅", title: "Badges", desc: "Every badge you've earned — pick 3 to show on your card.", tone: "track" },
     { href: "/marketplace/leaderboard", emoji: "🥇", title: "Leaderboard", desc: "Where you rank against the whole pack.", tone: "leader" },
     { href: "/marketplace/bounties", emoji: "🎯", title: "Bounties", desc: "Post gold for real-world help — or claim someone else's.", tone: "bounty" },
 ];
