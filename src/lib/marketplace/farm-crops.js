@@ -20,22 +20,21 @@ import { grantConsumable } from "@/lib/marketplace/consumables.js";
 // that, EVERY harvest rolls one random reward from the shared HARVEST_POOL — and rarer crops shift those odds
 // toward the better loot tiers (that's what "rarity does"). Rarer crops also take longer + sell for more.
 export const SEEDS = {
-    // Gold is real value (≈1g = 1¢, $10 = 1,000g), so base sell is deliberately small — farming is a supplement,
-    // not a gold printer, and the fun sits in the non-gold pool rewards (treats, spins, chests, seeds).
+    // Gold values sit against the coin scale ($10 = 2,000 coins, so 1g ≈ ½¢). Farming stays a supplement.
     // Common — quick, cheap, found from everyday actions (the daily grind).
-    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 90, sell: 8, xp: 6, rarity: "common" },
-    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 180, sell: 16, xp: 10, rarity: "common" },
-    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 240, sell: 24, xp: 14, rarity: "common" },
+    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 90, sell: 56, xp: 6, rarity: "common" },
+    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 180, sell: 112, xp: 10, rarity: "common" },
+    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 240, sell: 168, xp: 14, rarity: "common" },
     // Rare — a few hours; from digs, raids, iron chests.
-    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 40, xp: 20, rarity: "rare" },
-    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 60, xp: 26, rarity: "rare" },
+    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 280, xp: 20, rarity: "rare" },
+    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 420, xp: 26, rarity: "rare" },
     // Epic — half a day; from raids, gold chests, boss kills.
-    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 95, xp: 40, rarity: "epic" },
-    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 150, xp: 62, rarity: "epic" },
+    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 665, xp: 40, rarity: "epic" },
+    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 1050, xp: 62, rarity: "epic" },
     // Legendary — overnight; from gold chests + boss kills only.
-    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 280, xp: 130, rarity: "legendary" },
+    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 1960, xp: 130, rarity: "legendary" },
     // Mythic — a day and a half; the jackpot, only from the very best sources.
-    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 600, xp: 300, rarity: "mythic" },
+    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 4200, xp: 300, rarity: "mythic" },
 };
 // How good the shared-pool loot odds are for a crop's rarity (shown in the seed picker).
 export const LOOT_LABEL = { common: "Basic loot", rare: "Better loot", epic: "Good loot", legendary: "Great loot", mythic: "Best loot" };
@@ -77,21 +76,21 @@ const RAIN_GUARD_HOURS = 6;
 // seeds shift the odds toward the higher TIERS (see RARITY_TIER_WEIGHTS) — that's the payoff for the longer
 // grow + rarer seed. The Lucky Harvest upgrade can bump the rolled tier up a level.
 const HARVEST_POOL = [
-    { tier: 1, type: "gold", amount: 6, label: "+6 🪙" },
+    { tier: 1, type: "gold", amount: 42, label: "+42 🪙" },
     { tier: 1, type: "treat", id: "treat_bone", label: "🦴 a Pet Treat" },
     { tier: 1, type: "xp", amount: 15, label: "✨ +15 XP" },
-    { tier: 2, type: "gold", amount: 18, label: "+18 🪙" },
+    { tier: 2, type: "gold", amount: 126, label: "+126 🪙" },
     { tier: 2, type: "treat", id: "treat_snack", label: "🍖 a Hearty Snack" },
     { tier: 2, type: "spin", n: 1, label: "🎡 +1 wheel spin" },
     { tier: 3, type: "chest", chestTier: "wooden", label: "🧰 a Wooden chest" },
     { tier: 3, type: "treat", id: "treat_toy", label: "🧸 a Chew Toy" },
     { tier: 3, type: "seed", band: ["common", "rare"], label: "🌱 a bonus seed" },
     { tier: 4, type: "chest", chestTier: "iron", label: "🧰 an Iron chest" },
-    { tier: 4, type: "gold", amount: 55, label: "+55 🪙" },
+    { tier: 4, type: "gold", amount: 385, label: "+385 🪙" },
     { tier: 4, type: "treat", id: "treat_feast", label: "🍲 a Pet Feast" },
     { tier: 4, type: "seed", band: ["rare", "epic"], label: "🌱 a rare seed" },
     { tier: 5, type: "chest", chestTier: "gold", label: "💰 a Gold chest" },
-    { tier: 5, type: "gold", amount: 130, label: "+130 🪙" },
+    { tier: 5, type: "gold", amount: 910, label: "+910 🪙" },
     { tier: 5, type: "seed", band: ["epic", "legendary"], label: "🌱 an epic seed" },
     { tier: 5, type: "spin", n: 3, label: "🎡 +3 wheel spins" },
 ];
