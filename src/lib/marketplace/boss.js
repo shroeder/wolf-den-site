@@ -498,6 +498,9 @@ export async function getBossState(buyerId = null) {
         // Fortune (raffle luck) from pets/gear banks bonus tickets PER DAY the boss is alive (see fortuneTickets).
         const myFortuneTickets = fortuneTickets(myPet?.stats?.fortune || 0, boss);
         you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) + myFortuneTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
+        // Keep your Hall-of-Heroes chip in sync with your headline ticket count (dmg tickets + fortune) — the
+        // raffle counts fortune, so both should show the same total instead of the chip showing dmg-only.
+        if (mine) mine.tickets = you.tickets;
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -647,9 +650,14 @@ export async function getMyBossSummary(buyerId) {
     const boss = await getActiveBoss();
     if (!boss) return null;
     const divisor = Math.max(1, boss.ticket_divisor || 100);
-    const row = await db.queryOne(`SELECT COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE boss_id = $1 AND buyer_id = $2`, [boss.id, buyerId]).catch(() => null);
+    const [row, myPet] = await Promise.all([
+        db.queryOne(`SELECT COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE boss_id = $1 AND buyer_id = $2`, [boss.id, buyerId]).catch(() => null),
+        getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
+    ]);
     const dmg = row?.dmg || 0;
-    return { bossName: boss.name, dmg, tickets: Math.floor(dmg / divisor), divisor };
+    // Include fortune raffle tickets so this matches the boss screen's headline count (both feed the same raffle).
+    const tickets = Math.floor(dmg / divisor) + fortuneTickets(myPet?.stats?.fortune || 0, boss);
+    return { bossName: boss.name, dmg, tickets, divisor };
 }
 
 async function markDefeatIfDead(bossId, hp, defeatedBy = null) {

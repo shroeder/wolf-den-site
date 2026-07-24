@@ -147,7 +147,8 @@ export default function BossFightClient() {
             const divisor = data.boss.ticketDivisor || 100;
             setData((d) => {
                 const dmg = (d.you?.dmg || 0) + res.damage;
-                const tickets = Math.floor(dmg / divisor);
+                // Headline tickets = damage tickets + fortune (matches the raffle + the Hall-of-Heroes chip).
+                const tickets = Math.floor(dmg / divisor) + (d.you?.fortuneTickets || 0);
                 // Reflect the new total in the Hall of Heroes immediately: bump your chip, re-sort by damage,
                 // and recompute the medal ranks so your position jumps right away (load() then reconciles).
                 const roster = (d.roster || [])
