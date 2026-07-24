@@ -9,7 +9,7 @@ const RARITY_COL = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legend
 // "You got raided (and won)" welcome-back report. Self-fetches once on mount; if any raids were repelled since
 // you last checked, it pops a modal with each attacker's hero card, how many times you beat them, and the gold
 // (already credited to your wallet at raid time — this just tells you who and how much).
-export default function RaidDefenseReport({ owner = false }) {
+export default function RaidDefenseReport() {
     const [report, setReport] = useState(null);
     const [open, setOpen] = useState(false);
     useScrollLock(open); // lock the background from scrolling while the report is up
@@ -21,18 +21,7 @@ export default function RaidDefenseReport({ owner = false }) {
             .catch(() => {});
         return () => { alive = false; };
     }, []);
-    // Owner-only: open the modal on demand with sample data (the report otherwise only appears after a real raid).
-    function preview() {
-        fetch("/api/marketplace/raid-defense?preview=1", { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => { if (d?.defenses?.length) { setReport(d); setOpen(true); } })
-            .catch(() => {});
-    }
-    if (!open || !report) {
-        return owner ? (
-            <button type="button" onClick={preview} style={{ alignSelf: "flex-start", padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(91,141,214,0.6)", background: "rgba(91,141,214,0.1)", color: "#8fb4ee", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>🧪 Preview raid-defense report</button>
-        ) : null;
-    }
+    if (!open || !report) return null;
     return (
         <div onClick={() => setOpen(false)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.62)", display: "grid", placeItems: "center", padding: 16 }}>
             <style>{"@keyframes rdrPop{0%{opacity:0;transform:scale(.85)}60%{transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}"}</style>
