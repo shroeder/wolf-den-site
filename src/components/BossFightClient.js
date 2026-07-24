@@ -7,6 +7,7 @@ import AvatarStack from "@/components/AvatarStack";
 import BossBattleScene, { AURA_COL, BORDER_COL } from "@/components/BossBattleScene";
 import BossFinalBlow from "@/components/BossFinalBlow";
 import ItemArt from "@/components/ItemArt";
+import useScrollLock from "@/lib/useScrollLock";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
@@ -26,6 +27,7 @@ export default function BossFightClient() {
     const [cheerToast, setCheerToast] = useState(null);
     const [rewardIdx, setRewardIdx] = useState(0); // which reward item is showing in the rotating drop card
     const floatId = useRef(0);
+    useScrollLock(Boolean(victory)); // lock bg scroll behind the victory overlay
 
     // When a boss has more than one reward item, cycle through them every 3s so each gets seen.
     const rewardCount = data?.boss?.rewardItems?.length || 0;
@@ -145,7 +147,14 @@ export default function BossFightClient() {
             const divisor = data.boss.ticketDivisor || 100;
             setData((d) => {
                 const dmg = (d.you?.dmg || 0) + res.damage;
-                return { ...d, boss: { ...d.boss, hp: res.hp, maxHp: res.maxHp }, you: { ...d.you, attacksLeft: res.attacksLeft, dmg, tickets: Math.floor(dmg / divisor) } };
+                const tickets = Math.floor(dmg / divisor);
+                // Reflect the new total in the Hall of Heroes immediately: bump your chip, re-sort by damage,
+                // and recompute the medal ranks so your position jumps right away (load() then reconciles).
+                const roster = (d.roster || [])
+                    .map((f) => (f.you ? { ...f, dmg, tickets } : f))
+                    .sort((a, b) => (b.dmg || 0) - (a.dmg || 0))
+                    .map((f, i) => ({ ...f, dmgRank: i < 3 ? i + 1 : null }));
+                return { ...d, boss: { ...d.boss, hp: res.hp, maxHp: res.maxHp }, roster, you: { ...d.you, attacksLeft: res.attacksLeft, dmg, tickets } };
             });
             if (res.defeated) {
                 const deadBossId = data?.boss?.id;
@@ -167,28 +176,22 @@ export default function BossFightClient() {
     const { boss, roster = [], fighters = [], you } = data;
     const displayHp = liveHp != null ? liveHp : boss.hp;
     const pct = Math.max(0, Math.min(100, (displayHp / boss.maxHp) * 100));
-    // Owner-only preview of the final-blow kill cinematic — uses the current boss + top fighter (or a mock) as
-    // the MVP so it can be watched + tuned without waiting for a real kill. Gated on data.owner (server isOwner).
-    const testMvp = data.owner ? {
-        name: fighters[0]?.name || "The Wolf Den",
-        dmg: fighters[0]?.dmg || 999999,
-        spriteUrl: fighters[0]?.spriteUrl || null,
-        spriteFlip: fighters[0]?.spriteFlip || false,
-        avatarUrl: fighters[0]?.avatarUrl || null,
-        you: true,
+    // The final-blow MVP = the pack's top damage dealer. Built from whichever source carries the richest data
+    // (fighters have battle sprites; roster has avatars) so the cinematic shows a real name + real damage.
+    const mvpSrc = [...(fighters || []), ...(roster || [])].reduce((best, f) => (!best || (f?.dmg || 0) > (best.dmg || 0) ? f : best), null);
+    const topMvp = mvpSrc ? {
+        name: mvpSrc.name,
+        dmg: mvpSrc.dmg || 0,
+        spriteUrl: mvpSrc.spriteUrl || null,
+        spriteFlip: mvpSrc.spriteFlip || false,
+        avatarUrl: mvpSrc.avatarUrl || null,
+        you: Boolean(mvpSrc.you),
     } : null;
+    const killMvp = boss.defeated ? topMvp : null;
 
     return (
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
-            <div className="boss2-sub muted">One swing a day for XP + raffle tickets · drop in daily to help finish it.</div>
-
-            {testMvp ? (
-                <div className="boss-owner-test">
-                    <span>🧪 <strong>Owner test</strong> · preview the final-blow kill cinematic (only you see this)</span>
-                    <BossFinalBlow mvp={testMvp} boss={{ name: boss.name, imageUrl: boss.imageUrl }} />
-                </div>
-            ) : null}
 
             <div className="boss-stage-wrap">
                 <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} canCheer={Boolean(you) && !boss.defeated} cheersLeft={you?.cheersLeft ?? 0} onCheer={cheer} />
@@ -237,6 +240,11 @@ export default function BossFightClient() {
                         <p className="muted">The pack brought it down. A new boss will rise soon.</p>
                     )}
                     {you ? <div className="boss2-you"><span className="muted">Your final damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span><span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span></div> : null}
+                    {killMvp ? (
+                        <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
+                            <BossFinalBlow mvp={killMvp} boss={{ name: boss.name, imageUrl: boss.imageUrl }} />
+                        </div>
+                    ) : null}
                 </div>
             ) : (
                 <div className="boss2-actions">
@@ -388,6 +396,7 @@ export default function BossFightClient() {
                         ) : null}
                         <p className="boss2-vic-reward">🎁 You earned a 🎟️ spin token + a shot at loot — check your stash!</p>
                         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                            {topMvp ? <BossFinalBlow mvp={topMvp} boss={{ name: victory.name || boss.name, imageUrl: boss.imageUrl }} /> : null}
                             <Link href="/marketplace/inventory" className="btn-gold">🎒 See your loot</Link>
                             <button type="button" className="pill" onClick={() => setVictory(null)}>A new boss rises →</button>
                         </div>

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
+import useScrollLock from "@/lib/useScrollLock";
+
 // The "FINAL BLOW" cinematic — replays the top-damage member delivering the killing strike: the hero rushes
 // in, time slows and the camera zooms as they wind up, then a flash + screen-shake impact shatters the boss
 // into a SLAIN payoff. Purely presentational; all data comes from the recap's `mvp` + `boss`.
@@ -10,6 +12,7 @@ export default function BossFinalBlow({ mvp, boss }) {
     // runId: 0 = closed. >0 = playing; bumping it remounts the scene (via `key`) so every replay restarts clean.
     const [runId, setRunId] = useState(0);
     const [ended, setEnded] = useState(false); // the sequence finished → reveal Replay / Done
+    useScrollLock(runId > 0); // lock bg scroll while the cinematic is playing
 
     if (!mvp) return null;
     const heroImg = mvp.spriteUrl || mvp.avatarUrl;

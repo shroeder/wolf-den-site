@@ -6,6 +6,7 @@ import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
 import MerchantScene from "@/components/MerchantScene";
 import RaidScene from "@/components/RaidScene";
+import useScrollLock from "@/lib/useScrollLock";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
@@ -218,6 +219,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidPlay, setRaidPlay] = useState(null);        // the resolved raid → drives the full-screen battle scene
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
+    // Lock the background from scrolling while any sailing modal is open (raid picker, raid battle, arrival).
+    useScrollLock(raidOpen || Boolean(raidPlay) || arriveModal);
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -1097,8 +1100,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {/* RAID — target picker: choose WHO to raid (best-gear-first) with the stakes shown up front. */}
             {raidOpen ? (
-                <div className="sail-reward-overlay">
-                    <div className="card sail-recap sail-raid-pick">
+                <div className="sail-reward-overlay" style={{ padding: 0, alignItems: "stretch" }}>
+                    <div className="card sail-recap sail-raid-pick" style={{ width: "100%", maxWidth: "none", height: "100dvh", maxHeight: "100dvh", margin: 0, borderRadius: 0, display: "flex", flexDirection: "column", overflowY: "auto", justifyContent: "flex-start" }}>
                         <div className="sail-raid-crest" aria-hidden="true">🏴‍☠️</div>
                         <h2 style={{ margin: "6px 0 2px" }}>Choose your target</h2>
                         <ul className="sail-raid-terms">

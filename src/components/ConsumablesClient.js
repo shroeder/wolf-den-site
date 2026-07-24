@@ -7,6 +7,7 @@ import CoinCta from "@/components/CoinCta";
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
+import useScrollLock from "@/lib/useScrollLock";
 
 const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic" };
 
@@ -18,6 +19,7 @@ export default function ConsumablesClient() {
     const [msg, setMsg] = useState(null);
     const [picking, setPicking] = useState(null); // a stash item awaiting a charged-gear target
     const [petCele, setPetCele] = useState(null); // { petId, petName, level, rarity, maxed } — level-up dopamine
+    useScrollLock(Boolean(picking) || Boolean(petCele)); // lock bg scroll behind the target-picker / level-up modals
     const [open, setOpen] = useState(false); // collapsed by default so it doesn't push the page down
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);

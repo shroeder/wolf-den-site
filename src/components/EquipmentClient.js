@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import ChestOpener from "@/components/ChestOpener";
 import CoinCta from "@/components/CoinCta";
 import ItemArt from "@/components/ItemArt";
+import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
@@ -159,6 +160,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const burstKey = useRef(0);
     const [chargeClaim, setChargeClaim] = useState(null); // { token, qr, rewardLabel, itemName } — QR to show staff
     const [buyCele, setBuyCele] = useState(null); // purchase celebration (the item you just bought)
+    useScrollLock(Boolean(detailItem) || Boolean(setDetail) || Boolean(chargeClaim) || Boolean(buyCele)); // lock bg scroll behind any sheet
     const [collapsedCats, setCollapsedCats] = useState(() => new Set()); // store: which shop slot-categories are collapsed
     const toggleCat = (slot) => setCollapsedCats((prev) => { const n = new Set(prev); if (n.has(slot)) n.delete(slot); else n.add(slot); return n; });
 

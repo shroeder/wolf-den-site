@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
 import CoinCta from "@/components/CoinCta";
+import useScrollLock from "@/lib/useScrollLock";
 
 // Per-tier wedge fills — jackpot glows gold, mini purple, rare teal, everything else alternating slate.
 const TIER_FILL = { jackpot: "#5a4212", mini: "#3a1f58", rare: "#12463c" };
@@ -45,6 +46,7 @@ export default function SpinWheel() {
     const [spinning, setSpinning] = useState(false);
     const [result, setResult] = useState(null);
     const [celebrate, setCelebrate] = useState(null); // {kind} for jackpot/mini burst
+    useScrollLock(Boolean(celebrate)); // lock bg scroll behind the jackpot/mini celebration
     const [msg, setMsg] = useState(null);
     const [lowCoins, setLowCoins] = useState(false);
     const timer = useRef(null);
@@ -155,7 +157,7 @@ export default function SpinWheel() {
             </div>
 
             {st.nextWheel ? <p className="muted spin-next">Reach Lv {st.nextWheel.atLevel} to unlock the {st.nextWheel.name} (bigger prizes).</p> : null}
-            <p className="muted spin-hint">One free spin daily. Earn 🎟️ tokens from quests, boss kills, and 7-day streaks. Odds are shown above — the jackpot is rare on purpose.</p>
+            <p className="muted spin-hint">One free spin daily. Earn 🎟️ tokens from quests, boss kills, and 7-day streaks.</p>
 
             {celebrate ? (
                 <div className={`spin-celebrate spin-celebrate-${celebrate.kind}`} onClick={() => setCelebrate(null)}>

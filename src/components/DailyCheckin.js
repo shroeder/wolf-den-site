@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import useScrollLock from "@/lib/useScrollLock";
+
 // The once-a-day check-in modal: a login-streak reward to claim + a "while you were away" summary. Mounted
 // globally (marketplace layout); it self-suppresses if there's nothing to show or already claimed today.
 // Store-local day (America/Chicago, matching the server) — used to remember we've already shown/handled
@@ -18,6 +20,7 @@ export default function DailyCheckin() {
     const [claimed, setClaimed] = useState(null);
     const [busy, setBusy] = useState(false);
     const [mounted, setMounted] = useState(false);
+    useScrollLock(open && Boolean(state)); // lock bg scroll behind the check-in modal
 
     useEffect(() => { setMounted(true); }, []);
     useEffect(() => {

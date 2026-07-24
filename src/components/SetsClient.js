@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 
 import ItemArt from "@/components/ItemArt";
+import useScrollLock from "@/lib/useScrollLock";
 import { describeSea } from "@/lib/marketplace/items.js";
 
 const RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
@@ -16,6 +17,7 @@ const tierText = (t) => [statText(t.stats), t.sea ? describeSea(t.sea) : ""].fil
 // locked), the tiered bonuses, and the full-set capstone. Tapping a piece inspects what it does.
 export default function SetsClient({ sets }) {
     const [inspect, setInspect] = useState(null);
+    useScrollLock(Boolean(inspect)); // lock bg scroll behind the piece-inspect modal
 
     return (
         <>

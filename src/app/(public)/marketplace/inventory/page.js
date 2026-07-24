@@ -1,3 +1,4 @@
+import ConsumablesClient from "@/components/ConsumablesClient";
 import EquipmentClient from "@/components/EquipmentClient";
 import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -47,6 +48,8 @@ export default async function InventoryPage() {
                 backdropUrl={backdropUrl || null}
             />
 
+            {/* Your consumables — potions, scrolls, pet treats & relics. Tap one to use it (self-serve). */}
+            <ConsumablesClient />
         </div>
     );
 }

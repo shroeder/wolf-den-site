@@ -21,11 +21,18 @@ export async function GET(request) {
             const gold = Math.max(0, Math.floor(Number(row?.gold) || 0));
             const level = levelForXp(xp).level;
             const next = nextUnlock(level);
-            if (!next) return NextResponse.json({ authed: true, maxed: true, xp, gold }, { headers: { "Cache-Control": "no-store" } });
+            // The HUD bar tracks progress within the CURRENT level (cumulative XP to reach level L = 50·(L-1)·L),
+            // so it visibly moves with every XP gain and reads like a real XP bar — not distance to a far-off
+            // reward milestone (which barely budged per hit and looked stuck/wrong). The next-unlock label/icon
+            // still ride along as the "what you're working toward" flavor.
+            const curBase = 50 * (level - 1) * level; // XP to reach this level
+            const nextBase = 50 * level * (level + 1); // XP to reach the next level
+            const span = Math.max(1, nextBase - curBase);
+            const into = Math.max(0, xp - curBase);
+            const pct = Math.max(0, Math.min(100, Math.round((into / span) * 100)));
+            const xpToGo = Math.max(0, nextBase - xp); // XP to the next level
 
-            const target = 50 * (next.level - 1) * next.level; // cumulative XP to REACH next.level
-            const xpToGo = Math.max(0, target - xp);
-            const pct = target > 0 ? Math.min(100, Math.round((xp / target) * 100)) : 0;
+            if (!next) return NextResponse.json({ authed: true, maxed: true, xp, gold, level, pct, xpToGo }, { headers: { "Cache-Control": "no-store" } });
 
             return NextResponse.json(
                 { authed: true, xp, gold, level, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct },
