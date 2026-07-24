@@ -14,6 +14,8 @@ import { ITEMS } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { getGarden, farmPetCapBonus } from "@/lib/marketplace/farm-crops.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
 // (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
@@ -165,6 +167,7 @@ export async function claimPig(buyerId) {
             item = { id: def.id, name: def.name, rarity: def.rarity, slot: def.slot || null, image: await itemSpriteFor(def.id).catch(() => null), isNew: Boolean(g?.granted) };
         }
     }
+    await trackActivity(buyerId, "loot_pig", { gold, item: item?.name || null }).catch(() => {});
     return { ok: true, gold, goldAfter: paid?.gold ?? null, item };
 }
 
@@ -249,6 +252,8 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
         : await addPetXp(petOwner, petId, c.effect.amount).catch(() => ({ ok: false }));
     const leveled = c.effect.type === "pet_level" ? Boolean(applied?.ok) : Boolean(applied?.leveled);
     await awardXp(feederId, "feed_other", { points: FEED_OTHER_PLAYER_XP, gold: FEED_OTHER_GOLD }).catch(() => {});
+    await trackActivity(feederId, "feed_other", { petId, owner: petOwner }).catch(() => {});
+    await bumpQuestProgress(feederId, "feed_pet", 1).catch(() => {});
     const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
     const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
     return {
@@ -339,6 +344,8 @@ export async function petPet(petterId, petId, ownerId = null) {
     const goldGained = own ? PET_PET_GOLD : PET_OTHER_GOLD;
     const playerXp = own ? PET_PET_PLAYER_XP : PET_OTHER_PLAYER_XP;
     await awardXp(petterId, own ? "pet_farm" : "pet_farm_other", { points: playerXp, gold: goldGained }).catch(() => {});
+    await trackActivity(petterId, own ? "pet_farm" : "pet_other", { petId, owner: own ? undefined : petOwner }).catch(() => {});
+    await bumpQuestProgress(petterId, "pet_animal", 1).catch(() => {});
 
     const info = petLevelInfo(newXp, def?.rarity || "common");
     return {

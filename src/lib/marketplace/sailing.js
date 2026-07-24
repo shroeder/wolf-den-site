@@ -14,6 +14,7 @@ import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -1133,6 +1134,7 @@ export async function doRaid(buyerId, targetId = null) {
     // Log the raid AFTER resolution so gold + the copied item carry real values (this call used to sit before
     // goldDelta/itemWon were assigned, which threw in the temporal dead zone and dropped the event entirely).
     await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
+    if (sim.win) await dropSeedFrom(buyerId, "sail_raid").catch(() => {}); // plundered seeds on a raid win
 
     const petView = (id) => { const p = id ? petMap[id] : null; return p?.url ? { url: p.url, flip: p.flip === true } : null; };
     const result = {
@@ -1474,6 +1476,7 @@ async function finishDig(buyerId, board) {
     if (voyagesNow >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
+    await dropSeedFrom(buyerId, "sail_dig").catch(() => {}); // a chance to unearth a farming seed
     await trackActivity(buyerId, "sail_dig", { frags: fragCount, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
     const state = await getSailingState(buyerId);
     // byTier decorated with art/label so the recap can show what kind of shards you hauled up.

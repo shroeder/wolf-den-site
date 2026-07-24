@@ -144,6 +144,9 @@ export async function openChest(buyerId, tier) {
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
     await trackActivity(buyerId, "open_chest", { tier });
+    // Chest opens can also drop a farming seed (tier scales rarity). Dynamic import avoids a chests↔farm-crops
+    // static import cycle (farm-crops pulls in quests/xp, which pull in chests).
+    try { const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js"); await dropSeedFrom(buyerId, ["wooden", "iron", "gold"].includes(tier) ? `chest_${tier}` : "chest_gold"); } catch { /* best-effort */ }
 
     // A chance at a companion PET from this chest tier — the standout reveal.
     const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);

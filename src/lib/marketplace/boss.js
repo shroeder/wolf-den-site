@@ -10,6 +10,7 @@ import { petLevelForXp, addEquippedPetXp } from "@/lib/marketplace/pet-level.js"
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
+import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -723,6 +724,7 @@ async function finalizeBossKill(bossId) {
         if (drop) petWinners.add(p.id);
     }
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
+    for (const p of pool) await dropSeedFrom(p.id, "boss_kill").catch(() => {}); // slaying the boss showers seeds
 
     // IN-GAME REWARD ITEMS — the admin hand-picks 0+ items; each drops to a WEIGHTED-RANDOM participant.
     // The top 3 dealers get a modest edge (weights 3/2/2 vs 1 for everyone else), but it's far from a
@@ -975,6 +977,7 @@ export async function attackBoss(buyerId) {
 
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});
+    await dropSeedFrom(buyerId, "boss_strike").catch(() => {}); // a chance to find a farming seed
 
     // Report the EFFECTIVE hp (stored minus pending passive drain) so the client's bar stays consistent
     // with the polled state instead of snapping back up after a manual strike.

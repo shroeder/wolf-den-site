@@ -123,6 +123,15 @@ export async function getMemberMetrics(buyerId) {
     // adjustments never create a mkt_credit_purchase row, so hand-granted credit correctly doesn't count.
     const creditRow = await db.queryOne(`SELECT COALESCE(SUM(amount_cents), 0)::bigint AS c FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`, [buyerId]).catch(() => null);
 
+    // Farming + petting counts (from the activity log) — drive the farm/pet badges.
+    const farmRow = await db.queryOne(
+        `SELECT COUNT(*) FILTER (WHERE event = 'harvest_crop')::int AS harvests,
+                COUNT(*) FILTER (WHERE event IN ('pet_farm', 'pet_other'))::int AS pets_petted,
+                COUNT(*) FILTER (WHERE event = 'feed_other')::int AS pets_fed
+           FROM mkt_activity_event WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
+
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
     const ownedItemRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     let eliteItems = 0, eternalItems = 0;
@@ -167,6 +176,9 @@ export async function getMemberMetrics(buyerId) {
         onboardingComplete,
         messages: messageRow?.n || 0,
         badgeCount: badgeRow?.n || 0,
+        cropsHarvested: farmRow?.harvests || 0,
+        petsPetted: farmRow?.pets_petted || 0,
+        petsFed: farmRow?.pets_fed || 0,
         tradeCount: tradeRow?.trades || 0,
         cardsTraded: tradeRow?.cards || 0,
         tradeValue: Math.round(Number(tradeRow?.value_cents || 0) / 100),
@@ -283,6 +295,9 @@ export function progressForRule(rule, threshold, m) {
         case "cheers_given": return { current: m.cheersGiven, target: t }; // times you've cheered a hero in the boss fight
         case "cheers_received": return { current: m.cheersReceived, target: t }; // times the pack has cheered you
         case "credit_purchased": return { current: m.creditPurchased, target: t }; // lifetime $ of store credit bought
+        case "crops_harvested": return { current: m.cropsHarvested, target: t }; // crops harvested on the farm
+        case "pets_petted": return { current: m.petsPetted, target: t }; // times you've petted a pet
+        case "pets_fed_others": return { current: m.petsFed, target: t }; // treats given to friends' pets (generosity)
         default: return { current: 0, target: t || 1 };
     }
 }

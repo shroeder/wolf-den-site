@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
@@ -184,6 +185,7 @@ export async function doSpin(buyerId) {
     const display = await grantPrize(buyerId, prize);
     await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + 1 END WHERE id = $1`, [buyerId, Boolean(prize.rare)]).catch(() => {});
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
+    await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
     const prizeOut = { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal"), jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare) };

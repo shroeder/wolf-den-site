@@ -83,6 +83,13 @@ const ACTIVITY_LABEL = {
     buy_digs: () => "⛏️ Bought extra digs",
     buy_spin: () => "🎡 Bought an extra spin",
     cooldown_skip: (m) => `⏩ Skipped a cooldown${m?.kind ? ` (${String(m.kind).replace(/_/g, " ")})` : ""}`,
+    // Farm / pets
+    pet_farm: () => "❤️ Petted one of their pets",
+    pet_other: () => "❤️ Petted a friend's pet",
+    feed_other: () => "🎁 Fed a treat to a friend's pet",
+    plant_seed: (m) => `🌱 Planted ${m?.seedId || "a seed"}`,
+    harvest_crop: (m) => `🌾 Harvested ${m?.seedId || "a crop"}${m?.chest ? ` — found a ${m.chest} chest!` : ""}`,
+    loot_pig: (m) => `🐷 Loot Pig haul (+${m?.gold || 0}g${m?.item ? ` + ${m.item}` : ""})`,
 };
 const activityLabel = (event, meta, path) => {
     if (event === "page_view") return `📄 Viewed ${path || "a page"}`;

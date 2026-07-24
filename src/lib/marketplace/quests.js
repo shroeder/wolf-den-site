@@ -5,6 +5,7 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
 const ALL_QUESTS_XP = 300;
@@ -33,6 +34,11 @@ export const QUEST_TEMPLATES = [
     { key: "sail_wave", label: "Greet a passing sailor at sea", metric: "wave", target: 1, gold: 90, area: "/marketplace/sailing", cta: "Go sailing", gate: "sailing" },
     { key: "sail_raid", label: "Raid a passing ship", metric: "raid_do", target: 1, gold: 150, area: "/marketplace/sailing", cta: "Go raiding", gate: "sailing" },
     { key: "sail_dig", label: "Dig up buried treasure", metric: "dig_done", target: 1, gold: 160, chest: "wooden", area: "/marketplace/sailing", cta: "Go digging", gate: "sailing" },
+    // ── Farm quests (gated: only appear for members who can access the Farm — see eligibleTemplates) ──
+    { key: "harvest_crop", label: "Harvest a crop from your farm", metric: "harvest_crop", target: 1, gold: 150, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },
+    { key: "plant_seed", label: "Plant a seed", metric: "plant_seed", target: 1, gold: 90, area: "/marketplace/farm", cta: "Plant a crop", gate: "farm" },
+    { key: "pet_a_pet", label: "Pet a pet on the farm", metric: "pet_animal", target: 1, gold: 100, area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
+    { key: "pet_three", label: "Pet 3 pets today", metric: "pet_animal", target: 3, gold: 190, chest: "wooden", area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
@@ -50,9 +56,11 @@ function hashStr(s) {
     return h >>> 0;
 }
 
-// Which templates this member is eligible for. Sailing has launched publicly, so its quests are open to all.
-function eligibleTemplates() {
-    return QUEST_TEMPLATES;
+// Which templates this member is eligible for. Sailing has launched publicly (open to all); the Farm is still
+// an owner-only preview, so farm-gated quests are hidden from everyone but the owner (no dead daily todos).
+function eligibleTemplates(buyerId) {
+    const owner = isOwner(buyerId);
+    return QUEST_TEMPLATES.filter((t) => t.gate !== "farm" || owner);
 }
 
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
