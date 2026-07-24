@@ -447,6 +447,18 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; }
                 .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
+                /* Juicy candy-gold button with a springy 3D press — for the friendly farm actions. */
+                .farm-jbtn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px; font-weight: 800; font-size: 14px; cursor: pointer; border: 1px solid rgba(255,214,110,0.6); background: linear-gradient(180deg, #ffe488, #f3b23a); color: #3a2c08; box-shadow: 0 3px 0 #b57f22, 0 6px 14px rgba(0,0,0,0.35); transition: transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s ease, filter .12s ease; }
+                .farm-jbtn:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 0 #b57f22, 0 9px 18px rgba(0,0,0,0.42); }
+                .farm-jbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22, 0 3px 8px rgba(0,0,0,0.35); }
+                /* Visit-a-farm opener: an inviting, tappable bar (not a flat box). */
+                .farm-visit { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.3); background: linear-gradient(180deg, rgba(255,214,110,0.1), rgba(255,255,255,0.02)); color: inherit; cursor: pointer; text-align: left; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+                .farm-visit:hover { transform: translateY(-1px); border-color: rgba(255,214,110,0.55); background: linear-gradient(180deg, rgba(255,214,110,0.16), rgba(255,255,255,0.03)); }
+                .farm-visit:active { transform: translateY(1px); }
+                .farm-visit .farm-visit-chev { transition: transform .2s ease; }
+                /* Rarity-framed portrait tile so a pet sprite reads as an intentional framed portrait, not a raw square. */
+                .farm-portrait { position: relative; display: inline-block; border-radius: 20px; overflow: hidden; }
+                .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
             `}</style>
 
             <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -464,7 +476,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         </button>
                     ) : null}
                     {!farm.mine ? (
-                        <button type="button" className="btn" onClick={() => window.location.assign("/marketplace/farm")}>← My farm</button>
+                        <button type="button" className="farm-jbtn" onClick={() => window.location.assign("/marketplace/farm")}>🏡 My farm</button>
                     ) : null}
                 </div>
             </section>
@@ -733,8 +745,10 @@ function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [],
                 <div style={{ position: "relative", padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}22 0%, transparent 70%)` }}>
                     <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", color: "inherit", fontSize: 20, cursor: "pointer", opacity: 0.7 }}>×</button>
                     {pet.spriteUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={pet.spriteUrl} alt={pet.name} width={132} height={132} style={{ width: 132, height: 132, objectFit: "contain", filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.45))" }} />
+                        <span className="farm-portrait" style={{ "--pring": `${ring}88`, width: 148, height: 148, background: `radial-gradient(80% 80% at 50% 35%, ${ring}18, rgba(0,0,0,0.25))` }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={pet.spriteUrl} alt={pet.name} width={148} height={148} style={{ width: 148, height: 148, objectFit: "cover", display: "block" }} />
+                        </span>
                     ) : null}
                     <div style={{ marginTop: 4, fontSize: 20, fontWeight: 800 }}>{pet.name}</div>
                     <div style={{ marginTop: 2, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -930,12 +944,13 @@ function FarmDirectory({ current }) {
                 type="button"
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: open ? "0 0 10px" : "14px 16px", background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left" }}
+                className={open ? undefined : "farm-visit"}
+                style={open ? { width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "0 0 10px", background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left" } : undefined}
             >
-                <span style={{ display: "flex", opacity: 0.6 }}><SearchIcon /></span>
+                <span style={{ display: "flex", color: "#ffd75e" }}><SearchIcon /></span>
                 <strong style={{ fontSize: 16 }}>Visit a farm</strong>
                 <span className="muted" style={{ fontSize: 11 }}>owner-only</span>
-                <span aria-hidden="true" style={{ marginLeft: "auto", transition: "transform .2s ease", transform: open ? "rotate(90deg)" : "none", opacity: 0.6, fontSize: 18, lineHeight: 1 }}>›</span>
+                <span aria-hidden="true" className="farm-visit-chev" style={{ marginLeft: "auto", transform: open ? "rotate(90deg)" : "none", opacity: 0.6, fontSize: 18, lineHeight: 1 }}>›</span>
             </button>
             {open ? (
                 <>
