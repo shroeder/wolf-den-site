@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
-import { petPerk, GOLD_PER_POINT } from "@/lib/marketplace/pet-perks";
+import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
 const statText = (stat) => {
     const m = PET_STAT_META[stat] || { label: stat, icon: "" };
@@ -17,7 +17,7 @@ const ownedBonusText = (p) => {
     // base rate; each pet's share scales up as it levels, and every owned pet stacks).
     if (p.stat === "gold_find") return `💰 +${Math.max(1, Math.round(p.value * GOLD_PER_POINT))} gold/hr passive income — more as it levels (all your pets stack).`;
     if (p.stat === "xp_gain") return `✨ +${p.value} XP/hr passive income — more as it levels (all your pets stack).`;
-    if (p.stat === "fortune") return `🍀 +${p.value} bonus tickets in the weekly boss-prize draw.`;
+    if (p.stat === "fortune") return `🍀 +${p.value * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day — banked all week (all your pets stack).`;
     return `+${p.value} ${statText(p.stat)} — buffs your boss damage (stacks across your whole menagerie).`;
 };
 

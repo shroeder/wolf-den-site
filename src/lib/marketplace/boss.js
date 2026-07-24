@@ -9,6 +9,7 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { petLevelForXp, addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
+import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -32,6 +33,20 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
 // where every member's avatar chips away 24/7 (a background tick applies it and records it over time).
 export const DAILY_ATTACKS = 1;
+
+// Fortune → boss-raffle tickets. Instead of a flat one-time bonus, each point of fortune banks
+// TICKETS_PER_FORTUNE_PER_DAY (from pet-perks.js) lottery tickets PER DAY the boss is alive — so holding
+// fortune gear/pets across the week compounds into a real edge. `fortuneTickets(fortune, boss)` is the single
+// source used by both the display and the draw.
+const MAX_FORTUNE_DAYS = 8; // don't let an unusually long-lived boss balloon the accrual
+function bossDaysActive(boss) {
+    if (!boss?.started_at) return 1;
+    const ms = Date.now() - new Date(boss.started_at).getTime();
+    return Math.min(MAX_FORTUNE_DAYS, Math.max(1, Math.ceil(ms / 86400000)));
+}
+export function fortuneTickets(fortune, boss) {
+    return Math.round((Number(fortune) || 0) * TICKETS_PER_FORTUNE_PER_DAY * bossDaysActive(boss));
+}
 
 // Single source of truth for a member's daily manual-strike cap: base + gear/pet extra_strike + signature +
 // set capstone + consumable strike-boosts. BOTH the enforcer (attackBoss) and the status display compute the
@@ -479,9 +494,9 @@ export async function getBossState(buyerId = null) {
         const myLevel = mine?.level || lvl(goldRow?.xp || 0);
         const myAutoPerHour = Math.round(autoPerHour(myLevel, autoStats(myStats, myPet?.stats || {})) * em.mult);
         const cheerStatus = await getCheerStatus(buyerId).catch(() => ({ left: 0, perDay: CHEERS_PER_DAY }));
-        // Fortune (raffle luck) from pets/gear now adds REAL bonus tickets on top of the damage-earned ones.
-        const fortuneTickets = Math.round(myPet?.stats?.fortune || 0);
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) + fortuneTickets, fortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
+        // Fortune (raffle luck) from pets/gear banks bonus tickets PER DAY the boss is alive (see fortuneTickets).
+        const myFortuneTickets = fortuneTickets(myPet?.stats?.fortune || 0, boss);
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) + myFortuneTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -677,7 +692,7 @@ async function finalizeBossKill(bossId) {
     const pool = parts.map((p) => ({
         id: p.buyer_id,
         dmg: p.dmg,
-        tickets: Math.floor(p.dmg / divisor) + Math.round(petBonuses.get(p.buyer_id)?.stats?.fortune || 0),
+        tickets: Math.floor(p.dmg / divisor) + fortuneTickets(petBonuses.get(p.buyer_id)?.stats?.fortune || 0, boss),
     }));
     const ranked = pool.slice().sort((a, b) => b.dmg - a.dmg);
     const top1 = ranked[0] || null;
