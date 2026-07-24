@@ -7,7 +7,7 @@ const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legen
 // ── Decorate DOCK: a bottom tray you drag decorations OUT of, straight onto the farm scene (which stays fully
 // visible above it). Drag a chip up, release over the field → it drops there. Also carries the placed-count,
 // a Shop button, and Done. This is the "grab from a drawer while watching the farm" flow.
-export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onDone }) {
+export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onOpenCreator, onDone }) {
     const { catalog = [], placedTotal = 0, placedCap = 500 } = deco || {};
     const atCap = placedTotal >= placedCap;
     const ownedItems = catalog.filter((d) => d.owned);
@@ -116,6 +116,12 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onDone })
                             <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: o.buyable ? "#ffd75e" : "#8fb3d6" }}>{o.buyable ? `🪙 ${o.price.toLocaleString()}` : (o.source === "spin" ? "🎡 wheel" : "🏆 track")}</span>
                         </button>
                     ))}
+                    {onOpenCreator ? (
+                        <button type="button" onClick={onOpenCreator} title="Design your own decoration" style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "radial-gradient(120% 120% at 50% 0%, rgba(201,162,255,0.25), rgba(255,255,255,0.03))", border: "1px dashed rgba(201,162,255,0.6)", fontSize: 26 }}>✨</span>
+                            <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#d9b8ff", fontWeight: 700 }}>Make your own</span>
+                        </button>
+                    ) : null}
                 </div>
             </div>
         </>
@@ -355,5 +361,96 @@ function DecoIcon({ o }) {
 function TabBtn({ active, onClick, children }) {
     return (
         <button type="button" onClick={onClick} style={{ padding: "6px 12px", borderRadius: 10, border: "none", background: active ? "rgba(126,213,126,0.18)" : "rgba(255,255,255,0.05)", color: active ? "#a7e6a7" : "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>{children}</button>
+    );
+}
+
+const CINP = { width: "100%", padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "inherit", fontSize: 14, boxSizing: "border-box" };
+const CPRIMARY = { width: "100%", padding: 12, fontWeight: 900, fontSize: 14, border: "none", borderRadius: 11, cursor: "pointer", background: "linear-gradient(180deg,#d9b8ff,#a875e6)", color: "#25103f" };
+const CGHOST = { padding: "9px 14px", fontWeight: 800, fontSize: 13, borderRadius: 10, cursor: "pointer", border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9b8ff" };
+const customErr = (e) => ({ no_credits: "You're out of creations — load $5 store credit to earn one.", describe_it: "Describe your decoration first.", gen_failed: "The art pipeline hiccuped — try again (your creation was refunded).", no_attempts: "No refines left.", bad_choice: "Pick one of the options.", not_found: "That draft expired — start over." }[e] || "Something went wrong — try again.");
+
+// ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a creation credit
+// (earned by loading $5 store credit; owner can self-grant). Personal-only + never tradeable.
+export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, onFinalize, onGrantSelf, onClose }) {
+    const [draft, setDraft] = useState(custom?.draft || null);
+    const [credits, setCredits] = useState(custom?.credits || 0);
+    const [name, setName] = useState(draft?.name || "");
+    const [prompt, setPrompt] = useState(draft?.prompt || "");
+    const [chosen, setChosen] = useState(null);
+    const [gen, setGen] = useState(false);
+    const [err, setErr] = useState(null);
+    const attemptsLeft = draft ? Math.max(0, (draft.maxAttempts || 3) - draft.attempts) : 3;
+
+    const run = async (fn) => {
+        setGen(true); setErr(null);
+        const r = await fn();
+        setGen(false);
+        if (!r?.ok) { setErr(customErr(r?.error)); return r; }
+        if (r.draft) { setDraft(r.draft); setChosen(null); }
+        if (r.credits != null) setCredits(r.credits);
+        return r;
+    };
+    const doStart = () => { if (prompt.trim().length < 4) { setErr("Describe your decoration (a few words at least)."); return; } run(() => onStart(name, prompt)); };
+    const doRefine = () => run(() => onRefine(draft.id, prompt));
+    const doFinalize = async () => { if (!chosen) return; setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false); if (r?.ok) onClose(); else setErr(customErr(r?.error)); };
+    const doGrant = async () => { const r = await onGrantSelf(); if (r?.ok && r.credits != null) setCredits(r.credits); };
+
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10058, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Make your own decoration" style={{ width: "100%", maxWidth: 420, maxHeight: "90dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #c9a2ff", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", padding: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <strong style={{ fontSize: 17 }}>✨ Make your own</strong>
+                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: credits > 0 ? "#c9a2ff" : "#9aa0a6" }}>{credits} creation{credits === 1 ? "" : "s"}</span>
+                    <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7 }}>×</button>
+                </div>
+
+                {gen ? (
+                    <div style={{ textAlign: "center", padding: "34px 12px" }}>
+                        <div style={{ fontSize: 34, animation: "farmBob 1.4s ease-in-out infinite" }}>🎨</div>
+                        <div style={{ fontWeight: 800, marginTop: 8 }}>Drawing 3 options…</div>
+                        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>This takes ~30 seconds — hang tight.</div>
+                    </div>
+                ) : !draft ? (
+                    <div style={{ marginTop: 10 }}>
+                        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Describe a decoration and our art pipeline draws you 3 to choose from — with 2 refine tries. It&apos;s yours alone, forever.</p>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Name</label>
+                        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="e.g. Wolf Totem" style={CINP} />
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, margin: "12px 0 4px" }}>Describe it</label>
+                        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={300} rows={3} placeholder="e.g. a carved wooden wolf totem with glowing blue eyes" style={{ ...CINP, resize: "vertical" }} />
+                        {err ? <div style={{ color: "#ff9a9a", fontSize: 12.5, marginTop: 8 }}>{err}</div> : null}
+                        {credits > 0 ? (
+                            <button type="button" onClick={doStart} disabled={busy} style={{ ...CPRIMARY, marginTop: 14 }}>🎨 Draw my decoration (uses 1 creation)</button>
+                        ) : (
+                            <div style={{ marginTop: 14, textAlign: "center" }}>
+                                <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creations. Load $5 of store credit to earn one (you keep the credit).</div>
+                                <a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 8, fontWeight: 800, color: "#ffd75e" }}>Load store credit →</a>
+                                {canGrant ? <div><button type="button" onClick={doGrant} style={{ marginTop: 10, ...CGHOST }}>🎁 Grant myself one (owner)</button></div> : null}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ marginTop: 12 }}>
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>{draft.name} — pick your favorite</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+                            {draft.options.map((o) => (
+                                <button key={o.url} type="button" onClick={() => setChosen(o.url)} style={{ padding: 0, borderRadius: 12, cursor: "pointer", border: `2px solid ${chosen === o.url ? "#c9a2ff" : "rgba(255,255,255,0.14)"}`, background: chosen === o.url ? "rgba(201,162,255,0.14)" : "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={o.url} alt="" width={110} height={110} style={{ width: "100%", aspectRatio: "1", objectFit: "contain", display: "block" }} />
+                                </button>
+                            ))}
+                        </div>
+                        {err ? <div style={{ color: "#ff9a9a", fontSize: 12.5, marginTop: 8 }}>{err}</div> : null}
+                        {attemptsLeft > 0 ? (
+                            <div style={{ marginTop: 12 }}>
+                                <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Not quite? Tweak the description &amp; try again ({attemptsLeft} refine{attemptsLeft === 1 ? "" : "s"} left)</label>
+                                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={300} rows={2} style={{ ...CINP, resize: "vertical" }} />
+                                <button type="button" onClick={doRefine} disabled={busy} style={{ ...CGHOST, marginTop: 8, width: "100%" }}>✨ Draw 3 more</button>
+                            </div>
+                        ) : <div className="muted" style={{ fontSize: 12, marginTop: 10, textAlign: "center" }}>No refines left — pick your favorite to finish.</div>}
+                        <button type="button" onClick={doFinalize} disabled={!chosen || busy} style={{ ...CPRIMARY, marginTop: 14, opacity: chosen ? 1 : 0.5 }}>✓ Use this one</button>
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }

@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { DECORATIONS, decorationById, isDecoration, decorationBuffs, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
+import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
+
+const isCustom = (id) => String(id).startsWith("custom:");
+const CUSTOM_COLOR = "#c9a2ff";
 
 // Farm decoration ownership + placement + buffs. The catalog is code (decorations.js); this module is the
 // per-member state: what you own, where you've placed it, and the passive buffs your placed pieces grant.
@@ -68,13 +72,14 @@ export async function getPlacements(buyerId) {
     if (!buyerId) return [];
     const rows = await db.query(`SELECT id, deco_id, x, y, z, flip FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []);
     if (!rows.length) return [];
-    const sprites = await getDecoSprites(rows.map((r) => r.deco_id));
+    const [sprites, customMap] = await Promise.all([getDecoSprites(rows.map((r) => r.deco_id)), listFinalCustomDecos(buyerId)]);
     return rows.map((r) => {
         const def = decorationById(r.deco_id);
+        const cm = customMap.get(r.deco_id);
         return {
             id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true,
-            name: def?.name || r.deco_id, emoji: def?.emoji || "🏵️", rarity: def?.rarity || "common", rarityColor: DECO_RARITY[def?.rarity]?.color,
-            spriteUrl: sprites[r.deco_id] || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || null,
+            name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
+            spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
         };
     });
 }
@@ -83,48 +88,54 @@ export async function getPlacements(buyerId) {
 // the aggregate buff totals, and the keep-out zone. Everything the client needs to manage decorations.
 export async function decoState(buyerId) {
     if (!buyerId) return { owned: [], placements: [], buffs: decorationBuffs([]), keepout: decoKeepout() };
-    const [ownedRows, placeRows, sprites] = await Promise.all([
+    const [ownedRows, placeRows, sprites, customMap] = await Promise.all([
         db.query(`SELECT deco_id, qty FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT id, deco_id, x, y, z, flip FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []),
         getDecoSprites(),
+        listFinalCustomDecos(buyerId),
     ]);
+    const customState = await getCustomState(buyerId).catch(() => ({ credits: 0, draft: null }));
     const placedCount = {};
     for (const p of placeRows || []) placedCount[p.deco_id] = (placedCount[p.deco_id] || 0) + 1;
+    // Build owned entries — catalog decorations AND player-made customs (custom:<id>).
+    const ownedEntry = (decoId, placed) => {
+        const cm = customMap.get(decoId);
+        if (cm) return { id: decoId, name: cm.name, emoji: "🎨", rarity: "custom", rarityColor: CUSTOM_COLOR, spriteUrl: sprites[decoId] || cm.url || null, owned: true, placed, buff: null, buffText: null, custom: true };
+        const def = decorationById(decoId);
+        if (!def) return null;
+        return { id: def.id, name: def.name, emoji: def.emoji, rarity: def.rarity, rarityColor: DECO_RARITY[def.rarity]?.color, spriteUrl: sprites[def.id] || null, owned: true, placed, buff: def.buff, buffText: def.buff ? buffText(def.buff) : null };
+    };
     const owned = (ownedRows || [])
-        .map((r) => {
-            const def = decorationById(r.deco_id);
-            if (!def) return null;
-            const placed = placedCount[r.deco_id] || 0;
-            return {
-                id: def.id, name: def.name, emoji: def.emoji, rarity: def.rarity, rarityColor: DECO_RARITY[def.rarity]?.color,
-                spriteUrl: sprites[def.id] || null, owned: true, placed, // owning = permanent; place as many as you like
-                buff: def.buff, buffText: def.buff ? buffText(def.buff) : null,
-            };
-        })
+        .map((r) => ownedEntry(r.deco_id, placedCount[r.deco_id] || 0))
         .filter(Boolean)
-        .sort((a, b) => (DECO_RARITY[b.rarity]?.rank || 0) - (DECO_RARITY[a.rarity]?.rank || 0));
+        .sort((a, b) => (a.custom ? 1 : 0) - (b.custom ? 1 : 0) || (DECO_RARITY[b.rarity]?.rank || 0) - (DECO_RARITY[a.rarity]?.rank || 0));
     const placements = (placeRows || []).map((r) => {
         const def = decorationById(r.deco_id);
-        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, name: def?.name || r.deco_id, emoji: def?.emoji || "🏵️", rarity: def?.rarity || "common", rarityColor: DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || null };
+        const cm = customMap.get(r.deco_id);
+        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
     });
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));
     // The FULL catalog (all 100) annotated with owned/placed/price/buyable — the drawer shows everything: owned
     // pieces you can drag out, and locked ones you tap to inspect + buy (or learn where to earn them).
     const RANK = DECO_RARITY;
-    const catalog = DECORATIONS
+    const customCatalog = [...customMap.entries()].map(([id, cm]) => ({
+        id, name: cm.name, emoji: "🎨", rarity: "custom", rarityColor: CUSTOM_COLOR, source: "custom", price: null,
+        spriteUrl: sprites[id] || cm.url || null, buff: null, buffText: null, owned: true, placed: placedCount[id] || 0, buyable: false, custom: true,
+    }));
+    const catalog = [...customCatalog, ...DECORATIONS
         .map((d) => ({
             id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, rarityColor: RANK[d.rarity]?.color,
             source: d.source, price: d.price || null, spriteUrl: sprites[d.id] || null,
             buff: d.buff || null, buffText: d.buff ? buffText(d.buff) : null,
             owned: ownedSet.has(d.id), placed: placedCount[d.id] || 0,
             buyable: ["shop", "special"].includes(d.source) && Boolean(d.price),
-        }))
+        }))]
         .sort((a, b) => {
             if (a.owned !== b.owned) return a.owned ? -1 : 1; // owned (placeable) first
             return (RANK[a.rarity]?.rank || 0) - (RANK[b.rarity]?.rank || 0) || (a.price || 0) - (b.price || 0);
         });
-    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), catalog, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
+    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), catalog, custom: customState, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
 }
 
 const clampPct = (v, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(2, Math.min(98, n)) : def; };
@@ -133,7 +144,7 @@ const clampPct = (v, def) => { const n = Number(v); return Number.isFinite(n) ? 
 // many times as you like (reusable). Guards: you own it, the spot isn't over the plots, and you're under the
 // global 500-item placement cap.
 export async function placeDecoration(buyerId, decoId, x, y) {
-    if (!buyerId || !isDecoration(decoId)) return { ok: false, error: "bad_decoration" };
+    if (!buyerId || (!isDecoration(decoId) && !isCustom(decoId))) return { ok: false, error: "bad_decoration" };
     const px = clampPct(x, 50);
     const py = clampPct(y, 55);
     if (nearPlots(px, py)) return { ok: false, error: "too_close_to_plots" };

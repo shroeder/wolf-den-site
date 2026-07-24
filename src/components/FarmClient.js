@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import CoinCta from "@/components/CoinCta";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
-import { DecoLayer, DecoDock, DecoInspect } from "@/components/FarmDecorations";
+import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -208,6 +208,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
     const [ownerMenu, setOwnerMenu] = useState(false); // farmer character tapped → connect menu
     const [crownOpen, setCrownOpen] = useState(false); // owner crown-calibrator tool
+    const [customOpen, setCustomOpen] = useState(false); // custom-decoration creator
     const [pig, setPig] = useState(null); // "running" while the loot pig is on screen
     const [pigToast, setPigToast] = useState(false);
     const [pigResult, setPigResult] = useState(null); // the haul modal after he leaves
@@ -250,7 +251,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || inspectDeco || crownOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || inspectDeco || crownOpen || customOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -267,7 +268,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot, inspectDeco, crownOpen]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot, inspectDeco, crownOpen, customOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -485,6 +486,23 @@ export default function FarmClient({ initial, viewingAlias }) {
     const decoMove = useCallback((placementId, x, y) => decoAct({ action: "deco_move", placementId, x, y }), [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
     const fieldRef = useRef(null);
+    // Custom (player-made) decorations
+    const customStart = useCallback(async (name, prompt) => {
+        const r = await post({ action: "deco_custom_start", name, prompt });
+        if (r?.ok) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), credits: r.credits, draft: r.draft } } }));
+        return r;
+    }, [post]);
+    const customRefine = useCallback((id, prompt) => post({ action: "deco_custom_refine", id, prompt }), [post]);
+    const customFinalize = useCallback(async (id, chosenUrl) => {
+        const r = await post({ action: "deco_custom_finalize", id, chosenUrl });
+        if (r?.ok && r.catalog) setFarm((f) => ({ ...f, placements: r.placements || f.placements, decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, custom: { ...(f.decorations?.custom || {}), draft: null }, placedTotal: r.placedTotal, placedCap: r.placedCap } }));
+        return r;
+    }, [post]);
+    const customGrant = useCallback(async () => {
+        const r = await post({ action: "deco_custom_grant" });
+        if (r?.ok) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), credits: r.credits } } }));
+        return r;
+    }, [post]);
     // "Decorate" opens a bottom DOCK (farm scene stays visible; drag decorations up onto it) rather than a modal.
     const [decorating, setDecorating] = useState(false);
     const startDecorating = useCallback(() => {
@@ -784,6 +802,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     busy={decoBusy}
                     onPlaceAt={decoPlaceAt}
                     onInspect={(cat) => setInspectDeco(cat)}
+                    onOpenCreator={() => setCustomOpen(true)}
                     onDone={stopDecorating}
                 />
             ) : null}
@@ -802,6 +821,19 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {crownOpen && farm.mine ? (
                 <CrownCalibrator initial={farm.crownCfg} onSave={saveCrown} onClose={() => setCrownOpen(false)} />
+            ) : null}
+
+            {customOpen && farm.mine && farm.decorations ? (
+                <CustomDecoCreator
+                    custom={farm.decorations.custom}
+                    canGrant={farm.mine}
+                    busy={decoBusy}
+                    onStart={customStart}
+                    onRefine={customRefine}
+                    onFinalize={customFinalize}
+                    onGrantSelf={customGrant}
+                    onClose={() => setCustomOpen(false)}
+                />
             ) : null}
 
             {planting != null && garden ? (

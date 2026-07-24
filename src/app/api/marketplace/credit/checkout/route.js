@@ -18,6 +18,7 @@ import {
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
+import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -124,6 +125,9 @@ export async function POST(request) {
                 }).catch(() => {});
                 // Grant any newly-earned store-credit badges from the higher lifetime total.
                 syncEarnedBadges(buyer.id).catch(() => {});
+                // 1 custom-decoration creation credit per full $5 loaded (design-your-own-decoration perk).
+                const creations = Math.floor(amountCents / 500);
+                if (creations > 0) grantCustomCredit(buyer.id, creations).catch(() => {});
             }
 
             return noStore({
