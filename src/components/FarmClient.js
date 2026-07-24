@@ -326,7 +326,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (!farm.canPet || pet.petted || busy) return;
         const i = pets.findIndex((p) => p.id === pet.id);
         setBusy(pet.id);
-        const r = await post({ action: "pet", petId: pet.id });
+        const r = await post({ action: "pet", petId: pet.id, owner: farm.mine ? undefined : farm.owner?.alias });
         setBusy(null);
         if (r?.petting) setFarm((f) => ({ ...f, petting: r.petting }));
         if (r?.ok) {
@@ -338,7 +338,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, petted: true } : p)) }));
             setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, petted: true } : cur));
         }
-    }, [farm.canPet, busy, addFloater, pets, post]);
+    }, [farm.canPet, farm.mine, farm.owner, busy, addFloater, pets, post]);
 
     const rechargeBudget = useCallback(async () => {
         if (busy) return;
@@ -387,7 +387,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         setBusy(consumableId);
         const r = await fetch("/api/marketplace/farm", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "use_item", petId: pet.id, consumableId }),
+            body: JSON.stringify({ action: "use_item", petId: pet.id, consumableId, owner: farm.mine ? undefined : farm.owner?.alias }),
         }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
         setBusy(null);
         if (!r?.ok) return;
@@ -396,10 +396,12 @@ export default function FarmClient({ initial, viewingAlias }) {
             ...f,
             pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)),
             treats: (f.treats || []).map((t) => (t.id === consumableId ? { ...t, count: t.count - 1 } : t)).filter((t) => t.count > 0),
+            // Feeding a friend's pet pays the feeder a small generosity bonus.
+            wallet: f.wallet && r.goldGained ? { ...f.wallet, gold: f.wallet.gold + r.goldGained } : f.wallet,
         }));
         setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
-        if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : `+${r.petXpGain || ""} XP`, "#ffe27a");
-    }, [farm.canPet, busy, addFloater, pets]);
+        if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : r.forOther ? `+${r.playerXp} XP · +${r.goldGained}g 💛` : `+${r.petXpGain || ""} XP`, "#ffe27a");
+    }, [farm.canPet, farm.mine, farm.owner, busy, addFloater, pets]);
 
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
@@ -614,6 +616,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             {inspect ? (
                 <PetInspect
                     pet={inspect}
+                    mine={farm.mine}
+                    ownerName={farm.owner?.name}
                     canPet={farm.canPet}
                     petXp={farm.petXp}
                     petGold={farm.petGold}
@@ -723,7 +727,7 @@ function LootPig({ onFinish }) {
 
 // Detail card for a single pet: big sprite, rarity/level, XP progress, what it does, and — on your own farm —
 // the once-a-day "pet for XP" action.
-function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [], treatShop = [], busyKey, onPet, onRecharge, onUseTreat, onBuyTreat, onClose }) {
+function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petting, wallet, treats = [], treatShop = [], busyKey, onPet, onRecharge, onUseTreat, onBuyTreat, onClose }) {
     const busy = Boolean(busyKey);
     const def = collectibleById(pet.id);
     const perk = def ? petPerk(def) : null; // active (equipped) signature
@@ -788,7 +792,7 @@ function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [],
                     {canPet ? (
                         <div style={{ marginTop: 4 }}>
                             {pet.petted ? (
-                                <div style={{ textAlign: "center", padding: "8px 0 2px", color: "#ff9ec2", fontWeight: 600 }}>❤️ Petted today — come back tomorrow</div>
+                                <div style={{ textAlign: "center", padding: "8px 0 2px", color: "#ff9ec2", fontWeight: 600 }}>{mine ? "❤️ Petted today — come back tomorrow" : "❤️ You petted this pet — spread the love!"}</div>
                             ) : petting && petting.left <= 0 ? (
                                 <div>
                                     <div className="muted" style={{ fontSize: 12, textAlign: "center", marginBottom: 6 }}>Out of pets for today.</div>
@@ -806,7 +810,7 @@ function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [],
                             ) : (
                                 <>
                                     <button type="button" onClick={onPet} disabled={busy} style={{ width: "100%", padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
-                                        {busyKey === pet.id ? "Petting…" : `❤️ Pet ${pet.name} (+${petXp} XP, +${petGold}g)`}
+                                        {busyKey === pet.id ? "Petting…" : mine ? `❤️ Pet ${pet.name} (+${petXp} XP, +${petGold}g)` : `❤️ Pet ${pet.name} — +${petXp} XP for them, +${petGold}g for you`}
                                     </button>
                                     {petting ? <div className="muted" style={{ fontSize: 11, textAlign: "center", marginTop: 4 }}>{petting.left} of {petting.allowance} pettings left today</div> : null}
                                 </>
@@ -817,7 +821,7 @@ function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [],
                     {/* Feed a treat you own */}
                     {canPet && treats.length ? (
                         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🍖 Feed a treat</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{mine ? "🍖 Feed a treat" : `🍖 Feed a treat 💛 — a gift to ${ownerName || "them"} (earns you a little too)`}</div>
                             {pet.maxed ? (
                                 <div className="muted" style={{ fontSize: 12 }}>{pet.name} is max level — treats won&apos;t add more.</div>
                             ) : (

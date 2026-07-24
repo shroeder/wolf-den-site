@@ -42,9 +42,16 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer || !isOwner(buyer.id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
             const b = await request.json().catch(() => ({}));
+            // When acting on a FRIEND'S farm the client passes their @handle as `owner`; resolve it to the pet
+            // owner so petting/feeding lands on their pet (but spends the viewer's budget/treats).
+            let ownerId = null;
+            if (b?.owner) {
+                const o = await resolveFarmOwner(String(b.owner));
+                ownerId = o && String(o.id) !== String(buyer.id) ? o.id : null;
+            }
             let res = null;
-            if (b?.action === "pet") res = await petPet(buyer.id, String(b?.petId || ""));
-            else if (b?.action === "use_item") res = await feedPetItem(buyer.id, String(b?.petId || ""), String(b?.consumableId || ""));
+            if (b?.action === "pet") res = await petPet(buyer.id, String(b?.petId || ""), ownerId);
+            else if (b?.action === "use_item") res = await feedPetItem(buyer.id, String(b?.petId || ""), String(b?.consumableId || ""), ownerId);
             else if (b?.action === "buy_treat") res = await buyTreat(buyer.id, String(b?.consumableId || ""));
             else if (b?.action === "recharge") res = await rechargePetting(buyer.id);
             else if (b?.action === "pig_claim") res = await claimPig(buyer.id);

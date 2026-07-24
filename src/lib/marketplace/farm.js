@@ -6,7 +6,7 @@ import { collectibleById, COLLECTIBLES } from "@/lib/marketplace/collectibles.js
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
-import { petLevelInfo, petMaxXp } from "@/lib/marketplace/pet-level.js";
+import { petLevelInfo, petMaxXp, addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
 import { CONSUMABLES, listConsumables, useConsumable as applyConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -14,14 +14,24 @@ import { ITEMS } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 
-// The Farm: a member's owned pets roam a little pasture. On your OWN farm you can PET pets — a shared daily
-// budget of 3 (rechargeable for gold at a doubling cost). Each pet can still only be petted once/day, but the
-// 3/day cap is the real limiter. Other members' farms are view-only. (mkt_pet_level.buyer_id is TEXT → ::text.)
+// The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
+// (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
+// visiting their farm (petting theirs pays you a small thank-you). You can also FEED any pet a treat from your
+// own bag — unlimited; feeding a friend's pet grants the feeder a small generosity bonus. (mkt_pet_level.buyer_id
+// is TEXT → ::text.)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date"; // store-local day, matches the rest of the game
 export const PET_PET_XP = 30; // pet XP the fed pet gains per petting
 const PET_PET_GOLD = 12; // gold YOU earn per petting (petting is rewarding, not just chores)
 const PET_PET_PLAYER_XP = 5; // player XP you earn per petting
-const PET_PETS_PER_DAY = 3; // free daily pettings (total, across all pets)
+const PET_PETS_PER_DAY = 3; // free daily pettings (total, across all pets — your own AND friends')
+// Petting a FRIEND'S pet: a smaller thank-you to the petter (their pet gets the full PET_PET_XP). Shares the
+// same 3/day budget as petting your own.
+const PET_OTHER_GOLD = 8;
+const PET_OTHER_PLAYER_XP = 5;
+// Feeding a FRIEND'S pet (unlimited — it costs one of YOUR treats): a small generosity bonus to the feeder.
+// Always worth less than a treat, so it can't be farmed for profit.
+const FEED_OTHER_GOLD = 15;
+const FEED_OTHER_PLAYER_XP = 8;
 const PET_RECHARGE_AMOUNT = 3; // extra pettings granted per paid recharge
 const PET_RECHARGE_BASE = 200; // gold cost of the FIRST recharge; doubles each time (200 → 400 → 800 …)
 const rechargeCost = (n) => PET_RECHARGE_BASE * 2 ** n;
@@ -189,31 +199,68 @@ export async function getFarm(ownerId, viewerId) {
             };
         })
         .filter((p) => p.spriteUrl);
-    const extras = mine ? await farmMineBits(ownerId) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
+    // The VIEWER's own treats / wallet / petting budget power the pet + feed actions — whether they're standing
+    // on their own farm or a friend's. (On a friend's farm you can still pet, spending your budget, and feed
+    // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
+    const extras = viewerId ? await farmMineBits(viewerId) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null },
         mine,
-        canPet: mine,
+        canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
+        canFeed: Boolean(viewerId), // feed with your own treats
         petXp: PET_PET_XP,
-        petGold: PET_PET_GOLD,
-        pets,
+        petGold: mine ? PET_PET_GOLD : PET_OTHER_GOLD,
+        pets: mine ? pets : pets.map((p) => ({ ...p, petted: false })),
         ...extras,
     };
 }
 
 // Use a pet TREAT on a specific owned pet (feed it XP or instant-level it).
-export async function feedPetItem(buyerId, petId, consumableId) {
-    if (!buyerId || !petId || !consumableId) return { ok: false, error: "bad_request" };
+export async function feedPetItem(feederId, petId, consumableId, ownerId = null) {
+    if (!feederId || !petId || !consumableId) return { ok: false, error: "bad_request" };
     const c = CONSUMABLES[consumableId];
     if (!c || (c.effect?.type !== "pet_xp" && c.effect?.type !== "pet_level")) return { ok: false, error: "not_a_treat" };
-    const state = await petsState(buyerId).catch(() => null);
-    if (!state || !(state.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
-    const res = await applyConsumable(buyerId, consumableId, null, petId);
-    if (!res.ok) return res;
+    const petOwner = ownerId || feederId;
+    const own = String(petOwner) === String(feederId);
+    // The pet must belong to whoever's farm this is; the treat always comes from the feeder's own bag.
+    const ownerState = await petsState(petOwner).catch(() => null);
+    if (!ownerState || !(ownerState.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
     const def = collectibleById(petId);
-    const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+
+    if (own) {
+        const res = await applyConsumable(feederId, consumableId, null, petId);
+        if (!res.ok) return res;
+        const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [feederId, petId]).catch(() => null);
+        const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
+        return { ...res, petId, level: info.level, xp: row?.xp || 0, into: info.into, span: info.span, maxed: info.maxed };
+    }
+
+    // Feeding a FRIEND'S pet: spend one of the feeder's treats, land the XP on the OWNER's pet, and thank the
+    // feeder for the generosity. Unlimited (each feed costs a real treat).
+    const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [feederId, consumableId]).catch(() => null);
+    if (!dec) return { ok: false, error: "insufficient" };
+    const applied = c.effect.type === "pet_level"
+        ? await levelUpPet(petOwner, petId).catch(() => ({ ok: false }))
+        : await addPetXp(petOwner, petId, c.effect.amount).catch(() => ({ ok: false }));
+    const leveled = c.effect.type === "pet_level" ? Boolean(applied?.ok) : Boolean(applied?.leveled);
+    await awardXp(feederId, "feed_other", { points: FEED_OTHER_PLAYER_XP, gold: FEED_OTHER_GOLD }).catch(() => {});
+    const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
     const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
-    return { ...res, petId, level: info.level, xp: row?.xp || 0, into: info.into, span: info.span, maxed: info.maxed };
+    return {
+        ok: true,
+        petId,
+        remaining: dec.count,
+        gave: c.name,
+        forOther: true,
+        goldGained: FEED_OTHER_GOLD,
+        playerXp: FEED_OTHER_PLAYER_XP,
+        petLevelUp: leveled ? { petId, petName: def?.name || "the pet", level: applied.level, rarity: def?.rarity || "common", maxed: applied.level >= 5 } : null,
+        level: info.level,
+        xp: row?.xp || 0,
+        into: info.into,
+        span: info.span,
+        maxed: info.maxed,
+    };
 }
 
 // Buy a pet treat from the farm (routes through buyConsumable). Returns fresh treats + wallet on success, or
@@ -229,60 +276,79 @@ export async function buyTreat(buyerId, consumableId) {
 
 // Pet one of YOUR pets: spends one from the shared daily budget, gives the pet XP + rewards YOU gold & XP.
 // Each pet can only be petted once/day (spread the love), and the 3/day total is the real cap.
-export async function petPet(buyerId, petId) {
-    if (!buyerId || !petId) return { ok: false, error: "bad_request" };
-    const state = await petsState(buyerId).catch(() => null);
-    if (!state || !(state.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
+export async function petPet(petterId, petId, ownerId = null) {
+    if (!petterId || !petId) return { ok: false, error: "bad_request" };
+    const petOwner = ownerId || petterId;
+    const own = String(petOwner) === String(petterId);
+    // The pet must belong to whoever's farm this is.
+    const ownerState = await petsState(petOwner).catch(() => null);
+    if (!ownerState || !(ownerState.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
 
-    const budget = await pettingBudget(buyerId);
+    const budget = await pettingBudget(petterId);
     if (budget.left <= 0) return { ok: false, error: "no_pets_left", petting: budget };
 
-    // Reserve a slot from the daily budget FIRST (guarded so we can't exceed the allowance under a burst).
+    // Reserve a slot from the petter's daily budget FIRST (guarded so a burst can't exceed the allowance).
     const slot = await db
         .queryOne(
             `UPDATE mkt_buyer SET pet_farm_used = pet_farm_used + 1
               WHERE id = $1 AND pet_farm_day = ${DAY} AND pet_farm_used < $2
               RETURNING pet_farm_used`,
-            [buyerId, budget.allowance]
+            [petterId, budget.allowance]
         )
         .catch(() => null);
     if (!slot) return { ok: false, error: "no_pets_left", petting: budget };
 
-    // Now the per-pet once/day feed. If this pet was already petted today, refund the reserved slot.
     const def = collectibleById(petId);
     const maxXp = petMaxXp(def?.rarity || "common");
-    const row = await db
-        .queryOne(
-            `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, petted_day, last_tick_at, updated_at)
-             VALUES ($1::text, $2, LEAST($3::int, $4::int), ${DAY}, NOW(), NOW())
-             ON CONFLICT (buyer_id, pet_id)
-             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3::int, $4::int), petted_day = ${DAY}, updated_at = NOW()
-              WHERE mkt_pet_level.petted_day IS DISTINCT FROM ${DAY}
-             RETURNING xp`,
-            [buyerId, petId, PET_PET_XP, maxXp]
-        )
-        .catch(() => null);
-    if (!row) {
-        await db.query(`UPDATE mkt_buyer SET pet_farm_used = GREATEST(0, pet_farm_used - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [buyerId]).catch(() => {});
-        return { ok: false, error: "already_petted", petting: await pettingBudget(buyerId) };
+    let newXp = null;
+    if (own) {
+        // Your OWN pet: once/day/pet guard (spread the love). If already petted today, refund the slot.
+        const row = await db
+            .queryOne(
+                `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, petted_day, last_tick_at, updated_at)
+                 VALUES ($1::text, $2, LEAST($3::int, $4::int), ${DAY}, NOW(), NOW())
+                 ON CONFLICT (buyer_id, pet_id)
+                 DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3::int, $4::int), petted_day = ${DAY}, updated_at = NOW()
+                  WHERE mkt_pet_level.petted_day IS DISTINCT FROM ${DAY}
+                 RETURNING xp`,
+                [petterId, petId, PET_PET_XP, maxXp]
+            )
+            .catch(() => null);
+        if (!row) {
+            await db.query(`UPDATE mkt_buyer SET pet_farm_used = GREATEST(0, pet_farm_used - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
+            return { ok: false, error: "already_petted", petting: await pettingBudget(petterId) };
+        }
+        newXp = row.xp;
+    } else {
+        // A FRIEND'S pet: no per-pet guard (your 3/day budget is the cap), XP lands on the owner's pet.
+        const res = await addPetXp(petOwner, petId, PET_PET_XP).catch(() => null);
+        if (!res) {
+            await db.query(`UPDATE mkt_buyer SET pet_farm_used = GREATEST(0, pet_farm_used - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
+            return { ok: false, error: "pet_error", petting: await pettingBudget(petterId) };
+        }
+        const r = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
+        newXp = r?.xp || 0;
     }
 
-    // Reward YOU for the bond: gold + a little XP (awardXp logs the coin accrual + trickles the equipped pet).
-    await awardXp(buyerId, "pet_farm", { points: PET_PET_PLAYER_XP, gold: PET_PET_GOLD }).catch(() => {});
+    // Reward the petter: your own pet pays a bit more (the bond); a friend's pet a small thank-you.
+    const goldGained = own ? PET_PET_GOLD : PET_OTHER_GOLD;
+    const playerXp = own ? PET_PET_PLAYER_XP : PET_OTHER_PLAYER_XP;
+    await awardXp(petterId, own ? "pet_farm" : "pet_farm_other", { points: playerXp, gold: goldGained }).catch(() => {});
 
-    const info = petLevelInfo(row.xp, def?.rarity || "common");
+    const info = petLevelInfo(newXp, def?.rarity || "common");
     return {
         ok: true,
         petId,
+        forOther: !own,
         xpGained: PET_PET_XP,
-        goldGained: PET_PET_GOLD,
-        playerXp: PET_PET_PLAYER_XP,
+        goldGained,
+        playerXp,
         level: info.level,
-        xp: row.xp,
+        xp: newXp,
         into: info.into,
         span: info.span,
         maxed: info.maxed,
-        petting: await pettingBudget(buyerId),
+        petting: await pettingBudget(petterId),
     };
 }
 
