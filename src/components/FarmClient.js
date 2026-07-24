@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import CoinCta from "@/components/CoinCta";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
-import { DecoLayer, DecoManager, DecoDock, DecoInspect } from "@/components/FarmDecorations";
+import { DecoLayer, DecoDock, DecoInspect } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -218,7 +218,6 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [gardenBusy, setGardenBusy] = useState(null);
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
-    const [decoOpen, setDecoOpen] = useState(false); // decoration manager drawer open
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
     const rainedRef = useRef(false);
@@ -251,7 +250,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || decoOpen || inspectDeco || crownOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || inspectDeco || crownOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -268,7 +267,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot, decoOpen, inspectDeco, crownOpen]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot, inspectDeco, crownOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -475,14 +474,13 @@ export default function FarmClient({ initial, viewingAlias }) {
             setFarm((f) => ({
                 ...f,
                 placements: r.placements || f.placements,
-                decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, shop: r.shop, placedTotal: r.placedTotal, placedCap: r.placedCap },
+                decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, placedTotal: r.placedTotal, placedCap: r.placedCap },
                 wallet: f.wallet && r.gold != null ? { ...f.wallet, gold: r.gold } : f.wallet,
             }));
         }
         return r;
     }, [post]);
     const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
-    const decoPlace = useCallback((decoId) => { decoAct({ action: "deco_place", decoId, x: 52 + Math.random() * 36, y: 26 + Math.random() * 38 }); setDecoEditing(true); }, [decoAct]);
     const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y }), [decoAct]);
     const decoMove = useCallback((placementId, x, y) => decoAct({ action: "deco_move", placementId, x, y }), [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
@@ -672,7 +670,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             editing={farm.mine && decoEditing}
                             fieldRef={fieldRef}
                             onMove={decoMove}
-                            onInspect={(p) => { if (p) setInspectDeco(p); }}
+                            onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
                         />
 
                         {pets.length === 0 ? (
@@ -785,16 +783,18 @@ export default function FarmClient({ initial, viewingAlias }) {
                     fieldRef={fieldRef}
                     busy={decoBusy}
                     onPlaceAt={decoPlaceAt}
-                    onOpenShop={() => setDecoOpen(true)}
+                    onInspect={(cat) => setInspectDeco(cat)}
                     onDone={stopDecorating}
                 />
             ) : null}
 
             {inspectDeco ? (
                 <DecoInspect
-                    placement={inspectDeco}
+                    item={inspectDeco}
                     mine={farm.mine}
+                    gold={farm.wallet?.gold || 0}
                     busy={decoBusy}
+                    onBuy={decoBuy}
                     onPickup={decoPickup}
                     onClose={() => setInspectDeco(null)}
                 />
@@ -802,20 +802,6 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {crownOpen && farm.mine ? (
                 <CrownCalibrator initial={farm.crownCfg} onSave={saveCrown} onClose={() => setCrownOpen(false)} />
-            ) : null}
-
-            {decoOpen && farm.mine && farm.decorations ? (
-                <DecoManager
-                    deco={farm.decorations}
-                    gold={farm.wallet?.gold || 0}
-                    busy={decoBusy}
-                    editing={decoEditing}
-                    initialTab="shop"
-                    onToggleEdit={() => setDecoEditing((v) => !v)}
-                    onBuy={decoBuy}
-                    onPlace={decoPlace}
-                    onClose={() => setDecoOpen(false)}
-                />
             ) : null}
 
             {planting != null && garden ? (

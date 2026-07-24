@@ -7,9 +7,11 @@ const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legen
 // ── Decorate DOCK: a bottom tray you drag decorations OUT of, straight onto the farm scene (which stays fully
 // visible above it). Drag a chip up, release over the field → it drops there. Also carries the placed-count,
 // a Shop button, and Done. This is the "grab from a drawer while watching the farm" flow.
-export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }) {
-    const { owned = [], placedTotal = 0, placedCap = 500 } = deco || {};
+export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onDone }) {
+    const { catalog = [], placedTotal = 0, placedCap = 500 } = deco || {};
     const atCap = placedTotal >= placedCap;
+    const ownedItems = catalog.filter((d) => d.owned);
+    const lockedItems = catalog.filter((d) => !d.owned);
     // Imperative ghost: we set the sprite ONCE on drag-start (one render), then move the ghost by writing
     // .style directly on every pointermove — no per-move React re-render, so it tracks the finger 1:1.
     const ghostRef = useRef(null);
@@ -69,16 +71,13 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }
                     <strong style={{ fontSize: 14 }}>🪴 Decorating</strong>
                     <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
                     <span style={{ marginLeft: "auto" }} />
-                    <button type="button" onClick={onOpenShop} style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,214,110,0.5)", background: "rgba(255,214,110,0.12)", color: "#ffd75e", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>🛒 Shop</button>
-                    <button type="button" onClick={onDone} style={{ padding: "6px 14px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer" }}>✓ Done</button>
+                    <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer" }}>✓ Done</button>
                 </div>
                 <div style={{ fontSize: 10.5, color: "#9fbf9f", padding: "0 12px 6px" }}>
-                    {atCap ? "Farm full (500 placed) — pick some up to add more." : "Drag a decoration up onto your farm. Drag placed ones to move them; tap ✕ to pick one up."}
+                    {atCap ? "Farm full (500 placed) — tap a placed piece to pick it up." : "Drag your decorations up onto the farm. Tap a 🔒 locked one to see it & buy. Tap placed pieces to move or inspect."}
                 </div>
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 12px 10px", WebkitOverflowScrolling: "touch" }}>
-                    {owned.length === 0 ? (
-                        <button type="button" onClick={onOpenShop} style={{ padding: "12px 18px", borderRadius: 12, border: "none", fontWeight: 900, fontSize: 13, cursor: "pointer", background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", whiteSpace: "nowrap" }}>🛒 Get your first decoration</button>
-                    ) : owned.map((o) => (
+                    {ownedItems.map((o) => (
                         <div
                             key={o.id}
                             onPointerDown={(e) => startDrag(e, o)}
@@ -87,7 +86,7 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }
                             title={`Drag ${o.name} onto your farm`}
                             style={{ flex: "0 0 auto", width: 66, textAlign: "center", touchAction: "none", cursor: atCap ? "default" : "grab", opacity: atCap ? 0.5 : 1, userSelect: "none" }}
                         >
-                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${(RARITY_RING[o.rarity] || "#555")}66` }}>
+                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `2px solid ${(RARITY_RING[o.rarity] || "#555")}88` }}>
                                 {o.spriteUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={o.spriteUrl} alt="" width={48} height={48} style={{ width: 48, height: 48, objectFit: "contain", pointerEvents: "none" }} />
@@ -96,6 +95,26 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }
                             <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#dfeede", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
                             {o.placed ? <span style={{ display: "block", fontSize: 9, color: "#a7e6a7" }}>{o.placed} out</span> : null}
                         </div>
+                    ))}
+                    {ownedItems.length && lockedItems.length ? <div style={{ flex: "0 0 auto", width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.14)", margin: "4px 2px" }} /> : null}
+                    {lockedItems.map((o) => (
+                        <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => onInspect(o)}
+                            title={`${o.name} — tap for details`}
+                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer", userSelect: "none" }}
+                        >
+                            <span style={{ position: "relative", display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px dashed ${(RARITY_RING[o.rarity] || "#555")}55` }}>
+                                {o.spriteUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={o.spriteUrl} alt="" width={46} height={46} style={{ width: 46, height: 46, objectFit: "contain", filter: "grayscale(0.7) brightness(0.7)" }} />
+                                ) : <span style={{ fontSize: 28, filter: "grayscale(1) brightness(0.7)" }}>{o.emoji}</span>}
+                                <span style={{ position: "absolute", top: 2, right: 2, fontSize: 11 }}>🔒</span>
+                            </span>
+                            <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#9aa4a0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
+                            <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: o.buyable ? "#ffd75e" : "#8fb3d6" }}>{o.buyable ? `🪙 ${o.price.toLocaleString()}` : (o.source === "spin" ? "🎡 wheel" : "🏆 track")}</span>
+                        </button>
                     ))}
                 </div>
             </div>
@@ -167,35 +186,55 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
     );
 }
 
-// ── Inspect modal for a PLACED decoration: what it is, its effect, and (your farm) a Pick up button.
-export function DecoInspect({ placement, mine = false, busy, onPickup, onClose }) {
-    if (!placement) return null;
-    const ring = RARITY_RING[placement.rarity] || "#8fbf6a";
+// ── Inspect modal for a decoration — works for a PLACED piece (→ Pick up) or a LOCKED catalog item (→ Buy, or
+// "win it from the wheel / level track"). `item` carries name/rarity/effect + owned/buyable/price; a placed
+// instance also has `placementId`.
+export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPickup, onClose }) {
+    if (!item) return null;
+    const ring = item.rarityColor || RARITY_RING[item.rarity] || "#8fbf6a";
+    const placed = Boolean(item.placementId);
+    const canBuy = !placed && !item.owned && item.buyable;
+    const afford = gold >= (item.price || 0);
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
-            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${placement.name} details`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .35s ease both" }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${item.name} details`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .35s ease both" }}>
                 <div style={{ padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}33, transparent 70%)` }}>
                     <span style={{ display: "grid", placeItems: "center", width: 96, height: 96, margin: "0 auto", borderRadius: 16, background: "rgba(0,0,0,0.22)" }}>
-                        {placement.spriteUrl ? (
+                        {item.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={placement.spriteUrl} alt={placement.name} width={84} height={84} style={{ width: 84, height: 84, objectFit: "contain" }} />
-                        ) : <span style={{ fontSize: 54 }}>{placement.emoji}</span>}
+                            <img src={item.spriteUrl} alt={item.name} width={84} height={84} style={{ width: 84, height: 84, objectFit: "contain" }} />
+                        ) : <span style={{ fontSize: 54 }}>{item.emoji}</span>}
                     </span>
-                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 8 }}>{placement.name}</div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{placement.rarity}{placement.source === "special" ? " · premium" : ""}</div>
+                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 8 }}>{item.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{item.rarity}{item.source === "special" ? " · premium" : ""}</div>
                 </div>
                 <div style={{ padding: "8px 16px 4px" }}>
-                    {placement.buffText ? (
+                    {item.buffText ? (
                         <div style={{ padding: "10px 12px", borderRadius: 11, background: "rgba(126,213,126,0.14)", border: "1px solid rgba(126,213,126,0.5)", color: "#a7e6a7", fontSize: 13, fontWeight: 800, textAlign: "center" }}>
-                            While placed: {placement.buffText}
+                            While placed: {item.buffText}
                         </div>
                     ) : (
                         <div className="muted" style={{ fontSize: 12.5, textAlign: "center", padding: "6px 0" }}>Cosmetic — looks great, no farming buff. (Epic+ decorations carry buffs.)</div>
                     )}
                 </div>
                 <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
-                    {mine ? (
-                        <button type="button" disabled={busy} onClick={() => { onPickup(placement.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ff9ec2,#e0559a)", color: "#3a0a22", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #a83b73", opacity: busy ? 0.6 : 1 }}>✋ Pick up (back to your tray)</button>
+                    {placed && mine ? (
+                        <button type="button" disabled={busy} onClick={() => { onPickup(item.placementId); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ff9ec2,#e0559a)", color: "#3a0a22", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #a83b73", opacity: busy ? 0.6 : 1 }}>✋ Pick up (back to your tray)</button>
+                    ) : null}
+                    {canBuy && afford ? (
+                        <button type="button" disabled={busy} onClick={() => { onBuy(item.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.6 : 1 }}>🪙 Buy · {item.price.toLocaleString()}g{item.source === "special" ? " (premium)" : ""}</button>
+                    ) : null}
+                    {canBuy && !afford ? (
+                        <div style={{ textAlign: "center", fontSize: 12.5 }}>
+                            <div className="muted">Costs {item.price.toLocaleString()}g — you have {gold.toLocaleString()}g.</div>
+                            <a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 6, fontWeight: 800, color: "#ffd75e" }}>Get store credit &amp; coins →</a>
+                        </div>
+                    ) : null}
+                    {!placed && !item.owned && !item.buyable ? (
+                        <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#8fb3d6", padding: "6px 0" }}>{item.source === "spin" ? "🎡 Win it from the Daily Spin wheel." : "🏆 Unlock it on the Rewards Track."}</div>
+                    ) : null}
+                    {!placed && item.owned ? (
+                        <div className="muted" style={{ textAlign: "center", fontSize: 12 }}>You own this — drag it from your tray to place it.</div>
                     ) : null}
                     <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
                 </div>

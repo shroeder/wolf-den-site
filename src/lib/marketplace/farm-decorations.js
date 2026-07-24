@@ -109,16 +109,22 @@ export async function decoState(buyerId) {
     });
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));
-    // The buyable catalog (regular + premium shop), annotated with sprite + owned state for the shop tab.
-    const shop = DECORATIONS
-        .filter((d) => ["shop", "special"].includes(d.source) && d.price)
+    // The FULL catalog (all 100) annotated with owned/placed/price/buyable — the drawer shows everything: owned
+    // pieces you can drag out, and locked ones you tap to inspect + buy (or learn where to earn them).
+    const RANK = DECO_RARITY;
+    const catalog = DECORATIONS
         .map((d) => ({
-            id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, rarityColor: DECO_RARITY[d.rarity]?.color,
-            source: d.source, price: d.price, spriteUrl: sprites[d.id] || null,
-            buff: d.buff, buffText: d.buff ? buffText(d.buff) : null, owned: ownedSet.has(d.id),
+            id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, rarityColor: RANK[d.rarity]?.color,
+            source: d.source, price: d.price || null, spriteUrl: sprites[d.id] || null,
+            buff: d.buff || null, buffText: d.buff ? buffText(d.buff) : null,
+            owned: ownedSet.has(d.id), placed: placedCount[d.id] || 0,
+            buyable: ["shop", "special"].includes(d.source) && Boolean(d.price),
         }))
-        .sort((a, b) => (DECO_RARITY[a.rarity]?.rank || 0) - (DECO_RARITY[b.rarity]?.rank || 0) || a.price - b.price);
-    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), shop, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
+        .sort((a, b) => {
+            if (a.owned !== b.owned) return a.owned ? -1 : 1; // owned (placeable) first
+            return (RANK[a.rarity]?.rank || 0) - (RANK[b.rarity]?.rank || 0) || (a.price || 0) - (b.price || 0);
+        });
+    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), catalog, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
 }
 
 const clampPct = (v, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(2, Math.min(98, n)) : def; };
