@@ -53,6 +53,7 @@ export default function GameNav() {
     const [chests, setChests] = useState(0);
     const [spins, setSpins] = useState(0); // unused spins (free + tokens) → red badge on the Spin tab
     const [questsReady, setQuestsReady] = useState(0); // completed-but-unclaimed quests → red badge on Quests
+    const [cropsReady, setCropsReady] = useState(0); // ripe crops on the owner's farm → red badge on Farm
     const [sailAttn, setSailAttn] = useState(false); // boat landed & waiting to dig → red-alert dot on Sailing
     useEffect(() => {
         if (!inGame) return undefined;
@@ -85,6 +86,20 @@ export default function GameNav() {
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
 
+    // Owner-only: ripe-crop count for the Farm badge (the farm GET 404s for everyone else, so gate on `owner`).
+    useEffect(() => {
+        if (!inGame || !owner) return undefined;
+        let alive = true;
+        const load = () => fetch("/api/marketplace/farm", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (alive) setCropsReady(d?.garden?.readyCount || 0); })
+            .catch(() => {});
+        load();
+        const onRefresh = () => load();
+        window.addEventListener("wolfden-hud-refresh", onRefresh);
+        return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
+    }, [inGame, owner, pathname]);
+
     if (!inGame) return null;
 
     return (
@@ -95,8 +110,9 @@ export default function GameNav() {
                     const chestBadge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
                     const spinBadge = l.href === "/marketplace/spin" && spins > 0 ? spins : null;
                     const questBadge = l.href === "/marketplace/quests" && questsReady > 0 ? questsReady : null;
-                    const badge = chestBadge ?? spinBadge ?? questBadge;
-                    const badgeTitle = chestBadge ? `${chestBadge} chest${chestBadge === 1 ? "" : "s"} to open` : spinBadge ? `${spinBadge} spin${spinBadge === 1 ? "" : "s"} ready` : questBadge ? `${questBadge} quest${questBadge === 1 ? "" : "s"} ready to claim` : null;
+                    const cropBadge = l.href === "/marketplace/farm" && cropsReady > 0 ? cropsReady : null;
+                    const badge = chestBadge ?? spinBadge ?? questBadge ?? cropBadge;
+                    const badgeTitle = chestBadge ? `${chestBadge} chest${chestBadge === 1 ? "" : "s"} to open` : spinBadge ? `${spinBadge} spin${spinBadge === 1 ? "" : "s"} ready` : questBadge ? `${questBadge} quest${questBadge === 1 ? "" : "s"} ready to claim` : cropBadge ? `${cropBadge} crop${cropBadge === 1 ? "" : "s"} ready to harvest` : null;
                     const dot = l.href === "/marketplace/sailing" && sailAttn;
                     return (
                         <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
