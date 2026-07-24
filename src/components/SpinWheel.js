@@ -86,6 +86,7 @@ export default function SpinWheel() {
             if (kind) { setCelebrate({ kind }); setTimeout(() => setCelebrate(null), 4200); }
             playWin(kind || "normal");
             setSt((s) => ({ ...s, tokens: d.tokens, freeAvailable: d.freeAvailable, canSpin: d.canSpin, gold: d.gold, spinCount: d.spinCount }));
+            if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); // drop the nav spin badge
         }, SPIN_MS);
     }
 
@@ -93,7 +94,7 @@ export default function SpinWheel() {
         if (spinning) return;
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy" }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
-        if (d?.ok) { setSt(d); setLowCoins(false); }
+        if (d?.ok) { setSt(d); setLowCoins(false); if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); }
         else { setMsg(d?.error === "not_enough_gold" ? "Not enough coins for a spin." : "Couldn't buy a spin."); setLowCoins(d?.error === "not_enough_gold"); }
     }
 

@@ -4,6 +4,7 @@ import { FaDharmachakra } from "react-icons/fa6";
 import GameHubStats from "@/components/GameHubStats";
 import RaidDefenseReport from "@/components/RaidDefenseReport";
 import ReferralInvite from "@/components/ReferralInvite";
+import SpinNudge from "@/components/SpinNudge";
 import ViewPing from "@/components/ViewPing";
 import { db } from "@/lib/db";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -45,6 +46,7 @@ export default async function GamePlayHub({ searchParams }) {
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
             {buyer ? <RaidDefenseReport /> : null}
+            {buyer ? <SpinNudge /> : null}
             <section className="card game-hub-hero">
                 <h1 style={{ margin: 0 }}>🎮 The Wolf Den Game</h1>
                 <p className="muted" style={{ margin: "4px 0 0" }}>Level up, fight the boss, collect pets & gear, and spin the wheel — all in one place.</p>
