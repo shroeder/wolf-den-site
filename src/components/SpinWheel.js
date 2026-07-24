@@ -70,7 +70,15 @@ export default function SpinWheel() {
     }, [prizes, seg]);
 
     async function spin() {
-        if (spinning || !st?.canSpin) return;
+        if (spinning) return;
+        // If our local state thinks we can't spin, re-sync from the server first (guards against a stale
+        // client) — then only bail (with a visible message) if we're genuinely out of spins.
+        if (!st?.canSpin) {
+            const rs = await fetch("/api/marketplace/spin", { cache: "no-store" }).catch(() => null);
+            const ds = rs?.ok ? await rs.json().catch(() => null) : null;
+            if (ds) setSt(ds);
+            if (!ds?.canSpin) { setMsg("No spins right now — your free spin resets daily; earn or buy a token."); return; }
+        }
         setSpinning(true); setResult(null); setMsg(null); setCelebrate(null);
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
@@ -128,7 +136,7 @@ export default function SpinWheel() {
             {msg ? <div className="spin-msg">{msg}{lowCoins ? <span style={{ marginLeft: 8 }}><CoinCta label="Get coins" /></span> : null}</div> : null}
 
             <div className="spin-actions">
-                <button type="button" className="btn-gold spin-go" onClick={spin} disabled={spinning || !st.canSpin}>{spinning ? "Spinning…" : <>{st.freeAvailable ? <FaDharmachakra className="spin-ico" aria-hidden="true" /> : null} {spinLabel}</>}</button>
+                <button type="button" className="btn-gold spin-go" style={{ position: "relative", zIndex: 3, cursor: "pointer", touchAction: "manipulation", opacity: spinning || !st.canSpin ? 0.6 : 1 }} onClick={spin} aria-disabled={spinning || !st.canSpin}>{spinning ? "Spinning…" : <>{st.freeAvailable ? <FaDharmachakra className="spin-ico" aria-hidden="true" /> : null} {spinLabel}</>}</button>
                 {!st.freeAvailable ? <button type="button" className="spin-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
 

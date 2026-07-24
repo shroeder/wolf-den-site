@@ -32,9 +32,6 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip off the field edges
 // Fixed ring of coins that burst outward behind the pig on the haul modal (deterministic → SSR-safe).
 const PIG_BURST = Array.from({ length: 12 }, (_, i) => ({ a: i * 30, d: 74 + (i % 3) * 16, t: 0.7 + (i % 4) * 0.12 }));
-// Evenly-spaced home slot for pet i across the inner band [PAD, 100-PAD].
-const slotX = (i, n) => (n <= 1 ? 50 : FARM_PAD + (i / (n - 1)) * (100 - 2 * FARM_PAD));
-
 // ── Procedural sound (Web Audio, no asset files → CSP-safe) ─────────────────────────────────────────────────
 // A tiny synth: the Loot Pig event gets a squeal, a coin-jingle per drop, a bouncy chase loop while he rampages,
 // and a victory fanfare on the haul. Browsers gate audio behind a user gesture, so the farm primes the context
@@ -185,12 +182,17 @@ export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
     const [farm, setFarm] = useState(initial);
     const pets = useMemo(() => farm.pets || [], [farm.pets]);
-    // Each pet gets a "home" slot spread evenly across the (wide, scrollable) field and wanders around it.
-    // Deterministic init so server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
-    const homeX = useCallback((i) => slotX(i, pets.length), [pets.length]);
+    // On your own farm the fenced garden sits in the front-left corner, so keep the pets penned to the RIGHT
+    // of it — they get the whole rest of the pasture to roam but never wander onto the crops.
+    const gardened = Boolean(initial.mine && initial.garden);
+    const petMinX = gardened ? 44 : FARM_PAD; // left edge of the pets' roaming band
+    // Each pet gets a "home" slot spread evenly across its band and wanders around it. Deterministic init so
+    // server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
+    const petSlotX = useCallback((i, n) => (n <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (n - 1)) * (100 - FARM_PAD - petMinX)), [gardened, petMinX]);
+    const homeX = useCallback((i) => petSlotX(i, pets.length), [petSlotX, pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => ({
-        x: slotX(i, pets.length),
-        y: 64 + ((i * 7) % 10), // on the grass, ABOVE the garden bed at the front of the field
+        x: pets.length <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (pets.length - 1)) * (100 - FARM_PAD - petMinX),
+        y: 80 + ((i * 7) % 12), // low on the grass
         flip: i % 2 === 1,
         dur: 2, // seconds for the current stroll (varies per move → different speeds)
         moving: false,
@@ -291,8 +293,8 @@ export default function FarmClient({ initial, viewingAlias }) {
         const timers = [];
         const push = (t) => timers.push(t);
         const step = (i) => {
-            const nx = clamp(homeX(i) + rand(-5, 5), FARM_PAD, 100 - FARM_PAD);
-            const ny = 62 + rand(0, 12); // roam the grass band ABOVE the garden bed — never onto the soil
+            const nx = clamp(homeX(i) + rand(-5, 5), petMinX, 100 - FARM_PAD);
+            const ny = 78 + rand(0, 14); // stay low on the grass
             const dur = rand(1.3, 3.8); // different speeds each hop
             setPos((prev) => {
                 if (!prev[i]) return prev;
@@ -576,27 +578,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                             </div>
                         ) : null}
 
-                        {/* The garden: a clearly-defined tilled soil bed across the FRONT of the field (pets roam the
-                            grass above it and never step onto it), with the crops planted in it. */}
-                        {farm.mine && garden ? (
-                            <>
-                                <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "24%", zIndex: 30, background: "linear-gradient(180deg, #4e3319 0%, #3c2712 45%, #281909 100%)", borderTop: "3px solid #2a1a0c", boxShadow: "inset 0 7px 14px rgba(0,0,0,0.45)" }}>
-                                    {/* a soft grassy lip where the lawn meets the soil */}
-                                    <div style={{ position: "absolute", left: 0, right: 0, top: -4, height: 8, background: "linear-gradient(180deg, rgba(120,190,90,0.9), rgba(90,150,60,0))", borderRadius: "50% 50% 0 0 / 100% 100% 0 0" }} />
-                                    {/* tilled furrow rows so it reads as planted earth */}
-                                    <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.22) 0 3px, transparent 3px 30px)", opacity: 0.55 }} />
-                                    <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 14px)" }} />
-                                </div>
-                                <ScenePlots
-                                    garden={garden}
-                                    busy={gardenBusy}
-                                    onPlant={(slot) => setPlanting(slot)}
-                                    onHarvest={harvestAt}
-                                    onFertilize={fertilizeAt}
-                                />
-                            </>
-                        ) : null}
-
                         {pets.length === 0 ? (
                             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
                                 No pets yet — collect some and they&apos;ll roam here.
@@ -662,6 +643,18 @@ export default function FarmClient({ initial, viewingAlias }) {
                         ))}
                     </div>
                 </div>
+                {/* The garden: a grounded, fenced raised bed pinned to the front-left corner of the pasture, with
+                    the plots lined up next to each other inside it. It stays put (doesn't scroll away) and sits
+                    ON TOP of the field, so the pets — penned to the right — can never appear on the crops. */}
+                {farm.mine && garden ? (
+                    <SceneGarden
+                        garden={garden}
+                        busy={gardenBusy}
+                        onPlant={(slot) => setPlanting(slot)}
+                        onHarvest={harvestAt}
+                        onFertilize={fertilizeAt}
+                    />
+                ) : null}
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={wx.condition} />
                 {/* Wild Loot Pig announce toast (the pig himself lives inside the scrolling field, below) */}
@@ -912,34 +905,38 @@ function OwnerMenu({ owner, mine, onClose }) {
 // ── Garden: plant found seeds → crops grow in real time → harvest to sell for gold (+ rare chest). Rain &
 // fertilizer speed growth; upgrades add plots/speed/luck/pet-cap/chest-odds. Owner-only debug tools included.
 const fmtGrow = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
-// ── Crops IN the pasture ──────────────────────────────────────────────────────────────────────────────────
-// A tilled row of soil right in the scrolling field: each plot's plant literally sprouts from a mound and
-// grows taller over real time, then ripens (swaps to the crop, glows & bobs) when it's ready to harvest. Tap
-// a plot to plant / fertilize / harvest. Ticks its own clock so only this row re-renders each second.
-function ScenePlots({ garden, busy, onPlant, onHarvest, onFertilize }) {
+// ── The garden IN the scene ───────────────────────────────────────────────────────────────────────────────
+// A grounded, fenced raised bed pinned to the front-left corner of the pasture. The plots sit side-by-side
+// inside it (a clear, defined garden patch); each plant sprouts from its mound and grows taller over real
+// time, ripening (swap to the crop, glow + bob) when it's ready. Tap a plot to plant / fertilize / harvest.
+// Pinned to the field container (not the scrolling world) so it never scrolls away and always sits ON TOP of
+// the pets — who are penned to the right — so nothing ever appears standing on the crops.
+function SceneGarden({ garden, busy, onPlant, onHarvest, onFertilize }) {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
     const plots = garden.plots || [];
-    const n = plots.length || 1;
     const totalSeeds = (garden.seedBag || []).reduce((s, x) => s + x.count, 0);
     return (
-        <>
-            {plots.map((p, i) => {
-                // Spread the plots evenly across a foreground band of the (wide) field.
-                const left = n === 1 ? 50 : 8 + (i * 84) / (n - 1);
-                return (
-                    <ScenePlot
-                        key={p.slot} p={p} left={left} now={now} busy={busy}
-                        totalSeeds={totalSeeds} fertilizer={garden.fertilizer}
-                        onPlant={onPlant} onHarvest={onHarvest} onFertilize={onFertilize}
-                    />
-                );
-            })}
-        </>
+        <div style={{ position: "absolute", left: 10, bottom: 10, zIndex: 55, maxWidth: "min(66%, 320px)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 9px", marginBottom: 4, borderRadius: 999, background: "rgba(18,26,14,0.82)", border: "1px solid rgba(150,110,64,0.7)", fontSize: 11, fontWeight: 800, color: "#ecdcc0", boxShadow: "0 2px 6px rgba(0,0,0,0.4)" }}>🌱 Garden{garden.readyCount ? <span style={{ color: "#8fe39a" }}> · {garden.readyCount} ready</span> : null}</span>
+            {/* the raised bed: wooden frame around tilled soil */}
+            <div style={{ position: "relative", padding: "9px 11px 11px", borderRadius: 12, background: "linear-gradient(180deg, #5a3d22 0%, #3c2712 9%, #281909 100%)", border: "3px solid #6b4a2a", boxShadow: "0 7px 18px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,222,166,0.28)" }}>
+                <div aria-hidden="true" style={{ position: "absolute", inset: 6, borderRadius: 8, background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.24) 0 3px, transparent 3px 22px)", opacity: 0.5, pointerEvents: "none" }} />
+                <div style={{ position: "relative", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end", justifyContent: "center" }}>
+                    {plots.map((p) => (
+                        <BedPlot
+                            key={p.slot} p={p} now={now} busy={busy}
+                            totalSeeds={totalSeeds} fertilizer={garden.fertilizer}
+                            onPlant={onPlant} onHarvest={onHarvest} onFertilize={onFertilize}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 }
 
-function ScenePlot({ p, left, now, busy, totalSeeds, fertilizer, onPlant, onHarvest, onFertilize }) {
+function BedPlot({ p, now, busy, totalSeeds, fertilizer, onPlant, onHarvest, onFertilize }) {
     const empty = p.empty;
     let progress = 1; let ready = false; let secsLeft = 0;
     if (!empty) {
@@ -959,46 +956,32 @@ function ScenePlot({ p, left, now, busy, totalSeeds, fertilizer, onPlant, onHarv
         if (ready) onHarvest(p.slot);
         else if (canFertilize) onFertilize(p.slot);
     };
-    // The plant scales up from a seedling as it matures; ripe crops pop to full size + a soft glow.
-    const plantScale = ready ? 1 : 0.4 + 0.6 * progress;
+    const plantScale = ready ? 1 : 0.4 + 0.6 * progress; // grows from a seedling as it matures
     const title = empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — find seeds across the games")
         : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left${canFertilize ? " · tap to fertilize" : ""}`;
     return (
-        <button
-            type="button" onClick={onClick} title={title}
-            style={{ position: "absolute", left: `${left}%`, top: "93%", transform: "translate(-50%, -100%)", width: 66, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default", zIndex: 85 }}
-        >
-            {/* the plant / sprout rising above the mound */}
-            <span style={{ display: "block", position: "relative", height: 48 }}>
-                {ready ? (
-                    <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "58%", width: 46, height: 46, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", animation: "farmReadyRing 1.6s ease-out infinite" }} />
-                ) : null}
+        <button type="button" onClick={onClick} title={title} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: 52, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default" }}>
+            {/* the plant / sprout rising from the mound */}
+            <span style={{ display: "block", position: "relative", height: 40, width: "100%" }}>
+                {ready ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "52%", width: 38, height: 38, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", animation: "farmReadyRing 1.6s ease-out infinite" }} /> : null}
                 {!empty ? (
-                    <span style={{ position: "absolute", left: "50%", bottom: 3, transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1s linear" }}>
-                        <span style={{ display: "block", fontSize: 30, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 7px rgba(140,240,150,0.9))" : "drop-shadow(0 2px 2px rgba(0,0,0,0.35))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>
-                            {ready ? p.emoji : p.sprout}
-                        </span>
+                    <span style={{ position: "absolute", left: "50%", bottom: 2, transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1s linear" }}>
+                        <span style={{ display: "block", fontSize: 26, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 6px rgba(140,240,150,0.9))" : "drop-shadow(0 2px 2px rgba(0,0,0,0.4))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{ready ? p.emoji : p.sprout}</span>
                     </span>
                 ) : canPlant ? (
-                    <span style={{ position: "absolute", left: "50%", bottom: 9, transform: "translateX(-50%)", fontSize: 20, color: "#ffe27a", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.7)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
+                    <span style={{ position: "absolute", left: "50%", bottom: 6, transform: "translateX(-50%)", fontSize: 17, color: "#ffe27a", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.8)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
                 ) : null}
             </span>
-            {/* tilled soil mound */}
-            <span style={{ display: "block", width: 50, height: 15, margin: "0 auto", borderRadius: "50%", background: p.fertilized ? "radial-gradient(ellipse at 50% 25%, #6f4c28, #3c2712)" : "radial-gradient(ellipse at 50% 25%, #59391f, #32200e)", boxShadow: "inset 0 2px 3px rgba(255,255,255,0.14), inset 0 -3px 6px rgba(0,0,0,0.55), 0 3px 6px rgba(0,0,0,0.4)", border: canPlant ? "1.5px dashed rgba(255,226,122,0.6)" : "1px solid rgba(0,0,0,0.35)" }} />
+            {/* soil mound */}
+            <span style={{ display: "block", width: 42, height: 12, borderRadius: "50%", background: p.fertilized ? "radial-gradient(ellipse at 50% 25%, #7a5430, #40290f)" : "radial-gradient(ellipse at 50% 25%, #63421f, #351f0c)", boxShadow: "inset 0 1px 2px rgba(255,255,255,0.18), inset 0 -2px 4px rgba(0,0,0,0.6)", border: canPlant ? "1.5px dashed rgba(255,226,122,0.65)" : "1px solid rgba(0,0,0,0.4)" }} />
             {/* status chip */}
             {!empty ? (
-                <span style={{ display: "block", textAlign: "center", marginTop: 3 }}>
-                    {ready ? (
-                        <span style={{ padding: "1px 8px", borderRadius: 9, background: "rgba(47,174,114,0.95)", border: "1px solid rgba(190,255,205,0.55)", fontSize: 10, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>{busyHere ? "…" : "🧺 Harvest"}</span>
-                    ) : (
-                        <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.76)", border: "1px solid rgba(255,255,255,0.12)", fontSize: 10, fontWeight: 700, color: "#f2f6ee", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.35)" }}>⏳ {fmtGrow(secsLeft)}{p.fertilized ? " 💧" : ""}</span>
-                    )}
-                </span>
+                ready
+                    ? <span style={{ padding: "0 6px", borderRadius: 8, background: "rgba(47,174,114,0.95)", border: "1px solid rgba(190,255,205,0.55)", fontSize: 9, fontWeight: 800, color: "#fff", whiteSpace: "nowrap" }}>{busyHere ? "…" : "🧺"}</span>
+                    : <span style={{ padding: "0 5px", borderRadius: 8, background: "rgba(10,16,8,0.85)", border: "1px solid rgba(255,255,255,0.14)", fontSize: 9, fontWeight: 700, color: "#f2f6ee", whiteSpace: "nowrap" }}>{fmtGrow(secsLeft)}{p.fertilized ? " 💧" : ""}</span>
             ) : canPlant ? (
-                <span style={{ display: "block", textAlign: "center", marginTop: 3 }}>
-                    <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.62)", border: "1px dashed rgba(255,226,122,0.5)", fontSize: 10, fontWeight: 700, color: "#ffe6a3", whiteSpace: "nowrap" }}>Plant</span>
-                </span>
-            ) : null}
+                <span style={{ padding: "0 5px", borderRadius: 8, background: "rgba(10,16,8,0.7)", border: "1px dashed rgba(255,226,122,0.5)", fontSize: 9, fontWeight: 700, color: "#ffe6a3", whiteSpace: "nowrap" }}>Plant</span>
+            ) : <span style={{ height: 11 }} />}
         </button>
     );
 }

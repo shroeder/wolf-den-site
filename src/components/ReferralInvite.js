@@ -20,7 +20,7 @@ export default function ReferralInvite({ alias, referrerGold = 500, joinerGold =
     }
     async function share() {
         if (navigator.share) {
-            try { await navigator.share({ title: "The Wolf Den Game", text: "Come play The Wolf Den with me — we both get a bonus!", url: link }); } catch { /* cancelled */ }
+            try { await navigator.share({ title: "Den Quest", text: "Come play Den Quest with me — we both get a bonus!", url: link }); } catch { /* cancelled */ }
         } else {
             copy();
         }
