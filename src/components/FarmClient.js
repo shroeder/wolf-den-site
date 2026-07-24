@@ -228,18 +228,28 @@ export default function FarmClient({ initial, viewingAlias }) {
         window.addEventListener("keydown", prime, { once: true });
         return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
     }, []);
-    // Lock the page behind the pig haul modal so the background doesn't scroll under it. (The pet detail is a
-    // full drill-in screen now, not a modal, so it scrolls with the page normally.)
+    // Lock the page behind an open modal (pet detail or pig haul). `overflow:hidden` alone doesn't hold on
+    // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
+    // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !pigResult) return undefined;
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => { document.body.style.overflow = prev; };
-    }, [pigResult]);
-    // Drilling into a pet lands you at the top of its screen (you may have been scrolled down the farm).
-    useEffect(() => {
-        if (inspect && typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "auto" });
-    }, [inspect]);
+        if (typeof document === "undefined" || !(inspect || pigResult)) return undefined;
+        const scrollY = window.scrollY;
+        const body = document.body;
+        const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
+        body.style.position = "fixed";
+        body.style.top = `-${scrollY}px`;
+        body.style.left = "0";
+        body.style.right = "0";
+        body.style.width = "100%";
+        return () => {
+            body.style.position = prev.position;
+            body.style.top = prev.top;
+            body.style.left = prev.left;
+            body.style.right = prev.right;
+            body.style.width = prev.width;
+            window.scrollTo(0, scrollY);
+        };
+    }, [inspect, pigResult]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -439,25 +449,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
             `}</style>
 
-            {inspect ? (
-                <PetInspect
-                    pet={inspect}
-                    canPet={farm.canPet}
-                    petXp={farm.petXp}
-                    petGold={farm.petGold}
-                    petting={farm.petting}
-                    wallet={farm.wallet}
-                    treats={farm.treats || []}
-                    treatShop={farm.treatShop || []}
-                    busyKey={busy}
-                    onPet={() => petIt(inspect)}
-                    onRecharge={rechargeBudget}
-                    onUseTreat={(cid) => feedTreat(inspect, cid)}
-                    onBuyTreat={buyTreatItem}
-                    onClose={() => setInspect(null)}
-                />
-            ) : (
-              <>
             <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div>
                     <h1 style={{ margin: 0 }}>🏡 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
@@ -608,8 +599,24 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             </div>
 
-              </>
-            )}
+            {inspect ? (
+                <PetInspect
+                    pet={inspect}
+                    canPet={farm.canPet}
+                    petXp={farm.petXp}
+                    petGold={farm.petGold}
+                    petting={farm.petting}
+                    wallet={farm.wallet}
+                    treats={farm.treats || []}
+                    treatShop={farm.treatShop || []}
+                    busyKey={busy}
+                    onPet={() => petIt(inspect)}
+                    onRecharge={rechargeBudget}
+                    onUseTreat={(cid) => feedTreat(inspect, cid)}
+                    onBuyTreat={buyTreatItem}
+                    onClose={() => setInspect(null)}
+                />
+            ) : null}
 
             {pigResult ? (
                 <div onClick={() => setPigResult(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "radial-gradient(120% 100% at 50% 40%, rgba(60,45,8,0.72), rgba(0,0,0,0.7))", display: "grid", placeItems: "center", padding: 16, animation: "overlayFade .25s ease both", overflow: "hidden" }}>
@@ -712,20 +719,19 @@ function PetInspect({ pet, canPet, petXp, petGold, petting, wallet, treats = [],
     const ring = RARITY_RING[pet.rarity] || "#9aa0a6";
     const pct = pet.maxed || !pet.span ? 100 : Math.round((Math.min(pet.into, pet.span) / pet.span) * 100);
     return (
-        <div className="stack reveal">
-            <button
-                type="button"
-                onClick={onClose}
-                style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", fontWeight: 700 }}
-            >
-                ← Back to farm
-            </button>
+        <div
+            onClick={onClose}
+            role="presentation"
+            style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}
+        >
             <div
-                role="region"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
                 aria-label={`${pet.name} details`}
-                style={{ width: "100%", borderRadius: 16, background: "var(--card-bg, #17181c)", border: `2px solid ${ring}`, boxShadow: "0 10px 30px rgba(0,0,0,0.35)", overflow: "hidden" }}
+                style={{ width: "100%", maxWidth: 360, maxHeight: "90dvh", overflowY: "auto", overflowX: "hidden", borderRadius: 16, background: "var(--card-bg, #17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
             >
                 <div style={{ position: "relative", padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}22 0%, transparent 70%)` }}>
+                    <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", color: "inherit", fontSize: 20, cursor: "pointer", opacity: 0.7 }}>×</button>
                     {pet.spriteUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={pet.spriteUrl} alt={pet.name} width={132} height={132} style={{ width: 132, height: 132, objectFit: "contain", filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.45))" }} />
