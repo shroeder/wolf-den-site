@@ -5,12 +5,24 @@ import { useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
+import { STAT_META } from "@/lib/marketplace/items.js";
 
 function ItemToggle({ item, on, onClick }) {
+    const stats = item.stats && typeof item.stats === "object" ? Object.entries(item.stats) : [];
     return (
-        <button type="button" className={`equip-card rar-${item.rarity}${on ? " is-equipped" : ""}`} onClick={onClick}>
+        <button type="button" className={`equip-card rar-${item.rarity}${on ? " is-equipped" : ""}`} onClick={onClick} title={item.chargeLabel ? `Charged perk: ${item.chargeLabel}` : item.name}>
             <ItemArt id={item.id} icon={item.icon} className="equip-card-glyph" />
             <span className="equip-card-name">{item.name}</span>
+            {stats.length ? (
+                <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 7px", justifyContent: "center", fontSize: "0.66rem", fontWeight: 800, color: "#dfe8d6", lineHeight: 1.3, margin: "1px 0 2px" }}>
+                    {stats.map(([k, v]) => (
+                        <span key={k} title={STAT_META[k]?.label || k}>{STAT_META[k]?.icon || "•"} {v}{STAT_META[k]?.suffix || ""}</span>
+                    ))}
+                </span>
+            ) : <span style={{ fontSize: "0.62rem", opacity: 0.55, margin: "1px 0 2px" }}>cosmetic</span>}
+            {(item.charged || item.sea) ? (
+                <span style={{ fontSize: "0.6rem", color: "#ffd75e", fontWeight: 700 }}>{item.charged ? "🔋 perk" : ""}{item.charged && item.sea ? " · " : ""}{item.sea ? "🌊 sea" : ""}</span>
+            ) : null}
             <span className="equip-card-stats">{on ? "✓ in trade" : "tap to add"}</span>
         </button>
     );

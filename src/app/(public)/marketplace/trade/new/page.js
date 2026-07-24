@@ -5,13 +5,19 @@ import TradeBuilder from "@/components/TradeBuilder";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { itemById } from "@/lib/marketplace/items.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Propose a trade | Wolf Den", robots: { index: false, follow: false } };
 
-const strip = (inv) => (inv?.items || []).map((i) => ({ id: i.id, name: i.name, rarity: i.rarity, icon: i.icon }));
+// Carry the item's boss STATS (+ charged-perk / sea-affinity flags) so the trade cards can show what a piece
+// actually does — you shouldn't have to guess what you're giving away.
+const strip = (inv) => (inv?.items || []).map((i) => {
+    const d = itemById(i.id);
+    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats: d?.stats || null, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea) };
+});
 const petStrip = (ids) => ids.map((id) => collectibleById(id)).filter(Boolean).map((d) => ({ id: d.id, name: d.name, rarity: d.rarity }));
 
 export default async function NewTradePage({ searchParams }) {
