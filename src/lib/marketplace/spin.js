@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
+import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
@@ -31,6 +31,7 @@ const WHEELS = [
             { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
             { label: "200 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 200 },
             { label: "Pet Treat", emoji: "🦴", weight: 16, kind: "treat", treat: "treat_bone" },
+            { label: "Common Seed", emoji: "🌱", weight: 12, kind: "seed" },
             { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
             { label: "500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 500 },
@@ -107,6 +108,12 @@ async function grantPrize(buyerId, prize) {
         return { emoji: prize.emoji, text: `${prize.amount.toLocaleString()} XP` };
     }
     if (prize.kind === "treat") { await grantConsumable(buyerId, prize.treat, 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "seed") {
+        const commons = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === "common");
+        const sid = commons[Math.floor(Math.random() * commons.length)];
+        await grantSeed(buyerId, sid).catch(() => {});
+        return { emoji: "🌱", text: `${SEEDS[sid]?.name || "Common"} seed!` };
+    }
     if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
     if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% shop coupon` }; }
     if (prize.kind === "token") { await grantSpinTokens(buyerId, prize.n || 1); return { emoji: prize.emoji, text: `+${prize.n || 1} spin` }; }
