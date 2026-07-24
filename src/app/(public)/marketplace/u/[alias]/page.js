@@ -156,6 +156,13 @@ export default async function UserProfilePage({ params }) {
 
             <PublicGear inventory={inventory} displayLabel={profile.displayLabel} canTrade={Boolean(viewer && viewer.id !== profile.id)} targetAlias={profile.alias} />
 
+            {(profile.badges || []).length ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>🏅 Badges <span className="muted" style={{ fontSize: "0.8rem", fontWeight: 600 }}>· {profile.badges.length} earned</span></h2>
+                    <UserBadges badges={profile.badges} />
+                </section>
+            ) : null}
+
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>🐾 Pets</h2>
                 <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has collected — from leveling, chests, the boss, and the shop.</p>

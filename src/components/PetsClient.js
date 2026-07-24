@@ -44,6 +44,26 @@ const SOURCE_LABEL = {
 };
 
 // A 1–5 star meter for a pet's level (filled = reached).
+// A clean, scannable group of stat tiles for the menagerie summary — a labeled header + a row of tiles, each
+// with the value big + the stat name below, so the bonuses read at a glance instead of as a jumble of chips.
+function MenagerieGroup({ title, sub, tiles, accent = "#ffd75e" }) {
+    if (!tiles.length) return null;
+    return (
+        <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: accent }}>{title}</div>
+            <div className="muted" style={{ fontSize: "0.68rem", margin: "1px 0 8px" }}>{sub}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                {tiles.map((t) => (
+                    <div key={t.key} style={{ display: "flex", flexDirection: "column", minWidth: 70, padding: "5px 10px", borderRadius: 10, background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span style={{ fontWeight: 900, fontSize: "1.02rem", color: accent, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{t.value}</span>
+                        <span className="muted" style={{ fontSize: "0.72rem", whiteSpace: "nowrap" }}>{t.label}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function Stars({ level = 1, max = 5, className = "" }) {
     return (
         <span className={`pet-stars ${className}`} role="img" aria-label={`Level ${level} of ${max}`}>
@@ -394,39 +414,45 @@ export default function PetsClient() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                     <div>
                         <h1 style={{ margin: 0 }}>🐾 Pets</h1>
-                        <p className="muted" style={{ margin: "4px 0 0" }}>
-                            Collect companions from leveling, the shop, achievements, chests, and boss drops. <strong>Every pet you own</strong> adds a passive bonus that stacks — fighters buff your boss strike, earners generate XP &amp; gold over time. <strong>Equip one</strong> for a much stronger active buff.
+                        <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.88rem" }}>
+                            <strong>Every pet you own</strong> stacks a passive bonus; <strong>equip one</strong> for a much stronger active buff.
                         </p>
                     </div>
                 </div>
                 {state ? (
-                    <>
-                        <div className="pets-summary">
-                            <span><strong>{ownedCount}</strong> / {COLLECTIBLES.length} pets</span>
-                            {featured ? <span>★ Equipped: <strong>{featured.name}</strong> — {petPerk(featured).icon} {petPerk(featured).name} <span className="muted">({petPerk(featured).desc})</span></span> : <span className="muted">No pet equipped</span>}
+                    <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+                        {/* headline: collection count + who's equipped */}
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontWeight: 800, fontSize: "1.05rem" }}>{ownedCount}<span className="muted" style={{ fontWeight: 600 }}> / {COLLECTIBLES.length} pets</span></span>
+                            {featured ? (
+                                <span title={petPerk(featured).desc} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 999, background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.4)", fontSize: "0.85rem", maxWidth: "100%" }}>
+                                    ★ <strong>{featured.name}</strong> <span style={{ opacity: 0.9 }}>· {petPerk(featured).icon} {petPerk(featured).name}</span>
+                                </span>
+                            ) : <span className="muted" style={{ marginLeft: "auto" }}>No pet equipped</span>}
                         </div>
-                        {passiveEntries.length ? (
-                            <div className="pets-passives">
-                                <span className="muted" style={{ fontSize: "0.8rem" }}>Menagerie passive bonuses:</span>
-                                {passiveEntries.map(([stat, val]) => <span key={stat} className="pet-passive-chip">{statText({ stat })} +{val}</span>)}
-                            </div>
-                        ) : null}
-                        {state.income && (state.income.xpPerHour > 0 || state.income.goldPerHour > 0 || state.income.raffleTickets > 0) ? (
-                            <div className="pets-passives" style={{ marginTop: 8 }}>
-                                <span className="muted" style={{ fontSize: "0.8rem" }}>Your earner pets generate:</span>
-                                {state.income.xpPerHour > 0 ? <span className="pet-passive-chip">✨ +{state.income.xpPerHour} XP/hr</span> : null}
-                                {state.income.goldPerHour > 0 ? <span className="pet-passive-chip">🪙 +{state.income.goldPerHour} gold/hr</span> : null}
-                                {state.income.raffleTickets > 0 ? <span className="pet-passive-chip">🎟️ +{state.income.raffleTickets} boss raffle tickets</span> : null}
-                            </div>
-                        ) : null}
+                        {/* two clean stat groups: what every pet stacks + what your earners generate */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+                            <MenagerieGroup
+                                title="Passive bonuses" sub="every pet you own stacks these" accent="#ffd75e"
+                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, label: statText({ stat }), value: `+${val}` }))}
+                            />
+                            <MenagerieGroup
+                                title="Earning" sub="your earner pets, automatically" accent="#8fe39a"
+                                tiles={[
+                                    state.income?.xpPerHour > 0 ? { key: "xp", label: "✨ XP / hr", value: `+${state.income.xpPerHour}` } : null,
+                                    state.income?.goldPerHour > 0 ? { key: "gold", label: "🪙 Gold / hr", value: `+${state.income.goldPerHour}` } : null,
+                                    state.income?.raffleTickets > 0 ? { key: "tix", label: "🎟️ Raffle / day", value: `+${state.income.raffleTickets}` } : null,
+                                ].filter(Boolean)}
+                            />
+                        </div>
                         {state.incomeEarned && (state.incomeEarned.xp > 0 || state.incomeEarned.gold > 0) ? (
-                            <p style={{ margin: "8px 0 0", color: "#ffd75e", fontWeight: 600 }}>
+                            <div style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.35)", color: "#ffe9a8", fontWeight: 700, fontSize: "0.88rem" }}>
                                 🐾 Your pets earned you {state.incomeEarned.xp > 0 ? `+${state.incomeEarned.xp} XP` : ""}
-                                {state.incomeEarned.xp > 0 && state.incomeEarned.gold > 0 ? " and " : ""}
+                                {state.incomeEarned.xp > 0 && state.incomeEarned.gold > 0 ? " · " : ""}
                                 {state.incomeEarned.gold > 0 ? `+${state.incomeEarned.gold} gold` : ""} since your last visit!
-                            </p>
+                            </div>
                         ) : null}
-                    </>
+                    </div>
                 ) : null}
             </section>
 

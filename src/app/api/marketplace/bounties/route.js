@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { createBounty, listBounties } from "@/lib/marketplace/bounties.js";
+import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -49,6 +50,18 @@ export async function POST(request) {
                 mode: b?.mode,
             });
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
+            // Tell the whole pack a new bounty is up (best-effort web push to everyone).
+            try {
+                const who = (await db.queryOne(`SELECT COALESCE(NULLIF(display_name,''), alias, 'A member') AS name FROM mkt_buyer WHERE id = $1`, [buyer.id]))?.name || "A member";
+                const bt = res.bounty?.title || b?.title || "a new bounty";
+                const rg = Number(res.bounty?.rewardGold ?? b?.rewardGold) || 0;
+                await broadcastWebPush({
+                    title: "🎯 New bounty posted!",
+                    body: `${who} posted "${bt}"${rg ? ` — ${rg.toLocaleString()} gold` : ""}. Claim it on the bounty board.`,
+                    url: "/marketplace/bounties",
+                    tag: "bounty-new",
+                });
+            } catch { /* best-effort — never block bounty creation */ }
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.bounties.create.failure" });
