@@ -24,14 +24,16 @@ const COUPON_MAX = 4000;
 
 // Every wheel is 12 segments and carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a
 // rare thrill (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side.
+// Single wheel for everyone (the old bronze/silver/gold tiers were collapsed to one). ⚠️ AT FARM LAUNCH:
+// re-add a common-seed wedge → { label: "Common Seed", emoji: "🌱", weight: 12, kind: "seed" } (handler + the
+// grantSeed/SEEDS imports are already wired below). See the launch checklist.
 const WHEELS = [
     {
-        id: "bronze", name: "Bronze Wheel", minLevel: 1,
+        id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
             { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
             { label: "200 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 200 },
             { label: "Pet Treat", emoji: "🦴", weight: 16, kind: "treat", treat: "treat_bone" },
-            { label: "Common Seed", emoji: "🌱", weight: 12, kind: "seed" },
             { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
             { label: "500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 500 },
@@ -40,38 +42,6 @@ const WHEELS = [
             { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
             { label: "MINI JACKPOT · 1,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 1000 },
             { label: "JACKPOT · 2,500 gold", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 2500 },
-        ],
-    },
-    {
-        id: "silver", name: "Silver Wheel", minLevel: 20,
-        prizes: [
-            { label: "250 gold", emoji: "🪙", weight: 26, kind: "gold", amount: 250 },
-            { label: "500 XP", emoji: "⭐", weight: 16, kind: "xp", amount: 500 },
-            { label: "Hearty Snack", emoji: "🍖", weight: 14, kind: "treat", treat: "treat_snack" },
-            { label: "500 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 500 },
-            { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
-            { label: "1,000 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 1000 },
-            { label: "Iron Chest", emoji: "⚙️", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "iron" },
-            { label: "1,000 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1000 },
-            { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
-            { label: "MINI JACKPOT · 2,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 2000 },
-            { label: "JACKPOT · 5,000 gold", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 5000 },
-        ],
-    },
-    {
-        id: "gold", name: "Gold Wheel", minLevel: 50,
-        prizes: [
-            { label: "500 gold", emoji: "🪙", weight: 24, kind: "gold", amount: 500 },
-            { label: "1,000 XP", emoji: "⭐", weight: 14, kind: "xp", amount: 1000 },
-            { label: "Chew Toy", emoji: "🧸", weight: 12, kind: "treat", treat: "treat_toy" },
-            { label: "1,000 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 1000 },
-            { label: "+2 Spins", emoji: "🎟️", weight: 10, kind: "token", n: 2 },
-            { label: "2,500 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 2500 },
-            { label: "Iron Chest", emoji: "🧰", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "iron" },
-            { label: "2,500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 2500 },
-            { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
-            { label: "MINI JACKPOT · 3,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 3000 },
-            { label: "JACKPOT · 10,000 gold", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 10000 },
         ],
     },
 ];
