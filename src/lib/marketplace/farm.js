@@ -26,7 +26,8 @@ const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date"; // store-local day, 
 export const PET_PET_XP = 30; // pet XP the fed pet gains per petting
 const PET_PET_GOLD = 12; // gold YOU earn per petting (petting is rewarding, not just chores)
 const PET_PET_PLAYER_XP = 5; // player XP you earn per petting
-const PET_PETS_PER_DAY = 3; // free daily pettings (total, across all pets — your own AND friends')
+const PET_PETS_PER_DAY = 3; // free daily pettings on your OWN pets (+ Pet Whisperer upgrade + gold recharges)
+const PET_OTHERS_PER_DAY = 3; // SEPARATE free daily pettings on OTHER members' pets
 // Petting a FRIEND'S pet: a smaller thank-you to the petter (their pet gets the full PET_PET_XP). Shares the
 // same 3/day budget as petting your own.
 const PET_OTHER_GOLD = 8;
@@ -105,34 +106,50 @@ export async function resolveFarmOwner(alias) {
     return row ? { id: row.id, name: row.display_name || row.alias || "Member", alias: row.alias } : null;
 }
 
-// Read (and lazily day-reset) a member's daily petting budget. Idempotent — safe to call on a plain farm load.
+// Read (and lazily day-reset) a member's daily petting budgets — SEPARATE pools for your OWN pets and for
+// OTHER members' pets. Idempotent — safe to call on a plain farm load.
 async function pettingBudget(buyerId) {
     const b = await db
         .queryOne(
             `UPDATE mkt_buyer
                 SET pet_farm_used = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_used ELSE 0 END,
+                    pet_farm_used_others = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_used_others ELSE 0 END,
                     pet_farm_recharges = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_recharges ELSE 0 END,
                     pet_farm_day = ${DAY}
               WHERE id = $1
-              RETURNING pet_farm_used, pet_farm_recharges, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades`,
+              RETURNING pet_farm_used, pet_farm_used_others, pet_farm_recharges, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades`,
             [buyerId]
         )
         .catch(() => null);
-    const used = b?.pet_farm_used || 0;
+    const usedOwn = b?.pet_farm_used || 0;
+    const usedOthers = b?.pet_farm_used_others || 0;
     const recharges = b?.pet_farm_recharges || 0;
-    // Base 3/day + the permanent "Pet Whisperer" farm upgrade + any gold recharges bought today.
-    const allowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + recharges * PET_RECHARGE_AMOUNT;
-    return { used, allowance, left: Math.max(0, allowance - used), recharges, rechargeCost: rechargeCost(recharges), rechargeAmount: PET_RECHARGE_AMOUNT };
+    // OWN: base 3/day + the permanent "Pet Whisperer" upgrade + any gold recharges bought today. OTHERS: flat 3.
+    const ownAllowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + recharges * PET_RECHARGE_AMOUNT;
+    return {
+        own: { used: usedOwn, allowance: ownAllowance, left: Math.max(0, ownAllowance - usedOwn) },
+        others: { used: usedOthers, allowance: PET_OTHERS_PER_DAY, left: Math.max(0, PET_OTHERS_PER_DAY - usedOthers) },
+        recharges, rechargeCost: rechargeCost(recharges), rechargeAmount: PET_RECHARGE_AMOUNT,
+    };
+}
+
+// Flatten the two-pool budget to the shape the client uses, keyed to the CURRENT context (your own farm →
+// the "own" pool; a friend's farm → the "others" pool), while still carrying both pools for the UI.
+function flatBudget(b, own) {
+    const scope = own ? b.own : b.others;
+    return { used: scope.used, allowance: scope.allowance, left: scope.left, scope: own ? "own" : "others", own: b.own, others: b.others, recharges: b.recharges, rechargeCost: b.rechargeCost, rechargeAmount: b.rechargeAmount };
 }
 
 // The "your own farm" extras: treats you own + a treat shop + your wallet + the petting budget. Reused on load
 // and after a buy/recharge so the client can patch without a full refetch.
-async function farmMineBits(buyerId) {
-    const [cons, wallet, petting] = await Promise.all([
+async function farmMineBits(buyerId, mine = true) {
+    const [cons, wallet, rawBudget] = await Promise.all([
         listConsumables(buyerId).catch(() => ({ owned: [], shop: [] })),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc, (pig_day IS DISTINCT FROM ${DAY}) AS pig_available FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         pettingBudget(buyerId),
     ]);
+    // Show the budget for the pets you're actually looking at: your own pool on your farm, the others pool on a friend's.
+    const petting = flatBudget(rawBudget, mine);
     const treats = (cons.owned || [])
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), count: o.count }));
@@ -207,7 +224,7 @@ export async function getFarm(ownerId, viewerId) {
     // The VIEWER's own treats / wallet / petting budget power the pet + feed actions — whether they're standing
     // on their own farm or a friend's. (On a friend's farm you can still pet, spending your budget, and feed
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
-    const extras = viewerId ? await farmMineBits(viewerId) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
+    const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
     const garden = mine ? await getGarden(ownerId).catch(() => null) : null;
     return {
@@ -295,18 +312,21 @@ export async function petPet(petterId, petId, ownerId = null) {
     if (!ownerState || !(ownerState.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
 
     const budget = await pettingBudget(petterId);
-    if (budget.left <= 0) return { ok: false, error: "no_pets_left", petting: budget };
+    // Separate pools: your OWN pets vs OTHER members' pets (3 each per day).
+    const col = own ? "pet_farm_used" : "pet_farm_used_others";
+    const pool = own ? budget.own : budget.others;
+    if (pool.left <= 0) return { ok: false, error: "no_pets_left", petting: flatBudget(budget, own) };
 
-    // Reserve a slot from the petter's daily budget FIRST (guarded so a burst can't exceed the allowance).
+    // Reserve a slot from the right pool FIRST (guarded so a burst can't exceed the allowance).
     const slot = await db
         .queryOne(
-            `UPDATE mkt_buyer SET pet_farm_used = pet_farm_used + 1
-              WHERE id = $1 AND pet_farm_day = ${DAY} AND pet_farm_used < $2
-              RETURNING pet_farm_used`,
-            [petterId, budget.allowance]
+            `UPDATE mkt_buyer SET ${col} = ${col} + 1
+              WHERE id = $1 AND pet_farm_day = ${DAY} AND ${col} < $2
+              RETURNING ${col} AS n`,
+            [petterId, pool.allowance]
         )
         .catch(() => null);
-    if (!slot) return { ok: false, error: "no_pets_left", petting: budget };
+    if (!slot) return { ok: false, error: "no_pets_left", petting: flatBudget(await pettingBudget(petterId), own) };
 
     const def = collectibleById(petId);
     const maxXp = petMaxXp(def?.rarity || "common");
@@ -325,16 +345,16 @@ export async function petPet(petterId, petId, ownerId = null) {
             )
             .catch(() => null);
         if (!row) {
-            await db.query(`UPDATE mkt_buyer SET pet_farm_used = GREATEST(0, pet_farm_used - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
-            return { ok: false, error: "already_petted", petting: await pettingBudget(petterId) };
+            await db.query(`UPDATE mkt_buyer SET ${col} = GREATEST(0, ${col} - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
+            return { ok: false, error: "already_petted", petting: flatBudget(await pettingBudget(petterId), own) };
         }
         newXp = row.xp;
     } else {
         // A FRIEND'S pet: no per-pet guard (your 3/day budget is the cap), XP lands on the owner's pet.
         const res = await addPetXp(petOwner, petId, PET_PET_XP).catch(() => null);
         if (!res) {
-            await db.query(`UPDATE mkt_buyer SET pet_farm_used = GREATEST(0, pet_farm_used - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
-            return { ok: false, error: "pet_error", petting: await pettingBudget(petterId) };
+            await db.query(`UPDATE mkt_buyer SET ${col} = GREATEST(0, ${col} - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
+            return { ok: false, error: "pet_error", petting: flatBudget(await pettingBudget(petterId), own) };
         }
         const r = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
         newXp = r?.xp || 0;
@@ -360,7 +380,7 @@ export async function petPet(petterId, petId, ownerId = null) {
         into: info.into,
         span: info.span,
         maxed: info.maxed,
-        petting: await pettingBudget(petterId),
+        petting: flatBudget(await pettingBudget(petterId), own),
     };
 }
 
@@ -377,7 +397,7 @@ export async function rechargePetting(buyerId) {
             [buyerId, cost]
         )
         .catch(() => null);
-    if (!paid) return { ok: false, error: "insufficient", cost, petting: budget };
+    if (!paid) return { ok: false, error: "insufficient", cost, petting: flatBudget(budget, true) };
     await logCoin(buyerId, -cost, "pet_recharge", { balanceAfter: paid.gold }).catch(() => {});
-    return { ok: true, spent: cost, petting: await pettingBudget(buyerId), wallet: { gold: paid.gold } };
+    return { ok: true, spent: cost, petting: flatBudget(await pettingBudget(buyerId), true), wallet: { gold: paid.gold } };
 }

@@ -509,7 +509,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <h1 style={{ margin: 0 }}>🏡 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
                     <p className="muted" style={{ margin: "4px 0 0" }}>
                         {pets.length} pet{pets.length === 1 ? "" : "s"} roaming · tap one to inspect
-                        {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings left today` : ""}
+                        {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings on ${farm.mine ? "your pets" : "their pets"} today` : ""}
                     </p>
                 </div>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
@@ -1221,7 +1221,7 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                                     <button type="button" onClick={onPet} disabled={busy} style={{ width: "100%", padding: "10px 12px", fontWeight: 700, background: "#e0559a", color: "#fff", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
                                         {busyKey === pet.id ? "Petting…" : mine ? `❤️ Pet ${pet.name} (+${petXp} XP, +${petGold}g)` : `❤️ Pet ${pet.name} — +${petXp} XP for them, +${petGold}g for you`}
                                     </button>
-                                    {petting ? <div className="muted" style={{ fontSize: 11, textAlign: "center", marginTop: 4 }}>{petting.left} of {petting.allowance} pettings left today</div> : null}
+                                    {petting ? <div className="muted" style={{ fontSize: 11, textAlign: "center", marginTop: 4 }}>{petting.left} of {petting.allowance} pettings on {mine ? "your pets" : "their pets"} today{petting.scope === "own" && petting.others ? ` · ${petting.others.left}/${petting.others.allowance} on others` : ""}</div> : null}
                                 </>
                             )}
                         </div>
