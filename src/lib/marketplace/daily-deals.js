@@ -77,15 +77,16 @@ function dayContext() {
 const DEAL_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
 const DEAL_RARITY_CAP = "epic"; // nothing above epic goes on sale
 
-// The full purchasable pool across categories (gear / consumables / shop pets), each with a base gold price.
+// The full purchasable pool for daily deals (gear + consumables). Pets are intentionally EXCLUDED for now —
+// several pets are meant to be earned through specific paths (boss/achievement/real-world perks), so selling
+// random ones through the deals shop wasn't right. Revisit with a curated, rarity-capped shop-pet list later.
 function dealPool() {
     const gear = ITEMS.filter((i) => i.source === "xp_shop" && (i.xpCost || 0) > 0
             && (DEAL_RARITY_RANK[i.rarity] ?? 9) <= (DEAL_RARITY_RANK[DEAL_RARITY_CAP] ?? 2))
         .map((i) => ({ kind: "gear", id: i.id, name: i.name, rarity: i.rarity, basePrice: i.xpCost }));
     const consumables = Object.entries(CONSUMABLES).filter(([, c]) => c.price != null)
         .map(([id, c]) => ({ kind: "consumable", id, name: c.name, emoji: c.emoji, basePrice: c.price }));
-    const pets = COLLECTIBLES.filter((p) => p.source === "shop").map((p) => ({ kind: "pet", id: p.id, name: p.name, rarity: p.rarity, basePrice: petPrice(p) }));
-    return [...gear, ...consumables, ...pets].filter((d) => d.basePrice > 0);
+    return [...gear, ...consumables].filter((d) => d.basePrice > 0);
 }
 
 // The deterministic list of today's deals (id + kind + discounted price). Same for everyone all day —
