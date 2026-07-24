@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
+import { GOLD_PER_POINT } from "@/lib/marketplace/pet-perks.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 
@@ -13,7 +14,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // for a week doesn't dump a lump sum (encourages checking in).
 
 const XP_PER_POINT = 1; // each xp_gain point → +1 XP / hour
-const GOLD_PER_POINT = 2; // each gold_find point → +2 gold / hour
+// GOLD_PER_POINT is shared from pet-perks.js so the accrued income and the on-card display never drift.
 const MAX_ACCRUE_HOURS = 24; // offline accrual cap
 
 // The player's current pet income rate (for display + settling). rafflePerDay is consumed by boss.js, not here.

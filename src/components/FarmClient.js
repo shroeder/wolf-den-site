@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
-import { petPerk } from "@/lib/marketplace/pet-perks";
+import { petPerk, GOLD_PER_POINT } from "@/lib/marketplace/pet-perks";
 
 const statText = (stat) => {
     const m = PET_STAT_META[stat] || { label: stat, icon: "" };
@@ -13,9 +13,9 @@ const statText = (stat) => {
 // Plain-language description of a pet's OWNED (just-by-having-it) bonus. Earner stats no longer read as a raw
 // "+6 Gold Find" number — they explain the actual effect.
 const ownedBonusText = (p) => {
-    // Passive income rate mirrors pet-income.js: 1 gold_find pt → +2 gold/hr, 1 xp_gain pt → +1 XP/hr (Lv1
+    // Passive income: gold uses the shared GOLD_PER_POINT rate (pet-perks.js), XP is 1 per point/hr (Lv1
     // base rate; each pet's share scales up as it levels, and every owned pet stacks).
-    if (p.stat === "gold_find") return `💰 +${p.value * 2} gold/hr passive income — more as it levels (all your pets stack).`;
+    if (p.stat === "gold_find") return `💰 +${Math.max(1, Math.round(p.value * GOLD_PER_POINT))} gold/hr passive income — more as it levels (all your pets stack).`;
     if (p.stat === "xp_gain") return `✨ +${p.value} XP/hr passive income — more as it levels (all your pets stack).`;
     if (p.stat === "fortune") return `🍀 +${p.value} bonus tickets in the weekly boss-prize draw.`;
     return `+${p.value} ${statText(p.stat)} — buffs your boss damage (stacks across your whole menagerie).`;

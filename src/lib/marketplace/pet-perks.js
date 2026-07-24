@@ -4,6 +4,9 @@
 import { petPassive, petSpecialPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
+// Passive gold income rate: each gold_find point → this many gold/hour. Single source of truth shared by the
+// income settler (pet-income.js) and the perk/owned-bonus display. Nerfed to 1/5 of the original 2.
+export const GOLD_PER_POINT = 0.4;
 const EXTRA_STRIKE_BY_RARITY = { common: 1, rare: 1, epic: 1, legendary: 1, mythic: 2, ascendant: 2, eternal: 3 };
 const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2, mythic: 2.6, ascendant: 3.0, eternal: 3.5 };
 const ERUPT_BY_RARITY = {
@@ -96,7 +99,7 @@ function perkDesc(key, v) {
         // Earner stats generate passive income over time (see pet-income.js: 1 xp-pt→1 XP/hr, 1 gold-pt→2 gold/hr
         // at the equipped rate, and more as the pet levels), paid out when you next check in.
         case "xp_gain": return `Earns you passive XP — about +${v}/hr while equipped (more as it levels), paid when you check in`;
-        case "gold_find": return `Earns you passive gold — about +${v * 2}/hr while equipped (more as it levels), paid when you check in`;
+        case "gold_find": return `Earns you passive gold — about +${Math.max(1, Math.round(v * GOLD_PER_POINT))}/hr while equipped (more as it levels), paid when you check in`;
         default: return "";
     }
 }
