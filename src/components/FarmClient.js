@@ -605,8 +605,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
                 <FarmWeather condition={wx.condition} />
                 {/* Wild Loot Pig announce toast (the pig himself lives inside the scrolling field, below) */}
+                {/* Fixed to the viewport (not the pasture) so it's always on-screen no matter where you've scrolled. */}
                 {pigToast ? (
-                    <div style={{ position: "absolute", top: 44, left: "50%", transform: "translateX(-50%)", zIndex: 70, padding: "8px 16px", borderRadius: 999, background: "rgba(20,16,6,0.92)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,0.45)", animation: "pigPop .4s ease both" }}>
+                    <div style={{ position: "fixed", top: "max(72px, env(safe-area-inset-top, 0px))", left: "50%", transform: "translateX(-50%)", zIndex: 10005, maxWidth: "92vw", padding: "9px 18px", borderRadius: 999, background: "rgba(20,16,6,0.95)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, whiteSpace: "nowrap", boxShadow: "0 8px 24px rgba(0,0,0,0.5)", animation: "pigPop .4s ease both" }}>
                         🐷👑 The Wild Loot Pig appeared!
                     </div>
                 ) : null}
@@ -725,7 +726,7 @@ function LootPig({ onFinish }) {
             ))}
             <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
                 <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
-                    <span style={{ position: "absolute", left: pos.flip ? "40%" : "60%", top: 9, fontSize: 27, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
+                    <span style={{ position: "absolute", left: pos.flip ? "33%" : "67%", top: 1, fontSize: 26, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
                     {PIG_SPRITE_URL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />
