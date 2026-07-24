@@ -16,6 +16,7 @@ import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { getGarden, farmPetCapBonus } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { farmRatingBits } from "@/lib/marketplace/farm-rating.js";
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
 // (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
@@ -228,7 +229,10 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
-    const garden = mine ? await getGarden(ownerId).catch(() => null) : null;
+    const [garden, ratingBits] = await Promise.all([
+        mine ? getGarden(ownerId).catch(() => null) : Promise.resolve(null),
+        farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
+    ]);
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
         mine,
@@ -239,6 +243,7 @@ export async function getFarm(ownerId, viewerId) {
         petGold: mine ? PET_PET_GOLD : PET_OTHER_GOLD,
         pets: mine ? pets : pets.map((p) => ({ ...p, petted: false })),
         ...extras,
+        ...ratingBits,
     };
 }
 

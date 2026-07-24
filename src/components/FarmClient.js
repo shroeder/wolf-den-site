@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import CoinCta from "@/components/CoinCta";
 import PetVisitReport from "@/components/PetVisitReport";
+import FarmRatingReport from "@/components/FarmRatingReport";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -434,6 +435,29 @@ export default function FarmClient({ initial, viewingAlias }) {
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
+
+    // Rate (like/love/admire) the farm you're visiting. Revising your rating is free; a brand-new rating spends
+    // your one daily charge. Patches the summary in place with a juicy burst.
+    const [rateBusy, setRateBusy] = useState(false);
+    const [rateBurst, setRateBurst] = useState(null); // tier just applied → one-shot burst overlay
+    const [rateNote, setRateNote] = useState(null); // e.g. "out of daily charges"
+    const rateFarmAt = useCallback(async (tier) => {
+        const R = farm.rating;
+        if (!R?.canRate || rateBusy) return;
+        if (R.myTier === tier) return; // tapping your current tier is a no-op
+        setRateBusy(true);
+        setRateNote(null);
+        const r = await post({ action: "rate", tier, owner: farm.owner?.alias });
+        setRateBusy(false);
+        if (!r?.ok) {
+            if (r?.error === "no_charge_left") setRateNote("You've used today's rating — but you can still change a rating you've already given, free.");
+            return;
+        }
+        setRateBurst({ tier, id: Date.now() });
+        setTimeout(() => setRateBurst((b) => (b && b.tier === tier ? null : b)), 950);
+        SFX.coin();
+        setFarm((f) => ({ ...f, rating: { ...f.rating, total: r.total, byTier: r.byTier, myTier: r.myTier, charge: r.charge } }));
+    }, [farm.rating, farm.owner, rateBusy, post]);
     const gardenDebug = useCallback((action) => gardenAct({ action }, action), [gardenAct]);
 
     // Logging in during rain surges every growing crop closer to harvest (server-guarded once per plot per 6h).
@@ -478,6 +502,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes crownJiggle { 0%,100% { transform: translateX(-50%) rotate(-11deg); } 50% { transform: translateX(-50%) rotate(11deg); } }
                 @keyframes coinPop { 0% { opacity: 0; transform: translate(-50%, -22px) scale(.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(360deg); } }
                 @keyframes pigPop { 0% { opacity: 0; transform: scale(.82); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+                @keyframes rateBurstAnim { 0% { transform: translate(-50%,-50%) scale(.4); opacity: 0; } 25% { opacity: 1; } 55% { transform: translate(-50%,-60%) scale(1.7); opacity: 1; } 100% { transform: translate(-50%,-140%) scale(1.9); opacity: 0; } }
+                @keyframes ratePulse { 0%,100% { transform: scale(1); } 45% { transform: scale(1.18); } }
+                @keyframes rateStars { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px) scale(1.1); } }
                 @keyframes haulShake { 0%,100% { transform: translate(0,0) } 15% { transform: translate(-6px,2px) rotate(-1deg) } 30% { transform: translate(6px,-2px) rotate(1deg) } 45% { transform: translate(-5px,1px) } 60% { transform: translate(5px,-1px) } 75% { transform: translate(-3px,1px) } 90% { transform: translate(2px,0) } }
                 @keyframes haulGlow { 0% { transform: scale(.4); opacity: .9 } 100% { transform: scale(2.4); opacity: 0 } }
                 @keyframes haulSweep { 0% { transform: translateX(-160%) skewX(-18deg) } 100% { transform: translateX(260%) skewX(-18deg) } }
@@ -507,8 +534,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
             `}</style>
 
-            {/* Welcome-back recap: who petted your pets while you were away (own farm only). */}
+            {/* Welcome-back recaps: who petted your pets + who rated your farm (own farm only). */}
             {farm.mine ? <PetVisitReport /> : null}
+            {farm.mine ? <FarmRatingReport /> : null}
 
             <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <div>
@@ -529,6 +557,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                     ) : null}
                 </div>
             </section>
+
+            {farm.rating ? (
+                <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
+            ) : null}
 
             <FarmDirectory current={viewingAlias} />
 
@@ -1006,6 +1038,80 @@ function PanelToggle({ title, open, onToggle, accent = "#e7dcc4", note = null })
             {note ? <span className="muted" style={{ fontSize: 11 }}>{note}</span> : null}
             <span aria-hidden="true" style={{ marginLeft: "auto", color: "#ffd75e", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
         </button>
+    );
+}
+
+// Farm LIKES bar — positive-only, three ascending tiers. On another member's farm the tiers are big tappable
+// buttons (your current pick glows); on your own farm it's a read-only tally of the love you've collected. New
+// ratings cost your one daily charge; revising a rating you've already given is free.
+const RATE_TIER_UI = [
+    { tier: 1, key: "like", label: "Like", icon: "👍", color: "#7ec8ff" },
+    { tier: 2, key: "love", label: "Love", icon: "❤️", color: "#ff6fae" },
+    { tier: 3, key: "admire", label: "Admire", icon: "⭐", color: "#ffd75e" },
+];
+function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
+    const { total = 0, byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
+    const rated = Boolean(myTier);
+    return (
+        <section className="card" style={{ borderColor: "rgba(255,215,94,0.4)", background: "linear-gradient(180deg, rgba(255,215,94,0.09), transparent 42%)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontWeight: 900, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                        {mine ? "🏡 Your farm's love" : `Rate ${ownerName}'s farm`}
+                        {total > 0 ? <span style={{ padding: "1px 9px", borderRadius: 999, background: "rgba(255,215,94,0.16)", border: "1px solid rgba(255,215,94,0.5)", color: "#ffd75e", fontSize: 12, fontWeight: 800 }}>{total} total</span> : null}
+                    </div>
+                    <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+                        {RATE_TIER_UI.map((t) => (
+                            <span key={t.key} title={`${byTier[t.tier]} ${t.label}${byTier[t.tier] === 1 ? "" : "s"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 800, color: byTier[t.tier] ? t.color : "#7c8088" }}>
+                                <span style={{ fontSize: 16 }}>{t.icon}</span>{byTier[t.tier]}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {mine ? (
+                <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>Visit friends&apos; farms to like theirs — you both earn XP, and they&apos;ll see who rated their place. 💛</p>
+            ) : canRate ? (
+                <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
+                        {RATE_TIER_UI.map((t) => {
+                            const active = myTier === t.tier;
+                            const bursting = burst && burst.tier === t.tier;
+                            return (
+                                <button
+                                    key={t.key}
+                                    type="button"
+                                    onClick={() => onRate(t.tier)}
+                                    disabled={busy}
+                                    aria-pressed={active}
+                                    style={{
+                                        position: "relative", overflow: "visible", padding: "12px 6px 10px", borderRadius: 14, cursor: busy ? "default" : "pointer",
+                                        border: `2px solid ${active ? t.color : "rgba(255,255,255,0.14)"}`,
+                                        background: active ? `radial-gradient(120% 100% at 50% 0%, ${t.color}33, ${t.color}12)` : "rgba(255,255,255,0.04)",
+                                        color: "inherit", fontWeight: 800, transition: "transform .12s ease, border-color .15s ease, background .15s ease",
+                                        boxShadow: active ? `0 0 0 3px ${t.color}22, 0 6px 18px ${t.color}22` : "none",
+                                        transform: active ? "translateY(-1px)" : "none",
+                                    }}
+                                >
+                                    <span style={{ display: "block", fontSize: 26, lineHeight: 1, animation: bursting ? "ratePulse .5s ease" : undefined }}>{t.icon}</span>
+                                    <span style={{ display: "block", fontSize: 12.5, marginTop: 4, color: active ? t.color : "inherit" }}>{t.label}{active ? "d ✓" : ""}</span>
+                                    {bursting ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "40%", fontSize: 30, pointerEvents: "none", animation: "rateBurstAnim .9s ease-out forwards" }}>{t.icon}</span> : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="muted" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center" }}>
+                        {rated
+                            ? "You've rated this farm — tap another tier to change it anytime, free. 💛"
+                            : charge && charge.left > 0
+                                ? `Pick a tier — you have ${charge.left} new rating${charge.left === 1 ? "" : "s"} today.`
+                                : "You've used today's new rating."}
+                    </div>
+                    {note ? <div style={{ fontSize: 11.5, marginTop: 6, textAlign: "center", color: "#ffcf6a" }}>{note}</div> : null}
+                </>
+            ) : null}
+        </section>
     );
 }
 

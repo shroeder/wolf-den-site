@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
+import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, applyRainBoost, debugGrantAllSeeds, debugGrowAll, debugGrantFertilizer } from "@/lib/marketplace/farm-crops.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -52,6 +53,7 @@ export async function POST(request) {
             }
             let res = null;
             if (b?.action === "pet") res = await petPet(buyer.id, String(b?.petId || ""), ownerId);
+            else if (b?.action === "rate") res = ownerId ? await rateFarm(buyer.id, ownerId, Number(b?.tier)) : { ok: false, error: "cant_rate_own" };
             else if (b?.action === "use_item") res = await feedPetItem(buyer.id, String(b?.petId || ""), String(b?.consumableId || ""), ownerId);
             else if (b?.action === "buy_treat") res = await buyTreat(buyer.id, String(b?.consumableId || ""));
             else if (b?.action === "recharge") res = await rechargePetting(buyer.id);
