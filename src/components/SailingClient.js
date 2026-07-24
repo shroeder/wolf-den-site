@@ -845,8 +845,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
-            {/* Boat upgrades — 4 travel/loot levers. Buying any of them levels the boat; every 10 levels = new form. */}
-            <section className="card">
+            {/* Boat upgrades — SEA-themed (blue) so it's visually distinct from the earthy digging section below. */}
+            <section className="card" style={{ borderColor: "rgba(96,170,255,0.45)", background: "linear-gradient(180deg, rgba(70,130,220,0.08), transparent 40%)" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(96,170,255,0.16)", border: "1px solid rgba(96,170,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛵ Sailing</div>
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels your boat ⭐ — every 10 levels it takes a new form and unlocks a perk. (Digging doesn&apos;t level the boat.)</p>
                 <div className="sail-upgrades is-boat">
@@ -870,8 +871,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
-            {/* Excavation — the digging upgrade system (separate from the boat). */}
-            <section className="card">
+            {/* Excavation — EARTH-themed (amber) so the digging system reads as clearly separate from sailing. */}
+            <section className="card" style={{ borderColor: "rgba(214,158,80,0.5)", background: "linear-gradient(180deg, rgba(180,120,50,0.1), transparent 40%)" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(214,158,80,0.16)", border: "1px solid rgba(214,158,80,0.5)", color: "#e6b878", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛏️ Digging</div>
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Tools below unlock with <b>🎁 {state.digTools?.chestPoints ?? 0} chests unlocked</b> (earned forging chests — bigger chests count more){state.digTools?.nextUnlock ? <> · next: <b>{state.digTools.nextUnlock.name}</b> at {state.digTools.nextUnlock.unlockPoints}</> : ""}.</p>
                 <div className="sail-upgrades is-dig">

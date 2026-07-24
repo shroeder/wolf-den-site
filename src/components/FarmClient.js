@@ -623,7 +623,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         })}
 
                         {/* The farmer (farm owner) strolls their pasture — tap to connect */}
-                        {farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} onTap={() => setOwnerMenu(true)} /> : null}
+                        {farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} onTap={() => setOwnerMenu(true)} /> : null}
 
                         {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
                         {pig === "running" ? <LootPig onFinish={onPigFinish} /> : null}
@@ -789,15 +789,15 @@ function LootPig({ onFinish }) {
 
 // The farm owner's avatar strolling their own pasture. Taps open a connect menu (profile / message / trade /
 // add friend). On your OWN farm it's just you (tap → your profile).
-function OwnerWalker({ owner, mine, onTap }) {
-    const [pos, setPos] = useState({ x: 20, y: 86, flip: false, dur: 3, moving: false });
+function OwnerWalker({ owner, mine, minX = FARM_PAD, onTap }) {
+    const [pos, setPos] = useState({ x: Math.max(20, minX + 8), y: 86, flip: false, dur: 3, moving: false });
     useEffect(() => {
         let alive = true;
         const timers = [];
         const glide = (dur) => { timers.push(setTimeout(() => { if (alive) setPos((p) => ({ ...p, moving: false })); }, dur * 1000)); };
         const step = () => {
             if (!alive) return;
-            const nx = rand(10, 88);
+            const nx = rand(minX, 94); // stay right of the garden plots (penned like the pets)
             const dur = rand(2.6, 4.2);
             setPos((p) => ({ x: nx, y: 82 + rand(0, 8), flip: nx < p.x, dur, moving: true }));
             glide(dur);
@@ -805,7 +805,7 @@ function OwnerWalker({ owner, mine, onTap }) {
         };
         timers.push(setTimeout(step, 900));
         return () => { alive = false; timers.forEach(clearTimeout); };
-    }, []);
+    }, [minX]);
     const flip = Boolean(pos.flip) !== Boolean(owner.avatarFlip);
     return (
         <button
@@ -815,8 +815,8 @@ function OwnerWalker({ owner, mine, onTap }) {
             style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s linear, top ${pos.dur}s linear`, background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(pos.y) + 1 }}
         >
             <span style={{ position: "relative", display: "block", width: 66, height: 66, margin: "0 auto" }}>
-                <span className={pos.moving ? "farm-shadow-hop" : ""} style={{ position: "absolute", left: "50%", bottom: -2, width: 46, height: 10, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0 }} />
-                <span className={pos.moving ? "farm-hop" : "farm-idle"} style={{ position: "absolute", inset: 0, display: "block" }}>
+                <span className={pos.moving ? "farm-shadow-hop" : ""} style={{ position: "absolute", left: "50%", bottom: -2, width: 46, height: 10, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0, animationDuration: pos.moving ? "480ms" : undefined }} />
+                <span className={pos.moving ? "farm-hop" : "farm-idle"} style={{ position: "absolute", inset: 0, display: "block", animationDuration: pos.moving ? "480ms" : undefined }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={owner.avatarUrl} alt={owner.name} width={66} height={66} style={{ width: 66, height: 66, objectFit: "contain", transform: flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.5))" }} />
                 </span>
@@ -1085,14 +1085,19 @@ function SeedPickerModal({ garden, slot, busy, onPick, onClose }) {
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Plant a seed" style={{ width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
-                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>Pick a seed to sow — it&apos;ll sprout right in the field.</div>
+                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>Rarer seeds take longer, sell for more, and roll better harvest loot. Here&apos;s what each one pays out:</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {bag.length ? bag.map((s) => (
                         <button key={s.id} type="button" disabled={Boolean(busy)} onClick={() => onPick(slot, s.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
                             <span style={{ fontSize: 26 }}>{s.emoji}</span>
-                            <span style={{ flex: 1 }}>
+                            <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ display: "block", fontSize: 13.5, fontWeight: 800 }}>{s.name} <span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span></span>
-                                <span className="muted" style={{ fontSize: 11.5 }}>⏳ {Math.round(s.growMin / 60)}h · 🪙 {s.sell.toLocaleString()}{s.loot ? ` · 🎁 ${s.loot}` : ""}</span>
+                                <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 8px", marginTop: 4, fontSize: 11.5 }}>
+                                    <span style={{ color: "#ffd75e", fontWeight: 700 }}>🪙 {s.sell.toLocaleString()} gold</span>
+                                    <span style={{ color: "#8fd8ff", fontWeight: 700 }}>✨ {s.xp} XP</span>
+                                    <span className="muted">⏳ {Math.round(s.growMin / 60)}h grow</span>
+                                    {s.loot ? <span style={{ color: RARITY_RING[s.rarity] || "#cdd9c6", fontWeight: 700 }}>🎁 {s.loot}</span> : null}
+                                </span>
                             </span>
                         </button>
                     )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds yet — find them across the games (boss, sailing, chests…).</div>}
