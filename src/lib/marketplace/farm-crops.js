@@ -23,19 +23,19 @@ export const SEEDS = {
     // Each crop sells for gold + player XP; its `yield` is a SIGNATURE bonus that feeds a different system, so
     // what you plant depends on what you need — cash, pet treats, XP, wheel spins, chests, or more seeds.
     // Common — quick, cheap, found from everyday actions (the daily grind).
-    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 90, sell: 140, xp: 12, rarity: "common", role: "Fast cash" },
-    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 180, sell: 300, xp: 20, rarity: "common", role: "Cash + a pet treat", yield: { type: "treat", id: "treat_bone", n: 1 } },
-    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 240, sell: 440, xp: 28, rarity: "common", role: "Bulk cash" },
+    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 90, sell: 45, xp: 6, rarity: "common", role: "Fast cash" },
+    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 180, sell: 95, xp: 10, rarity: "common", role: "Cash + a pet treat", yield: { type: "treat", id: "treat_bone", n: 1 } },
+    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 240, sell: 140, xp: 14, rarity: "common", role: "Bulk cash" },
     // Rare — a few hours; from digs, raids, iron chests.
-    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 640, xp: 40, rarity: "rare", role: "Pet treats", yield: { type: "treat", id: "treat_snack", n: 2 } },
-    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 940, xp: 56, rarity: "rare", role: "Player XP", yield: { type: "xp", amount: 220 } },
+    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 200, xp: 20, rarity: "rare", role: "Pet treat", yield: { type: "treat", id: "treat_snack", n: 1 } },
+    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 300, xp: 26, rarity: "rare", role: "Player XP", yield: { type: "xp", amount: 90 } },
     // Epic — half a day; from raids, gold chests, boss kills.
-    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 1600, xp: 82, rarity: "epic", role: "Wheel spins", yield: { type: "spin", n: 2 } },
-    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 2600, xp: 130, rarity: "epic", role: "Guaranteed chest", yield: { type: "chest", tier: "iron" } },
+    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 480, xp: 40, rarity: "epic", role: "A wheel spin", yield: { type: "spin", n: 1 } },
+    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 780, xp: 62, rarity: "epic", role: "Guaranteed chest", yield: { type: "chest", tier: "wooden" } },
     // Legendary — overnight; from gold chests + boss kills only.
-    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 5200, xp: 270, rarity: "legendary", role: "Premium cash + top chest odds" },
+    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 1500, xp: 130, rarity: "legendary", role: "Premium cash + top chest odds" },
     // Mythic — a day and a half; the jackpot, only from the very best sources.
-    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 12000, xp: 640, rarity: "mythic", role: "Jackpot: bonus seeds", yield: { type: "seed", n: 2 } },
+    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 3600, xp: 300, rarity: "mythic", role: "Jackpot: bonus seeds", yield: { type: "seed", n: 2 } },
 };
 // Short human line for a crop's signature yield (seed picker + harvest toast).
 export function yieldText(seed) {
