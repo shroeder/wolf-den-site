@@ -76,6 +76,33 @@ export async function sendDmNotificationEmail(email, { senderName = "Someone", p
     return true;
 }
 
+// Nudge a vendor (by email) to list their items — sent by an admin from the marketplace admin app. Best-effort.
+export async function sendVendorListingNudgeEmail(email, { name = "", listingCount = 0, note = "" } = {}) {
+    if (!email || !process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    const hi = name ? `Hey ${name},` : "Hey,";
+    const portalUrl = `${baseUrl()}/marketplace/vendor`;
+    const headline = listingCount > 0
+        ? `You've got ${listingCount} listing${listingCount === 1 ? "" : "s"} up — buyers are browsing, and more listings mean more sales.`
+        : `Buyers are browsing the marketplace right now — but you don't have any items listed yet.`;
+    await resend.emails.send({
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: "Got cards to sell? List them on The Wolf Den marketplace",
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;">
+                <p>${hi}</p>
+                <p>${headline}</p>
+                ${note ? `<p style="color:#555;border-left:3px solid #d4af37;padding-left:12px;">${note.replace(/</g, "&lt;")}</p>` : ""}
+                <p>Listing takes a minute — scan a barcode or search the catalog, set your price, and you're live in front of every buyer in the pack. 🐺</p>
+                <p><a href="${portalUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">List your items →</a></p>
+                <p style="color:#888;font-size:12px;">Sent by The Wolf Den. Reply to this email if you need a hand getting set up.</p>
+            </div>
+        `,
+    });
+    return true;
+}
+
 // Notify a member (by email) of a friend request while away. Best-effort.
 export async function sendFriendRequestEmail(email, { requesterName = "Someone", name = "" } = {}) {
     if (!email || !process.env.RESEND_API_KEY) return false;
