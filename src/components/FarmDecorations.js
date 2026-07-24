@@ -4,6 +4,91 @@ import { useRef, useState } from "react";
 
 const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8" };
 
+// ── Decorate DOCK: a bottom tray you drag decorations OUT of, straight onto the farm scene (which stays fully
+// visible above it). Drag a chip up, release over the field → it drops there. Also carries the placed-count,
+// a Shop button, and Done. This is the "grab from a drawer while watching the farm" flow.
+export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onOpenShop, onDone }) {
+    const { owned = [], placedTotal = 0, placedCap = 500 } = deco || {};
+    const [drag, setDrag] = useState(null); // { decoId, emoji, spriteUrl, x, y, pointerId, ok }
+    const atCap = placedTotal >= placedCap;
+
+    const insideField = (cx, cy) => {
+        const r = fieldRef?.current?.getBoundingClientRect();
+        return r ? cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom : false;
+    };
+    const startDrag = (e, o) => {
+        if (atCap || busy) return;
+        e.preventDefault();
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
+        setDrag({ decoId: o.id, emoji: o.emoji, spriteUrl: o.spriteUrl, x: e.clientX, y: e.clientY, pointerId: e.pointerId, ok: false });
+    };
+    const onMove = (e) => {
+        setDrag((d) => (d && e.pointerId === d.pointerId ? { ...d, x: e.clientX, y: e.clientY, ok: insideField(e.clientX, e.clientY) } : d));
+    };
+    const endDrag = (e) => {
+        setDrag((d) => {
+            if (!d || e.pointerId !== d.pointerId) return d;
+            const r = fieldRef?.current?.getBoundingClientRect();
+            if (r && insideField(e.clientX, e.clientY)) {
+                const xPct = ((e.clientX - r.left) / r.width) * 100;
+                const yPct = ((e.clientY - r.top) / r.height) * 100;
+                onPlaceAt(d.decoId, xPct, yPct);
+            }
+            return null;
+        });
+    };
+
+    return (
+        <>
+            {/* drag ghost following the finger; green when it's over a droppable spot */}
+            {drag ? (
+                <div style={{ position: "fixed", left: drag.x, top: drag.y, transform: "translate(-50%, -80%)", zIndex: 10060, pointerEvents: "none", opacity: 0.9, filter: drag.ok ? "drop-shadow(0 0 6px #7ed57e)" : "none" }}>
+                    {drag.spriteUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={drag.spriteUrl} alt="" width={54} height={54} style={{ width: 54, height: 54, objectFit: "contain" }} />
+                    ) : <span style={{ fontSize: 40 }}>{drag.emoji}</span>}
+                </div>
+            ) : null}
+
+            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10040, background: "rgba(18,24,16,0.98)", borderTop: "2px solid #7ed57e", boxShadow: "0 -10px 30px rgba(0,0,0,0.55)", paddingBottom: "max(6px, env(safe-area-inset-bottom))" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px 2px" }}>
+                    <strong style={{ fontSize: 14 }}>🎀 Decorating</strong>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
+                    <span style={{ marginLeft: "auto" }} />
+                    <button type="button" onClick={onOpenShop} style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(255,214,110,0.5)", background: "rgba(255,214,110,0.12)", color: "#ffd75e", fontWeight: 800, fontSize: 12.5, cursor: "pointer" }}>🛒 Shop</button>
+                    <button type="button" onClick={onDone} style={{ padding: "6px 14px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer" }}>✓ Done</button>
+                </div>
+                <div style={{ fontSize: 10.5, color: "#9fbf9f", padding: "0 12px 6px" }}>
+                    {atCap ? "Farm full (500 placed) — pick some up to add more." : "Drag a decoration up onto your farm. Drag placed ones to move them; tap ✕ to pick one up."}
+                </div>
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 12px 10px", WebkitOverflowScrolling: "touch" }}>
+                    {owned.length === 0 ? (
+                        <button type="button" onClick={onOpenShop} style={{ padding: "12px 18px", borderRadius: 12, border: "none", fontWeight: 900, fontSize: 13, cursor: "pointer", background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", whiteSpace: "nowrap" }}>🛒 Get your first decoration</button>
+                    ) : owned.map((o) => (
+                        <div
+                            key={o.id}
+                            onPointerDown={(e) => startDrag(e, o)}
+                            onPointerMove={onMove}
+                            onPointerUp={endDrag}
+                            title={`Drag ${o.name} onto your farm`}
+                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", touchAction: "none", cursor: atCap ? "default" : "grab", opacity: atCap ? 0.5 : 1, userSelect: "none" }}
+                        >
+                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `1px solid ${(RARITY_RING[o.rarity] || "#555")}66` }}>
+                                {o.spriteUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={o.spriteUrl} alt="" width={48} height={48} style={{ width: 48, height: 48, objectFit: "contain", pointerEvents: "none" }} />
+                                ) : <span style={{ fontSize: 30, pointerEvents: "none" }}>{o.emoji}</span>}
+                            </span>
+                            <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#dfeede", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
+                            {o.placed ? <span style={{ display: "block", fontSize: 9, color: "#a7e6a7" }}>{o.placed} out</span> : null}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </>
+    );
+}
+
 // ── Scene layer: renders a member's PLACED decorations inside the pasture field. On your own farm, toggling
 // "edit" makes them draggable (pointer drag maps to field %) and shows a pick-up ✕. Read-only elsewhere.
 export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onPickup }) {
@@ -73,8 +158,8 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
 
 // ── Manager drawer: your decoration inventory (place) + the shop (buy) + a live buff summary. Opened from the
 // farm's "Decorate" button. Placing drops the piece into an open spot on the right of the field; drag to move.
-export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy, onPlace, onClose }) {
-    const [tab, setTab] = useState("mine");
+export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy, onPlace, onClose, initialTab = "mine" }) {
+    const [tab, setTab] = useState(initialTab);
     const { owned = [], shop = [], buffs = {}, buffMeta = {}, placedTotal = 0, placedCap = 500 } = deco || {};
     const activeBuffs = Object.entries(buffs).filter(([, v]) => v > 0);
     const atCap = placedTotal >= placedCap;

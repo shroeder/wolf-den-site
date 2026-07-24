@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import CoinCta from "@/components/CoinCta";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
-import { DecoLayer, DecoManager } from "@/components/FarmDecorations";
+import { DecoLayer, DecoManager, DecoDock } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
@@ -481,9 +481,18 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [post]);
     const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
     const decoPlace = useCallback((decoId) => { decoAct({ action: "deco_place", decoId, x: 52 + Math.random() * 36, y: 26 + Math.random() * 38 }); setDecoEditing(true); }, [decoAct]);
+    const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y }), [decoAct]);
     const decoMove = useCallback((placementId, x, y) => decoAct({ action: "deco_move", placementId, x, y }), [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
     const fieldRef = useRef(null);
+    // "Decorate" opens a bottom DOCK (farm scene stays visible; drag decorations up onto it) rather than a modal.
+    const [decorating, setDecorating] = useState(false);
+    const startDecorating = useCallback(() => {
+        setDecorating(true);
+        setDecoEditing(true);
+        setTimeout(() => { try { fieldRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ } }, 60);
+    }, []);
+    const stopDecorating = useCallback(() => { setDecorating(false); setDecoEditing(false); }, []);
     const gardenDebug = useCallback((action) => gardenAct({ action }, action), [gardenAct]);
 
     // Logging in during rain surges every growing crop closer to harvest (server-guarded once per plot per 6h).
@@ -574,7 +583,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     {farm.mine && farm.decorations ? (
-                        <button type="button" className="farm-jbtn" onClick={() => setDecoOpen(true)}>🎀 Decorate</button>
+                        <button type="button" className="farm-jbtn" onClick={decorating ? stopDecorating : startDecorating}>{decorating ? "✓ Done" : "🎀 Decorate"}</button>
                     ) : null}
                     {farm.mine ? (
                         <button type="button" onClick={spawnPigDebug} disabled={Boolean(pig)} title="Owner debug: force-spawn the Loot Pig now (repeatable)" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pig ? "default" : "pointer", opacity: pig ? 0.5 : 1 }}>
@@ -745,12 +754,25 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             ) : null}
 
+            {/* Decorate DOCK: bottom tray you drag decorations out of, onto the (still-visible) farm scene. */}
+            {decorating && farm.mine && farm.decorations ? (
+                <DecoDock
+                    deco={farm.decorations}
+                    fieldRef={fieldRef}
+                    busy={decoBusy}
+                    onPlaceAt={decoPlaceAt}
+                    onOpenShop={() => setDecoOpen(true)}
+                    onDone={stopDecorating}
+                />
+            ) : null}
+
             {decoOpen && farm.mine && farm.decorations ? (
                 <DecoManager
                     deco={farm.decorations}
                     gold={farm.wallet?.gold || 0}
                     busy={decoBusy}
                     editing={decoEditing}
+                    initialTab="shop"
                     onToggleEdit={() => setDecoEditing((v) => !v)}
                     onBuy={decoBuy}
                     onPlace={decoPlace}
