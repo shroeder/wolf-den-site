@@ -9,14 +9,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // A canned report so the owner can preview the modal on demand (it normally only appears after a real raid).
+// 10 attackers on purpose, so the owner can test how a long list scrolls inside the modal.
+const PREVIEW_NAMES = ["Nynebreaker", "Ironhowl", "Snappy", "Direfang", "Emberpaw", "Stormjaw", "Ashenclaw", "Grimtail", "Frostmane", "Nightbite"];
 const PREVIEW_REPORT = {
     preview: true,
-    totalWins: 5,
-    totalGold: 1240,
-    defenses: [
-        { attacker: { name: "Nynebreaker", level: 14, avatarUrl: null, avatarFlip: false }, count: 3, gold: 820, gear: [{ name: "Rune Blade", rarity: "epic" }] },
-        { attacker: { name: "Ironhowl", level: 9, avatarUrl: null, avatarFlip: false }, count: 2, gold: 420, gear: [] },
-    ],
+    totalWins: 27,
+    totalGold: 6420,
+    defenses: PREVIEW_NAMES.map((name, i) => ({
+        attacker: { name, level: 6 + ((i * 3) % 12), avatarUrl: null, avatarFlip: i % 2 === 0 },
+        count: 1 + ((i * 2) % 4),
+        gold: 240 + i * 130,
+        gear: i % 3 === 0 ? [{ name: ["Rune Blade", "Frost Brand", "Dragonplate", "Void Maelstrom"][i % 4], rarity: ["epic", "rare", "legendary", "mythic"][i % 4] }] : [],
+    })),
 };
 
 // The "you got raided (and won)" welcome-back report. Fetching it marks the entries seen, so it pops once.

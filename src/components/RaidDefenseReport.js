@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import useScrollLock from "@/lib/useScrollLock";
+
 const RARITY_COL = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8", ascendant: "#ff7a3c", eternal: "#22e0c8" };
 
 // "You got raided (and won)" welcome-back report. Self-fetches once on mount; if any raids were repelled since
@@ -10,6 +12,7 @@ const RARITY_COL = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legend
 export default function RaidDefenseReport({ owner = false }) {
     const [report, setReport] = useState(null);
     const [open, setOpen] = useState(false);
+    useScrollLock(open); // lock the background from scrolling while the report is up
     useEffect(() => {
         let alive = true;
         fetch("/api/marketplace/raid-defense", { cache: "no-store" })

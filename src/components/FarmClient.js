@@ -999,12 +999,10 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
 }
 
 function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
-    const [showUpg, setShowUpg] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
     const g = garden;
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
     const canBuyFert = g.gold >= g.fertilizerPrice;
-    const upgradesMaxed = (g.upgrades || []).filter((u) => u.cost == null).length;
     return (
         <section className="card" style={{ borderColor: g.readyCount ? "rgba(120,220,120,0.5)" : undefined }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1032,43 +1030,38 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
                 </div>
             </div>
 
-            {/* Fertilizer */}
-            <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 20 }} aria-hidden="true">💧</span>
-                <span style={{ flex: 1, minWidth: 140 }}>
-                    <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>Fertilizer</span>
-                    <span className="muted" style={{ fontSize: 11 }}>tap a growing crop to spend one — cuts 40% off its grow time.</span>
+            {/* Fertilizer — juiced card */}
+            <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 14, background: "linear-gradient(180deg, rgba(120,200,255,0.13), rgba(255,255,255,0.02))", border: "1px solid rgba(120,200,255,0.4)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 30, filter: "drop-shadow(0 2px 5px rgba(120,200,255,0.55))", animation: "farmBob 2.8s ease-in-out infinite" }} aria-hidden="true">💧</span>
+                <span style={{ flex: 1, minWidth: 150 }}>
+                    <span style={{ display: "block", fontWeight: 800, fontSize: 14 }}>Fertilizer <span style={{ color: "#9fd0ff" }}>· {g.fertilizer} in stock</span></span>
+                    <span className="muted" style={{ fontSize: 11.5 }}>Tap a growing crop to spend one — instantly cuts <b style={{ color: "#cfe8ff" }}>40%</b> off its grow time.</span>
                 </span>
-                <button type="button" onClick={onBuyFertilizer} disabled={busy || !canBuyFert} style={{ padding: "7px 12px", borderRadius: 10, border: "none", background: canBuyFert ? "#ffd75e" : "rgba(255,255,255,0.1)", color: canBuyFert ? "#2a2410" : "inherit", fontSize: 12, fontWeight: 800, cursor: canBuyFert ? "pointer" : "default", whiteSpace: "nowrap", opacity: canBuyFert ? 1 : 0.6 }}>🪙 Buy · {g.fertilizerPrice}g</button>
+                <button type="button" onClick={onBuyFertilizer} disabled={busy || !canBuyFert} style={{ padding: "9px 14px", borderRadius: 11, border: "none", background: canBuyFert ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.1)", color: canBuyFert ? "#3a2c08" : "inherit", fontSize: 13, fontWeight: 900, cursor: canBuyFert ? "pointer" : "default", whiteSpace: "nowrap", opacity: canBuyFert ? 1 : 0.6, boxShadow: canBuyFert ? "0 3px 0 #b57f22" : "none" }}>🪙 Buy · {g.fertilizerPrice}g</button>
             </div>
 
-            {/* Upgrades (collapsible) */}
-            <PanelToggle title="⬆️ Farm upgrades" open={showUpg} onToggle={() => setShowUpg((v) => !v)} accent="#e7dcc4" note={`${(g.upgrades || []).length - upgradesMaxed} available`} />
-            {showUpg ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8 }}>
+            {/* Farm upgrades — expanded, styled like the SHIP upgrades so the whole game reads consistently. */}
+            <div style={{ marginTop: 16 }}>
+                <h3 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⬆️ Farm upgrades</h3>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Spend gold to grow faster, find more seeds, raise the petting cap, and pull better loot from every harvest.</p>
+                <div className="sail-upgrades is-boat">
                     {g.upgrades.map((u) => {
                         const affordable = u.cost != null && g.gold >= u.cost;
                         return (
-                            <div key={u.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${u.cost == null ? "rgba(255,215,94,0.35)" : "rgba(255,255,255,0.1)"}` }}>
-                                <span style={{ fontSize: 20 }} aria-hidden="true">{u.emoji}</span>
-                                <span style={{ flex: 1, minWidth: 0 }}>
-                                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 700 }}>{u.name}</span>
-                                    <span className="muted" style={{ fontSize: 11 }}>{u.desc}</span>
-                                    {/* level pips */}
-                                    <span style={{ display: "inline-flex", gap: 3, marginTop: 4 }} aria-label={`Level ${u.level} of ${u.max}`}>
-                                        {Array.from({ length: u.max }, (_, i) => (
-                                            <span key={i} style={{ width: 12, height: 5, borderRadius: 3, background: i < u.level ? "#ffd75e" : "rgba(255,255,255,0.14)" }} />
-                                        ))}
-                                    </span>
-                                </span>
-                                {u.cost == null ? <span style={{ fontSize: 11, fontWeight: 800, color: "#ffd75e" }}>★ MAX</span> : (
-                                    <button type="button" onClick={() => onUpgrade(u.key)} disabled={busy || !affordable} style={{ padding: "7px 11px", borderRadius: 10, border: "none", background: affordable ? "#ffd75e" : "rgba(255,255,255,0.1)", color: affordable ? "#2a2410" : "inherit", fontSize: 11.5, fontWeight: 800, cursor: affordable ? "pointer" : "default", whiteSpace: "nowrap", opacity: affordable ? 1 : 0.6 }}>🪙 {u.cost.toLocaleString()}</button>
-                                )}
+                            <div className={`sail-upg${u.cost == null ? " is-maxed" : ""}`} key={u.key}>
+                                <div className="sail-upg-top">
+                                    <span className="sail-upg-title"><span className="sail-upg-ico">{u.emoji}</span>{u.name}</span>
+                                    <span className="muted sail-upg-lv">Lv {u.level}/{u.max}</span>
+                                </div>
+                                <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.max ? Math.min(100, (u.level / u.max) * 100) : 0}%` }} /></div>
+                                <p className="muted sail-upg-desc">{u.desc}</p>
+                                {u.cost == null ? <button className="pill" disabled>✓ Maxed</button>
+                                    : <button className="btn-ghost sail-upg-buy" disabled={busy || !affordable} onClick={() => onUpgrade(u.key)}>🪙 {u.cost.toLocaleString()}</button>}
                             </div>
                         );
                     })}
                 </div>
-            ) : null}
+            </div>
 
             {/* Owner debug (collapsible) */}
             <PanelToggle title="🛠️ Debug · seeds & growth" open={showDebug} onToggle={() => setShowDebug((v) => !v)} accent="#ffd75e" note="owner-only" />
