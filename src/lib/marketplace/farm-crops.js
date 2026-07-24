@@ -171,7 +171,7 @@ export async function getGarden(buyerId) {
         if (ready) readyCount += 1;
         gardenPlots.push({
             slot: i, empty: false, seedId: p.seed_id, name: def?.name || p.seed_id, emoji: def?.emoji || "🌱",
-            sprout: def?.sprout || "🌱", sell: def?.sell || 0, rarity: def?.rarity || "common",
+            sprout: def?.sprout || "🌱", sell: def?.sell || 0, xp: def?.xp || 0, loot: LOOT_LABEL[def?.rarity] || null, rarity: def?.rarity || "common",
             plantedAt: new Date(p.planted_at).toISOString(), readyAt: new Date(p.ready_at).toISOString(),
             ready, secondsLeft: Math.max(0, Math.round((readyMs - now) / 1000)), fertilized: p.fertilized,
         });

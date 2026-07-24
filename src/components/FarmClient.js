@@ -212,6 +212,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [garden, setGarden] = useState(initial.garden || null);
     const [gardenBusy, setGardenBusy] = useState(null);
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
+    const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
     const rainedRef = useRef(false);
 
@@ -243,7 +244,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -260,7 +261,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -567,7 +568,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                 busy={gardenBusy}
                                 onPlant={(slot) => setPlanting(slot)}
                                 onHarvest={harvestAt}
-                                onFertilize={fertilizeAt}
+                                onInspect={(slot) => setInspectSlot(slot)}
                             />
                         ) : null}
 
@@ -664,6 +665,18 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {planting != null && garden ? (
                 <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} onPick={plantSeedAt} onClose={() => setPlanting(null)} />
+            ) : null}
+
+            {inspectSlot != null && garden ? (
+                <PlotInspectModal
+                    garden={garden}
+                    slot={inspectSlot}
+                    busy={gardenBusy}
+                    onFertilize={fertilizeAt}
+                    onBuyFertilizer={buyFert}
+                    onHarvest={harvestAt}
+                    onClose={() => setInspectSlot(null)}
+                />
             ) : null}
 
             {harvestToast ? <HarvestToast toast={harvestToast} onClose={() => setHarvestToast(null)} /> : null}
@@ -891,7 +904,7 @@ const fmtGrow = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 
 // LEFT of the (scrolling) field. They're part of the world, so they scroll with everything else; the pets are
 // penned to the right, so they never trample the crops. Each plant sprouts from its mound and grows taller
 // over real time, ripening (swap to the crop, glow + bob) when ready. Tap a plot to plant / fertilize / harvest.
-function ScenePlots({ garden, busy, onPlant, onHarvest, onFertilize }) {
+function ScenePlots({ garden, busy, onPlant, onHarvest, onInspect }) {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
     const plots = garden.plots || [];
@@ -908,8 +921,8 @@ function ScenePlots({ garden, busy, onPlant, onHarvest, onFertilize }) {
                 return (
                     <ScenePlot
                         key={p.slot} p={p} left={left} top={top} now={now} busy={busy}
-                        totalSeeds={totalSeeds} fertilizer={garden.fertilizer}
-                        onPlant={onPlant} onHarvest={onHarvest} onFertilize={onFertilize}
+                        totalSeeds={totalSeeds}
+                        onPlant={onPlant} onHarvest={onHarvest} onInspect={onInspect}
                     />
                 );
             })}
@@ -917,7 +930,7 @@ function ScenePlots({ garden, busy, onPlant, onHarvest, onFertilize }) {
     );
 }
 
-function ScenePlot({ p, left, top, now, busy, totalSeeds, fertilizer, onPlant, onHarvest, onFertilize }) {
+function ScenePlot({ p, left, top, now, busy, totalSeeds, onPlant, onHarvest, onInspect }) {
     const empty = p.empty;
     let progress = 1; let ready = false; let secsLeft = 0;
     if (!empty) {
@@ -929,17 +942,16 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, fertilizer, onPlant, o
     }
     const busyHere = busy === `h-${p.slot}` || busy === `p-${p.slot}` || busy === `f-${p.slot}`;
     const canPlant = empty && totalSeeds > 0;
-    const canFertilize = !empty && !ready && fertilizer > 0 && !p.fertilized;
-    const tappable = canPlant || ready || canFertilize;
+    const tappable = empty ? canPlant : true; // growing/ready plots are always tappable
     const onClick = () => {
         if (busyHere) return;
         if (empty) { if (canPlant) onPlant(p.slot); return; }
         if (ready) onHarvest(p.slot);
-        else if (canFertilize) onFertilize(p.slot);
+        else onInspect(p.slot); // growing → open the inspect modal (don't silently fertilize)
     };
     const plantScale = ready ? 1 : 0.4 + 0.6 * progress; // grows from a seedling as it matures
     const title = empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — find seeds across the games")
-        : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left${canFertilize ? " · tap to fertilize" : ""}`;
+        : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
     return (
         <button type="button" onClick={onClick} title={title}
             style={{ position: "absolute", left: `${left}%`, top: `${top}%`, transform: "translate(-50%, -100%)", width: 56, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default", zIndex: Math.round(top) }}>
@@ -1104,6 +1116,80 @@ function SeedPickerModal({ garden, slot, busy, onPick, onClose }) {
                 </div>
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Cancel</button>
             </div>
+        </div>
+    );
+}
+
+// Tap a growing crop → this modal tells you what it is, when it's ready, and exactly what to expect at harvest
+// (gold, XP, loot tier). From here you can spend fertilizer to speed it up, buy more fertilizer, or (once ripe)
+// harvest — but a plain tap never silently burns fertilizer anymore.
+function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, onHarvest, onClose }) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+    const p = (garden.plots || []).find((x) => x.slot === slot);
+    // Plot was harvested/removed out from under us (e.g. a rain surge finished it) → nothing to inspect.
+    useEffect(() => { if (!p || p.empty) onClose(); }, [p, onClose]);
+    if (!p || p.empty) return null;
+
+    const secsLeft = Math.max(0, Math.round((new Date(p.readyAt).getTime() - now) / 1000));
+    const ready = secsLeft <= 0;
+    const ring = RARITY_RING[p.rarity] || "#8fbf6a";
+    const canFertilize = !ready && garden.fertilizer > 0 && !p.fertilized;
+    const canBuyFert = garden.gold >= garden.fertilizerPrice;
+    const fBusy = busy === `f-${slot}`;
+    const hBusy = busy === `h-${slot}`;
+
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${p.name} crop`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
+                <div style={{ padding: "18px 18px 12px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}33, transparent 70%)` }}>
+                    <div style={{ fontSize: 46, lineHeight: 1 }}>{ready ? p.emoji : p.sprout}</div>
+                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 6 }}>{p.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize", marginTop: 2 }}>{p.rarity}{p.fertilized ? " · 💧 fertilized" : ""}</div>
+                    <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                        {ready ? "🌟 Ready to harvest!" : <>⏳ <strong style={{ color: "#f2f6ee" }}>{fmtGrow(secsLeft)}</strong> until ripe</>}
+                    </div>
+                </div>
+                <div style={{ padding: "6px 16px 4px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", color: "#9aa0a6", margin: "6px 2px 8px" }}>Expected harvest</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <ExpectStat icon="🪙" value={(p.sell || 0).toLocaleString()} label="gold" accent="#ffd75e" />
+                        <ExpectStat icon="✨" value={`+${(p.xp || 0).toLocaleString()}`} label="XP" accent="#8cd0ff" />
+                    </div>
+                    {p.loot ? (
+                        <div style={{ marginTop: 8, padding: "9px 12px", borderRadius: 11, background: `${ring}1f`, border: `1px solid ${ring}80`, display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700 }}>
+                            <span style={{ fontSize: 16 }}>🎁</span><span>Chance at <strong style={{ color: ring }}>{p.loot}</strong> on harvest</span>
+                        </div>
+                    ) : null}
+                </div>
+                <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {ready ? (
+                        <button type="button" onClick={() => { onHarvest(slot); onClose(); }} disabled={hBusy} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#43d98a,#2fae72)", color: "#06311f", border: "none", borderRadius: 11, cursor: hBusy ? "default" : "pointer", boxShadow: "0 3px 0 #1c7a4f", opacity: hBusy ? 0.6 : 1 }}>🧺 Harvest now</button>
+                    ) : (
+                        <>
+                            <button type="button" onClick={() => onFertilize(slot)} disabled={!canFertilize || fBusy} title={p.fertilized ? "Already fertilized" : garden.fertilizer <= 0 ? "No fertilizer in stock" : ""} style={{ width: "100%", padding: 12, fontWeight: 900, background: canFertilize ? "linear-gradient(180deg,#8cc7ff,#4a93e0)" : "rgba(255,255,255,0.08)", color: canFertilize ? "#052540" : "inherit", border: "none", borderRadius: 11, cursor: canFertilize && !fBusy ? "pointer" : "default", boxShadow: canFertilize ? "0 3px 0 #2f6bb0" : "none", opacity: canFertilize && !fBusy ? 1 : 0.55 }}>
+                                💧 {p.fertilized ? "Already fertilized" : "Fertilize · speed up growth"}
+                                {!p.fertilized && garden.fertilizer > 0 ? <span style={{ fontWeight: 700, opacity: 0.8 }}> ({garden.fertilizer} left)</span> : null}
+                            </button>
+                            {!p.fertilized && garden.fertilizer <= 0 ? (
+                                <button type="button" onClick={onBuyFertilizer} disabled={!canBuyFert || busy === "fbuy"} style={{ width: "100%", padding: 11, fontWeight: 900, background: canBuyFert ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.08)", color: canBuyFert ? "#3a2c08" : "inherit", border: "none", borderRadius: 11, cursor: canBuyFert && busy !== "fbuy" ? "pointer" : "default", boxShadow: canBuyFert ? "0 3px 0 #b57f22" : "none", opacity: canBuyFert && busy !== "fbuy" ? 1 : 0.55 }}>🪙 Buy fertilizer · {garden.fertilizerPrice}g</button>
+                            ) : null}
+                        </>
+                    )}
+                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// One "expected harvest" stat tile (gold / XP) inside the plot inspect modal.
+function ExpectStat({ icon, value, label, accent }) {
+    return (
+        <div style={{ padding: "10px 8px", borderRadius: 11, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", textAlign: "center" }}>
+            <div style={{ fontSize: 18 }}>{icon}</div>
+            <div style={{ fontWeight: 900, fontSize: 16, color: accent, marginTop: 2 }}>{value}</div>
+            <div className="muted" style={{ fontSize: 11 }}>{label}</div>
         </div>
     );
 }
