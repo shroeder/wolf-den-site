@@ -264,7 +264,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
-    const [wxOverride, setWxOverride] = useState({ tod: null, condition: null }); // owner debug: force tod/weather
+    const [wxOverride] = useState({ tod: null, condition: null }); // reserved (sky always follows real weather now)
     useEffect(() => {
         const t0 = setTimeout(() => setWeather((w) => ({ ...w, tod: hourToTod(new Date().getHours()) })), 0);
         if (typeof navigator === "undefined" || !navigator.geolocation) return () => clearTimeout(t0);
@@ -452,7 +452,6 @@ export default function FarmClient({ initial, viewingAlias }) {
         located: wxOverride.tod || wxOverride.condition ? true : weather.located,
         forced: Boolean(wxOverride.tod || wxOverride.condition),
     };
-    const chip = (active) => ({ padding: "3px 9px", borderRadius: 999, border: `1px solid ${active ? "#ffd75e" : "rgba(128,128,128,0.4)"}`, background: active ? "rgba(255,215,94,0.16)" : "transparent", color: active ? "#ffd75e" : "inherit", fontSize: 12, cursor: "pointer", fontWeight: active ? 700 : 400 });
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
     const bgUrl = pickFarmBg(wx.tod, wx.condition);
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
@@ -524,24 +523,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                     ) : null}
                 </div>
             </section>
-
-            {farm.mine ? (
-                <section className="card" style={{ padding: "8px 12px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#ffd75e", marginBottom: 5 }}>🛠️ Debug · force sky {wx.forced ? "(override active)" : ""}</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                        <span className="muted" style={{ fontSize: 11, width: 52 }}>Time</span>
-                        {[["Auto", null], ["Dawn", "dawn"], ["Day", "day"], ["Dusk", "dusk"], ["Night", "night"]].map(([label, val]) => (
-                            <button key={label} type="button" onClick={() => setWxOverride((o) => ({ ...o, tod: val }))} style={chip(wxOverride.tod === val)}>{label}</button>
-                        ))}
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 6 }}>
-                        <span className="muted" style={{ fontSize: 11, width: 52 }}>Weather</span>
-                        {[["Auto", null], ["Clear", "clear"], ["Cloudy", "cloudy"], ["Rain", "rain"], ["Snow", "snow"], ["Fog", "fog"], ["Storm", "storm"]].map(([label, val]) => (
-                            <button key={label} type="button" onClick={() => setWxOverride((o) => ({ ...o, condition: val }))} style={chip(wxOverride.condition === val)}>{label}</button>
-                        ))}
-                    </div>
-                </section>
-            ) : null}
 
             <FarmDirectory current={viewingAlias} />
 
@@ -992,64 +973,110 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, fertilizer, onPlant, o
 
 // The controls panel below the pasture: the crops themselves live IN the scene (ScenePlots) — this is just the
 // seed bag, fertilizer, upgrades & owner debug. Shares the same live `garden` passed down from FarmClient.
+// A collapsible section header — themed gold triangle (never a light-blue arrow), rotates when open.
+function PanelToggle({ title, open, onToggle, accent = "#e7dcc4", note = null }) {
+    return (
+        <button type="button" onClick={onToggle} aria-expanded={open} style={{ marginTop: 12, width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "11px 0 0", background: "none", border: "none", borderTop: "1px solid rgba(255,255,255,0.1)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+            <strong style={{ fontSize: 13, color: accent }}>{title}</strong>
+            {note ? <span className="muted" style={{ fontSize: 11 }}>{note}</span> : null}
+            <span aria-hidden="true" style={{ marginLeft: "auto", color: "#ffd75e", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
+        </button>
+    );
+}
+
+// A compact stat tile for the garden's status strip.
+function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
+    return (
+        <div style={{ flex: "1 1 0", minWidth: 84, display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,0.22)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <span style={{ fontSize: 18 }} aria-hidden="true">{icon}</span>
+            <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+                <span style={{ fontWeight: 900, fontSize: "1rem", color: accent, fontVariantNumeric: "tabular-nums" }}>{value}</span>
+                <span className="muted" style={{ fontSize: "0.68rem" }}>{label}</span>
+            </span>
+        </div>
+    );
+}
+
 function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
     const [showUpg, setShowUpg] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
     const g = garden;
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
+    const canBuyFert = g.gold >= g.fertilizerPrice;
+    const upgradesMaxed = (g.upgrades || []).filter((u) => u.cost == null).length;
     return (
         <section className="card" style={{ borderColor: g.readyCount ? "rgba(120,220,120,0.5)" : undefined }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <h2 style={{ margin: 0 }}>🌱 Your Garden</h2>
-                <span className="muted" style={{ fontSize: 12 }}>{g.plotCount} plots in the field · tap a plot to plant &amp; harvest</span>
                 {g.readyCount ? <span style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 999, background: "rgba(120,220,120,0.16)", border: "1px solid rgba(120,220,120,0.5)", color: "#8fe39a", fontWeight: 800, fontSize: 12, animation: "pigPop .4s ease both" }}>🧺 {g.readyCount} ready to harvest!</span> : null}
             </div>
+            <p className="muted" style={{ margin: "4px 0 12px", fontSize: 12 }}>Tap a plot out in the field to plant &amp; harvest.</p>
 
-            {/* Seed bag — what you're holding to plant */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ fontWeight: 700, fontSize: 12 }}>🎒 Seeds:</span>
-                {totalSeeds ? (g.seedBag || []).map((s) => (
-                    <span key={s.id} title={s.loot || ""} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", fontSize: 12, fontWeight: 700 }}>
-                        <span style={{ fontSize: 15 }}>{s.emoji}</span>{s.name}<span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span>
-                    </span>
-                )) : <span className="muted" style={{ fontSize: 12 }}>none yet — find them across the games (boss, sailing, chests…).</span>}
+            {/* At-a-glance status */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <GardenStat icon="🌿" value={`${g.plotCount}`} label="plots" accent="#8fe39a" />
+                <GardenStat icon="🎒" value={`${totalSeeds}`} label="seeds" />
+                <GardenStat icon="💧" value={`${g.fertilizer}`} label="fertilizer" accent="#9fd0ff" />
+            </div>
+
+            {/* Seed bag */}
+            <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8fe39a", marginBottom: 8 }}>Seed bag</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {totalSeeds ? (g.seedBag || []).map((s) => (
+                        <span key={s.id} title={s.loot || ""} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", fontSize: 12, fontWeight: 700 }}>
+                            <span style={{ fontSize: 15 }}>{s.emoji}</span>{s.name}<span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span>
+                        </span>
+                    )) : <span className="muted" style={{ fontSize: 12 }}>none yet — find them across the games (boss, sailing, chests…).</span>}
+                </div>
             </div>
 
             {/* Fertilizer */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 10, fontSize: 12 }}>
-                <span style={{ fontWeight: 700 }}>💧 Fertilizer: {g.fertilizer}</span>
-                <span className="muted" style={{ fontSize: 11 }}>tap a growing crop in the field to speed it up</span>
-                <button type="button" onClick={onBuyFertilizer} disabled={busy || g.gold < g.fertilizerPrice} style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(120,200,255,0.5)", background: "rgba(120,200,255,0.1)", color: "#9fd0ff", fontSize: 11, fontWeight: 700, cursor: g.gold >= g.fertilizerPrice ? "pointer" : "default", opacity: g.gold >= g.fertilizerPrice ? 1 : 0.5 }}>🪙 Buy · {g.fertilizerPrice}g</button>
+            <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 20 }} aria-hidden="true">💧</span>
+                <span style={{ flex: 1, minWidth: 140 }}>
+                    <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>Fertilizer</span>
+                    <span className="muted" style={{ fontSize: 11 }}>tap a growing crop to spend one — cuts 40% off its grow time.</span>
+                </span>
+                <button type="button" onClick={onBuyFertilizer} disabled={busy || !canBuyFert} style={{ padding: "7px 12px", borderRadius: 10, border: "none", background: canBuyFert ? "#ffd75e" : "rgba(255,255,255,0.1)", color: canBuyFert ? "#2a2410" : "inherit", fontSize: 12, fontWeight: 800, cursor: canBuyFert ? "pointer" : "default", whiteSpace: "nowrap", opacity: canBuyFert ? 1 : 0.6 }}>🪙 Buy · {g.fertilizerPrice}g</button>
             </div>
 
-            {/* Upgrades */}
-            <button type="button" onClick={() => setShowUpg((v) => !v)} style={{ marginTop: 12, width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 0 0", background: "none", border: "none", borderTop: "1px solid rgba(255,255,255,0.1)", color: "inherit", cursor: "pointer" }}>
-                <strong style={{ fontSize: 13 }}>⬆️ Farm upgrades</strong>
-                <span aria-hidden="true" style={{ marginLeft: "auto", transform: showUpg ? "rotate(90deg)" : "none", transition: "transform .2s", opacity: 0.6 }}>›</span>
-            </button>
+            {/* Upgrades (collapsible) */}
+            <PanelToggle title="⬆️ Farm upgrades" open={showUpg} onToggle={() => setShowUpg((v) => !v)} accent="#e7dcc4" note={`${(g.upgrades || []).length - upgradesMaxed} available`} />
             {showUpg ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                    {g.upgrades.map((u) => (
-                        <div key={u.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                            <span style={{ fontSize: 18 }}>{u.emoji}</span>
-                            <span style={{ flex: 1 }}>
-                                <span style={{ display: "block", fontSize: 12, fontWeight: 700 }}>{u.name} <span className="muted" style={{ fontWeight: 400 }}>· Lv {u.level}/{u.max}</span></span>
-                                <span className="muted" style={{ fontSize: 11 }}>{u.desc}</span>
-                            </span>
-                            {u.cost == null ? <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>MAX</span> : (
-                                <button type="button" onClick={() => onUpgrade(u.key)} disabled={busy || g.gold < u.cost} style={{ padding: "6px 10px", borderRadius: 8, border: "none", background: g.gold >= u.cost ? "#ffd75e" : "rgba(255,255,255,0.1)", color: g.gold >= u.cost ? "#2a2410" : "inherit", fontSize: 11, fontWeight: 800, cursor: g.gold >= u.cost ? "pointer" : "default", whiteSpace: "nowrap" }}>🪙 {u.cost.toLocaleString()}</button>
-                            )}
-                        </div>
-                    ))}
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 8 }}>
+                    {g.upgrades.map((u) => {
+                        const affordable = u.cost != null && g.gold >= u.cost;
+                        return (
+                            <div key={u.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${u.cost == null ? "rgba(255,215,94,0.35)" : "rgba(255,255,255,0.1)"}` }}>
+                                <span style={{ fontSize: 20 }} aria-hidden="true">{u.emoji}</span>
+                                <span style={{ flex: 1, minWidth: 0 }}>
+                                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 700 }}>{u.name}</span>
+                                    <span className="muted" style={{ fontSize: 11 }}>{u.desc}</span>
+                                    {/* level pips */}
+                                    <span style={{ display: "inline-flex", gap: 3, marginTop: 4 }} aria-label={`Level ${u.level} of ${u.max}`}>
+                                        {Array.from({ length: u.max }, (_, i) => (
+                                            <span key={i} style={{ width: 12, height: 5, borderRadius: 3, background: i < u.level ? "#ffd75e" : "rgba(255,255,255,0.14)" }} />
+                                        ))}
+                                    </span>
+                                </span>
+                                {u.cost == null ? <span style={{ fontSize: 11, fontWeight: 800, color: "#ffd75e" }}>★ MAX</span> : (
+                                    <button type="button" onClick={() => onUpgrade(u.key)} disabled={busy || !affordable} style={{ padding: "7px 11px", borderRadius: 10, border: "none", background: affordable ? "#ffd75e" : "rgba(255,255,255,0.1)", color: affordable ? "#2a2410" : "inherit", fontSize: 11.5, fontWeight: 800, cursor: affordable ? "pointer" : "default", whiteSpace: "nowrap", opacity: affordable ? 1 : 0.6 }}>🪙 {u.cost.toLocaleString()}</button>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             ) : null}
 
-            {/* Owner debug */}
-            <button type="button" onClick={() => setShowDebug((v) => !v)} style={{ marginTop: 10, background: "none", border: "none", color: "#ffd75e", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>🛠️ Debug · seeds &amp; growth</button>
+            {/* Owner debug (collapsible) */}
+            <PanelToggle title="🛠️ Debug · seeds & growth" open={showDebug} onToggle={() => setShowDebug((v) => !v)} accent="#ffd75e" note="owner-only" />
             {showDebug ? (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-                    {[["farm_debug_seeds", "🎒 +2 of every seed"], ["farm_debug_grow", "⏩ grow all now"], ["farm_debug_fertilizer", "💧 +5 fertilizer"]].map(([action, label]) => (
-                        <button key={action} type="button" onClick={() => onDebug(action)} disabled={busy} style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{label}</button>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 7, marginTop: 8 }}>
+                    {[["farm_debug_seeds", "🎒", "+2 of every seed"], ["farm_debug_grow", "⏩", "Grow all now"], ["farm_debug_fertilizer", "💧", "+5 fertilizer"]].map(([action, icon, label]) => (
+                        <button key={action} type="button" onClick={() => onDebug(action)} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, border: "1px dashed rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.07)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
+                            <span style={{ fontSize: 16 }} aria-hidden="true">{icon}</span>{label}
+                        </button>
                     ))}
                 </div>
             ) : null}
@@ -1337,7 +1364,7 @@ function FarmDirectory({ current }) {
                 <span style={{ display: "flex", color: "#ffd75e" }}><SearchIcon /></span>
                 <strong style={{ fontSize: 16 }}>Visit a farm</strong>
                 <span className="muted" style={{ fontSize: 11 }}>owner-only</span>
-                <span aria-hidden="true" className="farm-visit-chev" style={{ marginLeft: "auto", transform: open ? "rotate(90deg)" : "none", opacity: 0.6, fontSize: 18, lineHeight: 1 }}>›</span>
+                <span aria-hidden="true" className="farm-visit-chev" style={{ marginLeft: "auto", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s", color: "#ffd75e", fontSize: 12, lineHeight: 1 }}>▾</span>
             </button>
             {open ? (
                 <>
@@ -1348,7 +1375,6 @@ function FarmDirectory({ current }) {
                             value={q}
                             onChange={(e) => setQ(e.target.value)}
                             placeholder="Search members…"
-                            autoFocus
                             style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: 12, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.04)", color: "inherit" }}
                         />
                     </div>

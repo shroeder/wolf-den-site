@@ -197,6 +197,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
+    const [showForms, setShowForms] = useState(false); // the boat-forms gallery is collapsed by default
     const [toolFx, setToolFx] = useState(null); // { emoji, name, k } — flashes when a dig tool procs
     const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a scan pulse
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
@@ -869,28 +870,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
-            {/* Boat forms — 8 milestones, each a new hull + a permanent perk unlocked every 10 levels. */}
-            <section className="card sail-forms">
-                <h2 style={{ margin: "0 0 2px" }}>Boat forms</h2>
-                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Every 10 levels your boat takes a new form and unlocks a permanent perk. You&apos;re <b>Lv {level}</b> · Form <b>{state.tier}/{state.boatTiers}</b>.</p>
-                <div className="sail-forms-list">
-                    {(state.forms || []).map((f) => (
-                        <button type="button" className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level} onClick={() => setInspectForm(f)}>
-                            <span className="sail-form-art">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={f.art} alt="" className={`${f.unlocked ? "" : "is-locked"} boat-aura-${f.tier}`} />
-                                {f.unlocked ? null : <span className="sail-form-lock">🔒</span>}
-                            </span>
-                            <div className="sail-form-body">
-                                <div className="sail-form-name">{f.name} <span className="muted">· Lv {f.level}</span>{f.current ? <span className="sail-form-cur">current</span> : null}</div>
-                                <div className="muted sail-form-perk">{f.perk}</div>
-                            </div>
-                            <span className="sail-form-chev" aria-hidden="true">›</span>
-                        </button>
-                    ))}
-                </div>
-            </section>
-
             {/* Excavation — the digging upgrade system (separate from the boat). */}
             <section className="card">
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
@@ -931,6 +910,36 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            {/* Boat forms — collapsed by default, below the upgrades. 8 milestones, each a new hull + a perk. */}
+            <section className="card sail-forms">
+                <button type="button" onClick={() => setShowForms((v) => !v)} aria-expanded={showForms} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}>
+                    <h2 style={{ margin: 0 }}>Boat forms</h2>
+                    <span className="muted" style={{ fontSize: "0.78rem" }}>Form {state.tier}/{state.boatTiers}</span>
+                    <span aria-hidden="true" style={{ marginLeft: "auto", color: "#ffd75e", fontSize: 12, transform: showForms ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
+                </button>
+                {showForms ? (
+                    <>
+                        <p className="muted" style={{ margin: "6px 0 12px", fontSize: "0.8rem" }}>Every 10 levels your boat takes a new form and unlocks a permanent perk. You&apos;re <b>Lv {level}</b> · Form <b>{state.tier}/{state.boatTiers}</b>.</p>
+                        <div className="sail-forms-list">
+                            {(state.forms || []).map((f) => (
+                                <button type="button" className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level} onClick={() => setInspectForm(f)}>
+                                    <span className="sail-form-art">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={f.art} alt="" className={`${f.unlocked ? "" : "is-locked"} boat-aura-${f.tier}`} />
+                                        {f.unlocked ? null : <span className="sail-form-lock">🔒</span>}
+                                    </span>
+                                    <div className="sail-form-body">
+                                        <div className="sail-form-name">{f.name} <span className="muted">· Lv {f.level}</span>{f.current ? <span className="sail-form-cur">current</span> : null}</div>
+                                        <div className="muted sail-form-perk">{f.perk}</div>
+                                    </div>
+                                    <span className="sail-form-chev" aria-hidden="true" style={{ color: "#ffd75e" }}>▸</span>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                ) : null}
             </section>
 
             {/* Win / fail RECAP — you confirm before it returns you to port. */}
