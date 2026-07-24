@@ -72,6 +72,7 @@ export const FARM_UPGRADES = {
     seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 1000, desc: "+25% seeds found across the games" },
     petcap: { name: "Pet Whisperer", emoji: "🐾", max: 5, base: 1500, desc: "+1 free petting every day" },
     chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 2500, desc: "+0.25% chest-on-harvest chance" },
+    seedsaver: { name: "Seed Saver", emoji: "🌰", max: 5, base: 1800, desc: "+1% to keep the seed when you harvest" },
 };
 export const upgradeCost = (key, level) => Math.round((FARM_UPGRADES[key]?.base || 1000) * 2 ** level);
 
@@ -98,6 +99,7 @@ export const plotCount = (up) => BASE_PLOTS + lvl(up, "plots");
 export const farmPetCapBonus = (up) => lvl(up, "petcap");
 export const seedLuckMult = (up) => 1 + 0.25 * lvl(up, "seedluck");
 const chestChance = (up) => CHEST_BASE + CHEST_PER_LEVEL * lvl(up, "chest");
+const seedSaverChance = (up) => 0.01 * lvl(up, "seedsaver"); // Seed Saver: 1% per level to recover the planted seed
 
 function weightedPick(weights) {
     const total = Object.values(weights).reduce((s, w) => s + w, 0);
@@ -211,13 +213,19 @@ export async function harvestPlot(buyerId, slot) {
         ).catch(() => {});
         chest = tier;
     }
+    // Seed Saver upgrade — small chance to recover the seed you planted (rare crops stay sustainable).
+    let savedSeed = false;
+    if (Math.random() < seedSaverChance(buyer?.farm_upgrades || {})) {
+        await grantSeed(buyerId, claimed.seed_id).catch(() => {});
+        savedSeed = true;
+    }
     // Signature yield — each crop grants a distinct bonus that feeds a different system.
     const bonus = await grantYield(buyerId, def?.yield);
     await trackActivity(buyerId, "harvest_crop", { seedId: claimed.seed_id, rarity, gold, chest, yield: def?.yield?.type || null }).catch(() => {});
     await bumpQuestProgress(buyerId, "harvest_crop", 1).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, bonus, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.

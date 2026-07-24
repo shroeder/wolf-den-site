@@ -868,7 +868,7 @@ function Garden({ initial, raining }) {
         post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setG(r.garden); if (r.boosted) setToast({ rain: r.boosted }); } });
     }, [raining, post]);
 
-    const harvest = async (slot) => { const r = await act({ action: "harvest", slot }, `h-${slot}`); if (r?.ok) setToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus }); };
+    const harvest = async (slot) => { const r = await act({ action: "harvest", slot }, `h-${slot}`); if (r?.ok) setToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji }); };
     const plant = async (slot, seedId) => { setPlanting(null); await act({ action: "plant", slot, seedId }, `p-${slot}`); };
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
 
@@ -990,6 +990,7 @@ function Garden({ initial, raining }) {
                                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Harvested {toast.name}!</div>
                                 <div style={{ fontSize: 24, fontWeight: 900, color: "#ffd75e", marginTop: 6 }}>+{(toast.gold || 0).toLocaleString()} 🪙</div>
                                 {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.1)", border: "1px solid rgba(140,200,255,0.4)", fontWeight: 700, fontSize: 13 }}>{toast.bonus}</div> : null}
+                                {toast.savedSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(120,220,120,0.12)", border: "1px solid rgba(120,220,120,0.45)", fontWeight: 700, fontSize: 13 }}>🌰 Seed saved! {toast.savedEmoji} back in your bag</div> : null}
                                 {toast.chest ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.4)", fontWeight: 700, fontSize: 13 }}>🎁 Lucky find — a {toast.chest} chest!</div> : null}
                             </>
                         )}
