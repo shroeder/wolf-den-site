@@ -205,6 +205,14 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [pigToast, setPigToast] = useState(false);
     const [pigResult, setPigResult] = useState(null); // the haul modal after he leaves
 
+    // ── Garden (crops live IN the pasture) ── state is lifted up here so the growing plots render inside the
+    // scrolling field, while a compact controls panel below shares the exact same live garden.
+    const [garden, setGarden] = useState(initial.garden || null);
+    const [gardenBusy, setGardenBusy] = useState(null);
+    const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
+    const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
+    const rainedRef = useRef(false);
+
     // Wild Loot Pig: once/day, at a random moment after you land on YOUR farm, a crowned pig may rampage
     // through dropping gold. The payout is server-guarded once/day; this just decides the dramatic entrance.
     useEffect(() => {
@@ -233,7 +241,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -250,7 +258,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult]);
+    }, [inspect, pigResult, harvestToast, planting]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -404,6 +412,34 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : r.forOther ? `+${r.playerXp} XP · +${r.goldGained}g 💛` : `+${r.petXpGain || ""} XP`, "#ffe27a");
     }, [farm.canPet, farm.mine, farm.owner, busy, addFloater, pets]);
 
+    // ── Garden actions ── every response returns the fresh garden so the in-scene plots + the controls panel
+    // stay in lockstep. Only wired on your own farm.
+    const gardenAct = useCallback(async (body, key) => {
+        setGardenBusy(key);
+        const r = await post(body);
+        setGardenBusy(null);
+        if (r?.garden) setGarden(r.garden);
+        return r;
+    }, [post]);
+    const plantSeedAt = useCallback(async (slot, seedId) => { setPlanting(null); await gardenAct({ action: "plant", slot, seedId }, `p-${slot}`); }, [gardenAct]);
+    const harvestAt = useCallback(async (slot) => {
+        const r = await gardenAct({ action: "harvest", slot }, `h-${slot}`);
+        if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji }); SFX.coin(); }
+    }, [gardenAct]);
+    const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
+    const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
+    const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
+    const gardenDebug = useCallback((action) => gardenAct({ action }, action), [gardenAct]);
+
+    // Logging in during rain surges every growing crop closer to harvest (server-guarded once per plot per 6h).
+    useEffect(() => {
+        if (!farm.mine || !garden || rainedRef.current) return;
+        const cond = wxOverride.condition || weather.condition;
+        if (!["rain", "storm"].includes(cond)) return;
+        rainedRef.current = true;
+        post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setGarden(r.garden); if (r.boosted) setHarvestToast({ rain: r.boosted }); } });
+    }, [farm.mine, garden, weather.condition, wxOverride.condition, post]);
+
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
     const fieldW = Math.max(150, pets.length * 36);
@@ -423,6 +459,9 @@ export default function FarmClient({ initial, viewingAlias }) {
         <div className="stack reveal">
             <style>{`
                 @keyframes farmBob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+                @keyframes farmSway { 0%,100% { transform: rotate(-3.5deg) } 50% { transform: rotate(3.5deg) } }
+                @keyframes farmSprout { 0% { transform: translateY(6px) scale(.2); opacity: 0 } 100% { transform: translateY(0) scale(1); opacity: 1 } }
+                @keyframes farmReadyRing { 0% { transform: translate(-50%,-50%) scale(.7); opacity: .6 } 100% { transform: translate(-50%,-50%) scale(1.5); opacity: 0 } }
                 @keyframes farmHop { 0% { transform: translateY(0) scaleY(1) } 25% { transform: translateY(-13px) scaleY(1.05) } 55% { transform: translateY(0) scaleY(0.92) } 70% { transform: translateY(-4px) } 100% { transform: translateY(0) scaleY(1) } }
                 @keyframes farmFloat { 0% { opacity: 0; transform: translate(-50%, 0) scale(.8) } 15% { opacity: 1 } 100% { opacity: 0; transform: translate(-50%, -46px) scale(1.1) } }
                 @keyframes farmCloud { from { transform: translateX(0) } to { transform: translateX(40px) } }
@@ -537,6 +576,17 @@ export default function FarmClient({ initial, viewingAlias }) {
                             </div>
                         ) : null}
 
+                        {/* Crops grow right in the field — a tilled row you tap to plant, fertilize & harvest */}
+                        {farm.mine && garden ? (
+                            <ScenePlots
+                                garden={garden}
+                                busy={gardenBusy}
+                                onPlant={(slot) => setPlanting(slot)}
+                                onHarvest={harvestAt}
+                                onFertilize={fertilizeAt}
+                            />
+                        ) : null}
+
                         {pets.length === 0 ? (
                             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
                                 No pets yet — collect some and they&apos;ll roam here.
@@ -618,7 +668,21 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             </div>
 
-            {farm.mine && farm.garden ? <Garden initial={farm.garden} raining={["rain", "storm"].includes(wx.condition)} /> : null}
+            {farm.mine && garden ? (
+                <GardenPanel
+                    garden={garden}
+                    busy={gardenBusy}
+                    onBuyFertilizer={buyFert}
+                    onUpgrade={buyUpgradeKey}
+                    onDebug={gardenDebug}
+                />
+            ) : null}
+
+            {planting != null && garden ? (
+                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} onPick={plantSeedAt} onClose={() => setPlanting(null)} />
+            ) : null}
+
+            {harvestToast ? <HarvestToast toast={harvestToast} onClose={() => setHarvestToast(null)} /> : null}
 
             {inspect ? (
                 <PetInspect
@@ -838,108 +902,127 @@ function OwnerMenu({ owner, mine, onClose }) {
 // ── Garden: plant found seeds → crops grow in real time → harvest to sell for gold (+ rare chest). Rain &
 // fertilizer speed growth; upgrades add plots/speed/luck/pet-cap/chest-odds. Owner-only debug tools included.
 const fmtGrow = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
-function Garden({ initial, raining }) {
-    const [g, setG] = useState(initial);
+// ── Crops IN the pasture ──────────────────────────────────────────────────────────────────────────────────
+// A tilled row of soil right in the scrolling field: each plot's plant literally sprouts from a mound and
+// grows taller over real time, then ripens (swaps to the crop, glows & bobs) when it's ready to harvest. Tap
+// a plot to plant / fertilize / harvest. Ticks its own clock so only this row re-renders each second.
+function ScenePlots({ garden, busy, onPlant, onHarvest, onFertilize }) {
     const [now, setNow] = useState(() => Date.now());
-    const [busy, setBusy] = useState(null);
-    const [planting, setPlanting] = useState(null); // slot awaiting a seed choice
-    const [toast, setToast] = useState(null);
+    useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+    const plots = garden.plots || [];
+    const n = plots.length || 1;
+    const totalSeeds = (garden.seedBag || []).reduce((s, x) => s + x.count, 0);
+    return (
+        <>
+            {plots.map((p, i) => {
+                // Spread the plots evenly across a foreground band of the (wide) field.
+                const left = n === 1 ? 50 : 8 + (i * 84) / (n - 1);
+                return (
+                    <ScenePlot
+                        key={p.slot} p={p} left={left} now={now} busy={busy}
+                        totalSeeds={totalSeeds} fertilizer={garden.fertilizer}
+                        onPlant={onPlant} onHarvest={onHarvest} onFertilize={onFertilize}
+                    />
+                );
+            })}
+        </>
+    );
+}
+
+function ScenePlot({ p, left, now, busy, totalSeeds, fertilizer, onPlant, onHarvest, onFertilize }) {
+    const empty = p.empty;
+    let progress = 1; let ready = false; let secsLeft = 0;
+    if (!empty) {
+        const start = new Date(p.plantedAt).getTime();
+        const end = new Date(p.readyAt).getTime();
+        secsLeft = Math.max(0, Math.round((end - now) / 1000));
+        ready = secsLeft <= 0;
+        progress = end > start ? Math.max(0, Math.min(1, (now - start) / (end - start))) : 1;
+    }
+    const busyHere = busy === `h-${p.slot}` || busy === `p-${p.slot}` || busy === `f-${p.slot}`;
+    const canPlant = empty && totalSeeds > 0;
+    const canFertilize = !empty && !ready && fertilizer > 0 && !p.fertilized;
+    const tappable = canPlant || ready || canFertilize;
+    const onClick = () => {
+        if (busyHere) return;
+        if (empty) { if (canPlant) onPlant(p.slot); return; }
+        if (ready) onHarvest(p.slot);
+        else if (canFertilize) onFertilize(p.slot);
+    };
+    // The plant scales up from a seedling as it matures; ripe crops pop to full size + a soft glow.
+    const plantScale = ready ? 1 : 0.4 + 0.6 * progress;
+    const title = empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — find seeds across the games")
+        : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left${canFertilize ? " · tap to fertilize" : ""}`;
+    return (
+        <button
+            type="button" onClick={onClick} title={title}
+            style={{ position: "absolute", left: `${left}%`, top: "64%", transform: "translate(-50%, -100%)", width: 66, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default", zIndex: 40 }}
+        >
+            {/* the plant / sprout rising above the mound */}
+            <span style={{ display: "block", position: "relative", height: 48 }}>
+                {ready ? (
+                    <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "58%", width: 46, height: 46, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", animation: "farmReadyRing 1.6s ease-out infinite" }} />
+                ) : null}
+                {!empty ? (
+                    <span style={{ position: "absolute", left: "50%", bottom: 3, transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1s linear" }}>
+                        <span style={{ display: "block", fontSize: 30, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 7px rgba(140,240,150,0.9))" : "drop-shadow(0 2px 2px rgba(0,0,0,0.35))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>
+                            {ready ? p.emoji : p.sprout}
+                        </span>
+                    </span>
+                ) : canPlant ? (
+                    <span style={{ position: "absolute", left: "50%", bottom: 9, transform: "translateX(-50%)", fontSize: 20, color: "#ffe27a", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.7)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
+                ) : null}
+            </span>
+            {/* tilled soil mound */}
+            <span style={{ display: "block", width: 50, height: 15, margin: "0 auto", borderRadius: "50%", background: p.fertilized ? "radial-gradient(ellipse at 50% 25%, #6f4c28, #3c2712)" : "radial-gradient(ellipse at 50% 25%, #59391f, #32200e)", boxShadow: "inset 0 2px 3px rgba(255,255,255,0.14), inset 0 -3px 6px rgba(0,0,0,0.55), 0 3px 6px rgba(0,0,0,0.4)", border: canPlant ? "1.5px dashed rgba(255,226,122,0.6)" : "1px solid rgba(0,0,0,0.35)" }} />
+            {/* status chip */}
+            {!empty ? (
+                <span style={{ display: "block", textAlign: "center", marginTop: 3 }}>
+                    {ready ? (
+                        <span style={{ padding: "1px 8px", borderRadius: 9, background: "rgba(47,174,114,0.95)", border: "1px solid rgba(190,255,205,0.55)", fontSize: 10, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>{busyHere ? "…" : "🧺 Harvest"}</span>
+                    ) : (
+                        <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.76)", border: "1px solid rgba(255,255,255,0.12)", fontSize: 10, fontWeight: 700, color: "#f2f6ee", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,0.35)" }}>⏳ {fmtGrow(secsLeft)}{p.fertilized ? " 💧" : ""}</span>
+                    )}
+                </span>
+            ) : canPlant ? (
+                <span style={{ display: "block", textAlign: "center", marginTop: 3 }}>
+                    <span style={{ padding: "1px 7px", borderRadius: 9, background: "rgba(18,26,14,0.62)", border: "1px dashed rgba(255,226,122,0.5)", fontSize: 10, fontWeight: 700, color: "#ffe6a3", whiteSpace: "nowrap" }}>Plant</span>
+                </span>
+            ) : null}
+        </button>
+    );
+}
+
+// The controls panel below the pasture: the crops themselves live IN the scene (ScenePlots) — this is just the
+// seed bag, fertilizer, upgrades & owner debug. Shares the same live `garden` passed down from FarmClient.
+function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
     const [showUpg, setShowUpg] = useState(false);
     const [showDebug, setShowDebug] = useState(false);
-    const rained = useRef(false);
-    useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-
-    const post = useCallback(async (body) => {
-        const res = await fetch("/api/marketplace/farm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
-        return res ? res.json().catch(() => null) : null;
-    }, []);
-    const act = useCallback(async (body, key) => {
-        setBusy(key);
-        const r = await post(body);
-        setBusy(null);
-        if (r?.garden) setG(r.garden);
-        return r;
-    }, [post]);
-
-    // Logging in during rain gives every growing crop a big one-shot boost (server-guarded per plot).
-    useEffect(() => {
-        if (!raining || rained.current) return;
-        rained.current = true;
-        post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setG(r.garden); if (r.boosted) setToast({ rain: r.boosted }); } });
-    }, [raining, post]);
-
-    const harvest = async (slot) => { const r = await act({ action: "harvest", slot }, `h-${slot}`); if (r?.ok) setToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji }); };
-    const plant = async (slot, seedId) => { setPlanting(null); await act({ action: "plant", slot, seedId }, `p-${slot}`); };
+    const g = garden;
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
-
     return (
         <section className="card" style={{ borderColor: g.readyCount ? "rgba(120,220,120,0.5)" : undefined }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                 <h2 style={{ margin: 0 }}>🌱 Your Garden</h2>
-                <span className="muted" style={{ fontSize: 12 }}>{g.plotCount} plots · every harvest rolls a random reward</span>
+                <span className="muted" style={{ fontSize: 12 }}>{g.plotCount} plots in the field · tap a plot to plant &amp; harvest</span>
                 {g.readyCount ? <span style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 999, background: "rgba(120,220,120,0.16)", border: "1px solid rgba(120,220,120,0.5)", color: "#8fe39a", fontWeight: 800, fontSize: 12, animation: "pigPop .4s ease both" }}>🧺 {g.readyCount} ready to harvest!</span> : null}
             </div>
 
-            {/* Plots */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
-                {g.plots.map((p) => {
-                    if (p.empty) {
-                        return (
-                            <button key={p.slot} type="button" onClick={() => setPlanting(planting === p.slot ? null : p.slot)} disabled={!totalSeeds}
-                                style={{ minHeight: 108, borderRadius: 12, border: `1.5px dashed ${planting === p.slot ? "#ffd75e" : "rgba(255,255,255,0.22)"}`, background: "rgba(255,255,255,0.03)", color: "inherit", cursor: totalSeeds ? "pointer" : "default", opacity: totalSeeds ? 1 : 0.5, display: "grid", placeItems: "center", gap: 3 }}>
-                                <span style={{ fontSize: 24 }}>🟫</span>
-                                <span style={{ fontSize: 11, fontWeight: 700 }}>{totalSeeds ? "＋ Plant" : "empty"}</span>
-                            </button>
-                        );
-                    }
-                    const left = Math.max(0, Math.round((new Date(p.readyAt).getTime() - now) / 1000));
-                    const ready = left <= 0;
-                    return (
-                        <div key={p.slot} style={{ minHeight: 108, borderRadius: 12, border: `1.5px solid ${ready ? "rgba(120,220,120,0.6)" : "rgba(255,255,255,0.14)"}`, background: ready ? "radial-gradient(90% 90% at 50% 30%, rgba(120,220,120,0.14), rgba(255,255,255,0.02))" : "rgba(255,255,255,0.03)", padding: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, textAlign: "center" }}>
-                            <span style={{ fontSize: 30, lineHeight: 1, filter: ready ? "drop-shadow(0 0 6px rgba(140,240,150,0.8))" : "none", animation: ready ? "farmBob 2s ease-in-out infinite" : "none" }}>{ready ? p.emoji : p.sprout}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700 }}>{p.name}</span>
-                            {ready ? (
-                                <button type="button" onClick={() => harvest(p.slot)} disabled={busy === `h-${p.slot}`} style={{ marginTop: "auto", width: "100%", padding: "6px", fontSize: 11, fontWeight: 800, borderRadius: 8, border: "none", background: "#2fae72", color: "#fff", cursor: "pointer" }}>{busy === `h-${p.slot}` ? "…" : `🧺 +${p.sell.toLocaleString()}g`}</button>
-                            ) : (
-                                <>
-                                    <span className="muted" style={{ fontSize: 11 }}>⏳ {fmtGrow(left)}</span>
-                                    {g.fertilizer > 0 && !p.fertilized ? (
-                                        <button type="button" onClick={() => act({ action: "fertilizer_use", slot: p.slot }, `f-${p.slot}`)} disabled={busy === `f-${p.slot}`} style={{ marginTop: "auto", width: "100%", padding: "5px", fontSize: 10, fontWeight: 700, borderRadius: 8, border: "1px solid rgba(120,200,255,0.5)", background: "rgba(120,200,255,0.12)", color: "#9fd0ff", cursor: "pointer" }}>💧 Fertilize</button>
-                                    ) : p.fertilized ? <span className="muted" style={{ fontSize: 10 }}>💧 fertilized</span> : null}
-                                </>
-                            )}
-                        </div>
-                    );
-                })}
+            {/* Seed bag — what you're holding to plant */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 700, fontSize: 12 }}>🎒 Seeds:</span>
+                {totalSeeds ? (g.seedBag || []).map((s) => (
+                    <span key={s.id} title={s.loot || ""} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", fontSize: 12, fontWeight: 700 }}>
+                        <span style={{ fontSize: 15 }}>{s.emoji}</span>{s.name}<span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span>
+                    </span>
+                )) : <span className="muted" style={{ fontSize: 12 }}>none yet — find them across the games (boss, sailing, chests…).</span>}
             </div>
 
-            {/* Seed picker (shown after tapping an empty plot) */}
-            {planting != null ? (
-                <div style={{ marginTop: 10, padding: 10, borderRadius: 12, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(255,215,110,0.06)" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Pick a seed to plant in plot {planting + 1}:</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {(g.seedBag || []).map((s) => (
-                            <button key={s.id} type="button" onClick={() => plant(planting, s.id)} disabled={busy} title={s.loot} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "8px 11px", borderRadius: 12, border: `1px solid ${RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)"}55`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", minWidth: 128 }}>
-                                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <span style={{ fontSize: 18 }}>{s.emoji}</span>
-                                    <span style={{ fontSize: 12.5, fontWeight: 800 }}>{s.name}</span>
-                                    <span className="muted" style={{ fontSize: 11 }}>×{s.count}</span>
-                                </span>
-                                <span className="muted" style={{ fontSize: 11 }}>⏳ {Math.round(s.growMin / 60)}h · 🪙 {s.sell.toLocaleString()}</span>
-                                {s.loot ? <span style={{ fontSize: 11, fontWeight: 700, color: RARITY_RING[s.rarity] || "#cdd9c6" }}>🎁 {s.loot}</span> : null}
-                            </button>
-                        ))}
-                        {!totalSeeds ? <span className="muted" style={{ fontSize: 12 }}>No seeds yet — find them across the games (boss, sailing, chests…).</span> : null}
-                    </div>
-                </div>
-            ) : null}
-
-            {/* Seed bag + fertilizer */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 12, fontSize: 12 }}>
-                <span style={{ fontWeight: 700 }}>🎒 Seeds: {totalSeeds}</span>
-                <span className="muted">·</span>
+            {/* Fertilizer */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 10, fontSize: 12 }}>
                 <span style={{ fontWeight: 700 }}>💧 Fertilizer: {g.fertilizer}</span>
-                <button type="button" onClick={() => act({ action: "fertilizer_buy" }, "fbuy")} disabled={busy || g.gold < g.fertilizerPrice} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(120,200,255,0.5)", background: "rgba(120,200,255,0.1)", color: "#9fd0ff", fontSize: 11, fontWeight: 700, cursor: g.gold >= g.fertilizerPrice ? "pointer" : "default", opacity: g.gold >= g.fertilizerPrice ? 1 : 0.5 }}>🪙 Buy · {g.fertilizerPrice}g</button>
+                <span className="muted" style={{ fontSize: 11 }}>tap a growing crop in the field to speed it up</span>
+                <button type="button" onClick={onBuyFertilizer} disabled={busy || g.gold < g.fertilizerPrice} style={{ marginLeft: "auto", padding: "5px 10px", borderRadius: 8, border: "1px solid rgba(120,200,255,0.5)", background: "rgba(120,200,255,0.1)", color: "#9fd0ff", fontSize: 11, fontWeight: 700, cursor: g.gold >= g.fertilizerPrice ? "pointer" : "default", opacity: g.gold >= g.fertilizerPrice ? 1 : 0.5 }}>🪙 Buy · {g.fertilizerPrice}g</button>
             </div>
 
             {/* Upgrades */}
@@ -957,7 +1040,7 @@ function Garden({ initial, raining }) {
                                 <span className="muted" style={{ fontSize: 11 }}>{u.desc}</span>
                             </span>
                             {u.cost == null ? <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>MAX</span> : (
-                                <button type="button" onClick={() => act({ action: "farm_upgrade", key: u.key }, `u-${u.key}`)} disabled={busy || g.gold < u.cost} style={{ padding: "6px 10px", borderRadius: 8, border: "none", background: g.gold >= u.cost ? "#ffd75e" : "rgba(255,255,255,0.1)", color: g.gold >= u.cost ? "#2a2410" : "inherit", fontSize: 11, fontWeight: 800, cursor: g.gold >= u.cost ? "pointer" : "default", whiteSpace: "nowrap" }}>🪙 {u.cost.toLocaleString()}</button>
+                                <button type="button" onClick={() => onUpgrade(u.key)} disabled={busy || g.gold < u.cost} style={{ padding: "6px 10px", borderRadius: 8, border: "none", background: g.gold >= u.cost ? "#ffd75e" : "rgba(255,255,255,0.1)", color: g.gold >= u.cost ? "#2a2410" : "inherit", fontSize: 11, fontWeight: 800, cursor: g.gold >= u.cost ? "pointer" : "default", whiteSpace: "nowrap" }}>🪙 {u.cost.toLocaleString()}</button>
                             )}
                         </div>
                     ))}
@@ -965,39 +1048,66 @@ function Garden({ initial, raining }) {
             ) : null}
 
             {/* Owner debug */}
-            <button type="button" onClick={() => setShowDebug((v) => !v)} style={{ marginTop: 10, background: "none", border: "none", color: "#ffd75e", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>🛠️ Debug · seeds & growth</button>
+            <button type="button" onClick={() => setShowDebug((v) => !v)} style={{ marginTop: 10, background: "none", border: "none", color: "#ffd75e", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>🛠️ Debug · seeds &amp; growth</button>
             {showDebug ? (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                     {[["farm_debug_seeds", "🎒 +2 of every seed"], ["farm_debug_grow", "⏩ grow all now"], ["farm_debug_fertilizer", "💧 +5 fertilizer"]].map(([action, label]) => (
-                        <button key={action} type="button" onClick={() => act({ action }, action)} disabled={busy} style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{label}</button>
+                        <button key={action} type="button" onClick={() => onDebug(action)} disabled={busy} style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{label}</button>
                     ))}
                 </div>
             ) : null}
-
-            {/* Harvest / rain reward toast */}
-            {toast ? (
-                <div onClick={() => setToast(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
-                    <div onClick={(e) => e.stopPropagation()} role="dialog" style={{ width: "100%", maxWidth: 300, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #2fae72", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 20, textAlign: "center", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
-                        {toast.rain ? (
-                            <>
-                                <div style={{ fontSize: 44 }}>🌧️🌱</div>
-                                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Rain boost!</div>
-                                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>The rain surged {toast.rain} crop{toast.rain === 1 ? "" : "s"} closer to harvest.</div>
-                            </>
-                        ) : (
-                            <>
-                                <div style={{ fontSize: 46 }}>{toast.emoji}</div>
-                                <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Harvested {toast.name}!</div>
-                                <div style={{ fontSize: 24, fontWeight: 900, color: "#ffd75e", marginTop: 6 }}>+{(toast.gold || 0).toLocaleString()} 🪙</div>
-                                {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.12)", border: "1px solid rgba(140,200,255,0.45)", fontWeight: 800, fontSize: 13 }}>🎁 Harvest loot: {toast.bonus}</div> : null}
-                                {toast.savedSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(120,220,120,0.12)", border: "1px solid rgba(120,220,120,0.45)", fontWeight: 700, fontSize: 13 }}>🌰 Seed saved! {toast.savedEmoji} back in your bag</div> : null}
-                            </>
-                        )}
-                        <button type="button" onClick={() => setToast(null)} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
-                    </div>
-                </div>
-            ) : null}
         </section>
+    );
+}
+
+// Centered "pick a seed" modal, opened by tapping an empty plot out in the field.
+function SeedPickerModal({ garden, slot, busy, onPick, onClose }) {
+    const bag = garden.seedBag || [];
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Plant a seed" style={{ width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
+                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>Pick a seed to sow — it&apos;ll sprout right in the field.</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {bag.length ? bag.map((s) => (
+                        <button key={s.id} type="button" disabled={Boolean(busy)} onClick={() => onPick(slot, s.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+                            <span style={{ fontSize: 26 }}>{s.emoji}</span>
+                            <span style={{ flex: 1 }}>
+                                <span style={{ display: "block", fontSize: 13.5, fontWeight: 800 }}>{s.name} <span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span></span>
+                                <span className="muted" style={{ fontSize: 11.5 }}>⏳ {Math.round(s.growMin / 60)}h · 🪙 {s.sell.toLocaleString()}{s.loot ? ` · 🎁 ${s.loot}` : ""}</span>
+                            </span>
+                        </button>
+                    )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds yet — find them across the games (boss, sailing, chests…).</div>}
+                </div>
+                <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Cancel</button>
+            </div>
+        </div>
+    );
+}
+
+// Harvest / rain-boost reward modal.
+function HarvestToast({ toast, onClose }) {
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" style={{ width: "100%", maxWidth: 300, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #2fae72", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 20, textAlign: "center", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
+                {toast.rain ? (
+                    <>
+                        <div style={{ fontSize: 44 }}>🌧️🌱</div>
+                        <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Rain boost!</div>
+                        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>The rain surged {toast.rain} crop{toast.rain === 1 ? "" : "s"} closer to harvest.</div>
+                    </>
+                ) : (
+                    <>
+                        <div style={{ fontSize: 46 }}>{toast.emoji}</div>
+                        <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Harvested {toast.name}!</div>
+                        <div style={{ fontSize: 24, fontWeight: 900, color: "#ffd75e", marginTop: 6 }}>+{(toast.gold || 0).toLocaleString()} 🪙</div>
+                        {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.12)", border: "1px solid rgba(140,200,255,0.45)", fontWeight: 800, fontSize: 13 }}>🎁 Harvest loot: {toast.bonus}</div> : null}
+                        {toast.savedSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(120,220,120,0.12)", border: "1px solid rgba(120,220,120,0.45)", fontWeight: 700, fontSize: 13 }}>🌰 Seed saved! {toast.savedEmoji} back in your bag</div> : null}
+                    </>
+                )}
+                <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
+            </div>
+        </div>
     );
 }
 
