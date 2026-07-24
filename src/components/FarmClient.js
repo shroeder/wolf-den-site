@@ -190,7 +190,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const homeX = useCallback((i) => slotX(i, pets.length), [pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => ({
         x: slotX(i, pets.length),
-        y: 80 + ((i * 7) % 12), // low on the grass
+        y: 64 + ((i * 7) % 10), // on the grass, ABOVE the garden bed at the front of the field
         flip: i % 2 === 1,
         dur: 2, // seconds for the current stroll (varies per move → different speeds)
         moving: false,
@@ -292,7 +292,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         const push = (t) => timers.push(t);
         const step = (i) => {
             const nx = clamp(homeX(i) + rand(-5, 5), FARM_PAD, 100 - FARM_PAD);
-            const ny = 78 + rand(0, 14); // stay low on the grass — never drift high
+            const ny = 62 + rand(0, 12); // roam the grass band ABOVE the garden bed — never onto the soil
             const dur = rand(1.3, 3.8); // different speeds each hop
             setPos((prev) => {
                 if (!prev[i]) return prev;
@@ -576,15 +576,25 @@ export default function FarmClient({ initial, viewingAlias }) {
                             </div>
                         ) : null}
 
-                        {/* Crops grow right in the field — a tilled row you tap to plant, fertilize & harvest */}
+                        {/* The garden: a clearly-defined tilled soil bed across the FRONT of the field (pets roam the
+                            grass above it and never step onto it), with the crops planted in it. */}
                         {farm.mine && garden ? (
-                            <ScenePlots
-                                garden={garden}
-                                busy={gardenBusy}
-                                onPlant={(slot) => setPlanting(slot)}
-                                onHarvest={harvestAt}
-                                onFertilize={fertilizeAt}
-                            />
+                            <>
+                                <div aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "24%", zIndex: 30, background: "linear-gradient(180deg, #4e3319 0%, #3c2712 45%, #281909 100%)", borderTop: "3px solid #2a1a0c", boxShadow: "inset 0 7px 14px rgba(0,0,0,0.45)" }}>
+                                    {/* a soft grassy lip where the lawn meets the soil */}
+                                    <div style={{ position: "absolute", left: 0, right: 0, top: -4, height: 8, background: "linear-gradient(180deg, rgba(120,190,90,0.9), rgba(90,150,60,0))", borderRadius: "50% 50% 0 0 / 100% 100% 0 0" }} />
+                                    {/* tilled furrow rows so it reads as planted earth */}
+                                    <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.22) 0 3px, transparent 3px 30px)", opacity: 0.55 }} />
+                                    <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 14px)" }} />
+                                </div>
+                                <ScenePlots
+                                    garden={garden}
+                                    busy={gardenBusy}
+                                    onPlant={(slot) => setPlanting(slot)}
+                                    onHarvest={harvestAt}
+                                    onFertilize={fertilizeAt}
+                                />
+                            </>
                         ) : null}
 
                         {pets.length === 0 ? (
@@ -956,7 +966,7 @@ function ScenePlot({ p, left, now, busy, totalSeeds, fertilizer, onPlant, onHarv
     return (
         <button
             type="button" onClick={onClick} title={title}
-            style={{ position: "absolute", left: `${left}%`, top: "64%", transform: "translate(-50%, -100%)", width: 66, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default", zIndex: 40 }}
+            style={{ position: "absolute", left: `${left}%`, top: "93%", transform: "translate(-50%, -100%)", width: 66, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default", zIndex: 85 }}
         >
             {/* the plant / sprout rising above the mound */}
             <span style={{ display: "block", position: "relative", height: 48 }}>
