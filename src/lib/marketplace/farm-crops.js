@@ -8,6 +8,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -19,21 +20,34 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // Rarity drives BOTH the sell value/grow-time curve AND the harvest-chest odds (see harvestPlot): rarer crops
 // take longer but are worth far more and roll better loot chests.
 export const SEEDS = {
+    // Each crop sells for gold + player XP; its `yield` is a SIGNATURE bonus that feeds a different system, so
+    // what you plant depends on what you need — cash, pet treats, XP, wheel spins, chests, or more seeds.
     // Common — quick, cheap, found from everyday actions (the daily grind).
-    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 90, sell: 140, xp: 12, rarity: "common" },
-    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 180, sell: 300, xp: 20, rarity: "common" },
-    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 240, sell: 440, xp: 28, rarity: "common" },
+    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 90, sell: 140, xp: 12, rarity: "common", role: "Fast cash" },
+    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 180, sell: 300, xp: 20, rarity: "common", role: "Cash + a pet treat", yield: { type: "treat", id: "treat_bone", n: 1 } },
+    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 240, sell: 440, xp: 28, rarity: "common", role: "Bulk cash" },
     // Rare — a few hours; from digs, raids, iron chests.
-    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 640, xp: 40, rarity: "rare" },
-    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 940, xp: 56, rarity: "rare" },
+    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 640, xp: 40, rarity: "rare", role: "Pet treats", yield: { type: "treat", id: "treat_snack", n: 2 } },
+    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 940, xp: 56, rarity: "rare", role: "Player XP", yield: { type: "xp", amount: 220 } },
     // Epic — half a day; from raids, gold chests, boss kills.
-    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 1600, xp: 82, rarity: "epic" },
-    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 2600, xp: 130, rarity: "epic" },
+    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 1600, xp: 82, rarity: "epic", role: "Wheel spins", yield: { type: "spin", n: 2 } },
+    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 2600, xp: 130, rarity: "epic", role: "Guaranteed chest", yield: { type: "chest", tier: "iron" } },
     // Legendary — overnight; from gold chests + boss kills only.
-    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 5200, xp: 270, rarity: "legendary" },
+    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 5200, xp: 270, rarity: "legendary", role: "Premium cash + top chest odds" },
     // Mythic — a day and a half; the jackpot, only from the very best sources.
-    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 12000, xp: 640, rarity: "mythic" },
+    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 12000, xp: 640, rarity: "mythic", role: "Jackpot: bonus seeds", yield: { type: "seed", n: 2 } },
 };
+// Short human line for a crop's signature yield (seed picker + harvest toast).
+export function yieldText(seed) {
+    const y = seed?.yield;
+    if (!y) return null;
+    if (y.type === "treat") { const t = seed.yieldTreatName || y.id; return `🦴 +${y.n} pet treat${y.n === 1 ? "" : "s"}`; }
+    if (y.type === "xp") return `✨ +${y.amount} bonus XP`;
+    if (y.type === "spin") return `🎡 +${y.n} wheel spin${y.n === 1 ? "" : "s"}`;
+    if (y.type === "chest") return `🧰 a guaranteed ${y.tier} chest`;
+    if (y.type === "seed") return `🌱 +${y.n} bonus seed${y.n === 1 ? "" : "s"}`;
+    return null;
+}
 export const seedById = (id) => SEEDS[id] || null;
 const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === r);
 
@@ -197,10 +211,13 @@ export async function harvestPlot(buyerId, slot) {
         ).catch(() => {});
         chest = tier;
     }
-    await trackActivity(buyerId, "harvest_crop", { seedId: claimed.seed_id, rarity, gold, chest }).catch(() => {});
+    // Signature yield — each crop grants a distinct bonus that feeds a different system.
+    const bonus = await grantYield(buyerId, def?.yield);
+    await trackActivity(buyerId, "harvest_crop", { seedId: claimed.seed_id, rarity, gold, chest, yield: def?.yield?.type || null }).catch(() => {});
     await bumpQuestProgress(buyerId, "harvest_crop", 1).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, goldAfter: paid?.gold ?? null, garden: await getGarden(buyerId) };
+    const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, bonus, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.
@@ -273,6 +290,41 @@ export async function grantSeed(buyerId, seedId) {
          ON CONFLICT (buyer_id, seed_id) DO UPDATE SET count = mkt_farm_seed.count + 1`,
         [buyerId, seedId]
     ).catch(() => {});
+}
+
+// Grant a harvested crop's signature yield; returns a short human string for the harvest toast (or null).
+async function grantYield(buyerId, y) {
+    if (!buyerId || !y) return null;
+    try {
+        if (y.type === "treat") {
+            await grantConsumable(buyerId, y.id, y.n);
+            return `🦴 +${y.n} ${CONSUMABLES[y.id]?.name || "Pet Treat"}`;
+        }
+        if (y.type === "xp") {
+            await awardXp(buyerId, "harvest", { points: y.amount, gold: 0 });
+            return `✨ +${y.amount} bonus XP`;
+        }
+        if (y.type === "spin") {
+            await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens, 0) + $2 WHERE id = $1`, [buyerId, y.n]);
+            return `🎡 +${y.n} wheel spin${y.n === 1 ? "" : "s"}`;
+        }
+        if (y.type === "chest") {
+            await db.query(`INSERT INTO mkt_user_chest (buyer_id, tier, count) VALUES ($1, $2, 1) ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + 1`, [buyerId, y.tier]);
+            return `🧰 a ${y.tier} chest`;
+        }
+        if (y.type === "seed") {
+            const got = [];
+            for (let i = 0; i < y.n; i += 1) {
+                const r = weightedPick({ common: 30, rare: 30, epic: 25, legendary: 12, mythic: 3 });
+                const pool = seedsOfRarity(r);
+                const sid = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "wheat";
+                await grantSeed(buyerId, sid);
+                got.push(SEEDS[sid].emoji);
+            }
+            return `🌱 +${y.n} bonus seed${y.n === 1 ? "" : "s"} ${got.join("")}`;
+        }
+    } catch { /* best-effort */ }
+    return null;
 }
 
 // Roll to drop a seed from another game system (source keys in SEED_SOURCES). Returns { seedId, name, emoji,

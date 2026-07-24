@@ -868,7 +868,7 @@ function Garden({ initial, raining }) {
         post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setG(r.garden); if (r.boosted) setToast({ rain: r.boosted }); } });
     }, [raining, post]);
 
-    const harvest = async (slot) => { const r = await act({ action: "harvest", slot }, `h-${slot}`); if (r?.ok) setToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest }); };
+    const harvest = async (slot) => { const r = await act({ action: "harvest", slot }, `h-${slot}`); if (r?.ok) setToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus }); };
     const plant = async (slot, seedId) => { setPlanting(null); await act({ action: "plant", slot, seedId }, `p-${slot}`); };
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
 
@@ -919,10 +919,14 @@ function Garden({ initial, raining }) {
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Pick a seed to plant in plot {planting + 1}:</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {(g.seedBag || []).map((s) => (
-                            <button key={s.id} type="button" onClick={() => plant(planting, s.id)} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer" }}>
-                                <span style={{ fontSize: 16 }}>{s.emoji}</span>
-                                <span style={{ fontSize: 12, fontWeight: 700 }}>{s.name}</span>
-                                <span className="muted" style={{ fontSize: 11 }}>×{s.count} · {Math.round(s.growMin / 60)}h · {s.sell}g</span>
+                            <button key={s.id} type="button" onClick={() => plant(planting, s.id)} disabled={busy} title={s.role} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "8px 11px", borderRadius: 12, border: `1px solid ${RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)"}55`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", minWidth: 128 }}>
+                                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ fontSize: 18 }}>{s.emoji}</span>
+                                    <span style={{ fontSize: 12.5, fontWeight: 800 }}>{s.name}</span>
+                                    <span className="muted" style={{ fontSize: 11 }}>×{s.count}</span>
+                                </span>
+                                <span className="muted" style={{ fontSize: 11 }}>⏳ {Math.round(s.growMin / 60)}h · 🪙 {s.sell.toLocaleString()}</span>
+                                {s.role ? <span style={{ fontSize: 11, fontWeight: 700, color: RARITY_RING[s.rarity] || "#cdd9c6" }}>{s.role}</span> : null}
                             </button>
                         ))}
                         {!totalSeeds ? <span className="muted" style={{ fontSize: 12 }}>No seeds yet — find them across the games (boss, sailing, chests…).</span> : null}
@@ -985,6 +989,7 @@ function Garden({ initial, raining }) {
                                 <div style={{ fontSize: 46 }}>{toast.emoji}</div>
                                 <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Harvested {toast.name}!</div>
                                 <div style={{ fontSize: 24, fontWeight: 900, color: "#ffd75e", marginTop: 6 }}>+{(toast.gold || 0).toLocaleString()} 🪙</div>
+                                {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.1)", border: "1px solid rgba(140,200,255,0.4)", fontWeight: 700, fontSize: 13 }}>{toast.bonus}</div> : null}
                                 {toast.chest ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.4)", fontWeight: 700, fontSize: 13 }}>🎁 Lucky find — a {toast.chest} chest!</div> : null}
                             </>
                         )}
