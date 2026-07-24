@@ -1,9 +1,65 @@
 import "server-only";
 
+import { list } from "@vercel/blob";
+
 // OpenAI cost/usage insight — reads the REAL spend from OpenAI's Organization Costs API (admin-key only) and
 // aggregates it into a by-source + by-day breakdown for the admin app's "AI Costs" screen. No estimates.
 // Needs an admin key (sk-admin-…) in OPEN_AI_ADMIN_KEY — a project key (sk-proj-…) can't read usage (403).
 const COSTS_URL = "https://api.openai.com/v1/organization/costs";
+
+// ── Itemize IMAGE spend by SOURCE ────────────────────────────────────────────────────────────────────────────
+// OpenAI can't tell an avatar from a decoration — that attribution is ours, keyed by the blob PATH PREFIX each
+// generator writes to. We count the images stored under each prefix and multiply by that generator's per-image
+// gpt-image-1 cost. The sum reconciles against the API's real gpt-image-1 total. (Per-image $ from OpenAI's
+// output-token counts: low 1024²≈$0.011, medium≈$0.042, high≈$0.167; edits +~$0.004 ref input; 1536×1024 scene≈$0.063.)
+const IMG_SOURCES = {
+    "marketplace/sprite": { label: "Hero sprites (avatars)", unit: 0.046, note: "member avatar → full-body sprite; redraws on gear change" },
+    "marketplace/pet": { label: "Pet sprites + level art", unit: 0.046, note: "pet battle sprites and per-level art" },
+    "marketplace/items": { label: "Item / gear sprites", unit: 0.042, note: "gear die-cut art" },
+    "marketplace/badges": { label: "Badge sprites", unit: 0.011, note: "small emblems (low quality)" },
+    "marketplace/decorations": { label: "Farm decorations", unit: 0.042, note: "the 100 decoration sprites" },
+    "marketplace/consumables": { label: "Consumable sprites", unit: 0.042, note: "treats/potions/relics" },
+    "marketplace/chest": { label: "Chest art", unit: 0.167, note: "loot chests (high quality)" },
+    "marketplace/boss": { label: "Boss sprites", unit: 0.042, note: "weekly boss art" },
+    "marketplace/boss-bg": { label: "Boss backgrounds", unit: 0.063, note: "battle scenes (wide)" },
+    "marketplace/farm-bg": { label: "Farm backgrounds", unit: 0.063, note: "pasture scenes (wide)" },
+    "marketplace/bounties": { label: "Bounty art", unit: 0.042, note: "bounty illustrations" },
+    "marketplace/avatars": { label: "Avatar (raw)", unit: 0.046, note: "raw avatar renders" },
+    "marketplace/logos": { label: "Logos / misc", unit: 0.042, note: "one-off graphics" },
+    "marketplace/ai": { label: "Misc AI art", unit: 0.042, note: "uncategorized generations" },
+};
+
+// Count blobs per known image prefix and estimate spend. Returns [{ key,label,note,count,unit,est }] desc by est,
+// plus estTotal. Best-effort: any failure returns an empty breakdown (the model-level costs still stand alone).
+export async function getImageSpendByFeature() {
+    try {
+        const counts = new Map();
+        let cursor;
+        let pages = 0;
+        do {
+            const res = await list({ limit: 1000, cursor });
+            for (const b of res.blobs) {
+                const parts = String(b.pathname || "").split("/");
+                const prefix = parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts[0];
+                if (!IMG_SOURCES[prefix]) continue; // skip APKs and non-image blobs
+                counts.set(prefix, (counts.get(prefix) || 0) + 1);
+            }
+            cursor = res.cursor;
+            pages++;
+        } while (cursor && pages < 15);
+
+        const rows = [...counts.entries()]
+            .map(([key, count]) => {
+                const s = IMG_SOURCES[key];
+                return { key, label: s.label, note: s.note, count, unit: s.unit, est: Math.round(count * s.unit * 100) / 100 };
+            })
+            .sort((a, b) => b.est - a.est);
+        const estTotal = Math.round(rows.reduce((sum, r) => sum + r.est, 0) * 100) / 100;
+        return { rows, estTotal };
+    } catch {
+        return { rows: [], estTotal: 0 };
+    }
+}
 
 function adminKey() {
     return process.env.OPEN_AI_ADMIN_KEY || process.env.OPENAI_ADMIN_KEY || null;
