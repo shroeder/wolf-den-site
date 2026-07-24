@@ -47,6 +47,96 @@ function ItemGlyph({ id, className = "" }) {
 let DEFS = {};
 const itemDef = (id) => DEFS[id] || null;
 
+// Rarity colors for set pieces + a helper to strip the "Full set:" prefix off a capstone description.
+const SET_RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
+const capText = (desc) => (desc || "").replace(/^Full set:\s*/i, "");
+// A set tier's bonus as text — stat bonuses and/or sea affinity (the sailing set grants the latter).
+const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : ""].filter(Boolean).join(" · ") || "—";
+
+// A rich, tappable card for one set the player is building: piece dots, a progress bar, the tiered stat
+// bonuses (active ones lit), and — the fun differentiator two sets otherwise hide — the full-set CAPSTONE.
+function SetBonusCard({ set, onOpen }) {
+    const complete = set.equipped >= set.total;
+    const pct = Math.round((set.equipped / set.total) * 100);
+    const nextTier = set.tiers.find((t) => !t.active);
+    const need = nextTier ? nextTier.need - set.equipped : set.total - set.equipped;
+    return (
+        <button type="button" onClick={onOpen} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", marginTop: 8, borderRadius: 12, cursor: "pointer", color: "inherit", background: complete ? "linear-gradient(180deg, rgba(255,215,94,0.1), rgba(255,255,255,0.02))" : "rgba(255,255,255,0.03)", border: `1px solid ${complete ? "rgba(255,215,94,0.5)" : "rgba(255,255,255,0.1)"}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ display: "flex", gap: 3 }}>
+                    {set.pieces.map((p) => (
+                        <span key={p.id} title={p.name} style={{ width: 8, height: 8, borderRadius: "50%", background: p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : p.owned ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.13)", boxShadow: p.equipped ? `0 0 5px ${SET_RARITY[p.rarity] || "#ffd75e"}` : "none" }} />
+                    ))}
+                </span>
+                <strong style={{ flex: 1, minWidth: 0 }}>{set.name}{complete ? " ✨" : ""}</strong>
+                <span className="muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total}</span>
+                <span aria-hidden="true" style={{ opacity: 0.5 }}>›</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 8 }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 999, background: complete ? "linear-gradient(90deg,#ffd75e,#ffb648)" : "linear-gradient(90deg,#4aa3ff,#8fd8ff)", transition: "width .4s ease" }} />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", marginTop: 7 }}>
+                {set.tiers.map((t, i) => (
+                    <span key={i} style={{ fontSize: "0.78rem", color: t.active ? "#ffd75e" : "#7f8a97", fontWeight: t.active ? 700 : 500 }}>{t.active ? "✓" : "○"} {t.need}-pc: {tierText(t)}</span>
+                ))}
+            </div>
+            {set.capstone ? (
+                <div style={{ marginTop: 7, display: "flex", gap: 6, alignItems: "flex-start", padding: "6px 9px", borderRadius: 8, background: set.capstone.active ? "linear-gradient(180deg, rgba(255,215,94,0.16), rgba(255,215,94,0.04))" : "rgba(255,255,255,0.03)", border: `1px solid ${set.capstone.active ? "rgba(255,215,94,0.5)" : "rgba(255,255,255,0.08)"}` }}>
+                    <span aria-hidden="true">{set.capstone.active ? "⭐" : "🔒"}</span>
+                    <span style={{ fontSize: "0.8rem", color: set.capstone.active ? "#ffe9a8" : "#9aa7b5", fontWeight: set.capstone.active ? 700 : 500 }}><strong>Full set:</strong> {capText(set.capstone.desc)}</span>
+                </div>
+            ) : null}
+            {!complete && need > 0 ? (
+                <div style={{ marginTop: 6, fontSize: "0.74rem", color: "#8fd8ff", fontWeight: 600 }}>
+                    {nextTier ? `＋ Equip ${need} more to unlock the ${nextTier.need}-piece bonus` : `＋ Equip ${need} more to complete the set & unlock its capstone`}
+                </div>
+            ) : null}
+        </button>
+    );
+}
+
+// The full set breakdown: every piece (equipped / owned / locked) plus all tiers and the capstone.
+function SetDetailSheet({ set, onClose }) {
+    const complete = set.equipped >= set.total;
+    const pct = Math.round((set.equipped / set.total) * 100);
+    return createPortal((
+        <div className="equip-sheet-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.8)", padding: 16 }}>
+            <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, margin: 0, maxHeight: "88dvh", overflowY: "auto", borderColor: complete ? "rgba(255,215,94,0.5)" : "rgba(143,216,255,0.4)", borderWidth: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 22 }} aria-hidden="true">🧩</span>
+                    <h3 style={{ margin: 0, flex: 1 }}>{set.name}{complete ? " ✨" : ""}</h3>
+                    <span className="muted" style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total} equipped</span>
+                </div>
+                <div style={{ height: 7, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 10 }}>
+                    <div style={{ height: "100%", width: `${pct}%`, borderRadius: 999, background: complete ? "linear-gradient(90deg,#ffd75e,#ffb648)" : "linear-gradient(90deg,#4aa3ff,#8fd8ff)", transition: "width .4s ease" }} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(88px,1fr))", gap: 8, marginTop: 12 }}>
+                    {set.pieces.map((p) => (
+                        <div key={p.id} title={p.statsText || ""} style={{ padding: 8, borderRadius: 12, textAlign: "center", border: `1.5px solid ${p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : "rgba(255,255,255,0.1)"}`, background: p.equipped ? "rgba(255,215,94,0.06)" : "rgba(255,255,255,0.03)", opacity: p.owned || p.equipped ? 1 : 0.55 }}>
+                            <ItemArt id={p.id} icon={p.icon} className="set-tile-art" />
+                            <div style={{ fontSize: "0.72rem", fontWeight: 700, marginTop: 3, color: p.equipped ? (SET_RARITY[p.rarity] || undefined) : undefined }}>{p.name}</div>
+                            <div className="muted" style={{ fontSize: "0.66rem", marginTop: 1 }}>{p.equipped ? "✅ equipped" : p.owned ? "• owned" : "🔒 locked"}</div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ marginTop: 14 }}>
+                    <div className="muted" style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 800, marginBottom: 2 }}>Set bonuses</div>
+                    {set.tiers.map((t, i) => (
+                        <div key={i} style={{ fontSize: "0.88rem", padding: "4px 0", color: t.active ? "#ffd75e" : "#9aa7b5", fontWeight: t.active ? 700 : 500 }}>{t.active ? "✓" : "○"} <strong>{t.need}-piece:</strong> {tierText(t)}</div>
+                    ))}
+                    {set.capstone ? (
+                        <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: set.capstone.active ? "linear-gradient(180deg, rgba(255,215,94,0.18), rgba(255,215,94,0.05))" : "rgba(255,255,255,0.03)", border: `1px solid ${set.capstone.active ? "rgba(255,215,94,0.55)" : "rgba(255,255,255,0.1)"}` }}>
+                            <div style={{ fontWeight: 800, color: set.capstone.active ? "#ffd75e" : "#c9b98a" }}>{set.capstone.active ? "⭐ Capstone — ACTIVE" : "🔒 Full-set capstone"}</div>
+                            <div style={{ fontSize: "0.85rem", marginTop: 2, color: set.capstone.active ? "#ffe9a8" : "#9aa7b5" }}>{capText(set.capstone.desc)}</div>
+                        </div>
+                    ) : null}
+                </div>
+                <button type="button" className="button" onClick={onClose} style={{ marginTop: 14, width: "100%" }}>Close</button>
+            </div>
+        </div>
+    ), document.body);
+}
+
 // Friendly text for a charge-claim mint failure.
 const chargeErr = (code) => ({
     no_charges: "No charges left on this perk.",
@@ -63,6 +153,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
     const [detailItem, setDetailItem] = useState(null); // inventory item detail sheet (inspect → equip / sell)
+    const [setDetail, setSetDetail] = useState(null); // the full set breakdown modal (from a set card or an item's set link)
     const [sellArmed, setSellArmed] = useState(false); // two-tap sell confirm inside the sheet (no native popup)
     const [coinBurst, setCoinBurst] = useState(null); // coin-shower juice on a sale
     const burstKey = useRef(0);
@@ -252,26 +343,23 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 </ul>
             </details>
 
-            {/* Set bonuses */}
-            {(data.setBonuses || []).length ? (
-                <div className="card">
-                    <h3>🧩 Set bonuses <a href="/marketplace/sets" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff" }}>all sets →</a></h3>
-                    <p className="muted" style={{ marginTop: 0 }}>Equip matching pieces of a set to unlock bonuses — they stack on top of your gear.</p>
-                    {(data.setBonuses || []).map((s) => (
-                        <div key={s.id} style={{ padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                                <strong>{s.name}</strong>
-                                <span className="muted" style={{ fontSize: "0.8rem" }}>{s.equipped}/{s.total} equipped</span>
-                            </div>
-                            {s.tiers.map((t, i) => (
-                                <div key={i} style={{ fontSize: "0.82rem", marginTop: 3, color: t.active ? "#ffd75e" : "#9aa7b5", fontWeight: t.active ? 700 : 400 }}>
-                                    {t.active ? "✓" : "○"} {t.need}-piece: {describeStats(t.stats)}{t.sea ? <span style={{ color: "#7fd8ff" }}> {describeSea(t.sea)}</span> : null}
-                                </div>
-                            ))}
+            {/* Set bonuses — the sets you're actively wearing, with progress + capstones (tap for the full set) */}
+            {(() => {
+                const active = (data.setsOverview || []).filter((s) => s.equipped > 0).sort((a, b) => b.equipped / b.total - a.equipped / a.total);
+                if (!active.length) return null;
+                return (
+                    <div className="card">
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <h3 style={{ margin: 0, flex: 1 }}>🧩 Set bonuses</h3>
+                            <a href="/marketplace/sets" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff" }}>all sets →</a>
                         </div>
-                    ))}
-                </div>
-            ) : null}
+                        <p className="muted" style={{ margin: "4px 0 0" }}>Matching pieces stack extra stats on top of your gear — and a <strong style={{ color: "#ffd75e" }}>full set</strong> unlocks a game-changing capstone. Tap a set for the full breakdown.</p>
+                        {active.map((s) => (
+                            <SetBonusCard key={s.id} set={s} onOpen={() => setSetDetail(s)} />
+                        ))}
+                    </div>
+                );
+            })()}
 
             {/* Slot picker */}
             {slot ? (
@@ -420,7 +508,13 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
-                        {detailItem.setName ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p> : null}
+                        {detailItem.setId && (data.setsOverview || []).some((s) => s.id === detailItem.setId) ? (
+                            <button type="button" onClick={() => { const s = (data.setsOverview || []).find((x) => x.id === detailItem.setId); if (s) setSetDetail(s); }} style={{ margin: "8px 0 0", padding: "7px 11px", borderRadius: 8, border: "1px solid rgba(143,216,255,0.45)", background: "rgba(143,216,255,0.08)", color: "#8fd8ff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                🧩 Part of the {detailItem.setName} set <span style={{ opacity: 0.7 }}>· view set ›</span>
+                            </button>
+                        ) : detailItem.setName ? (
+                            <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🧩 Part of the {detailItem.setName} set</p>
+                        ) : null}
                         {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {detailItem.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(detailItem.cost || 0).toLocaleString()}</span> {(detailItem.effectiveCost || 0).toLocaleString()}</> : (detailItem.cost || 0).toLocaleString()} gold{detailItem.discounted ? ` · ${data.coupon?.pct || 50}% off` : ""}{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
                             {detailItem.shop ? (
@@ -448,6 +542,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     </div>
                 </div>
             ), document.body) : null}
+
+            {/* Full set breakdown (opened from a set card or an item's "part of a set" link). */}
+            {setDetail ? <SetDetailSheet set={setDetail} onClose={() => setSetDetail(null)} /> : null}
 
             {/* Coin-shower juice on a sale. */}
             {coinBurst ? createPortal((

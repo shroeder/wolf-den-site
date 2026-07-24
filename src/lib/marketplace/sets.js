@@ -223,7 +223,7 @@ export function getSetsOverview(equippedIds, ownedIds) {
             id: set.id, name: set.name, total: set.items.length, equipped, owned,
             weakness: set.weakness || null,
             pieces,
-            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats })),
+            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats || null, sea: t.sea || null })),
             capstone: set.capstone ? { desc: set.capstone.desc, active: equipped >= set.items.length } : null,
         };
     });

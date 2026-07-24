@@ -533,7 +533,7 @@ export function sumItemStats(itemIds = []) {
 
 // A short human summary of an item's stats, e.g. "+12% Might · +5% Crit Chance".
 export function describeStats(stats = {}) {
-    return Object.entries(stats)
+    return Object.entries(stats || {})
         .map(([k, v]) => {
             const m = STAT_META[k];
             return m ? `+${v}${m.suffix} ${m.label}` : `+${v} ${k}`;

@@ -5,7 +5,7 @@ import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marke
 import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
-import { setBonusStats, activeSetBonuses, setForItem } from "@/lib/marketplace/sets.js";
+import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
@@ -220,7 +220,8 @@ export async function getInventory(buyerId) {
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: setForItem(def.id)?.name || null };
+            const set = setForItem(def.id);
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
@@ -233,16 +234,18 @@ export async function getInventory(buyerId) {
         .map((i) => {
             const cost = Math.max(0, i.xpCost || 0);
             const effectiveCost = couponedPrice(coupon, cost);
+            const set = setForItem(i.id);
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
                 stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, signature: signatureFor(i.id),
+                setName: set?.name || null, setId: set?.id || null,
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
             };
         })
         // One clean progression: rarity, then price, then level — no more "worst again" as you scroll.
         .sort((a, z) => (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[z.rarity] ?? 9) || a.cost - z.cost || (a.reqLevel || 0) - (z.reqLevel || 0));
     const equippedList = Object.values(bySlot);
-    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), coupon };
+    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds]), coupon };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
