@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
+import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resetPig, resolveFarmOwner, farmDirectory, saveCrownConfig } from "@/lib/marketplace/farm.js";
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, removeDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, applyRainBoost, debugGrantAllSeeds, debugGrowAll, debugGrantFertilizer } from "@/lib/marketplace/farm-crops.js";
@@ -72,6 +72,7 @@ export async function POST(request) {
             else if (b?.action === "deco_place") res = await placeDecoration(buyer.id, String(b?.decoId || ""), b?.x, b?.y);
             else if (b?.action === "deco_move") res = await moveDecoration(buyer.id, Number(b?.placementId), b?.x, b?.y);
             else if (b?.action === "deco_remove") res = await removeDecoration(buyer.id, Number(b?.placementId));
+            else if (b?.action === "crown_save") res = await saveCrownConfig(b?.crown);
             else if (b?.action === "farm_debug_seeds") res = await debugGrantAllSeeds(buyer.id);
             else if (b?.action === "farm_debug_grow") res = await debugGrowAll(buyer.id);
             else if (b?.action === "farm_debug_fertilizer") res = await debugGrantFertilizer(buyer.id);

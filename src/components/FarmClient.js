@@ -207,6 +207,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [busy, setBusy] = useState(null);
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
     const [ownerMenu, setOwnerMenu] = useState(false); // farmer character tapped → connect menu
+    const [crownOpen, setCrownOpen] = useState(false); // owner crown-calibrator tool
     const [pig, setPig] = useState(null); // "running" while the loot pig is on screen
     const [pigToast, setPigToast] = useState(false);
     const [pigResult, setPigResult] = useState(null); // the haul modal after he leaves
@@ -250,7 +251,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || decoOpen || inspectDeco)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || decoOpen || inspectDeco || crownOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -267,7 +268,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot, decoOpen, inspectDeco]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot, decoOpen, inspectDeco, crownOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -494,6 +495,11 @@ export default function FarmClient({ initial, viewingAlias }) {
         setTimeout(() => { try { fieldRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ } }, 60);
     }, []);
     const stopDecorating = useCallback(() => { setDecorating(false); setDecoEditing(false); }, []);
+    const saveCrown = useCallback(async (cfg) => {
+        const r = await post({ action: "crown_save", crown: cfg });
+        if (r?.ok && r.crownCfg) setFarm((f) => ({ ...f, crownCfg: r.crownCfg }));
+        return r;
+    }, [post]);
     const gardenDebug = useCallback((action) => gardenAct({ action }, action), [gardenAct]);
 
     // Logging in during rain surges every growing crop closer to harvest (server-guarded once per plot per 6h).
@@ -594,6 +600,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                     {farm.mine ? (
                         <button type="button" onClick={spawnPigDebug} disabled={Boolean(pig)} title="Owner debug: force-spawn the Loot Pig now (repeatable)" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pig ? "default" : "pointer", opacity: pig ? 0.5 : 1 }}>
                             🐷 debug: spawn pig
+                        </button>
+                    ) : null}
+                    {farm.mine ? (
+                        <button type="button" onClick={() => setCrownOpen(true)} title="Owner tool: position the loot pig's crown" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                            👑 crown
                         </button>
                     ) : null}
                     {!farm.mine ? (
@@ -720,7 +731,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} onTap={() => setOwnerMenu(true)} /> : null}
 
                         {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
-                        {pig === "running" ? <LootPig onFinish={onPigFinish} /> : null}
+                        {pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
 
                         {/* XP / heart floaters */}
                         {floaters.map((f) => (
@@ -787,6 +798,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onPickup={decoPickup}
                     onClose={() => setInspectDeco(null)}
                 />
+            ) : null}
+
+            {crownOpen && farm.mine ? (
+                <CrownCalibrator initial={farm.crownCfg} onSave={saveCrown} onClose={() => setCrownOpen(false)} />
             ) : null}
 
             {decoOpen && farm.mine && farm.decorations ? (
@@ -886,7 +901,50 @@ const PIG_SPRITE_URL = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/
 
 // The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping gold,
 // then wanders off an edge. Cosmetic only — the haul is claimed server-side in onFinish.
-function LootPig({ onFinish }) {
+// Owner tool: dial in the loot pig's crown (height / toward-head / size) on a live preview, both facings.
+function CrownCalibrator({ initial, onSave, onClose }) {
+    const [c, setC] = useState(initial || { top: 9, side: 8, size: 22 });
+    const [saving, setSaving] = useState(false);
+    const preview = (flip) => (
+        <div style={{ textAlign: "center" }}>
+            <div style={{ position: "relative", width: 96, height: 100, margin: "0 auto", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)" }}>
+                <div style={{ position: "relative", width: 68, height: 68 }}>
+                    <span style={{ position: "absolute", left: flip ? `${50 + c.side}%` : `${50 - c.side}%`, top: c.top, fontSize: c.size, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={PIG_SPRITE_URL} alt="pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: flip ? "scaleX(-1)" : "none" }} />
+                </div>
+            </div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>facing {flip ? "right" : "left"}</div>
+        </div>
+    );
+    const slider = (label, key, min, max, step = 1) => (
+        <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 700 }}>
+            <span style={{ display: "flex", justifyContent: "space-between" }}>{label}<span style={{ color: "#ffd75e" }}>{c[key]}</span></span>
+            <input type="range" min={min} max={max} step={step} value={c[key]} onChange={(e) => setC((v) => ({ ...v, [key]: Number(e.target.value) }))} style={{ width: "100%", marginTop: 4, accentColor: "#ffd75e" }} />
+        </label>
+    );
+    const doSave = async () => { setSaving(true); await onSave(c); setSaving(false); onClose(); };
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Crown calibrator" style={{ width: "100%", maxWidth: 340, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18 }}>
+                <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 2 }}>👑 Crown calibrator</div>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Position the loot pig&apos;s crown — it mirrors for both facings. Save to set it live.</p>
+                <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>{preview(false)}{preview(true)}</div>
+                {slider("Height (up ↔ down)", "top", -25, 30)}
+                {slider("Toward the head", "side", 0, 26)}
+                {slider("Size", "size", 14, 40)}
+                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                    <button type="button" onClick={() => setC({ top: 9, side: 8, size: 22 })} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Reset</button>
+                    <button type="button" onClick={onClose} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Close</button>
+                    <button type="button" onClick={doSave} disabled={saving} style={{ flex: 1.4, padding: "10px 12px", borderRadius: 10, border: "none", background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", fontWeight: 900, fontSize: 13, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "Saving…" : "Save crown"}</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function LootPig({ onFinish, crown }) {
+    const cw = crown || { top: 9, side: 8, size: 22 };
     const [pos, setPos] = useState({ x: 4, y: 84, flip: false, dur: 1.6 });
     const [moving, setMoving] = useState(false); // true only while ambling between waypoints (gates the crown shake)
     const [coins, setCoins] = useState([]);
@@ -930,7 +988,7 @@ function LootPig({ onFinish }) {
                     {/* Crown rests ON the head: lowered onto the crown of the skull and nudged toward the facing
                         side (the head, away from the rump). Positioned via top/left — NOT transform — so
                         crownJiggle can't reset it. */}
-                    <span style={{ position: "absolute", left: pos.flip ? "58%" : "42%", top: 9, fontSize: 22, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
+                    <span style={{ position: "absolute", left: pos.flip ? `${50 + cw.side}%` : `${50 - cw.side}%`, top: cw.top, fontSize: cw.size, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
                     {PIG_SPRITE_URL ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />

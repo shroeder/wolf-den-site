@@ -18,6 +18,24 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { farmRatingBits } from "@/lib/marketplace/farm-rating.js";
 import { placedDecoBuffs, decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
+import { getSetting, setSetting } from "@/lib/settings.js";
+
+// Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
+const CROWN_DEFAULT = { top: 9, side: 8, size: 22 };
+export async function getCrownConfig() {
+    const raw = await getSetting("loot_pig_crown", null).catch(() => null);
+    if (!raw) return CROWN_DEFAULT;
+    try { const c = JSON.parse(raw); return { top: Number(c.top ?? CROWN_DEFAULT.top), side: Number(c.side ?? CROWN_DEFAULT.side), size: Number(c.size ?? CROWN_DEFAULT.size) }; } catch { return CROWN_DEFAULT; }
+}
+export async function saveCrownConfig(cfg) {
+    const c = {
+        top: Math.max(-30, Math.min(40, Number(cfg?.top ?? CROWN_DEFAULT.top))),
+        side: Math.max(0, Math.min(30, Number(cfg?.side ?? CROWN_DEFAULT.side))),
+        size: Math.max(12, Math.min(42, Number(cfg?.size ?? CROWN_DEFAULT.size))),
+    };
+    await setSetting("loot_pig_crown", JSON.stringify(c)).catch(() => {});
+    return { ok: true, crownCfg: c };
+}
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
 // (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
@@ -230,11 +248,12 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
-    const [garden, ratingBits, placements, decorations] = await Promise.all([
+    const [garden, ratingBits, placements, decorations, crownCfg] = await Promise.all([
         mine ? getGarden(ownerId).catch(() => null) : Promise.resolve(null),
         farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
         getPlacements(ownerId).catch(() => []), // the OWNER's placed decorations — rendered on any farm
         mine ? decoState(viewerId).catch(() => null) : Promise.resolve(null), // your inventory — manage on your own farm only
+        getCrownConfig().catch(() => null), // loot-pig crown placement (owner-calibrated)
     ]);
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
@@ -247,6 +266,7 @@ export async function getFarm(ownerId, viewerId) {
         pets: mine ? pets : pets.map((p) => ({ ...p, petted: false })),
         placements, // decorations placed in this pasture (rendered for everyone)
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
+        crownCfg, // loot-pig crown placement
         ...extras,
         ...ratingBits,
     };
