@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
 // ===== Referral loop =====
 // A member's public referral code IS their @handle (alias); the share link is /marketplace/play?ref=<handle>.
@@ -53,6 +54,8 @@ export async function maybeGrantReferral(newBuyerId) {
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [referrerId, REF_REFERRER_GOLD]).catch(() => {});
     await logCoin(referrerId, REF_REFERRER_GOLD, "referral_bonus").catch(() => {});
     await addChests(referrerId, REF_REFERRER_CHEST).catch(() => {});
+    // Now that this referral has converted, grant any invite badges the referrer newly qualifies for.
+    await syncEarnedBadges(referrerId).catch(() => {}); // Recruiter / Pack Builder / Pack Leader
 
     // Let the referrer know their invite paid off (best-effort web push).
     const joiner = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [newBuyerId]).catch(() => null);

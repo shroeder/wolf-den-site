@@ -61,8 +61,8 @@ export async function getRewardsTrack(buyerId) {
 
     // ---- Level spine ----
     // Role borders are badge-gated, not level-gated — they don't belong on the level spine.
-    const unlockableBorders = BORDERS.filter((b) => b.id !== "none" && !b.requiresBadges);
-    const unlockableBackgrounds = BACKGROUNDS.filter((b) => b.id !== "none");
+    const unlockableBorders = BORDERS.filter((b) => b.id !== "none" && !b.requiresBadges && !b.achievement);
+    const unlockableBackgrounds = BACKGROUNDS.filter((b) => b.id !== "none" && !b.achievement);
     const unlockableFrames = FRAMES.filter((f) => f.id !== "none" && !f.requiresBadges);
     const unlockableCosmetics = AVATAR_COSMETICS.filter((c) => !c.requiresBadges);
     // Only LEVEL-gated pets belong on the level spine. Shop/chest/boss/achievement/elite pets have no `level`,

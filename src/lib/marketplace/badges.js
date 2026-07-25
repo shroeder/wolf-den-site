@@ -123,14 +123,27 @@ export async function getMemberMetrics(buyerId) {
     // adjustments never create a mkt_credit_purchase row, so hand-granted credit correctly doesn't count.
     const creditRow = await db.queryOne(`SELECT COALESCE(SUM(amount_cents), 0)::bigint AS c FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`, [buyerId]).catch(() => null);
 
-    // Farming + petting counts (from the activity log) — drive the farm/pet badges.
+    // Farming + petting counts (from the activity log) — drive the farm/pet badges. crop_types = how many
+    // DISTINCT crop kinds you've ever harvested (the Botanist "one of each" badge; there are 9 seeds).
     const farmRow = await db.queryOne(
         `SELECT COUNT(*) FILTER (WHERE event = 'harvest_crop')::int AS harvests,
+                COUNT(DISTINCT meta->>'seedId') FILTER (WHERE event = 'harvest_crop')::int AS crop_types,
                 COUNT(*) FILTER (WHERE event IN ('pet_farm', 'pet_other'))::int AS pets_petted,
-                COUNT(*) FILTER (WHERE event = 'feed_other')::int AS pets_fed
+                COUNT(*) FILTER (WHERE event = 'feed_other')::int AS pets_fed,
+                COUNT(*) FILTER (WHERE event = 'place_deco')::int AS decos_placed,
+                COUNT(*) FILTER (WHERE event = 'fertilize_crop')::int AS fertilizer_used,
+                COUNT(*) FILTER (WHERE event = 'loot_pig')::int AS pig_claims
            FROM mkt_activity_event WHERE buyer_id = $1`,
         [buyerId]
     ).catch(() => null);
+
+    // Farm ratings RECEIVED (Well-Liked / Adored), custom creations FINALIZED (First Creation / Artisan /
+    // Gallery), and converted referrals (Recruiter / Pack Builder / Pack Leader) — one cheap count each.
+    const [ratingRow, creationRow, referralRow] = await Promise.all([
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE owner_id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'final'`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE referred_by = $1 AND referral_reward_at IS NOT NULL`, [buyerId]).catch(() => null),
+    ]);
 
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
     const ownedItemRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
@@ -177,8 +190,15 @@ export async function getMemberMetrics(buyerId) {
         messages: messageRow?.n || 0,
         badgeCount: badgeRow?.n || 0,
         cropsHarvested: farmRow?.harvests || 0,
+        cropTypes: farmRow?.crop_types || 0,
         petsPetted: farmRow?.pets_petted || 0,
         petsFed: farmRow?.pets_fed || 0,
+        decosPlaced: farmRow?.decos_placed || 0,
+        fertilizerUsed: farmRow?.fertilizer_used || 0,
+        pigClaims: farmRow?.pig_claims || 0,
+        farmRatingsReceived: ratingRow?.n || 0,
+        creationsMade: creationRow?.n || 0,
+        referralsConverted: referralRow?.n || 0,
         tradeCount: tradeRow?.trades || 0,
         cardsTraded: tradeRow?.cards || 0,
         tradeValue: Math.round(Number(tradeRow?.value_cents || 0) / 100),
@@ -296,8 +316,15 @@ export function progressForRule(rule, threshold, m) {
         case "cheers_received": return { current: m.cheersReceived, target: t }; // times the pack has cheered you
         case "credit_purchased": return { current: m.creditPurchased, target: t }; // lifetime $ of store credit bought
         case "crops_harvested": return { current: m.cropsHarvested, target: t }; // crops harvested on the farm
+        case "crop_types": return { current: m.cropTypes, target: t }; // distinct crop kinds harvested (Botanist)
         case "pets_petted": return { current: m.petsPetted, target: t }; // times you've petted a pet
         case "pets_fed_others": return { current: m.petsFed, target: t }; // treats given to friends' pets (generosity)
+        case "decos_placed": return { current: m.decosPlaced, target: t }; // decorations placed on the farm
+        case "fertilizer_used": return { current: m.fertilizerUsed, target: t }; // fertilizer applied to crops
+        case "pig_claims": return { current: m.pigClaims, target: t }; // Wild Loot Pig claims
+        case "farm_ratings_received": return { current: m.farmRatingsReceived, target: t }; // ratings your farm earned
+        case "creations_made": return { current: m.creationsMade, target: t }; // custom creations finalized
+        case "referrals_converted": return { current: m.referralsConverted, target: t }; // invited friends who joined
         default: return { current: 0, target: t || 1 };
     }
 }

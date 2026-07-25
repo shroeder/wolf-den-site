@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // Farm LIKES — a positive-only, three-tier "rate a friend's farm" system. Rating is a like, not a score:
 // Like 👍 < Love ❤️ < Admire ⭐. One persistent rating per (rater → owner); revise anytime. Both earn XP the
@@ -135,6 +137,12 @@ export async function rateFarm(raterId, ownerId, tier) {
     await awardXp(raterId, "farm_rate_give", { points: meta.raterXp, gold: 0 }).catch(() => {});
     await awardXp(ownerId, "farm_rate_get", { points: meta.ownerXp, gold: 0 }).catch(() => {});
     await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t }).catch(() => {});
+    // Earned cosmetic: the "Kindred Spirit" border for a generous rater at 10 distinct farms rated (the row
+    // was inserted just above, so this count includes it). Idempotent grant into mkt_cosmetic_unlock.
+    const given = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE rater_id = $1`, [raterId]).catch(() => null);
+    if ((given?.n || 0) >= 10) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'kindred') ON CONFLICT DO NOTHING`, [raterId]).catch(() => {});
+    await bumpQuestProgress(raterId, "farm_rate", 1).catch(() => {}); // credit the "rate a friend's farm" quest (new ratings only)
+    await syncEarnedBadges(ownerId).catch(() => {}); // Well-Liked / Adored — the OWNER just received a rating
 
     const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
     return { ok: true, changed: true, isNew: true, myTier: t, xpGained: meta.raterXp, ...summary, charge };

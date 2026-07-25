@@ -90,6 +90,11 @@ const BADGE_RAID_DEFENDER = 10, BADGE_RAID_BASTION = 50;
 // Milestone thresholds for the newer sailing badges (waving, marine encounters, early voyages).
 const BADGE_WAVE_FRIENDLY = 25, BADGE_WAVE_AMBASSADOR = 100, BADGE_WAVE_BELOVED = 500;
 const BADGE_ENC_TESTED = 10, BADGE_ENC_VETERAN = 50, BADGE_FIRST_VOYAGE = 1, BADGE_SAIL_REGULAR = 25;
+// Activity-earned COSMETICS (granted into mkt_cosmetic_unlock, idempotent). Kept modest — the owner dislikes
+// grind — so they land well before the hard achievement badges. Art (CSS) is added in a later pass by id.
+const COSMETIC_SAILOR_VOYAGES = 10;  // "Seasoned Sailor" border
+const COSMETIC_WARBORN_WINS = 10;    // "Warborn" border
+const COSMETIC_HOARD_FORGES = 10;    // "Buried Hoard" background
 
 // After the free once-a-day tailwind is spent, extra tailwinds can be bought with gold — and the price DOUBLES
 // for each extra one caught this voyage (wind_recharges), so spamming tailwinds gets expensive fast.
@@ -1137,6 +1142,8 @@ export async function doRaid(buyerId, targetId = null) {
         if (wins >= BADGE_RAID_SCOURGE) await grantEventBadge(buyerId, "raid_scourge").catch(() => {});
         if (sim.myHp >= 100) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {}); // never got hit
         if (itemWon) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
+        // Earned cosmetic: the "Warborn" border for raid-win milestone (idempotent).
+        if (wins >= COSMETIC_WARBORN_WINS) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'warborn') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     } else {
         const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1); // Ironclad reduces losses by winning more, not by softening the bill
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
@@ -1416,6 +1423,8 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
     // Achievement badges (hard): forge count + forging a gold-or-better chest.
     const forgedRow = await db.queryOne(`UPDATE mkt_sailing SET chests_forged = COALESCE(chests_forged, 0) + 1 WHERE buyer_id = $1 RETURNING chests_forged`, [buyerId]).catch(() => null);
     if ((forgedRow?.chests_forged || 0) >= BADGE_DIG_EXCAVATOR) await grantEventBadge(buyerId, "dig_excavator").catch(() => {});
+    // Earned cosmetic: the "Buried Hoard" profile background for forging chests (idempotent).
+    if ((forgedRow?.chests_forged || 0) >= COSMETIC_HOARD_FORGES) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'background', 'hoard') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     if (CHEST_ORDER.indexOf(tierKey) >= CHEST_ORDER.indexOf("gold")) await grantEventBadge(buyerId, "dig_goldtouch").catch(() => {});
     const tier = CHEST_TIERS[tierKey];
     const upgraded = tierKey !== fragmentTier;
@@ -1555,6 +1564,8 @@ async function finishDig(buyerId, board) {
     if (voyagesNow >= BADGE_FIRST_VOYAGE) await grantEventBadge(buyerId, "first_voyage").catch(() => {});
     if (voyagesNow >= BADGE_SAIL_REGULAR) await grantEventBadge(buyerId, "sail_regular").catch(() => {});
     if (voyagesNow >= BADGE_VOYAGER) await grantEventBadge(buyerId, "sail_voyager").catch(() => {});
+    // Earned cosmetic: the "Seasoned Sailor" border for sticking with voyages (idempotent).
+    if (voyagesNow >= COSMETIC_SAILOR_VOYAGES) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'sailor') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
     await dropSeedFrom(buyerId, "sail_dig").catch(() => {}); // a chance to unearth a farming seed

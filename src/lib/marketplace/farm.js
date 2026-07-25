@@ -13,11 +13,12 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
-import { getGarden, farmPetCapBonus } from "@/lib/marketplace/farm-crops.js";
+import { getGarden, farmPetCapBonus, dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { farmRatingBits } from "@/lib/marketplace/farm-rating.js";
 import { placedDecoBuffs, decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
 // Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
@@ -207,6 +208,7 @@ export async function claimPig(buyerId) {
         }
     }
     await trackActivity(buyerId, "loot_pig", { gold, item: item?.name || null }).catch(() => {});
+    await syncEarnedBadges(buyerId).catch(() => {}); // Pig Whisperer / Pig Tycoon
     return { ok: true, gold, goldAfter: paid?.gold ?? null, item };
 }
 
@@ -287,6 +289,8 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
     if (own) {
         const res = await applyConsumable(feederId, consumableId, null, petId);
         if (!res.ok) return res;
+        await trackActivity(feederId, "feed_pet", { petId }).catch(() => {});
+        await bumpQuestProgress(feederId, "feed_pet", 1).catch(() => {});
         const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [feederId, petId]).catch(() => null);
         const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
         return { ...res, petId, level: info.level, xp: row?.xp || 0, into: info.into, span: info.span, maxed: info.maxed };
@@ -405,6 +409,9 @@ export async function petPet(petterId, petId, ownerId = null) {
     await awardXp(petterId, own ? "pet_farm" : "pet_farm_other", { points: playerXp, gold: goldGained }).catch(() => {});
     await trackActivity(petterId, own ? "pet_farm" : "pet_other", { petId, owner: own ? undefined : petOwner }).catch(() => {});
     await bumpQuestProgress(petterId, "pet_animal", 1).catch(() => {});
+    // Farm-native seed drop: tending a pet on the farm can turn up a fresh seed (mostly common). Best-effort,
+    // Forager-scaled inside dropSeedFrom — feeds the farm's own seed supply.
+    const foundSeed = await dropSeedFrom(petterId, "pet_farm").catch(() => null);
 
     const info = petLevelInfo(newXp, def?.rarity || "common");
     return {
@@ -419,6 +426,7 @@ export async function petPet(petterId, petId, ownerId = null) {
         into: info.into,
         span: info.span,
         maxed: info.maxed,
+        foundSeed,
         petting: flatBudget(await pettingBudget(petterId), own),
     };
 }

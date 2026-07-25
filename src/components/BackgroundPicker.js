@@ -50,7 +50,7 @@ export default function BackgroundPicker({ current = "none", level = 1, unlockAl
             <div className="bg-swatches">
                 {backgrounds.map((b) => {
                     const isSel = equipped === b.id;
-                    const forSale = !b.unlocked && b.id !== "none";
+                    const forSale = !b.unlocked && !b.achievement && b.id !== "none";
                     const price = forSale ? cosmeticPrice("background", b.level) : 0;
                     const canAfford = gold >= price;
                     return (
@@ -61,14 +61,14 @@ export default function BackgroundPicker({ current = "none", level = 1, unlockAl
                             className={`bg-swatch${isSel ? " is-selected" : ""}${!b.unlocked ? " is-locked" : ""}`}
                             onClick={() => (b.unlocked ? equip(b.id) : (forSale ? (canAfford ? buy(b.id) : router.push("/marketplace/credit")) : null))}
                             aria-pressed={isSel}
-                            title={b.unlocked ? b.label : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${b.level}`)}
+                            title={b.unlocked ? b.label : (b.achievement ? b.earn : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${b.level}`))}
                         >
                             <span className={`bg-swatch-scene${b.id !== "none" ? ` bg-scene bg-${b.id}` : ""}`}>
                                 {!b.unlocked ? <span className="bg-swatch-lock" aria-hidden="true">{forSale ? "💰" : "🔒"}</span> : null}
                             </span>
                             <span className="bg-swatch-label">{b.label}</span>
                             <span className="bg-swatch-sub muted">
-                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${b.level}`)}
+                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.achievement ? b.earn : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${b.level}`))}
                             </span>
                         </button>
                     );

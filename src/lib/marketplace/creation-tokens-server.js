@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { grantCoins } from "@/lib/marketplace/store-credit.js";
 import { getCreationTier } from "@/lib/marketplace/creation-tokens.js";
+import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
 // ── Creation Token purchase bookkeeping. Mirrors the store-credit purchase flow (record pending → charge →
 // finalize on the single pending→paid transition) so a retried charge can never double-grant. On finalize we
@@ -40,6 +41,7 @@ export async function finalizeCreationPurchase(purchaseId, { squarePaymentId = n
     }
     const res = await grantCustomCredit(won.buyer_id, won.tokens).catch(() => null);
     await grantCoins(won.buyer_id, won.coins);
+    await grantEventBadge(won.buyer_id, "creation_patron").catch(() => {}); // backed the artists — bought a bundle
     return { granted: true, tokens: won.tokens, coins: won.coins, tokenBalance: res?.credits ?? (await getTokenBalance(won.buyer_id)) };
 }
 

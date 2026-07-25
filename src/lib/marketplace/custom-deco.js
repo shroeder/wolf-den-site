@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { generateImage } from "@/lib/marketplace/openai-image.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
 // Player-made decorations: describe → the art pipeline draws ONE image → if you don't love it, add a short
 // correction note and it redraws (the original description is preserved, your note nudges it) → pick one. Each
@@ -86,6 +87,10 @@ export async function finalizeCustomDeco(buyerId, id, chosenUrl) {
     await db.query(`UPDATE mkt_custom_deco SET status = 'final', chosen_url = $2, updated_at = NOW() WHERE id = $1`, [Number(id), chosenUrl]).catch(() => {});
     await db.query(`INSERT INTO mkt_deco_sprite (deco_id, url, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (deco_id) DO UPDATE SET url = EXCLUDED.url, updated_at = NOW()`, [decoId, chosenUrl]).catch(() => {});
     await db.query(`INSERT INTO mkt_deco_owned (buyer_id, deco_id, qty) VALUES ($1, $2, 1) ON CONFLICT (buyer_id, deco_id) DO NOTHING`, [buyerId, decoId]).catch(() => {});
+    // Earned cosmetic: finishing a creation grants the "Artisan's Mark" border (idempotent). Creations are a
+    // premium, deliberate act, so a single finished piece is a fair unlock.
+    await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'artisan') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+    await syncEarnedBadges(buyerId).catch(() => {}); // First Creation / Artisan / Gallery
     return { ok: true, decoId, name: row.name };
 }
 

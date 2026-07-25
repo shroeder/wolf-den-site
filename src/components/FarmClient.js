@@ -434,7 +434,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const plantSeedAt = useCallback(async (slot, seedId) => { setPlanting(null); await gardenAct({ action: "plant", slot, seedId }, `p-${slot}`); }, [gardenAct]);
     const harvestAt = useCallback(async (slot) => {
         const r = await gardenAct({ action: "harvest", slot }, `h-${slot}`);
-        if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji }); SFX.coin(); }
+        if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed }); SFX.coin(); }
     }, [gardenAct]);
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
@@ -1244,7 +1244,7 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
     };
     const plantScale = ready ? 1 : 0.4 + 0.6 * progress; // grows from a seedling as it matures
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
-        : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — find seeds across the games")
+        : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — harvest crops, tend pets, or play the other games to find seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
     return (
         <button type="button" onClick={onClick} title={title}
@@ -1421,7 +1421,7 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpaw
                         <button key={s.id} type="button" onClick={() => setSeedInfo(s)} title={`${s.name} — tap for details`} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
                             <span style={{ fontSize: 15 }}>{s.emoji}</span>{s.name}<span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span>
                         </button>
-                    )) : <span className="muted" style={{ fontSize: 12 }}>none yet — find them across the games (boss, sailing, chests…).</span>}
+                    )) : <span className="muted" style={{ fontSize: 12 }}>none yet — your farm drops its own from harvests &amp; petting, plus the other games (boss, sailing, chests…).</span>}
                 </div>
             </div>
 
@@ -1538,7 +1538,7 @@ function SeedPickerModal({ garden, slot, busy, onPick, onClose }) {
                                 </span>
                             </span>
                         </button>
-                    )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds yet — find them across the games (boss, sailing, chests…).</div>}
+                    )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds yet — harvest crops &amp; tend pets to find your own, or play the other games (boss, sailing, chests…).</div>}
                 </div>
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Cancel</button>
             </div>
@@ -1638,6 +1638,7 @@ function HarvestToast({ toast, onClose }) {
                         <div style={{ fontSize: 24, fontWeight: 900, color: "#ffd75e", marginTop: 6 }}>+{(toast.gold || 0).toLocaleString()} 🪙</div>
                         {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.12)", border: "1px solid rgba(140,200,255,0.45)", fontWeight: 800, fontSize: 13 }}>🎁 Harvest loot: {toast.bonus}</div> : null}
                         {toast.savedSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(120,220,120,0.12)", border: "1px solid rgba(120,220,120,0.45)", fontWeight: 700, fontSize: 13 }}>🌰 Seed saved! {toast.savedEmoji} back in your bag</div> : null}
+                        {toast.foundSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(143,227,154,0.12)", border: "1px solid rgba(143,227,154,0.45)", fontWeight: 700, fontSize: 13 }}>🌱 Found a {toast.foundSeed.emoji} {toast.foundSeed.name} seed in the harvest!</div> : null}
                     </>
                 )}
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>

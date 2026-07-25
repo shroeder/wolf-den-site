@@ -15,6 +15,9 @@ export const BACKGROUNDS = [
     { id: "voidstorm", label: "Voidstorm", level: 66, icon: "🌀", hint: "A churning dark tempest", animated: true },
     { id: "empyrean", label: "Empyrean", level: 88, icon: "🌟", hint: "Golden heavens", animated: true },
     { id: "singularity", label: "Singularity", level: 100, icon: "🌌", hint: "The end of everything", animated: true },
+    // --- Activity-earned (achievement-gated) — NOT level-gated and NOT for sale. Granted into
+    // mkt_cosmetic_unlock at the digging completion site; unlocked purely by the `owned` grant (no `level`).
+    { id: "hoard", label: "Buried Hoard", icon: "🪙", hint: "A cavern of unearthed gold", animated: true, achievement: true, rarity: "epic", earn: "Forge 10 treasure chests" },
 ];
 
 export function backgroundById(id) {
@@ -22,7 +25,10 @@ export function backgroundById(id) {
 }
 
 export function isBackgroundUnlocked(id, level, { unlockAll = false, owned = null } = {}) {
-    return (owned && owned.has(id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= backgroundById(id).level;
+    const b = backgroundById(id);
+    // Activity-earned backgrounds are unlocked ONLY by the grant (no level, no staff bypass).
+    if (b.achievement) return Boolean(owned && owned.has(b.id));
+    return (owned && owned.has(id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= b.level;
 }
 
 // The class(es) to hang on the hero container so it renders the scene. Empty for the default/none.

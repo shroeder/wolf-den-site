@@ -15,7 +15,8 @@ import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
 // chest). Rain (reported by the client on load) and bought fertilizer cut the remaining grow time; upgrades
 // add plots, speed growth, boost seed-finding, raise the petting cap, and improve harvest-chest luck. Seeds
-// are found across the other games (see maybeDropSeed) — you don't buy them.
+// are found by working the farm itself (harvesting crops + tending pets) AND across the other games (see
+// SEED_SOURCES / dropSeedFrom) — you don't buy them, and the farm now sustains its own supply.
 
 // Crop catalog. growMin = minutes to grow at base speed; sell = base gold on harvest; xp = player XP. On TOP of
 // that, EVERY harvest rolls one random reward from the shared HARVEST_POOL — and rarer crops shift those odds
@@ -54,13 +55,17 @@ const SEED_SOURCES = {
     chest_wooden: { chance: 0.5, rarities: { common: 84, rare: 16 } },
     chest_iron: { chance: 0.6, rarities: { common: 44, rare: 42, epic: 14 } },
     chest_gold: { chance: 0.8, rarities: { common: 14, rare: 38, epic: 33, legendary: 14, mythic: 1 } },
+    // Farm-native drops so the loop feeds itself — mostly common, with a slim rare/epic tail. Working the farm
+    // (harvesting crops + tending pets) now finds its own seeds, not just the other games.
+    harvest_crop: { chance: 0.15, rarities: { common: 78, rare: 18, epic: 4 } },
+    pet_farm: { chance: 0.1, rarities: { common: 85, rare: 14, epic: 1 } },
 };
 
 // Upgrade tracks — each 5 levels. Effects applied in the helpers below.
 export const FARM_UPGRADES = {
     plots: { name: "Extra Plot", emoji: "🟫", max: 5, base: 150, desc: "+1 planting plot" },
     grow: { name: "Green Thumb", emoji: "🌱", max: 5, base: 220, desc: "−8% grow time per level" },
-    seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 160, desc: "+25% seeds found across the games" },
+    seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 160, desc: "+25% seeds found — harvests, petting & the other games" },
     petcap: { name: "Pet Whisperer", emoji: "🐾", max: 5, base: 240, desc: "+1 free petting every day" },
     chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 300, desc: "+3% chance per level to bump a harvest reward up a loot tier" },
     seedsaver: { name: "Seed Saver", emoji: "🌰", max: 5, base: 200, desc: "+1% to keep the seed when you harvest" },
@@ -286,9 +291,18 @@ export async function harvestPlot(buyerId, slot) {
     }
     await trackActivity(buyerId, "harvest_crop", { seedId: claimed.seed_id, rarity, gold, loot: loot.label, tier: loot.tier }).catch(() => {});
     await bumpQuestProgress(buyerId, "harvest_crop", 1).catch(() => {});
+    // Earned cosmetic: the "Harvest Crown" border at 20 lifetime harvests. Reuses the harvest_crop activity
+    // count (just logged above), so it needs no new counter. Idempotent grant into mkt_cosmetic_unlock.
+    const harvested = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_activity_event WHERE buyer_id = $1 AND event = 'harvest_crop'`, [buyerId]).catch(() => null);
+    if ((harvested?.n || 0) >= 20) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'harvest_crown') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+    // Epic-or-better harvest also credits the "harvest a rare crop" quest.
+    if (rarity === "epic" || rarity === "legendary" || rarity === "mythic") await bumpQuestProgress(buyerId, "harvest_rare", 1).catch(() => {});
+    // Farm-native seed drop: a modest chance for the harvest itself to yield back a fresh seed, so the farm
+    // sustains its own supply (on top of the Seed Saver recovery above). Best-effort, Forager-scaled inside.
+    const foundSeed = await dropSeedFrom(buyerId, "harvest_crop").catch(() => null);
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.
@@ -320,6 +334,9 @@ export async function applyFertilizer(buyerId, slot) {
           WHERE buyer_id = $1 AND slot = $2`,
         [buyerId, slot, 1 - cut]
     ).catch(() => {});
+    await trackActivity(buyerId, "fertilize_crop", { slot }).catch(() => {});
+    await bumpQuestProgress(buyerId, "fertilize_crop", 1).catch(() => {});
+    await syncEarnedBadges(buyerId).catch(() => {}); // Fertilizer Baron
     return { ok: true, garden: await getGarden(buyerId) };
 }
 

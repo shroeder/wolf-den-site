@@ -181,7 +181,7 @@ export async function equipBorder(buyerId, borderId) {
     const unlockAll = badges.some((s) => ["owner", "site_admin", "staff"].includes(s));
     const owned = await purchasedSet(buyerId, "border");
     if (border.id !== "none" && !isBorderUnlocked(border.id, level, { badges, unlockAll, owned })) {
-        throw new Error(border.requiresBadges ? `That frame is ${border.lockLabel || "role"}-exclusive.` : `That border unlocks at Level ${border.level}.`);
+        throw new Error(border.requiresBadges ? `That frame is ${border.lockLabel || "role"}-exclusive.` : border.achievement ? `Earn that border: ${border.earn}.` : `That border unlocks at Level ${border.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_border = $2, updated_at = NOW() WHERE id = $1`, [buyerId, border.id === "none" ? null : border.id]);
     return getProfile(buyerId);
@@ -208,7 +208,7 @@ export async function equipBackground(buyerId, backgroundId) {
     const unlockAll = badgeRows.map((r) => r.badge_slug).some((s) => ["owner", "site_admin", "staff"].includes(s));
     const owned = await purchasedSet(buyerId, "background");
     if (bg.id !== "none" && !isBackgroundUnlocked(bg.id, level, { unlockAll, owned })) {
-        throw new Error(`That background unlocks at Level ${bg.level}.`);
+        throw new Error(bg.achievement ? `Earn that background: ${bg.earn}.` : `That background unlocks at Level ${bg.level}.`);
     }
     await db.query(`UPDATE mkt_buyer SET equipped_background = $2, updated_at = NOW() WHERE id = $1`, [buyerId, bg.id === "none" ? null : bg.id]);
     return getProfile(buyerId);

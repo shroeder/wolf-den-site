@@ -30,6 +30,14 @@ export const BORDERS = [
     { id: "abyss", label: "Abyss", level: 72, icon: "🕳️", hint: "Light-swallowing dark", animated: true },
     { id: "godray", label: "Godray", level: 90, icon: "🌟", hint: "Radiance of the divine", animated: true },
     { id: "singularity", label: "Singularity", level: 100, icon: "🌌", hint: "Only for the Fenrir", animated: true },
+    // --- Activity-earned (achievement-gated) — NOT level-gated and NOT for sale. Granted into
+    // mkt_cosmetic_unlock when you hit the milestone at the activity's completion site (see each system).
+    // No `level` on purpose so they never show on the level track; unlocked purely by the `owned` grant.
+    { id: "sailor", label: "Seasoned Sailor", icon: "⚓", hint: "A weathered rope-and-anchor frame", animated: false, achievement: true, rarity: "epic", earn: "Complete 10 voyages" },
+    { id: "warborn", label: "Warborn", icon: "⚔️", hint: "A raider's war-banner frame", animated: true, achievement: true, rarity: "epic", earn: "Win 10 sea raids" },
+    { id: "harvest_crown", label: "Harvest Crown", icon: "🌾", hint: "A crown of golden wheat", animated: false, achievement: true, rarity: "epic", earn: "Harvest 20 crops" },
+    { id: "artisan", label: "Artisan's Mark", icon: "🎨", hint: "The maker's signature frame", animated: true, achievement: true, rarity: "rare", earn: "Finish a custom creation" },
+    { id: "kindred", label: "Kindred Spirit", icon: "💞", hint: "A warm glow of generosity", animated: true, achievement: true, rarity: "rare", earn: "Rate 10 friends' farms" },
     // --- Role-exclusive (badge-gated) ---
     { id: "role_volunteer", label: "Volunteer", icon: "🙌", hint: "Volunteer-only frame", animated: true, requiresBadges: ["volunteer"], lockLabel: "Volunteers" },
     { id: "role_staff", label: "Staff", icon: "⭐", hint: "Staff-only frame", animated: true, requiresBadges: ["staff"], lockLabel: "Staff only" },
@@ -46,6 +54,9 @@ export function borderById(id) {
 export function isBorderUnlocked(id, level, { badges = [], unlockAll = false, owned = null } = {}) {
     const b = borderById(id);
     if (b.requiresBadges) return b.requiresBadges.some((s) => badges.includes(s));
+    // Activity-earned borders are unlocked ONLY by the grant (no level, no staff bypass) — like role borders,
+    // they're earned, not leveled into.
+    if (b.achievement) return Boolean(owned && owned.has(b.id));
     return (owned && owned.has(b.id)) || unlockAll || Math.max(1, Math.floor(Number(level) || 1)) >= b.level;
 }
 

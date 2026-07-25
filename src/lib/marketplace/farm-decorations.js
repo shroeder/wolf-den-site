@@ -3,8 +3,10 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { DECORATIONS, decorationById, isDecoration, decorationBuffs, decoLight, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
 import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
+import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
 
 const isCustom = (id) => String(id).startsWith("custom:");
 const CUSTOM_COLOR = "#c9a2ff";
@@ -153,6 +155,10 @@ export async function placeDecoration(buyerId, decoId, x, y) {
     if ((total?.n || 0) >= PLACE_CAP) return { ok: false, error: "placement_limit", ...(await decoState(buyerId)) };
     const topZ = await db.queryOne(`SELECT COALESCE(MAX(z), 0) AS z FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ z: 0 }));
     await db.query(`INSERT INTO mkt_deco_placement (buyer_id, deco_id, x, y, z) VALUES ($1, $2, $3, $4, $5)`, [buyerId, decoId, px, py, (topZ?.z || 0) + 1]).catch(() => {});
+    await trackActivity(buyerId, "place_deco", { decoId }).catch(() => {});
+    await bumpQuestProgress(buyerId, "place_deco", 1).catch(() => {});
+    await syncEarnedBadges(buyerId).catch(() => {}); // Decorator / Landscaper
+    if (isCustom(decoId)) await grantEventBadge(buyerId, "creation_curator").catch(() => {}); // placed your own creation
     return { ok: true, ...(await decoState(buyerId)) };
 }
 
@@ -169,6 +175,8 @@ export async function transformDecoration(buyerId, placementId, { scale, rot } =
         [placementId, buyerId, s, r]
     ).catch(() => null);
     if (!moved) return { ok: false, error: "not_found" };
+    await trackActivity(buyerId, "arrange_deco", { placementId, kind: "transform" }).catch(() => {});
+    await bumpQuestProgress(buyerId, "arrange_deco", 1).catch(() => {});
     return { ok: true, ...(await decoState(buyerId)) };
 }
 
@@ -179,6 +187,8 @@ export async function moveDecoration(buyerId, placementId, x, y) {
     const py = clampPct(y, 55);
     const moved = await db.queryOne(`UPDATE mkt_deco_placement SET x = $3, y = $4 WHERE id = $1 AND buyer_id = $2 RETURNING id`, [placementId, buyerId, px, py]).catch(() => null);
     if (!moved) return { ok: false, error: "not_found" };
+    await trackActivity(buyerId, "arrange_deco", { placementId, kind: "move" }).catch(() => {});
+    await bumpQuestProgress(buyerId, "arrange_deco", 1).catch(() => {});
     return { ok: true, ...(await decoState(buyerId)) };
 }
 

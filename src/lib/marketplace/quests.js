@@ -39,6 +39,12 @@ export const QUEST_TEMPLATES = [
     { key: "plant_seed", label: "Plant a seed", metric: "plant_seed", target: 1, gold: 90, area: "/marketplace/farm", cta: "Plant a crop", gate: "farm" },
     { key: "pet_a_pet", label: "Pet a pet on the farm", metric: "pet_animal", target: 1, gold: 100, area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
     { key: "pet_three", label: "Pet 3 pets today", metric: "pet_animal", target: 3, gold: 190, chest: "wooden", area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
+    { key: "fertilize_crop", label: "Fertilize a growing crop", metric: "fertilize_crop", target: 1, gold: 110, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },
+    { key: "harvest_rare", label: "Harvest an epic-or-better crop", metric: "harvest_rare", target: 1, gold: 190, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },
+    { key: "feed_treat", label: "Feed a pet a treat", metric: "feed_pet", target: 1, gold: 120, area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
+    { key: "place_deco", label: "Place a decoration on your farm", metric: "place_deco", target: 1, gold: 120, area: "/marketplace/farm", cta: "Decorate your farm", gate: "farm" },
+    { key: "arrange_deco", label: "Move or resize a decoration", metric: "arrange_deco", target: 1, gold: 90, area: "/marketplace/farm", cta: "Decorate your farm", gate: "farm" },
+    { key: "rate_friend", label: "Rate a friend's farm", metric: "farm_rate", target: 1, gold: 110, area: "/marketplace/farm", cta: "Visit a friend's farm", gate: "farm" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

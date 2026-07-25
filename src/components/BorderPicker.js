@@ -51,7 +51,7 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
             <div className="border-swatches">
                 {borders.map((b) => {
                     const isSel = equipped === b.id;
-                    const forSale = !b.unlocked && !b.requiresBadges && b.id !== "none";
+                    const forSale = !b.unlocked && !b.requiresBadges && !b.achievement && b.id !== "none";
                     const price = forSale ? cosmeticPrice("border", b.level) : 0;
                     const canAfford = gold >= price;
                     return (
@@ -62,7 +62,7 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
                             className={`border-swatch${isSel ? " is-selected" : ""}${!b.unlocked ? " is-locked" : ""}`}
                             onClick={() => (b.unlocked ? equip(b.id) : (forSale ? (canAfford ? buy(b.id) : router.push("/marketplace/credit")) : null))}
                             aria-pressed={isSel}
-                            title={b.unlocked ? b.label : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${b.level}`)}
+                            title={b.unlocked ? b.label : (b.achievement ? b.earn : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${b.level}`))}
                         >
                             <span className={`border-swatch-av${b.id !== "none" ? ` av-border av-border-${b.id}` : ""}`}>
                                 {avatarUrl ? (
@@ -75,7 +75,7 @@ export default function BorderPicker({ current = "none", level = 1, avatarUrl = 
                             </span>
                             <span className="border-swatch-label">{b.label}</span>
                             <span className="border-swatch-sub muted">
-                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${b.level}`))}
+                                {b.unlocked ? (isSel ? "Equipped ✓" : b.hint) : (b.requiresBadges ? b.lockLabel : (b.achievement ? b.earn : (forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${b.level}`)))}
                             </span>
                         </button>
                     );

@@ -12,8 +12,8 @@ import { LEVEL_PERKS, RANKS } from "@/lib/marketplace/ranks.js";
 function allUnlocks() {
     const out = [];
     RANKS.forEach((r) => { if (r.level > 1) out.push({ level: r.level, icon: r.emoji, label: `${r.title} rank` }); });
-    BORDERS.filter((b) => b.id !== "none" && !b.requiresBadges).forEach((b) => out.push({ level: b.level, icon: b.icon, label: `${b.label} border` }));
-    BACKGROUNDS.filter((b) => b.id !== "none").forEach((b) => out.push({ level: b.level, icon: b.icon, label: `${b.label} background` }));
+    BORDERS.filter((b) => b.id !== "none" && !b.requiresBadges && !b.achievement).forEach((b) => out.push({ level: b.level, icon: b.icon, label: `${b.label} border` }));
+    BACKGROUNDS.filter((b) => b.id !== "none" && !b.achievement).forEach((b) => out.push({ level: b.level, icon: b.icon, label: `${b.label} background` }));
     FRAMES.filter((f) => f.id !== "none" && !f.requiresBadges).forEach((f) => out.push({ level: f.level, icon: f.icon, label: `${f.label} frame` }));
     AVATAR_COSMETICS.filter((c) => !c.requiresBadges).forEach((c) => out.push({ level: c.level, icon: c.icon, label: c.label }));
     LEVEL_PERKS.filter((p) => !p.soon).forEach((p) => out.push({ level: p.level, icon: p.icon, label: p.label }));
