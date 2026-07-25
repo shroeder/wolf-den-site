@@ -105,7 +105,7 @@ function perkDesc(key, v) {
         case "ferocity": return `+${v}% PASSIVE auto-damage only (24/7)`;
         case "fortune": return `+${v * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day (banked all week)`;
         case "extra_strike": return `+${v} manual daily strike${v > 1 ? "s" : ""}`;
-        case "first_hit": return `Your first strike each day deals ×${v} damage`;
+        case "first_hit": return `Your first MANUAL strike each day (your daily boss tap) deals ×${v} damage — passive auto-damage isn't affected`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
         case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
         case "execute": return `+${Math.round(v * 100)}% damage when the boss is below 30% HP`;

@@ -336,8 +336,8 @@ export function signatureFor(itemId) {
     if (!s) return null;
     const i = tierIdx(itemId);
     const parts = [];
-    if (s.firstHitMult) parts.push(`Your first daily strike hits for ${s.firstHitMult >= 3 ? "TRIPLE" : "DOUBLE"}.`);
-    if (s.firstHitCrit) parts.push("Your first daily strike is a GUARANTEED critical.");
+    if (s.firstHitMult) parts.push(`Your first MANUAL strike each day (your daily boss tap) hits for ${s.firstHitMult >= 3 ? "TRIPLE" : "DOUBLE"} — passive auto-damage isn't affected.`);
+    if (s.firstHitCrit) parts.push("Your first MANUAL strike each day (your daily boss tap) is a GUARANTEED critical.");
     if (s.critMult) parts.push("Your critical hits strike TWICE.");
     if (s.eruptChance) parts.push(`${pct(s.eruptChance)} chance on each hit to erupt for ${s.eruptMult >= 3 ? "TRIPLE" : "double"} damage.`);
     if (s.extraStrikes) parts.push(`Grants +${s.extraStrikes} extra manual daily strike${s.extraStrikes > 1 ? "s" : ""}.`);
