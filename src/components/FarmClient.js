@@ -12,20 +12,30 @@ import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/component
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 
-const statText = (stat) => {
-    const m = PET_STAT_META[stat] || { label: stat, icon: "" };
-    return `${m.icon} ${m.label}`.trim();
+// A pet's OWNED (just-by-having-it) passive bonus, split into { icon, name, desc } so the modal can lay it out
+// as a clean labeled row instead of a run-on sentence. Earner stats explain the real income; combat stats show
+// the buff. GOLD_PER_POINT / TICKETS rates come from pet-perks.js so the numbers never drift.
+const ownedBonusParts = (p) => {
+    if (p.stat === "gold_find") return { icon: "💰", name: `+${Math.max(1, Math.round(p.value * GOLD_PER_POINT))} gold / hr`, desc: "Passive income — grows as it levels · every pet you own stacks" };
+    if (p.stat === "xp_gain") return { icon: "✨", name: `+${p.value} XP / hr`, desc: "Passive income — grows as it levels · every pet you own stacks" };
+    if (p.stat === "fortune") return { icon: "🍀", name: `+${p.value * TICKETS_PER_FORTUNE_PER_DAY} tickets / day`, desc: "Boss-raffle tickets, banked all week · every pet you own stacks" };
+    const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨" };
+    return { icon: m.icon, name: `+${p.value} ${m.label}`, desc: "Buffs your boss damage · stacks across your whole menagerie" };
 };
-// Plain-language description of a pet's OWNED (just-by-having-it) bonus. Earner stats no longer read as a raw
-// "+6 Gold Find" number — they explain the actual effect.
-const ownedBonusText = (p) => {
-    // Passive income: gold uses the shared GOLD_PER_POINT rate (pet-perks.js), XP is 1 per point/hr (Lv1
-    // base rate; each pet's share scales up as it levels, and every owned pet stacks).
-    if (p.stat === "gold_find") return `💰 +${Math.max(1, Math.round(p.value * GOLD_PER_POINT))} gold/hr passive income — more as it levels (all your pets stack).`;
-    if (p.stat === "xp_gain") return `✨ +${p.value} XP/hr passive income — more as it levels (all your pets stack).`;
-    if (p.stat === "fortune") return `🍀 +${p.value * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day — banked all week (all your pets stack).`;
-    return `+${p.value} ${statText(p.stat)} — buffs your boss damage (stacks across your whole menagerie).`;
-};
+
+// One effect row in the pet modal: an icon tile + a tiny label, the effect name, and a muted one-line detail.
+function FxRow({ label, icon, name, desc, accent }) {
+    return (
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "9px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ flex: "0 0 auto", width: 30, height: 30, borderRadius: 8, display: "grid", placeItems: "center", fontSize: 15, background: "rgba(255,255,255,0.06)" }}>{icon}</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: accent }}>{label}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.25, marginTop: 1 }}>{name}</div>
+                {desc ? <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.35, marginTop: 2 }}>{desc}</div> : null}
+            </div>
+        </div>
+    );
+}
 
 // Owner-only Farm: your owned pets wander a little pasture. On your own farm you can pet each one once a day
 // for a small XP bump; you can also look up another member and watch their pets roam (view-only).
@@ -1730,16 +1740,11 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                         </div>
                     </div>
 
-                    {/* What it does */}
-                    {perk ? (
-                        <div style={{ marginBottom: 8 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700 }}>⭐ {perk.icon} {perk.name} <span className="muted" style={{ fontWeight: 400 }}>· equipped</span></div>
-                            {perk.desc ? <div className="muted" style={{ fontSize: 12 }}>{perk.desc}</div> : null}
-                        </div>
-                    ) : null}
-                    {passive ? (
-                        <div style={{ marginBottom: 8, fontSize: 12 }}>
-                            <span style={{ fontWeight: 700 }}>Owned bonus:</span> <span className="muted">{ownedBonusText(passive)}</span>
+                    {/* What it does — two clean, parallel effect rows (equipped power + owned bonus) */}
+                    {(perk || passive) ? (
+                        <div style={{ display: "grid", gap: 8, marginBottom: 10 }}>
+                            {perk ? <FxRow label="Equipped power" icon={perk.icon} name={perk.name} desc={perk.desc} accent={ring} /> : null}
+                            {passive ? (() => { const ob = ownedBonusParts(passive); return <FxRow label="Owned bonus" icon={ob.icon} name={ob.name} desc={ob.desc} accent="#9aa0a6" />; })() : null}
                         </div>
                     ) : null}
 
