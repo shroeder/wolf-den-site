@@ -79,6 +79,14 @@ async function ownedSet(buyerId, ids) {
     return new Set(rows.map((r) => r.item_id));
 }
 
+// Which of these item ids the member currently has EQUIPPED. An equipped piece must be unequipped before it
+// can be offered in a trade (defense in depth — the UI disables equipped cards, this blocks any bypass).
+async function equippedSet(buyerId, ids) {
+    if (!ids.length) return new Set();
+    const rows = await db.query(`SELECT item_id FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, ids]).catch(() => []);
+    return new Set(rows.map((r) => r.item_id));
+}
+
 // Is a specific (owner, item) copy already locked in another PENDING offer — either requested from that
 // owner or offered by them? Used to block duplicate/conflicting trades for the same piece. Returns the
 // first conflicting item id, or null.
@@ -149,6 +157,13 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
     const [mine, theirs] = await Promise.all([ownedSet(fromId, oItems), ownedSet(toId, rItems)]);
     if (oItems.some((id) => !mine.has(id))) return { ok: false, error: "you_dont_own_offered" };
     if (rItems.some((id) => !theirs.has(id))) return { ok: false, error: "they_dont_own_requested" };
+
+    // An equipped piece can't be offered — unequip it first (matches the UI, and blocks any client bypass).
+    if (oItems.length) {
+        const equipped = await equippedSet(fromId, oItems);
+        const eqId = oItems.find((id) => equipped.has(id));
+        if (eqId) return { ok: false, error: "item_equipped", itemName: itemById(eqId)?.name || eqId };
+    }
 
     // Pets: offered must be MY earned+tradeable pets the recipient doesn't already own; requested must be
     // THEIR earned+tradeable pets I don't already own.

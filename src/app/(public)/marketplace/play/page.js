@@ -33,6 +33,7 @@ const FEATURES = [
     { href: "/marketplace/badges", emoji: "🎖️", title: "Badges", desc: "Every badge you've earned — pick 3 to show on your card.", tone: "track" },
     { href: "/marketplace/leaderboard", emoji: "🥇", title: "Leaderboard", desc: "Where you rank against the whole pack.", tone: "leader" },
     { href: "/marketplace/bounties", emoji: "🎯", title: "Bounties", desc: "Post gold for real-world help — or claim someone else's.", tone: "bounty" },
+    { href: "/marketplace/invite", emoji: "🎁", title: "Invite Friends", desc: "Share your link — you both earn 500 gold + a chest.", tone: "track" },
 ];
 
 export default async function GamePlayHub({ searchParams }) {

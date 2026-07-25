@@ -41,6 +41,7 @@ const TILES = [
     { href: "/marketplace/trade", icon: "🤝", label: "Trades", sub: "Swap items & gold" },
     { href: "/marketplace/profile/avatar", icon: "🎨", label: "Your avatar", sub: "Build your look" },
     { href: "/marketplace/friends", icon: "👥", label: "Friends", sub: "Add & message" },
+    { href: "/marketplace/invite", icon: "🎁", label: "Invite friends", sub: "Earn 500 gold each" },
     { href: "/marketplace/inbox", icon: "✉️", label: "Inbox", sub: "All your messages" },
     { href: "/marketplace/badges", icon: "🎖️", label: "Badges", sub: "Show off & earn" },
     { href: "/marketplace/leaderboard", icon: "🏆", label: "Leaderboard", sub: "See your rank" },

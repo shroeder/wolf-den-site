@@ -7,10 +7,18 @@ import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import { STAT_META } from "@/lib/marketplace/items.js";
 
-function ItemToggle({ item, on, onClick }) {
+function ItemToggle({ item, on, onClick, blocked = false }) {
     const stats = item.stats && typeof item.stats === "object" ? Object.entries(item.stats) : [];
     return (
-        <button type="button" className={`equip-card rar-${item.rarity}${on ? " is-equipped" : ""}`} onClick={onClick} title={item.chargeLabel ? `Charged perk: ${item.chargeLabel}` : item.name}>
+        <button
+            type="button"
+            className={`equip-card rar-${item.rarity}${on ? " is-equipped" : ""}`}
+            onClick={blocked ? undefined : onClick}
+            disabled={blocked}
+            aria-disabled={blocked}
+            title={blocked ? "Equipped — unequip it on your Gear screen before you can trade it" : (item.chargeLabel ? `Charged perk: ${item.chargeLabel}` : item.name)}
+            style={blocked ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
+        >
             <ItemArt id={item.id} icon={item.icon} className="equip-card-glyph" />
             <span className="equip-card-name">{item.name}</span>
             {stats.length ? (
@@ -23,7 +31,8 @@ function ItemToggle({ item, on, onClick }) {
             {(item.charged || item.sea) ? (
                 <span style={{ fontSize: "0.6rem", color: "#ffd75e", fontWeight: 700 }}>{item.charged ? "🔋 perk" : ""}{item.charged && item.sea ? " · " : ""}{item.sea ? "🌊 sea" : ""}</span>
             ) : null}
-            <span className="equip-card-stats">{on ? "✓ in trade" : "tap to add"}</span>
+            {blocked ? <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "#ffd75e" }}>✓ equipped</span> : null}
+            <span className="equip-card-stats">{blocked ? "unequip to trade" : on ? "✓ in trade" : "tap to add"}</span>
         </button>
     );
 }
@@ -73,6 +82,7 @@ export default function TradeBuilder({ me, them, preselectWant = null, preselect
             const d = await r.json().catch(() => ({}));
             if (!r.ok) {
                 const MSG = {
+                    item_equipped: `${d?.itemName || "That item"} is equipped — unequip it on your Gear screen first, then trade it.`,
                     item_in_pending_trade: `${d?.itemName || "That item"} is already tied up in a pending trade — resolve or cancel that one first.`,
                     pet_in_pending_trade: `${d?.itemName || "That pet"} is already in a pending trade — resolve that one first.`,
                     they_dont_own_requested: "They no longer have that item.",
@@ -105,7 +115,7 @@ export default function TradeBuilder({ me, them, preselectWant = null, preselect
                         <input type="number" min="0" value={giveGold} onChange={(e) => setGiveGold(e.target.value)} placeholder="0" />
                     </label>
                     <div className="equip-bag-grid" style={{ marginTop: 10 }}>
-                        {me.items.length ? me.items.map((i) => <ItemToggle key={i.id} item={i} on={give.has(i.id)} onClick={() => toggle(setGive)(i.id)} />)
+                        {me.items.length ? me.items.map((i) => <ItemToggle key={i.id} item={i} on={give.has(i.id)} blocked={Boolean(i.equipped)} onClick={() => toggle(setGive)(i.id)} />)
                             : <p className="muted" style={{ margin: 0 }}>You have no items to give.</p>}
                     </div>
                     {mePets.length ? (

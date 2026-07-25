@@ -16,7 +16,7 @@ export const metadata = { title: "Propose a trade | Wolf Den", robots: { index: 
 // actually does — you shouldn't have to guess what you're giving away.
 const strip = (inv) => (inv?.items || []).map((i) => {
     const d = itemById(i.id);
-    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats: d?.stats || null, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea) };
+    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats: d?.stats || null, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea), equipped: Boolean(i.equipped) };
 });
 const petStrip = (ids) => ids.map((id) => collectibleById(id)).filter(Boolean).map((d) => ({ id: d.id, name: d.name, rarity: d.rarity }));
 

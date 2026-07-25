@@ -66,3 +66,80 @@ export async function maybeGrantReferral(newBuyerId) {
 
     return { referrerId, joinerId: newBuyerId };
 }
+
+// A member's own invite scorecard for the invite page: how many friends they invited, how many converted
+// (verified their email → the reward paid out), and the gold they earned from it. Cheap single-row query.
+export async function getReferralStats(buyerId) {
+    const empty = { invited: 0, converted: 0, goldEarned: 0 };
+    if (!buyerId) return empty;
+    const row = await db.queryOne(
+        `SELECT COUNT(*)::int AS invited,
+                COUNT(*) FILTER (WHERE referral_reward_at IS NOT NULL)::int AS converted
+           FROM mkt_buyer WHERE referred_by = $1`,
+        [buyerId]
+    ).catch(() => null);
+    if (!row) return empty;
+    return {
+        invited: row.invited || 0,
+        converted: row.converted || 0,
+        goldEarned: (row.converted || 0) * REF_REFERRER_GOLD,
+    };
+}
+
+// Whole-program telemetry for the admin invite screen. Three grouped queries (no N+1): headline totals,
+// the most recent joins (joiner + who referred them), and the top-referrer leaderboard.
+export async function getReferralAdminStats({ recentLimit = 25, leaderLimit = 25 } = {}) {
+    const [totalsRow, recentRows, leaderRows] = await Promise.all([
+        db.queryOne(
+            `SELECT COUNT(*) FILTER (WHERE referred_by IS NOT NULL)::int AS total_referred,
+                    COUNT(*) FILTER (WHERE referral_reward_at IS NOT NULL)::int AS total_converted
+               FROM mkt_buyer`
+        ).catch(() => null),
+        db.query(
+            `SELECT j.id AS joiner_id, j.alias AS joiner_alias, j.display_name AS joiner_name,
+                    r.alias AS referrer_alias, r.display_name AS referrer_name,
+                    j.created_at AS joined_at, j.referral_reward_at AS verified_at
+               FROM mkt_buyer j
+               JOIN mkt_buyer r ON r.id = j.referred_by
+              ORDER BY j.created_at DESC
+              LIMIT $1`,
+            [recentLimit]
+        ).catch(() => []),
+        db.query(
+            `SELECT r.id AS referrer_id, r.alias AS referrer_alias, r.display_name AS referrer_name,
+                    COUNT(j.id)::int AS invited,
+                    COUNT(j.id) FILTER (WHERE j.referral_reward_at IS NOT NULL)::int AS converted
+               FROM mkt_buyer r
+               JOIN mkt_buyer j ON j.referred_by = r.id
+              GROUP BY r.id, r.alias, r.display_name
+              ORDER BY converted DESC, invited DESC
+              LIMIT $1`,
+            [leaderLimit]
+        ).catch(() => []),
+    ]);
+
+    const totalReferred = totalsRow?.total_referred || 0;
+    const totalConverted = totalsRow?.total_converted || 0;
+    const label = (alias, name) => (alias ? `@${alias}` : name || "—");
+
+    return {
+        totals: {
+            totalReferred,
+            totalConverted,
+            conversionPct: totalReferred ? Math.round((totalConverted / totalReferred) * 1000) / 10 : 0,
+            goldPaidOut: totalConverted * (REF_REFERRER_GOLD + REF_JOINER_GOLD),
+        },
+        recentJoins: (recentRows || []).map((r) => ({
+            joiner: label(r.joiner_alias, r.joiner_name),
+            referrer: label(r.referrer_alias, r.referrer_name),
+            joinedAt: r.joined_at,
+            verifiedAt: r.verified_at,
+            converted: Boolean(r.verified_at),
+        })),
+        topReferrers: (leaderRows || []).map((r) => ({
+            referrer: label(r.referrer_alias, r.referrer_name),
+            invited: r.invited || 0,
+            converted: r.converted || 0,
+        })),
+    };
+}

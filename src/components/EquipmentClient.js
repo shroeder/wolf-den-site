@@ -45,6 +45,13 @@ function ItemGlyph({ id, className = "" }) {
     return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} />;
 }
 
+// Render a slot's glyph. The helmet slot uses the approved Warplate Helm die-cut sprite (never the 🪖
+// army-helmet emoji as a persistent icon); every other slot uses its emoji.
+function SlotIcon({ slot, size = 18 }) {
+    if (slot === "helmet") return <HelmetSprite size={size} />;
+    return <>{SLOT_ICON[slot] || "🎒"}</>;
+}
+
 // Resolve an item def from the loaded list (avoids re-importing ITEMS on the client render path).
 let DEFS = {};
 const itemDef = (id) => DEFS[id] || null;
@@ -97,8 +104,9 @@ function SetBonusCard({ set, onOpen }) {
     );
 }
 
-// The full set breakdown: every piece (equipped / owned / locked) plus all tiers and the capstone.
-function SetDetailSheet({ set, onClose }) {
+// The full set breakdown: every piece (equipped / owned / locked) plus all tiers and the capstone. Owned
+// pieces can be equipped (or unequipped) right here — no need to hunt the slot in the paper-doll.
+function SetDetailSheet({ set, onClose, onEquip, onUnequip, busy = false }) {
     const complete = set.equipped >= set.total;
     const pct = Math.round((set.equipped / set.total) * 100);
     return createPortal((
@@ -114,10 +122,15 @@ function SetDetailSheet({ set, onClose }) {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(88px,1fr))", gap: 8, marginTop: 12 }}>
                     {set.pieces.map((p) => (
-                        <div key={p.id} title={p.statsText || ""} style={{ padding: 8, borderRadius: 12, textAlign: "center", border: `1.5px solid ${p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : "rgba(255,255,255,0.1)"}`, background: p.equipped ? "rgba(255,215,94,0.06)" : "rgba(255,255,255,0.03)", opacity: p.owned || p.equipped ? 1 : 0.55 }}>
+                        <div key={p.id} title={p.statsText || ""} style={{ display: "flex", flexDirection: "column", padding: 8, borderRadius: 12, textAlign: "center", border: `1.5px solid ${p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : "rgba(255,255,255,0.1)"}`, background: p.equipped ? "rgba(255,215,94,0.06)" : "rgba(255,255,255,0.03)", opacity: p.owned || p.equipped ? 1 : 0.55 }}>
                             <ItemArt id={p.id} icon={p.icon} className="set-tile-art" />
                             <div style={{ fontSize: "0.72rem", fontWeight: 700, marginTop: 3, color: p.equipped ? (SET_RARITY[p.rarity] || undefined) : undefined }}>{p.name}</div>
                             <div className="muted" style={{ fontSize: "0.66rem", marginTop: 1 }}>{p.equipped ? "✅ equipped" : p.owned ? "• owned" : "🔒 locked"}</div>
+                            {p.equipped ? (
+                                onUnequip ? <button type="button" className="pill" onClick={() => onUnequip(p)} disabled={busy} style={{ marginTop: 6, fontSize: "0.68rem", padding: "3px 8px", alignSelf: "center" }}>Unequip</button> : null
+                            ) : p.owned && onEquip ? (
+                                <button type="button" className="pill" onClick={() => onEquip(p)} disabled={busy} style={{ marginTop: 6, fontSize: "0.68rem", padding: "3px 8px", alignSelf: "center", background: "rgba(143,216,255,0.14)", borderColor: "rgba(143,216,255,0.5)", color: "#8fd8ff" }}>⚔️ Equip</button>
+                            ) : null}
                         </div>
                     ))}
                 </div>
@@ -309,7 +322,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     const def = id ? itemDef(id) : null;
                     return (
                         <button type="button" key={s.slot} className={`equip-slot slot-${s.slot}${def ? ` filled rar-${def.rarity}` : ""}`} onClick={() => setSlot(s.slot)} title={def ? def.name : s.label}>
-                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" /> : <span className="equip-slot-empty">{SLOT_ICON[s.slot]}</span>}
+                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" /> : <span className="equip-slot-empty"><SlotIcon slot={s.slot} size={20} /></span>}
                         </button>
                     );
                 })}
@@ -415,8 +428,11 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
 
             {/* The bag */}
             <div className="card">
-                <h3>🎒 Inventory</h3>
-                <p className="muted" style={{ marginTop: 0 }}>Tap a piece of gear to see what it does — then equip or sell it.</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <h3 style={{ margin: 0, flex: 1 }}>🎒 Inventory</h3>
+                    <a href="/marketplace/trade" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff", whiteSpace: "nowrap" }}>my trades →</a>
+                </div>
+                <p className="muted" style={{ marginTop: 4 }}>Tap a piece of gear to see what it does — then equip, sell, or trade it.</p>
                 {(data.items || []).length ? (
                     <div className="equip-bag-grid">
                         {(data.items || []).map((i) => (
@@ -445,7 +461,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         return (
                             <div key={cat.slot} className="shop-cat">
                                 <button type="button" className="collapse-head" onClick={() => toggleCat(cat.slot)} aria-expanded={open}>
-                                    <span style={{ textTransform: "capitalize" }}>{cat.icon} {cat.label}<span className="collapse-count">{cat.items.length}</span></span>
+                                    <span style={{ textTransform: "capitalize", display: "inline-flex", alignItems: "center", gap: 6 }}>{cat.slot === "helmet" ? <HelmetSprite size={16} /> : cat.icon} {cat.label}<span className="collapse-count">{cat.items.length}</span></span>
                                     <span className="collapse-chevron">{open ? "▾" : "▸"}</span>
                                 </button>
                                 {open ? (
@@ -546,8 +562,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 </div>
             ), document.body) : null}
 
-            {/* Full set breakdown (opened from a set card or an item's "part of a set" link). */}
-            {setDetail ? <SetDetailSheet set={setDetail} onClose={() => setSetDetail(null)} /> : null}
+            {/* Full set breakdown (opened from a set card or an item's "part of a set" link). Read the LIVE set
+                from data so equip/unequip from inside the sheet immediately flips a piece's state. */}
+            {setDetail ? (
+                <SetDetailSheet
+                    set={(data.setsOverview || []).find((s) => s.id === setDetail.id) || setDetail}
+                    onClose={() => setSetDetail(null)}
+                    onEquip={(p) => equipFromBag(p)}
+                    onUnequip={(p) => { const s = Object.keys(equipped).find((k) => equipped[k] === p.id); if (s) unequip(s); }}
+                    busy={busy}
+                />
+            ) : null}
 
             {/* Coin-shower juice on a sale. */}
             {coinBurst ? createPortal((
