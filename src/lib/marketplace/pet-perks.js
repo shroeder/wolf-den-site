@@ -20,6 +20,9 @@ const ERUPT_BY_RARITY = {
 const CHAIN_BY_RARITY = { common: 0.08, rare: 0.1, epic: 0.15, legendary: 0.2, mythic: 0.28, ascendant: 0.35, eternal: 0.45 };
 const EXECUTE_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.3, legendary: 0.45, mythic: 0.65, ascendant: 0.85, eternal: 1.1 };
 const FIRSTBLOOD_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.35, legendary: 0.5, mythic: 0.7, ascendant: 0.9, eternal: 1.2 };
+// Onslaught (opener) — bonus while the boss is FRESH (above 75% HP). The mirror of execute; a distinct proc so
+// elite openers (the Phoenix) don't clone a low-HP finisher.
+const ONSLAUGHT_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.3, legendary: 0.45, mythic: 0.65, ascendant: 0.85, eternal: 1.1 };
 
 // Perk mechanic → how it reads. STAT/econ perks add to the buff totals; proc perks fire on your strike.
 export const PERK_META = {
@@ -33,6 +36,7 @@ export const PERK_META = {
     erupt: { icon: "🌋", kind: "proc" },
     chain_strike: { icon: "🌀", kind: "proc" },
     execute: { icon: "☠️", kind: "proc" },
+    onslaught: { icon: "🌅", kind: "proc" },
     first_blood: { icon: "🩸", kind: "proc" },
     xp_gain: { icon: "✨", kind: "econ" },
     gold_find: { icon: "💰", kind: "econ" },
@@ -42,42 +46,42 @@ export const PERK_META = {
 // collectibles.js PET_PASSIVE_STAT — every pet is a unique passive+active pairing.)
 export const PET_PERKS = {
     // Level
-    bunny: { name: "Rabbit's Foot", key: "fortune" }, frog: { name: "Fortune Hop", key: "gold_find" }, chick: { name: "Golden Yolk", key: "gold_find" },
+    bunny: { name: "Hop Combo", key: "chain_strike" }, frog: { name: "Tongue Lash", key: "first_hit" }, chick: { name: "Rapid Peck", key: "extra_strike" },
     kitten: { name: "Nine Lives", key: "crit_chance" }, fox_kit: { name: "Sly Strike", key: "crit_chance" }, wolf_pup: { name: "Pack Instinct", key: "might" },
     owl: { name: "Night Study", key: "xp_gain" }, bear_cub: { name: "Bear Hug", key: "might" }, raven: { name: "Ill Omen", key: "xp_gain" },
-    serpent: { name: "Venom Fang", key: "crit_power" }, fawn: { name: "Gentle Grace", key: "fortune" }, bat: { name: "Echolocate", key: "crit_chance" },
-    scorpion: { name: "Stinger", key: "crit_power" }, tiger_cub: { name: "Ambush", key: "first_hit" }, seahorse: { name: "Tidal Charm", key: "fortune" },
-    eagle: { name: "Keen Eye", key: "crit_chance" }, lion_cub: { name: "Lion's Roar", key: "might" }, gorilla: { name: "Ground Pound", key: "ferocity" },
-    croc: { name: "Death Roll", key: "crit_power" }, hydra: { name: "Hydra Heads", key: "chain_strike" }, griffin: { name: "Sky Dive", key: "first_hit" },
+    serpent: { name: "Venom Fang", key: "crit_power" }, fawn: { name: "Gentle Leap", key: "first_hit" }, bat: { name: "Echolocate", key: "crit_chance" },
+    scorpion: { name: "Stinger", key: "crit_power" }, tiger_cub: { name: "Ambush", key: "first_hit" }, seahorse: { name: "Tidal Dart", key: "crit_chance" },
+    eagle: { name: "Keen Eye", key: "crit_chance" }, lion_cub: { name: "Pouncing Roar", key: "first_hit" }, gorilla: { name: "Ground Pound", key: "ferocity" },
+    croc: { name: "Death Roll", key: "crit_power" }, hydra: { name: "Hydra Heads", key: "chain_strike" }, griffin: { name: "Sky Dive", key: "execute" },
     unicorn: { name: "Wish Granted", key: "fortune" }, dragon_whelp: { name: "Ember Burst", key: "erupt" }, pegasus: { name: "Tailwind", key: "xp_gain" },
-    baby_rex: { name: "Apex Bite", key: "execute" }, sky_whale: { name: "Cloud Blessing", key: "fortune" }, chameleon: { name: "Prismatic Shift", key: "crit_chance" },
+    baby_rex: { name: "Apex Bite", key: "execute" }, sky_whale: { name: "Cloud Burst", key: "erupt" }, chameleon: { name: "Prismatic Hex", key: "crit_power" },
     elder_dragon: { name: "Cataclysm", key: "execute" },
     // Shop
     penguin: { name: "Cold Cash", key: "gold_find" }, hedgehog: { name: "Spiny Luck", key: "fortune" }, sheep: { name: "Golden Fleece", key: "gold_find" },
-    crab: { name: "Pincer", key: "crit_power" }, turtle: { name: "Shell Slam", key: "ferocity" }, parrot: { name: "Mimic", key: "xp_gain" },
-    dolphin: { name: "Lucky Leap", key: "fortune" }, monkey: { name: "Trickster", key: "crit_chance" }, panda: { name: "Bamboo Might", key: "might" },
+    crab: { name: "Double Pincer", key: "chain_strike" }, turtle: { name: "Shell Slam", key: "ferocity" }, parrot: { name: "Double Talk", key: "extra_strike" },
+    dolphin: { name: "Lucky Leap", key: "fortune" }, monkey: { name: "Trickster Combo", key: "extra_strike" }, panda: { name: "Bamboo Might", key: "might" },
     kangaroo: { name: "Kick Combo", key: "extra_strike" },
     // Achievement
-    ladybug: { name: "Lucky Spots", key: "fortune" }, bee: { name: "Honey Haul", key: "gold_find" }, sloth: { name: "Slow Study", key: "xp_gain" },
-    beaver: { name: "Hard Worker", key: "might" }, raccoon: { name: "Bandit's Cut", key: "gold_find" }, flamingo: { name: "Flock Fortune", key: "fortune" },
-    toucan: { name: "Bright Beak", key: "fortune" },
+    ladybug: { name: "Lucky Spots", key: "fortune" }, bee: { name: "Sting Rush", key: "crit_chance" }, sloth: { name: "Dead Weight", key: "execute" },
+    beaver: { name: "Hard Worker", key: "might" }, raccoon: { name: "Bandit Ambush", key: "first_hit" }, flamingo: { name: "Pink Rush", key: "first_hit" },
+    toucan: { name: "Bright Beak", key: "crit_power" },
     // Chest
-    tropical_fish: { name: "Reef Shine", key: "fortune" }, axolotl: { name: "Regenerate", key: "xp_gain" }, butterfly: { name: "Lucky Flutter", key: "fortune" },
-    squid: { name: "Ink Ambush", key: "crit_chance" }, jellyfish: { name: "Sting Surge", key: "crit_power" }, octopus: { name: "Eight Arms", key: "extra_strike" },
+    tropical_fish: { name: "Reef Flare", key: "erupt" }, axolotl: { name: "Regen Surge", key: "chain_strike" }, butterfly: { name: "Flutter Flurry", key: "chain_strike" },
+    squid: { name: "Ink Ambush", key: "crit_chance" }, jellyfish: { name: "Sting Surge", key: "erupt" }, octopus: { name: "Eight Arms", key: "extra_strike" },
     // Boss
-    vulture: { name: "Circling Death", key: "crit_chance" }, minotaur: { name: "Charge", key: "first_blood" }, centaur: { name: "Volley", key: "crit_chance" },
-    imp: { name: "Hellfire", key: "erupt" }, polar_bear: { name: "Frozen Might", key: "might" }, mammoth: { name: "Trample", key: "execute" },
-    wyvern: { name: "Dive Bomb", key: "first_hit" }, sea_serpent: { name: "Tidal Wrath", key: "chain_strike" }, fairy: { name: "Fairy Dust", key: "fortune" },
+    vulture: { name: "Circling Death", key: "first_blood" }, minotaur: { name: "Charge", key: "first_blood" }, centaur: { name: "Opening Volley", key: "first_hit" },
+    imp: { name: "Hellfire", key: "erupt" }, polar_bear: { name: "Frozen Crush", key: "execute" }, mammoth: { name: "Trample", key: "extra_strike" },
+    wyvern: { name: "Dive Bomb", key: "first_hit" }, sea_serpent: { name: "Tidal Wrath", key: "chain_strike" }, fairy: { name: "Pixie Ambush", key: "first_blood" },
     kraken: { name: "Tentacle Flurry", key: "chain_strike" },
     // Elite
-    molten_phoenix: { name: "Rebirth Flame", key: "execute" }, eternal_wolf: { name: "Spirit Howl", key: "chain_strike" }, bounty_hound: { name: "On the Hunt", key: "fortune" },
+    molten_phoenix: { name: "Rebirth Flame", key: "onslaught" }, eternal_wolf: { name: "Spirit Frenzy", key: "extra_strike" }, bounty_hound: { name: "On the Hunt", key: "first_blood" },
     // Merchant (its signature ability — boosting Gold-Merchant find chance — is applied in sailing.js, not combat)
     elephant_spear: { name: "Merchant's Nose", key: "gold_find", note: "Unique: while equipped, boosts your chance to find the Gold Merchant at sea (+1% per pet level, up to +5%)." },
     // Farm/pastoral pets — a farm passive (in collectibles PET_PASSIVE_STAT) PLUS a combat active so they still
     // fight. Actives are ordinary combat keys (nothing farm-specific here).
     honeybee: { name: "Pollen Flurry", key: "chain_strike" }, barn_cat: { name: "Mouser", key: "crit_chance" },
     piglet: { name: "Truffle Snout", key: "gold_find" }, hen: { name: "Golden Egg", key: "gold_find" },
-    spring_lamb: { name: "Fleece Fortune", key: "fortune" }, scarecrow_crow: { name: "Startle", key: "first_blood" },
+    spring_lamb: { name: "Lamb Leap", key: "first_hit" }, scarecrow_crow: { name: "Startle", key: "first_blood" },
     field_mouse: { name: "Scurry", key: "extra_strike" }, golden_goose: { name: "Windfall", key: "fortune" },
 };
 
@@ -88,6 +92,7 @@ export function petPerkValue(rarity, key) {
     if (key === "erupt") return ERUPT_BY_RARITY[rarity] || ERUPT_BY_RARITY.epic;
     if (key === "chain_strike") return CHAIN_BY_RARITY[rarity] || 0.1;
     if (key === "execute") return EXECUTE_BY_RARITY[rarity] || 0.3;
+    if (key === "onslaught") return ONSLAUGHT_BY_RARITY[rarity] || 0.3;
     if (key === "first_blood") return FIRSTBLOOD_BY_RARITY[rarity] || 0.3;
     return PET_ACTIVE_BY_RARITY[rarity] || 3;
 }
@@ -104,6 +109,7 @@ function perkDesc(key, v) {
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
         case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
         case "execute": return `+${Math.round(v * 100)}% damage when the boss is below 30% HP`;
+        case "onslaught": return `+${Math.round(v * 100)}% damage while the boss is above 75% HP`;
         case "first_blood": return `+${Math.round(v * 100)}% damage if you're among the first 3 to hit the boss today`;
         // Earner stats generate passive income over time (see pet-income.js: 1 xp-pt→1 XP/hr, 1 gold-pt→2 gold/hr
         // at the equipped rate, and more as the pet levels), paid out when you next check in.
@@ -176,6 +182,7 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         else if (def.key === "erupt") { proc.eruptChance = cap(v.chance * aMult, 0.6); proc.eruptMult = v.mult; }
         else if (def.key === "chain_strike") proc.chainChance = cap(v * aMult, 0.6);
         else if (def.key === "execute") proc.executePct = cap(v * aMult, 1.2);
+        else if (def.key === "onslaught") proc.onslaughtPct = cap(v * aMult, 1.2);
         else if (def.key === "first_blood") proc.firstBloodPct = cap(v * aMult, 1.2);
         else add(def.key, v * aMult);
     }

@@ -939,6 +939,7 @@ export async function attackBoss(buyerId) {
     if (pp.eruptChance && Math.random() < pp.eruptChance) { petMult *= pp.eruptMult || 1; petProc = petProc || "erupt"; }
     if (pp.chainChance && Math.random() < pp.chainChance) { petMult *= 2; petProc = petProc || "chain"; }
     if (pp.executePct && boss.max_hp && boss.hp <= boss.max_hp * 0.3) { petMult *= 1 + pp.executePct; petProc = petProc || "execute"; }
+    if (pp.onslaughtPct && boss.max_hp && boss.hp >= boss.max_hp * 0.75) { petMult *= 1 + pp.onslaughtPct; petProc = petProc || "onslaught"; }
     if (pp.firstBloodPct && (await hittersToday(boss.id)) < 3) { petMult *= 1 + pp.firstBloodPct; petProc = petProc || "first_blood"; }
     const wMult = elem.mult; // element-match damage (elem computed above, before the signature roll)
     // Set capstones (full set).
