@@ -70,14 +70,14 @@ export async function placedDecoBuffs(buyerId) {
 // Placed decorations for rendering (position + sprite + flip), newest last so higher z / later placements draw on top.
 export async function getPlacements(buyerId) {
     if (!buyerId) return [];
-    const rows = await db.query(`SELECT id, deco_id, x, y, z, flip FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []);
+    const rows = await db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []);
     if (!rows.length) return [];
     const [sprites, customMap] = await Promise.all([getDecoSprites(rows.map((r) => r.deco_id)), listFinalCustomDecos(buyerId)]);
     return rows.map((r) => {
         const def = decorationById(r.deco_id);
         const cm = customMap.get(r.deco_id);
         return {
-            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true,
+            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0),
             name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
             spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
         };
@@ -90,7 +90,7 @@ export async function decoState(buyerId) {
     if (!buyerId) return { owned: [], placements: [], buffs: decorationBuffs([]), keepout: decoKeepout() };
     const [ownedRows, placeRows, sprites, customMap] = await Promise.all([
         db.query(`SELECT deco_id, qty FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT id, deco_id, x, y, z, flip FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []),
+        db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []),
         getDecoSprites(),
         listFinalCustomDecos(buyerId),
     ]);
@@ -112,7 +112,7 @@ export async function decoState(buyerId) {
     const placements = (placeRows || []).map((r) => {
         const def = decorationById(r.deco_id);
         const cm = customMap.get(r.deco_id);
-        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
+        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
     });
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));
@@ -153,6 +153,22 @@ export async function placeDecoration(buyerId, decoId, x, y) {
     if ((total?.n || 0) >= PLACE_CAP) return { ok: false, error: "placement_limit", ...(await decoState(buyerId)) };
     const topZ = await db.queryOne(`SELECT COALESCE(MAX(z), 0) AS z FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ z: 0 }));
     await db.query(`INSERT INTO mkt_deco_placement (buyer_id, deco_id, x, y, z) VALUES ($1, $2, $3, $4, $5)`, [buyerId, decoId, px, py, (topZ?.z || 0) + 1]).catch(() => {});
+    return { ok: true, ...(await decoState(buyerId)) };
+}
+
+// Resize / rotate a placed decoration (plots are NOT transformable — only decorations). scale clamps to
+// 0.4–2.5×, rot wraps to 0–359°. Returns the fresh decoration state so the scene updates in place.
+export async function transformDecoration(buyerId, placementId, { scale, rot } = {}) {
+    if (!buyerId || !placementId) return { ok: false, error: "bad_request" };
+    const s = scale == null ? null : Math.max(0.4, Math.min(2.5, Number(scale)));
+    const r = rot == null ? null : ((Math.round(Number(rot)) % 360) + 360) % 360;
+    if (s == null && r == null) return { ok: false, error: "no_change" };
+    const moved = await db.queryOne(
+        `UPDATE mkt_deco_placement SET scale = COALESCE($3, scale), rot = COALESCE($4, rot)
+          WHERE id = $1 AND buyer_id = $2 RETURNING id`,
+        [placementId, buyerId, s, r]
+    ).catch(() => null);
+    if (!moved) return { ok: false, error: "not_found" };
     return { ok: true, ...(await decoState(buyerId)) };
 }
 
