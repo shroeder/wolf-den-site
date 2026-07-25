@@ -9,6 +9,7 @@ import { getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
 // Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
@@ -22,6 +23,15 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 //   pet_level      → instantly bump the equipped pet up one level
 //   spin_token     → grant N daily-wheel spins
 //   spin_reset     → refresh the free daily spin (spin again today)
+// Non-combat ACTIVITY effects (farming / petting / liking / sailing) — applied via the helpers in
+// farm-consumables.js and the sail_* block:
+//   farm_grow         → speed up your slowest-growing crop by `cut`
+//   farm_seed         → grant `count` random crop seeds (weighted common)
+//   farm_harvest_luck → bank `charges` harvest-luck charges (better harvest loot for the next N harvests)
+//   farm_fertilizer   → grant `count` fertilizer
+//   farm_petting      → +`amount` EXTRA own-pet pettings today
+//   farm_rating       → +`amount` EXTRA farm-rating charges today
+//   sail_tailwind     → buyable gust: shave `hours` off your current voyage
 export const CONSUMABLES = {
     scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP.", price: 1500, effect: { type: "xp", amount: 500 } },
     scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP.", price: 5000, effect: { type: "xp", amount: 2000 } },

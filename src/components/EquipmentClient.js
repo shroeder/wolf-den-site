@@ -10,7 +10,7 @@ import HelmetSprite from "@/components/HelmetSprite";
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
-import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
 // An item's elemental affinity chip — matters against a boss weak to that element (bonus damage).
@@ -60,7 +60,7 @@ const itemDef = (id) => DEFS[id] || null;
 const SET_RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 const capText = (desc) => (desc || "").replace(/^Full set:\s*/i, "");
 // A set tier's bonus as text — stat bonuses and/or sea affinity (the sailing set grants the latter).
-const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : ""].filter(Boolean).join(" · ") || "—";
+const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : ""].filter(Boolean).join(" · ") || "—";
 
 // A rich, tappable card for one set the player is building: piece dots, a progress bar, the tiered stat
 // bonuses (active ones lit), and — the fun differentiator two sets otherwise hide — the full-set CAPSTONE.
