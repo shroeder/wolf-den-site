@@ -62,14 +62,17 @@ async function fetchOrderTenders(orderId) {
     }
 }
 
-// Does this text name the store-credit tender? Configurable via SQUARE_STORE_CREDIT_TENDER_NAME (matched
-// case-insensitively as a substring, e.g. "Store Credit"); with it unset we fall back to /store\s*credit/i.
+// Does this text EXACTLY name the store-credit custom payment method? We ONLY match the specific,
+// admin-configured tender name (SQUARE_STORE_CREDIT_TENDER_NAME) by exact case-insensitive equality — NO
+// substring/regex fuzz and NO free-text notes. This is deliberate: Square surfaces EVERY register custom
+// payment (including trade-in value applied against a purchase) as source "Store Credit", so a loose match
+// false-fired the redemption push/auto-deduct on trades. If the env var is unset, the feature is OFF (returns
+// false) rather than guessing — so it can never trigger until a precise, dedicated tender name is configured.
 function storeCreditNameMatches(text) {
-    const raw = (text == null ? "" : String(text)).trim();
-    if (!raw) return false;
     const configured = String(process.env.SQUARE_STORE_CREDIT_TENDER_NAME || "").trim();
-    if (configured) return raw.toLowerCase().includes(configured.toLowerCase());
-    return /store\s*credit/i.test(raw);
+    if (!configured) return false;
+    const raw = (text == null ? "" : String(text)).trim();
+    return raw.toLowerCase() === configured.toLowerCase();
 }
 
 // Detect the store-credit tender on a paid sale. Store credit is rung up at the register as a custom
@@ -87,7 +90,8 @@ async function detectStoreCreditTender(payment) {
         for (const tender of tenders) {
             const type = String(tender?.type || "").toUpperCase();
             if (type !== "OTHER" && type !== "WALLET" && type !== "EXTERNAL") continue;
-            if (storeCreditNameMatches(tender?.name) || storeCreditNameMatches(tender?.note)) {
+            // Match the tender NAME only (never the free-text note — cashier notes catch trades/misc).
+            if (storeCreditNameMatches(tender?.name)) {
                 amountCents += Number(tender?.amount_money?.amount || 0);
             }
         }
