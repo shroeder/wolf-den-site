@@ -507,7 +507,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [decorating, setDecorating] = useState(false);
     const startDecorating = useCallback(() => {
         setDecorating(true);
-        setDecoEditing(true);
+        setDecoEditing(false); // start LOCKED — tap a piece to inspect; flip on "Move" to drag/reposition
         setTimeout(() => { try { fieldRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ } }, 60);
     }, []);
     const stopDecorating = useCallback(() => { setDecorating(false); setDecoEditing(false); }, []);
@@ -762,7 +762,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {/* Floating decorate button, right in the scene — the fast way in (own farm, when not already decorating) */}
                 {farm.mine && farm.decorations && !decorating ? (
                     <button type="button" onClick={startDecorating} className="farm-deco-fab" aria-label="Decorate your farm" title="Decorate your farm"
-                        style={{ position: "absolute", right: 10, bottom: 10, zIndex: 66, display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px 9px 12px", borderRadius: 999, border: "1px solid rgba(126,213,126,0.55)", background: "linear-gradient(180deg, rgba(28,44,26,0.92), rgba(18,30,16,0.92))", color: "#c8f0c8", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}>
+                        style={{ position: "absolute", right: 10, bottom: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px 9px 12px", borderRadius: 999, border: "1px solid rgba(126,213,126,0.55)", background: "linear-gradient(180deg, rgba(28,44,26,0.96), rgba(18,30,16,0.96))", color: "#c8f0c8", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 17 }} aria-hidden="true">🪴</span>Decorate
                     </button>
                 ) : null}
@@ -800,6 +800,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     deco={farm.decorations}
                     fieldRef={fieldRef}
                     busy={decoBusy}
+                    editing={decoEditing}
+                    onToggleMove={() => setDecoEditing((v) => !v)}
                     onPlaceAt={decoPlaceAt}
                     onInspect={(cat) => setInspectDeco(cat)}
                     onOpenCreator={() => setCustomOpen(true)}
@@ -948,9 +950,9 @@ function CrownCalibrator({ initial, onSave, onClose }) {
                 <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 2 }}>👑 Crown calibrator</div>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Position the loot pig&apos;s crown — it mirrors for both facings. Save to set it live.</p>
                 <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>{preview(false)}{preview(true)}</div>
-                {slider("Height (up ↔ down)", "top", -25, 30)}
-                {slider("Toward the head", "side", 0, 26)}
-                {slider("Size", "size", 14, 40)}
+                {slider("Height (up ↔ down)", "top", -40, 50)}
+                {slider("Toward the head", "side", -10, 50)}
+                {slider("Size", "size", 14, 48)}
                 <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                     <button type="button" onClick={() => setC({ top: 9, side: 8, size: 22 })} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Reset</button>
                     <button type="button" onClick={onClose} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Close</button>

@@ -7,7 +7,7 @@ const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legen
 // ── Decorate DOCK: a bottom tray you drag decorations OUT of, straight onto the farm scene (which stays fully
 // visible above it). Drag a chip up, release over the field → it drops there. Also carries the placed-count,
 // a Shop button, and Done. This is the "grab from a drawer while watching the farm" flow.
-export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onOpenCreator, onDone }) {
+export function DecoDock({ deco, fieldRef, busy, editing, onToggleMove, onPlaceAt, onInspect, onOpenCreator, onDone }) {
     const { catalog = [], placedTotal = 0, placedCap = 500 } = deco || {};
     const atCap = placedTotal >= placedCap;
     const ownedItems = catalog.filter((d) => d.owned);
@@ -71,10 +71,15 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onOpenCre
                     <strong style={{ fontSize: 14 }}>🪴 Decorating</strong>
                     <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
                     <span style={{ marginLeft: "auto" }} />
-                    <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer" }}>✓ Done</button>
+                    <button type="button" onClick={onToggleMove} title={editing ? "Lock pieces so they can't be moved" : "Unlock to drag placed pieces around"} style={{ padding: "6px 12px", borderRadius: 9, border: `1px solid ${editing ? "#8fc7ff" : "rgba(255,255,255,0.2)"}`, background: editing ? "rgba(143,199,255,0.16)" : "transparent", color: editing ? "#bfe0ff" : "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+                        {editing ? "✋ Moving" : "🔒 Locked"}
+                    </button>
+                    <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>✓ Done</button>
                 </div>
                 <div style={{ fontSize: 10.5, color: "#9fbf9f", padding: "0 12px 6px" }}>
-                    {atCap ? "Farm full (500 placed) — tap a placed piece to pick it up." : "Drag your decorations up onto the farm. Tap a 🔒 locked one to see it & buy. Tap placed pieces to move or inspect."}
+                    {atCap ? "Farm full (500 placed) — tap a placed piece to pick it up."
+                        : editing ? "✋ Move mode — drag placed pieces to reposition (tap for details). Lock 🔒 when you're happy."
+                            : "Drag decorations up onto the farm. Tap a placed piece for details. Flip to ✋ Move to drag them around."}
                 </div>
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 12px 10px", WebkitOverflowScrolling: "touch" }}>
                     {ownedItems.map((o) => (
@@ -84,7 +89,7 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onOpenCre
                             onPointerMove={onMove}
                             onPointerUp={endDrag}
                             title={`Drag ${o.name} onto your farm`}
-                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", touchAction: "none", cursor: atCap ? "default" : "grab", opacity: atCap ? 0.5 : 1, userSelect: "none" }}
+                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", touchAction: "none", cursor: atCap ? "default" : "grab", opacity: atCap ? 0.5 : 1, userSelect: "none", WebkitTapHighlightColor: "transparent" }}
                         >
                             <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `2px solid ${(RARITY_RING[o.rarity] || "#555")}88` }}>
                                 {o.spriteUrl ? (
@@ -103,7 +108,7 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onOpenCre
                             type="button"
                             onClick={() => onInspect(o)}
                             title={`${o.name} — tap for details`}
-                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer", userSelect: "none" }}
+                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer", userSelect: "none", WebkitTapHighlightColor: "transparent" }}
                         >
                             <span style={{ position: "relative", display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px dashed ${(RARITY_RING[o.rarity] || "#555")}55` }}>
                                 {o.spriteUrl ? (
@@ -117,7 +122,7 @@ export function DecoDock({ deco, fieldRef, busy, onPlaceAt, onInspect, onOpenCre
                         </button>
                     ))}
                     {onOpenCreator ? (
-                        <button type="button" onClick={onOpenCreator} title="Design your own decoration" style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                        <button type="button" onClick={onOpenCreator} title="Design your own decoration" style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" , WebkitTapHighlightColor: "transparent" }}>
                             <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "radial-gradient(120% 120% at 50% 0%, rgba(201,162,255,0.25), rgba(255,255,255,0.03))", border: "1px dashed rgba(201,162,255,0.6)", fontSize: 26 }}>✨</span>
                             <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#d9b8ff", fontWeight: 700 }}>Make your own</span>
                         </button>
@@ -176,6 +181,7 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                             position: "absolute", left: `${live.x}%`, top: `${live.y}%`, transform: "translate(-50%, -100%)",
                             zIndex: Math.round(live.y), cursor: "pointer", touchAction: editing ? "none" : "auto",
                             transition: drag && drag.id === p.id ? "none" : "left .15s ease, top .15s ease",
+                            WebkitTapHighlightColor: "transparent", WebkitTouchCallout: "none", userSelect: "none", outline: "none",
                         }}
                         title={editing ? `${p.name} — drag to move, tap for details` : `${p.name} — tap for details`}
                     >

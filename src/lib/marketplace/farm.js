@@ -29,9 +29,9 @@ export async function getCrownConfig() {
 }
 export async function saveCrownConfig(cfg) {
     const c = {
-        top: Math.max(-30, Math.min(40, Number(cfg?.top ?? CROWN_DEFAULT.top))),
-        side: Math.max(0, Math.min(30, Number(cfg?.side ?? CROWN_DEFAULT.side))),
-        size: Math.max(12, Math.min(42, Number(cfg?.size ?? CROWN_DEFAULT.size))),
+        top: Math.max(-40, Math.min(50, Number(cfg?.top ?? CROWN_DEFAULT.top))),
+        side: Math.max(-10, Math.min(50, Number(cfg?.side ?? CROWN_DEFAULT.side))),
+        size: Math.max(12, Math.min(48, Number(cfg?.size ?? CROWN_DEFAULT.size))),
     };
     await setSetting("loot_pig_crown", JSON.stringify(c)).catch(() => {});
     return { ok: true, crownCfg: c };
