@@ -103,6 +103,10 @@ function perkDesc(key, v) {
         // at the equipped rate, and more as the pet levels), paid out when you next check in.
         case "xp_gain": return `Earns you passive XP — about +${v}/hr while equipped (more as it levels), paid when you check in`;
         case "gold_find": return `Earns you passive gold — about +${Math.max(1, Math.round(v * GOLD_PER_POINT))}/hr while equipped (more as it levels), paid when you check in`;
+        // FARM passives (pastoral pets) — help the farm, not the boss. Shown when the pet is equipped as a farm companion.
+        case "seedLuck": return `+${v}% seed luck on your farm while equipped — more seeds found and kept`;
+        case "growSpeed": return `−${v}% crop grow time on your farm while equipped`;
+        case "petXp": return `+${v}% pet XP from tending your farm while equipped`;
         default: return "";
     }
 }

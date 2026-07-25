@@ -174,9 +174,13 @@ export const decoLight = (id) => DECO_LIGHT[id] || null;
 
 // counts ONCE — placing multiple copies of the same piece does NOT stack its bonus (dedupe by id). Different
 // buffed decorations still add together, capped per stat. Returns { growSpeed, seedLuck, ... } %.
-const BUFF_CAP = { growSpeed: 40, seedLuck: 50, harvestLuck: 40, petXp: 50, fertPower: 40, goldHarvest: 60 };
+// Per-stat cap on the COMBINED farm bonus (decorations + gear farm affixes + equipped-pet farm passive — see
+// farm-bonus.js). Exported so the unified aggregator caps the same totals decorations already respect.
+export const BUFF_CAP = { growSpeed: 40, seedLuck: 50, harvestLuck: 40, petXp: 50, fertPower: 40, goldHarvest: 60 };
+// A fresh zeroed farm-bonus object (the canonical shape every farm bonus source contributes to).
+export const emptyFarmBuffs = () => ({ growSpeed: 0, seedLuck: 0, harvestLuck: 0, petXp: 0, fertPower: 0, goldHarvest: 0 });
 export function decorationBuffs(placedIds) {
-    const out = { growSpeed: 0, seedLuck: 0, harvestLuck: 0, petXp: 0, fertPower: 0, goldHarvest: 0 };
+    const out = emptyFarmBuffs();
     for (const id of new Set(placedIds || [])) { // dedupe → one bonus per decoration type, no dup stacking
         const d = BY_ID.get(id);
         if (d?.buff?.stat && out[d.buff.stat] != null) out[d.buff.stat] += d.buff.value;

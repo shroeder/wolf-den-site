@@ -8,6 +8,7 @@ import {
     GiBoneMace, GiRelicBlade, GiIceBolt, GiWingedScepter, GiFireSilhouette, GiMeteorImpact, GiFireShield, GiIceGolem, GiFloatingCrystal, GiWorld, GiHood, GiHelmetHeadShot, GiHeavyHelm, GiCultist, GiDeadEye, GiPirateCoat, GiRaggedWound, GiHeartInside, GiSpring, GiSnowflake2, GiCometSpark, GiOwl, GiFox, GiTigerHead, GiLotus, GiElephant, GiSpectre, GiOakLeaf, GiWaterDrop, GiFangedSkull, GiDropletSplash,
     GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
 } from "react-icons/gi";
+import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 
 // The nine equip slots (rings occupy ring1/ring2). `accepts` = which item.slot fits.
 export const EQUIP_SLOTS = [
@@ -126,7 +127,7 @@ export const ITEMS = [
     { id: "dragonplate", name: "Dragonplate Armor", slot: "chest", rarity: "legendary", icon: "GiSpikedArmor", flavor: "Forged from a wyrm.", stats: { might: 10, ferocity: 20 }, reqLevel: 52, source: "boss_drop", sort: 44 },
 
     // --- Belt ---
-    { id: "leather_belt", name: "Leather Belt", slot: "belt", rarity: "common", icon: "GiBelt", flavor: "Holds your pants up.", stats: { fortune: 6, ferocity: 4 }, reqLevel: 4, source: "level", sort: 50 },
+    { id: "leather_belt", name: "Leather Belt", slot: "belt", rarity: "common", icon: "GiBelt", flavor: "Holds your pants up — and your seed pouch.", stats: { fortune: 6, ferocity: 4 }, farm: { growSpeed: 3 }, reqLevel: 4, source: "level", sort: 50 },
     { id: "champions_belt", name: "Champion's Belt", slot: "belt", rarity: "epic", icon: "GiBlackBelt", flavor: "Proof you showed up.", stats: { might: 9, fortune: 13 }, reqLevel: 30, source: "xp_shop", xpCost: 3000, sort: 52 },
 
     // --- Boots ---
@@ -175,7 +176,7 @@ export const ITEMS = [
     { id: "aegis_plate", name: "Aegis Plate", slot: "chest", rarity: "legendary", icon: "GiLayeredArmor", flavor: "Immovable.", stats: { might: 10, ferocity: 20 }, reqLevel: 66, source: "chest", sort: 143 },
     { id: "celestial_robe", name: "Celestial Robe", slot: "chest", rarity: "mythic", icon: "GiRobe", flavor: "Woven from starlight.", stats: { ferocity: 24, fortune: 16 }, reqLevel: 94, source: "chest", sort: 144 },
     // -- Belt --
-    { id: "sturdy_belt", name: "Sturdy Belt", slot: "belt", rarity: "common", icon: "GiBeltArmor", flavor: "Cinch it tight.", stats: { ferocity: 6, might: 5 }, reqLevel: 8, source: "chest", sort: 150 },
+    { id: "sturdy_belt", name: "Sturdy Belt", slot: "belt", rarity: "common", icon: "GiBeltArmor", flavor: "Cinch it tight — pockets full of feed.", stats: { ferocity: 6, might: 5 }, farm: { fertPower: 5 }, reqLevel: 8, source: "chest", sort: 150 },
     { id: "focus_sash", name: "Sash of Focus", slot: "belt", rarity: "rare", icon: "GiBlackBelt", flavor: "Steady the aim.", stats: { crit_chance: 16 }, reqLevel: 22, source: "chest", sort: 151 },
     { id: "warlords_girdle", name: "Warlord's Girdle", slot: "belt", rarity: "epic", icon: "GiBelt", flavor: "Command respect.", stats: { might: 11, ferocity: 11 }, reqLevel: 40, source: "chest", sort: 152 },
     { id: "giants_belt", name: "Belt of Giants", slot: "belt", rarity: "legendary", icon: "GiBeltArmor", flavor: "Strength of ten.", stats: { might: 30 }, reqLevel: 60, source: "chest", sort: 153 },
@@ -187,14 +188,14 @@ export const ITEMS = [
     { id: "windwalkers", name: "Windwalkers", slot: "boots", rarity: "legendary", icon: "GiGreaves", flavor: "One more swing in you.", stats: { ferocity: 18, extra_strike: 1 }, reqLevel: 62, source: "chest", sort: 163 },
     { id: "featherfall", name: "Featherfall Greaves", slot: "boots", rarity: "mythic", icon: "GiMetalBoot", flavor: "Never touch the ground.", stats: { ferocity: 27, fortune: 13 }, reqLevel: 92, source: "chest", sort: 164 },
     // -- Amulet --
-    { id: "copper_charm", name: "Copper Charm", slot: "amulet", rarity: "common", icon: "GiCharm", flavor: "A little luck.", stats: { fortune: 7, might: 4 }, reqLevel: 8, source: "chest", sort: 170 },
+    { id: "copper_charm", name: "Copper Charm", slot: "amulet", rarity: "common", icon: "GiCharm", flavor: "A little luck in the furrows.", stats: { fortune: 7, might: 4 }, farm: { seedLuck: 4 }, reqLevel: 8, source: "chest", sort: 170 },
     { id: "talisman", name: "Talisman", slot: "amulet", rarity: "rare", icon: "GiFeatherNecklace", flavor: "Old protection.", stats: { might: 7, fortune: 9 }, reqLevel: 22, source: "chest", sort: 171 },
     { id: "wrath_pendant", name: "Pendant of Wrath", slot: "amulet", rarity: "epic", icon: "GiEmeraldNecklace", flavor: "Anger, focused.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 38, source: "chest", sort: 172 },
     { id: "wolf_heart", name: "Heart of the Wolf", slot: "amulet", rarity: "legendary", icon: "GiHeartNecklace", flavor: "The pack beats within.", stats: { might: 13, crit_power: 17 }, reqLevel: 60, source: "chest", sort: 173 },
     { id: "eye_eternity", name: "Eye of Eternity", slot: "amulet", rarity: "mythic", icon: "GiGemNecklace", flavor: "Sees every weakness.", stats: { crit_chance: 15, crit_power: 25 }, reqLevel: 95, source: "chest", sort: 174 },
     // -- Rings --
-    { id: "copper_ring", name: "Copper Ring", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "Barely magic.", stats: { might: 6, fortune: 5 }, reqLevel: 5, source: "chest", sort: 180 },
-    { id: "silver_ring", name: "Silver Ring", slot: "ring", rarity: "common", icon: "GiFrozenRing", flavor: "Shiny.", stats: { fortune: 7, crit_chance: 4 }, reqLevel: 10, source: "chest", sort: 181 },
+    { id: "copper_ring", name: "Copper Ring", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "Barely magic, but the crops don't mind.", stats: { might: 6, fortune: 5 }, farm: { growSpeed: 4 }, reqLevel: 5, source: "chest", sort: 180 },
+    { id: "silver_ring", name: "Silver Ring", slot: "ring", rarity: "common", icon: "GiFrozenRing", flavor: "Shiny — the sower's favorite.", stats: { fortune: 7, crit_chance: 4 }, farm: { seedLuck: 5 }, reqLevel: 10, source: "chest", sort: 181 },
     { id: "focus_band", name: "Band of Focus", slot: "ring", rarity: "rare", icon: "GiFireRing", flavor: "Aim true.", stats: { crit_chance: 16 }, reqLevel: 22, source: "chest", sort: 182 },
     { id: "power_signet", name: "Signet of Power", slot: "ring", rarity: "epic", icon: "GiSkullRing", flavor: "Raw force.", stats: { might: 22 }, reqLevel: 36, source: "chest", sort: 183 },
     { id: "kings_ring", name: "Ring of Kings", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "Worn by rulers.", stats: { might: 14, fortune: 16 }, reqLevel: 64, source: "chest", sort: 184 },
@@ -211,7 +212,7 @@ export const ITEMS = [
     { id: "reapers_scythe", name: "Reaper's Scythe", slot: "main_hand", rarity: "legendary", icon: "GiScythe", flavor: "It only asks once.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 66, source: "chest", sort: 205 },
     { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, sea: { plunder: 8 }, reqLevel: 92, source: "chest", sort: 206 },
     // -- Off hand --
-    { id: "oak_buckler", name: "Oak Buckler", slot: "off_hand", rarity: "common", icon: "GiWoodFrame", flavor: "Humble but honest.", stats: { ferocity: 7, fortune: 4 }, reqLevel: 5, source: "chest", sort: 210 },
+    { id: "oak_buckler", name: "Oak Buckler", slot: "off_hand", rarity: "common", icon: "GiWoodFrame", flavor: "Humble oak — doubles as a harvest tray.", stats: { ferocity: 7, fortune: 4 }, farm: { harvestLuck: 4 }, reqLevel: 5, source: "chest", sort: 210 },
     { id: "spiked_shield", name: "Spiked Shield", slot: "off_hand", rarity: "rare", icon: "GiShieldBash", flavor: "Defense that bites back.", stats: { might: 5, ferocity: 11 }, reqLevel: 20, source: "chest", sort: 211 },
     { id: "warding_orb", name: "Warding Orb", slot: "off_hand", rarity: "epic", icon: "GiCrystalCluster", flavor: "Hums with old magic.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 32, source: "chest", sort: 212 },
     { id: "bastion_shield", name: "Bastion Shield", slot: "off_hand", rarity: "legendary", icon: "GiSurroundedShield", flavor: "The wall the pack hides behind.", stats: { might: 10, ferocity: 20 }, reqLevel: 58, source: "chest", sort: 213 },
@@ -235,8 +236,8 @@ export const ITEMS = [
     { id: "thunderstride", name: "Thunderstride Boots", slot: "boots", rarity: "legendary", icon: "GiMetalBoot", flavor: "Thunder in every step.", stats: { might: 12, ferocity: 18 }, reqLevel: 64, source: "chest", sort: 243 },
     { id: "voidwalkers", name: "Voidwalkers", slot: "boots", rarity: "mythic", icon: "GiSteeltoeBoots", flavor: "Step between worlds.", stats: { ferocity: 27, fortune: 13 }, reqLevel: 90, source: "chest", sort: 244 },
     // -- Amulet --
-    { id: "bone_charm", name: "Bone Charm", slot: "amulet", rarity: "common", icon: "GiFangs", flavor: "Rattles with luck.", stats: { fortune: 6, crit_chance: 5 }, reqLevel: 6, source: "chest", sort: 250 },
-    { id: "pearl_strand", name: "Pearl Strand", slot: "amulet", rarity: "common", icon: "GiPearlNecklace", flavor: "Sea-born shimmer.", stats: { fortune: 8, ferocity: 3 }, reqLevel: 8, source: "chest", sort: 251 },
+    { id: "bone_charm", name: "Bone Charm", slot: "amulet", rarity: "common", icon: "GiFangs", flavor: "Rattles up a good harvest.", stats: { fortune: 6, crit_chance: 5 }, farm: { harvestLuck: 4 }, reqLevel: 6, source: "chest", sort: 250 },
+    { id: "pearl_strand", name: "Pearl Strand", slot: "amulet", rarity: "common", icon: "GiPearlNecklace", flavor: "Sea-born shimmer, worth its weight at market.", stats: { fortune: 8, ferocity: 3 }, farm: { goldHarvest: 5 }, reqLevel: 8, source: "chest", sort: 251 },
     { id: "moonstone_pendant", name: "Moonstone Pendant", slot: "amulet", rarity: "rare", icon: "GiMoon", flavor: "Glows at midnight.", stats: { might: 7, fortune: 9 }, reqLevel: 22, source: "chest", sort: 252 },
     { id: "balance_amulet", name: "Amulet of Balance", slot: "amulet", rarity: "rare", icon: "GiLibra", flavor: "Weigh every strike.", stats: { crit_chance: 8, crit_power: 8 }, reqLevel: 20, source: "chest", sort: 253 },
     { id: "eagle_sigil", name: "Eagle Sigil", slot: "amulet", rarity: "epic", icon: "GiEagleEmblem", flavor: "Strike from the sky.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 38, source: "chest", sort: 254 },
@@ -251,7 +252,7 @@ export const ITEMS = [
     { id: "bear_girdle", name: "Girdle of the Bear", slot: "belt", rarity: "legendary", icon: "GiBlackBelt", flavor: "Endless endurance.", stats: { ferocity: 30 }, reqLevel: 62, source: "chest", sort: 263 },
     { id: "colossus_belt", name: "Belt of the Colossus", slot: "belt", rarity: "mythic", icon: "GiBeltArmor", flavor: "Raw, unstoppable force.", stats: { might: 40 }, reqLevel: 90, source: "chest", sort: 264 },
     // -- Rings --
-    { id: "band_valor", name: "Band of Valor", slot: "ring", rarity: "common", icon: "GiRing", flavor: "A soldier's first ring.", stats: { might: 7, ferocity: 4 }, reqLevel: 6, source: "chest", sort: 270 },
+    { id: "band_valor", name: "Band of Valor", slot: "ring", rarity: "common", icon: "GiRing", flavor: "A soldier's first ring — later, a farmer's.", stats: { might: 7, ferocity: 4 }, farm: { fertPower: 4 }, reqLevel: 6, source: "chest", sort: 270 },
     { id: "ring_embers", name: "Ring of Embers", slot: "ring", rarity: "rare", icon: "GiFireRing", flavor: "Warm to the touch.", stats: { might: 11, crit_chance: 5 }, reqLevel: 24, source: "chest", sort: 271 },
     { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, sea: { bounty: 6 }, reqLevel: 36, source: "chest", sort: 272 },
     { id: "ring_titans", name: "Ring of Titans", slot: "ring", rarity: "legendary", icon: "GiPowerRing", flavor: "Power beyond measure.", stats: { might: 16, crit_power: 14 }, reqLevel: 66, source: "chest", sort: 273 },
@@ -290,7 +291,7 @@ export const ITEMS = [
     { id: "valor_treads", name: "Treads of Valor", slot: "boots", rarity: "epic", icon: "GiBoots", flavor: "Never take a step back.", stats: { might: 9, ferocity: 13 }, reqLevel: 36, source: "chest", sort: 342 },
     { id: "titan_stompers", name: "Titan Stompers", slot: "boots", rarity: "legendary", icon: "GiGreaves", flavor: "The earth minds its manners.", stats: { ferocity: 30 }, reqLevel: 64, source: "chest", sort: 343 },
     // -- Amulet --
-    { id: "emerald_charm", name: "Emerald Charm", slot: "amulet", rarity: "common", icon: "GiEmerald", flavor: "Green for greed.", stats: { fortune: 8, crit_chance: 3 }, reqLevel: 6, source: "chest", sort: 350 },
+    { id: "emerald_charm", name: "Emerald Charm", slot: "amulet", rarity: "common", icon: "GiEmerald", flavor: "Green for a growing thing.", stats: { fortune: 8, crit_chance: 3 }, farm: { goldHarvest: 6 }, reqLevel: 6, source: "chest", sort: 350 },
     { id: "ruby_bead", name: "Ruby Bead", slot: "amulet", rarity: "common", icon: "GiGems", flavor: "A drop of luck.", stats: { fortune: 6, might: 5 }, reqLevel: 8, source: "chest", sort: 351 },
     { id: "diamond_droplet", name: "Diamond Droplet", slot: "amulet", rarity: "rare", icon: "GiCutDiamond", flavor: "Flawless and cold.", stats: { might: 7, fortune: 9 }, reqLevel: 22, source: "chest", sort: 352 },
     { id: "ankh_pendant", name: "Ankh Pendant", slot: "amulet", rarity: "rare", icon: "GiAnkh", flavor: "Old life, old power.", stats: { crit_chance: 8, crit_power: 8 }, reqLevel: 20, source: "chest", sort: 353 },
@@ -342,7 +343,7 @@ export const ITEMS = [
     { id: "frost_treads", name: "Frost Treads", slot: "boots", rarity: "rare", icon: "GiSnowflake2", flavor: "Never slip on ice.", stats: { ferocity: 16 }, reqLevel: 22, source: "chest", sort: 441 },
     { id: "comet_greaves", name: "Comet Greaves", slot: "boots", rarity: "epic", icon: "GiCometSpark", flavor: "Leave a trail of light.", stats: { crit_chance: 4, ferocity: 18 }, reqLevel: 36, source: "chest", sort: 442 },
     // -- Amulet --
-    { id: "owl_charm", name: "Owl Charm", slot: "amulet", rarity: "common", icon: "GiOwl", flavor: "Wise little thing.", stats: { fortune: 7, crit_chance: 4 }, reqLevel: 6, source: "chest", sort: 450 },
+    { id: "owl_charm", name: "Owl Charm", slot: "amulet", rarity: "common", icon: "GiOwl", flavor: "Watches over the barn at night.", stats: { fortune: 7, crit_chance: 4 }, farm: { petXp: 6 }, reqLevel: 6, source: "chest", sort: 450 },
     { id: "fox_charm", name: "Fox Charm", slot: "amulet", rarity: "rare", icon: "GiFox", flavor: "Cunning on a chain.", stats: { might: 7, fortune: 9 }, reqLevel: 22, source: "chest", sort: 451 },
     { id: "tiger_fang", name: "Tiger Fang", slot: "amulet", rarity: "epic", icon: "GiTigerHead", flavor: "Fierce and fast.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 38, source: "chest", sort: 452 },
     { id: "lotus_pendant", name: "Lotus Pendant", slot: "amulet", rarity: "epic", icon: "GiLotus", flavor: "Calm in the storm.", stats: { ferocity: 8, fortune: 14 }, reqLevel: 34, source: "chest", sort: 453 },
@@ -477,8 +478,8 @@ export const ITEMS = [
     // level unlocks, loot-chest & boss drops, and the gold shop. Several carry signatures or a lopsided
     // "identity" stat line so they play differently, not just bigger. =====
     // -- Level unlocks --
-    { id: "wanderers_cloak", name: "Wanderer's Cloak", slot: "back", rarity: "common", icon: "GiCape", flavor: "Patched for the long road.", stats: { fortune: 10 }, reqLevel: 3, source: "level", sort: 800 },
-    { id: "scouts_mantle", name: "Scout's Mantle", slot: "back", rarity: "common", icon: "GiCowled", flavor: "Blend into the tree line.", stats: { crit_chance: 6, ferocity: 4 }, reqLevel: 6, source: "level", sort: 801 },
+    { id: "wanderers_cloak", name: "Wanderer's Cloak", slot: "back", rarity: "common", icon: "GiCape", flavor: "Patched for the long road — and long seasons.", stats: { fortune: 10 }, farm: { growSpeed: 4 }, reqLevel: 3, source: "level", sort: 800 },
+    { id: "scouts_mantle", name: "Scout's Mantle", slot: "back", rarity: "common", icon: "GiCowled", flavor: "Knows where the good soil is.", stats: { crit_chance: 6, ferocity: 4 }, farm: { seedLuck: 5 }, reqLevel: 6, source: "level", sort: 801 },
     { id: "hunters_cloak", name: "Hunter's Cloak", slot: "back", rarity: "rare", icon: "GiFeatheredWing", flavor: "Silent on the approach.", stats: { crit_chance: 8, ferocity: 8 }, reqLevel: 14, source: "level", sort: 802 },
     { id: "guardian_mantle", name: "Guardian's Mantle", slot: "back", rarity: "rare", icon: "GiShoulderArmor", flavor: "Shoulders that carry the pack.", stats: { might: 10, fortune: 6 }, reqLevel: 18, source: "level", sort: 803 },
     // -- Loot-chest & boss drops --
@@ -565,5 +566,24 @@ export function sumItemSea(itemIds = []) {
 export function describeSea(sea = {}) {
     return Object.entries(sea).filter(([, v]) => v)
         .map(([k, v]) => { const m = SEA_META[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
+        .join(" · ");
+}
+
+// ── FARM AFFIX ── a SECOND quarantined effect layer (mirrors sea affinity): kept OUT of `stats`, so
+// sumItemStats/combat never see it. Utility gear that is weak in the boss fight carries a small FARM bonus
+// instead, making it desirable to farmers. Read only by the farm-bonus aggregator (farm-bonus.js). Keys are
+// the farm stats from decorations.js DECO_STATS { growSpeed, seedLuck, harvestLuck, petXp, fertPower, goldHarvest }.
+export function sumItemFarm(itemIds = []) {
+    const total = {};
+    for (const id of itemIds) {
+        const it = itemById(id);
+        if (!it?.farm) continue;
+        for (const [k, v] of Object.entries(it.farm)) total[k] = (total[k] || 0) + (Number(v) || 0);
+    }
+    return total;
+}
+export function describeFarm(farm = {}) {
+    return Object.entries(farm).filter(([, v]) => v)
+        .map(([k, v]) => { const m = DECO_STATS[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
         .join(" · ");
 }

@@ -17,7 +17,8 @@ import { getGarden, farmPetCapBonus, dropSeedFrom } from "@/lib/marketplace/farm
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { farmRatingBits } from "@/lib/marketplace/farm-rating.js";
-import { placedDecoBuffs, decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
+import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
+import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
@@ -368,8 +369,9 @@ export async function petPet(petterId, petId, ownerId = null) {
 
     const def = collectibleById(petId);
     const maxXp = petMaxXp(def?.rarity || "common");
-    // The FARM OWNER's placed decorations (pet-bond buff) boost the pet XP earned from petting on their farm.
-    const ownerBuffs = await placedDecoBuffs(petOwner).catch(() => null);
+    // The FARM OWNER's farm bonuses (decorations + their equipped gear farm affix + equipped pet's pet-bond
+    // passive) boost the pet XP earned from petting on their farm.
+    const ownerBuffs = await farmBonuses(petOwner).catch(() => null);
     const petXpAmt = Math.round(PET_PET_XP * (1 + (ownerBuffs?.petXp || 0) / 100));
     let newXp = null;
     if (own) {

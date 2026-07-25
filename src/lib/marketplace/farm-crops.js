@@ -9,7 +9,7 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
-import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
+import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -243,8 +243,9 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Consume one seed atomically.
     const dec = await db.queryOne(`UPDATE mkt_farm_seed SET count = count - 1 WHERE buyer_id = $1 AND seed_id = $2 AND count > 0 RETURNING count`, [buyerId, seedId]).catch(() => null);
     if (!dec) return { ok: false, error: "no_seed" };
-    // Placed-decoration grow-speed buff stacks on top of the Green Thumb upgrade (both cut grow time).
-    const buffs = await placedDecoBuffs(buyerId).catch(() => null);
+    // Farm grow-speed buff (decorations + equipped gear farm affix + equipped pet) stacks on top of the Green
+    // Thumb upgrade (both cut grow time).
+    const buffs = await farmBonuses(buyerId).catch(() => null);
     const decoGrow = Math.max(0.5, 1 - (buffs?.growSpeed || 0) / 100);
     const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow);
     const row = await db.queryOne(
@@ -270,8 +271,9 @@ export async function harvestPlot(buyerId, slot) {
     const claimed = await db.queryOne(`DELETE FROM mkt_farm_plot WHERE buyer_id = $1 AND slot = $2 AND ready_at <= NOW() RETURNING seed_id`, [buyerId, slot]).catch(() => null);
     if (!claimed) return { ok: false, error: "not_ready" };
     const def = seedById(claimed.seed_id);
-    // Placed-decoration buffs: more harvest gold, better loot odds, better seed-save luck.
-    const buffs = await placedDecoBuffs(buyerId).catch(() => null);
+    // Farm buffs (decorations + equipped gear farm affix + equipped pet): more harvest gold, better loot odds,
+    // better seed-save luck.
+    const buffs = await farmBonuses(buyerId).catch(() => null);
     const xp = def?.xp || 0;
     const gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100));
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
@@ -324,8 +326,9 @@ export async function applyFertilizer(buyerId, slot) {
     if (new Date(plot.ready_at).getTime() <= Date.now()) return { ok: false, error: "already_ready" };
     const dec = await db.queryOne(`UPDATE mkt_buyer SET farm_fertilizer = farm_fertilizer - 1 WHERE id = $1 AND farm_fertilizer > 0 RETURNING farm_fertilizer`, [buyerId]).catch(() => null);
     if (!dec) return { ok: false, error: "no_fertilizer" };
-    // Placed-decoration fertilizer-power buff deepens the cut (base 40%, capped at 85%).
-    const buffs = await placedDecoBuffs(buyerId).catch(() => null);
+    // Farm fertilizer-power buff (decorations + equipped gear farm affix + equipped pet) deepens the cut
+    // (base 40%, capped at 85%).
+    const buffs = await farmBonuses(buyerId).catch(() => null);
     const cut = Math.min(0.85, FERTILIZER_CUT * (1 + (buffs?.fertPower || 0) / 100));
     // remaining = ready_at - now; new ready_at = now + remaining*(1-CUT)
     await db.query(

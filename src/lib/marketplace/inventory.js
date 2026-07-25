@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
@@ -221,7 +221,7 @@ export async function getInventory(buyerId) {
             const def = itemById(r.item_id);
             if (!def) return null;
             const set = setForItem(def.id);
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));

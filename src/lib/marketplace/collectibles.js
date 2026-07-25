@@ -20,19 +20,23 @@ export const PET_PASSIVE_BY_RARITY = { common: 1, rare: 2, epic: 4, legendary: 6
 
 // Each pet's PASSIVE stat is its own (distinct from its active) so every pet feels unique — collecting a
 // varied menagerie shapes a varied account bonus rather than a stack of the same stat.
+// FARM PASSIVE STATS — the pastoral/nature pets carry a FARM passive (seedLuck / growSpeed / petXp) instead of
+// a combat/econ one. These keys are NOT combat stats, so combinePetBonuses' add() silently ignores them (they
+// never touch the boss); the farm-bonus aggregator reads the EQUIPPED pet's farm passive via petFarmPassive().
+export const FARM_PASSIVE_STATS = new Set(["seedLuck", "growSpeed", "petXp"]);
 export const PET_PASSIVE_STAT = {
     // Level
-    bunny: "gold_find", frog: "fortune", chick: "xp_gain", kitten: "fortune", fox_kit: "gold_find",
-    wolf_pup: "ferocity", owl: "fortune", bear_cub: "crit_power", raven: "crit_chance", serpent: "crit_power",
-    fawn: "xp_gain", bat: "ferocity", scorpion: "might", tiger_cub: "crit_chance", seahorse: "gold_find",
+    bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
+    wolf_pup: "ferocity", owl: "petXp", bear_cub: "crit_power", raven: "crit_chance", serpent: "crit_power",
+    fawn: "petXp", bat: "ferocity", scorpion: "might", tiger_cub: "crit_chance", seahorse: "seedLuck",
     eagle: "might", lion_cub: "ferocity", gorilla: "crit_power", croc: "ferocity", hydra: "crit_power",
     griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "fortune", baby_rex: "might",
     sky_whale: "xp_gain", chameleon: "fortune", elder_dragon: "crit_power",
     // Shop
-    penguin: "fortune", hedgehog: "gold_find", sheep: "xp_gain", crab: "might", turtle: "might",
-    parrot: "fortune", dolphin: "xp_gain", monkey: "gold_find", panda: "fortune", kangaroo: "crit_power",
+    penguin: "fortune", hedgehog: "gold_find", sheep: "xp_gain", crab: "might", turtle: "growSpeed",
+    parrot: "fortune", dolphin: "growSpeed", monkey: "gold_find", panda: "growSpeed", kangaroo: "crit_power",
     // Achievement
-    ladybug: "gold_find", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
+    ladybug: "seedLuck", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
     flamingo: "xp_gain", toucan: "gold_find",
     // Chest
     tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
@@ -59,6 +63,10 @@ export const PET_STAT_META = {
     fortune: { label: "Fortune", icon: "🍀", desc: "Banks extra weekly-boss raffle tickets every day — better odds to win the prize." },
     xp_gain: { label: "XP Gain", icon: "✨", desc: "You level up faster — more XP from everything you do." },
     gold_find: { label: "Gold Find", icon: "💰", desc: "More gold from everything you earn (boss, spins, sales)." },
+    // FARM passives (pastoral pets) — these help your FARM, not the boss. Equip the pet to apply its farm bonus.
+    seedLuck: { label: "Seed Luck", icon: "🍀", desc: "Better chance to find and keep seeds while you farm." },
+    growSpeed: { label: "Grow Speed", icon: "🌱", desc: "Your crops grow faster while this pet is equipped." },
+    petXp: { label: "Pet Bond", icon: "🐾", desc: "Your pets earn more XP when you tend them on the farm." },
 };
 
 const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal", celestial: "Celestial", primordial: "Primordial" };
@@ -168,6 +176,16 @@ export function collectibleById(id) {
 // Passive bonus this pet adds just by being OWNED (all owned pets stack) — its own themed stat.
 export function petPassive(pet) {
     return { stat: PET_PASSIVE_STAT[pet.id] || pet.activeStat || "fortune", value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
+}
+
+// The EQUIPPED pet's FARM passive (or null if the pet isn't a farm/pastoral pet). Same magnitude as its owned
+// passive (PET_PASSIVE_BY_RARITY), read by the farm-bonus aggregator. Combat never reads this — the same farm
+// stat is dropped by combinePetBonuses' add(), so a pastoral pet gives farm power WITHOUT any boss power.
+export function petFarmPassive(pet) {
+    if (!pet) return null;
+    const stat = PET_PASSIVE_STAT[pet.id];
+    if (!FARM_PASSIVE_STATS.has(stat)) return null;
+    return { stat, value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
 }
 
 // Active buff this pet grants when EQUIPPED/featured — its themed stat, scaled by rarity.
