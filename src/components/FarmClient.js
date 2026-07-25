@@ -601,33 +601,12 @@ export default function FarmClient({ initial, viewingAlias }) {
             {farm.mine ? <PetVisitReport /> : null}
             {farm.mine ? <FarmRatingReport /> : null}
 
-            <section className="card" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div>
-                    <h1 style={{ margin: 0 }}>🏡 {farm.mine ? "Your Farm" : `${farm.owner.name}'s Farm`}</h1>
-                    <p className="muted" style={{ margin: "4px 0 0" }}>
-                        {pets.length} pet{pets.length === 1 ? "" : "s"} roaming · tap one to inspect
-                        {farm.canPet && farm.petting ? ` · ${farm.petting.left}/${farm.petting.allowance} pettings ${farm.mine ? "for your own pets" : "for their pets"} today` : ""}
-                    </p>
+            {!farm.mine ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <h2 style={{ margin: 0 }}>🏡 {farm.owner.name}&apos;s Farm</h2>
+                    <button type="button" className="farm-jbtn" style={{ marginLeft: "auto" }} onClick={() => window.location.assign("/marketplace/farm")}>🏡 My farm</button>
                 </div>
-                <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    {farm.mine && farm.decorations ? (
-                        <button type="button" className="farm-jbtn" onClick={decorating ? stopDecorating : startDecorating}>{decorating ? "✓ Done" : "🪴 Decorate"}</button>
-                    ) : null}
-                    {farm.mine ? (
-                        <button type="button" onClick={spawnPigDebug} disabled={Boolean(pig)} title="Owner debug: force-spawn the Loot Pig now (repeatable)" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pig ? "default" : "pointer", opacity: pig ? 0.5 : 1 }}>
-                            🐷 debug: spawn pig
-                        </button>
-                    ) : null}
-                    {farm.mine ? (
-                        <button type="button" onClick={() => setCrownOpen(true)} title="Owner tool: position the loot pig's crown" style={{ padding: "5px 10px", borderRadius: 8, border: "1px dashed rgba(255,215,94,0.5)", background: "rgba(255,215,94,0.08)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                            👑 crown
-                        </button>
-                    ) : null}
-                    {!farm.mine ? (
-                        <button type="button" className="farm-jbtn" onClick={() => window.location.assign("/marketplace/farm")}>🏡 My farm</button>
-                    ) : null}
-                </div>
-            </section>
+            ) : null}
 
             {farm.rating ? (
                 <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
@@ -781,6 +760,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onBuyFertilizer={buyFert}
                     onUpgrade={buyUpgradeKey}
                     onDebug={gardenDebug}
+                    onSpawnPig={spawnPigDebug}
+                    onCrown={() => setCrownOpen(true)}
+                    pigBusy={Boolean(pig)}
                 />
             ) : null}
 
@@ -1306,7 +1288,7 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
     );
 }
 
-function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
+function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpawnPig, onCrown, pigBusy }) {
     const [showDebug, setShowDebug] = useState(false);
     const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade just bought → brief celebratory pop
     const buyUpgrade = (key) => { setUpgFlash(key); setTimeout(() => setUpgFlash(null), 620); onUpgrade(key); };
@@ -1391,6 +1373,16 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug }) {
                             <span style={{ fontSize: 16 }} aria-hidden="true">{icon}</span>{label}
                         </button>
                     ))}
+                    {onSpawnPig ? (
+                        <button type="button" onClick={onSpawnPig} disabled={pigBusy} title="Force-spawn the Loot Pig now" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, border: "1px dashed rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.07)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pigBusy ? "default" : "pointer", opacity: pigBusy ? 0.5 : 1, textAlign: "left" }}>
+                            <span style={{ fontSize: 16 }} aria-hidden="true">🐷</span>Spawn Loot Pig
+                        </button>
+                    ) : null}
+                    {onCrown ? (
+                        <button type="button" onClick={onCrown} title="Position the loot pig's crown" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, border: "1px dashed rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.07)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
+                            <span style={{ fontSize: 16 }} aria-hidden="true">👑</span>Crown calibrator
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
         </section>

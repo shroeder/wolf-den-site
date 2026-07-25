@@ -437,6 +437,8 @@ function FriendsTab({ data, busyId, onMessage, onRespond }) {
 }
 
 function DiscoverTab({ q, setQ, results, busyId, onAdd, onMessage, onGotoFriends }) {
+    // Discover is for meeting NEW people — hide anyone you're already friends with.
+    const shown = (results || []).filter((m) => m.relation !== "friends");
     return (
         <div className="social-people">
             <input
@@ -450,10 +452,10 @@ function DiscoverTab({ q, setQ, results, busyId, onAdd, onMessage, onGotoFriends
             />
             {results === null ? (
                 <p className="muted social-empty">Find people by @handle or display name.</p>
-            ) : results.length === 0 ? (
-                <p className="muted social-empty">No members match that search.</p>
+            ) : shown.length === 0 ? (
+                <p className="muted social-empty">{results.length ? "You're already friends with everyone here — search for someone new." : "No members match that search."}</p>
             ) : (
-                results.map((m) => (
+                shown.map((m) => (
                     <MemberHeroCard
                         key={m.id}
                         member={m}
