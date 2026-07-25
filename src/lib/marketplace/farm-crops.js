@@ -62,7 +62,7 @@ export const FARM_UPGRADES = {
     grow: { name: "Green Thumb", emoji: "🌱", max: 5, base: 220, desc: "−8% grow time per level" },
     seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 160, desc: "+25% seeds found across the games" },
     petcap: { name: "Pet Whisperer", emoji: "🐾", max: 5, base: 240, desc: "+1 free petting every day" },
-    chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 300, desc: "better harvest-loot odds (bumps the drop tier)" },
+    chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 300, desc: "+3% chance per level to bump a harvest reward up a loot tier" },
     seedsaver: { name: "Seed Saver", emoji: "🌰", max: 5, base: 200, desc: "+1% to keep the seed when you harvest" },
 };
 // Cost curve mirrors Sailing's boat/dig upgrades: quadratic in the NEXT level (base × (level+1)²), not doubling —
@@ -137,7 +137,9 @@ const seedSaverChance = (up) => 0.01 * lvl(up, "seedsaver"); // Seed Saver: 1% p
 // harvest-luck can promote the tier.
 async function rollHarvestReward(buyerId, rarity, luckyLevel = 0, bonusPromote = 0) {
     let tier = Number(weightedPick(RARITY_TIER_WEIGHTS[rarity] || RARITY_TIER_WEIGHTS.common));
-    if (Math.random() < 0.06 * luckyLevel + bonusPromote) tier = Math.min(5, tier + 1); // Lucky Harvest / deco promote
+    // Lucky Harvest (3%/level, was 6%) + placed-deco harvest-luck, but the COMBINED promote chance is capped at
+    // 35% (was uncapped and could hit ~70% with maxed decos — far too strong).
+    if (Math.random() < Math.min(0.35, 0.03 * luckyLevel + bonusPromote)) tier = Math.min(5, tier + 1);
     const pool = POOL_BY_TIER[tier] || POOL_BY_TIER[1];
     const pick = pool[Math.floor(Math.random() * pool.length)];
     let label = pick.label;
