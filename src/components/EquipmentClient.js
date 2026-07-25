@@ -513,10 +513,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setId && (data.setsOverview || []).some((s) => s.id === detailItem.setId) ? (
                             <button type="button" onClick={() => { const s = (data.setsOverview || []).find((x) => x.id === detailItem.setId); if (s) setSetDetail(s); }} style={{ margin: "8px 0 0", padding: "7px 11px", borderRadius: 8, border: "1px solid rgba(143,216,255,0.45)", background: "rgba(143,216,255,0.08)", color: "#8fd8ff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                                🪖 Part of the {detailItem.setName} set <span style={{ opacity: 0.7 }}>· view set ›</span>
+                                <HelmetSprite size={15} /> Part of the {detailItem.setName} set <span style={{ opacity: 0.7 }}>· view set ›</span>
                             </button>
                         ) : detailItem.setName ? (
-                            <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff" }}>🪖 Part of the {detailItem.setName} set</p>
+                            <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff", display: "inline-flex", alignItems: "center", gap: 6 }}><HelmetSprite size={15} /> Part of the {detailItem.setName} set</p>
                         ) : null}
                         {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {detailItem.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(detailItem.cost || 0).toLocaleString()}</span> {(detailItem.effectiveCost || 0).toLocaleString()}</> : (detailItem.cost || 0).toLocaleString()} gold{detailItem.discounted ? ` · ${data.coupon?.pct || 50}% off` : ""}{detailItem.canAfford ? "" : " · not enough"}</p> : null}
                         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>

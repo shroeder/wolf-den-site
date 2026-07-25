@@ -480,7 +480,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // Decorations — buy / place / drag-move / pick-up. Every action returns the fresh decoration state, which we
     // fold into both `decorations` (inventory) and `placements` (what renders in the scene).
-    const [decoEditing, setDecoEditing] = useState(true); // default MOVABLE — drag placed decorations any time, tray or not
+    const [decoEditing, setDecoEditing] = useState(false); // default LOCKED on arrival — tap the 🔒/🔓 toggle to rearrange
     const [decoBusy, setDecoBusy] = useState(false);
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);

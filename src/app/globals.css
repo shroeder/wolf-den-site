@@ -10168,7 +10168,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .spin-legend { margin-top: 14px; text-align: left; }
 .spin-legend-head { font-weight: 800; font-size: 0.82rem; color: #cdbfa6; margin-bottom: 6px; }
 .spin-legend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
-.spin-legend-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 0.76rem; }
+.spin-legend-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 0.76rem; min-width: 0; /* let the 1fr track shrink so the odds never overflow off-screen */ }
 .spin-legend-emoji { font-size: 0.95rem; flex: 0 0 auto; }
 .spin-legend-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spin-legend-odds { color: #8a9099; font-weight: 700; font-size: 0.7rem; flex: 0 0 auto; }
