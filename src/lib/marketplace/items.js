@@ -526,6 +526,49 @@ export const ITEMS = [
     { id: "foxglove_charm", name: "Foxglove Charm", slot: "amulet", rarity: "epic", icon: "GiThreeLeaves", flavor: "Wildflower magic, carried close to the heart.", stats: { fortune: 8, crit_chance: 3 }, farm: { harvestLuck: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2300, sort: 937 },
 ];
 
+// ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────
+// The flat per-rarity stat budgets left dozens of items with byte-identical stat blocks (e.g. nine different
+// epics all "might 22"). This one-time pass makes every same-rarity stat block UNIQUE by deterministically
+// shuffling 1–3 points among an item's stats — NO new perks, and each item's TOTAL point budget is preserved,
+// so power and boss-HP sizing are unchanged (it's purely cosmetic redistribution). Keyed by cluster index so
+// it's stable across loads. Signature/farm/sea affixes are untouched — only the `stats` block is nudged.
+const DEDUP_STAT_KEYS = ["might", "ferocity", "crit_chance", "crit_power", "fortune"];
+const statSig = (stats = {}) => DEDUP_STAT_KEYS.map((k) => `${k}:${stats[k] || 0}`).join("|");
+(function dedupeStatBlocks() {
+    // Global per RARITY: the first item to claim a stat block keeps it; any later item with a colliding block
+    // (same cluster OR a block another item already nudged into) gets shuffled to the nearest FREE block, so
+    // no two same-rarity items are ever identical. Each candidate move is point-neutral (primary → secondary).
+    const byRarity = new Map();
+    for (const it of ITEMS) {
+        if (!it.stats || !Object.keys(it.stats).length) continue; // skip stat-less charms (farm/sea/charged only)
+        if (!byRarity.has(it.rarity)) byRarity.set(it.rarity, []);
+        byRarity.get(it.rarity).push(it);
+    }
+    for (const list of byRarity.values()) {
+        list.sort((a, b) => (a.id < b.id ? -1 : 1)); // deterministic order → stable across loads
+        const used = new Set();
+        for (const it of list) {
+            const base = { ...it.stats };
+            const keys = Object.keys(base);
+            const primary = keys.reduce((a, b) => (base[b] > base[a] ? b : a), keys[0]); // biggest stat
+            const pIdx = DEDUP_STAT_KEYS.indexOf(primary);
+            let chosen = base;
+            if (used.has(statSig(base)) && pIdx >= 0) {
+                for (let t = 1; t <= 24; t++) {
+                    const secOffset = ((t - 1) % (DEDUP_STAT_KEYS.length - 1)) + 1;
+                    const sec = DEDUP_STAT_KEYS[(pIdx + secOffset) % DEDUP_STAT_KEYS.length];
+                    const move = Math.min(1 + Math.floor((t - 1) / (DEDUP_STAT_KEYS.length - 1)), (base[primary] || 0) - 1);
+                    if (move <= 0 || sec === primary) continue;
+                    const cand = { ...base, [primary]: base[primary] - move, [sec]: (base[sec] || 0) + move };
+                    if (!used.has(statSig(cand))) { chosen = cand; break; }
+                }
+            }
+            it.stats = chosen;
+            used.add(statSig(chosen));
+        }
+    }
+})();
+
 export function itemById(id) {
     return ITEMS.find((i) => i.id === id) || null;
 }
