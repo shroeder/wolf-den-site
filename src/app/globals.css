@@ -6066,6 +6066,13 @@ body.tv-mode .shop-mobile-cart-fab {
 .av-border-rainbow { animation: av-rainbow 3s linear infinite; }
 .av-border-cosmic { animation: av-cosmic 5s linear infinite; }
 .av-border-legendary { animation: av-legendary 4s linear infinite; }
+/* Activity-earned cosmetic borders (farming meta expansion) */
+.av-border-sailor { box-shadow: 0 0 0 3px #4aa3d4, 0 0 14px rgba(74, 163, 212, 0.7); }
+.av-border-warborn { box-shadow: 0 0 0 3px #e0687a, 0 0 14px rgba(224, 104, 122, 0.72); }
+.av-border-artisan { box-shadow: 0 0 0 3px #c9a2ff, 0 0 13px rgba(201, 162, 255, 0.7); }
+.av-border-kindred { box-shadow: 0 0 0 3px #ffb14a, 0 0 13px rgba(255, 177, 74, 0.68); }
+.av-border-harvest_crown { animation: av-harvest 4s ease-in-out infinite; }
+@keyframes av-harvest { 0%, 100% { box-shadow: 0 0 0 3px #ffcf5e, 0 0 10px rgba(255, 207, 94, 0.6); } 50% { box-shadow: 0 0 0 3px #ffe27a, 0 0 20px rgba(255, 207, 94, 0.95); } }
 
 @keyframes av-ember {
     0%, 100% { box-shadow: 0 0 0 3px #ff7a1a, 0 0 8px rgba(255, 122, 26, 0.5); }
@@ -6201,6 +6208,7 @@ body.tv-mode .shop-mobile-cart-fab {
 .bg-forest { background: linear-gradient(160deg, #08120e, #0e241c 55%, #0a1a14) !important; }
 .bg-ocean { background: linear-gradient(160deg, #08172a, #0e2a44 55%, #0a1e33) !important; }
 .bg-sunset { background: radial-gradient(120% 100% at 80% 0%, rgba(255, 90, 140, 0.26), transparent 55%), linear-gradient(160deg, #2a1030, #3a1a2a 55%, #1a1020) !important; }
+.bg-hoard { background: radial-gradient(130% 90% at 50% 112%, rgba(255, 196, 66, 0.3), transparent 55%), radial-gradient(90% 80% at 18% 0%, rgba(120, 80, 40, 0.42), transparent 60%), linear-gradient(160deg, #1b1207, #2a1c0a 55%, #140d04) !important; }
 .bg-nebula {
     background: linear-gradient(130deg, #1a0b2e, #3a1a5a, #5a1a4a, #1a0b2e) !important;
     background-size: 300% 300% !important;
