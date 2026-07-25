@@ -43,7 +43,7 @@ export default function BadgeArt({ slug, icon, className = "" }) {
     if (sprite) {
         return (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={sprite} alt="" className={`badge-art-img ${className}`} loading="lazy" style={{ height: "1.25em", width: "auto", verticalAlign: "-0.2em" }} />
+            <img src={sprite} alt="" className={`badge-art-img ${className}`} loading="lazy" style={{ height: "1.5em", width: "auto", verticalAlign: "-0.28em" }} />
         );
     }
     return (

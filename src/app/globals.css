@@ -5397,18 +5397,19 @@ body.tv-mode .shop-mobile-cart-fab {
 .user-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.28rem;
-    font-size: 0.7rem;
+    gap: 0.35rem;
+    font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: #fff;
-    padding: 0.14rem 0.55rem;
+    padding: 0.24rem 0.62rem;
     border-radius: 999px;
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
     white-space: nowrap;
 }
 .user-badge-icon {
-    font-size: 0.85rem;
+    font-size: 1.5em; /* scales with the pill; BadgeArt renders relative to this so the art reads big */
+    line-height: 0;
 }
 
 /* Level-up celebration overlay (confetti + pop-in card). Fires once per level. */
@@ -6004,7 +6005,7 @@ body.tv-mode .shop-mobile-cart-fab {
     gap: 8px;
     margin-bottom: 4px;
 }
-.track-ach-icon { font-size: 1.3rem; }
+.track-ach-icon { font-size: 1.9rem; line-height: 0; }
 .track-ach-label { font-weight: 700; flex: 1 1 auto; }
 .track-ach-check {
     font-size: 0.7rem;
@@ -8987,14 +8988,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .feat-badge-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
+    gap: 7px;
+    padding: 8px 14px;
     border-radius: 999px;
     border: 1px solid var(--chip-color, rgba(255, 255, 255, 0.18));
     background: rgba(255, 255, 255, 0.04);
     color: var(--ink);
     font: inherit;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
 }
@@ -9423,8 +9424,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .bhc-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .bhc-meta .rank-chip-sm { font-size: 0.6rem; padding: 0 6px; text-shadow: 0 1px 2px #000; }
 .bhc-lv { font-size: 0.64rem; font-weight: 800; color: #ffcf7a; text-shadow: 0 1px 2px #000; }
-.bhc .user-badges { margin-top: 2px; gap: 3px; flex-wrap: wrap; }
-.bhc .user-badge { font-size: 0.5rem; padding: 1px 5px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.bhc .user-badges { margin-top: 2px; gap: 5px; flex-wrap: wrap; }
+.bhc .user-badge { font-size: 0.58rem; padding: 2px 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.bhc .user-badge-icon { font-size: 1.75em; } /* let the redone art read on the compact hub card without inflating the label */
 .bhc.is-you { box-shadow: 0 0 0 1.5px rgba(255,215,94,0.75), 0 5px 16px rgba(0,0,0,0.6); }
 @media (prefers-reduced-motion: reduce) { .bhc-slot { animation: none; } }
 
@@ -9560,7 +9562,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-winner-claim { color: #a7ffc4; font-weight: 700; font-size: 0.9rem; margin-top: 4px; }
 /* ---- badge customization: next-badge nudge + collection board ---- */
 .badge-nudge { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(212,175,55,0.4); background: radial-gradient(120% 120% at 0% 0%, rgba(212,175,55,0.12), transparent 60%); }
-.badge-nudge-icon { font-size: 1.7rem; line-height: 1; }
+.badge-nudge-icon { font-size: 2.3rem; line-height: 1; }
 .badge-nudge-body { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .badge-nudge-label { font-weight: 700; font-size: 0.95rem; }
 .badge-nudge-sub { font-size: 0.78rem; }
@@ -9571,7 +9573,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .badge-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .badge-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 14px 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); }
 .badge-tile.is-locked { opacity: 0.72; }
-.badge-tile-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; background: rgba(255,255,255,0.08); }
+.badge-tile-icon { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; font-size: 2.1rem; background: rgba(255,255,255,0.08); }
 .badge-tile.is-locked .badge-tile-icon { filter: grayscale(1); opacity: 0.7; }
 .badge-tile-label { font-weight: 700; font-size: 0.9rem; }
 .badge-tile-desc { font-size: 0.76rem; line-height: 1.3; }

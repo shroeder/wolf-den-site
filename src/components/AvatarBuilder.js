@@ -64,7 +64,7 @@ function presetLook(kind) {
 }
 
 // Build your "vanilla" avatar (base identity — skin, hair, face, basic clothes). Live preview renders via
-// our own /api/marketplace/avatar route. Save stores the config; "Use a photo instead" clears it.
+// our own /api/marketplace/avatar route. Save stores the config (the build-your-own avatar is the only path).
 export default function AvatarBuilder({ current = null }) {
     const router = useRouter();
     const [config, setConfig] = useState(() => ({ ...DEFAULT_AVATAR, ...(current || {}) }));
@@ -165,9 +165,6 @@ export default function AvatarBuilder({ current = null }) {
             <div className="avatar-builder-actions">
                 <button type="button" className="btn-gold" onClick={() => save(config, "Avatar saved.")} disabled={busy}>
                     {busy ? "Saving…" : "Save avatar"}
-                </button>
-                <button type="button" className="btn-ghost" onClick={() => save(null, "Switched back to your photo.")} disabled={busy}>
-                    Use a photo instead
                 </button>
             </div>
             {msg ? <p className="shop-payment-success" style={{ marginTop: 8 }}>{msg}</p> : null}

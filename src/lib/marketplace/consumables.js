@@ -25,12 +25,12 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 export const CONSUMABLES = {
     scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP.", price: 1500, effect: { type: "xp", amount: 500 } },
     scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP.", price: 5000, effect: { type: "xp", amount: 2000 } },
-    pot_adrenaline: { name: "Adrenaline Vial", emoji: "🧪", kind: "potion", desc: "Gain +2 boss attacks today.", price: 1200, effect: { type: "strikes", amount: 2 } },
-    pot_secondwind: { name: "Second Wind", emoji: "🌀", kind: "potion", desc: "Gain +5 boss attacks today.", price: 3200, effect: { type: "strikes", amount: 5 } },
-    pot_berserker: { name: "Berserker's Brew", emoji: "🍺", kind: "potion", desc: "DOUBLE your boss damage for 24 hours.", price: 4000, effect: { type: "damage", mult: 2, hours: 24 } },
-    pot_fury: { name: "Bottled Fury", emoji: "🔥", kind: "potion", desc: "TRIPLE your boss damage for 6 hours.", price: 6500, effect: { type: "damage", mult: 3, hours: 6 } },
-    stone_ember: { name: "Ember Stone", emoji: "🔴", kind: "stone", desc: "DOUBLE your boss damage for 12 hours.", price: 3500, effect: { type: "damage", mult: 2, hours: 12 } },
-    stone_storm: { name: "Storm Crystal", emoji: "🔷", kind: "stone", desc: "Gain +3 boss attacks today.", price: 2000, effect: { type: "strikes", amount: 3 } },
+    pot_adrenaline: { name: "Adrenaline Vial", emoji: "🧪", kind: "potion", desc: "Gain +2 manual daily strikes today.", price: 1200, effect: { type: "strikes", amount: 2 } },
+    pot_secondwind: { name: "Second Wind", emoji: "🌀", kind: "potion", desc: "Gain +5 manual daily strikes today.", price: 3200, effect: { type: "strikes", amount: 5 } },
+    pot_berserker: { name: "Berserker's Brew", emoji: "🍺", kind: "potion", desc: "DOUBLE your daily strike damage for 24 hours.", price: 4000, effect: { type: "damage", mult: 2, hours: 24 } },
+    pot_fury: { name: "Bottled Fury", emoji: "🔥", kind: "potion", desc: "TRIPLE your daily strike damage for 6 hours.", price: 6500, effect: { type: "damage", mult: 3, hours: 6 } },
+    stone_ember: { name: "Ember Stone", emoji: "🔴", kind: "stone", desc: "DOUBLE your daily strike damage for 12 hours.", price: 3500, effect: { type: "damage", mult: 2, hours: 12 } },
+    stone_storm: { name: "Storm Crystal", emoji: "🔷", kind: "stone", desc: "Gain +3 manual daily strikes today.", price: 2000, effect: { type: "strikes", amount: 3 } },
     // ULTRA relics — no gold price (drop only from the highest chests). Applied to a charged item you pick.
     elixir_renewal: { name: "Elixir of Renewal", emoji: "⚗️", kind: "relic", price: null, target: "recharge", desc: "Fully RECHARGE all charges on one of your charged items.", effect: { type: "recharge" } },
     sands_of_time: { name: "Sands of Time", emoji: "⏳", kind: "relic", price: null, target: "cooldown", desc: "Instantly RESET the cooldown on a charged item that still has a charge left.", effect: { type: "reset_cooldown" } },
@@ -260,7 +260,7 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
              VALUES ($1, 'strikes', $2, (date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') + interval '1 day') AT TIME ZONE 'America/Chicago')`,
             [buyerId, e.amount]
         ).catch(() => {});
-        applied = `+${e.amount} boss attacks today`;
+        applied = `+${e.amount} manual daily strikes today`;
     } else if (e.type === "damage") {
         await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, e.mult, String(e.hours)]).catch(() => {});
         applied = `${e.mult}× boss damage for ${e.hours}h`;

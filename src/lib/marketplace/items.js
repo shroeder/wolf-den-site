@@ -27,12 +27,12 @@ export const EQUIP_SLOTS = [
 // Each stat carries a plain-English `desc` (what it does for a player, no jargon) + an icon, so the gear
 // screen can teach what every stat means instead of just showing a number.
 export const STAT_META = {
-    might: { label: "Might", icon: "⚔️", desc: "How hard your big daily attack hits the boss.", suffix: "%" },
-    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often your attack lands a huge critical hit.", suffix: "%" },
-    crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra damage your critical hits deal.", suffix: "%" },
-    ferocity: { label: "Ferocity", icon: "🔥", desc: "Damage your hero deals to the boss automatically, 24/7.", suffix: "%" },
+    might: { label: "Might", icon: "⚔️", desc: "How hard you hit — powers BOTH your 24/7 passive auto-damage and your manual daily strike.", suffix: "%" },
+    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often you land a critical — on both your passive auto-damage and your manual strike.", suffix: "%" },
+    crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra your critical hits deal — on both passive auto-damage and your manual strike.", suffix: "%" },
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "PASSIVE only: auto-damage your hero deals 24/7 on its own (doesn't affect your manual strike).", suffix: "%" },
     fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize.", suffix: "%" },
-    extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra daily attacks on the boss.", suffix: "" },
+    extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
 // Charged-perk reward keys → the real-world thing you hand over in-store. Redeemed via the admin app

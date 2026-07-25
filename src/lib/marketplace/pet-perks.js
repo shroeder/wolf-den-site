@@ -88,12 +88,12 @@ export function petPerkValue(rarity, key) {
 
 function perkDesc(key, v) {
     switch (key) {
-        case "might": return `+${v}% boss attack damage`;
-        case "crit_chance": return `+${v}% crit chance`;
-        case "crit_power": return `+${v}% crit damage`;
-        case "ferocity": return `+${v}% ferocious strike damage`;
+        case "might": return `+${v}% damage — passive auto-damage AND your daily strike`;
+        case "crit_chance": return `+${v}% crit chance — passive and your daily strike`;
+        case "crit_power": return `+${v}% crit damage — passive and your daily strike`;
+        case "ferocity": return `+${v}% PASSIVE auto-damage only (24/7)`;
         case "fortune": return `+${v * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day (banked all week)`;
-        case "extra_strike": return `+${v} boss attack${v > 1 ? "s" : ""} per day`;
+        case "extra_strike": return `+${v} manual daily strike${v > 1 ? "s" : ""}`;
         case "first_hit": return `Your first strike each day deals ×${v} damage`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
         case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
