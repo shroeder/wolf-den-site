@@ -19,7 +19,7 @@ const buildPrompt = (desc, correction) => {
 // Draw a single option (the whole flow is one-at-a-time now).
 async function genOne(prompt, attempt) {
     try {
-        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320 });
+        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true });
         return url ? [{ url, attempt }] : [];
     } catch { return []; }
 }

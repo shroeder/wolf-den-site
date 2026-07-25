@@ -98,7 +98,7 @@ export async function storePng(buffer, pathPrefix = "marketplace/ai") {
     return blob.url;
 }
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null } = {}) {
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null, deHalo = false } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -118,6 +118,9 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     let buffer = Buffer.from(b64, "base64");
     // Enforce a consistent right-facing orientation (e.g. pets/companions that fight toward the boss).
     if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;
+    // Future-proof the die-cut white halo: safely peel it off die-cut sprite generations (no-ops when there's
+    // no halo, keeps the original if a pale subject would go ragged). Callers opt in; never used on scenes.
+    if (deHalo) { const { deHaloBuffer } = await import("@/lib/marketplace/dehalo.js"); buffer = await deHaloBuffer(buffer); }
     // Optionally downscale before storing (e.g. badges render at ~24px — no need to ship a 1024px, ~1.5MB PNG).
     // Preserves transparency; sharp is loaded lazily so callers that don't resize don't pull it in.
     if (resizeTo) {
