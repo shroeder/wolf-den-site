@@ -88,7 +88,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                     <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
                     <span style={{ marginLeft: "auto" }} />
                     {onOpenCreator ? (
-                        <button type="button" onClick={onOpenCreator} title="Design your own decoration with AI" style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(201,162,255,0.6)", background: "linear-gradient(180deg,#c9a2ff,#a56be8)", color: "#2a0f45", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent", boxShadow: "0 2px 10px rgba(165,107,232,0.4)" }}>✨ Make your own</button>
+                        <button type="button" onClick={onOpenCreator} title="Design your own decoration with AI" style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(201,162,255,0.6)", background: "linear-gradient(180deg,#c9a2ff,#a56be8)", color: "#2a0f45", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent", boxShadow: "0 2px 10px rgba(165,107,232,0.4)" }}>🎨 Make your own</button>
                     ) : null}
                     <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>✓ Done</button>
                 </div>
@@ -140,7 +140,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                     ))}
                     {onOpenCreator ? (
                         <button type="button" onClick={onOpenCreator} title="Design your own decoration" style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" , WebkitTapHighlightColor: "transparent" }}>
-                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "radial-gradient(120% 120% at 50% 0%, rgba(201,162,255,0.25), rgba(255,255,255,0.03))", border: "1px dashed rgba(201,162,255,0.6)", fontSize: 26 }}>✨</span>
+                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "radial-gradient(120% 120% at 50% 0%, rgba(201,162,255,0.25), rgba(255,255,255,0.03))", border: "1px dashed rgba(201,162,255,0.6)", fontSize: 26 }}>🎨</span>
                             <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#d9b8ff", fontWeight: 700 }}>Make your own</span>
                         </button>
                     ) : null}
@@ -415,10 +415,10 @@ function TabBtn({ active, onClick, children }) {
 const CINP = { width: "100%", padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "inherit", fontSize: 14, boxSizing: "border-box" };
 const CPRIMARY = { width: "100%", padding: 12, fontWeight: 900, fontSize: 14, border: "none", borderRadius: 11, cursor: "pointer", background: "linear-gradient(180deg,#d9b8ff,#a875e6)", color: "#25103f" };
 const CGHOST = { padding: "9px 14px", fontWeight: 800, fontSize: 13, borderRadius: 10, cursor: "pointer", border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9b8ff" };
-const customErr = (e) => ({ no_credits: "You're out of creation tokens — grab a bundle to get more.", describe_it: "Describe your decoration first.", gen_failed: "The art pipeline hiccuped — try again (your creation was refunded).", no_attempts: "No refines left.", bad_choice: "Pick one of the options.", not_found: "That draft expired — start over." }[e] || "Something went wrong — try again.");
+const customErr = (e) => ({ no_credits: "You're out of creations — grab a bundle to get more.", describe_it: "Describe your decoration first.", gen_failed: "The art pipeline hiccuped — try again (your creation was refunded).", no_attempts: "No refines left.", bad_choice: "Pick one of the options.", not_found: "That draft expired — start over." }[e] || "Something went wrong — try again.");
 
-// ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a creation credit
-// (earned by loading $5 store credit; owner can self-grant). Personal-only + never tradeable.
+// ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a Creation
+// (bought on /marketplace/creations; owner can self-grant). Personal-only + never tradeable.
 export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, onFinalize, onGrantSelf, onClose }) {
     const [draft, setDraft] = useState(custom?.draft || null);
     const [credits, setCredits] = useState(custom?.credits || 0);
@@ -448,7 +448,7 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10058, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Make your own decoration" style={{ width: "100%", maxWidth: 420, maxHeight: "90dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #c9a2ff", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <strong style={{ fontSize: 17 }}>✨ Make your own</strong>
+                    <strong style={{ fontSize: 17 }}>🎨 Make your own</strong>
                     <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: credits > 0 ? "#c9a2ff" : "#9aa0a6" }}>{credits} creation{credits === 1 ? "" : "s"}</span>
                     <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7 }}>×</button>
                 </div>
@@ -461,7 +461,7 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                     </div>
                 ) : !draft ? (
                     <div style={{ marginTop: 10 }}>
-                        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Describe a decoration and our art pipeline draws it. Not quite right? Add a quick tweak and it redraws — your description stays, the tweak nudges it. It&apos;s yours alone, forever.</p>
+                        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Describe what you want and our art pipeline draws it. Not quite right? Add a quick tweak and it redraws — your description stays, the tweak nudges it. It&apos;s yours alone, forever.</p>
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Name</label>
                         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="e.g. Wolf Totem" style={CINP} />
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, margin: "12px 0 4px" }}>Describe it</label>
@@ -471,9 +471,8 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                             <button type="button" onClick={doStart} disabled={busy} style={{ ...CPRIMARY, marginTop: 14 }}>🎨 Draw my decoration (uses 1 creation)</button>
                         ) : (
                             <div style={{ marginTop: 14, textAlign: "center" }}>
-                                <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creation tokens. Grab a bundle — you also get coins with every buy.</div>
-                                <a href="/marketplace/creations" style={{ display: "inline-block", marginTop: 8, fontWeight: 800, color: "#c9a2ff" }}>✨ Get creation tokens →</a>
-                                <div><a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 6, fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>or load store credit →</a></div>
+                                <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creations. Grab a bundle — you also get coins with every buy.</div>
+                                <a href="/marketplace/creations" style={{ ...CPRIMARY, display: "inline-block", width: "auto", padding: "10px 18px", marginTop: 10, textDecoration: "none" }}>🎨 Get creations →</a>
                                 {canGrant ? <div><button type="button" onClick={doGrant} style={{ marginTop: 10, ...CGHOST }}>🎁 Grant myself one (owner)</button></div> : null}
                             </div>
                         )}
@@ -497,7 +496,7 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                             <div style={{ marginTop: 12 }}>
                                 <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Not quite? Add a tweak &amp; redraw ({attemptsLeft} redraw{attemptsLeft === 1 ? "" : "s"} left)</label>
                                 <input value={correction} onChange={(e) => setCorrection(e.target.value)} maxLength={200} placeholder="e.g. make it bigger, add snow on top" style={CINP} />
-                                <button type="button" onClick={doRefine} disabled={busy || !correction.trim()} style={{ ...CGHOST, marginTop: 8, width: "100%", opacity: correction.trim() ? 1 : 0.55 }}>✨ Redraw with my tweak</button>
+                                <button type="button" onClick={doRefine} disabled={busy || !correction.trim()} style={{ ...CGHOST, marginTop: 8, width: "100%", opacity: correction.trim() ? 1 : 0.55 }}>🎨 Redraw with my tweak</button>
                             </div>
                         ) : <div className="muted" style={{ fontSize: 12, marginTop: 10, textAlign: "center" }}>No redraws left — pick your favorite to finish.</div>}
                         <button type="button" onClick={doFinalize} disabled={!chosen || busy} style={{ ...CPRIMARY, marginTop: 14, opacity: chosen ? 1 : 0.5 }}>✓ Use this one</button>

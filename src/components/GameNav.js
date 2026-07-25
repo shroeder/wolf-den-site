@@ -34,6 +34,7 @@ const LINKS = [
     { href: "/marketplace/leaderboard", emoji: "🥇", label: "Ranks" },
     { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties" },
     { href: "/marketplace/invite", emoji: "🎁", label: "Invite" },
+    { href: "/marketplace/creations", emoji: "🎨", label: "Creations" },
     { href: "/marketplace/credit", emoji: "💳", label: "Credit" },
 ];
 

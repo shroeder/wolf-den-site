@@ -1,7 +1,8 @@
-// ── Creation Tokens: the single source of truth for the buyable "Creation Token" tiers. A Creation Token is
-// spent in the farm's "Make your own" flow to design your own AI decoration (stored under mkt_buyer as
-// custom_deco_credits — presented to members as "Creation Tokens"). Buying a tier grants TOKENS + COINS
-// (gold). This is deliberately SEPARATE from store credit: no dollar balance is added, only tokens + coins.
+// ── Creations: the single source of truth for the buyable "Creation" tiers. A Creation is
+// spent in the "Make your own" flow to design your own AI art (stored under mkt_buyer as
+// custom_deco_credits — presented to members as "Creations"; the `tokens` field below is that count).
+// Buying a tier grants CREATIONS + COINS (gold). This is deliberately SEPARATE from store credit: no dollar
+// balance is added, only creations + coins.
 //
 // This module is isomorphic (no DB / server-only imports) so both the buy screen (client) and the checkout
 // route (server) share the exact same ladder. Each tier is a better deal than the last: more tokens and more
