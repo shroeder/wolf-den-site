@@ -136,9 +136,10 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
 export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect }) {
     const [drag, setDrag] = useState(null); // { id, x, y } live position during an actual drag
     const gr = useRef({}); // gesture: { id, pointerId, sx, sy, moved, x, y, el }
+    const suppressClick = useRef(false); // set after a real drag so the trailing click doesn't also inspect
     const start = (e, p) => {
         if (!editing) return;
-        e.preventDefault();
+        suppressClick.current = false; // fresh gesture — assume it's a tap until it moves
         e.stopPropagation();
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
         gr.current = { id: p.id, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, x: p.x, y: p.y, el: e.currentTarget };
@@ -148,6 +149,7 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
         if (!g.id || e.pointerId !== g.pointerId || !fieldRef?.current) return;
         if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 7) return; // still a tap until it moves enough
         g.moved = true;
+        e.preventDefault();
         const rect = fieldRef.current.getBoundingClientRect();
         g.x = Math.max(2, Math.min(98, ((e.clientX - rect.left) / rect.width) * 100));
         g.y = Math.max(4, Math.min(98, ((e.clientY - rect.top) / rect.height) * 100));
@@ -157,10 +159,14 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
         const g = gr.current;
         if (!g.id || e.pointerId !== g.pointerId) return;
         try { g.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
-        if (g.moved) onMove?.(g.id, g.x, g.y);
-        else onInspect?.(placements.find((p) => p.id === g.id));
+        if (g.moved) { suppressClick.current = true; onMove?.(g.id, g.x, g.y); } // a drag — swallow the trailing click
         gr.current = {};
         setDrag(null);
+    };
+    // Inspect on a real click/tap. Works in BOTH modes; in move mode a click that followed a drag is suppressed.
+    const clickInspect = (p) => {
+        if (suppressClick.current) { suppressClick.current = false; return; }
+        onInspect?.(p);
     };
     return (
         <>
@@ -173,14 +179,15 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                         onPointerDown={editing ? (e) => start(e, p) : undefined}
                         onPointerMove={editing ? move : undefined}
                         onPointerUp={editing ? end : undefined}
-                        onClick={editing ? undefined : () => onInspect?.(p)}
+                        onPointerCancel={editing ? () => { gr.current = {}; setDrag(null); } : undefined}
+                        onClick={() => clickInspect(p)}
                         style={{
                             position: "absolute", left: `${live.x}%`, top: `${live.y}%`, transform: "translate(-50%, -100%)",
                             zIndex: Math.round(live.y), cursor: "pointer", touchAction: editing ? "none" : "auto",
                             transition: drag && drag.id === p.id ? "none" : "left .15s ease, top .15s ease",
                             WebkitTapHighlightColor: "transparent", WebkitTouchCallout: "none", userSelect: "none", outline: "none",
                         }}
-                        title={editing ? `${p.name} — drag to move, tap for details` : `${p.name} — tap for details`}
+                        title={editing ? `${p.name} — drag to move, click to inspect / remove` : `${p.name} — tap for details`}
                     >
                         {p.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
