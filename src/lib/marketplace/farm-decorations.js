@@ -147,7 +147,6 @@ export async function placeDecoration(buyerId, decoId, x, y) {
     if (!buyerId || (!isDecoration(decoId) && !isCustom(decoId))) return { ok: false, error: "bad_decoration" };
     const px = clampPct(x, 50);
     const py = clampPct(y, 55);
-    if (nearPlots(px, py)) return { ok: false, error: "too_close_to_plots" };
     const owned = await db.queryOne(`SELECT 1 FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = $2 AND qty > 0`, [buyerId, decoId]).catch(() => null);
     if (!owned) return { ok: false, error: "not_owned" };
     const total = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ n: 0 }));
@@ -157,12 +156,11 @@ export async function placeDecoration(buyerId, decoId, x, y) {
     return { ok: true, ...(await decoState(buyerId)) };
 }
 
-// Reposition a placed decoration (drag). Same keep-out guard.
+// Reposition a placed decoration (drag). Decorations can go anywhere on the farm — you place them freely.
 export async function moveDecoration(buyerId, placementId, x, y) {
     if (!buyerId || !placementId) return { ok: false, error: "bad_request" };
     const px = clampPct(x, 50);
     const py = clampPct(y, 55);
-    if (nearPlots(px, py)) return { ok: false, error: "too_close_to_plots" };
     const moved = await db.queryOne(`UPDATE mkt_deco_placement SET x = $3, y = $4 WHERE id = $1 AND buyer_id = $2 RETURNING id`, [placementId, buyerId, px, py]).catch(() => null);
     if (!moved) return { ok: false, error: "not_found" };
     return { ok: true, ...(await decoState(buyerId)) };

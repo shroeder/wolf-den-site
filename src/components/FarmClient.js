@@ -466,7 +466,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // Decorations — buy / place / drag-move / pick-up. Every action returns the fresh decoration state, which we
     // fold into both `decorations` (inventory) and `placements` (what renders in the scene).
-    const [decoEditing, setDecoEditing] = useState(false);
+    const [decoEditing, setDecoEditing] = useState(true); // default MOVABLE — drag placed decorations any time, tray or not
     const [decoBusy, setDecoBusy] = useState(false);
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);
@@ -759,7 +759,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     </button>
                 ) : null}
                 {/* Persistent lock/move toggle — top-right of the scene, only while decorating. Default is movable. */}
-                {farm.mine && farm.decorations && decorating ? (
+                {farm.mine && farm.decorations && (((farm.placements?.length || 0) > 0) || decorating) ? (
                     <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock decorations" : "Unlock to move decorations"} title={decoEditing ? "Decorations movable — tap to LOCK" : "Decorations locked — tap to move"}
                         style={{ position: "absolute", top: 10, right: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 999, border: `1px solid ${decoEditing ? "rgba(143,199,255,0.6)" : "rgba(255,255,255,0.25)"}`, background: decoEditing ? "linear-gradient(180deg, rgba(30,52,74,0.96), rgba(18,32,46,0.96))" : "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: decoEditing ? "#bfe0ff" : "#d7d7db", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "✋" : "🔒"}</span>{decoEditing ? "Move" : "Locked"}
