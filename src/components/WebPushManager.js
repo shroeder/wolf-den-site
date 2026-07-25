@@ -68,7 +68,7 @@ export default function WebPushManager() {
             <div className="webpush-prompt-icon" aria-hidden="true">🔔</div>
             <div className="webpush-prompt-body">
                 <strong>Turn on notifications</strong>
-                <span>Get pinged about messages, drop alerts, and rewards — right on this device.</span>
+                <span>Get pinged about trade offers, messages, drop alerts, and rewards — right on this device.</span>
             </div>
             <div className="webpush-prompt-actions">
                 <button type="button" className="btn-gold" onClick={onEnable} disabled={busy}>
