@@ -1,5 +1,6 @@
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import BossCelebrationWatcher from "@/components/BossCelebrationWatcher";
+import FeatureModal from "@/components/FeatureModal";
 import GiftWatcher from "@/components/GiftWatcher";
 import HappyHourWatcher from "@/components/HappyHourWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
@@ -29,6 +30,8 @@ export default function PublicLayout({ children }) {
             <GiftWatcher />
             {/* Ever-present social hub (friends + discover + messaging) for signed-in members, every page. */}
             <SocialHub />
+            {/* One-time feature-launch announcement (shows once per member) — currently the Farm launch. */}
+            <FeatureModal />
             {/* Registers the push service worker + offers to turn on browser notifications (signed-in). */}
             <WebPushManager />
             {/* Logs a page_view for every visitor (incl. anonymous) — powers the admin traffic telemetry. */}
