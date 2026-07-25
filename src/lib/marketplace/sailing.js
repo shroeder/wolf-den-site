@@ -882,7 +882,7 @@ export async function startVoyage(buyerId, optionId = "standard") {
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
-                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, arrival_notified = FALSE, updated_at = NOW()`,
+                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, arrival_notified = FALSE, idle_notified_at = NULL, updated_at = NOW()`,
         [buyerId, String(ms), opt.id, ms, encMs]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
@@ -929,6 +929,44 @@ export async function runSailingArrivals() {
         pushed += 1;
     }
     return { checked: due.length, pushed };
+}
+
+// How long the boat can sit docked before we nudge "you forgot to sail", and how often the nudge can repeat
+// while it stays idle (so it's a reminder, not a nag).
+const SAIL_IDLE_AFTER_HOURS = 3;
+const SAIL_IDLE_REPEAT_HOURS = 20;
+
+// "Your boat is docked — send it out" reminder. Fires for anyone whose boat has been idle (no active voyage,
+// no dig) for SAIL_IDLE_AFTER_HOURS, at most once per SAIL_IDLE_REPEAT_HOURS. Only nudges players who've sailed
+// before (voyages_completed > 0), so a never-sailed account isn't pestered. Cleared when a new voyage departs.
+export async function runSailingIdleReminders() {
+    const idle = await db.query(
+        `SELECT buyer_id FROM mkt_sailing
+          WHERE departed_at IS NULL AND dig_state IS NULL AND voyages_completed > 0
+            AND updated_at < NOW() - ($1 || ' hours')::interval
+            AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
+          LIMIT 500`,
+        [String(SAIL_IDLE_AFTER_HOURS), String(SAIL_IDLE_REPEAT_HOURS)],
+    ).catch(() => []);
+    let pushed = 0;
+    for (const r of idle) {
+        // Atomic claim — stamp idle_notified_at only if it's still due, so overlapping cron ticks can't double-send.
+        const claimed = await db.queryOne(
+            `UPDATE mkt_sailing SET idle_notified_at = NOW()
+              WHERE buyer_id = $1 AND departed_at IS NULL AND dig_state IS NULL
+                AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
+              RETURNING buyer_id`,
+            [r.buyer_id, String(SAIL_IDLE_REPEAT_HOURS)],
+        ).catch(() => null);
+        if (!claimed) continue;
+        await sendWebPush(r.buyer_id, {
+            title: "⛵ Your boat is docked",
+            body: "It's ready to set sail — send it on a voyage to haul back treasure.",
+            url: "/marketplace/sailing", tag: "sail-idle", data: { type: "sail_idle" },
+        }).catch(() => {});
+        pushed += 1;
+    }
+    return { idleChecked: idle.length, idlePushed: pushed };
 }
 
 // Wave to a passing sailor — up to WAVES_PER_DAY/day, each a little XP + coins + a small travel-time cut.
