@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import CoinCta from "@/components/CoinCta";
@@ -1425,8 +1426,9 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpaw
                 </div>
             </div>
 
-            {/* Seed detail modal — tap a seed in the bag to see what it grows into */}
-            {seedInfo ? (
+            {/* Seed detail modal — tap a seed in the bag to see what it grows into. Portaled to <body> so a
+                transformed/filtered ancestor can't trap the position:fixed and shove it to the page bottom. */}
+            {seedInfo && typeof document !== "undefined" ? createPortal((
                 <div onClick={() => setSeedInfo(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
                     <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${seedInfo.name} seed`} style={{ width: "100%", maxWidth: 300, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${(RARITY_RING[seedInfo.rarity] || "#8fbf6a")}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .35s ease both" }}>
                         <div style={{ padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${(RARITY_RING[seedInfo.rarity] || "#8fbf6a")}33, transparent 70%)` }}>
@@ -1447,7 +1449,7 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpaw
                         </div>
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
 
             {/* Fertilizer — juiced card */}
             <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 14, background: "linear-gradient(180deg, rgba(120,200,255,0.13), rgba(255,255,255,0.02))", border: "1px solid rgba(120,200,255,0.4)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
