@@ -7,10 +7,10 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Farm LIKES — a positive-only, three-tier "rate a friend's farm" system. Rating is a like, not a score:
 // Like 👍 < Love ❤️ < Admire ⭐. One persistent rating per (rater → owner); revise anytime. Both earn XP the
-// first time you rate them (revising is free and doesn't re-award). ONE new-rating charge per day; revising an
-// existing rating never spends the charge. (mig222.)
+// first time you rate them (changing a rating spends a charge but awards nothing — anti-farm). THREE rating
+// charges per day, spent on a NEW rating OR changing an existing one — no free flip-flopping. (mig222.)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
-const RATES_PER_DAY = 1; // new-rating charges per day (revising past ratings is always free)
+const RATES_PER_DAY = 3; // rating charges per day — spent on a NEW rating OR changing an existing one
 
 export const RATE_TIERS = {
     1: { key: "like", label: "Like", icon: "👍", color: "#7ec8ff", raterXp: 12, ownerXp: 18, blurb: "Nice farm!" },
@@ -82,10 +82,23 @@ export async function rateFarm(raterId, ownerId, tier) {
     const meta = RATE_TIERS[t];
 
     if (existing) {
-        // Revise — free, no charge, no XP. Bump owner_seen so the change resurfaces in their recap.
+        // Tapping the tier you already gave = no-op (no charge spent).
         if (existing.tier === t) {
             const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
             return { ok: true, changed: false, myTier: t, ...summary, charge, xpGained: 0 };
+        }
+        // CHANGING your rating now costs a charge too — no free flip-flopping. No XP (anti-farm).
+        const charge0 = await rateCharge(raterId);
+        if (charge0.left <= 0) {
+            const summary = await ratingSummary(ownerId, raterId);
+            return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge: charge0 };
+        }
+        const slot = await db
+            .queryOne(`UPDATE mkt_buyer SET farm_rate_used = farm_rate_used + 1 WHERE id = $1 AND farm_rate_day = ${DAY} AND farm_rate_used < $2 RETURNING farm_rate_used`, [raterId, RATES_PER_DAY])
+            .catch(() => null);
+        if (!slot) {
+            const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
+            return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge };
         }
         await db.query(`UPDATE mkt_farm_rating SET tier = $3, updated_at = NOW(), owner_seen_at = NULL WHERE rater_id = $1 AND owner_id = $2`, [raterId, ownerId, t]).catch(() => {});
         await trackActivity(raterId, "farm_rate_revise", { owner: ownerId, tier: t }).catch(() => {});

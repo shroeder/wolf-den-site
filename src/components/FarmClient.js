@@ -449,12 +449,13 @@ export default function FarmClient({ initial, viewingAlias }) {
         const R = farm.rating;
         if (!R?.canRate || rateBusy) return;
         if (R.myTier === tier) return; // tapping your current tier is a no-op
+        if ((R.charge?.left ?? 0) <= 0) { setRateNote("You're out of ratings for today — come back tomorrow."); return; } // new OR change both need a charge
         setRateBusy(true);
         setRateNote(null);
         const r = await post({ action: "rate", tier, owner: farm.owner?.alias });
         setRateBusy(false);
         if (!r?.ok) {
-            if (r?.error === "no_charge_left") setRateNote("You've used today's rating — but you can still change a rating you've already given, free.");
+            if (r?.error === "no_charge_left") setRateNote("You're out of ratings for today — come back tomorrow.");
             return;
         }
         setRateBurst({ tier, id: Date.now() });
@@ -1226,69 +1227,48 @@ const RATE_TIER_UI = [
     { tier: 2, key: "love", label: "Love", icon: "❤️", color: "#ff6fae" },
     { tier: 3, key: "admire", label: "Admire", icon: "⭐", color: "#ffd75e" },
 ];
+// Compact farm-rating bar: on your own farm a slim like-tally; on a friend's farm a tight row of 3 tier
+// buttons + your remaining charges. Buttons that would need a charge you don't have are disabled (no baiting).
 function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
-    const { total = 0, byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
-    const rated = Boolean(myTier);
+    const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
+    const left = charge?.left ?? 0;
+    const allowance = charge?.allowance ?? 3;
+    const tally = (
+        <div style={{ display: "flex", gap: 12 }}>
+            {RATE_TIER_UI.map((t) => (
+                <span key={t.key} title={`${byTier[t.tier]} ${t.label}${byTier[t.tier] === 1 ? "" : "s"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 800, color: byTier[t.tier] ? t.color : "#7c8088" }}>
+                    <span style={{ fontSize: 15 }}>{t.icon}</span>{byTier[t.tier]}
+                </span>
+            ))}
+        </div>
+    );
+    const wrap = { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,215,94,0.3)", background: "rgba(255,215,94,0.06)", flexWrap: "wrap" };
+    if (mine) {
+        return <div style={wrap}><strong style={{ fontSize: 13 }}>🏡 Your farm&apos;s love</strong><div style={{ marginLeft: "auto" }}>{tally}</div></div>;
+    }
+    if (!canRate) return null;
     return (
-        <section className="card" style={{ borderColor: "rgba(255,215,94,0.4)", background: "linear-gradient(180deg, rgba(255,215,94,0.09), transparent 42%)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ fontWeight: 900, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
-                        {mine ? "🏡 Your farm's love" : `Rate ${ownerName}'s farm`}
-                        {total > 0 ? <span style={{ padding: "1px 9px", borderRadius: 999, background: "rgba(255,215,94,0.16)", border: "1px solid rgba(255,215,94,0.5)", color: "#ffd75e", fontSize: 12, fontWeight: 800 }}>{total} total</span> : null}
-                    </div>
-                    <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                        {RATE_TIER_UI.map((t) => (
-                            <span key={t.key} title={`${byTier[t.tier]} ${t.label}${byTier[t.tier] === 1 ? "" : "s"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 800, color: byTier[t.tier] ? t.color : "#7c8088" }}>
-                                <span style={{ fontSize: 16 }}>{t.icon}</span>{byTier[t.tier]}
-                            </span>
-                        ))}
-                    </div>
-                </div>
+        <div style={wrap}>
+            <span style={{ fontSize: 12.5, fontWeight: 800 }}>Rate {ownerName}:</span>
+            <div style={{ display: "flex", gap: 6 }}>
+                {RATE_TIER_UI.map((t) => {
+                    const active = myTier === t.tier;
+                    const disabled = busy || (!active && left <= 0);
+                    const bursting = burst && burst.tier === t.tier;
+                    return (
+                        <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active} title={active ? `${t.label} (yours)` : disabled ? "No ratings left today" : t.label}
+                            style={{ position: "relative", width: 44, height: 40, borderRadius: 10, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.4 : 1, fontSize: 21, WebkitTapHighlightColor: "transparent",
+                                border: `2px solid ${active ? t.color : "rgba(255,255,255,0.14)"}`, background: active ? `${t.color}22` : "rgba(255,255,255,0.04)", transform: active ? "translateY(-1px)" : "none", boxShadow: active ? `0 0 0 2px ${t.color}22` : "none" }}>
+                            <span style={{ animation: bursting ? "ratePulse .5s ease" : undefined }}>{t.icon}</span>
+                            {active ? <span style={{ position: "absolute", bottom: -3, right: -3, fontSize: 11, background: "var(--card-bg,#17181c)", borderRadius: "50%" }}>✓</span> : null}
+                            {bursting ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "28%", fontSize: 26, pointerEvents: "none", animation: "rateBurstAnim .9s ease-out forwards" }}>{t.icon}</span> : null}
+                        </button>
+                    );
+                })}
             </div>
-
-            {mine ? (
-                <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>Visit friends&apos; farms to like theirs — you both earn XP, and they&apos;ll see who rated their place. 💛</p>
-            ) : canRate ? (
-                <>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
-                        {RATE_TIER_UI.map((t) => {
-                            const active = myTier === t.tier;
-                            const bursting = burst && burst.tier === t.tier;
-                            return (
-                                <button
-                                    key={t.key}
-                                    type="button"
-                                    onClick={() => onRate(t.tier)}
-                                    disabled={busy}
-                                    aria-pressed={active}
-                                    style={{
-                                        position: "relative", overflow: "visible", padding: "12px 6px 10px", borderRadius: 14, cursor: busy ? "default" : "pointer",
-                                        border: `2px solid ${active ? t.color : "rgba(255,255,255,0.14)"}`,
-                                        background: active ? `radial-gradient(120% 100% at 50% 0%, ${t.color}33, ${t.color}12)` : "rgba(255,255,255,0.04)",
-                                        color: "inherit", fontWeight: 800, transition: "transform .12s ease, border-color .15s ease, background .15s ease",
-                                        boxShadow: active ? `0 0 0 3px ${t.color}22, 0 6px 18px ${t.color}22` : "none",
-                                        transform: active ? "translateY(-1px)" : "none",
-                                    }}
-                                >
-                                    <span style={{ display: "block", fontSize: 26, lineHeight: 1, animation: bursting ? "ratePulse .5s ease" : undefined }}>{t.icon}</span>
-                                    <span style={{ display: "block", fontSize: 12.5, marginTop: 4, color: active ? t.color : "inherit" }}>{t.label}{active ? "d ✓" : ""}</span>
-                                    {bursting ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "40%", fontSize: 30, pointerEvents: "none", animation: "rateBurstAnim .9s ease-out forwards" }}>{t.icon}</span> : null}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <div className="muted" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center" }}>
-                        {rated
-                            ? "You've rated this farm — tap another tier to change it anytime, free. 💛"
-                            : charge && charge.left > 0
-                                ? `Pick a tier — you have ${charge.left} new rating${charge.left === 1 ? "" : "s"} today.`
-                                : "You've used today's new rating."}
-                    </div>
-                    {note ? <div style={{ fontSize: 11.5, marginTop: 6, textAlign: "center", color: "#ffcf6a" }}>{note}</div> : null}
-                </>
-            ) : null}
-        </section>
+            <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: left > 0 ? "#a7e6a7" : "#ff9a9a" }}>{left > 0 ? `${left}/${allowance} today` : "0 left today"}</span>
+            {note ? <span style={{ width: "100%", fontSize: 11, color: "#ffcf6a", textAlign: "center" }}>{note}</span> : null}
+        </div>
     );
 }
 
