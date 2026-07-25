@@ -565,6 +565,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     };
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
     const bgUrl = pickFarmBg(wx.tod, wx.condition);
+    // Time-of-day tint applied ONLY to world objects (pets/crops/decorations/farmer), never the backdrop — the
+    // illustrated backdrop is already the right time of day, so we just knock down the flat-lit sprites.
+    const objFilter = wx.tod === "night" ? "brightness(0.6) saturate(0.82)" : wx.tod === "dusk" ? "brightness(0.82) saturate(0.92)" : wx.tod === "dawn" ? "brightness(0.92) saturate(0.97)" : "none";
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
@@ -674,6 +677,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                             </div>
                         ) : null}
 
+                        {/* World OBJECTS layer — pets, crops, decorations, the farmer. The time-of-day tint is applied
+                            to THIS layer only, so the illustrated backdrop keeps its own night/dusk mood while the
+                            flat-lit sprites stop glowing like noon. */}
+                        <div style={{ position: "absolute", inset: 0, filter: objFilter }}>
                         {/* Crops grow right on the grass (clustered on the LEFT of the field), part of the world —
                             they scroll with the pasture and the pets are penned to the right so they never trample them. */}
                         {farm.mine && garden ? (
@@ -758,13 +765,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
                         {pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
 
-                        {/* Ambient light veil — the sky sets the mood, but sprites (pets, crops, decorations) are lit
-                            flat, so at night/dusk/dawn they'd glow like noon. Wash the whole world in a matching tint
-                            so everything reads as the same time of day. Sits above the world, below floaters/UI. */}
-                        {wx.tod !== "day" ? (
-                            <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 300,
-                                background: wx.tod === "night" ? "rgba(16,26,58,0.5)" : wx.tod === "dusk" ? "rgba(58,38,74,0.3)" : "rgba(120,92,48,0.16)" }} />
-                        ) : null}
+                        </div>{/* /world-objects tint layer */}
 
                         {/* XP / heart floaters */}
                         {floaters.map((f) => (
@@ -1286,47 +1287,79 @@ const RATE_TIER_UI = [
     { tier: 2, key: "love", label: "Love", icon: "❤️", color: "#ff6fae" },
     { tier: 3, key: "admire", label: "Admire", icon: "⭐", color: "#ffd75e" },
 ];
-// Compact farm-rating bar: on your own farm a slim like-tally; on a friend's farm a tight row of 3 tier
-// buttons + your remaining charges. Buttons that would need a charge you don't have are disabled (no baiting).
+// Charge indicator: N dots, `left` of them lit green.
+function ChargeDots({ left, allowance }) {
+    return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ display: "inline-flex", gap: 3 }}>
+                {Array.from({ length: allowance }).map((_, i) => (
+                    <span key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: i < left ? "#8fe39a" : "rgba(255,255,255,0.16)", boxShadow: i < left ? "0 0 5px rgba(143,227,154,0.7)" : "none", transition: "background .2s" }} />
+                ))}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: left > 0 ? "#a7e6a7" : "#ff9a9a" }}>{left > 0 ? `${left} left today` : "none left today"}</span>
+        </span>
+    );
+}
+
+// Farm-rating card: a polished, juicy way to Like / Love / Admire a friend's farm (or, on your own farm, a
+// clean tally of the love you've received). Big tier buttons with an active glow + lift + burst; charge dots.
 function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
     const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
     const left = charge?.left ?? 0;
     const allowance = charge?.allowance ?? 3;
-    const tally = (
-        <div style={{ display: "flex", gap: 12 }}>
+    const totalLove = (byTier[1] || 0) + (byTier[2] || 0) + (byTier[3] || 0);
+    const card = { borderRadius: 16, padding: "13px 15px", border: "1px solid rgba(255,215,94,0.26)", background: "linear-gradient(155deg, rgba(255,215,94,0.11), rgba(255,111,174,0.06) 62%, rgba(255,255,255,0.02))", boxShadow: "0 6px 22px rgba(0,0,0,0.28)" };
+    const tallyPills = (
+        <div style={{ display: "flex", gap: 6 }}>
             {RATE_TIER_UI.map((t) => (
-                <span key={t.key} title={`${byTier[t.tier]} ${t.label}${byTier[t.tier] === 1 ? "" : "s"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 800, color: byTier[t.tier] ? t.color : "#7c8088" }}>
-                    <span style={{ fontSize: 15 }}>{t.icon}</span>{byTier[t.tier]}
+                <span key={t.key} title={`${byTier[t.tier] || 0} ${t.label}${byTier[t.tier] === 1 ? "" : "s"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 800, color: byTier[t.tier] ? t.color : "#8a9096", background: byTier[t.tier] ? `${t.color}1c` : "rgba(255,255,255,0.04)", border: `1px solid ${byTier[t.tier] ? `${t.color}55` : "rgba(255,255,255,0.08)"}` }}>
+                    <span style={{ fontSize: 14 }}>{t.icon}</span>{byTier[t.tier] || 0}
                 </span>
             ))}
         </div>
     );
-    const wrap = { display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 12, border: "1px solid rgba(255,215,94,0.3)", background: "rgba(255,215,94,0.06)", flexWrap: "wrap" };
     if (mine) {
-        return <div style={wrap}><strong style={{ fontSize: 13 }}>🏡 Your farm&apos;s love</strong><div style={{ marginLeft: "auto" }}>{tally}</div></div>;
+        return (
+            <div style={card}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, fontSize: 15 }}>🏡 Your farm&apos;s love</div>
+                        <div className="muted" style={{ fontSize: 11.5, marginTop: 1 }}>{totalLove > 0 ? `${totalLove} rating${totalLove === 1 ? "" : "s"} from the pack 💛` : "No ratings yet — visit friends and they'll rate you back"}</div>
+                    </div>
+                    <div style={{ marginLeft: "auto" }}>{tallyPills}</div>
+                </div>
+            </div>
+        );
     }
     if (!canRate) return null;
     return (
-        <div style={wrap}>
-            <span style={{ fontSize: 12.5, fontWeight: 800 }}>Rate {ownerName}:</span>
-            <div style={{ display: "flex", gap: 6 }}>
+        <div style={card}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 900, fontSize: 15 }}>Rate {ownerName}&apos;s farm</span>
+                {totalLove > 0 ? <span className="muted" style={{ fontSize: 11.5 }}>· {totalLove} so far</span> : null}
+                <span style={{ marginLeft: "auto" }}><ChargeDots left={left} allowance={allowance} /></span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 {RATE_TIER_UI.map((t) => {
                     const active = myTier === t.tier;
                     const disabled = busy || (!active && left <= 0);
                     const bursting = burst && burst.tier === t.tier;
                     return (
-                        <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active} title={active ? `${t.label} (yours)` : disabled ? "No ratings left today" : t.label}
-                            style={{ position: "relative", width: 44, height: 40, borderRadius: 10, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.4 : 1, fontSize: 21, WebkitTapHighlightColor: "transparent",
-                                border: `2px solid ${active ? t.color : "rgba(255,255,255,0.14)"}`, background: active ? `${t.color}22` : "rgba(255,255,255,0.04)", transform: active ? "translateY(-1px)" : "none", boxShadow: active ? `0 0 0 2px ${t.color}22` : "none" }}>
-                            <span style={{ animation: bursting ? "ratePulse .5s ease" : undefined }}>{t.icon}</span>
-                            {active ? <span style={{ position: "absolute", bottom: -3, right: -3, fontSize: 11, background: "var(--card-bg,#17181c)", borderRadius: "50%" }}>✓</span> : null}
-                            {bursting ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "28%", fontSize: 26, pointerEvents: "none", animation: "rateBurstAnim .9s ease-out forwards" }}>{t.icon}</span> : null}
+                        <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active} title={active ? `${t.label} (your rating)` : disabled ? "No ratings left today" : `${t.label} this farm`}
+                            style={{ position: "relative", overflow: "visible", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "11px 6px 8px", borderRadius: 14, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.45 : 1, WebkitTapHighlightColor: "transparent",
+                                border: `1.5px solid ${active ? t.color : "rgba(255,255,255,0.12)"}`, color: "inherit",
+                                background: active ? `radial-gradient(120% 100% at 50% 0%, ${t.color}30, ${t.color}0f)` : "rgba(255,255,255,0.03)",
+                                boxShadow: active ? `0 0 0 3px ${t.color}22, 0 6px 16px ${t.color}22` : "none",
+                                transform: active ? "translateY(-2px)" : "none", transition: "transform .14s cubic-bezier(.2,1.3,.4,1), border-color .15s ease, box-shadow .15s ease, background .15s ease" }}>
+                            <span style={{ fontSize: 26, lineHeight: 1, animation: bursting ? "ratePulse .5s ease" : undefined, filter: active ? `drop-shadow(0 2px 7px ${t.color}99)` : "none" }}>{t.icon}</span>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: active ? t.color : "#cdd3d8" }}>{t.label}{active ? " ✓" : ""}</span>
+                            {byTier[t.tier] ? <span style={{ fontSize: 10, fontWeight: 700, color: "#8a9096" }}>{byTier[t.tier]}</span> : null}
+                            {bursting ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "18%", fontSize: 34, pointerEvents: "none", animation: "rateBurstAnim .9s ease-out forwards" }}>{t.icon}</span> : null}
                         </button>
                     );
                 })}
             </div>
-            <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: left > 0 ? "#a7e6a7" : "#ff9a9a" }}>{left > 0 ? `${left}/${allowance} today` : "0 left today"}</span>
-            {note ? <span style={{ width: "100%", fontSize: 11, color: "#ffcf6a", textAlign: "center" }}>{note}</span> : null}
+            {note ? <div style={{ fontSize: 11.5, marginTop: 9, textAlign: "center", color: "#ffcf6a", fontWeight: 600 }}>{note}</div> : null}
         </div>
     );
 }
