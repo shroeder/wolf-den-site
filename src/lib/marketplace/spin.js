@@ -42,7 +42,7 @@ const WHEELS = [
             { label: "Farm Decoration", emoji: "🪴", weight: 7, rare: true, tier: "rare", kind: "deco" },
             { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             { label: "500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 500 },
-            { label: "50% Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
+            { label: "50% Gold-Shop Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
             { label: "MINI JACKPOT · 1,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 1000 },
             { label: "JACKPOT · 2,500 gold", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 2500 },
         ],
@@ -98,7 +98,7 @@ async function grantPrize(buyerId, prize) {
         return { emoji: "🪙", text: "300 gold" };
     }
     if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
-    if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% shop coupon` }; }
+    if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% off an in-game 🪙 gold-shop item` }; }
     if (prize.kind === "token") { await grantSpinTokens(buyerId, prize.n || 1); return { emoji: prize.emoji, text: `+${prize.n || 1} spin` }; }
     if (prize.kind === "pet") {
         const owned = new Set((await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => [])).map((r) => r.ref));

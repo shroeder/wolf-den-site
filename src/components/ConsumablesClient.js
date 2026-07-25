@@ -147,7 +147,7 @@ export default function ConsumablesClient() {
 
             <h3 style={{ margin: "6px 0" }}>🪙 Shop</h3>
             {state.coupon ? (
-                <div className="shop-coupon">🏷️ {state.coupon.pct}% off coupon active — auto-applies to your next buy ≤ 🪙 {state.coupon.max.toLocaleString()} (one use)</div>
+                <div className="shop-coupon">🏷️ {state.coupon.pct}% off the in-game 🪙 gold shop — auto-applies to your next gold buy ≤ 🪙 {state.coupon.max.toLocaleString()} (one use). Not a real-store discount.</div>
             ) : null}
             <div className="badge-board">
                 {(state.shop || []).map((i) => (

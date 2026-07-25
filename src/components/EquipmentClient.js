@@ -439,7 +439,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 <div className="card">
                     <h3>🪙 Gold Shop</h3>
                     <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear. Browse by slot.</p>
-                    {data.coupon ? <div className="shop-coupon">🏷️ {data.coupon.pct}% off coupon active — auto-applies to your next gear pick ≤ 🪙 {data.coupon.max.toLocaleString()} (one use)</div> : null}
+                    {data.coupon ? <div className="shop-coupon">🏷️ {data.coupon.pct}% off the in-game 🪙 gold shop — auto-applies to your next gold gear pick ≤ 🪙 {data.coupon.max.toLocaleString()} (one use). Not a real-store discount.</div> : null}
                     {shopCategories.map((cat) => {
                         const open = !collapsedCats.has(cat.slot);
                         return (

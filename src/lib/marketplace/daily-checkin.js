@@ -111,7 +111,7 @@ async function resolveLoginProcs(buyerId) {
             out.push({ emoji: "🎟️", text: `${p.label} — +${p.amount || 1} wheel spin` });
         } else if (p.kind === "coupon") {
             await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {});
-            out.push({ emoji: "🎟️", text: `${p.label} — a ${COUPON_PCT}% shop coupon!` });
+            out.push({ emoji: "🎟️", text: `${p.label} — ${COUPON_PCT}% off an in-game 🪙 gold-shop item!` });
         } else if (p.kind === "petGamble") {
             // Win a random pet you couldn't just get by leveling — but the item is destroyed.
             const ownedRows = await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);

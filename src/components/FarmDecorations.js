@@ -84,6 +84,9 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                     <strong style={{ fontSize: 14 }}>🪴 Decorating</strong>
                     <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
                     <span style={{ marginLeft: "auto" }} />
+                    {onOpenCreator ? (
+                        <button type="button" onClick={onOpenCreator} title="Design your own decoration with AI" style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(201,162,255,0.6)", background: "linear-gradient(180deg,#c9a2ff,#a56be8)", color: "#2a0f45", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent", boxShadow: "0 2px 10px rgba(165,107,232,0.4)" }}>✨ Make your own</button>
+                    ) : null}
                     <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>✓ Done</button>
                 </div>
                 <div style={{ fontSize: 10.5, color: "#9fbf9f", padding: "0 12px 6px" }}>

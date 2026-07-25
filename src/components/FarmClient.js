@@ -758,6 +758,14 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
                         {pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
 
+                        {/* Ambient light veil — the sky sets the mood, but sprites (pets, crops, decorations) are lit
+                            flat, so at night/dusk/dawn they'd glow like noon. Wash the whole world in a matching tint
+                            so everything reads as the same time of day. Sits above the world, below floaters/UI. */}
+                        {wx.tod !== "day" ? (
+                            <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 300,
+                                background: wx.tod === "night" ? "rgba(16,26,58,0.5)" : wx.tod === "dusk" ? "rgba(58,38,74,0.3)" : "rgba(120,92,48,0.16)" }} />
+                        ) : null}
+
                         {/* XP / heart floaters */}
                         {floaters.map((f) => (
                             <span key={f.id} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, transform: "translate(-50%, -120%)", fontWeight: 800, fontSize: 15, color: f.color || "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.5)", pointerEvents: "none", animation: "farmFloat 1.3s ease-out forwards", zIndex: 9999 }}>
@@ -778,9 +786,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {/* Persistent lock/move toggle — top-right of the scene. Governs dragging BOTH plots and
                     decorations on your own farm. Default is movable. */}
                 {farm.mine && (garden || (farm.decorations && (((farm.placements?.length || 0) > 0) || decorating))) ? (
-                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock farm layout" : "Unlock to move plots & decorations"} title={decoEditing ? "Plots & decorations movable — tap to LOCK" : "Layout locked — tap to move plots & decorations"}
+                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock farm layout" : "Unlock farm layout"} title={decoEditing ? "Layout unlocked — tap to LOCK plots & decorations" : "Layout locked — tap to UNLOCK and rearrange"}
                         style={{ position: "absolute", top: 10, right: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 999, border: `1px solid ${decoEditing ? "rgba(143,199,255,0.6)" : "rgba(255,255,255,0.25)"}`, background: decoEditing ? "linear-gradient(180deg, rgba(30,52,74,0.96), rgba(18,32,46,0.96))" : "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: decoEditing ? "#bfe0ff" : "#d7d7db", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
-                        <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "✋" : "🔒"}</span>{decoEditing ? "Move" : "Locked"}
+                        <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "🔓" : "🔒"}</span>{decoEditing ? "Unlocked" : "Locked"}
                     </button>
                 ) : null}
                 {/* Live conditions label (unobtrusive, top-left) */}
