@@ -68,9 +68,9 @@ const SEED_SOURCES = {
 export const FARM_UPGRADES = {
     plots: { name: "Extra Plot", emoji: "🟫", max: 5, base: 150, desc: "+1 planting plot" },
     grow: { name: "Green Thumb", emoji: "🌱", max: 5, base: 220, desc: "−8% grow time per level" },
-    seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 160, desc: "+25% seeds found — harvests, petting & the other games" },
+    seedluck: { name: "Forager", emoji: "🍀", max: 5, base: 160, desc: "×0.25 more seeds found per level (a multiplier on the find rate — never a guaranteed drop) from harvests, petting & the other games" },
     petcap: { name: "Pet Whisperer", emoji: "🐾", max: 5, base: 240, desc: "+1 free petting every day" },
-    chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 300, desc: "+3% chance per level to bump a harvest reward up a loot tier" },
+    chest: { name: "Lucky Harvest", emoji: "🎁", max: 5, base: 300, desc: "+1% chance per level to bump a harvest reward up a loot tier" },
     seedsaver: { name: "Seed Saver", emoji: "🌰", max: 5, base: 200, desc: "+1% to keep the seed when you harvest" },
 };
 // Cost curve mirrors Sailing's boat/dig upgrades: quadratic in the NEXT level (base × (level+1)²), not doubling —
@@ -85,9 +85,9 @@ export function upgradeEffect(key, level) {
         switch (key) {
             case "plots": return `${BASE_PLOTS + l} plots`;
             case "grow": return `−${8 * l}%`;
-            case "seedluck": return `+${25 * l}%`;
+            case "seedluck": return `×${(1 + 0.25 * l).toFixed(2)}`;
             case "petcap": return `+${l}/day`;
-            case "chest": return `+${6 * l}%`;
+            case "chest": return `+${1 * l}%`;
             case "seedsaver": return `${l}%`;
             default: return `Lv ${l}`;
         }
@@ -145,9 +145,9 @@ const seedSaverChance = (up) => 0.01 * lvl(up, "seedsaver"); // Seed Saver: 1% p
 // harvest-luck can promote the tier.
 async function rollHarvestReward(buyerId, rarity, luckyLevel = 0, bonusPromote = 0) {
     let tier = Number(weightedPick(RARITY_TIER_WEIGHTS[rarity] || RARITY_TIER_WEIGHTS.common));
-    // Lucky Harvest (3%/level, was 6%) + placed-deco harvest-luck, but the COMBINED promote chance is capped at
+    // Lucky Harvest (1%/level) + placed-deco harvest-luck, but the COMBINED promote chance is capped at
     // 35% (was uncapped and could hit ~70% with maxed decos — far too strong).
-    if (Math.random() < Math.min(0.35, 0.03 * luckyLevel + bonusPromote)) tier = Math.min(5, tier + 1);
+    if (Math.random() < Math.min(0.35, 0.01 * luckyLevel + bonusPromote)) tier = Math.min(5, tier + 1);
     const pool = POOL_BY_TIER[tier] || POOL_BY_TIER[1];
     const pick = pool[Math.floor(Math.random() * pool.length)];
     let label = pick.label;

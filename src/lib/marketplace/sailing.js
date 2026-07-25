@@ -383,6 +383,36 @@ export function boatArt(level) {
     for (let t = boatTier(level); t >= 1; t--) if (BOAT_ART[t]) return BOAT_ART[t];
     return BOAT_ART[1];
 }
+// The boat's current FORM name (the highest milestone reached); the tier-1 starter has no milestone.
+export function boatName(level) {
+    let name = "Wooden Dinghy";
+    for (const m of MILESTONES) if (level >= m.level) name = m.name;
+    return name;
+}
+// A member's SHIP summary for their public profile (name, level, form, hull art). null if they've never
+// sailed (no mkt_sailing row) — so it only shows for members who actually have a boat.
+export async function getPublicShip(buyerId) {
+    if (!buyerId) return null;
+    const row = await db
+        .queryOne(
+            `SELECT COALESCE(speed_level,0) AS speed_level, COALESCE(luck_level,0) AS luck_level,
+                    COALESCE(rarity_level,0) AS rarity_level, COALESCE(find_level,0) AS find_level,
+                    COALESCE(raid_level,0) AS raid_level, COALESCE(voyages_completed,0) AS voyages_completed
+               FROM mkt_sailing WHERE buyer_id = $1`,
+            [buyerId]
+        )
+        .catch(() => null);
+    if (!row) return null;
+    const level = boatLevelFromUpgrades(row.speed_level, row.luck_level, row.rarity_level, row.find_level, row.raid_level);
+    return {
+        name: boatName(level),
+        level,
+        tier: boatTier(level),
+        forms: BOAT_TIERS,
+        art: boatArt(level),
+        voyages: row.voyages_completed,
+    };
+}
 // Cumulative milestone perks unlocked at this boat level.
 function boatPerks(level) {
     const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0,

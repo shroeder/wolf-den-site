@@ -21,6 +21,7 @@ import { getInventory } from "@/lib/marketplace/inventory.js";
 import { petActiveLevelMult } from "@/lib/marketplace/pet-level.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petsState } from "@/lib/marketplace/pets.js";
+import { getPublicShip } from "@/lib/marketplace/sailing.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const runtime = "nodejs";
@@ -76,10 +77,11 @@ export default async function UserProfilePage({ params }) {
 
     // Viewer context (for the Add friend / Message actions) + the member's gear to inspect.
     const viewer = await getAuthenticatedBuyer().catch(() => null);
-    const [relation, inventory, pets] = await Promise.all([
+    const [relation, inventory, pets, ship] = await Promise.all([
         viewer ? friendStatus(viewer.id, profile.id).catch(() => "none") : Promise.resolve(null),
         getInventory(profile.id).catch(() => null),
         petsState(profile.id).catch(() => ({ ownedIds: [] })),
+        getPublicShip(profile.id).catch(() => null),
     ]);
     // Telemetry: someone inspected another member's profile.
     if (viewer && viewer.id !== profile.id) after(() => trackActivity(viewer.id, "view_profile", { alias: profile.alias, name: profile.displayLabel }));
@@ -155,6 +157,23 @@ export default async function UserProfilePage({ params }) {
             </section>
 
             <PublicGear inventory={inventory} displayLabel={profile.displayLabel} canTrade={Boolean(viewer && viewer.id !== profile.id)} targetAlias={profile.alias} />
+
+            {ship ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>⛵ Ship</h2>
+                    <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ flex: "0 0 auto", width: 140, maxWidth: "40vw", borderRadius: 14, overflow: "hidden", background: "linear-gradient(180deg,#0b2a45,#123a5c)", padding: 8 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={ship.art} alt={ship.name} style={{ width: "100%", height: "auto", display: "block" }} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{ship.name}</div>
+                            <div className="muted" style={{ marginTop: 2 }}>Level {ship.level} · Form {ship.tier}/{ship.forms}</div>
+                            <div className="muted" style={{ marginTop: 2 }}>🏝️ {ship.voyages.toLocaleString()} voyage{ship.voyages === 1 ? "" : "s"} completed</div>
+                        </div>
+                    </div>
+                </section>
+            ) : null}
 
             {(profile.badges || []).length ? (
                 <section className="card">
