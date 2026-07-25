@@ -7,7 +7,6 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
@@ -432,9 +431,6 @@ export async function grantSeed(buyerId, seedId) {
 // upgrade; the RARITY is weighted per source so rare crops only come from big events.
 export async function dropSeedFrom(buyerId, source) {
     try {
-        // ⚠️ FARM PREVIEW: seeds only drop for the owner while farming is owner-gated, so it's fully inert for
-        // everyone else. REMOVE this line when farming launches publicly (see the launch checklist).
-        if (!isOwner(buyerId)) return null;
         const cfg = SEED_SOURCES[source];
         if (!buyerId || !cfg) return null;
         const buyer = await loadFarmBuyer(buyerId);
@@ -476,18 +472,4 @@ export async function runCropsReadyNudge() {
     // Mark every ready-but-unannounced plot as notified so we never re-push it (even for members with no sub).
     await db.query(`UPDATE mkt_farm_plot SET notified_at = NOW() WHERE ready_at <= NOW() AND notified_at IS NULL`).catch(() => {});
     return { sent, plots: rows.length };
-}
-
-// ── Owner-only debug (gated by the farm route) ──
-export async function debugGrantAllSeeds(buyerId) {
-    for (const id of Object.keys(SEEDS)) await grantSeed(buyerId, id).then(() => grantSeed(buyerId, id)).catch(() => {});
-    return { ok: true, garden: await getGarden(buyerId) };
-}
-export async function debugGrowAll(buyerId) {
-    await db.query(`UPDATE mkt_farm_plot SET ready_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
-    return { ok: true, garden: await getGarden(buyerId) };
-}
-export async function debugGrantFertilizer(buyerId) {
-    await db.query(`UPDATE mkt_buyer SET farm_fertilizer = COALESCE(farm_fertilizer,0) + 5 WHERE id = $1`, [buyerId]).catch(() => {});
-    return { ok: true, garden: await getGarden(buyerId) };
 }

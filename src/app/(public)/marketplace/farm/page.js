@@ -2,17 +2,15 @@ import { notFound } from "next/navigation";
 
 import FarmClient from "@/components/FarmClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getFarm, resolveFarmOwner } from "@/lib/marketplace/farm.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Farm | The Wolf Den", robots: { index: false } };
 
-// Owner-only preview (like Sailing's phase 1) — 404 for everyone else so it stays hidden. ?u=<alias> inspects
-// another member's farm (view-only).
+// Every signed-in member has a farm. ?u=<alias> inspects another member's farm (view-only).
 export default async function FarmPage({ searchParams }) {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    if (!buyer || !isOwner(buyer.id)) notFound();
+    if (!buyer) notFound();
 
     const sp = (await searchParams) || {};
     const u = typeof sp.u === "string" ? sp.u : null;

@@ -219,7 +219,6 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [busy, setBusy] = useState(null);
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
     const [ownerMenu, setOwnerMenu] = useState(false); // farmer character tapped → connect menu
-    const [crownOpen, setCrownOpen] = useState(false); // owner crown-calibrator tool
     const [customOpen, setCustomOpen] = useState(false); // custom-decoration creator
     const [pig, setPig] = useState(null); // "running" while the loot pig is on screen
     const [pigToast, setPigToast] = useState(false);
@@ -264,7 +263,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || inspectDeco || crownOpen || customOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -281,11 +280,10 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot, inspectDeco, crownOpen, customOpen]);
+    }, [inspect, pigResult, harvestToast, planting, inspectSlot, inspectDeco, customOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
-    const [wxOverride] = useState({ tod: null, condition: null }); // reserved (sky always follows real weather now)
     useEffect(() => {
         const t0 = setTimeout(() => setWeather((w) => ({ ...w, tod: hourToTod(new Date().getHours()) })), 0);
         if (typeof navigator === "undefined" || !navigator.geolocation) return () => clearTimeout(t0);
@@ -387,18 +385,6 @@ export default function FarmClient({ initial, viewingAlias }) {
         setBusy(null);
         if (r?.ok) setFarm((f) => ({ ...f, treats: r.treats, treatShop: r.treatShop, wallet: r.wallet }));
     }, [busy, post]);
-
-    // Owner debug: clear today's pig guard and force him to spawn now (repeatable testing).
-    const spawnPigDebug = useCallback(async () => {
-        if (pig) return;
-        await post({ action: "pig_reset" });
-        setFarm((f) => ({ ...f, pigAvailable: true }));
-        setPig("running");
-        setPigToast(true);
-        SFX.oink();
-        SFX.startPigMusic();
-        setTimeout(() => setPigToast(false), 4200);
-    }, [pig, post]);
 
     // The pig ran off screen → claim the haul (server-guarded once/day) and show the juiced modal.
     const onPigFinish = useCallback(async () => {
@@ -547,11 +533,6 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok && r.catalog) setFarm((f) => ({ ...f, placements: r.placements || f.placements, decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, custom: { ...(f.decorations?.custom || {}), draft: null }, placedTotal: r.placedTotal, placedCap: r.placedCap } }));
         return r;
     }, [post]);
-    const customGrant = useCallback(async () => {
-        const r = await post({ action: "deco_custom_grant" });
-        if (r?.ok) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), credits: r.credits } } }));
-        return r;
-    }, [post]);
     // "Decorate" opens a bottom DOCK (farm scene stays visible; drag decorations up onto it) rather than a modal.
     const [decorating, setDecorating] = useState(false);
     const startDecorating = useCallback(() => {
@@ -560,32 +541,20 @@ export default function FarmClient({ initial, viewingAlias }) {
         setTimeout(() => { try { fieldRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ } }, 60);
     }, []);
     const stopDecorating = useCallback(() => { setDecorating(false); setDecoEditing(false); }, []);
-    const saveCrown = useCallback(async (cfg) => {
-        const r = await post({ action: "crown_save", crown: cfg });
-        if (r?.ok && r.crownCfg) setFarm((f) => ({ ...f, crownCfg: r.crownCfg }));
-        return r;
-    }, [post]);
-    const gardenDebug = useCallback((action) => gardenAct({ action }, action), [gardenAct]);
 
     // Logging in during rain surges every growing crop closer to harvest (server-guarded once per plot per 6h).
     useEffect(() => {
         if (!farm.mine || !garden || rainedRef.current) return;
-        const cond = wxOverride.condition || weather.condition;
-        if (!["rain", "storm"].includes(cond)) return;
+        if (!["rain", "storm"].includes(weather.condition)) return;
         rainedRef.current = true;
         post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setGarden(r.garden); if (r.boosted) setHarvestToast({ rain: r.boosted }); } });
-    }, [farm.mine, garden, weather.condition, wxOverride.condition, post]);
+    }, [farm.mine, garden, weather.condition, post]);
 
     // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
     // viewport per pet gives each one lots of elbow room.
     const fieldW = Math.max(150, pets.length * 36);
-    // Effective sky = detected weather, unless the owner has forced a value via the debug controls.
-    const wx = {
-        tod: wxOverride.tod || weather.tod,
-        condition: wxOverride.condition || weather.condition,
-        located: wxOverride.tod || wxOverride.condition ? true : weather.located,
-        forced: Boolean(wxOverride.tod || wxOverride.condition),
-    };
+    // Sky follows the player's real local weather.
+    const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
     const bgUrl = pickFarmBg(wx.tod, wx.condition);
     // Time-of-day tint applied ONLY to world objects (pets/crops/decorations/farmer), never the backdrop — the
@@ -831,10 +800,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                     busy={gardenBusy}
                     onBuyFertilizer={buyFert}
                     onUpgrade={buyUpgradeKey}
-                    onDebug={gardenDebug}
-                    onSpawnPig={spawnPigDebug}
-                    onCrown={() => setCrownOpen(true)}
-                    pigBusy={Boolean(pig)}
                 />
             ) : null}
 
@@ -876,10 +841,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 />
             ) : null}
 
-            {crownOpen && farm.mine ? (
-                <CrownCalibrator initial={farm.crownCfg} onSave={saveCrown} onClose={() => setCrownOpen(false)} />
-            ) : null}
-
             {/* Pet level-up celebration — same juicy modal the shop shows, now fired when a pet levels on the farm */}
             {petCele && typeof document !== "undefined" ? createPortal((
                 <div className="petfeed-cele" onClick={() => setPetCele(null)}>
@@ -911,12 +872,10 @@ export default function FarmClient({ initial, viewingAlias }) {
             {customOpen && farm.mine && farm.decorations ? (
                 <CustomDecoCreator
                     custom={farm.decorations.custom}
-                    canGrant={farm.mine}
                     busy={decoBusy}
                     onStart={customStart}
                     onRefine={customRefine}
                     onFinalize={customFinalize}
-                    onGrantSelf={customGrant}
                     onClose={() => setCustomOpen(false)}
                 />
             ) : null}
@@ -1004,48 +963,6 @@ const PIG_SPRITE_URL = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/
 
 // The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping gold,
 // then wanders off an edge. Cosmetic only — the haul is claimed server-side in onFinish.
-// Owner tool: dial in the loot pig's crown (height / toward-head / size) on a live preview, both facings.
-function CrownCalibrator({ initial, onSave, onClose }) {
-    const [c, setC] = useState(initial || { top: 9, side: 8, size: 22 });
-    const [saving, setSaving] = useState(false);
-    const preview = (flip) => (
-        <div style={{ textAlign: "center" }}>
-            <div style={{ position: "relative", width: 96, height: 100, margin: "0 auto", display: "grid", placeItems: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)" }}>
-                <div style={{ position: "relative", width: 68, height: 68 }}>
-                    <span style={{ position: "absolute", left: flip ? `${50 + c.side}%` : `${50 - c.side}%`, top: c.top, fontSize: c.size, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={PIG_SPRITE_URL} alt="pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: flip ? "scaleX(-1)" : "none" }} />
-                </div>
-            </div>
-            <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>facing {flip ? "right" : "left"}</div>
-        </div>
-    );
-    const slider = (label, key, min, max, step = 1) => (
-        <label style={{ display: "block", marginTop: 12, fontSize: 13, fontWeight: 700 }}>
-            <span style={{ display: "flex", justifyContent: "space-between" }}>{label}<span style={{ color: "#ffd75e" }}>{c[key]}</span></span>
-            <input type="range" min={min} max={max} step={step} value={c[key]} onChange={(e) => setC((v) => ({ ...v, [key]: Number(e.target.value) }))} style={{ width: "100%", marginTop: 4, accentColor: "#ffd75e" }} />
-        </label>
-    );
-    const doSave = async () => { setSaving(true); await onSave(c); setSaving(false); onClose(); };
-    return (
-        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
-            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Crown calibrator" style={{ width: "100%", maxWidth: 340, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18 }}>
-                <div style={{ fontWeight: 900, fontSize: 17, marginBottom: 2 }}>👑 Crown calibrator</div>
-                <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Position the loot pig&apos;s crown — it mirrors for both facings. Save to set it live.</p>
-                <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>{preview(false)}{preview(true)}</div>
-                {slider("Height (up ↔ down)", "top", -40, 50)}
-                {slider("Toward the head", "side", -50, 50)}
-                {slider("Size", "size", 14, 48)}
-                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                    <button type="button" onClick={() => setC({ top: 9, side: 8, size: 22 })} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Reset</button>
-                    <button type="button" onClick={onClose} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Close</button>
-                    <button type="button" onClick={doSave} disabled={saving} style={{ flex: 1.4, padding: "10px 12px", borderRadius: 10, border: "none", background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", fontWeight: 900, fontSize: 13, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "Saving…" : "Save crown"}</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function LootPig({ onFinish, crown }) {
     const cw = crown || { top: 9, side: 8, size: 22 };
     const [pos, setPos] = useState({ x: 4, y: 84, flip: false, dur: 1.6 });
@@ -1432,8 +1349,7 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
     );
 }
 
-function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpawnPig, onCrown, pigBusy }) {
-    const [showDebug, setShowDebug] = useState(false);
+function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade }) {
     const [seedInfo, setSeedInfo] = useState(null); // a seed tapped in the bag → detail modal
     const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade just bought → brief celebratory pop
     const buyUpgrade = (key) => { setUpgFlash(key); setTimeout(() => setUpgFlash(null), 620); onUpgrade(key); };
@@ -1533,28 +1449,6 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpaw
                     })}
                 </div>
             </section>
-
-            {/* Owner debug (collapsible) */}
-            <PanelToggle title="🛠️ Debug · seeds & growth" open={showDebug} onToggle={() => setShowDebug((v) => !v)} accent="#ffd75e" note="owner-only" />
-            {showDebug ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 7, marginTop: 8 }}>
-                    {[["farm_debug_seeds", "🎒", "+2 of every seed"], ["farm_debug_grow", "⏩", "Grow all now"], ["farm_debug_fertilizer", "💧", "+5 fertilizer"]].map(([action, icon, label]) => (
-                        <button key={action} type="button" onClick={() => onDebug(action)} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, border: "1px dashed rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.07)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
-                            <span style={{ fontSize: 16 }} aria-hidden="true">{icon}</span>{label}
-                        </button>
-                    ))}
-                    {onSpawnPig ? (
-                        <button type="button" onClick={onSpawnPig} disabled={pigBusy} title="Force-spawn the Loot Pig now" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, border: "1px dashed rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.07)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: pigBusy ? "default" : "pointer", opacity: pigBusy ? 0.5 : 1, textAlign: "left" }}>
-                            <span style={{ fontSize: 16 }} aria-hidden="true">🐷</span>Spawn Loot Pig
-                        </button>
-                    ) : null}
-                    {onCrown ? (
-                        <button type="button" onClick={onCrown} title="Position the loot pig's crown" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, border: "1px dashed rgba(255,215,94,0.45)", background: "rgba(255,215,94,0.07)", color: "#ffd75e", fontSize: 12, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
-                            <span style={{ fontSize: 16 }} aria-hidden="true">👑</span>Crown calibrator
-                        </button>
-                    ) : null}
-                </div>
-            ) : null}
         </section>
     );
 }

@@ -427,7 +427,7 @@ const customErr = (e) => ({ no_credits: "You're out of creations — grab a bund
 
 // ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a Creation
 // (bought on /marketplace/creations; owner can self-grant). Personal-only + never tradeable.
-export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, onFinalize, onGrantSelf, onClose }) {
+export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onClose }) {
     const [draft, setDraft] = useState(custom?.draft || null);
     const [credits, setCredits] = useState(custom?.credits || 0);
     const [name, setName] = useState(draft?.name || "");
@@ -450,7 +450,6 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
     const doStart = () => { if (prompt.trim().length < 4) { setErr("Describe your decoration (a few words at least)."); return; } run(() => onStart(name, prompt)); };
     const doRefine = () => { if (!correction.trim()) { setErr("Add a quick note on what to change."); return; } run(() => onRefine(draft.id, correction)); };
     const doFinalize = async () => { if (!chosen) return; setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false); if (r?.ok) onClose(); else setErr(customErr(r?.error)); };
-    const doGrant = async () => { const r = await onGrantSelf(); if (r?.ok && r.credits != null) setCredits(r.credits); };
 
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10058, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
@@ -481,7 +480,6 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                             <div style={{ marginTop: 14, textAlign: "center" }}>
                                 <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creations. Grab a bundle — you also get coins with every buy.</div>
                                 <a href="/marketplace/creations" style={{ ...CPRIMARY, display: "inline-block", width: "auto", padding: "10px 18px", marginTop: 10, textDecoration: "none" }}>🎨 Get creations →</a>
-                                {canGrant ? <div><button type="button" onClick={doGrant} style={{ marginTop: 10, ...CGHOST }}>🎁 Grant myself one (owner)</button></div> : null}
                             </div>
                         )}
                     </div>

@@ -46,9 +46,8 @@ const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplac
 
 export default function GameNav() {
     const pathname = usePathname() || "";
-    const [owner, setOwner] = useState(false); // owner-only preview links (e.g. Farm) appended when true
-    // Farm is an owner-only preview — append it to the menu only for the owner account.
-    const links = owner ? [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }] : LINKS;
+    // Farm is live for everyone — always in the menu.
+    const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.
@@ -78,7 +77,7 @@ export default function GameNav() {
                 .catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" })
                 .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { if (alive) { setSailAttn(Boolean(d?.attention)); setOwner(Boolean(d?.owner)); } })
+                .then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); })
                 .catch(() => {});
         };
         loadChests();
@@ -88,9 +87,9 @@ export default function GameNav() {
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
 
-    // Owner-only: ripe-crop count for the Farm badge (the farm GET 404s for everyone else, so gate on `owner`).
+    // Ripe-crop count for the Farm badge — every member has a farm now.
     useEffect(() => {
-        if (!inGame || !owner) return undefined;
+        if (!inGame) return undefined;
         let alive = true;
         const load = () => fetch("/api/marketplace/farm", { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
@@ -100,7 +99,7 @@ export default function GameNav() {
         const onRefresh = () => load();
         window.addEventListener("wolfden-hud-refresh", onRefresh);
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
-    }, [inGame, owner, pathname]);
+    }, [inGame, pathname]);
 
     if (!inGame) return null;
 

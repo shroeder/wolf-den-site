@@ -20,7 +20,7 @@ import { farmRatingBits } from "@/lib/marketplace/farm-rating.js";
 import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { getSetting, setSetting } from "@/lib/settings.js";
+import { getSetting } from "@/lib/settings.js";
 
 // Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
 const CROWN_DEFAULT = { top: 9, side: 8, size: 22 };
@@ -28,15 +28,6 @@ export async function getCrownConfig() {
     const raw = await getSetting("loot_pig_crown", null).catch(() => null);
     if (!raw) return CROWN_DEFAULT;
     try { const c = JSON.parse(raw); return { top: Number(c.top ?? CROWN_DEFAULT.top), side: Number(c.side ?? CROWN_DEFAULT.side), size: Number(c.size ?? CROWN_DEFAULT.size) }; } catch { return CROWN_DEFAULT; }
-}
-export async function saveCrownConfig(cfg) {
-    const c = {
-        top: Math.max(-40, Math.min(50, Number(cfg?.top ?? CROWN_DEFAULT.top))),
-        side: Math.max(-50, Math.min(50, Number(cfg?.side ?? CROWN_DEFAULT.side))),
-        size: Math.max(12, Math.min(48, Number(cfg?.size ?? CROWN_DEFAULT.size))),
-    };
-    await setSetting("loot_pig_crown", JSON.stringify(c)).catch(() => {});
-    return { ok: true, crownCfg: c };
 }
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
@@ -184,13 +175,6 @@ async function farmMineBits(buyerId, mine = true) {
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), price: o.effectivePrice ?? o.price, canAfford: o.canAfford }));
     return { treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting, pigAvailable: Boolean(wallet?.pig_available) };
-}
-
-// Debug (owner-only, gated by the farm route): clear today's pig claim so the Loot Pig can be re-tested.
-export async function resetPig(buyerId) {
-    if (!buyerId) return { ok: false };
-    await db.query(`UPDATE mkt_buyer SET pig_day = NULL WHERE id = $1`, [buyerId]).catch(() => {});
-    return { ok: true, pigAvailable: true };
 }
 
 // The Wild Loot Pig payout — once per store-local day, guarded atomically. Rolls gold + a rare item drop.
