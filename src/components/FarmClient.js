@@ -511,6 +511,11 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
+    // Resize / rotate a placed decoration — optimistic so the scene updates live under the inspect modal.
+    const decoTransform = useCallback(async (placementId, { scale, rot }) => {
+        setFarm((f) => ({ ...f, placements: (f.placements || []).map((q) => (q.id === placementId ? { ...q, ...(scale != null ? { scale } : {}), ...(rot != null ? { rot } : {}) } : q)) }));
+        return decoAct({ action: "deco_transform", placementId, scale, rot });
+    }, [decoAct]);
     const fieldRef = useRef(null);
     // Custom (player-made) decorations
     const customStart = useCallback(async (name, prompt) => {
@@ -845,6 +850,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     busy={decoBusy}
                     onBuy={decoBuy}
                     onPickup={decoPickup}
+                    onTransform={decoTransform}
                     onClose={() => setInspectDeco(null)}
                 />
             ) : null}

@@ -188,7 +188,7 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
     return (
         <>
             {placements.map((p) => {
-                const live = drag && drag.id === p.id ? drag : p;
+                const live = drag && drag.id === p.id ? { ...p, ...drag } : p;
                 const size = 66;
                 return (
                     <div
@@ -199,7 +199,7 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                         onPointerCancel={editing ? () => { gr.current = {}; setDrag(null); } : undefined}
                         onClick={() => clickInspect(p)}
                         style={{
-                            position: "absolute", left: `${live.x}%`, top: `${live.y}%`, transform: "translate(-50%, -100%)",
+                            position: "absolute", left: `${live.x}%`, top: `${live.y}%`, transform: `translate(-50%, -100%) rotate(${live.rot || 0}deg) scale(${live.scale || 1})`,
                             zIndex: Math.round(live.y), cursor: "pointer", touchAction: editing ? "none" : "auto",
                             transition: drag && drag.id === p.id ? "none" : "left .15s ease, top .15s ease",
                             WebkitTapHighlightColor: "transparent", WebkitTouchCallout: "none", userSelect: "none", outline: "none",
@@ -222,21 +222,24 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
 // ── Inspect modal for a decoration — works for a PLACED piece (→ Pick up) or a LOCKED catalog item (→ Buy, or
 // "win it from the wheel / level track"). `item` carries name/rarity/effect + owned/buyable/price; a placed
 // instance also has `placementId`.
-export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPickup, onClose }) {
+export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPickup, onTransform, onClose }) {
+    const [scale, setScale] = useState(Number(item?.scale ?? 1));
+    const [rot, setRot] = useState(Number(item?.rot ?? 0));
     if (!item) return null;
     const ring = item.rarityColor || RARITY_RING[item.rarity] || "#8fbf6a";
     const placed = Boolean(item.placementId);
+    const commit = (s, r) => onTransform?.(item.placementId, { scale: s, rot: r });
     const canBuy = !placed && !item.owned && item.buyable;
     const afford = gold >= (item.price || 0);
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${item.name} details`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .35s ease both" }}>
                 <div style={{ padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}33, transparent 70%)` }}>
-                    <span style={{ display: "grid", placeItems: "center", width: 96, height: 96, margin: "0 auto", borderRadius: 16, background: "rgba(0,0,0,0.22)" }}>
+                    <span style={{ display: "grid", placeItems: "center", width: 110, height: 110, margin: "0 auto", borderRadius: 16, background: "rgba(0,0,0,0.22)", overflow: "hidden" }}>
                         {item.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={item.spriteUrl} alt={item.name} width={84} height={84} style={{ width: 84, height: 84, objectFit: "contain" }} />
-                        ) : <span style={{ fontSize: 54 }}>{item.emoji}</span>}
+                            <img src={item.spriteUrl} alt={item.name} width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain", transform: placed ? `rotate(${rot}deg) scale(${scale})` : "none", transition: "transform .08s linear" }} />
+                        ) : <span style={{ fontSize: 54, display: "inline-block", transform: placed ? `rotate(${rot}deg) scale(${scale})` : "none" }}>{item.emoji}</span>}
                     </span>
                     <div style={{ fontWeight: 900, fontSize: 18, marginTop: 8 }}>{item.name}</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{item.rarity}{item.source === "special" ? " · premium" : ""}</div>
@@ -251,6 +254,21 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     )}
                 </div>
                 <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {placed && mine && onTransform ? (
+                        <div style={{ padding: "2px 2px 6px", display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>📏 Size</span>
+                                <input type="range" min="0.4" max="2.5" step="0.05" value={scale} onChange={(e) => setScale(Number(e.target.value))} onPointerUp={() => commit(scale, rot)} onKeyUp={() => commit(scale, rot)} style={{ flex: 1, accentColor: "#c9a2ff" }} />
+                                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#c9a2ff", width: 40, textAlign: "right" }}>{Math.round(scale * 100)}%</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>📐 Rotate</span>
+                                <input type="range" min="0" max="355" step="5" value={rot} onChange={(e) => setRot(Number(e.target.value))} onPointerUp={() => commit(scale, rot)} onKeyUp={() => commit(scale, rot)} style={{ flex: 1, accentColor: "#c9a2ff" }} />
+                                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#c9a2ff", width: 40, textAlign: "right" }}>{rot}°</span>
+                            </div>
+                            <button type="button" onClick={() => { setScale(1); setRot(0); commit(1, 0); }} style={{ alignSelf: "flex-start", fontSize: 11.5, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Reset size &amp; rotation</button>
+                        </div>
+                    ) : null}
                     {placed && mine ? (
                         <button type="button" disabled={busy} onClick={() => { onPickup(item.placementId); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ff9ec2,#e0559a)", color: "#3a0a22", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #a83b73", opacity: busy ? 0.6 : 1 }}>✋ Pick up (back to your tray)</button>
                     ) : null}
