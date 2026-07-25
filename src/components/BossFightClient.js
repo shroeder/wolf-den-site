@@ -198,6 +198,31 @@ export default function BossFightClient() {
         <div className="boss2">
             <div className="boss2-title">⚔️ This week&apos;s boss — the whole pack vs. {boss.name}</div>
 
+            {boss.weakness ? (
+                <div
+                    className="boss-weakness"
+                    style={{
+                        display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8,
+                        margin: "0 auto 10px", padding: "8px 14px", borderRadius: 12, maxWidth: 520,
+                        background: `${boss.weakness.color}1f`, border: `1px solid ${boss.weakness.color}66`,
+                    }}
+                    title={boss.weakness.desc || ""}
+                >
+                    <span style={{ fontWeight: 800, color: boss.weakness.color, fontSize: "0.98rem" }}>
+                        {boss.weakness.emoji} Weak to {boss.weakness.label}
+                    </span>
+                    {you?.element && you.element.matches > 0 ? (
+                        <span style={{ fontWeight: 800, color: "#37e0a1", fontSize: "0.82rem" }}>
+                            ✓ Your gear matches · +{you.element.bonusPct}% damage
+                        </span>
+                    ) : (
+                        <span className="muted" style={{ fontSize: "0.82rem" }}>
+                            Gear with a {boss.weakness.label} affinity hits harder{you?.element ? " — equip some!" : ""}
+                        </span>
+                    )}
+                </div>
+            ) : null}
+
             <div className="boss-stage-wrap">
                 <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} canCheer={Boolean(you) && !boss.defeated} cheersLeft={you?.cheersLeft ?? 0} onCheer={cheer} />
                 {cheerToast ? (
