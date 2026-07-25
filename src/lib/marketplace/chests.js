@@ -43,8 +43,8 @@ const ELITE_TIERS = new Set(["ascendant", "eternal", "celestial", "primordial"])
 // (Elixir of Renewal / Sands of Time) only appear from Eternal chests and up.
 const CHEST_CONSUMABLES = {
     wooden: { chance: 0.06, pool: ["treat_bone", "treat_wild"] },
-    iron: { chance: 0.08, pool: ["treat_wild", "treat_bone", "treat_snack"] },
-    gold: { chance: 0.1, pool: ["treat_wild", "treat_marrow", "treat_snack", "spin_rewind"] },
+    iron: { chance: 0.08, pool: ["treat_wild", "treat_bone", "treat_snack", "farm_fertilizer_haul"] },
+    gold: { chance: 0.1, pool: ["treat_wild", "treat_marrow", "treat_snack", "spin_rewind", "farm_fertilizer_haul"] },
     mythic: { chance: 0.12, pool: ["pot_berserker", "stone_ember", "pot_secondwind", "treat_marrow", "treat_mythic", "spin_golden_ticket"] },
     ascendant: { chance: 0.2, pool: ["pot_fury", "pot_berserker", "stone_storm", "scroll_ancient", "treat_mythic", "spin_golden_ticket"] },
     eternal: { chance: 0.32, pool: ["pot_fury", "scroll_ancient", "elixir_renewal", "sands_of_time", "treat_mythic", "treat_ambrosia", "spin_golden_ticket"] },

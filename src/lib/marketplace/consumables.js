@@ -67,6 +67,23 @@ export const CONSUMABLES = {
     spin_lucky_coin: { name: "Lucky Coin", emoji: "🎟️", kind: "spin", desc: "Gain +2 wheel spins.", price: 1500, effect: { type: "spin_token", amount: 2 } },
     spin_golden_ticket: { name: "Golden Ticket", emoji: "🎫", kind: "spin", price: null, desc: "Gain +5 wheel spins.", effect: { type: "spin_token", amount: 5 } },
     spin_rewind: { name: "Wheel Rewind", emoji: "⏪", kind: "spin", price: null, desc: "Refresh your FREE daily spin — spin again now.", effect: { type: "spin_reset" } },
+    // FARM supplies — buyable boosts for the garden loop. Growth Tonic / Fertilizer Crate speed crops; Seed
+    // Packet restocks the seed bag; Harvest Charm sweetens the next few harvests' loot rolls.
+    farm_growth_tonic: { name: "Growth Tonic", emoji: "🧴", kind: "farm", desc: "Speed up your slowest-growing crop by 60%.", price: 600, effect: { type: "farm_grow", cut: 0.6 } },
+    farm_seed_packet: { name: "Seed Packet", emoji: "🌱", kind: "farm", desc: "Tear open for 3 random crop seeds.", price: 500, effect: { type: "farm_seed", count: 3 } },
+    farm_harvest_charm: { name: "Harvest Charm", emoji: "🍀", kind: "farm", desc: "Your next 5 harvests roll for better loot.", price: 1200, effect: { type: "farm_harvest_luck", charges: 5 } },
+    farm_fertilizer_crate: { name: "Fertilizer Crate", emoji: "📦", kind: "farm", desc: "A crate of 5 fertilizer for your crops.", price: 1500, effect: { type: "farm_fertilizer", count: 5 } },
+    // Drop-only bumper crate — a bigger fertilizer haul from the better chests.
+    farm_fertilizer_haul: { name: "Bumper Fertilizer Haul", emoji: "🚜", kind: "farm", price: null, desc: "A haul of 12 fertilizer for your crops.", effect: { type: "farm_fertilizer", count: 12 } },
+    // PETTING & LIKING — small daily top-ups for the social farm loops.
+    farm_pet_whistle: { name: "Pettin' Whistle", emoji: "🐕", kind: "farm", desc: "Grants +2 EXTRA pettings on your own pets today.", price: 400, effect: { type: "farm_petting", amount: 2 } },
+    farm_kindness_token: { name: "Kindness Token", emoji: "💝", kind: "farm", desc: "Grants +2 EXTRA farm ratings you can give today.", price: 300, effect: { type: "farm_rating", amount: 2 } },
+    // SAILING — BUYABLE so players can actually purchase into the sailing/dig/raid loops (the relics above are
+    // all drop-only). Tailwind Charm speeds the current voyage; Prospector's Charm is a buyable dig-luck;
+    // Raiding Horn a buyable raid restore.
+    sail_tailwind_charm: { name: "Tailwind Charm", emoji: "🌬️", kind: "sail", desc: "Summon a gust — shave 2 hours off your current voyage.", price: 700, effect: { type: "sail_tailwind", hours: 2 } },
+    sail_prospectors_charm: { name: "Prospector's Charm", emoji: "⛏️", kind: "sail", desc: "Your next dig unearths +50% more fragments.", price: 600, effect: { type: "sail_lure" } },
+    sail_raiding_horn: { name: "Raiding Horn", emoji: "📯", kind: "sail", desc: "Sound the horn to regain one spent daily raid.", price: 900, effect: { type: "sail_raid" } },
 };
 
 // Buyable order (shop). Relics + drop-only treats are intentionally excluded — they're chest/boss-only.
@@ -74,6 +91,9 @@ const SHOP_ORDER = [
     "scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm",
     "treat_bone", "treat_snack", "treat_toy", "treat_feast", "treat_golden", "treat_kibble",
     "spin_lucky_coin",
+    // Non-combat activity supplies.
+    "farm_growth_tonic", "farm_seed_packet", "farm_harvest_charm", "farm_fertilizer_crate", "farm_pet_whistle", "farm_kindness_token",
+    "sail_tailwind_charm", "sail_prospectors_charm", "sail_raiding_horn",
 ];
 
 // --- Boss-fight hooks (read by boss.js) -------------------------------------------------------------
@@ -236,7 +256,9 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
         const s = await db.queryOne(`SELECT returns_at, dig_state, raid_count, (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_today FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
         if (e.type === "sail_raid" && !(s?.raid_today && (s?.raid_count || 0) > 0)) return { ok: false, error: "no_raid_used" };
-        if (e.type === "sail_storm" && !(s?.returns_at && !s?.dig_state && new Date(s.returns_at).getTime() > Date.now())) return { ok: false, error: "not_sailing" };
+        const midVoyage = s?.returns_at && !s?.dig_state && new Date(s.returns_at).getTime() > Date.now();
+        if (e.type === "sail_storm" && !midVoyage) return { ok: false, error: "not_sailing" };
+        if (e.type === "sail_tailwind" && !midVoyage) return { ok: false, error: "not_sailing" };
         const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
         if (!dec) return { ok: false, error: "none_owned" };
         let applied = "";
@@ -244,9 +266,46 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         else if (e.type === "sail_merchant") { await db.query(`UPDATE mkt_sailing SET force_merchant = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next voyage will meet the Gold Merchant."; }
         else if (e.type === "sail_lure") { await db.query(`UPDATE mkt_sailing SET dig_lure = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next dig will turn up +50% fragments."; }
         else if (e.type === "sail_storm") { await db.query(`UPDATE mkt_sailing SET returns_at = NOW() + (returns_at - NOW()) / 2 WHERE buyer_id = $1 AND returns_at > NOW()`, [buyerId]).catch(() => {}); applied = "The storm hurls you homeward — sail time halved!"; }
+        else if (e.type === "sail_tailwind") { const h = Math.max(1, Number(e.hours) || 2); await db.query(`UPDATE mkt_sailing SET returns_at = GREATEST(NOW(), returns_at - ($2 || ' hours')::interval) WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at > NOW()`, [buyerId, String(h)]).catch(() => {}); applied = `A strong gust fills your sails — ${h} hours shaved off the voyage!`; }
         else if (e.type === "sail_encounter") { await db.query(`UPDATE mkt_sailing SET force_encounter = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Something stirs the deep — your next voyage brings an encounter."; }
         await trackActivity(buyerId, "use_consumable", { id, name: c.name }).catch(() => {});
         return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied };
+    }
+
+    // Non-combat ACTIVITY consumables (farming / petting / liking). All self-use, no target picker — Growth
+    // Tonic auto-picks your slowest crop; the rest grant supplies or extra daily charges. Validate context
+    // (only Growth Tonic needs a growing crop) BEFORE spending so an item is never wasted.
+    if (e.type?.startsWith("farm_")) {
+        if (e.type === "farm_grow") {
+            const growing = await db.queryOne(`SELECT 1 AS ok FROM mkt_farm_plot WHERE buyer_id = $1 AND ready_at > NOW() LIMIT 1`, [buyerId]).catch(() => null);
+            if (!growing) return { ok: false, error: "no_growing_crop" };
+        }
+        const decF = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
+        if (!decF) return { ok: false, error: "none_owned" };
+        let appliedF = "";
+        if (e.type === "farm_grow") {
+            const pct = Math.round((e.cut ?? 0.6) * 100);
+            const res = await applyGrowthTonic(buyerId, e.cut ?? 0.6).catch(() => null);
+            appliedF = res ? `${res.emoji} ${res.name} surges ahead — ${pct}% of its grow time gone!` : "Crop growth sped up!";
+        } else if (e.type === "farm_seed") {
+            const res = await grantSeedBundle(buyerId, e.count ?? 3).catch(() => null);
+            const list = res?.got?.map((g) => `${g.emoji} ${g.name}${g.count > 1 ? ` ×${g.count}` : ""}`).join(", ");
+            appliedF = list ? `Seeds added: ${list}` : `+${e.count ?? 3} seeds added to your bag`;
+        } else if (e.type === "farm_fertilizer") {
+            const res = await grantFarmFertilizer(buyerId, e.count ?? 5).catch(() => null);
+            appliedF = `+${res?.count ?? e.count ?? 5} fertilizer added to your stock 📦`;
+        } else if (e.type === "farm_harvest_luck") {
+            const res = await grantHarvestLuckCharges(buyerId, e.charges ?? 5).catch(() => null);
+            appliedF = `🍀 Your next ${res?.count ?? e.charges ?? 5} harvests will roll for better loot`;
+        } else if (e.type === "farm_petting") {
+            const res = await grantExtraPettings(buyerId, e.amount ?? 2).catch(() => null);
+            appliedF = `+${res?.count ?? e.amount ?? 2} extra pettings today 🐾`;
+        } else if (e.type === "farm_rating") {
+            const res = await grantExtraRatings(buyerId, e.amount ?? 2).catch(() => null);
+            appliedF = `+${res?.count ?? e.amount ?? 2} extra farm ratings today 💝`;
+        }
+        await trackActivity(buyerId, "use_consumable", { id, name: c.name }).catch(() => {});
+        return { ok: true, remaining: decF.count, name: c.name, emoji: c.emoji, applied: appliedF };
     }
 
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);

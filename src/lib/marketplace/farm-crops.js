@@ -176,7 +176,7 @@ function weightedPick(weights) {
 }
 
 async function loadFarmBuyer(buyerId) {
-    return db.queryOne(`SELECT COALESCE(gold,0) AS gold, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades, COALESCE(farm_fertilizer,0) AS farm_fertilizer, COALESCE(farm_plot_pos,'{}'::jsonb) AS farm_plot_pos FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return db.queryOne(`SELECT COALESCE(gold,0) AS gold, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades, COALESCE(farm_fertilizer,0) AS farm_fertilizer, COALESCE(farm_harvest_luck,0) AS farm_harvest_luck, COALESCE(farm_plot_pos,'{}'::jsonb) AS farm_plot_pos FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
 }
 
 // Default tidy-cluster position for a plot when the buyer hasn't dragged it somewhere custom. Mirrors the
@@ -292,8 +292,16 @@ export async function harvestPlot(buyerId, slot) {
     if (xp > 0) await awardXp(buyerId, "harvest", { points: xp, gold: 0 }).catch(() => {});
     const buyer = await loadFarmBuyer(buyerId);
     const rarity = def?.rarity || "common";
-    // Shared loot pool — one random reward, odds weighted by rarity; Lucky Harvest + deco harvest-luck bump the tier.
-    const loot = await rollHarvestReward(buyerId, rarity, luckyHarvestLevel(buyer?.farm_upgrades || {}), (buffs?.harvestLuck || 0) / 100);
+    // Harvest Charm consumable: a banked charge adds a flat +20% loot-tier promote chance for THIS harvest, then
+    // burns one charge (atomic guard so a charge is spent at most once).
+    let charmActive = false;
+    if ((buyer?.farm_harvest_luck || 0) > 0) {
+        const used = await db.queryOne(`UPDATE mkt_buyer SET farm_harvest_luck = farm_harvest_luck - 1 WHERE id = $1 AND farm_harvest_luck > 0 RETURNING farm_harvest_luck`, [buyerId]).catch(() => null);
+        charmActive = Boolean(used);
+    }
+    // Shared loot pool — one random reward, odds weighted by rarity; Lucky Harvest + deco harvest-luck + an
+    // active Harvest Charm bump the tier.
+    const loot = await rollHarvestReward(buyerId, rarity, luckyHarvestLevel(buyer?.farm_upgrades || {}), (buffs?.harvestLuck || 0) / 100 + (charmActive ? 0.2 : 0));
     const bonus = loot.label;
     const chest = loot.chest;
     // Seed Saver upgrade (+ deco seed-luck) — chance to recover the seed you planted (rare crops stay sustainable).

@@ -27,14 +27,17 @@ async function rateCharge(buyerId) {
         .queryOne(
             `UPDATE mkt_buyer
                 SET farm_rate_used = CASE WHEN farm_rate_day = ${DAY} THEN farm_rate_used ELSE 0 END,
+                    farm_rate_bonus = CASE WHEN farm_rate_day = ${DAY} THEN COALESCE(farm_rate_bonus,0) ELSE 0 END,
                     farm_rate_day = ${DAY}
               WHERE id = $1
-              RETURNING farm_rate_used`,
+              RETURNING farm_rate_used, COALESCE(farm_rate_bonus,0) AS farm_rate_bonus`,
             [buyerId]
         )
         .catch(() => null);
     const used = b?.farm_rate_used || 0;
-    return { used, allowance: RATES_PER_DAY, left: Math.max(0, RATES_PER_DAY - used) };
+    const bonus = b?.farm_rate_bonus || 0; // Kindness Token consumable — extra rating charges today
+    const allowance = RATES_PER_DAY + bonus;
+    return { used, allowance, left: Math.max(0, allowance - used) };
 }
 
 // Aggregate counts of a farm's likes, by tier + total, plus the viewer's own current rating.
@@ -96,7 +99,7 @@ export async function rateFarm(raterId, ownerId, tier) {
             return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge: charge0 };
         }
         const slot = await db
-            .queryOne(`UPDATE mkt_buyer SET farm_rate_used = farm_rate_used + 1 WHERE id = $1 AND farm_rate_day = ${DAY} AND farm_rate_used < $2 RETURNING farm_rate_used`, [raterId, RATES_PER_DAY])
+            .queryOne(`UPDATE mkt_buyer SET farm_rate_used = farm_rate_used + 1 WHERE id = $1 AND farm_rate_day = ${DAY} AND farm_rate_used < $2 RETURNING farm_rate_used`, [raterId, charge0.allowance])
             .catch(() => null);
         if (!slot) {
             const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
@@ -115,7 +118,7 @@ export async function rateFarm(raterId, ownerId, tier) {
         .queryOne(
             `UPDATE mkt_buyer SET farm_rate_used = farm_rate_used + 1
               WHERE id = $1 AND farm_rate_day = ${DAY} AND farm_rate_used < $2 RETURNING farm_rate_used`,
-            [raterId, RATES_PER_DAY]
+            [raterId, charge0.allowance]
         )
         .catch(() => null);
     if (!slot) return { ok: false, error: "no_charge_left", charge: await rateCharge(raterId) };

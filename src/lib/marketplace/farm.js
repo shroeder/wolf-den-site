@@ -138,17 +138,19 @@ async function pettingBudget(buyerId) {
                 SET pet_farm_used = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_used ELSE 0 END,
                     pet_farm_used_others = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_used_others ELSE 0 END,
                     pet_farm_recharges = CASE WHEN pet_farm_day = ${DAY} THEN pet_farm_recharges ELSE 0 END,
+                    pet_farm_extra = CASE WHEN pet_farm_day = ${DAY} THEN COALESCE(pet_farm_extra,0) ELSE 0 END,
                     pet_farm_day = ${DAY}
               WHERE id = $1
-              RETURNING pet_farm_used, pet_farm_used_others, pet_farm_recharges, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades`,
+              RETURNING pet_farm_used, pet_farm_used_others, pet_farm_recharges, COALESCE(pet_farm_extra,0) AS pet_farm_extra, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades`,
             [buyerId]
         )
         .catch(() => null);
     const usedOwn = b?.pet_farm_used || 0;
     const usedOthers = b?.pet_farm_used_others || 0;
     const recharges = b?.pet_farm_recharges || 0;
-    // OWN: base 3/day + the permanent "Pet Whisperer" upgrade + any gold recharges bought today. OTHERS: flat 3.
-    const ownAllowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + recharges * PET_RECHARGE_AMOUNT;
+    const extra = b?.pet_farm_extra || 0; // Pettin' Whistle consumable — extra own-pet pettings today
+    // OWN: base 3/day + the permanent "Pet Whisperer" upgrade + gold recharges + Pettin' Whistle extras. OTHERS: flat 3.
+    const ownAllowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + recharges * PET_RECHARGE_AMOUNT + extra;
     return {
         own: { used: usedOwn, allowance: ownAllowance, left: Math.max(0, ownAllowance - usedOwn) },
         others: { used: usedOthers, allowance: PET_OTHERS_PER_DAY, left: Math.max(0, PET_OTHERS_PER_DAY - usedOthers) },

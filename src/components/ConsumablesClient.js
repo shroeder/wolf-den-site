@@ -9,7 +9,7 @@ import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import useScrollLock from "@/lib/useScrollLock";
 
-const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic" };
+const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic", farm: "Farm Supply", sail: "Voyage Gear" };
 
 // Consumables: buy one-shot boosts with gold and use them yourself (no admin needed). Potions/stones buff
 // the boss fight, scrolls give XP, and two ultra-rare relics recharge / reset the cooldown on charged gear.
@@ -55,6 +55,9 @@ export default function ConsumablesClient() {
                     already_full: "That item's charges are already full.", not_on_cooldown: "That item isn't on cooldown.",
                     bad_target: "Pick a charged item.", target_not_owned: "You don't own that item.",
                     no_pet_equipped: "Equip a pet first — treats feed your active pet.",
+                    no_growing_crop: "No crop is growing right now — plant something first.",
+                    not_sailing: "You're not on a voyage right now.",
+                    no_raid_used: "You haven't used a daily raid to restore.",
                 };
                 setMsg({ ok: false, text: errs[data.error] || "Couldn't do that right now." });
             }
