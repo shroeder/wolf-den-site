@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { DECORATIONS, decorationById, isDecoration, decorationBuffs, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
+import { DECORATIONS, decorationById, isDecoration, decorationBuffs, decoLight, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
 import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
 
 const isCustom = (id) => String(id).startsWith("custom:");
@@ -77,7 +77,7 @@ export async function getPlacements(buyerId) {
         const def = decorationById(r.deco_id);
         const cm = customMap.get(r.deco_id);
         return {
-            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0),
+            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), light: decoLight(r.deco_id),
             name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
             spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
         };
@@ -112,7 +112,7 @@ export async function decoState(buyerId) {
     const placements = (placeRows || []).map((r) => {
         const def = decorationById(r.deco_id);
         const cm = customMap.get(r.deco_id);
-        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
+        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), light: decoLight(r.deco_id), name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
     });
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));

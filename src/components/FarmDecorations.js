@@ -153,7 +153,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
 // ── Scene layer: renders a member's PLACED decorations inside the pasture field. TAP any decoration to open its
 // inspect modal (details/effects + pick up). When "editing" (decorate mode), you can also DRAG to reposition —
 // a short movement is treated as a tap (inspect), a longer one as a drag (move). No always-visible ✕.
-export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect }) {
+export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day" }) {
     const [drag, setDrag] = useState(null); // { id, x, y } live position during an actual drag
     const gr = useRef({}); // gesture: { id, pointerId, sx, sy, moved, x, y, el }
     const suppressClick = useRef(false); // set after a real drag so the trailing click doesn't also inspect
@@ -209,11 +209,19 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                         }}
                         title={editing ? `${p.name} — drag to move, click to inspect / remove` : `${p.name} — tap for details`}
                     >
+                        {p.light && tod !== "day" ? (
+                            <span aria-hidden="true" style={{
+                                position: "absolute", left: "50%", top: `${size * 0.42}px`, width: p.light.r * 2, height: p.light.r * 2,
+                                transform: "translate(-50%, -50%)", borderRadius: "50%", pointerEvents: "none", zIndex: 0, mixBlendMode: "screen",
+                                background: `radial-gradient(circle, rgba(${p.light.rgb},0.62) 0%, rgba(${p.light.rgb},0.28) 32%, rgba(${p.light.rgb},0) 68%)`,
+                                animation: p.light.flicker ? "decoFlicker 2.6s ease-in-out infinite" : "decoGlow 4.5s ease-in-out infinite",
+                            }} />
+                        ) : null}
                         {p.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} draggable={false} style={{ width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }} />
+                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} draggable={false} style={{ position: "relative", zIndex: 1, width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }} />
                         ) : (
-                            <span style={{ fontSize: 40, filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }}>{p.emoji}</span>
+                            <span style={{ position: "relative", zIndex: 1, fontSize: 40, filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }}>{p.emoji}</span>
                         )}
                     </div>
                 );

@@ -157,6 +157,21 @@ export const decorationById = (id) => BY_ID.get(id) || null;
 export const isDecoration = (id) => BY_ID.has(id);
 
 // Aggregate the passive buffs from PLACED decoration ids (placing = equipping). Each UNIQUE decoration's buff
+// Decorations that CAST LIGHT — they glow at dawn/dusk/night (not day). rgb = light color, r = radius in px
+// at 1× scale, flicker = a live flame/magic shimmer. The scene renders a soft radial glow behind the sprite.
+export const DECO_LIGHT = {
+    deco_torch: { rgb: "255,150,54", r: 96, flicker: true }, deco_lantern: { rgb: "255,196,104", r: 78 },
+    deco_lamp_post: { rgb: "255,224,150", r: 120 }, deco_lantern_string: { rgb: "255,210,130", r: 100 },
+    deco_pumpkin_small: { rgb: "255,150,40", r: 66, flicker: true },
+    deco_fairy_ring: { rgb: "150,255,180", r: 82, flicker: true }, deco_mushroom_grove: { rgb: "130,240,200", r: 90, flicker: true },
+    deco_crystal_pond: { rgb: "120,220,255", r: 96 }, deco_crystal_obelisk: { rgb: "150,200,255", r: 116 },
+    deco_moon_statue: { rgb: "175,200,255", r: 92 }, deco_moon_pool: { rgb: "160,195,255", r: 100 },
+    deco_rune_stone: { rgb: "180,150,255", r: 84, flicker: true }, deco_rainbow_fountain: { rgb: "190,160,255", r: 96 },
+    deco_star_sundial: { rgb: "200,215,255", r: 92 }, deco_celestial_garden: { rgb: "190,175,255", r: 130, flicker: true },
+    deco_clover_fountain: { rgb: "150,240,170", r: 92 },
+};
+export const decoLight = (id) => DECO_LIGHT[id] || null;
+
 // counts ONCE — placing multiple copies of the same piece does NOT stack its bonus (dedupe by id). Different
 // buffed decorations still add together, capped per stat. Returns { growSpeed, seedLuck, ... } %.
 const BUFF_CAP = { growSpeed: 40, seedLuck: 50, harvestLuck: 40, petXp: 50, fertPower: 40, goldHarvest: 60 };

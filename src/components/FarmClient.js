@@ -590,6 +590,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes farmFloat { 0% { opacity: 0; transform: translate(-50%, 0) scale(.8) } 15% { opacity: 1 } 100% { opacity: 0; transform: translate(-50%, -46px) scale(1.1) } }
                 @keyframes farmCloud { from { transform: translateX(0) } to { transform: translateX(40px) } }
                 @keyframes farmShadow { 0%,100% { transform: translateX(-50%) scale(1); opacity: .34 } 30% { transform: translateX(-50%) scale(.66); opacity: .55 } }
+                @keyframes decoGlow { 0%,100% { opacity: .75; transform: translate(-50%,-50%) scale(1) } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.06) } }
+                @keyframes decoFlicker { 0%,100% { opacity: .78; transform: translate(-50%,-50%) scale(1) } 25% { opacity: 1; transform: translate(-50%,-50%) scale(1.08) } 40% { opacity: .7; transform: translate(-50%,-50%) scale(.98) } 65% { opacity: .95; transform: translate(-50%,-50%) scale(1.05) } 80% { opacity: .82; transform: translate(-50%,-50%) scale(1.01) } }
                 @keyframes farmRain { to { transform: translateY(480px); } }
                 @keyframes farmSnow { to { transform: translateY(470px) translateX(18px); } }
                 @keyframes farmFog { from { transform: translateX(-5%) } to { transform: translateX(5%) } }
@@ -711,6 +713,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             placements={farm.placements || []}
                             editing={farm.mine && decoEditing}
                             fieldRef={fieldRef}
+                            tod={wx.tod}
                             onMove={decoMove}
                             onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
                         />
@@ -1389,6 +1392,7 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
 
 function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpawnPig, onCrown, pigBusy }) {
     const [showDebug, setShowDebug] = useState(false);
+    const [seedInfo, setSeedInfo] = useState(null); // a seed tapped in the bag → detail modal
     const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade just bought → brief celebratory pop
     const buyUpgrade = (key) => { setUpgFlash(key); setTimeout(() => setUpgFlash(null), 620); onUpgrade(key); };
     const g = garden;
@@ -1414,12 +1418,36 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onDebug, onSpaw
                 <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#8fe39a", marginBottom: 8 }}>Seed bag</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {totalSeeds ? (g.seedBag || []).map((s) => (
-                        <span key={s.id} title={s.loot || ""} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", fontSize: 12, fontWeight: 700 }}>
+                        <button key={s.id} type="button" onClick={() => setSeedInfo(s)} title={`${s.name} — tap for details`} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
                             <span style={{ fontSize: 15 }}>{s.emoji}</span>{s.name}<span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span>
-                        </span>
+                        </button>
                     )) : <span className="muted" style={{ fontSize: 12 }}>none yet — find them across the games (boss, sailing, chests…).</span>}
                 </div>
             </div>
+
+            {/* Seed detail modal — tap a seed in the bag to see what it grows into */}
+            {seedInfo ? (
+                <div onClick={() => setSeedInfo(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10055, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+                    <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${seedInfo.name} seed`} style={{ width: "100%", maxWidth: 300, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${(RARITY_RING[seedInfo.rarity] || "#8fbf6a")}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .35s ease both" }}>
+                        <div style={{ padding: "18px 16px 10px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${(RARITY_RING[seedInfo.rarity] || "#8fbf6a")}33, transparent 70%)` }}>
+                            <div style={{ fontSize: 48, lineHeight: 1 }}>{seedInfo.emoji}</div>
+                            <div style={{ fontWeight: 900, fontSize: 18, marginTop: 6 }}>{seedInfo.name}</div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: RARITY_RING[seedInfo.rarity] || "#8fbf6a", textTransform: "capitalize" }}>{seedInfo.rarity} seed · ×{seedInfo.count} in your bag</div>
+                        </div>
+                        <div style={{ padding: "8px 16px 16px", display: "flex", flexDirection: "column", gap: 7 }}>
+                            {[["⏳", "Grows in", fmtGrow((seedInfo.growMin || 0) * 60)], ["🪙", "Sells for", `${(seedInfo.sell || 0).toLocaleString()} gold`], ["✨", "Harvest XP", `+${seedInfo.xp || 0} XP`], ...(seedInfo.loot ? [["🎁", "Harvest loot", seedInfo.loot]] : [])].map(([ic, lab, val]) => (
+                                <div key={lab} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                                    <span style={{ fontSize: 16 }} aria-hidden="true">{ic}</span>
+                                    <span className="muted" style={{ fontSize: 12.5, flex: 1 }}>{lab}</span>
+                                    <span style={{ fontWeight: 800, fontSize: 13 }}>{val}</span>
+                                </div>
+                            ))}
+                            <div className="muted" style={{ fontSize: 11, textAlign: "center", marginTop: 2 }}>Tap an empty plot out in the field to plant it.</div>
+                            <button type="button" onClick={() => setSeedInfo(null)} style={{ marginTop: 4, width: "100%", padding: 10, borderRadius: 11, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "inherit", fontWeight: 800, cursor: "pointer" }}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {/* Fertilizer — juiced card */}
             <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 14, background: "linear-gradient(180deg, rgba(120,200,255,0.13), rgba(255,255,255,0.02))", border: "1px solid rgba(120,200,255,0.4)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
