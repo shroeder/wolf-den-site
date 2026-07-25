@@ -133,13 +133,14 @@ export async function refundOrderCredit(orderId) {
 
 // Owner/staff nudge a member's store credit and/or coins with an audit reason. Credit changes flow through
 // the ledger (addCredit/spendCredit) so history stays truthful. Returns the new balances.
-export async function adminAdjust(buyerId, { creditDeltaCents = 0, coinsDelta = 0, reason = "adjust", by = "admin" } = {}) {
+export async function adminAdjust(buyerId, { creditDeltaCents = 0, coinsDelta = 0, reason = "adjust", by = "admin", creditReason = null } = {}) {
     if (!buyerId) return { ok: false, error: "missing_buyer" };
     const credit = Math.round(Number(creditDeltaCents) || 0);
     const coins = Math.round(Number(coinsDelta) || 0);
-    if (credit > 0) await addCredit(buyerId, credit, "adjust", null, { reason, by });
+    const ledgerReason = creditReason || "adjust"; // ledger category (e.g. "spend_store" for a manual in-store redemption)
+    if (credit > 0) await addCredit(buyerId, credit, ledgerReason, null, { reason, by });
     else if (credit < 0) {
-        const spent = await spendCredit(buyerId, -credit, "adjust", null, { reason, by });
+        const spent = await spendCredit(buyerId, -credit, ledgerReason, null, { reason, by });
         if (!spent.ok) return { ok: false, error: spent.error, balanceCents: await getStoreCredit(buyerId) };
     }
     if (coins !== 0) await grantCoins(buyerId, coins);

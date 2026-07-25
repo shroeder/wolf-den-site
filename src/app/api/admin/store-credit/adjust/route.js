@@ -25,11 +25,16 @@ export async function POST(request) {
             const creditDeltaCents = Math.round(Number(body?.creditDeltaCents) || 0);
             const coinsDelta = Math.round(Number(body?.coinsDelta) || 0);
             if (creditDeltaCents === 0 && coinsDelta === 0) return noStore({ error: "no_change" }, { status: 400 });
+            const reason = String(body?.reason || "admin adjust").slice(0, 200);
+            // A manual in-store redemption records as a real "spend_store" ledger row (reads "Spent in store"),
+            // not a generic adjustment, so member history stays truthful.
+            const creditReason = creditDeltaCents < 0 && /in.?store|spend|redeem/i.test(reason) ? "spend_store" : "adjust";
             const res = await adminAdjust(buyerId, {
                 creditDeltaCents,
                 coinsDelta,
-                reason: String(body?.reason || "admin adjust").slice(0, 200),
+                reason,
                 by: String(body?.by || "admin").slice(0, 60),
+                creditReason,
             });
             return noStore(res, { status: res.ok ? 200 : 400 });
         } catch (error) {
