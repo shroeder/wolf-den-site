@@ -168,7 +168,7 @@ export default function ConsumablesClient() {
                     </div>
                 ))}
             </div>
-            <p className="muted" style={{ fontSize: "0.8rem", marginBottom: 0 }}>⚗️ Relics (Elixir of Renewal, Sands of Time) can&apos;t be bought — they only drop from the rarest chests.</p>
+            <p className="muted" style={{ fontSize: "0.8rem", marginBottom: 0 }}>⚗️ Rare relics can&apos;t be bought — they only drop from the rarest chests.</p>
             </>)}
             {mounted && petCele ? createPortal((
                 <div className="petfeed-cele" onClick={() => setPetCele(null)}>
