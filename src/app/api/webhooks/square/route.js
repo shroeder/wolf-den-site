@@ -10,8 +10,9 @@ import { INVENTORY_EVENT_TYPES } from "@/lib/product-alerts/state";
 import { reconcileIfDue } from "@/lib/inventory-feed/reconcile";
 import { withRequestLogging } from "@/lib/server-logger";
 import { db } from "@/lib/db";
-import { awardPurchaseXp } from "@/lib/marketplace/xp";
+import { awardPurchaseXp, resolveBuyerId } from "@/lib/marketplace/xp";
 import { createLoyaltyClaim } from "@/lib/marketplace/loyalty-claim.js";
+import { recordSquareStoreCreditRedemption } from "@/lib/marketplace/store-credit.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 
 export const runtime = "nodejs";
@@ -39,6 +40,68 @@ async function fetchOrderSubtotalCents(orderId) {
     } catch {
         return null;
     }
+}
+
+// Fetch an order's tenders (payment methods applied to the sale) so we can spot a store-credit custom
+// tender. Best-effort — returns [] if the order can't be read.
+async function fetchOrderTenders(orderId) {
+    const token = process.env.SQUARE_ACCESS_TOKEN;
+    if (!token || !orderId) return [];
+    try {
+        const res = await fetch(`https://connect.squareup.com/v2/orders/${encodeURIComponent(orderId)}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Square-Version": process.env.SQUARE_API_VERSION || "2026-01-22",
+            },
+        });
+        if (!res.ok) return [];
+        const order = (await res.json())?.order;
+        return Array.isArray(order?.tenders) ? order.tenders : [];
+    } catch {
+        return [];
+    }
+}
+
+// Does this text name the store-credit tender? Configurable via SQUARE_STORE_CREDIT_TENDER_NAME (matched
+// case-insensitively as a substring, e.g. "Store Credit"); with it unset we fall back to /store\s*credit/i.
+function storeCreditNameMatches(text) {
+    const raw = (text == null ? "" : String(text)).trim();
+    if (!raw) return false;
+    const configured = String(process.env.SQUARE_STORE_CREDIT_TENDER_NAME || "").trim();
+    if (configured) return raw.toLowerCase().includes(configured.toLowerCase());
+    return /store\s*credit/i.test(raw);
+}
+
+// Detect the store-credit tender on a paid sale. Store credit is rung up at the register as a custom
+// PAYMENT TYPE (tender), not a line item, so we look in two places:
+//   1. order.tenders[] — a tender of type OTHER / WALLET / EXTERNAL whose name or note names store credit.
+//   2. payment.external_details — a POS custom tender can surface only on the payment as source_type
+//      "EXTERNAL" with an external_details.source/type that names store credit.
+// Returns { used, amountCents } where amountCents is the store-credit portion of the sale in cents.
+async function detectStoreCreditTender(payment) {
+    let amountCents = 0;
+
+    const orderId = payment?.order_id;
+    if (orderId) {
+        const tenders = await fetchOrderTenders(orderId);
+        for (const tender of tenders) {
+            const type = String(tender?.type || "").toUpperCase();
+            if (type !== "OTHER" && type !== "WALLET" && type !== "EXTERNAL") continue;
+            if (storeCreditNameMatches(tender?.name) || storeCreditNameMatches(tender?.note)) {
+                amountCents += Number(tender?.amount_money?.amount || 0);
+            }
+        }
+    }
+
+    // Fall back to the payment's own EXTERNAL details when the order didn't surface it.
+    if (amountCents <= 0 && String(payment?.source_type || "").toUpperCase() === "EXTERNAL") {
+        const ext = payment?.external_details || {};
+        if (storeCreditNameMatches(ext.source) || storeCreditNameMatches(ext.type)) {
+            amountCents += Number(payment?.amount_money?.amount || 0);
+        }
+    }
+
+    return { used: amountCents > 0, amountCents: Math.max(0, Math.trunc(amountCents)) };
 }
 
 // Fetch a Square customer's email + phone so an in-store sale can be tied to the marketplace account.
@@ -134,6 +197,73 @@ async function handlePurchaseLoyalty(payload) {
     return { handled: true, awarded: false, claimed: Boolean(claim) };
 }
 
+// In-store STORE-CREDIT redemption alert. Store credit is entered at the register as a custom tender (a
+// payment type), not a line item, and today NO in-store redemptions are recorded — this closes that gap.
+// When a paid sale carries the store-credit tender we alert the admin + employee apps and, if the sale
+// carries a mappable Square customer, auto-deduct the amount from their balance so the ledger stays honest.
+// Additive to the loyalty flow: a store-credit sale still runs the normal XP/loyalty path. Deduped per order
+// (ref sc:<orderId>) so Square's repeated payment.created/updated events fire the push + deduct exactly once.
+async function handleStoreCreditRedemption(payload) {
+    const payment = payload?.data?.object?.payment;
+    if (!payment) return { handled: false, reason: "no_payment" };
+    if (payment.status !== "COMPLETED" && payment.status !== "APPROVED") {
+        return { handled: true, skipped: `status_${(payment.status || "unknown").toLowerCase()}` };
+    }
+
+    const { used, amountCents } = await detectStoreCreditTender(payment);
+    if (!used || amountCents <= 0) return { handled: true, used: false };
+
+    const orderId = String(payment.order_id || payment.id);
+
+    // Best-effort member resolution from the Square customer on the sale (same rules as loyalty XP).
+    let buyerId = null;
+    let alias = "";
+    if (payment.customer_id) {
+        const { email, phone } = await fetchCustomerContact(payment.customer_id);
+        buyerId = await resolveBuyerId({ squareCustomerId: payment.customer_id, email, phone });
+        if (buyerId) {
+            const row = await db.queryOne(`SELECT alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+            alias = row?.alias ? `@${row.alias}` : "";
+        }
+    }
+
+    const result = await recordSquareStoreCreditRedemption({ orderId, buyerId, amountCents });
+    // Push ONLY on the first time this order is processed (like the loyalty claim?.isNew guard), so retries
+    // never re-notify. All FCM data values are strings (see the push contract for store_credit_redeem).
+    if (result.ok && !result.alreadyProcessed) {
+        const dollars = (amountCents / 100).toFixed(2);
+        if (buyerId && result.deducted) {
+            await sendAdminPush({
+                title: "🏦 Store credit used",
+                body: `$${dollars} deducted from ${alias || "a member"} — tap to review.`,
+                route: "store_credit_redeem",
+                data: { buyerId, alias, amountCents: String(amountCents), orderId, autoDeducted: "true" },
+                channels: ["full", "employee"],
+            });
+        } else if (buyerId) {
+            // Member known but the balance couldn't cover it (or a transient deduct miss) — flag for manual
+            // handling, but still hand the app the member so staff can pick them straight away.
+            await sendAdminPush({
+                title: "🏦 Store credit used",
+                body: `$${dollars} in store credit used by ${alias || "a member"}, but it wasn't auto-deducted — tap to record it.`,
+                route: "store_credit_redeem",
+                data: { buyerId, alias, amountCents: String(amountCents), orderId, autoDeducted: "false" },
+                channels: ["full", "employee"],
+            });
+        } else {
+            await sendAdminPush({
+                title: "🏦 Store credit used",
+                body: `$${dollars} in store credit was used — tap to record it (pick the member).`,
+                route: "store_credit_redeem",
+                data: { buyerId: "", alias: "", amountCents: String(amountCents), orderId, autoDeducted: "false" },
+                channels: ["full", "employee"],
+            });
+        }
+    }
+
+    return { handled: true, used: true, buyerId: buyerId || null, deducted: result.deducted, alreadyProcessed: result.alreadyProcessed };
+}
+
 function isValidSquareSignature({ signature, body, requestUrl }) {
     const signatureKey = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY || "";
 
@@ -216,6 +346,15 @@ export async function POST(request) {
                 logger.info("webhooks.square.loyalty", { eventType, ...res });
             } catch (error) {
                 logger.error("webhooks.square.loyalty.failure", error, { eventType });
+            }
+
+            // In-store store-credit redemption (custom tender) alert + auto-deduct. Additive + independent of
+            // loyalty; deduped per order so it fires once. Best-effort: a failure must not 500 the webhook.
+            try {
+                const res = await handleStoreCreditRedemption(payload);
+                logger.info("webhooks.square.store_credit", { eventType, ...res });
+            } catch (error) {
+                logger.error("webhooks.square.store_credit.failure", error, { eventType });
             }
         }
 

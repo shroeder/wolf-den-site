@@ -129,6 +129,42 @@ export async function refundOrderCredit(orderId) {
     return { cents, buyerId };
 }
 
+// ── In-store custom-tender redemption (Square register) ──────────────────────────────────────────────
+
+// Record an in-store store-credit redemption that the Square webhook detected as a custom TENDER on a paid
+// sale (store credit is entered at the register as a payment type, not a line item). Idempotent per Square
+// order via mkt_store_credit_redeem(order_id) — an atomic INSERT ... ON CONFLICT DO NOTHING claims the order
+// exactly once, so Square's repeated payment.created/updated deliveries can never double-fire or double-deduct.
+// When the member is identified, the amount is deducted from their balance through spendCredit (ledger reason
+// "spend_store", ref sc:<orderId>) so the ledger stays truthful; a WALK-IN with no linked account is still
+// claimed here (staff record it manually from the push) — that's why the guard lives in its own table and not
+// the buyer-scoped, NON-NULL-buyer ledger. Returns { ok, deducted, alreadyProcessed }.
+export async function recordSquareStoreCreditRedemption({ orderId, buyerId = null, amountCents }) {
+    const oid = String(orderId || "").trim();
+    const amount = Math.max(0, Math.round(Number(amountCents) || 0));
+    if (!oid || amount <= 0) return { ok: false, deducted: false, alreadyProcessed: false };
+
+    // Claim the order once (atomic). No row back = another delivery already handled it → don't re-push/deduct.
+    const claimed = await db
+        .queryOne(
+            `INSERT INTO mkt_store_credit_redeem (order_id, buyer_id, amount_cents)
+             VALUES ($1, $2, $3) ON CONFLICT (order_id) DO NOTHING RETURNING order_id`,
+            [oid, buyerId || null, amount]
+        )
+        .catch(() => null);
+    if (!claimed) return { ok: true, deducted: false, alreadyProcessed: true };
+
+    let deducted = false;
+    if (buyerId) {
+        const spend = await spendCredit(buyerId, amount, "spend_store", `sc:${oid}`, { source: "square_tender", orderId: oid });
+        deducted = Boolean(spend?.ok);
+        if (deducted) {
+            await db.query(`UPDATE mkt_store_credit_redeem SET deducted = TRUE WHERE order_id = $1`, [oid]).catch(() => {});
+        }
+    }
+    return { ok: true, deducted, alreadyProcessed: false };
+}
+
 // ── Admin manual adjust (Members screen) ─────────────────────────────────────────────────────────────
 
 // Owner/staff nudge a member's store credit and/or coins with an audit reason. Credit changes flow through
