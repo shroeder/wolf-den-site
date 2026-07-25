@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { collectibleById, COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
-import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel, getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { petLevelInfo, petMaxXp, addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
@@ -224,10 +224,11 @@ export async function claimPig(buyerId) {
 // A member's farm state. viewerId === ownerId ⟺ it's your farm (petting enabled + per-pet "petted today" flags).
 export async function getFarm(ownerId, viewerId) {
     if (!ownerId) return null;
-    const [owner, state, sprites, pettedRows] = await Promise.all([
+    const [owner, state, sprites, levelSprites, pettedRows] = await Promise.all([
         db.queryOne(`SELECT id, display_name, alias, avatar_sprite_url, avatar_sprite_flip, equipped_border FROM mkt_buyer WHERE id = $1`, [ownerId]).catch(() => null),
         petsState(ownerId).catch(() => null),
         getPetSpriteData().catch(() => ({})),
+        getPetSpriteLevelData().catch(() => ({})),
         db.query(`SELECT pet_id FROM mkt_pet_level WHERE buyer_id = $1::text AND petted_day = ${DAY}`, [ownerId]).catch(() => []),
     ]);
     if (!owner || !state) return null;
@@ -236,8 +237,9 @@ export async function getFarm(ownerId, viewerId) {
     const pets = (state.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
-            const sp = sprites[id];
             const lvl = state.petLevels?.[id];
+            // Show the sprite for the pet's CURRENT level (evolved 2–5), like the boss scene — not the Lv1 base.
+            const sp = pickPetSpriteForLevel(sprites[id], levelSprites[id], lvl?.level || 1);
             return {
                 id,
                 name: def?.name || id,
@@ -320,6 +322,8 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
     await db.query(`INSERT INTO mkt_pet_visit (owner_id, petter_id, pet_id, xp) VALUES ($1, $2, $3, $4)`, [petOwner, feederId, petId, c.effect?.amount || 0]).catch(() => {});
     const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [petOwner, petId]).catch(() => null);
     const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
+    // The sprite the pet JUST evolved into (so the level-up celebration shows the new form, not the Lv1 base).
+    const evolved = leveled ? await getPetLevelSprite(petId, applied.level).catch(() => null) : null;
     return {
         ok: true,
         petId,
@@ -328,7 +332,7 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
         forOther: true,
         goldGained: FEED_OTHER_GOLD,
         playerXp: FEED_OTHER_PLAYER_XP,
-        petLevelUp: leveled ? { petId, petName: def?.name || "the pet", level: applied.level, rarity: def?.rarity || "common", maxed: applied.level >= 5 } : null,
+        petLevelUp: leveled ? { petId, petName: def?.name || "the pet", level: applied.level, rarity: def?.rarity || "common", maxed: applied.level >= 5, spriteUrl: evolved?.url || null, spriteFlip: evolved?.flip || false } : null,
         level: info.level,
         xp: row?.xp || 0,
         into: info.into,
