@@ -729,7 +729,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                                                 alt={pet.name}
                                                 width={58}
                                                 height={58}
-                                                style={{ width: 58, height: 58, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "none" }}
+                                                draggable={false}
+                                                style={{ width: 58, height: 58, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
                                             />
                                             {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                         </span>

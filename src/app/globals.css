@@ -18,6 +18,16 @@
 
 * {
     box-sizing: border-box;
+    /* Kill the mobile blue tap-highlight square everywhere (pets, decorations, buttons, tiles). */
+    -webkit-tap-highlight-color: transparent;
+}
+/* Never let a drag/long-press select or "save image" a game sprite (the blue selection box). */
+.reveal img,
+.farm-scroll img,
+button img {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 
 html,

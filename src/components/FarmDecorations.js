@@ -187,7 +187,7 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                     >
                         {p.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} style={{ width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }} />
+                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} draggable={false} style={{ width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }} />
                         ) : (
                             <span style={{ fontSize: 40, filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }}>{p.emoji}</span>
                         )}
