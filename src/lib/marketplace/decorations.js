@@ -31,7 +31,7 @@ export const DECO_RARITY = {
 };
 
 // A compact art-prompt builder so every sprite reads as one cohesive set (die-cut, transparent, painterly).
-const artStyle = "cute polished 2D game decoration sprite, painterly cartoon style, warm storybook lighting, bold clean outline, die-cut with transparent background, centered, no ground shadow, no text";
+const artStyle = "cute polished 2D game decoration sprite, painterly cartoon style, warm storybook lighting, clean crisp edges with NO outline and NO white sticker border, subject fully isolated on a transparent background, centered, no ground shadow, no text";
 const prompt = (subject) => `A ${subject}. ${artStyle}.`;
 
 // Helper to declare a decoration compactly. buff is null for cosmetic pieces.

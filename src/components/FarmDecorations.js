@@ -403,22 +403,23 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
     const [credits, setCredits] = useState(custom?.credits || 0);
     const [name, setName] = useState(draft?.name || "");
     const [prompt, setPrompt] = useState(draft?.prompt || "");
-    const [chosen, setChosen] = useState(null);
+    const [correction, setCorrection] = useState(""); // a tweak note for a redraw; the original prompt is preserved
+    const [chosen, setChosen] = useState(draft?.options?.[draft.options.length - 1]?.url || null);
     const [gen, setGen] = useState(false);
     const [err, setErr] = useState(null);
-    const attemptsLeft = draft ? Math.max(0, (draft.maxAttempts || 3) - draft.attempts) : 3;
+    const attemptsLeft = draft ? Math.max(0, (draft.maxAttempts || 4) - draft.attempts) : 4;
 
     const run = async (fn) => {
         setGen(true); setErr(null);
         const r = await fn();
         setGen(false);
         if (!r?.ok) { setErr(customErr(r?.error)); return r; }
-        if (r.draft) { setDraft(r.draft); setChosen(null); }
+        if (r.draft) { setDraft(r.draft); setChosen(r.draft.options?.[r.draft.options.length - 1]?.url || null); setCorrection(""); }
         if (r.credits != null) setCredits(r.credits);
         return r;
     };
     const doStart = () => { if (prompt.trim().length < 4) { setErr("Describe your decoration (a few words at least)."); return; } run(() => onStart(name, prompt)); };
-    const doRefine = () => run(() => onRefine(draft.id, prompt));
+    const doRefine = () => { if (!correction.trim()) { setErr("Add a quick note on what to change."); return; } run(() => onRefine(draft.id, correction)); };
     const doFinalize = async () => { if (!chosen) return; setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false); if (r?.ok) onClose(); else setErr(customErr(r?.error)); };
     const doGrant = async () => { const r = await onGrantSelf(); if (r?.ok && r.credits != null) setCredits(r.credits); };
 
@@ -434,12 +435,12 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                 {gen ? (
                     <div style={{ textAlign: "center", padding: "34px 12px" }}>
                         <div style={{ fontSize: 34, animation: "farmBob 1.4s ease-in-out infinite" }}>🎨</div>
-                        <div style={{ fontWeight: 800, marginTop: 8 }}>Drawing 3 options…</div>
-                        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>This takes ~30 seconds — hang tight.</div>
+                        <div style={{ fontWeight: 800, marginTop: 8 }}>Drawing your decoration…</div>
+                        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>This takes ~15 seconds — hang tight.</div>
                     </div>
                 ) : !draft ? (
                     <div style={{ marginTop: 10 }}>
-                        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Describe a decoration and our art pipeline draws you 3 to choose from — with 2 refine tries. It&apos;s yours alone, forever.</p>
+                        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Describe a decoration and our art pipeline draws it. Not quite right? Add a quick tweak and it redraws — your description stays, the tweak nudges it. It&apos;s yours alone, forever.</p>
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Name</label>
                         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="e.g. Wolf Totem" style={CINP} />
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, margin: "12px 0 4px" }}>Describe it</label>
@@ -457,23 +458,26 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                     </div>
                 ) : (
                     <div style={{ marginTop: 12 }}>
-                        <div style={{ fontWeight: 800, fontSize: 14 }}>{draft.name} — pick your favorite</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
-                            {draft.options.map((o) => (
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>{draft.name}</div>
+                        <div className="muted" style={{ fontSize: 11.5, margin: "2px 0 10px", fontStyle: "italic" }}>&ldquo;{draft.prompt}&rdquo;</div>
+                        {/* The generated image, big. If you redrew, earlier versions stay as thumbnails so you can pick any. */}
+                        <div style={{ display: "grid", gridTemplateColumns: draft.options.length > 1 ? "repeat(auto-fill, minmax(96px, 1fr))" : "1fr", gap: 8 }}>
+                            {[...draft.options].reverse().map((o) => (
                                 <button key={o.url} type="button" onClick={() => setChosen(o.url)} style={{ padding: 0, borderRadius: 12, cursor: "pointer", border: `2px solid ${chosen === o.url ? "#c9a2ff" : "rgba(255,255,255,0.14)"}`, background: chosen === o.url ? "rgba(201,162,255,0.14)" : "rgba(255,255,255,0.04)", overflow: "hidden" }}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={o.url} alt="" width={110} height={110} style={{ width: "100%", aspectRatio: "1", objectFit: "contain", display: "block" }} />
+                                    <img src={o.url} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "contain", display: "block" }} />
                                 </button>
                             ))}
                         </div>
+                        {draft.options.length > 1 ? <div className="muted" style={{ fontSize: 10.5, marginTop: 4 }}>Tap any version to pick it (newest first).</div> : null}
                         {err ? <div style={{ color: "#ff9a9a", fontSize: 12.5, marginTop: 8 }}>{err}</div> : null}
                         {attemptsLeft > 0 ? (
                             <div style={{ marginTop: 12 }}>
-                                <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Not quite? Tweak the description &amp; try again ({attemptsLeft} refine{attemptsLeft === 1 ? "" : "s"} left)</label>
-                                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={300} rows={2} style={{ ...CINP, resize: "vertical" }} />
-                                <button type="button" onClick={doRefine} disabled={busy} style={{ ...CGHOST, marginTop: 8, width: "100%" }}>✨ Draw 3 more</button>
+                                <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Not quite? Add a tweak &amp; redraw ({attemptsLeft} redraw{attemptsLeft === 1 ? "" : "s"} left)</label>
+                                <input value={correction} onChange={(e) => setCorrection(e.target.value)} maxLength={200} placeholder="e.g. make it bigger, add snow on top" style={CINP} />
+                                <button type="button" onClick={doRefine} disabled={busy || !correction.trim()} style={{ ...CGHOST, marginTop: 8, width: "100%", opacity: correction.trim() ? 1 : 0.55 }}>✨ Redraw with my tweak</button>
                             </div>
-                        ) : <div className="muted" style={{ fontSize: 12, marginTop: 10, textAlign: "center" }}>No refines left — pick your favorite to finish.</div>}
+                        ) : <div className="muted" style={{ fontSize: 12, marginTop: 10, textAlign: "center" }}>No redraws left — pick your favorite to finish.</div>}
                         <button type="button" onClick={doFinalize} disabled={!chosen || busy} style={{ ...CPRIMARY, marginTop: 14, opacity: chosen ? 1 : 0.5 }}>✓ Use this one</button>
                     </div>
                 )}

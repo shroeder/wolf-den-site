@@ -518,7 +518,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), credits: r.credits, draft: r.draft } } }));
         return r;
     }, [post]);
-    const customRefine = useCallback((id, prompt) => post({ action: "deco_custom_refine", id, prompt }), [post]);
+    const customRefine = useCallback((id, correction) => post({ action: "deco_custom_refine", id, correction }), [post]);
     const customFinalize = useCallback(async (id, chosenUrl) => {
         const r = await post({ action: "deco_custom_finalize", id, chosenUrl });
         if (r?.ok && r.catalog) setFarm((f) => ({ ...f, placements: r.placements || f.placements, decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, custom: { ...(f.decorations?.custom || {}), draft: null }, placedTotal: r.placedTotal, placedCap: r.placedCap } }));

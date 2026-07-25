@@ -79,7 +79,7 @@ export async function POST(request) {
             // ── Custom (player-made) decorations ──
             else if (b?.action === "deco_custom_state") res = { ok: true, custom: await getCustomState(buyer.id) };
             else if (b?.action === "deco_custom_start") res = await startCustomDeco(buyer.id, String(b?.name || ""), String(b?.prompt || ""));
-            else if (b?.action === "deco_custom_refine") res = await refineCustomDeco(buyer.id, Number(b?.id), String(b?.prompt || ""));
+            else if (b?.action === "deco_custom_refine") res = await refineCustomDeco(buyer.id, Number(b?.id), String(b?.correction || ""));
             else if (b?.action === "deco_custom_finalize") { res = await finalizeCustomDeco(buyer.id, Number(b?.id), String(b?.chosenUrl || "")); if (res?.ok) res = { ...res, ...(await decoState(buyer.id)) }; }
             else if (b?.action === "deco_custom_grant") res = await grantCustomCredit(buyer.id, 1); // owner-only self-grant (farm is owner-gated)
             else if (b?.action === "farm_debug_seeds") res = await debugGrantAllSeeds(buyer.id);
