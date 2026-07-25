@@ -6,9 +6,10 @@ import { itemById } from "@/lib/marketplace/items.js";
 // all variations of "crit twice / erupt / first-hit double", which made most items feel identical. This
 // catalog spans real ARCHETYPES so gear defines a playstyle, not just a bigger number:
 //   • Damage procs   — first-hit, erupt, crit (the classics, kept for variety)
-//   • Conditional    — opportunist (low-HP boss), giantSlayer (high-HP boss), bloodlust (attack streak),
-//                      packTactics (how many allies attacked today)
-//   • Burst          — overcharge (every 5th hit nukes), highroller (coin-flip swing)  [mythic+ only]
+//   • Conditional    — opportunist (low-HP boss / finisher), onslaught (high-HP boss / opener), giantSlayer
+//                      (colossal boss), vanguard (you struck early today), attuned (matches boss's weak element),
+//                      bloodlust (attack streak), packTactics (how many allies attacked today)
+//   • Burst          — overcharge (CHEER-fueled nuke — cheering charges it), highroller (coin-flip)  [mythic+]
 //   • Reward/utility — xpOnHit (Scholar), goldOnHit (Prospector), ticketOnCrit (Lucky Strike)
 //   • Synergy        — beastbond (boosts your equipped pet's strike), warbanner (buffs the WHOLE server) [myth+]
 //
@@ -23,11 +24,14 @@ const isTop3 = (id) => rankOf(id) >= 4; // mythic+
 
 // Per-mechanic magnitude by tier index [legendary, mythic, ascendant, eternal].
 const MAG = {
-    opportunist: [0.4, 0.55, 0.7, 0.85], // + damage while boss ≤25% HP
+    opportunist: [0.4, 0.55, 0.7, 0.85], // + damage while boss ≤25% HP (finisher)
+    onslaught: [0.3, 0.42, 0.54, 0.66], // + damage while boss ≥75% HP (opener — the mirror of opportunist)
     giantSlayer: [0.3, 0.4, 0.5, 0.6], //  + damage vs colossal (high-HP) bosses
+    vanguard: [0.28, 0.38, 0.48, 0.58], // + damage while you're among the FIRST few to strike today (lead the charge)
+    attuned: [0.2, 0.28, 0.36, 0.45], //   + EXTRA damage when your strike matches the boss's elemental weakness
     streakCap: [0.3, 0.4, 0.45, 0.5], //   bloodlust cap
     packCap: [0.15, 0.2, 0.22, 0.25], //   pack-tactics cap
-    overcharge: [3, 4, 4.5, 5], //         every-5th-hit nuke ×mult (mythic+ meaningful)
+    overcharge: [3, 4, 4.5, 5], //         CHEER-fueled nuke: fully-charged ×mult (each cheer builds toward it)
     xpOnHit: [3, 5, 7, 10], //             flat XP per boss attack
     goldOnHit: [30, 50, 70, 100], //       gold per Prospector proc
     warbanner: [0.06, 0.08, 0.12, 0.15], // global damage aura (mythic+ meaningful)
@@ -61,7 +65,9 @@ const STREAK_PER = 0.04; // per consecutive attack-day
 const PACK_PER = 0.02; //   per distinct ally who attacked today
 const GOLD_CHANCE = 0.12;
 const GIANT_HP = 5_000_000; // "colossal" boss threshold for giantSlayer
-const OVERCHARGE_EVERY = 5;
+const VANGUARD_N = 3; //     "first few" threshold — vanguard fires while ≤ this many allies have struck today
+const OVERCHARGE_CHEERS = 3; // cheers needed to FULLY charge overcharge (matches CHEERS_PER_DAY)
+const ONSLAUGHT_HP = 0.75; // boss HP fraction above which onslaught (opener) fires
 const SIG_MULT_CAP = 3; // always-on procs combine up to ×3
 const BURST_CAP = 5; //    overcharge/highroller burst up to ×5 on top
 
@@ -88,7 +94,7 @@ export const ITEM_SIGNATURES = {
     gs_worldedge: { label: "World's Edge", highroller: true }, // mythic
     gs_excalibur: { label: "Sword of Kings", firstHitMult: 3 }, // mythic — kept classic
     gs_worldbreaker: { label: "Worldbreaker", giantSlayer: true }, // mythic
-    gs2_dragon_god: { label: "Dragon God", overcharge: true }, // mythic
+    gs2_dragon_god: { label: "Dragon God", attuned: true }, // mythic — declone: element-attuned, not another overcharge
     gs2_energy_blade: { label: "Overcharge", overcharge: true }, // mythic
     gs2_rune_greatsword: { label: "Runecleave", eruptChance: 0.2, eruptMult: 2 }, // legendary
     gs_runeblade: { label: "Runebite", ticketOnCrit: true }, // legendary — luck
@@ -98,10 +104,10 @@ export const ITEM_SIGNATURES = {
     worldshield: { label: "Rally Standard", warbanner: true }, // mythic — the pack banner
     eternal_aegis: { label: "Aegis Eternal", warbanner: true }, // mythic
     gs_titan_aegis: { label: "Titan's Bulwark", packTactics: true }, // mythic
-    gs2_void_ward: { label: "Void Bulwark", packTactics: true }, // mythic
+    gs2_void_ward: { label: "Void Bulwark", onslaught: true }, // mythic — declone from Titan's Bulwark: an opener, not pack
     void_orb: { label: "Singularity", beastbond: true }, // mythic
     aegis: { label: "Aegis", packTactics: true }, // legendary
-    bastion_shield: { label: "Bastion", packTactics: true }, // legendary
+    bastion_shield: { label: "Bastion", vanguard: true }, // legendary — declone from Aegis: hold the line early (vanguard)
     aegis_plate: { label: "Bulwark", goldOnHit: true }, // legendary — off_hand? (chest actually) handled by slot theme
     spiked_wall: { label: "Retribution", opportunist: true }, // legendary off_hand
     gs_aegis: { label: "Wardstone", packTactics: true }, // legendary
@@ -110,23 +116,23 @@ export const ITEM_SIGNATURES = {
     // ===== Helmets — sight / mind: guaranteed first crit, scholar, foresight =====
     eye_eternity: { label: "Perfect Sight", firstHitCrit: true }, // mythic
     oracle_diadem: { label: "Foresight", firstHitCrit: true }, // mythic
-    archmage_visage: { label: "Arcane Overload", xpOnHit: true }, // mythic — scholar
+    archmage_visage: { label: "Arcane Overload", attuned: true }, // mythic — declone from Sanctified: arcane = element-attuned
     deadeye_mask: { label: "Deadeye", ticketOnCrit: true }, // mythic — luck
     cultist_hood: { label: "Dark Ritual", xpOnHit: true }, // legendary — scholar
-    gs2_crown_supreme: { label: "Coronation", firstHitCrit: true }, // mythic
+    gs2_crown_supreme: { label: "Coronation", onslaught: true }, // mythic — declone from Perfect Sight: an opener
     golden_crown: { label: "Midas Touch", goldOnHit: true }, // mythic — gold
     ancient_halo: { label: "Sanctified", xpOnHit: true }, // mythic
     patrons_crown: { label: "Patron's Blessing", firstHitCrit: true }, // mythic
     bigspender_crown: { label: "Big Spender", creditBonus: 0.09 }, // mythic — +9% coins on store-credit buys
     whale_crown: { label: "Leviathan", giantSlayer: true }, // mythic
-    gs_god_helm: { label: "Divine Sight", firstHitCrit: true }, // mythic
+    gs_god_helm: { label: "Divine Sight", attuned: true }, // mythic — declone from Perfect Sight: divine = element-attuned
     gs_sovereign_crown: { label: "Sovereign", warbanner: true }, // mythic — rally the realm
     gs2_apex_crown: { label: "Apex", firstHitMult: 3 }, // mythic
     overlord_helm: { label: "Overlord", firstHitCrit: true }, // legendary
     crown_of_kings: { label: "Regent", packTactics: true }, // legendary
-    wolf_crown: { label: "Alpha Howl", packTactics: true }, // legendary
+    wolf_crown: { label: "Alpha Howl", vanguard: true }, // legendary — declone: the alpha LEADS the charge (early striker)
     shadow_cowl: { label: "Shadowstrike", firstHitCrit: true }, // legendary
-    gs_warlord_crown: { label: "Conqueror", packTactics: true }, // legendary
+    gs_warlord_crown: { label: "Conqueror", onslaught: true }, // legendary — declone from Regent: a conqueror strikes first and hard
     gs2_horned_crown: { label: "Dread Gaze", opportunist: true }, // legendary
 
     // ===== Chest — endurance / scaling: bloodlust, giant slayer, pack =====
@@ -137,10 +143,10 @@ export const ITEM_SIGNATURES = {
     gs_celestial_plate: { label: "Heaven's Plate", packTactics: true }, // mythic
     dragonplate: { label: "Dragonhide", giantSlayer: true }, // legendary
     ronin_kimono: { label: "Bushido", bloodlust: true }, // legendary
-    dragoncape: { label: "Wyrmscale", giantSlayer: true }, // legendary (chest)
+    dragoncape: { label: "Wyrmscale", onslaught: true }, // legendary (chest) — declone from Dragonhide: an opener
     runeweave_robe: { label: "Runeweave", xpOnHit: true }, // legendary — scholar
-    gs_dragonhide: { label: "Scaleguard", giantSlayer: true }, // legendary
-    gs2_plate_of_kings: { label: "King's Plate", packTactics: true }, // legendary
+    gs_dragonhide: { label: "Scaleguard", vanguard: true }, // legendary — declone from Dragonhide: front-line vanguard
+    gs2_plate_of_kings: { label: "King's Plate", onslaught: true }, // legendary — declone from King's Plate pack dupe: an opener
 
     // ===== Belts — the STRIKE slot (kept) + a couple of giants =====
     giants_belt: { label: "Titan's Might", extraStrikes: 2 }, // legendary
@@ -165,7 +171,7 @@ export const ITEM_SIGNATURES = {
     wings_of_dawn: { label: "Daybreak", firstHitMult: 2 }, // legendary
     oblivion_wings: { label: "Nightfall", xpOnHit: true, cheerXp: true }, // mythic — scholar (XP on hits + on cheers)
     celestial_cloak: { label: "Starfall", goldOnHit: true }, // legendary — prospector
-    void_shroud: { label: "Eclipse", bloodlust: true }, // mythic
+    void_shroud: { label: "Eclipse", attuned: true }, // mythic — declone from the bloodlust glut: shadow eclipse = element-attuned
 
     // ===== Amulets — fortune / arcane / synergy =====
     dragonheart_sigil: { label: "Dragon's Fury", beastbond: true }, // mythic — heart = pet bond
@@ -228,7 +234,7 @@ export function signatureForcesCrit(equipped, hitIndex = 0) {
 // The signature damage multiplier for a hit. ctx carries the fight state the conditional/streak procs need.
 // Returns { mult, proc } where proc is a short flavor label for the first effect that fired.
 export function signatureHit(equipped, ctx = {}) {
-    const { hitIndex = 0, crit = false, bossHpFrac = 1, bossMaxHp = 0, streakDays = 0, hittersToday = 1, rand = Math.random } = ctx;
+    const { hitIndex = 0, crit = false, bossHpFrac = 1, bossMaxHp = 0, streakDays = 0, hittersToday = 1, cheersToday = 0, elementMatches = 0, rand = Math.random } = ctx;
     let mult = 1; // always-on / conditional procs (capped at SIG_MULT_CAP)
     let burst = 1; // overcharge / highroller (capped at BURST_CAP)
     const fired = [];
@@ -238,11 +244,20 @@ export function signatureHit(equipped, ctx = {}) {
         if (s.eruptChance && rand() < s.eruptChance) { mult *= s.eruptMult || 2; fired.push(`${s.label} ERUPTS`); }
         if (s.critMult && crit) { mult *= s.critMult; fired.push(s.label); }
         if (s.opportunist && bossHpFrac <= 0.25) { mult *= 1 + MAG.opportunist[i]; fired.push(`${s.label} — EXECUTE`); }
+        if (s.onslaught && bossHpFrac >= ONSLAUGHT_HP) { mult *= 1 + MAG.onslaught[i]; fired.push(`${s.label} — OPENING`); }
         if (s.giantSlayer && bossMaxHp >= GIANT_HP) { mult *= 1 + MAG.giantSlayer[i]; fired.push(s.label); }
+        if (s.vanguard && hittersToday <= VANGUARD_N) { mult *= 1 + MAG.vanguard[i]; fired.push(`${s.label} — VANGUARD`); }
+        if (s.attuned && elementMatches > 0) { mult *= 1 + MAG.attuned[i]; fired.push(`${s.label} — ATTUNED`); }
         if (s.bloodlust) { const b = Math.min(MAG.streakCap[i], STREAK_PER * Math.max(0, streakDays)); if (b > 0) { mult *= 1 + b; fired.push(`${s.label} ×${streakDays}d`); } }
         if (s.packTactics) { const b = Math.min(MAG.packCap[i], PACK_PER * Math.max(0, hittersToday - 1)); if (b > 0) { mult *= 1 + b; fired.push(s.label); } }
         // Bursts — gated to mythic+ (below that the flag is inert).
-        if (s.overcharge && isTop3(s.id) && (hitIndex + 1) % OVERCHARGE_EVERY === 0) { burst *= MAG.overcharge[i]; fired.push(`${s.label} — OVERCHARGE!`); }
+        // Overcharge is CHEER-fueled: each of the day's cheers builds the charge, discharging on every boss strike
+        // (fully charged at OVERCHARGE_CHEERS → the full ×mult). No cheers today = no bonus.
+        if (s.overcharge && isTop3(s.id) && cheersToday > 0) {
+            const charge = Math.min(cheersToday, OVERCHARGE_CHEERS) / OVERCHARGE_CHEERS;
+            burst *= 1 + (MAG.overcharge[i] - 1) * charge;
+            fired.push(`${s.label} — OVERCHARGE!`);
+        }
         if (s.highroller && isTop3(s.id)) { const win = rand() < 0.5; burst *= win ? 3 : 0.5; if (win) fired.push(`${s.label} — JACKPOT!`); }
     }
     const combined = Math.min(mult, SIG_MULT_CAP) * Math.min(burst, BURST_CAP);
@@ -327,16 +342,19 @@ export function signatureFor(itemId) {
     if (s.eruptChance) parts.push(`${pct(s.eruptChance)} chance on each hit to erupt for ${s.eruptMult >= 3 ? "TRIPLE" : "double"} damage.`);
     if (s.extraStrikes) parts.push(`Grants +${s.extraStrikes} extra manual daily strike${s.extraStrikes > 1 ? "s" : ""}.`);
     if (s.opportunist) parts.push(`+${pct(MAG.opportunist[i])} damage while the boss is under 25% HP.`);
-    if (s.giantSlayer) parts.push(`+${pct(MAG.giantSlayer[i])} damage against colossal (high-HP) bosses.`);
+    if (s.onslaught) parts.push(`+${pct(MAG.onslaught[i])} damage while the boss is above 75% HP — hit hard while it's fresh.`);
+    if (s.giantSlayer) parts.push(`+${pct(MAG.giantSlayer[i])} damage against colossal bosses — the weekly raid boss almost always qualifies.`);
+    if (s.vanguard) parts.push(`+${pct(MAG.vanguard[i])} damage while ${VANGUARD_N} or fewer allies have struck the boss today — lead the charge.`);
+    if (s.attuned) parts.push(`+${pct(MAG.attuned[i])} EXTRA damage when your strike matches the boss's elemental weakness.`);
     if (s.bloodlust) parts.push(`+${pct(STREAK_PER)} strike damage for each day you strike in a row, up to +${pct(MAG.streakCap[i])}.`);
     if (s.packTactics) parts.push(`+${pct(PACK_PER)} strike damage for every ally who struck the boss today, up to +${pct(MAG.packCap[i])}.`);
-    if (s.overcharge && isTop3(itemId)) parts.push(`Every ${OVERCHARGE_EVERY}th hit unleashes a ×${MAG.overcharge[i]} OVERCHARGE.`);
-    if (s.highroller && isTop3(itemId)) parts.push("Each hit is a gamble: ×3 damage or ×0.5.");
+    if (s.overcharge && isTop3(itemId)) parts.push(`Cheer to charge it: each of your ${OVERCHARGE_CHEERS} daily cheers builds toward a ×${MAG.overcharge[i]} OVERCHARGE on your boss strikes (fully charged at ${OVERCHARGE_CHEERS} cheers).`);
+    if (s.highroller && isTop3(itemId)) parts.push("Your daily strike is a gamble: ×3 damage or ×0.5.");
     if (s.xpOnHit) parts.push(`Earn +${MAG.xpOnHit[i]} XP on every manual strike.`);
     if (s.goldOnHit) parts.push(`${pct(GOLD_CHANCE)} chance on each hit to unearth ${MAG.goldOnHit[i]} gold.`);
     if (s.ticketOnCrit) parts.push("Your critical hits earn a bonus raffle ticket.");
     if (s.beastbond) parts.push(`Your equipped pet's strike power is boosted ×${MAG.beastbond[i]}.`);
-    if (s.warbanner && isTop3(itemId)) parts.push(`Buffs EVERY member's boss damage by +${pct(MAG.warbanner[i])} (stacks across the server, capped).`);
+    if (s.warbanner && isTop3(itemId)) parts.push(`Buffs EVERY member's boss damage by +${pct(MAG.warbanner[i])} (stacks across the server, whole-pack aura capped at +20%).`);
     // Login procs — fire at the daily check-in.
     if (s.loginGold) parts.push(`${pct(LOGIN.goldChance[i])} chance at your daily check-in to find ${LOGIN.goldAmt[i]} gold.`);
     if (s.loginPotion) parts.push(`${pct(LOGIN.potionChance[i])} chance at your daily check-in to conjure a random potion.`);

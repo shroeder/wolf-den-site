@@ -58,7 +58,7 @@ export const ITEM_SETS = [
         id: "frost", name: "Frostbound",
         items: ["frost_brand", "frost_barrier", "frost_treads", "droplet_ring"],
         bonuses: [{ need: 2, stats: { crit_chance: 6 } }, { need: 4, stats: { crit_chance: 8, crit_power: 12 } }],
-        capstone: { overcharge: { every: 5, mult: 3 }, desc: "Full set: every 5th hit deals ×3." },
+        capstone: { erupt: { chance: 0.25, mult: 3 }, desc: "Full set: 25% chance on each strike to SHATTER for ×3." },
         weakness: "unstable",
     },
     {
@@ -233,7 +233,6 @@ export function setCombatMult(equippedIds, ctx = {}) {
             if (c.erupt && rand() < c.erupt.chance) { mult *= c.erupt.mult; fired.push(`${set.name} ERUPTS`); }
             if (c.execute && bossHpFrac <= 0.25) { mult *= 1 + c.execute; fired.push(`${set.name} — EXECUTE`); }
             if (c.giant && bossMaxHp >= GIANT_HP) { mult *= 1 + c.giant; fired.push(set.name); }
-            if (c.overcharge && (hitIndex + 1) % c.overcharge.every === 0) { mult *= c.overcharge.mult; fired.push(`${set.name} OVERCHARGE`); }
             if (c.first_double && hitIndex === 0) { mult *= 2; fired.push(set.name); }
             if (c.pack) { const b = Math.min(0.25, 0.03 * Math.max(0, hittersToday - 1)); if (b > 0) { mult *= 1 + b; fired.push(set.name); } }
         }

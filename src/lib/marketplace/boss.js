@@ -911,17 +911,22 @@ export async function attackBoss(buyerId) {
     const swing = manualHit(lvl(me?.xp), stats, { forceCrit: signatureForcesCrit(equippedIds, used) });
     // Context the conditional/streak/social signatures need + the global admin buff, damage potions, and the
     // server-wide Warbanner aura.
-    const [streakDays, todayHitters, warAura] = await Promise.all([
+    const [streakDays, todayHitters, warAura, cheerStat] = await Promise.all([
         attackStreakDays(buyerId).catch(() => 0),
         hittersToday(boss.id).catch(() => 1),
         packWarbannerAura().catch(() => 1),
+        getCheerStatus(buyerId).catch(() => ({ used: 0 })),
     ]);
     const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1)) * warAura;
     const divisor = boss.ticket_divisor || 100;
+    // This week's boss is weak to an ELEMENT — matching gear deals bonus damage; the Attuned signature amplifies it.
+    const elem = elementMult(equippedIds, boss.weakness);
     const sig = signatureHit(equippedIds, {
         hitIndex: used, crit: swing.crit,
         bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1, bossMaxHp: boss.max_hp || 0,
         streakDays, hittersToday: todayHitters,
+        cheersToday: cheerStat?.used || 0, // CHEER-fueled overcharge: each cheer charges your strikes
+        elementMatches: elem.matches, //     Attuned: +extra when you match the boss's weak element
     });
     // Non-damage signature rewards: Scholar XP, Prospector gold, Lucky-Strike bonus tickets (as bonus damage).
     const onHit = signatureOnHit(equippedIds, { crit: swing.crit, divisor });
@@ -935,9 +940,7 @@ export async function attackBoss(buyerId) {
     if (pp.chainChance && Math.random() < pp.chainChance) { petMult *= 2; petProc = petProc || "chain"; }
     if (pp.executePct && boss.max_hp && boss.hp <= boss.max_hp * 0.3) { petMult *= 1 + pp.executePct; petProc = petProc || "execute"; }
     if (pp.firstBloodPct && (await hittersToday(boss.id)) < 3) { petMult *= 1 + pp.firstBloodPct; petProc = petProc || "first_blood"; }
-    // This week's boss is weak to an ELEMENT — equipped gear whose affinity matches deals bonus damage.
-    const elem = elementMult(equippedIds, boss.weakness);
-    const wMult = elem.mult;
+    const wMult = elem.mult; // element-match damage (elem computed above, before the signature roll)
     // Set capstones (full set).
     const setHit = setCombatMult(equippedIds, {
         crit: swing.crit, hitIndex: used, bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1,
