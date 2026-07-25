@@ -31,24 +31,37 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
     };
     const startDrag = (e, o) => {
         if (atCap || busy) return;
-        e.preventDefault();
-        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
-        dragRef.current = { decoId: o.id, pointerId: e.pointerId, el: e.currentTarget };
-        setGhost({ emoji: o.emoji, spriteUrl: o.spriteUrl, x0: e.clientX, y0: e.clientY });
+        // Don't capture yet — first move decides: a sideways swipe SCROLLS the tray, an upward pull PLACES.
+        dragRef.current = { o, pointerId: e.pointerId, el: e.currentTarget, x0: e.clientX, y0: e.clientY, active: false };
     };
     const onMove = (e) => {
         const d = dragRef.current;
-        if (d && e.pointerId === d.pointerId) positionGhost(e.clientX, e.clientY);
+        if (!d || e.pointerId !== d.pointerId) return;
+        if (!d.active) {
+            const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) { dragRef.current = null; return; } // sideways → let the tray scroll
+            if (dy < -8 && Math.abs(dy) >= Math.abs(dx)) { // pulled UP toward the farm → begin placing
+                d.active = true;
+                try { d.el.setPointerCapture(d.pointerId); } catch { /* older browsers */ }
+                setGhost({ emoji: d.o.emoji, spriteUrl: d.o.spriteUrl, x0: d.x0, y0: d.y0 });
+            } else return; // still ambiguous / tiny move
+        }
+        e.preventDefault();
+        positionGhost(e.clientX, e.clientY);
     };
     const endDrag = (e) => {
         const d = dragRef.current;
         if (!d || e.pointerId !== d.pointerId) return;
-        try { d.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
-        const r = fieldRef?.current?.getBoundingClientRect();
-        if (r && insideField(e.clientX, e.clientY)) {
-            const xPct = ((e.clientX - r.left) / r.width) * 100;
-            const yPct = ((e.clientY - r.top) / r.height) * 100;
-            onPlaceAt(d.decoId, xPct, yPct);
+        if (d.active) {
+            try { d.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+            const r = fieldRef?.current?.getBoundingClientRect();
+            if (r && insideField(e.clientX, e.clientY)) {
+                const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+                // getBoundingClientRect() already accounts for the field's horizontal scroll, so % is correct wherever you're scrolled.
+                const xPct = clamp(((e.clientX - r.left) / r.width) * 100, 2, 98);
+                const yPct = clamp(((e.clientY - r.top) / r.height) * 100, 4, 98);
+                onPlaceAt(d.o.id, xPct, yPct);
+            }
         }
         dragRef.current = null;
         setGhost(null);
@@ -75,8 +88,8 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                 </div>
                 <div style={{ fontSize: 10.5, color: "#9fbf9f", padding: "0 12px 6px" }}>
                     {atCap ? "Farm full (500 placed) — tap a placed piece to pick it up."
-                        : editing ? "Drag decorations onto the farm. Drag placed pieces to move them; tap for details. Use the 🔒 lock (top-right) to freeze them."
-                            : "🔒 Locked — tap the lock (top-right) to move pieces. Drag from the tray to place new ones; tap a placed piece for details."}
+                        : editing ? "Pull a decoration UP onto the farm to place it; swipe the tray sideways to browse. Drag placed pieces to move; tap for details."
+                            : "🔒 Locked — tap the lock (top-right) to move pieces. Pull one up from the tray to place; swipe sideways to browse."}
                 </div>
                 <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "2px 12px 10px", WebkitOverflowScrolling: "touch" }}>
                     {ownedItems.map((o) => (
@@ -85,8 +98,9 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                             onPointerDown={(e) => startDrag(e, o)}
                             onPointerMove={onMove}
                             onPointerUp={endDrag}
-                            title={`Drag ${o.name} onto your farm`}
-                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", touchAction: "none", cursor: atCap ? "default" : "grab", opacity: atCap ? 0.5 : 1, userSelect: "none", WebkitTapHighlightColor: "transparent" }}
+                            onPointerCancel={() => { dragRef.current = null; setGhost(null); }}
+                            title={`Drag ${o.name} up onto your farm — swipe sideways to browse`}
+                            style={{ flex: "0 0 auto", width: 66, textAlign: "center", touchAction: "pan-x", cursor: atCap ? "default" : "grab", opacity: atCap ? 0.5 : 1, userSelect: "none", WebkitTapHighlightColor: "transparent" }}
                         >
                             <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: `2px solid ${(RARITY_RING[o.rarity] || "#555")}88` }}>
                                 {o.spriteUrl ? (
