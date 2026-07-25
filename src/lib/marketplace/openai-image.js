@@ -67,28 +67,37 @@ export async function detectFacing(bufferOrUrl) {
     } else {
         dataUrl = `data:image/png;base64,${bufferOrUrl.toString("base64")}`;
     }
-    // gpt-4o (not -mini) is markedly better at reading the facing of a 3/4-view figure. A short answer with a
-    // one-word instruction keeps it cheap. The prompt explicitly frames the 3/4 case so a slightly-angled
-    // body still resolves to the side it's turned toward.
-    const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({
-            model: "gpt-4o",
-            temperature: 0,
-            max_tokens: 5,
-            messages: [{ role: "user", content: [
-                { type: "text", text: "This is a small game character sprite, usually drawn at a 3/4 angle. Which side of the image is the FRONT of its body and face turned toward? If it's angled, pick the side its chest/nose points to. Answer with exactly one word: left or right." },
-                { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
-            ] }],
-        }),
-    });
-    if (!resp.ok) throw new Error(`Facing detection request failed (${resp.status}).`);
-    const data = await resp.json().catch(() => null);
-    const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
-    if (answer.includes("left") && !answer.includes("right")) return "left";
-    if (answer.includes("right") && !answer.includes("left")) return "right";
-    return "unknown"; // a real but ambiguous answer — settle as no-flip; staff can override manually.
+    // Reading the facing of a small 3/4-view figure is the whole ballgame here — a wrong read means a
+    // human has to manually un-flip the sprite. Two things make it reliable: (1) detail:"high" so the model
+    // sees the full-res sprite (at "low" the image is downsampled to ~a thumbnail, where left/right is a
+    // coin-flip), and (2) a 3-way MAJORITY VOTE with a little temperature, so one bad read can't decide it.
+    const askOnce = async () => {
+        const resp = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: "gpt-4o",
+                temperature: 0.4,
+                max_tokens: 3,
+                messages: [{ role: "user", content: [
+                    { type: "text", text: "A game character sprite, drawn at a 3/4 angle. Look at which direction its NOSE and CHEST point — that's the way it faces. Ignore the image sides; judge only the character's own orientation. Answer exactly one word: left or right." },
+                    { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
+                ] }],
+            }),
+        });
+        if (!resp.ok) throw new Error(`Facing detection request failed (${resp.status}).`);
+        const data = await resp.json().catch(() => null);
+        const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
+        if (answer.includes("left") && !answer.includes("right")) return "left";
+        if (answer.includes("right") && !answer.includes("left")) return "right";
+        return "unknown";
+    };
+    const votes = await Promise.all([askOnce(), askOnce(), askOnce()]);
+    const left = votes.filter((v) => v === "left").length;
+    const right = votes.filter((v) => v === "right").length;
+    if (left > right) return "left";
+    if (right > left) return "right";
+    return "unknown"; // genuine tie/ambiguous — settle as no-flip; staff can override manually.
 }
 
 // Public: store a PNG buffer to Blob and return its URL (same convention as generateImage).
