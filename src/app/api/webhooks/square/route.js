@@ -12,7 +12,7 @@ import { withRequestLogging } from "@/lib/server-logger";
 import { db } from "@/lib/db";
 import { awardPurchaseXp, resolveBuyerId } from "@/lib/marketplace/xp";
 import { createLoyaltyClaim } from "@/lib/marketplace/loyalty-claim.js";
-import { recordSquareStoreCreditRedemption } from "@/lib/marketplace/store-credit.js";
+import { recordSquareStoreCreditRedemption, getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 
 export const runtime = "nodejs";
@@ -62,17 +62,14 @@ async function fetchOrderTenders(orderId) {
     }
 }
 
-// Does this text EXACTLY name the store-credit custom payment method? We ONLY match the specific,
-// admin-configured tender name (SQUARE_STORE_CREDIT_TENDER_NAME) by exact case-insensitive equality — NO
-// substring/regex fuzz and NO free-text notes. This is deliberate: Square surfaces EVERY register custom
-// payment (including trade-in value applied against a purchase) as source "Store Credit", so a loose match
-// false-fired the redemption push/auto-deduct on trades. If the env var is unset, the feature is OFF (returns
-// false) rather than guessing — so it can never trigger until a precise, dedicated tender name is configured.
+// The store's ONE custom register tender for store credit — the exact name from Square → Payment methods →
+// Custom payment methods. Hardcoded (no env var). Trades AND real redemptions both ring on this same tender,
+// so an exact name match only tells us "the Store Credit tender was used"; whether it's a genuine REDEMPTION
+// vs a trade-in applied at the register is settled downstream by the member actually having banked store
+// credit to spend (see the balance gate in the webhook handler). Match name only — never the free-text note.
+const STORE_CREDIT_TENDER_NAME = "Store Credit";
 function storeCreditNameMatches(text) {
-    const configured = String(process.env.SQUARE_STORE_CREDIT_TENDER_NAME || "").trim();
-    if (!configured) return false;
-    const raw = (text == null ? "" : String(text)).trim();
-    return raw.toLowerCase() === configured.toLowerCase();
+    return String(text == null ? "" : text).trim().toLowerCase() === STORE_CREDIT_TENDER_NAME.toLowerCase();
 }
 
 // Detect the store-credit tender on a paid sale. Store credit is rung up at the register as a custom
@@ -229,6 +226,17 @@ async function handleStoreCreditRedemption(payload) {
             const row = await db.queryOne(`SELECT alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
             alias = row?.alias ? `@${row.alias}` : "";
         }
+    }
+
+    // ── Redemption vs trade gate ──────────────────────────────────────────────────────────────────────────
+    // The store rings BOTH real store-credit redemptions AND trade-in value (cards traded against a purchase)
+    // on the single "Store Credit" custom tender, so they're identical at the tender level. The reliable tell:
+    // a real redemption spends a member's BANKED store credit — a trade-in customer has none (or not enough).
+    // So we only treat it as a redemption (alert + auto-deduct) when we can tie it to a member who actually has
+    // a balance that covers it. No member, or an insufficient balance → it's a trade → ignore silently.
+    const balanceCents = buyerId ? await getStoreCredit(buyerId).catch(() => 0) : 0;
+    if (!buyerId || balanceCents < amountCents) {
+        return { handled: true, used: true, skipped: "not_a_redemption" };
     }
 
     const result = await recordSquareStoreCreditRedemption({ orderId, buyerId, amountCents });
