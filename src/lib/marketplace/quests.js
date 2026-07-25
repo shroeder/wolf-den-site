@@ -5,7 +5,6 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
 const ALL_QUESTS_XP = 300;
@@ -63,17 +62,16 @@ function hashStr(s) {
 }
 
 // Which templates this member is eligible for. Sailing has launched publicly (open to all); the Farm is still
-// an owner-only preview, so farm-gated quests are hidden from everyone but the owner (no dead daily todos).
-function eligibleTemplates(buyerId) {
-    const owner = isOwner(buyerId);
-    return QUEST_TEMPLATES.filter((t) => t.gate !== "farm" || owner);
+// Sailing + Farm are both live for everyone now, so every quest template is eligible.
+function eligibleTemplates() {
+    return QUEST_TEMPLATES;
 }
 
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
 // paid re-roll produces a different set.
 function pickDaily(buyerId, day, reset = false) {
     const salt = reset ? ":r" : "";
-    return eligibleTemplates(buyerId)
+    return eligibleTemplates()
         .map((t) => ({ t, h: hashStr(`${buyerId}:${day}${salt}:${t.key}`) }))
         .sort((a, b) => a.h - b.h)
         .slice(0, 3)

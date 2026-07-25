@@ -24,11 +24,10 @@ const PITY = 20; // guaranteed rare within this many spins
 const COUPON_PCT = 50;
 const COUPON_MAX = 4000;
 
-// Every wheel is 12 segments and carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a
-// rare thrill (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side.
-// Single wheel for everyone (the old bronze/silver/gold tiers were collapsed to one). ⚠️ AT FARM LAUNCH:
-// re-add a common-seed wedge → { label: "Common Seed", emoji: "🌱", weight: 12, kind: "seed" } (handler + the
-// grantSeed/SEEDS imports are already wired below). See the launch checklist.
+// The wheel carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a rare thrill
+// (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side. Single wheel for
+// everyone (the old bronze/silver/gold tiers were collapsed to one). The 🌱 Common Seed wedge is live now
+// that the farm is public (grantSeed/SEEDS handler wired below).
 const WHEELS = [
     {
         id: "wheel", name: "Prize Wheel", minLevel: 1,
@@ -36,6 +35,7 @@ const WHEELS = [
             { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
             { label: "100 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 100 },
             { label: "Pet Treat", emoji: "🦴", weight: 16, kind: "treat", treat: "treat_bone" },
+            { label: "Common Seed", emoji: "🌱", weight: 12, kind: "seed" },
             { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
             { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
             { label: "250 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 250 },
