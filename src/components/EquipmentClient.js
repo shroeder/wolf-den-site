@@ -443,6 +443,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
+                                {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
                             </button>
                         ))}
                     </div>
@@ -472,6 +473,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                                 <span className="equip-card-name">{i.name}</span>
                                                 <span className="equip-card-stats">{i.statsText}</span>
                                                 <ElBadge id={i.id} />
+                                                {i.signature ? <span className="equip-card-sig">★ {i.signature.label}</span> : null}
+                                                {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
+                                                {!i.signature && i.sea ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity</span> : null}
                                                 <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                             </button>
                                         ))}

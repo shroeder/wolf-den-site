@@ -238,6 +238,7 @@ export async function getInventory(buyerId) {
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
                 stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, signature: signatureFor(i.id),
+                farmText: i.farm ? describeFarm(i.farm) : null,
                 setName: set?.name || null, setId: set?.id || null,
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
             };
