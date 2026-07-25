@@ -394,7 +394,7 @@ function TabBtn({ active, onClick, children }) {
 const CINP = { width: "100%", padding: "9px 11px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.05)", color: "inherit", fontSize: 14, boxSizing: "border-box" };
 const CPRIMARY = { width: "100%", padding: 12, fontWeight: 900, fontSize: 14, border: "none", borderRadius: 11, cursor: "pointer", background: "linear-gradient(180deg,#d9b8ff,#a875e6)", color: "#25103f" };
 const CGHOST = { padding: "9px 14px", fontWeight: 800, fontSize: 13, borderRadius: 10, cursor: "pointer", border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9b8ff" };
-const customErr = (e) => ({ no_credits: "You're out of creations — load $5 store credit to earn one.", describe_it: "Describe your decoration first.", gen_failed: "The art pipeline hiccuped — try again (your creation was refunded).", no_attempts: "No refines left.", bad_choice: "Pick one of the options.", not_found: "That draft expired — start over." }[e] || "Something went wrong — try again.");
+const customErr = (e) => ({ no_credits: "You're out of creation tokens — grab a bundle to get more.", describe_it: "Describe your decoration first.", gen_failed: "The art pipeline hiccuped — try again (your creation was refunded).", no_attempts: "No refines left.", bad_choice: "Pick one of the options.", not_found: "That draft expired — start over." }[e] || "Something went wrong — try again.");
 
 // ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a creation credit
 // (earned by loading $5 store credit; owner can self-grant). Personal-only + never tradeable.
@@ -450,8 +450,9 @@ export function CustomDecoCreator({ custom, canGrant, busy, onStart, onRefine, o
                             <button type="button" onClick={doStart} disabled={busy} style={{ ...CPRIMARY, marginTop: 14 }}>🎨 Draw my decoration (uses 1 creation)</button>
                         ) : (
                             <div style={{ marginTop: 14, textAlign: "center" }}>
-                                <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creations. Load $5 of store credit to earn one (you keep the credit).</div>
-                                <a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 8, fontWeight: 800, color: "#ffd75e" }}>Load store credit →</a>
+                                <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creation tokens. Grab a bundle — you also get coins with every buy.</div>
+                                <a href="/marketplace/creations" style={{ display: "inline-block", marginTop: 8, fontWeight: 800, color: "#c9a2ff" }}>✨ Get creation tokens →</a>
+                                <div><a href="/marketplace/credit" style={{ display: "inline-block", marginTop: 6, fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>or load store credit →</a></div>
                                 {canGrant ? <div><button type="button" onClick={doGrant} style={{ marginTop: 10, ...CGHOST }}>🎁 Grant myself one (owner)</button></div> : null}
                             </div>
                         )}
