@@ -36,6 +36,45 @@ function formatPrice(value) {
 // Notify the marketplace admin that a new vendor applied. Recipient is resolved by the caller
 // (MARKETPLACE_ADMIN_EMAIL env, else the store owner's email). Best-effort: returns false (no throw)
 // if there's no recipient, so it never blocks the public submission.
+// Broadcast a one-off announcement email to every member who has an email. Personalizes the greeting, sends
+// best-effort in batches (Resend allows 100/call). Returns { total, sent }. Reusable for any announcement.
+export async function broadcastAnnouncementEmail({ subject, heading, emoji = "📣", bodyHtml = "", ctaLabel = "", ctaUrl = "" }) {
+    if (!process.env.RESEND_API_KEY) return { total: 0, sent: 0, skipped: "no_api_key" };
+    const rows = await db
+        .query(
+            `SELECT email, COALESCE(NULLIF(first_name,''), NULLIF(display_name,''), NULLIF(alias,'')) AS name
+               FROM mkt_buyer WHERE email IS NOT NULL AND email <> '' AND alias IS NOT NULL`
+        )
+        .catch(() => []);
+    if (!rows.length) return { total: 0, sent: 0 };
+    const resend = getResendClient();
+    const url = ctaUrl ? new URL(ctaUrl, baseUrl()).toString() : baseUrl();
+    const wrap = (name) => `
+        <div style="max-width:520px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#26221c;">
+          <div style="background:linear-gradient(180deg,#2f8f52,#215f39);border-radius:16px 16px 0 0;padding:30px 24px;text-align:center;">
+            <div style="font-size:52px;line-height:1;">${emoji}</div>
+            <h1 style="margin:12px 0 0;color:#ffffff;font-size:24px;">${heading}</h1>
+          </div>
+          <div style="background:#fbf8f2;border:1px solid #e6ddcb;border-top:none;border-radius:0 0 16px 16px;padding:24px;">
+            <p style="margin:0 0 12px;">${name ? `Hey ${name},` : "Hey there,"}</p>
+            <div style="line-height:1.6;font-size:15px;">${bodyHtml}</div>
+            ${ctaLabel ? `<div style="text-align:center;margin:22px 0 6px;"><a href="${url}" style="display:inline-block;background:#2f8f52;color:#ffffff;padding:13px 26px;border-radius:10px;font-weight:800;text-decoration:none;font-size:15px;">${ctaLabel}</a></div>` : ""}
+            <p style="color:#8a8172;font-size:12px;margin-top:24px;border-top:1px solid #e6ddcb;padding-top:14px;">You're receiving this because you have a Wolf Den account. See you at the shop!</p>
+          </div>
+        </div>`;
+    let sent = 0;
+    for (let i = 0; i < rows.length; i += 100) {
+        const chunk = rows.slice(i, i + 100).map((r) => ({ from: FROM_ADDRESS, to: r.email, subject, html: wrap(r.name || "") }));
+        try {
+            await resend.batch.send(chunk);
+            sent += chunk.length;
+        } catch {
+            /* best-effort — a failed batch doesn't stop the rest */
+        }
+    }
+    return { total: rows.length, sent };
+}
+
 export async function sendVerificationEmail(email, code) {
     const resend = getResendClient();
     await resend.emails.send({
