@@ -951,7 +951,7 @@ function CrownCalibrator({ initial, onSave, onClose }) {
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: 12 }}>Position the loot pig&apos;s crown — it mirrors for both facings. Save to set it live.</p>
                 <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>{preview(false)}{preview(true)}</div>
                 {slider("Height (up ↔ down)", "top", -40, 50)}
-                {slider("Toward the head", "side", -10, 50)}
+                {slider("Toward the head", "side", -50, 50)}
                 {slider("Size", "size", 14, 48)}
                 <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                     <button type="button" onClick={() => setC({ top: 9, side: 8, size: 22 })} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.16)", background: "transparent", color: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Reset</button>
