@@ -1458,6 +1458,79 @@ export async function getStoreCreditVariationId() {
     }
 }
 
+// Resolve the Square catalog variation to itemize CREATION-TOKEN purchases against, so they land under a
+// "Creation Tokens" item/category in Square reports (same approach as store credit). Auto-provisions it: an
+// env override wins; otherwise we find it by name; otherwise we CREATE a "Creation Tokens" category + a
+// variable-price, NON-taxable item (variable so any bundle price fits; non-taxable so the order total matches
+// the payment). Memoized per warm instance. Returns the variation id, or null if the token lacks catalog
+// write (caller then falls back to a plain, un-itemized charge).
+let _creationTokensVariationId = null;
+export async function getCreationTokensVariationId() {
+    const override = String(process.env.SQUARE_CREATION_TOKENS_VARIATION_ID || "").trim();
+    if (override) return override;
+    if (_creationTokensVariationId) return _creationTokensVariationId;
+    try {
+        const found = await squareFetch("/v2/catalog/search", {
+            method: "POST",
+            body: JSON.stringify({
+                object_types: ["ITEM"],
+                query: { exact_query: { attribute_name: "name", attribute_value: "Creation Tokens" } },
+                limit: 1,
+            }),
+        }).catch(() => null);
+        const existingVar = found?.objects?.[0]?.item_data?.variations?.[0]?.id;
+        if (existingVar) {
+            _creationTokensVariationId = existingVar;
+            return existingVar;
+        }
+
+        const cat = await squareFetch("/v2/catalog/object", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: randomUUID(),
+                object: { type: "CATEGORY", id: "#wd-creation-tokens-cat", category_data: { name: "Creation Tokens" } },
+            }),
+        }).catch(() => null);
+        const categoryId = cat?.catalog_object?.id || null;
+
+        const item = await squareFetch("/v2/catalog/object", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: randomUUID(),
+                object: {
+                    type: "ITEM",
+                    id: "#wd-creation-tokens-item",
+                    item_data: {
+                        name: "Creation Tokens",
+                        description: "Online Creation-token bundle (in-game creative currency).",
+                        is_taxable: false,
+                        // Set BOTH legacy category_id AND reporting_category — Square's item/category sales
+                        // report keys off reporting_category, so category_id alone leaves it "Uncategorized".
+                        ...(categoryId ? { category_id: categoryId, reporting_category: { id: categoryId } } : {}),
+                        variations: [
+                            {
+                                type: "ITEM_VARIATION",
+                                id: "#wd-creation-tokens-var",
+                                item_variation_data: {
+                                    item_id: "#wd-creation-tokens-item",
+                                    name: "Online",
+                                    pricing_type: "VARIABLE_PRICING",
+                                },
+                            },
+                        ],
+                    },
+                },
+            }),
+        });
+        const variationId = item?.catalog_object?.item_data?.variations?.[0]?.id || null;
+        _creationTokensVariationId = variationId;
+        return variationId;
+    } catch (error) {
+        squareLogger.error("square.creation_tokens_item.provision_failed", { step: "creation_tokens_item_provision_failed", message: error instanceof Error ? error.message : "unknown" });
+        return null;
+    }
+}
+
 export async function createSquareCardPayment({
     sourceId,
     amountCents,

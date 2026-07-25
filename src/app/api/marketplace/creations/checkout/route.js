@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { createSquareCardPayment, createSquareOrder } from "@/lib/consignment/square";
+import { createSquareCardPayment, createSquareOrder, getCreationTokensVariationId } from "@/lib/consignment/square";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -70,12 +70,17 @@ export async function POST(request) {
                 idempotencyKey,
             });
 
-            // Itemize against a plain-named "Creation Tokens" line so the sale is readable in Square reports.
-            // Best-effort — falls back to a plain payment if order creation hiccups.
+            // Itemize against the catalog "Creation Tokens" item so the sale rolls up under its Square category
+            // in reports (auto-provisions the category + variable-price item on first use). If catalog write
+            // isn't available, fall back to a plain-named line so the sale is still readable. Best-effort.
             let squareOrderId = null;
             try {
+                const creationVariationId = await getCreationTokensVariationId().catch(() => null);
+                const lineItem = creationVariationId
+                    ? { catalog_object_id: creationVariationId, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }
+                    : { name: `Creation Tokens (${tier.tokens})`, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } };
                 const order = await createSquareOrder({
-                    lineItems: [{ name: `Creation Tokens (${tier.tokens})`, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
+                    lineItems: [lineItem],
                     referenceId: purchaseId,
                     idempotencyKey: `creation-order-${purchaseId}`,
                 });
