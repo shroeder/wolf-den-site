@@ -483,7 +483,18 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [post]);
     const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
     const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y }), [decoAct]);
-    const decoMove = useCallback((placementId, x, y) => decoAct({ action: "deco_move", placementId, x, y }), [decoAct]);
+    const decoMove = useCallback(async (placementId, x, y) => {
+        // Optimistically move it in local state so it stays put on drop (no snap-back); reconcile / revert on the response.
+        let prev = null;
+        setFarm((f) => {
+            const p = (f.placements || []).find((q) => q.id === placementId);
+            prev = p ? { x: p.x, y: p.y } : null;
+            return { ...f, placements: (f.placements || []).map((q) => (q.id === placementId ? { ...q, x, y } : q)) };
+        });
+        const r = await decoAct({ action: "deco_move", placementId, x, y });
+        if (!r?.ok && prev) setFarm((f) => ({ ...f, placements: (f.placements || []).map((q) => (q.id === placementId ? { ...q, x: prev.x, y: prev.y } : q)) }));
+        return r;
+    }, [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
     const fieldRef = useRef(null);
     // Custom (player-made) decorations
@@ -507,7 +518,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [decorating, setDecorating] = useState(false);
     const startDecorating = useCallback(() => {
         setDecorating(true);
-        setDecoEditing(false); // start LOCKED — tap a piece to inspect; flip on "Move" to drag/reposition
+        setDecoEditing(true); // default MOVABLE — drag placed pieces to reposition; the lock toggle (top-right) locks them
         setTimeout(() => { try { fieldRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ } }, 60);
     }, []);
     const stopDecorating = useCallback(() => { setDecorating(false); setDecoEditing(false); }, []);
@@ -746,6 +757,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                         <span style={{ fontSize: 17 }} aria-hidden="true">🪴</span>Decorate
                     </button>
                 ) : null}
+                {/* Persistent lock/move toggle — top-right of the scene, only while decorating. Default is movable. */}
+                {farm.mine && farm.decorations && decorating ? (
+                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock decorations" : "Unlock to move decorations"} title={decoEditing ? "Decorations movable — tap to LOCK" : "Decorations locked — tap to move"}
+                        style={{ position: "absolute", top: 10, right: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 999, border: `1px solid ${decoEditing ? "rgba(143,199,255,0.6)" : "rgba(255,255,255,0.25)"}`, background: decoEditing ? "linear-gradient(180deg, rgba(30,52,74,0.96), rgba(18,32,46,0.96))" : "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: decoEditing ? "#bfe0ff" : "#d7d7db", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
+                        <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "✋" : "🔒"}</span>{decoEditing ? "Move" : "Locked"}
+                    </button>
+                ) : null}
                 {/* Live conditions label (unobtrusive, top-left) */}
                 <div style={{ position: "absolute", top: 8, left: 8, zIndex: 60, pointerEvents: "none", padding: "3px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700, color: "#f2f6ee", background: "rgba(18,26,14,0.5)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(2px)" }}
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
@@ -784,7 +802,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                     fieldRef={fieldRef}
                     busy={decoBusy}
                     editing={decoEditing}
-                    onToggleMove={() => setDecoEditing((v) => !v)}
                     onPlaceAt={decoPlaceAt}
                     onInspect={(cat) => setInspectDeco(cat)}
                     onOpenCreator={() => setCustomOpen(true)}

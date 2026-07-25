@@ -156,12 +156,13 @@ const BY_ID = new Map(DECORATIONS.map((d) => [d.id, d]));
 export const decorationById = (id) => BY_ID.get(id) || null;
 export const isDecoration = (id) => BY_ID.has(id);
 
-// Aggregate the passive buffs from a set of PLACED decoration ids (placing = equipping). Duplicates stack, but
-// each stat is capped so a maxed-out farm can't trivialize grow times. Returns { growSpeed, seedLuck, ... } %.
+// Aggregate the passive buffs from PLACED decoration ids (placing = equipping). Each UNIQUE decoration's buff
+// counts ONCE — placing multiple copies of the same piece does NOT stack its bonus (dedupe by id). Different
+// buffed decorations still add together, capped per stat. Returns { growSpeed, seedLuck, ... } %.
 const BUFF_CAP = { growSpeed: 40, seedLuck: 50, harvestLuck: 40, petXp: 50, fertPower: 40, goldHarvest: 60 };
 export function decorationBuffs(placedIds) {
     const out = { growSpeed: 0, seedLuck: 0, harvestLuck: 0, petXp: 0, fertPower: 0, goldHarvest: 0 };
-    for (const id of placedIds || []) {
+    for (const id of new Set(placedIds || [])) { // dedupe → one bonus per decoration type, no dup stacking
         const d = BY_ID.get(id);
         if (d?.buff?.stat && out[d.buff.stat] != null) out[d.buff.stat] += d.buff.value;
     }
