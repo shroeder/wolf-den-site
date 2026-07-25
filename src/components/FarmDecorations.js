@@ -62,6 +62,9 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                 const yPct = clamp(((e.clientY - r.top) / r.height) * 100, 4, 98);
                 onPlaceAt(d.o.id, xPct, yPct);
             }
+        } else {
+            // Never became an upward drag and wasn't a sideways scroll → a tap → inspect this owned decoration.
+            onInspect?.(d.o);
         }
         dragRef.current = null;
         setGhost(null);

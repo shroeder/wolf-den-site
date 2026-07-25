@@ -484,6 +484,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [decoBusy, setDecoBusy] = useState(false);
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);
+        const sx = scrollRef.current?.scrollLeft; // remember how far the pasture is scrolled…
         const r = await post(body);
         setDecoBusy(false);
         if (r?.ok && r.owned) {
@@ -493,6 +494,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, placedTotal: r.placedTotal, placedCap: r.placedCap },
                 wallet: f.wallet && r.gold != null ? { ...f.wallet, gold: r.gold } : f.wallet,
             }));
+            // …and restore it after the re-render, so a piece placed while scrolled right doesn't vanish off-screen.
+            if (sx != null) requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollLeft = sx; });
         }
         return r;
     }, [post]);
@@ -517,6 +520,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         return decoAct({ action: "deco_transform", placementId, scale, rot });
     }, [decoAct]);
     const fieldRef = useRef(null);
+    const scrollRef = useRef(null); // the horizontal pasture scroller — preserved across deco re-renders so a placed piece doesn't scroll away
     // Custom (player-made) decorations
     const customStart = useCallback(async (name, prompt) => {
         const r = await post({ action: "deco_custom_start", name, prompt });
@@ -650,7 +654,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
             <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
-                <div className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden" }}>
+                <div ref={scrollRef} className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden" }}>
                     <div
                         ref={fieldRef}
                         style={{
