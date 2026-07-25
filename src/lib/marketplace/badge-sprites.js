@@ -44,7 +44,7 @@ export async function generateBadgeSprite(slug) {
     if (!badge) return null;
     const prompt = buildBadgePrompt(badge);
     try {
-        const url = await generateImage(prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/badges", resizeTo: 160 });
+        const url = await generateImage(prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/badges", resizeTo: 160, deHalo: true });
         if (!url) return null;
         await db.query(
             `INSERT INTO mkt_badge_sprite (slug, url, prompt, updated_at) VALUES ($1, $2, $3, NOW())
