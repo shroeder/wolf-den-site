@@ -10,6 +10,9 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
+import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -247,7 +250,10 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Thumb upgrade (both cut grow time).
     const buffs = await farmBonuses(buyerId).catch(() => null);
     const decoGrow = Math.max(0.5, 1 - (buffs?.growSpeed || 0) / 100);
-    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow);
+    // Forager's Kit full-set capstone: crops grow 15% faster (a flat multiplier on top of every other speedup).
+    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
+    const capGrow = Math.max(0.5, 1 - setFarmGrowBonus(equipped));
+    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow);
     const row = await db.queryOne(
         `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at)
          VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval)
@@ -275,7 +281,12 @@ export async function harvestPlot(buyerId, slot) {
     // better seed-save luck.
     const buffs = await farmBonuses(buyerId).catch(() => null);
     const xp = def?.xp || 0;
-    const gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100));
+    let gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100));
+    // Harvester's Garb full-set capstone: a chance the whole harvest yields DOUBLE gold.
+    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
+    let doubled = false;
+    const dblChance = setFarmDoubleHarvest(equipped);
+    if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
     if (xp > 0) await awardXp(buyerId, "harvest", { points: xp, gold: 0 }).catch(() => {});
@@ -297,6 +308,13 @@ export async function harvestPlot(buyerId, slot) {
     // count (just logged above), so it needs no new counter. Idempotent grant into mkt_cosmetic_unlock.
     const harvested = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_activity_event WHERE buyer_id = $1 AND event = 'harvest_crop'`, [buyerId]).catch(() => null);
     if ((harvested?.n || 0) >= 20) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'harvest_crown') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+    // FARM-ONLY pet: the Field Mouse is earned at 50 lifetime harvests (a farm-exclusive companion, never sold
+    // or dropped elsewhere). Idempotent grant; flagged as new only when the row is actually inserted.
+    let newPet = null;
+    if ((harvested?.n || 0) >= 50) {
+        const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', 'field_mouse') ON CONFLICT DO NOTHING RETURNING ref`, [buyerId]).catch(() => []);
+        if (ins.length) { const p = collectibleById("field_mouse"); newPet = { id: "field_mouse", name: p?.name || "Field Mouse", rarity: p?.rarity || "rare" }; }
+    }
     // Epic-or-better harvest also credits the "harvest a rare crop" quest.
     if (rarity === "epic" || rarity === "legendary" || rarity === "mythic") await bumpQuestProgress(buyerId, "harvest_rare", 1).catch(() => {});
     // Farm-native seed drop: a modest chance for the harvest itself to yield back a fresh seed, so the farm
@@ -304,7 +322,7 @@ export async function harvestPlot(buyerId, slot) {
     const foundSeed = await dropSeedFrom(buyerId, "harvest_crop").catch(() => null);
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.

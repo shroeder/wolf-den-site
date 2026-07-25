@@ -65,6 +65,7 @@ const rechargeCost = (n) => PET_RECHARGE_BASE * 2 ** n;
 const PIG_GOLD_MIN = 100, PIG_GOLD_MAX = 250;
 const PIG_ITEM_CHANCE = 0.2; // chance the pig drops an item at all
 const PIG_RARITY_WEIGHTS = { common: 65, rare: 28, epic: 7 }; // up to 3rd tier, weighted toward the low end
+const PIG_PET_CHANCE = 0.03; // rare chance the pig gifts the farm-only Golden Goose pet
 const randInt = (n) => Math.floor(Math.random() * n);
 const weightedPick = (weights) => {
     const entries = Object.entries(weights);
@@ -208,9 +209,16 @@ export async function claimPig(buyerId) {
             item = { id: def.id, name: def.name, rarity: def.rarity, slot: def.slot || null, image: await itemSpriteFor(def.id).catch(() => null), isNew: Boolean(g?.granted) };
         }
     }
-    await trackActivity(buyerId, "loot_pig", { gold, item: item?.name || null }).catch(() => {});
+    // FARM-ONLY pet: a rare Golden Goose drop from the Wild Loot Pig (never from the boss/shop/spin/chests).
+    // Small chance; idempotent grant that only flags as new when the row is actually inserted.
+    let pet = null;
+    if (Math.random() < PIG_PET_CHANCE) {
+        const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', 'golden_goose') ON CONFLICT DO NOTHING RETURNING ref`, [buyerId]).catch(() => []);
+        if (ins.length) { const def = collectibleById("golden_goose"); pet = { id: "golden_goose", name: def?.name || "Golden Goose", rarity: def?.rarity || "epic", hint: def?.hint || null }; }
+    }
+    await trackActivity(buyerId, "loot_pig", { gold, item: item?.name || null, pet: pet?.name || null }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // Pig Whisperer / Pig Tycoon
-    return { ok: true, gold, goldAfter: paid?.gold ?? null, item };
+    return { ok: true, gold, goldAfter: paid?.gold ?? null, item, pet };
 }
 
 // A member's farm state. viewerId === ownerId ⟺ it's your farm (petting enabled + per-pet "petted today" flags).

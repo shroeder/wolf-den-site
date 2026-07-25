@@ -73,6 +73,12 @@ export const PET_PERKS = {
     molten_phoenix: { name: "Rebirth Flame", key: "execute" }, eternal_wolf: { name: "Spirit Howl", key: "chain_strike" }, bounty_hound: { name: "On the Hunt", key: "fortune" },
     // Merchant (its signature ability — boosting Gold-Merchant find chance — is applied in sailing.js, not combat)
     elephant_spear: { name: "Merchant's Nose", key: "gold_find", note: "Unique: while equipped, boosts your chance to find the Gold Merchant at sea (+1% per pet level, up to +5%)." },
+    // Farm/pastoral pets — a farm passive (in collectibles PET_PASSIVE_STAT) PLUS a combat active so they still
+    // fight. Actives are ordinary combat keys (nothing farm-specific here).
+    honeybee: { name: "Pollen Flurry", key: "chain_strike" }, barn_cat: { name: "Mouser", key: "crit_chance" },
+    piglet: { name: "Truffle Snout", key: "gold_find" }, hen: { name: "Golden Egg", key: "gold_find" },
+    spring_lamb: { name: "Fleece Fortune", key: "fortune" }, scarecrow_crow: { name: "Startle", key: "first_blood" },
+    field_mouse: { name: "Scurry", key: "extra_strike" }, golden_goose: { name: "Windfall", key: "fortune" },
 };
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.

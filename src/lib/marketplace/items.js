@@ -7,6 +7,8 @@ import {
     GiHatchet, GiBoomerang, GiCleaver, GiChakram, GiWarAxe, GiWaveStrike, GiFlatHammer, GiEyeShield, GiHeraldicSun, GiConcentrationOrb, GiSpikedShield, GiVortex, GiSpartanHelmet, GiDwarfHelmet, GiWarBonnet, GiCowled, GiArmorVest, GiCape, GiSpikedShoulderArmor, GiCapeArmor, GiBootKick, GiWingfoot, GiEmerald, GiGems, GiCutDiamond, GiAnkh, GiPentacle, GiRaven, GiBearFace, GiSnakeTotem, GiGalaxy, GiSunbeams, GiFireGem, GiBeamsAura,
     GiBoneMace, GiRelicBlade, GiIceBolt, GiWingedScepter, GiFireSilhouette, GiMeteorImpact, GiFireShield, GiIceGolem, GiFloatingCrystal, GiWorld, GiHood, GiHelmetHeadShot, GiHeavyHelm, GiCultist, GiDeadEye, GiPirateCoat, GiRaggedWound, GiHeartInside, GiSpring, GiSnowflake2, GiCometSpark, GiOwl, GiFox, GiTigerHead, GiLotus, GiElephant, GiSpectre, GiOakLeaf, GiWaterDrop, GiFangedSkull, GiDropletSplash,
     GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
+    // Farm gear-set pieces
+    GiFarmer, GiRolledCloth, GiAmberMosquito, GiBasket, GiClover, GiSwapBag, GiThreeLeaves,
 } from "react-icons/gi";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 
@@ -99,6 +101,7 @@ const ICONS = {
     GiHatchet, GiBoomerang, GiCleaver, GiChakram, GiWarAxe, GiWaveStrike, GiFlatHammer, GiEyeShield, GiHeraldicSun, GiConcentrationOrb, GiSpikedShield, GiVortex, GiSpartanHelmet, GiDwarfHelmet, GiWarBonnet, GiCowled, GiArmorVest, GiCape, GiSpikedShoulderArmor, GiCapeArmor, GiBootKick, GiWingfoot, GiEmerald, GiGems, GiCutDiamond, GiAnkh, GiPentacle, GiRaven, GiBearFace, GiSnakeTotem, GiGalaxy, GiSunbeams, GiFireGem, GiBeamsAura,
     GiBoneMace, GiRelicBlade, GiIceBolt, GiWingedScepter, GiFireSilhouette, GiMeteorImpact, GiFireShield, GiIceGolem, GiFloatingCrystal, GiWorld, GiHood, GiHelmetHeadShot, GiHeavyHelm, GiCultist, GiDeadEye, GiPirateCoat, GiRaggedWound, GiHeartInside, GiSpring, GiSnowflake2, GiCometSpark, GiOwl, GiFox, GiTigerHead, GiLotus, GiElephant, GiSpectre, GiOakLeaf, GiWaterDrop, GiFangedSkull, GiDropletSplash,
     GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
+    GiFarmer, GiRolledCloth, GiAmberMosquito, GiBasket, GiClover, GiSwapBag, GiThreeLeaves,
 };
 export const itemIcon = (name) => ICONS[name] || GiRing;
 
@@ -508,6 +511,19 @@ export const ITEMS = [
     { id: "eternal_infinity", name: "Band of Eternity", slot: "ring", rarity: "eternal", icon: "GiEngagementRing", flavor: "No beginning. No end. No equal.", stats: { might: 25, crit_chance: 15, crit_power: 25, fortune: 10 }, reqLevel: 100, source: "elite", charged: true, charges: 1, cooldownDays: 365, chargeReward: "elite_grail", chargeRewardLabel: REWARDS.elite_grail, sort: 911 },
     // -- Bounty Board reward (granted for fulfilling 3 community bounties — see bounty-rewards.js) --
     { id: "bounty_hunters_mark", name: "Bounty Hunter's Mark", slot: "amulet", rarity: "legendary", icon: "GiWolfHead", flavor: "Proof you show up for the pack.", stats: { fortune: 15, might: 8 }, reqLevel: 1, source: "bounty_reward", sort: 920 },
+
+    // -- FARM GEAR SETS -- utility pieces with FARM affixes (weak in combat, strong in the garden). Bought with
+    // gold in the gear shop. Full-set capstones apply in farm-crops.js. See ITEM_SETS in sets.js.
+    // Harvester's Garb — reaping & harvest gold; full set = a chance each harvest yields DOUBLE.
+    { id: "harvesters_hat", name: "Harvester's Sun Hat", slot: "helmet", rarity: "rare", icon: "GiFarmer", flavor: "Wide brim, wider yield — the sun works for you now.", stats: { fortune: 6, ferocity: 4 }, farm: { growSpeed: 4 }, reqLevel: 8, source: "xp_shop", xpCost: 700, sort: 930 },
+    { id: "reapers_girdle", name: "Reaper's Girdle", slot: "belt", rarity: "rare", icon: "GiRolledCloth", flavor: "A sheaf-binder's belt, hung with twine and a whetstone.", stats: { fortune: 5, might: 5 }, farm: { goldHarvest: 6 }, reqLevel: 8, source: "xp_shop", xpCost: 800, sort: 931 },
+    { id: "sheafbound_cloak", name: "Sheafbound Cloak", slot: "back", rarity: "epic", icon: "GiCape", flavor: "Woven from the last golden stalks of autumn.", stats: { fortune: 8, crit_chance: 4 }, farm: { harvestLuck: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2200, sort: 932 },
+    { id: "amber_grain_pendant", name: "Amber Grain Pendant", slot: "amulet", rarity: "epic", icon: "GiAmberMosquito", flavor: "A single wheat-berry, sealed in honey-gold amber.", stats: { fortune: 9, ferocity: 3 }, farm: { goldHarvest: 7 }, reqLevel: 14, source: "xp_shop", xpCost: 2400, sort: 933 },
+    // Forager's Kit — finding & nurturing seeds; full set = crops grow 15% faster.
+    { id: "foragers_basket", name: "Forager's Basket", slot: "off_hand", rarity: "rare", icon: "GiBasket", flavor: "Never comes home empty — there's always one more seed.", stats: { ferocity: 6, fortune: 4 }, farm: { seedLuck: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 750, sort: 934 },
+    { id: "clover_signet", name: "Clover Signet", slot: "ring", rarity: "rare", icon: "GiClover", flavor: "A pressed four-leaf clover set under glass.", stats: { fortune: 7, crit_chance: 3 }, farm: { seedLuck: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 850, sort: 935 },
+    { id: "deep_seed_pouch", name: "Deep Seed Pouch", slot: "belt", rarity: "epic", icon: "GiSwapBag", flavor: "Bottomless — the good soil's secrets travel with you.", stats: { fortune: 6, might: 4 }, farm: { growSpeed: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2100, sort: 936 },
+    { id: "foxglove_charm", name: "Foxglove Charm", slot: "amulet", rarity: "epic", icon: "GiThreeLeaves", flavor: "Wildflower magic, carried close to the heart.", stats: { fortune: 8, crit_chance: 3 }, farm: { harvestLuck: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2300, sort: 937 },
 ];
 
 export function itemById(id) {

@@ -78,6 +78,23 @@ export const ITEM_SETS = [
             desc: "The Dread Pirate: +1 raid every day, raid wins pay DOUBLE gold, and a surge of Plunder & Bounty." },
         weakness: null,
     },
+    // ── FARM SETS ── bonuses are FARM affinity (seedLuck/growSpeed/harvestLuck/goldHarvest), NOT boss power, and
+    // capstones are farm powers read+applied in farm-crops.js (setFarmGrowBonus / setFarmDoubleHarvest). Pieces
+    // are utility-slot gear (helmet/belt/back/amulet/off_hand/ring) with FARM affixes — see items.js.
+    {
+        id: "harvester", name: "Harvester's Garb",
+        items: ["harvesters_hat", "reapers_girdle", "sheafbound_cloak", "amber_grain_pendant"],
+        bonuses: [{ need: 2, farm: { harvestLuck: 4 } }, { need: 4, farm: { harvestLuck: 6, goldHarvest: 8 } }],
+        capstone: { farmDoubleYield: 0.2, desc: "Bountiful Reaping: each harvest has a 20% chance to yield DOUBLE gold." },
+        weakness: null,
+    },
+    {
+        id: "forager", name: "Forager's Kit",
+        items: ["foragers_basket", "clover_signet", "deep_seed_pouch", "foxglove_charm"],
+        bonuses: [{ need: 2, farm: { seedLuck: 5 } }, { need: 4, farm: { seedLuck: 7, growSpeed: 5 } }],
+        capstone: { farmGrow: 0.15, desc: "Green Season: your crops grow 15% faster." },
+        weakness: null,
+    },
 ];
 
 const SET_BY_ITEM = {};
@@ -146,6 +163,34 @@ export function setDoublesRaidGold(equippedIds) {
     return false;
 }
 
+// Aggregate FARM affinity granted by active set-bonus tiers (read by the farm-bonus aggregator — never boss).
+// Mirrors setSeaBonus: only tier `farm` blocks contribute (capstones are handled by the readers below).
+export function setFarmBonus(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    const total = {};
+    for (const set of ITEM_SETS) {
+        const n = counts.get(set.id) || 0;
+        for (const tier of set.bonuses) {
+            if (n >= tier.need && tier.farm) for (const [k, v] of Object.entries(tier.farm)) total[k] = (total[k] || 0) + v;
+        }
+    }
+    return total;
+}
+// Full-set FARM capstone: total crop grow-speed fraction (Forager 0.15). Consumed in farm-crops.js plantSeed.
+export function setFarmGrowBonus(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    let frac = 0;
+    for (const set of ITEM_SETS) if (set.capstone?.farmGrow && (counts.get(set.id) || 0) >= set.items.length) frac += set.capstone.farmGrow;
+    return Math.min(0.5, frac);
+}
+// Full-set FARM capstone: chance a harvest yields DOUBLE gold (Harvester 0.20). Consumed in farm-crops.js harvestPlot.
+export function setFarmDoubleHarvest(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    let chance = 0;
+    for (const set of ITEM_SETS) if (set.capstone?.farmDoubleYield && (counts.get(set.id) || 0) >= set.items.length) chance += set.capstone.farmDoubleYield;
+    return Math.min(0.75, chance);
+}
+
 // A display view of every set the loadout touches: equipped count + each tier with an active flag.
 export function activeSetBonuses(equippedIds) {
     const counts = equippedCounts(equippedIds);
@@ -155,7 +200,7 @@ export function activeSetBonuses(equippedIds) {
             const n = counts.get(set.id) || 0;
             return {
                 id: set.id, name: set.name, equipped: n, total: set.items.length,
-                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea })),
+                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea, farm: t.farm })),
                 capstone: set.capstone ? { desc: set.capstone.desc, active: n >= set.items.length } : null,
             };
         });
@@ -223,7 +268,7 @@ export function getSetsOverview(equippedIds, ownedIds) {
             id: set.id, name: set.name, total: set.items.length, equipped, owned,
             weakness: set.weakness || null,
             pieces,
-            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats || null, sea: t.sea || null })),
+            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null })),
             capstone: set.capstone ? { desc: set.capstone.desc, active: equipped >= set.items.length } : null,
         };
     });

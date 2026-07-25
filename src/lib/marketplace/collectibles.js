@@ -13,6 +13,8 @@ import {
     GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
     GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant,
     GiAnglerFish, GiSeaDragon, GiFishMonster,
+    // Farm/pastoral pets
+    GiPig, GiRooster, GiScarecrow, GiMouse, GiGoose,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -48,6 +50,10 @@ export const PET_PASSIVE_STAT = {
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
     // Merchant (sailing-exclusive)
     elephant_spear: "gold_find",
+    // Farm/pastoral pets — every one carries a FARM passive (seedLuck / growSpeed / petXp), so it helps the
+    // garden without touching boss power (combinePetBonuses' add() drops these keys).
+    honeybee: "growSpeed", barn_cat: "petXp", piglet: "seedLuck", hen: "petXp",
+    spring_lamb: "growSpeed", scarecrow_crow: "seedLuck", field_mouse: "seedLuck", golden_goose: "petXp",
 };
 // Active buff strength when a pet is EQUIPPED/featured, by rarity (percent).
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
@@ -158,6 +164,20 @@ export const COLLECTIBLES = [
     { id: "eternal_wolf", name: "Eternal Wolf Spirit", Icon: GiSpectre, color: "#ff5cc8", rarity: "eternal", source: "elite", eliteOnly: true, unlockRarity: "eternal", unlockText: "Own an Eternal item & win 5 boss raffles", activeStat: "might", hint: "Bound to an Eternal relic", spritePrompt: "a majestic ghostly wolf spirit glowing with impossible prismatic rainbow light, ethereal and translucent" },
     { id: "bounty_hound", name: "Bounty Hound", Icon: GiWolfHead, color: "#ffd75e", rarity: "legendary", source: "achievement", eliteOnly: true, activeStat: "fortune", achievement: "Fulfill 10 community bounties", spritePrompt: "a loyal rugged hound wearing a bounty hunter's bandana, alert and ready for the hunt" },
 
+    // ── Farm / pastoral pets — barnyard companions that help the garden ────────────────────────────────
+    // Each carries a FARM passive (seedLuck / growSpeed / petXp) that only feeds the farm, plus a modest combat
+    // active so it still pulls weight in a boss fight. Two are FARM-ONLY (source: "farm"): the Field Mouse is
+    // earned at a harvest milestone, the Golden Goose is a rare Wild Loot Pig drop — neither comes from the
+    // boss, shop, spin, or chests.
+    { id: "honeybee", name: "Honeybee", Icon: GiBee, color: "#ffd75e", rarity: "common", source: "shop", activeStat: "xp_gain", hint: "Pollinates the whole garden", spritePrompt: "a cheerful fuzzy golden honeybee with tiny translucent wings, friendly cartoon style" },
+    { id: "barn_cat", name: "Barn Cat", Icon: GiCat, color: "#e2b07a", rarity: "common", source: "shop", activeStat: "crit_chance", hint: "Keeps the granary safe", spritePrompt: "a scruffy orange tabby barn cat perched on a hay bale, cozy and alert" },
+    { id: "piglet", name: "Piglet", Icon: GiPig, color: "#ffb3c1", rarity: "common", source: "shop", activeStat: "gold_find", hint: "Roots up buried seeds", spritePrompt: "a chubby pink piglet with a muddy snout, snuffling happily" },
+    { id: "hen", name: "Speckled Hen", Icon: GiRooster, color: "#e8d3a0", rarity: "common", source: "chest", chestTier: "wooden", activeStat: "gold_find", hint: "Lays a little luck each morning", spritePrompt: "a plump brown speckled hen mid-cluck, warm barnyard charm" },
+    { id: "spring_lamb", name: "Spring Lamb", Icon: GiSheep, color: "#f2f2ee", rarity: "rare", source: "shop", activeStat: "fortune", hint: "Soft-footed and lucky", spritePrompt: "a fluffy white spring lamb with a little bell collar, gentle and sweet" },
+    { id: "scarecrow_crow", name: "Scarecrow Crow", Icon: GiScarecrow, color: "#8a7a4a", rarity: "rare", source: "chest", chestTier: "iron", activeStat: "crit_chance", hint: "The scarecrow's unlikely friend", spritePrompt: "a glossy black crow perched on a straw scarecrow's shoulder, mischievous and clever" },
+    { id: "field_mouse", name: "Field Mouse", Icon: GiMouse, color: "#c9b79a", rarity: "rare", source: "farm", farmSource: "harvest_milestone", eliteOnly: true, activeStat: "crit_chance", hint: "Earned by harvesting 50 crops — a true farmhand's companion", spritePrompt: "a tiny brown field mouse clutching a single grain of wheat, wide-eyed and adorable" },
+    { id: "golden_goose", name: "Golden Goose", Icon: GiGoose, color: "#ffe08a", rarity: "epic", source: "farm", farmSource: "loot_pig", eliteOnly: true, activeStat: "fortune", hint: "A rare gift from the Wild Loot Pig", spritePrompt: "a proud white goose with shimmering gold-tipped feathers, radiant and regal" },
+
     // ── Merchant (sailing-exclusive) — only ever gifted by the Gold Merchant island event ──────────────
     { id: "elephant_spear", name: "Merchant's Guard", Icon: GiElephant, color: "#c9a24a", rarity: "legendary", source: "merchant", eliteOnly: true, activeStat: "gold_find", hint: "Boosts your chance to find the Gold Merchant at sea (+1% → +5% by level)", spritePrompt: "a standing cartoon elephant warrior holding a spear" },
 ];
@@ -231,6 +251,7 @@ export function petUnlockText(pet) {
         case "shop": return `Buy for ${petPrice(pet).toLocaleString()} gold`;
         case "chest": return `Found in ${CHEST_LABEL[pet.chestTier] || "rare"}+ chests`;
         case "boss": return "Rare boss-battle drop";
+        case "farm": return pet.farmSource === "loot_pig" ? "Rare drop from the Wild Loot Pig" : "Earned at a farm harvest milestone";
         case "achievement": return pet.achievement || "Earn via an achievement";
         case "elite": return pet.unlockText || (pet.unlockRarity ? `Own any ${pet.unlockRarity}-tier item` : (pet.hint || "Special unlock"));
         default: return pet.hint || "";

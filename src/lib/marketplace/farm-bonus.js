@@ -5,6 +5,7 @@ import { BUFF_CAP, emptyFarmBuffs } from "@/lib/marketplace/decorations.js";
 import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { sumItemFarm } from "@/lib/marketplace/items.js";
+import { setFarmBonus } from "@/lib/marketplace/sets.js";
 import { collectibleById, petFarmPassive } from "@/lib/marketplace/collectibles.js";
 
 // ── UNIFIED FARM BONUS AGGREGATOR ─────────────────────────────────────────────────────────────────────────
@@ -24,9 +25,12 @@ export async function farmBonuses(buyerId) {
         getEquippedIds(buyerId).catch(() => ({})),
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
-    const gearFarm = sumItemFarm(Object.values(bySlot || {}));
-    // (a) decorations + (b) equipped gear farm affixes
-    for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0);
+    const equippedList = Object.values(bySlot || {});
+    const gearFarm = sumItemFarm(equippedList);
+    // (b2) FARM set-bonus tiers (Harvester / Forager) — small farm affinity on top of the pieces' own affixes.
+    const setFarm = setFarmBonus(equippedList);
+    // (a) decorations + (b) equipped gear farm affixes + (b2) farm set bonuses
+    for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0) + (setFarm[k] || 0);
     // (c) equipped pet farm passive (pastoral pets only) — value by rarity
     const pet = buyer?.featured_collectible ? collectibleById(buyer.featured_collectible) : null;
     const petFarm = petFarmPassive(pet);
