@@ -119,6 +119,33 @@ export async function generateBossArt(bossId, prompt) {
     return url;
 }
 
+// Auto-heal a boss's art: generate whatever's missing (portrait and/or background). Used by the boss-art cron
+// so an AUTO-SPAWNED boss (activateNextBoss creates the row with no art when no admin draft is queued) gets a
+// real portrait + stage within a cron cycle instead of showing the fallback silhouette. Best-effort per image;
+// a failure on one doesn't block the other, and it's a no-op once both are present (so it costs nothing to poll).
+export async function ensureBossArt(bossId) {
+    const boss = await db.queryOne(`SELECT id, name, description, image_url, background_url FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
+    if (!boss) return { skipped: "not_found" };
+    const did = { portrait: false, background: false };
+    if (!boss.image_url) {
+        const prompt = `${boss.name || "a fearsome boss"}. ${boss.description || "a monstrous fantasy boss creature"}`;
+        await generateBossArt(bossId, prompt).then(() => { did.portrait = true; }).catch(() => {});
+    }
+    if (!boss.background_url) {
+        await generateBossBackground(bossId).then(() => { did.background = true; }).catch(() => {});
+    }
+    return did;
+}
+
+// Generate art for any LIVE boss that's missing it (the cron entrypoint). Returns what it touched.
+export async function ensureLiveBossArt() {
+    const boss = await db.queryOne(`SELECT id, name, image_url, background_url FROM boss_event WHERE status = 'live' AND defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`).catch(() => null);
+    if (!boss) return { skipped: "no_live_boss" };
+    if (boss.image_url && boss.background_url) return { skipped: "already_has_art", boss: boss.name };
+    const did = await ensureBossArt(boss.id);
+    return { boss: boss.name, ...did };
+}
+
 // A RANDOM, surprising battle-stage environment — deliberately NOT derived from the boss (feeding the
 // creature's description in made the model redraw the boss into the scene). Each call picks a fresh biome.
 const BOSS_BG_SETTINGS = [

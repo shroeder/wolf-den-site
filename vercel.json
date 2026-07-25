@@ -68,6 +68,10 @@
             "schedule": "*/10 * * * *"
         },
         {
+            "path": "/api/jobs/boss-art",
+            "schedule": "*/10 * * * *"
+        },
+        {
             "path": "/api/jobs/sailing-arrivals",
             "schedule": "*/15 * * * *"
         },
