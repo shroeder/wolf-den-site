@@ -439,6 +439,20 @@ export default function FarmClient({ initial, viewingAlias }) {
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
+    // Drag a plot to a new spot (own farm, in move mode). Optimistic so it doesn't snap back; server garden wins.
+    const movePlotTo = useCallback(async (slot, x, y) => {
+        let prev = null;
+        setGarden((g) => {
+            if (!g?.plots) return g;
+            const cur = g.plots.find((p) => p.slot === slot);
+            prev = cur ? { x: cur.x, y: cur.y } : null;
+            return { ...g, plots: g.plots.map((p) => (p.slot === slot ? { ...p, x, y } : p)) };
+        });
+        const r = await post({ action: "plot_move", slot, x, y });
+        if (r?.garden) setGarden(r.garden);
+        else if (prev) setGarden((g) => (g?.plots ? { ...g, plots: g.plots.map((p) => (p.slot === slot ? { ...p, x: prev.x, y: prev.y } : p)) } : g));
+        return r;
+    }, [post]);
 
     // Rate (like/love/admire) the farm you're visiting. Revising your rating is free; a brand-new rating spends
     // your one daily charge. Patches the summary in place with a juicy burst.
@@ -666,6 +680,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             <ScenePlots
                                 garden={garden}
                                 busy={gardenBusy}
+                                editing={farm.mine && decoEditing}
+                                fieldRef={fieldRef}
+                                onMovePlot={movePlotTo}
                                 onPlant={(slot) => setPlanting(slot)}
                                 onHarvest={harvestAt}
                                 onInspect={(slot) => setInspectSlot(slot)}
@@ -758,9 +775,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                         <span style={{ fontSize: 17 }} aria-hidden="true">🪴</span>Decorate
                     </button>
                 ) : null}
-                {/* Persistent lock/move toggle — top-right of the scene, only while decorating. Default is movable. */}
-                {farm.mine && farm.decorations && (((farm.placements?.length || 0) > 0) || decorating) ? (
-                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock decorations" : "Unlock to move decorations"} title={decoEditing ? "Decorations movable — tap to LOCK" : "Decorations locked — tap to move"}
+                {/* Persistent lock/move toggle — top-right of the scene. Governs dragging BOTH plots and
+                    decorations on your own farm. Default is movable. */}
+                {farm.mine && (garden || (farm.decorations && (((farm.placements?.length || 0) > 0) || decorating))) ? (
+                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock farm layout" : "Unlock to move plots & decorations"} title={decoEditing ? "Plots & decorations movable — tap to LOCK" : "Layout locked — tap to move plots & decorations"}
                         style={{ position: "absolute", top: 10, right: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 999, border: `1px solid ${decoEditing ? "rgba(143,199,255,0.6)" : "rgba(255,255,255,0.25)"}`, background: decoEditing ? "linear-gradient(180deg, rgba(30,52,74,0.96), rgba(18,32,46,0.96))" : "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: decoEditing ? "#bfe0ff" : "#d7d7db", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "✋" : "🔒"}</span>{decoEditing ? "Move" : "Locked"}
                     </button>
@@ -1126,24 +1144,54 @@ const fmtGrow = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 
 // LEFT of the (scrolling) field. They're part of the world, so they scroll with everything else; the pets are
 // penned to the right, so they never trample the crops. Each plant sprouts from its mound and grows taller
 // over real time, ripening (swap to the crop, glow + bob) when ready. Tap a plot to plant / fertilize / harvest.
-function ScenePlots({ garden, busy, onPlant, onHarvest, onInspect }) {
+function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPlant, onHarvest, onInspect }) {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
     const plots = garden.plots || [];
-    const n = plots.length || 1;
     const totalSeeds = (garden.seedBag || []).reduce((s, x) => s + x.count, 0);
+    // In move mode, plots drag just like decorations: a real drag repositions the plot, a plain click still
+    // plants/harvests/inspects. Positions (p.x / p.y, percent of the field) come from the server.
+    const [drag, setDrag] = useState(null); // { slot, x, y }
+    const gr = useRef({});
+    const suppressClickRef = useRef(false);
+    const start = (e, p) => {
+        if (!editing) return;
+        suppressClickRef.current = false;
+        e.stopPropagation();
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
+        gr.current = { slot: p.slot, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, x: p.x, y: p.y, el: e.currentTarget };
+    };
+    const move = (e) => {
+        const g = gr.current;
+        if (g.slot == null || e.pointerId !== g.pointerId || !fieldRef?.current) return;
+        if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 7) return;
+        g.moved = true;
+        e.preventDefault();
+        const rect = fieldRef.current.getBoundingClientRect();
+        g.x = Math.max(3, Math.min(97, ((e.clientX - rect.left) / rect.width) * 100));
+        g.y = Math.max(20, Math.min(96, ((e.clientY - rect.top) / rect.height) * 100));
+        setDrag({ slot: g.slot, x: g.x, y: g.y });
+    };
+    const end = (e) => {
+        const g = gr.current;
+        if (g.slot == null || e.pointerId !== g.pointerId) return;
+        try { g.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+        if (g.moved) { suppressClickRef.current = true; onMovePlot?.(g.slot, g.x, g.y); }
+        gr.current = {};
+        setDrag(null);
+    };
     return (
         <>
-            {plots.map((p, i) => {
-                // Cluster the plots CLOSE together on the left of the field; stagger the rows slightly so the
-                // garden reads as a tight little tilled patch on the grass rather than a spread-out line.
-                const span = Math.min(6 * (n - 1), 20); // tight cluster — ~6% between mounds, capped
-                const left = n === 1 ? 18 : 15 + (i / (n - 1)) * span;
-                const top = 84 + (i % 2) * 6; // 84–90% — sitting right on the grass, front of the pasture
+            {plots.map((p) => {
+                const live = drag && drag.slot === p.slot ? drag : p;
                 return (
                     <ScenePlot
-                        key={p.slot} p={p} left={left} top={top} now={now} busy={busy}
-                        totalSeeds={totalSeeds}
+                        key={p.slot} p={p} left={live.x} top={live.y} now={now} busy={busy}
+                        totalSeeds={totalSeeds} editing={editing} dragging={drag?.slot === p.slot} suppressClickRef={suppressClickRef}
+                        onPointerDown={editing ? (e) => start(e, p) : undefined}
+                        onPointerMove={editing ? move : undefined}
+                        onPointerUp={editing ? end : undefined}
+                        onPointerCancel={editing ? () => { gr.current = {}; setDrag(null); } : undefined}
                         onPlant={onPlant} onHarvest={onHarvest} onInspect={onInspect}
                     />
                 );
@@ -1152,7 +1200,7 @@ function ScenePlots({ garden, busy, onPlant, onHarvest, onInspect }) {
     );
 }
 
-function ScenePlot({ p, left, top, now, busy, totalSeeds, onPlant, onHarvest, onInspect }) {
+function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
     const empty = p.empty;
     let progress = 1; let ready = false; let secsLeft = 0;
     if (!empty) {
@@ -1166,17 +1214,20 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, onPlant, onHarvest, on
     const canPlant = empty && totalSeeds > 0;
     const tappable = empty ? canPlant : true; // growing/ready plots are always tappable
     const onClick = () => {
+        if (suppressClickRef?.current) { suppressClickRef.current = false; return; } // that was a drag, not a tap
         if (busyHere) return;
         if (empty) { if (canPlant) onPlant(p.slot); return; }
         if (ready) onHarvest(p.slot);
         else onInspect(p.slot); // growing → open the inspect modal (don't silently fertilize)
     };
     const plantScale = ready ? 1 : 0.4 + 0.6 * progress; // grows from a seedling as it matures
-    const title = empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — find seeds across the games")
-        : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
+    const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
+        : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — find seeds across the games")
+            : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
     return (
         <button type="button" onClick={onClick} title={title}
-            style={{ position: "absolute", left: `${left}%`, top: `${top}%`, transform: "translate(-50%, -100%)", width: 56, background: "none", border: "none", padding: 0, cursor: tappable ? "pointer" : "default", zIndex: Math.round(top) }}>
+            onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
+            style={{ position: "absolute", left: `${left}%`, top: `${top}%`, transform: "translate(-50%, -100%)", width: 56, background: "none", border: "none", padding: 0, cursor: editing ? "grab" : tappable ? "pointer" : "default", zIndex: dragging ? 9990 : Math.round(top), touchAction: editing ? "none" : "auto", transition: dragging ? "none" : "left .15s ease, top .15s ease", WebkitTapHighlightColor: "transparent", userSelect: "none", outline: "none" }}>
             {/* the plant / sprout rising from the mound */}
             <span style={{ display: "block", position: "relative", height: 44, width: "100%" }}>
                 {ready ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: 40, height: 40, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", animation: "farmReadyRing 1.6s ease-out infinite" }} /> : null}

@@ -166,7 +166,14 @@ function weightedPick(weights) {
 }
 
 async function loadFarmBuyer(buyerId) {
-    return db.queryOne(`SELECT COALESCE(gold,0) AS gold, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades, COALESCE(farm_fertilizer,0) AS farm_fertilizer FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return db.queryOne(`SELECT COALESCE(gold,0) AS gold, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades, COALESCE(farm_fertilizer,0) AS farm_fertilizer, COALESCE(farm_plot_pos,'{}'::jsonb) AS farm_plot_pos FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+}
+
+// Default tidy-cluster position for a plot when the buyer hasn't dragged it somewhere custom. Mirrors the
+// layout ScenePlots used before plots became movable, so nothing shifts until the player rearranges.
+function defaultPlotPos(i, n) {
+    const span = Math.min(6 * (n - 1), 20);
+    return { x: n === 1 ? 18 : 15 + (i / (n - 1)) * span, y: 84 + (i % 2) * 6 };
 }
 
 // Full garden state for the client: every plot (empty or growing/ready), the seed bag, upgrades + costs,
@@ -180,18 +187,22 @@ export async function getGarden(buyerId) {
     ]);
     const up = buyer?.farm_upgrades || {};
     const n = plotCount(up);
+    const posMap = buyer?.farm_plot_pos || {};
     const byslot = new Map((plots || []).map((p) => [p.slot, p]));
     const now = Date.now();
     const gardenPlots = [];
     let readyCount = 0;
+    const posFor = (i) => { const c = posMap[i] || posMap[String(i)]; const d = defaultPlotPos(i, n); return { x: Number.isFinite(c?.x) ? c.x : d.x, y: Number.isFinite(c?.y) ? c.y : d.y }; };
     for (let i = 0; i < n; i += 1) {
+        const pos = posFor(i);
         const p = byslot.get(i);
-        if (!p) { gardenPlots.push({ slot: i, empty: true }); continue; }
+        if (!p) { gardenPlots.push({ slot: i, empty: true, x: pos.x, y: pos.y }); continue; }
         const def = seedById(p.seed_id);
         const readyMs = new Date(p.ready_at).getTime();
         const ready = readyMs <= now;
         if (ready) readyCount += 1;
         gardenPlots.push({
+            x: pos.x, y: pos.y,
             slot: i, empty: false, seedId: p.seed_id, name: def?.name || p.seed_id, emoji: def?.emoji || "🌱",
             sprout: def?.sprout || "🌱", sell: def?.sell || 0, xp: def?.xp || 0, loot: LOOT_LABEL[def?.rarity] || null, rarity: def?.rarity || "common",
             plantedAt: new Date(p.planted_at).toISOString(), readyAt: new Date(p.ready_at).toISOString(),
@@ -325,6 +336,20 @@ export async function applyRainBoost(buyerId) {
     ).catch(() => []);
     const boosted = (res?.rows || res || []).length;
     return { ok: true, boosted, garden: boosted ? await getGarden(buyerId) : null };
+}
+
+// Drag a plot to a custom spot on the farm (owner arranging their own garden). Stores {x,y} percent for the
+// slot in farm_plot_pos; clamped to stay on-field. Returns the fresh garden so the scene + panel stay in sync.
+export async function movePlot(buyerId, slot, x, y) {
+    if (!buyerId) return { ok: false, error: "bad_request" };
+    const s = Number(slot);
+    const buyer = await loadFarmBuyer(buyerId);
+    const n = plotCount(buyer?.farm_upgrades || {});
+    if (!Number.isInteger(s) || s < 0 || s >= n) return { ok: false, error: "bad_slot" };
+    const clamp = (v, lo, hi) => { const num = Number(v); return Math.max(lo, Math.min(hi, Number.isFinite(num) ? num : lo)); };
+    const pos = { x: clamp(x, 3, 97), y: clamp(y, 20, 96) };
+    await db.query(`UPDATE mkt_buyer SET farm_plot_pos = jsonb_set(COALESCE(farm_plot_pos,'{}'::jsonb), $2, $3::jsonb, true) WHERE id = $1`, [buyerId, `{${s}}`, JSON.stringify(pos)]).catch(() => {});
+    return { ok: true, garden: await getGarden(buyerId) };
 }
 
 // Buy the next level of an upgrade track (gold sink).

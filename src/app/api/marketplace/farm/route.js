@@ -6,7 +6,7 @@ import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, rese
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, removeDecoration, decoState } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, grantCustomCredit, getCustomState } from "@/lib/marketplace/custom-deco.js";
-import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, applyRainBoost, debugGrantAllSeeds, debugGrowAll, debugGrantFertilizer } from "@/lib/marketplace/farm-crops.js";
+import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, debugGrantAllSeeds, debugGrowAll, debugGrantFertilizer } from "@/lib/marketplace/farm-crops.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -68,6 +68,7 @@ export async function POST(request) {
             else if (b?.action === "fertilizer_buy") res = await buyFertilizer(buyer.id);
             else if (b?.action === "fertilizer_use") res = await applyFertilizer(buyer.id, Number(b?.slot));
             else if (b?.action === "farm_upgrade") res = await buyUpgrade(buyer.id, String(b?.key || ""));
+            else if (b?.action === "plot_move") res = await movePlot(buyer.id, Number(b?.slot), b?.x, b?.y);
             else if (b?.action === "rain") res = await applyRainBoost(buyer.id);
             // ── Decorations ── (buy/place/move/remove on YOUR OWN farm)
             else if (b?.action === "deco_buy") res = await buyDecoration(buyer.id, String(b?.decoId || ""));
