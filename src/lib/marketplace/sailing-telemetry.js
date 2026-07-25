@@ -51,7 +51,8 @@ export async function getSailingTelemetry() {
             alias: s.alias || null,
             boatLevel: level,
             boatForm: boatTier(level),
-            upgrades: { speed: num(s.speed_level), fortune: num(s.find_level), rarity: num(s.rarity_level), luck: num(s.luck_level), raid: num(s.raid_level) },
+            // Fortune lives in the legacy luck_level column; Luck (waves stat) in find_level — see sailing.js.
+            upgrades: { speed: num(s.speed_level), fortune: num(s.luck_level), rarity: num(s.rarity_level), luck: num(s.find_level), raid: num(s.raid_level) },
             neverUpgraded: upgradesSum === 0,
             voyages: { completed: num(s.voyages_completed), quality: s.voyage_quality || null, sailing, returnsAt: iso(s.returns_at) },
             raids: { done: num(s.raid_count), won: num(s.raids_won), lost: num(loss?.losses), defended: num(s.raids_defended), resets: num(s.raid_resets), goldLost: num(loss?.gold_lost), lostTo: whoByAttacker.get(s.buyer_id) || [] },
