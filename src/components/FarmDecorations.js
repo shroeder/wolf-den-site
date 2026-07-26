@@ -255,10 +255,11 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
 export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPickup, onTransform, onClose }) {
     const [scale, setScale] = useState(Number(item?.scale ?? 1));
     const [rot, setRot] = useState(Number(item?.rot ?? 0));
+    const [flip, setFlip] = useState(Boolean(item?.flip));
     if (!item) return null;
     const ring = item.rarityColor || RARITY_RING[item.rarity] || "#8fbf6a";
     const placed = Boolean(item.placementId);
-    const commit = (s, r) => onTransform?.(item.placementId, { scale: s, rot: r });
+    const commit = (s, r, f = flip) => onTransform?.(item.placementId, { scale: s, rot: r, flip: f });
     const canBuy = !placed && !item.owned && item.buyable;
     const afford = gold >= (item.price || 0);
     return (
@@ -268,8 +269,8 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     <span style={{ display: "grid", placeItems: "center", width: 110, height: 110, margin: "0 auto", borderRadius: 16, background: "rgba(0,0,0,0.22)", overflow: "hidden" }}>
                         {item.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={item.spriteUrl} alt={item.name} width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain", transform: placed ? `rotate(${rot}deg) scale(${scale})` : "none", transition: "transform .08s linear" }} />
-                        ) : <span style={{ fontSize: 54, display: "inline-block", transform: placed ? `rotate(${rot}deg) scale(${scale})` : "none" }}>{item.emoji}</span>}
+                            <img src={item.spriteUrl} alt={item.name} width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain", transform: placed ? `rotate(${rot}deg) scale(${scale}) scaleX(${flip ? -1 : 1})` : "none", transition: "transform .08s linear" }} />
+                        ) : <span style={{ fontSize: 54, display: "inline-block", transform: placed ? `rotate(${rot}deg) scale(${scale}) scaleX(${flip ? -1 : 1})` : "none" }}>{item.emoji}</span>}
                     </span>
                     <div style={{ fontWeight: 900, fontSize: 18, marginTop: 8 }}>{item.name}</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{item.rarity}{item.source === "special" ? " · premium" : ""}</div>
@@ -296,7 +297,10 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                                 <input type="range" min="0" max="355" step="5" value={rot} onChange={(e) => setRot(Number(e.target.value))} onPointerUp={() => commit(scale, rot)} onKeyUp={() => commit(scale, rot)} style={{ flex: 1, accentColor: "#c9a2ff" }} />
                                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#c9a2ff", width: 40, textAlign: "right" }}>{rot}°</span>
                             </div>
-                            <button type="button" onClick={() => { setScale(1); setRot(0); commit(1, 0); }} style={{ alignSelf: "flex-start", fontSize: 11.5, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Reset size &amp; rotation</button>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                <button type="button" onClick={() => { const nf = !flip; setFlip(nf); commit(scale, rot, nf); }} style={{ fontSize: 12, fontWeight: 800, color: flip ? "#c9a2ff" : "#cfd6dd", background: flip ? "rgba(201,162,255,0.16)" : "rgba(255,255,255,0.06)", border: `1px solid ${flip ? "rgba(201,162,255,0.5)" : "rgba(255,255,255,0.18)"}`, borderRadius: 9, padding: "6px 13px", cursor: "pointer" }}>↔ Flip{flip ? " · on" : ""}</button>
+                                <button type="button" onClick={() => { setScale(1); setRot(0); setFlip(false); commit(1, 0, false); }} style={{ fontSize: 11.5, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Reset</button>
+                            </div>
                         </div>
                     ) : null}
                     {/* Close FIRST — the safe, default action sits on top. */}

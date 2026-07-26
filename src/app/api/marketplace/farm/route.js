@@ -80,7 +80,7 @@ export async function POST(request) {
             else if (b?.action === "deco_buy") res = await buyDecoration(buyer.id, String(b?.decoId || ""));
             else if (b?.action === "deco_place") res = await placeDecoration(buyer.id, String(b?.decoId || ""), b?.x, b?.y);
             else if (b?.action === "deco_move") res = await moveDecoration(buyer.id, Number(b?.placementId), b?.x, b?.y);
-            else if (b?.action === "deco_transform") res = await transformDecoration(buyer.id, Number(b?.placementId), { scale: b?.scale, rot: b?.rot });
+            else if (b?.action === "deco_transform") res = await transformDecoration(buyer.id, Number(b?.placementId), { scale: b?.scale, rot: b?.rot, flip: b?.flip });
             else if (b?.action === "deco_remove") res = await removeDecoration(buyer.id, Number(b?.placementId));
             // ── Custom (player-made) decorations ──
             else if (b?.action === "deco_custom_state") res = { ok: true, custom: await getCustomState(buyer.id) };

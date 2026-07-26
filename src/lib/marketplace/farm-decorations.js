@@ -164,17 +164,18 @@ export async function placeDecoration(buyerId, decoId, x, y) {
     return { ok: true, ...(await decoState(buyerId)) };
 }
 
-// Resize / rotate a placed decoration (plots are NOT transformable — only decorations). scale clamps to
-// 0.4–2.5×, rot wraps to 0–359°. Returns the fresh decoration state so the scene updates in place.
-export async function transformDecoration(buyerId, placementId, { scale, rot } = {}) {
+// Resize / rotate / flip a placed decoration (plots are NOT transformable — only decorations). scale clamps to
+// 0.4–2.5×, rot wraps to 0–359°, flip mirrors horizontally. Returns the fresh decoration state.
+export async function transformDecoration(buyerId, placementId, { scale, rot, flip } = {}) {
     if (!buyerId || !placementId) return { ok: false, error: "bad_request" };
     const s = scale == null ? null : Math.max(0.4, Math.min(2.5, Number(scale)));
     const r = rot == null ? null : ((Math.round(Number(rot)) % 360) + 360) % 360;
-    if (s == null && r == null) return { ok: false, error: "no_change" };
+    const f = flip == null ? null : Boolean(flip);
+    if (s == null && r == null && f == null) return { ok: false, error: "no_change" };
     const moved = await db.queryOne(
-        `UPDATE mkt_deco_placement SET scale = COALESCE($3, scale), rot = COALESCE($4, rot)
+        `UPDATE mkt_deco_placement SET scale = COALESCE($3, scale), rot = COALESCE($4, rot), flip = COALESCE($5, flip)
           WHERE id = $1 AND buyer_id = $2 RETURNING id`,
-        [placementId, buyerId, s, r]
+        [placementId, buyerId, s, r, f]
     ).catch(() => null);
     if (!moved) return { ok: false, error: "not_found" };
     await trackActivity(buyerId, "arrange_deco", { placementId, kind: "transform" }).catch(() => {});

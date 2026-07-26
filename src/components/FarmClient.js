@@ -522,9 +522,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
     // Resize / rotate a placed decoration — optimistic so the scene updates live under the inspect modal.
-    const decoTransform = useCallback(async (placementId, { scale, rot }) => {
-        setFarm((f) => ({ ...f, placements: (f.placements || []).map((q) => (q.id === placementId ? { ...q, ...(scale != null ? { scale } : {}), ...(rot != null ? { rot } : {}) } : q)) }));
-        return decoAct({ action: "deco_transform", placementId, scale, rot });
+    const decoTransform = useCallback(async (placementId, { scale, rot, flip }) => {
+        setFarm((f) => ({ ...f, placements: (f.placements || []).map((q) => (q.id === placementId ? { ...q, ...(scale != null ? { scale } : {}), ...(rot != null ? { rot } : {}), ...(flip != null ? { flip } : {}) } : q)) }));
+        return decoAct({ action: "deco_transform", placementId, scale, rot, flip });
     }, [decoAct]);
     const fieldRef = useRef(null);
     const scrollRef = useRef(null); // the horizontal pasture scroller — preserved across deco re-renders so a placed piece doesn't scroll away
