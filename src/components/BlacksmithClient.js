@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
+import ForgeRank from "@/components/ForgeRank";
 
 // ── The Forge (owner-gated blacksmith). Salvage unequipped gear → tiered parts → combine 5→1 → enhance equipped
 // gear via a hammer-&-anvil timing mini-game whose execution drives the stat roll. Juiced to high heaven.
@@ -148,7 +149,7 @@ export default function BlacksmithClient({ initial }) {
                     <div className="forge-grid">
                         {enhance.length ? enhance.map((it) => (
                             <button key={it.id} type="button" className="forge-card is-enhance" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setEnhancing(it); }}>
-                                {it.level > 0 ? <span className="forge-lvl">+{it.level}</span> : null}
+                                {it.level > 0 ? <span className="forge-cardrank"><ForgeRank level={it.level} size={30} /></span> : null}
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
@@ -298,7 +299,7 @@ function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }
                 <div className="forge-mg-head">
                     <ItemArt id={item.id} icon={item.icon} className="forge-mg-art" alt={item.name} />
                     <div>
-                        <div className="forge-mg-name">{item.name}{item.level > 0 ? <span className="forge-lvl inline">+{item.level}</span> : null}</div>
+                        <div className="forge-mg-name">{item.name}{item.level > 0 ? <span style={{ marginLeft: 8, display: "inline-flex", verticalAlign: "middle" }}><ForgeRank level={item.level} size={22} /></span> : null}</div>
                         <div className="forge-mg-sub">{item.stats}</div>
                     </div>
                     <button type="button" className="forge-mg-x" onClick={onCancel} aria-label="Cancel">×</button>
@@ -377,6 +378,7 @@ const FORGE_CSS = `
 .forge-card-cost { font-size: 10px; color: #a99; margin-top: 2px; }
 .forge-lvl { position: absolute; top: 6px; right: 6px; font-size: 12px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffd75e,#f3b23a); border-radius: 999px; padding: 1px 7px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 .forge-lvl.inline { position: static; margin-left: 6px; }
+.forge-cardrank { position: absolute; top: 6px; right: 6px; z-index: 2; }
 .forge-working { font-size: 10px; color: #ffb877; }
 .forge-empty { grid-column: 1/-1; text-align: center; color: #c8b79f; font-size: 13px; padding: 22px; }
 .forge-burst { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); z-index: 8; font-weight: 900; font-size: 1.4rem; color: #fff; text-shadow: 0 2px 10px color-mix(in srgb, var(--pc) 80%, #000); animation: forgeBurst 1.3s ease-out forwards; pointer-events: none; }

@@ -8,6 +8,7 @@ import ChestOpener from "@/components/ChestOpener";
 import CoinCta from "@/components/CoinCta";
 import HelmetSprite from "@/components/HelmetSprite";
 import ItemArt from "@/components/ItemArt";
+import ForgeRank from "@/components/ForgeRank";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, itemFitsSlot } from "@/lib/marketplace/items.js";
@@ -321,8 +322,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     const id = equipped[s.slot];
                     const def = id ? itemDef(id) : null;
                     return (
-                        <button type="button" key={s.slot} className={`equip-slot slot-${s.slot}${def ? ` filled rar-${def.rarity}` : ""}`} onClick={() => setSlot(s.slot)} title={def ? def.name : s.label}>
+                        <button type="button" key={s.slot} className={`equip-slot slot-${s.slot}${def ? ` filled rar-${def.rarity}` : ""}`} onClick={() => setSlot(s.slot)} title={def ? `${def.name}${def.enhanceLevel > 0 ? ` +${def.enhanceLevel}` : ""}` : s.label} style={{ position: "relative" }}>
                             {def ? <ItemGlyph id={id} className="equip-slot-glyph" /> : <span className="equip-slot-empty"><SlotIcon slot={s.slot} size={20} /></span>}
+                            {def && def.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -5, right: -5, zIndex: 3 }}><ForgeRank level={def.enhanceLevel} size={20} /></span> : null}
                         </button>
                     );
                 })}
@@ -436,7 +438,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 {(data.items || []).length ? (
                     <div className="equip-bag-grid">
                         {(data.items || []).map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${describeStats(i.stats)}`}>
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
+                                {i.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -4, right: -4, zIndex: 3 }}><ForgeRank level={i.enhanceLevel} size={22} /></span> : null}
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>

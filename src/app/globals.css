@@ -10737,6 +10737,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     animation: sailWaveBob 1.4s ease-in-out infinite; }
 .sail-ambient-boat.is-waveable:active .sail-wave-btn { transform: translateX(-50%) scale(0.9); }
 @keyframes sailWaveBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
+/* Forge rank badge — the visual quality of an ENHANCED item (an AI tier emblem + aura + "+level" tag). */
+.forge-rank { position: relative; display: inline-grid; place-items: center; border-radius: 50%; flex: 0 0 auto; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rk) 70%, transparent)); }
+.forge-rank b { font-weight: 900; font-size: 0.72em; }
+.forge-rank em { position: absolute; right: -6px; bottom: -5px; font-style: normal; font-weight: 900; font-size: 9px; line-height: 1; color: #1a0f06; background: var(--rk); border-radius: 999px; padding: 1px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 /* "You waved!" reward pop, floating over the scene. */
 .sail-wavefx { position: absolute; left: 50%; top: 15%; transform: translateX(-50%); z-index: 7; pointer-events: none;
     font-weight: 800; font-size: 0.9rem; color: #eaf6ff; white-space: nowrap; background: rgba(12,20,32,0.86);

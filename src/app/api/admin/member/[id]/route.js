@@ -4,6 +4,7 @@ import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/db";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
+import { forgeRank } from "@/lib/marketplace/forge-rank.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
@@ -260,6 +261,8 @@ export async function GET(request, { params }) {
                 rarity: i.rarity,
                 slot: i.slot,
                 equipped: equippedIds.has(i.id),
+                enhanceLevel: i.enhanceLevel || 0,
+                forge: forgeRank(i.enhanceLevel || 0), // { level, tier, color, emblem, label } or null
                 stats: describeStats(i.stats),
                 signature: i.signature ? `${i.signature.label}: ${i.signature.desc}` : null,
                 flavor: i.flavor || null,

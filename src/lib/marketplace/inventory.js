@@ -239,19 +239,21 @@ export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rar
 // and total stats.
 export async function getInventory(buyerId) {
     if (!buyerId) return { items: [], equipped: {}, slots: EQUIP_SLOTS, stats: {}, gold: 0, shop: [] };
-    const [ownedRows, bySlot, goldRow] = await Promise.all([
+    const [ownedRows, bySlot, goldRow, enhRows] = await Promise.all([
         db.query(`SELECT item_id, acquired_via, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getEquippedIds(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.query(`SELECT item_id, level FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
     const ownedIds = new Set(ownedRows.map((r) => r.item_id));
     const equippedIds = new Set(Object.values(bySlot));
+    const enhById = new Map((enhRows || []).map((r) => [r.item_id, r.level]));
     const items = ownedRows
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
             const set = setForItem(def.id);
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), enhanceLevel: enhById.get(def.id) || 0, charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
