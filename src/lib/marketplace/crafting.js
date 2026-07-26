@@ -164,6 +164,10 @@ export async function salvageItem(buyerId, itemId) {
     if (equippedSet.has(itemId)) return { ok: false, error: "equipped" };
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
+    // Read the item's enhancement BEFORE dropping it — salvaging an upgraded item melts down and recovers part
+    // of the parts you forged into it (~40%), on top of the base salvage.
+    const enhRow = await db.queryOne(`SELECT level FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    const enhLevel = enhRow?.level || 0;
     await db.query(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {}); // the item is gone — drop its enhancement
     const cfg = SALVAGE[item.rarity] || SALVAGE.common;
     const upg = await upgradeLevels(buyerId);
@@ -172,6 +176,14 @@ export async function salvageItem(buyerId, itemId) {
     let doubled = false;
     if (Math.random() < chance(upg, "efficient") + rb.doubleBonus) { n *= 2; doubled = true; } // Efficient Salvage + Regalia
     n += rb.flatParts;
+    // Melt-down recovery: ~40% of the parts forged into this item (same tier as its salvage parts).
+    let enhanceBonus = 0;
+    if (enhLevel > 0) {
+        let invested = 0;
+        for (let l = 0; l < enhLevel; l += 1) invested += enhanceCost(item, l).qty;
+        enhanceBonus = Math.max(1, Math.round(invested * 0.4));
+        n += enhanceBonus;
+    }
     await addParts(buyerId, cfg.tier, n);
     let bonusTier = null;
     if (cfg.tier < MAX_TIER && Math.random() < chance(upg, "keen_eye")) { await addParts(buyerId, cfg.tier + 1, 1); bonusTier = cfg.tier + 1; } // Keen Eye
@@ -182,11 +194,11 @@ export async function salvageItem(buyerId, itemId) {
     if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantItem(buyerId, pick, "forge").catch(() => {}); regaliaDrop = itemById(pick)?.name || pick; }
     const xp = 6 + cfg.tier * 4;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
-    await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier, regaliaDrop }).catch(() => {});
-    await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier, regaliaDrop } });
+    await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop }).catch(() => {});
+    await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop } });
     await bumpDaily(buyerId, "salvages", 1);
     grantEventBadge(buyerId, "forge_first").catch(() => {});
-    return { ok: true, gained: { tier: cfg.tier, n }, doubled, bonusTier, regaliaDrop, xp, ...(await getForgeState(buyerId)) };
+    return { ok: true, gained: { tier: cfg.tier, n }, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop, xp, ...(await getForgeState(buyerId)) };
 }
 
 // ── Combine 5 of a tier → 1 of the next ──

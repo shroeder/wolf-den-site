@@ -400,7 +400,7 @@ function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
                             </div>
                             <button type="button" className="forge-mg-x" onClick={onClose} aria-label="Cancel">×</button>
                         </div>
-                        {item.level > 0 ? <div className="forge-sv-warn">This is enhanced (+{item.level}) — salvaging destroys the item and its forge bonus.</div> : null}
+                        {item.level > 0 ? <div className="forge-sv-warn">This is enhanced (+{item.level}) — salvaging destroys the item &amp; its forge bonus, but melts down ~40% of the parts you forged in.</div> : null}
                         <div className="forge-sv-yield">
                             <span className="forge-sv-yield-label">You&apos;ll get</span>
                             <div className="forge-sv-yield-main">
@@ -435,6 +435,7 @@ function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
                             <div className="forge-sv-rewardname">{parts[result.gained.tier - 1]?.name || `T${result.gained.tier}`}</div>
                         </div>
                         {result.doubled ? <div className="forge-sv-tag double">✦ DOUBLE PARTS!</div> : null}
+                        {result.enhanceBonus > 0 ? <div className="forge-sv-tag bonus">🔨 +{result.enhanceBonus} melted from your +{result.enhLevel} forging</div> : null}
                         {result.bonusTier ? <div className="forge-sv-tag bonus">👁️ +1 {parts[result.bonusTier - 1]?.name || `T${result.bonusTier}`} · Keen Eye</div> : null}
                         {result.regaliaDrop ? <div className="forge-sv-tag regalia">⚒️ Found a Regalia piece — {result.regaliaDrop}!</div> : null}
                         <div className="forge-sv-xp">+{result.xp} XP</div>
