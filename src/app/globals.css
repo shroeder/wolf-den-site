@@ -9232,7 +9232,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .reward-nudge-togo { flex: 0 0 auto; font-weight: 700; color: #ffd75e; white-space: nowrap; }
 
 /* ---- High-tier (50–100) cosmetics ---- */
-/* Borders (box-shadow rings; disabled under reduced-motion by the existing [class*="av-border-"] rule) */
+/* Borders (box-shadow rings). Note: animations intentionally ALWAYS play — the game does not honor
+   prefers-reduced-motion (see the animation policy). Do NOT add reduced-motion suppression here. */
 .av-border-solar { animation: av-solar 2.5s ease-in-out infinite; }
 @keyframes av-solar { 0%, 100% { box-shadow: 0 0 0 3px #ffb02e, 0 0 10px rgba(255, 150, 20, 0.6); } 50% { box-shadow: 0 0 0 3px #ffd75e, 0 0 18px rgba(255, 180, 40, 0.95); } }
 .av-border-abyss { animation: av-abyss 3s ease-in-out infinite; }

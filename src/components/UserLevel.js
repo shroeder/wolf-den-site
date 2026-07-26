@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 // Level badge + progress-to-next-level bar. `level` is the object from levelForXp():
 // { level, totalXp, xpToNext, progress }. On mount the bar sweeps from 0 → target and the XP number
-// counts up, so progress feels *earned* rather than just appearing. Honors reduced-motion.
+// counts up, so progress feels *earned* rather than just appearing. (Animations always play — the game
+// deliberately does not honor prefers-reduced-motion; don't re-add a reduce-motion gate here.)
 export default function UserLevel({ level, animate = true }) {
     const pct = level ? Math.round(Math.min(1, Math.max(0, level.progress || 0)) * 100) : 0;
     const total = level ? Math.max(0, Math.round(level.totalXp || 0)) : 0;
