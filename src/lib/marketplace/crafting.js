@@ -53,9 +53,9 @@ function regaliaBonus(equippedCount) {
 // Owner-buyable forge upgrades. `per` = effect per level; `steady_hand` levels are combo-saves + band-widening
 // applied client-side in the mini-game. Cost is gold, climbing per level.
 export const FORGE_UPGRADES = {
-    efficient: { name: "Efficient Salvage", desc: "Chance for DOUBLE parts when you salvage.", max: 5, per: 0.07, base: 1500, unit: "%" },
-    keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.05, base: 2500, unit: "%" },
-    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.045, base: 3500, unit: "%" },
+    efficient: { name: "Efficient Salvage", desc: "Chance for DOUBLE parts when you salvage.", max: 5, per: 0.0233, base: 1500, unit: "%" },
+    keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.0167, base: 2500, unit: "%" },
+    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 3500, unit: "%" },
     steady_hand: { name: "Steady Hand", desc: "A slip won't break your combo (per forge) + wider timing windows.", max: 3, per: 1, base: 4000, unit: "save" },
 };
 // Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
