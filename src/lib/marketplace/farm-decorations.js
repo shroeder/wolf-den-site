@@ -72,14 +72,14 @@ export async function placedDecoBuffs(buyerId) {
 // Placed decorations for rendering (position + sprite + flip), newest last so higher z / later placements draw on top.
 export async function getPlacements(buyerId) {
     if (!buyerId) return [];
-    const rows = await db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []);
+    const rows = await db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot, view FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []);
     if (!rows.length) return [];
     const [sprites, customMap] = await Promise.all([getDecoSprites(rows.map((r) => r.deco_id)), listFinalCustomDecos(buyerId)]);
     return rows.map((r) => {
         const def = decorationById(r.deco_id);
         const cm = customMap.get(r.deco_id);
         return {
-            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), light: decoLight(r.deco_id),
+            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: decoLight(r.deco_id),
             name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
             spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
         };
@@ -92,7 +92,7 @@ export async function decoState(buyerId) {
     if (!buyerId) return { owned: [], placements: [], buffs: decorationBuffs([]), keepout: decoKeepout() };
     const [ownedRows, placeRows, sprites, customMap] = await Promise.all([
         db.query(`SELECT deco_id, qty FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []),
+        db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot, view FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []),
         getDecoSprites(),
         listFinalCustomDecos(buyerId),
     ]);
@@ -114,7 +114,7 @@ export async function decoState(buyerId) {
     const placements = (placeRows || []).map((r) => {
         const def = decorationById(r.deco_id);
         const cm = customMap.get(r.deco_id);
-        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), light: decoLight(r.deco_id), name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
+        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: decoLight(r.deco_id), name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
     });
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));
@@ -147,16 +147,17 @@ const clampPct = (v, def, lo = 1, hi = 100) => { const n = Number(v); return Num
 // Place a decoration you OWN at (x, y). Owning is a permanent unlock, so you can place the same decoration as
 // many times as you like (reusable). Guards: you own it, the spot isn't over the plots, and you're under the
 // global 500-item placement cap.
-export async function placeDecoration(buyerId, decoId, x, y) {
+export async function placeDecoration(buyerId, decoId, x, y, view = "outside") {
     if (!buyerId || (!isDecoration(decoId) && !isCustom(decoId))) return { ok: false, error: "bad_decoration" };
     const px = clampPct(x, 50, 1, 99);
     const py = clampPct(y, 55, 2, 100);
+    const vw = view === "inside" ? "inside" : "outside"; // decorations only live Outside or Inside (never the Garden)
     const owned = await db.queryOne(`SELECT 1 FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = $2 AND qty > 0`, [buyerId, decoId]).catch(() => null);
     if (!owned) return { ok: false, error: "not_owned" };
     const total = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ n: 0 }));
     if ((total?.n || 0) >= PLACE_CAP) return { ok: false, error: "placement_limit", ...(await decoState(buyerId)) };
     const topZ = await db.queryOne(`SELECT COALESCE(MAX(z), 0) AS z FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ z: 0 }));
-    await db.query(`INSERT INTO mkt_deco_placement (buyer_id, deco_id, x, y, z) VALUES ($1, $2, $3, $4, $5)`, [buyerId, decoId, px, py, (topZ?.z || 0) + 1]).catch(() => {});
+    await db.query(`INSERT INTO mkt_deco_placement (buyer_id, deco_id, x, y, z, view) VALUES ($1, $2, $3, $4, $5, $6)`, [buyerId, decoId, px, py, (topZ?.z || 0) + 1, vw]).catch(() => {});
     await trackActivity(buyerId, "place_deco", { decoId }).catch(() => {});
     await bumpQuestProgress(buyerId, "place_deco", 1).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // Decorator / Landscaper

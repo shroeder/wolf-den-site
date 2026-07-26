@@ -196,6 +196,12 @@ const FARM_BG = {
 const pickFarmBg = (tod, condition) =>
     (condition === "storm" && FARM_BG.storm) || (condition === "snow" && FARM_BG.snow) || FARM_BG[tod] || FARM_BG.day || null;
 
+// Fixed backdrops for the Inside (barn) and Garden views — generated once, hardcoded like FARM_BG.
+const VIEW_BG = {
+    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-1785106907576.png",
+    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-1785106961425.png",
+};
+
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
     const [farm, setFarm] = useState(initial);
@@ -488,6 +494,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Decorations — buy / place / drag-move / pick-up. Every action returns the fresh decoration state, which we
     // fold into both `decorations` (inventory) and `placements` (what renders in the scene).
     const [decoEditing, setDecoEditing] = useState(false); // default LOCKED on arrival — tap the 🔒/🔓 toggle to rearrange
+    const [view, setView] = useState("outside"); // farm view: 'garden' | 'outside' | 'inside' (declared early — decoPlaceAt reads it)
     const [decoBusy, setDecoBusy] = useState(false);
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);
@@ -518,7 +525,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r && ("bg" in r || "draft" in r)) setFarm((f) => ({ ...f, customBg: r.bg ?? null, customBgDraft: r.draft ?? null }));
         return r;
     }, [post]);
-    const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y }), [decoAct]);
+    const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y, view }), [decoAct, view]);
     const decoMove = useCallback(async (placementId, x, y) => {
         // Optimistically move it in local state so it stays put on drop (no snap-back); reconcile / revert on the response.
         let prev = null;
@@ -569,22 +576,25 @@ export default function FarmClient({ initial, viewingAlias }) {
         post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setGarden(r.garden); if (r.boosted) setHarvestToast({ rain: r.boosted }); } });
     }, [farm.mine, garden, weather.condition, post]);
 
-    // Wide pasture so pets spread out HORIZONTALLY with lots of space between them (the field scrolls sideways).
-    // Generous per-pet width — each pet's home column is evenly spread across this width, so a wider field = more
-    // horizontal separation between pets.
-    const fieldW = Math.max(200, pets.length * 62);
-    // Sky follows the player's real local weather.
+    // ── Three farm views: 🌾 Garden (plant/harvest), 🏡 Outside (pasture + your custom bg), 🛖 Inside (barn).
+    // Pets auto-split by index parity (even → Outside, odd → Inside); crops live in the Garden; a decoration
+    // belongs to Outside OR Inside; only Outside scrolls sideways. (`view` state is declared earlier.) ──
+    const petView = (i) => (i % 2 === 0 ? "outside" : "inside");
+    const viewPetCount = view === "garden" ? 0 : pets.filter((_, i) => petView(i) === view).length;
+    const scrolls = view === "outside"; // only the open pasture scrolls
+    // Field width: Outside scrolls a LITTLE (snug now that pets are split); Inside/Garden fit exactly (no scroll).
+    const fieldW = scrolls ? Math.max(115, viewPetCount * 55) : 100;
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
-    // Show the REAL time-of-day scene — including the illustrated NIGHT backdrop — but NEVER mute the sprite
-    // colors. The muting overlay was the thing to kill (it washed everything out); the night scene itself is
-    // fine, and pets/crops/decorations stay full-color against it (objFilter is 'none' at night below).
     const visTod = wx.tod;
-    // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
-    // A pending preview (customBgDraft) shows LIVE on the scene; else the accepted custom bg; else the weather set.
-    const bgUrl = farm.customBgDraft || farm.customBg || pickFarmBg(visTod, wx.condition);
-    // No color-muting overlay — sprites keep their full vibrant colors at night; only a whisper of brightness at
-    // dusk/dawn for ambiance. Night = none (full color).
-    const objFilter = visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none";
+    // Backdrop per view: Inside = fixed barn, Garden = fixed soil beds, Outside = your custom bg (or the live
+    // preview) or the weather set. Custom backgrounds only apply Outside.
+    const bgUrl = view === "inside" ? VIEW_BG.inside
+        : view === "garden" ? VIEW_BG.garden
+        : (farm.customBgDraft || farm.customBg || pickFarmBg(visTod, wx.condition));
+    const showWeather = view === "outside"; // weather effects only in the open pasture
+    const canDecorate = view !== "garden"; // decorate Outside & Inside; the Garden is just for planting
+    // No color-muting at night outdoors; the barn keeps its own warm light.
+    const objFilter = view === "inside" ? "none" : (visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none");
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS), plus the
@@ -693,6 +703,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-rank-bar { height: 6px; border-radius: 999px; background: rgba(0,0,0,0.28); overflow: hidden; margin: 5px 0 3px; }
                 .farm-rank-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f3b23a, #ffe488); box-shadow: 0 0 8px rgba(255,214,110,0.6); transition: width .6s cubic-bezier(.3,1.2,.4,1); }
                 .farm-rank-next { font-size: 10.5px; color: #b9a892; }
+                .farm-viewtabs { display: flex; gap: 6px; padding: 5px; border-radius: 14px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08); }
+                .farm-viewtabs button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #b7c2ad; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+                .farm-viewtabs button > span { font-size: 16px; }
+                .farm-viewtabs button.on { background: linear-gradient(180deg, #7ed57e, #4bbf6a); color: #10240f; box-shadow: 0 2px 6px rgba(75,191,106,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
+                @media (hover: hover) { .farm-viewtabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0e0; } }
             `}</style>
 
             {farm.mine ? (
@@ -732,7 +747,16 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             <FarmDirectory current={viewingAlias} />
 
-            {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
+            {/* Three farm areas: Garden (crops) · Outside (pasture) · Inside (barn). */}
+            <div className="farm-viewtabs">
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]].map(([v, ico, label]) => (
+                    <button key={v} type="button" className={view === v ? "on" : ""} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
+                        <span aria-hidden="true">{ico}</span>{label}
+                    </button>
+                ))}
+            </div>
+
+            {/* The scene — pasture (Outside) scrolls; Garden & Inside are fixed. */}
             <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
@@ -743,22 +767,27 @@ export default function FarmClient({ initial, viewingAlias }) {
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Illustrated backdrop, mirror-tiled to fill the scrollable width seamlessly */}
+                        {/* Backdrop — Outside mirror-tiles a strip for seamless scrolling; the fixed views (barn / garden) use a single cover image. */}
                         {bgUrl ? (
-                            <div className="farm-bg-strip" aria-hidden="true">
-                                {Array.from({ length: bgCopies }).map((_, k) => (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img key={k} src={bgUrl} alt="" />
-                                ))}
-                            </div>
+                            scrolls ? (
+                                <div className="farm-bg-strip" aria-hidden="true">
+                                    {Array.from({ length: bgCopies }).map((_, k) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img key={k} src={bgUrl} alt="" />
+                                    ))}
+                                </div>
+                            ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={bgUrl} alt="" aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }} />
+                            )
                         ) : null}
-                        {/* CSS-scene fallback (drifting clouds + fence) — only when no illustrated backdrop is set */}
-                        {!bgUrl && ["clear", "cloudy"].includes(wx.condition) && wx.tod !== "night"
+                        {/* CSS-scene fallback (drifting clouds + fence) — only in the open pasture with no illustrated backdrop */}
+                        {scrolls && !bgUrl && ["clear", "cloudy"].includes(wx.condition) && wx.tod !== "night"
                             ? Array.from({ length: wx.condition === "cloudy" ? 7 : 4 }).map((_, k) => (
                                 <div key={k} style={{ position: "absolute", top: `${8 + (k % 3) * 9}%`, left: `${(k * 23 + 6) % 96}%`, width: 78 + (k % 3) * 26, height: 22 + (k % 2) * 8, borderRadius: 22, background: wx.condition === "cloudy" ? "rgba(230,232,235,0.9)" : "rgba(255,255,255,0.82)", filter: "blur(1px)", animation: `farmCloud ${9 + (k % 4) * 2}s ease-in-out ${k * 0.6}s infinite alternate` }} />
                             ))
                             : null}
-                        {!bgUrl ? (
+                        {scrolls && !bgUrl ? (
                             <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
                                 <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
                                 <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
@@ -770,9 +799,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                             to THIS layer only, so the illustrated backdrop keeps its own night/dusk mood while the
                             flat-lit sprites stop glowing like noon. */}
                         <div style={{ position: "absolute", inset: 0, filter: objFilter }}>
-                        {/* Crops grow right on the grass (clustered on the LEFT of the field), part of the world —
-                            they scroll with the pasture and the pets are penned to the right so they never trample them. */}
-                        {farm.mine && garden ? (
+                        {/* Crops live ONLY in the Garden view — a dedicated planting/harvesting space. */}
+                        {view === "garden" && farm.mine && garden ? (
                             <ScenePlots
                                 garden={garden}
                                 busy={gardenBusy}
@@ -784,25 +812,30 @@ export default function FarmClient({ initial, viewingAlias }) {
                                 onInspect={(slot) => setInspectSlot(slot)}
                             />
                         ) : null}
+                        {view === "garden" && farm.mine && !garden ? (
+                            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>Loading your garden…</div>
+                        ) : null}
 
-                        {/* Placed decorations — part of the world, scroll with the pasture. Draggable when you're
-                            arranging your own farm; read-only when visiting. */}
-                        <DecoLayer
-                            placements={farm.placements || []}
-                            editing={farm.mine && decoEditing}
-                            fieldRef={fieldRef}
-                            tod={visTod}
-                            onMove={decoMove}
-                            onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
-                        />
+                        {/* Placed decorations belong to a specific view (Outside or Inside) — not the Garden. */}
+                        {canDecorate ? (
+                            <DecoLayer
+                                placements={(farm.placements || []).filter((p) => (p.view || "outside") === view)}
+                                editing={farm.mine && decoEditing}
+                                fieldRef={fieldRef}
+                                tod={visTod}
+                                onMove={decoMove}
+                                onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
+                            />
+                        ) : null}
 
-                        {pets.length === 0 ? (
-                            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
-                                No pets yet — collect some and they&apos;ll roam here.
+                        {view !== "garden" && viewPetCount === 0 ? (
+                            <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#eef6e6", fontWeight: 600, textShadow: "0 1px 3px rgba(0,0,0,0.4)", textAlign: "center", padding: 16 }}>
+                                {pets.length === 0 ? "No pets yet — collect some and they'll roam here." : `No pets in the ${view === "inside" ? "barn" : "pasture"} right now — your pets are split between Outside & Inside.`}
                             </div>
                         ) : null}
 
                         {pets.map((pet, i) => {
+                            if (view === "garden" || petView(i) !== view) return null; // pets live in Outside / Inside, split by index
                             const p = pos[i] || { x: 50, y: 82, flip: false, dur: 2, moving: false, hopMs: 500 };
                             const canTap = farm.canPet && !pet.petted;
                             return (
@@ -849,11 +882,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                             );
                         })}
 
-                        {/* The farmer (farm owner) strolls their pasture — tap to connect */}
-                        {farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} onTap={() => setOwnerMenu(true)} /> : null}
+                        {/* The farmer strolls the Outside & Inside (not the tidy Garden) — tap to connect */}
+                        {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} onTap={() => setOwnerMenu(true)} /> : null}
 
-                        {/* Wild Loot Pig meanders here, inside the field, so he scrolls with the world */}
-                        {pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
+                        {/* Wild Loot Pig only shows up Outside in the open pasture */}
+                        {view === "outside" && pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
 
                         </div>{/* /world-objects tint layer */}
 
@@ -865,10 +898,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                         ))}
                     </div>
                 </div>
-                {/* Weather effects over the visible pasture (rain / snow / fog / storm) */}
-                <FarmWeather condition={wx.condition} />
-                {/* Floating decorate button, right in the scene — the fast way in (own farm, when not already decorating) */}
-                {farm.mine && farm.decorations && !decorating ? (
+                {/* Weather effects only in the open pasture (Outside) — not indoors or in the garden view */}
+                {showWeather ? <FarmWeather condition={wx.condition} /> : null}
+                {/* Floating decorate button — Outside & Inside only (the Garden is for planting). */}
+                {farm.mine && canDecorate && farm.decorations && !decorating ? (
                     <button type="button" onClick={startDecorating} className="farm-deco-fab" aria-label="Decorate your farm" title="Decorate your farm"
                         style={{ position: "absolute", right: 10, bottom: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px 9px 12px", borderRadius: 999, border: "1px solid rgba(126,213,126,0.55)", background: "linear-gradient(180deg, rgba(28,44,26,0.96), rgba(18,30,16,0.96))", color: "#c8f0c8", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 17 }} aria-hidden="true">🪴</span>Decorate
@@ -887,8 +920,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
                     {weatherLabel(wx)}
                 </div>
-                {/* Custom AI background generator (owner) — sits just above the full-screen toggle. */}
-                {farm.mine ? (
+                {/* Custom AI background generator — Outside only (Inside is a fixed barn, Garden is fixed soil). */}
+                {farm.mine && view === "outside" ? (
                     <button type="button" onClick={() => setBgOpen(true)} aria-label="Custom background" title="Generate a custom farm background"
                         style={{ position: "absolute", bottom: 52, left: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 999, border: "1px solid rgba(201,162,255,0.5)", background: "linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96))", color: "#d9c9ff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 15 }} aria-hidden="true">🎨</span>Backdrop
