@@ -17,12 +17,36 @@ const buildPrompt = (desc, correction) => {
     return `${base}${note} ${ART}.`;
 };
 
-// Draw a single option (the whole flow is one-at-a-time now).
+// Turn a raw OpenAI image error into a short, member-friendly reason (so a refused prompt explains itself
+// instead of an opaque "hiccup"), while keeping the raw text for the admin console. This is a PAID action,
+// so the #1 job when it fails is telling the member WHY.
+function classifyGenError(err) {
+    const raw = String(err?.message || err || "").slice(0, 300);
+    const low = raw.toLowerCase();
+    let reason;
+    if (/moderation_blocked|content_policy|safety system|safety|rejected by|not allowed|violat/.test(low)) {
+        reason =
+            "That description was blocked by the art safety filter — most often because it names a real brand or a copyrighted character (Pokémon, Nintendo, Disney, sports logos, etc.). Describe your OWN original creature or object — colors, materials, mood — and it'll draw. Your creation was refunded.";
+    } else if (/missing openai_api_key|returned no image|no image/.test(low)) {
+        reason = "The art service is briefly unavailable — your creation was refunded. Please try again in a minute.";
+    } else if (/timeout|timed out|etimedout|network|fetch failed|econnreset/.test(low)) {
+        reason = "The art service took too long to respond — your creation was refunded. Please try again.";
+    } else {
+        reason = "The art pipeline hiccuped — your creation was refunded. Try again, or reword your description.";
+    }
+    return { reason, raw };
+}
+
+// Draw a single option (the whole flow is one-at-a-time now). Returns { urls:[{url,attempt}], error } — on any
+// failure/refusal `urls` is empty and `error` carries a member-friendly reason + the raw OpenAI text (for admins).
 async function genOne(prompt, attempt) {
     try {
         const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true });
-        return url ? [{ url, attempt }] : [];
-    } catch { return []; }
+        if (url) return { urls: [{ url, attempt }], error: null };
+        return { urls: [], error: classifyGenError(new Error("OpenAI returned no image")) };
+    } catch (e) {
+        return { urls: [], error: classifyGenError(e) };
+    }
 }
 
 const mapDraft = (r) => ({ id: Number(r.id), name: r.name, prompt: r.prompt, attempts: r.attempts, maxAttempts: MAX_ATTEMPTS, options: r.options || [], status: r.status });
@@ -53,12 +77,14 @@ export async function startCustomDeco(buyerId, name, prompt) {
     if (!paid) return { ok: false, error: "no_credits" };
     const row = await db.queryOne(`INSERT INTO mkt_custom_deco (buyer_id, name, prompt) VALUES ($1, $2, $3) RETURNING id`, [buyerId, nm, desc]).catch(() => null);
     if (!row) { await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); return { ok: false, error: "db" }; }
-    const opts = await genOne(buildPrompt(desc), 1);
-    if (!opts.length) {
+    const gen = await genOne(buildPrompt(desc), 1);
+    if (!gen.urls.length) {
         await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); // refund
-        await db.query(`UPDATE mkt_custom_deco SET status = 'abandoned' WHERE id = $1`, [row.id]).catch(() => {});
-        return { ok: false, error: "gen_failed" };
+        // 'failed' (not 'abandoned') + the raw reason, so a policy refusal is distinguishable from a user abandon.
+        await db.query(`UPDATE mkt_custom_deco SET status = 'failed', last_error = $2, updated_at = NOW() WHERE id = $1`, [row.id, gen.error?.raw || null]).catch(() => {});
+        return { ok: false, error: "gen_failed", reason: gen.error?.reason || null };
     }
+    const opts = gen.urls;
     await db.query(`UPDATE mkt_custom_deco SET attempts = 1, options = $2::jsonb, updated_at = NOW() WHERE id = $1`, [row.id, JSON.stringify(opts)]).catch(() => {});
     return { ok: true, draft: { id: Number(row.id), name: nm, prompt: desc, attempts: 1, maxAttempts: MAX_ATTEMPTS, options: opts, status: "drafting" }, credits: paid.custom_deco_credits };
 }
@@ -70,8 +96,14 @@ export async function refineCustomDeco(buyerId, id, correction) {
     const row = await db.queryOne(`SELECT * FROM mkt_custom_deco WHERE id = $1 AND buyer_id = $2 AND status = 'drafting'`, [Number(id), buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_found" };
     if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "no_attempts", draft: mapDraft(row) };
-    const opts = await genOne(buildPrompt(row.prompt, correction), row.attempts + 1);
-    if (!opts.length) return { ok: false, error: "gen_failed", draft: mapDraft(row) };
+    const gen = await genOne(buildPrompt(row.prompt, correction), row.attempts + 1);
+    if (!gen.urls.length) {
+        await db.query(`UPDATE mkt_custom_deco SET last_error = $2, updated_at = NOW() WHERE id = $1`, [Number(id), gen.error?.raw || null]).catch(() => {});
+        return { ok: false, error: "gen_failed", reason: gen.error?.reason || null, draft: mapDraft(row) };
+    }
+    // Stamp each redraw with the correction that produced it, so the full prompting history is visible to admins.
+    const note = String(correction || "").trim().slice(0, 200) || null;
+    const opts = gen.urls.map((o) => ({ ...o, note }));
     const merged = [...(row.options || []), ...opts];
     await db.query(`UPDATE mkt_custom_deco SET attempts = attempts + 1, options = $2::jsonb, updated_at = NOW() WHERE id = $1`, [Number(id), JSON.stringify(merged)]).catch(() => {});
     return { ok: true, draft: { id: Number(id), name: row.name, prompt: row.prompt, attempts: row.attempts + 1, maxAttempts: MAX_ATTEMPTS, options: merged, status: "drafting" } };

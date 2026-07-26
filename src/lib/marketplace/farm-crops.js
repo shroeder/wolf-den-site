@@ -456,6 +456,26 @@ export async function grantSeed(buyerId, seedId) {
     ).catch(() => {});
 }
 
+// Starter bag every member gets exactly once (at signup, backfilled for existing members via migration 234):
+// 3 each of the three low-level seeds (wheat/carrot/potato), so the farm loop is obvious from the first visit
+// instead of an empty plot.
+export async function grantStarterSeeds(buyerId) {
+    if (!buyerId) return;
+    // Atomic claim: flip the once-only flag first so any join path can call this without ever double-granting.
+    const won = await db
+        .queryOne(`UPDATE mkt_buyer SET starter_seeds_granted = true WHERE id = $1 AND starter_seeds_granted = false RETURNING id`, [buyerId])
+        .catch(() => null);
+    if (!won) return;
+    await db
+        .query(
+            `INSERT INTO mkt_farm_seed (buyer_id, seed_id, count)
+             VALUES ($1,'wheat',3), ($1,'carrot',3), ($1,'potato',3)
+             ON CONFLICT (buyer_id, seed_id) DO UPDATE SET count = mkt_farm_seed.count + EXCLUDED.count`,
+            [buyerId]
+        )
+        .catch(() => {});
+}
+
 // Grant a harvested crop's signature yield; returns a short human string for the harvest toast (or null).
 // Roll to drop a seed from another game system (source keys in SEED_SOURCES). Returns { seedId, name, emoji,
 // rarity } or null. Best-effort — never throws into the caller. The drop chance is scaled by the Forager

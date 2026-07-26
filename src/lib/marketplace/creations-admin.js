@@ -21,10 +21,11 @@ export async function getCreationsAdmin() {
                FROM mkt_creation_purchase p JOIN mkt_buyer b ON b.id = p.buyer_id
               ORDER BY p.created_at DESC LIMIT ${LIST_CAP + 1}`
         ).catch(() => []),
-        // Recent creations (art the members made by spending a Creation).
+        // Recent creations (art the members made by spending a Creation) — the FULL prompting trail: the base
+        // prompt, every generated option (with the refine note that produced it), the pick, and any failure reason.
         db.query(
-            `SELECT c.id, c.name, c.prompt, c.status, c.attempts, c.chosen_url, c.created_at, c.updated_at,
-                    b.id AS buyer_id, b.alias, b.display_name
+            `SELECT c.id, c.name, c.prompt, c.status, c.attempts, c.options, c.chosen_url, c.last_error,
+                    c.created_at, c.updated_at, b.id AS buyer_id, b.alias, b.display_name
                FROM mkt_custom_deco c JOIN mkt_buyer b ON b.id = c.buyer_id
               ORDER BY c.created_at DESC LIMIT ${LIST_CAP + 1}`
         ).catch(() => []),
@@ -53,6 +54,7 @@ export async function getCreationsAdmin() {
                 COUNT(*) FILTER (WHERE status = 'final')::int        AS finished,
                 COUNT(*) FILTER (WHERE status = 'drafting')::int     AS drafting,
                 COUNT(*) FILTER (WHERE status = 'abandoned')::int    AS abandoned,
+                COUNT(*) FILTER (WHERE status = 'failed')::int       AS failed,
                 COUNT(DISTINCT buyer_id)::int                        AS creators
                FROM mkt_custom_deco`
         ).catch(() => ({})),
@@ -85,9 +87,12 @@ export async function getCreationsAdmin() {
         alias: r.alias || null,
         title: r.name || "Untitled",
         prompt: r.prompt || "",
-        status: r.status, // drafting | final | abandoned
+        status: r.status, // drafting | final | failed | abandoned
         attempts: Number(r.attempts) || 0,
-        imageUrl: r.chosen_url || null,
+        // Every image the pipeline drew, in order, each with the refine note that steered it (base draw = no note).
+        options: Array.isArray(r.options) ? r.options.map((o) => ({ url: o.url, attempt: Number(o.attempt) || 0, note: o.note || null })) : [],
+        imageUrl: r.chosen_url || null, // the one they picked (null until finalized)
+        lastError: r.last_error || null, // raw OpenAI reason when status = 'failed' (usually a policy refusal)
         createdAt: r.created_at,
         updatedAt: r.updated_at,
     }));
@@ -113,6 +118,7 @@ export async function getCreationsAdmin() {
         creationsFinished: usageAgg?.finished || 0,
         creationsDrafting: usageAgg?.drafting || 0,
         creationsAbandoned: usageAgg?.abandoned || 0,
+        creationsFailed: usageAgg?.failed || 0, // blocked/refused draws (see each row's lastError)
         creators: usageAgg?.creators || 0,
         creationsHeld: outstanding?.held || 0, // unspent Creations still in wallets
     };

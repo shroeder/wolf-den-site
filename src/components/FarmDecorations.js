@@ -442,14 +442,15 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
         setGen(true); setErr(null);
         const r = await fn();
         setGen(false);
-        if (!r?.ok) { setErr(customErr(r?.error)); return r; }
+        // Prefer a specific server reason (e.g. "blocked — names a copyrighted character") over the generic map.
+        if (!r?.ok) { setErr(r?.reason || customErr(r?.error)); return r; }
         if (r.draft) { setDraft(r.draft); setChosen(r.draft.options?.[r.draft.options.length - 1]?.url || null); setCorrection(""); }
         if (r.credits != null) setCredits(r.credits);
         return r;
     };
     const doStart = () => { if (prompt.trim().length < 4) { setErr("Describe your decoration (a few words at least)."); return; } run(() => onStart(name, prompt)); };
     const doRefine = () => { if (!correction.trim()) { setErr("Add a quick note on what to change."); return; } run(() => onRefine(draft.id, correction)); };
-    const doFinalize = async () => { if (!chosen) return; setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false); if (r?.ok) onClose(); else setErr(customErr(r?.error)); };
+    const doFinalize = async () => { if (!chosen) return; setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false); if (r?.ok) onClose(); else setErr(r?.reason || customErr(r?.error)); };
 
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10058, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
@@ -473,6 +474,7 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
                         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="e.g. Wolf Totem" style={CINP} />
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, margin: "12px 0 4px" }}>Describe it</label>
                         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={300} rows={3} placeholder="e.g. a carved wooden wolf totem with glowing blue eyes" style={{ ...CINP, resize: "vertical" }} />
+                        <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>💡 Original ideas only — the art filter blocks named brands &amp; copyrighted characters (Pokémon, Nintendo, Disney, etc.). Describe your own creature or object and it&apos;ll draw.</div>
                         {err ? <div style={{ color: "#ff9a9a", fontSize: 12.5, marginTop: 8 }}>{err}</div> : null}
                         {credits > 0 ? (
                             <button type="button" onClick={doStart} disabled={busy} style={{ ...CPRIMARY, marginTop: 14 }}>🎨 Draw my decoration (uses 1 creation)</button>

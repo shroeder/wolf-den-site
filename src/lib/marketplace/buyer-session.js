@@ -10,6 +10,7 @@ import { DEFAULT_AVATAR } from "@/lib/marketplace/avatar-options.js";
 import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
 import { ensureAlias } from "@/lib/marketplace/profile.js";
 import { attachReferrer } from "@/lib/marketplace/referral.js";
+import { grantStarterSeeds } from "@/lib/marketplace/farm-crops.js";
 import { claimPendingPurchases } from "@/lib/marketplace/xp.js";
 
 // Buyer accounts + token sessions for the marketplace phone app. Mirrors the vendor-session shape
@@ -106,6 +107,8 @@ export async function createBuyer({ email, password, displayName = null, firstNa
         .catch(() => {});
     // Record who referred them (if they arrived via an invite link). Reward waits for email verification.
     if (refCode) await attachReferrer(row.id, refCode).catch(() => {});
+    // A few low-level seeds so the farm is playable from the first visit. Once-only (atomic flag), best-effort.
+    await grantStarterSeeds(row.id).catch(() => {});
     return mapBuyer(row);
 }
 
@@ -379,6 +382,9 @@ export async function getOrCreateBuyerByEmail(email, { emailVerified = false } =
         await claimPendingPurchases(row.id, normalized).catch(() => {});
         await ensureSquareCustomerForBuyer(row.id).catch(() => {});
         await ensureAlias(row.id, row.display_name || normalized.split("@")[0]).catch(() => {});
+        // Starter seeds too (grantStarterSeeds is once-only via its atomic flag, so an ON CONFLICT re-touch
+        // of an already-seeded account is a no-op).
+        await grantStarterSeeds(row.id).catch(() => {});
     }
     return mapBuyer(row);
 }
