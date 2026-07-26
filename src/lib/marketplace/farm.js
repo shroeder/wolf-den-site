@@ -137,12 +137,15 @@ async function pettingBudget(buyerId) {
     const usedOwn = b?.pet_farm_used || 0;
     const usedOthers = b?.pet_farm_used_others || 0;
     const recharges = b?.pet_farm_recharges || 0;
-    const extra = b?.pet_farm_extra || 0; // Pettin' Whistle consumable — extra own-pet pettings today
-    // OWN: base 3/day + the permanent "Pet Whisperer" upgrade + gold recharges + Pettin' Whistle extras. OTHERS: flat 3.
-    const ownAllowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + recharges * PET_RECHARGE_AMOUNT + extra;
+    const extra = b?.pet_farm_extra || 0; // Pettin' Whistle consumable — extra pettings today
+    // A paid gold recharge (+ a Pettin' Whistle) is a general "more pettings today" purchase, so it boosts BOTH
+    // pools — otherwise recharging while visiting a friend's farm did nothing (you'd buy more but still be capped).
+    const bought = recharges * PET_RECHARGE_AMOUNT + extra;
+    const ownAllowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + bought;
+    const othersAllowance = PET_OTHERS_PER_DAY + bought;
     return {
         own: { used: usedOwn, allowance: ownAllowance, left: Math.max(0, ownAllowance - usedOwn) },
-        others: { used: usedOthers, allowance: PET_OTHERS_PER_DAY, left: Math.max(0, PET_OTHERS_PER_DAY - usedOthers) },
+        others: { used: usedOthers, allowance: othersAllowance, left: Math.max(0, othersAllowance - usedOthers) },
         recharges, rechargeCost: rechargeCost(recharges), rechargeAmount: PET_RECHARGE_AMOUNT,
     };
 }

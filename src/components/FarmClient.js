@@ -1129,7 +1129,7 @@ function OwnerMenu({ owner, mine, onClose }) {
                     </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14 }}>
-                    {profileHref ? <a href={profileHref} className="farm-jbtn" style={{ justifyContent: "center", textDecoration: "none" }}>👤 View profile</a> : null}
+                    {profileHref ? <a href={profileHref} className="farm-jbtn" style={{ justifyContent: "center", textDecoration: "none", color: "#3a2c08" }}>👤 View profile</a> : null}
                     {!mine ? (
                         <>
                             <button type="button" onClick={message} disabled={busy} style={{ ...menuBtn, opacity: busy ? 0.6 : 1 }}>💬 Message</button>
