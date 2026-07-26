@@ -105,6 +105,8 @@ async function partCounts(buyerId) {
     return m;
 }
 const parseBonus = (raw) => (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : raw || {});
+// The `claimed` JSONB is an ARRAY — coerce to a real array (parseBonus defaults to {}, which isn't iterable).
+const parseClaimed = (raw) => { const p = parseBonus(raw); return Array.isArray(p) ? p : []; };
 
 // Log a forge open (for the admin adoption/abandonment funnel). Best-effort.
 export async function logForgeOpen(buyerId) {
@@ -130,7 +132,7 @@ export async function claimForgeDaily(buyerId, key) {
     if (!buyerId || !q) return { ok: false, error: "bad" };
     const row = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
     const prog = Number(row?.[q.field] || 0);
-    const claimed = new Set(parseBonus(row?.claimed) || []);
+    const claimed = new Set(parseClaimed(row?.claimed));
     if (prog < q.need) return { ok: false, error: "not_done", ...(await getForgeState(buyerId)) };
     if (claimed.has(key)) return { ok: false, error: "claimed", ...(await getForgeState(buyerId)) };
     claimed.add(key);
@@ -249,7 +251,7 @@ export async function getForgeState(buyerId) {
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
     const dRow = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
-    const claimedSet = new Set(parseBonus(dRow?.claimed) || []);
+    const claimedSet = new Set(parseClaimed(dRow?.claimed));
     const dailies = DAILIES.map((q) => { const prog = Number(dRow?.[q.field] || 0); return { key: q.key, label: q.label, need: q.need, progress: Math.min(prog, q.need), done: prog >= q.need, claimed: claimedSet.has(q.key), rewardLabel: q.rewardLabel }; });
     const equippedIds = new Set(Object.values(bySlot));
     const enhById = new Map();
