@@ -1,7 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById } from "@/lib/marketplace/items.js";
+import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -71,6 +72,39 @@ async function petInPendingTrade(ownerId, petId) {
         )
         .catch(() => null);
     return Boolean(row);
+}
+
+// ── Browse: a FLATTENED list of gear other members own but DON'T have equipped — each entry is one tradeable
+// copy you can propose a trade for (links to /marketplace/trade/new?to=<alias>&want=<itemId>). Rarity-first.
+const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+export async function listTradeableItems(viewerId, { q = "", rarity = null, limit = 160 } = {}) {
+    if (!viewerId) return [];
+    const rows = await db.query(
+        `SELECT ui.buyer_id, ui.item_id, b.display_name, b.alias
+           FROM mkt_user_item ui
+           JOIN mkt_buyer b ON b.id = ui.buyer_id
+          WHERE ui.buyer_id <> $1
+            AND b.alias IS NOT NULL AND b.alias <> ''
+            AND NOT EXISTS (SELECT 1 FROM mkt_user_equipment e WHERE e.buyer_id = ui.buyer_id AND e.item_id = ui.item_id)
+          LIMIT 1200`,
+        [viewerId]
+    ).catch(() => []);
+    const spriteMap = await itemSpriteMap().catch(() => ({}));
+    const query = String(q || "").trim().toLowerCase();
+    const out = [];
+    for (const r of rows) {
+        const it = itemById(r.item_id);
+        if (!it) continue;
+        if (rarity && it.rarity !== rarity) continue;
+        if (query && !it.name.toLowerCase().includes(query) && !(r.alias || "").toLowerCase().includes(query)) continue;
+        out.push({
+            itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot, stats: describeStats(it.stats),
+            icon: it.icon, sprite: spriteMap[r.item_id] || null,
+            ownerName: r.display_name || `@${r.alias}`, ownerAlias: r.alias,
+        });
+    }
+    out.sort((a, b) => (RARITY_RANK[b.rarity] || 0) - (RARITY_RANK[a.rarity] || 0) || a.name.localeCompare(b.name));
+    return out.slice(0, limit);
 }
 
 async function ownedSet(buyerId, ids) {
