@@ -50,7 +50,7 @@ export default function GameNav() {
     const [owner, setOwner] = useState(false);
     useEffect(() => {
         let alive = true;
-        fetch("/api/marketplace/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.owner) setOwner(true); }).catch(() => {});
+        fetch("/api/marketplace/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.buyer?.owner) setOwner(true); }).catch(() => {});
         return () => { alive = false; };
     }, []);
     // Farm is live for everyone — always in the menu.
