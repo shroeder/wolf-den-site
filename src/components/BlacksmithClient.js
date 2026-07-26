@@ -55,8 +55,8 @@ export default function BlacksmithClient({ initial }) {
     const [busy, setBusy] = useState(null);
     const [tab, setTab] = useState("enhance");
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
+    const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
     const [toast, setToast] = useState(null);
-    const [salvageBurst, setSalvageBurst] = useState(null);
 
     const post = useCallback(async (body, key) => {
         setBusy(key || body.action);
@@ -68,16 +68,13 @@ export default function BlacksmithClient({ initial }) {
         } finally { setBusy(null); }
     }, []);
 
+    // Runs the actual salvage (called by the confirm modal) and returns the server result so the modal can
+    // reveal the loot. Errors surface as a toast; the modal closes itself.
     const doSalvage = useCallback(async (item) => {
         const r = await post({ action: "salvage", itemId: item.id }, `sv-${item.id}`);
-        if (r?.ok) {
-            const t = forge.parts?.find((p) => p.tier === r.gained.tier);
-            setSalvageBurst({ k: Date.now(), n: r.gained.n, name: t?.name || "parts", color: t?.color || "#ffd75e" });
-            SFX.great();
-            setTimeout(() => setSalvageBurst(null), 1400);
-            if (r.regaliaDrop) { SFX.win(); setToast({ kind: "regalia", text: `⚒️ You forged a Blacksmith's Regalia piece — ${r.regaliaDrop}! Equip it to boost your salvaging.` }); }
-        } else if (r?.error) setToast(salvageErr(r.error));
-    }, [post, forge.parts]);
+        if (!r?.ok && r?.error) setToast(salvageErr(r.error));
+        return r;
+    }, [post]);
 
     const doCombine = useCallback(async (tier) => {
         const r = await post({ action: "combine", tier }, `cb-${tier}`);
@@ -165,11 +162,6 @@ export default function BlacksmithClient({ initial }) {
                     </div>
                     <p className="forge-tagline">{statusBits.join(" · ")}</p>
                 </div>
-                {salvageBurst ? (
-                    <div className="forge-burst" key={salvageBurst.k} style={{ "--pc": salvageBurst.color }}>
-                        <span>+{salvageBurst.n}</span> {salvageBurst.name}
-                    </div>
-                ) : null}
             </div>
 
             {/* Daily forge tasks. */}
@@ -288,7 +280,7 @@ export default function BlacksmithClient({ initial }) {
                 ) : tab === "salvage" ? (
                     <div className="forge-grid">
                         {salvage.length ? salvage.map((it) => (
-                            <button key={it.id} type="button" className="forge-card is-salvage" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => doSalvage(it)}>
+                            <button key={it.id} type="button" className="forge-card is-salvage" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setSalvaging(it); }}>
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats" style={{ color: rc(it.rarity) }}>{it.rarity}</span>
@@ -298,7 +290,6 @@ export default function BlacksmithClient({ initial }) {
                                         ? <img className="forge-cost-ico" src={parts[it.salvageTier - 1].sprite} alt="" /> : null}
                                     yields {parts[it.salvageTier - 1]?.name || `T${it.salvageTier}`}
                                 </span>
-                                {busy === `sv-${it.id}` ? <span className="forge-working">forging…</span> : null}
                             </button>
                         )) : <div className="forge-empty">Nothing spare to salvage — every item you own is equipped.</div>}
                     </div>
@@ -335,6 +326,8 @@ export default function BlacksmithClient({ initial }) {
 
             {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHandChance={forge.steadyHandChance || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
 
+            {salvaging ? <SalvageModal item={salvaging} parts={parts} odds={forge.salvageOdds || {}} onConfirm={() => doSalvage(salvaging)} onClose={() => setSalvaging(null)} /> : null}
+
             {toast ? (
                 <div className={`forge-toast${toast.kind === "err" ? " is-err" : ""}`} role="status">
                     {toast.kind === "enhance" ? (
@@ -352,6 +345,82 @@ export default function BlacksmithClient({ initial }) {
 
 const salvageErr = (e) => ({ kind: "err", text: { equipped: "That's equipped — unequip it first.", not_owned: "You don't own that.", bad_item: "Unknown item." }[e] || "Couldn't salvage that." });
 const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need ${need?.qty} of tier ${need?.tier}.` : e === "not_equipped" ? "Equip it first." : "Enhance failed — try again.");
+
+// ── Salvage preview → confirm → loot reveal ─────────────────────────────────────────────────────────────────
+// Shows what you MIGHT get (yield range + perk odds) before committing, then reveals what you DID get with juice.
+function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
+    const [phase, setPhase] = useState("confirm"); // confirm | working | result
+    const [result, setResult] = useState(null);
+    const tier = parts[item.salvageTier - 1] || {};
+    const lo = item.salvageMin || 1;
+    const hi = item.salvageMax || 1;
+
+    const doIt = async () => {
+        setPhase("working");
+        SFX.great();
+        const r = await onConfirm();
+        if (r?.ok) { setResult(r); setPhase("result"); (r.regaliaDrop ? SFX.pixel : SFX.win)(); }
+        else onClose();
+    };
+
+    return (
+        <div className="forge-mg-scrim" role="dialog" aria-label={`Salvage ${item.name}`} onPointerDown={phase === "result" ? onClose : undefined}>
+            <div className="forge-sv" style={{ "--rc": rc(item.rarity) }} onPointerDown={(e) => e.stopPropagation()}>
+                {phase !== "result" ? (
+                    <>
+                        <div className="forge-mg-head">
+                            <ItemArt id={item.id} icon={item.icon} className="forge-mg-art" alt={item.name} />
+                            <div>
+                                <div className="forge-mg-name">Salvage {item.name}?</div>
+                                <div className="forge-mg-sub" style={{ color: rc(item.rarity), textTransform: "capitalize" }}>{item.rarity}{item.level > 0 ? ` · forged +${item.level}` : ""}</div>
+                            </div>
+                            <button type="button" className="forge-mg-x" onClick={onClose} aria-label="Cancel">×</button>
+                        </div>
+                        {item.level > 0 ? <div className="forge-sv-warn">This is enhanced (+{item.level}) — salvaging destroys the item and its forge bonus.</div> : null}
+                        <div className="forge-sv-yield">
+                            <span className="forge-sv-yield-label">You&apos;ll get</span>
+                            <div className="forge-sv-yield-main">
+                                {tier.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="forge-sv-yieldimg" src={tier.sprite} alt="" />
+                                ) : null}
+                                <b>{lo === hi ? lo : `${lo}–${hi}`}</b> <span>{tier.name || `T${item.salvageTier}`}</span>
+                            </div>
+                        </div>
+                        {(odds.doublePct > 0 || odds.bonusPartPct > 0 || odds.regaliaFlat > 0 || odds.regaliaDropPct > 0) ? (
+                            <div className="forge-sv-odds">
+                                {odds.doublePct > 0 ? <span>🛠️ {odds.doublePct}% double</span> : null}
+                                {odds.bonusPartPct > 0 ? <span>👁️ {odds.bonusPartPct}% bonus part</span> : null}
+                                {odds.regaliaFlat > 0 ? <span>+{odds.regaliaFlat} from Regalia</span> : null}
+                                {odds.regaliaDropPct > 0 ? <span className="rare">✦ {odds.regaliaDropPct}% Regalia find</span> : null}
+                            </div>
+                        ) : null}
+                        <button type="button" className="forge-strike" disabled={phase === "working"} onPointerDown={(e) => { e.preventDefault(); if (phase !== "working") doIt(); }}>
+                            {phase === "working" ? "Salvaging…" : "Salvage it"}
+                        </button>
+                        <button type="button" className="forge-mg-cancel" onClick={onClose}>Keep it</button>
+                    </>
+                ) : (
+                    <div className="forge-sv-result">
+                        <div className="forge-sv-reward">
+                            {(parts[result.gained.tier - 1] || tier).sprite ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="forge-sv-rewardimg" src={(parts[result.gained.tier - 1] || tier).sprite} alt="" />
+                            ) : null}
+                            <div className="forge-sv-plus">+{result.gained.n}</div>
+                            <div className="forge-sv-rewardname">{parts[result.gained.tier - 1]?.name || `T${result.gained.tier}`}</div>
+                        </div>
+                        {result.doubled ? <div className="forge-sv-tag double">✦ DOUBLE PARTS!</div> : null}
+                        {result.bonusTier ? <div className="forge-sv-tag bonus">👁️ +1 {parts[result.bonusTier - 1]?.name || `T${result.bonusTier}`} · Keen Eye</div> : null}
+                        {result.regaliaDrop ? <div className="forge-sv-tag regalia">⚒️ Found a Regalia piece — {result.regaliaDrop}!</div> : null}
+                        <div className="forge-sv-xp">+{result.xp} XP</div>
+                        <button type="button" className="forge-strike big" onClick={onClose}>Nice!</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 // ── The hammer-&-anvil timing mini-game ─────────────────────────────────────────────────────────────────────
 function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, busy }) {
@@ -531,9 +600,6 @@ const FORGE_CSS = `
 .forge-cardrank { position: absolute; top: 6px; right: 6px; z-index: 2; }
 .forge-working { font-size: 10px; color: #ffb877; }
 .forge-empty { grid-column: 1/-1; text-align: center; color: #c8b79f; font-size: 13px; padding: 22px; }
-.forge-burst { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); z-index: 8; font-weight: 900; font-size: 1.4rem; color: #fff; text-shadow: 0 2px 10px color-mix(in srgb, var(--pc) 80%, #000); animation: forgeBurst 1.3s ease-out forwards; pointer-events: none; }
-.forge-burst span { color: var(--pc); }
-@keyframes forgeBurst { 0% { opacity: 0; transform: translate(-50%, 12px) scale(0.6); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -40px) scale(1); } }
 .forge-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10062; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
     background: linear-gradient(180deg, rgba(40,22,10,0.98), rgba(22,12,6,0.98)); border: 1px solid #ff9a3c; border-radius: 14px; padding: 12px 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); color: #ffe0b0; max-width: 92vw; animation: forgePop .35s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-toast.is-err { border-color: #e05b6a; color: #ffc9ce; }
@@ -579,6 +645,30 @@ const FORGE_CSS = `
 .forge-result-bar span { display: block; height: 100%; background: linear-gradient(90deg, #f3922a, #ffd75e); box-shadow: 0 0 12px #ffcf7a; transition: width .6s cubic-bezier(.2,1,.3,1); }
 .forge-result-sub { font-size: 12px; color: #cdb89f; }
 .forge-mg-cancel { display: block; margin: 8px auto 0; background: none; border: none; color: #b9a892; font-size: 12px; cursor: pointer; }
+/* ── salvage preview / reveal modal ── */
+.forge-sv { width: 100%; max-width: 400px; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #2a180c, #140b06); border: 2px solid color-mix(in srgb, var(--rc) 70%, #ff9a3c); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 30px color-mix(in srgb, var(--rc) 30%, transparent); animation: forgePop .3s cubic-bezier(.2,1.3,.3,1) both; }
+.forge-sv-warn { margin: 12px 0 0; font-size: 11px; color: #ffc98a; background: rgba(255,150,60,0.12); border: 1px solid rgba(255,150,60,0.35); border-radius: 9px; padding: 7px 9px; }
+.forge-sv-yield { margin: 12px 0 0; padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); text-align: center; }
+.forge-sv-yield-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #b9a892; }
+.forge-sv-yield-main { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; font-size: 14px; color: #efe2d2; }
+.forge-sv-yield-main b { font-size: 22px; font-weight: 900; color: #ffd75e; }
+.forge-sv-yieldimg { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.forge-sv-odds { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 10px 0 2px; }
+.forge-sv-odds span { font-size: 10.5px; font-weight: 700; color: #cdb89f; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 3px 9px; }
+.forge-sv-odds span.rare { color: #ffd75e; border-color: rgba(255,215,94,0.4); background: rgba(255,215,94,0.1); }
+.forge-sv .forge-strike { margin-top: 14px; }
+.forge-sv-result { text-align: center; padding: 6px 4px 2px; }
+.forge-sv-reward { display: inline-flex; flex-direction: column; align-items: center; animation: forgeReveal .5s cubic-bezier(.2,1.5,.35,1) both; }
+.forge-sv-rewardimg { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55)) drop-shadow(0 0 18px color-mix(in srgb, var(--rc) 50%, transparent)); animation: forgeRewardBob 2.4s ease-in-out infinite; }
+.forge-sv-plus { font-size: 2.1rem; font-weight: 900; color: #ffd75e; text-shadow: 0 2px 12px rgba(255,150,30,0.6); margin-top: 2px; }
+.forge-sv-rewardname { font-size: 13px; font-weight: 800; color: #efe2d2; }
+.forge-sv-tag { margin: 8px auto 0; display: inline-block; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; animation: forgePop .4s cubic-bezier(.2,1.3,.3,1) both; }
+.forge-sv-tag.double { color: #2a1000; background: linear-gradient(180deg,#ffe07a,#f3b23a); }
+.forge-sv-tag.bonus { color: #8fe3ff; background: rgba(143,227,255,0.14); border: 1px solid rgba(143,227,255,0.4); }
+.forge-sv-tag.regalia { color: #ffcf8a; background: rgba(255,180,80,0.16); border: 1px solid rgba(255,180,80,0.5); }
+.forge-sv-xp { margin-top: 10px; font-size: 12px; font-weight: 800; color: #8fe3a1; }
+@keyframes forgeReveal { 0% { opacity: 0; transform: scale(.4) translateY(10px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes forgeRewardBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 /* ── perks / upgrades (uses the shared .sail-upgrades pattern; only the gold line is bespoke) ── */
 .forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 10px; }
 /* ── daily forge tasks ── */
