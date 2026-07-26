@@ -483,11 +483,17 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
     const [pop, setPop] = useState(null); // { label, color, k }
     const [shakeXY, setShakeXY] = useState({ x: 0, y: 0 });
     const [sparks, setSparks] = useState([]);
+    const [flash, setFlash] = useState(null); // { color, k } full-modal flash on a strong hit
     const [done, setDone] = useState(false);
     const raf = useRef(0);
     const t0 = useRef(0);
     const comboRef = useRef(0);
     const markerRef = useRef(0.5);
+    const scoreRef = useRef(0);
+    const maxScoreRef = useRef(0);
+    const bestComboRef = useRef(0);
+    const lastStrikeAt = useRef(0); // debounce accidental double-taps
+    const finished = useRef(false);
     const cost = item.cost;
 
     // Marker oscillation (triangle wave) — speeds up each strike for rising tension.
@@ -506,7 +512,11 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
     }, [strikeNo, done]);
 
     const strike = useCallback(() => {
-        if (done) return;
+        if (done || finished.current) return;
+        // Debounce accidental double-taps (fingers land on the button twice) — ignore a 2nd hit within 150ms.
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (now - lastStrikeAt.current < 150) return;
+        lastStrikeAt.current = now;
         const dist = Math.abs(markerRef.current - 0.5);
         const g = gradeFor(dist);
         let keepCombo = g.score >= 2; // Great+ keeps the combo; Good & Miss reset it
@@ -517,23 +527,34 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
         const add = g.score * mult;
         const nextCombo = keepCombo ? curCombo + 1 : 0;
         comboRef.current = nextCombo;
+        scoreRef.current += add;
+        maxScoreRef.current += 4 * mult;
+        bestComboRef.current = Math.max(bestComboRef.current, nextCombo);
         setCombo(nextCombo);
-        setBestCombo((b) => Math.max(b, nextCombo));
-        setScore((s) => s + add);
-        setMaxScore((m) => m + 4 * mult);
-        setPop({ label: saved ? `${g.label} · SAVED` : g.label, color: saved ? "#8fe3ff" : g.color, k: Date.now(), combo: nextCombo });
+        setBestCombo(bestComboRef.current);
+        setScore(scoreRef.current);
+        setMaxScore(maxScoreRef.current);
+        setPop({ label: saved ? `${g.label} · SAVED` : g.label, color: saved ? "#8fe3ff" : g.color, k: now, combo: nextCombo });
         (saved ? SFX.great : SFX[g.key] || SFX.miss)();
-        // juice: spark burst + a shake scaled by grade
-        const n = g.score >= 3 ? 14 : g.score >= 2 ? 9 : g.score >= 1 ? 5 : 2;
-        setSparks(Array.from({ length: n }, (_, i) => ({ id: Date.now() + i, a: Math.random() * 360, d: 30 + Math.random() * 60, c: g.color })));
-        const mag = g.score >= 3 ? 10 : g.score >= 1 ? 5 : 8;
+        // juice: bigger spark burst, a shake scaled by grade, and a full-modal flash on strong/combo hits
+        const n = g.score >= 3 ? 22 : g.score >= 2 ? 14 : g.score >= 1 ? 7 : 3;
+        setSparks(Array.from({ length: n }, (_, i) => ({ id: now + i, a: Math.random() * 360, d: 34 + Math.random() * 78, c: g.color })));
+        const mag = g.score >= 3 ? 13 : g.score >= 1 ? 6 : 9;
         setShakeXY({ x: (Math.random() * 2 - 1) * mag, y: (Math.random() * 2 - 1) * mag });
+        if (g.score >= 3 || nextCombo >= 3) setFlash({ color: g.color, k: now });
         setTimeout(() => setShakeXY({ x: 0, y: 0 }), 220);
-        setTimeout(() => setSparks([]), 600);
+        setTimeout(() => setSparks([]), 620);
         const nextStrike = strikeNo + 1;
-        if (nextStrike >= STRIKES) { setDone(true); cancelAnimationFrame(raf.current); }
-        else { t0.current = 0; setStrikeNo(nextStrike); }
-    }, [done, strikeNo, steadyHandChance]);
+        if (nextStrike >= STRIKES) {
+            // Finished — auto-temper (no confirm / "Not now" retry). Show the final hit for a beat, then apply.
+            finished.current = true;
+            setDone(true);
+            cancelAnimationFrame(raf.current);
+            const q = maxScoreRef.current > 0 ? Math.max(0, Math.min(1, scoreRef.current / maxScoreRef.current)) : 0;
+            const hl = q >= 0.92 ? "pixel" : q >= 0.72 ? "perfect" : q >= 0.45 ? "great" : "good";
+            setTimeout(() => onDone({ quality: q, grade: hl, combo: bestComboRef.current }), 650);
+        } else { t0.current = 0; setStrikeNo(nextStrike); }
+    }, [done, strikeNo, steadyHandChance, onDone]);
 
     // keyboard: space/enter to strike
     useEffect(() => {
@@ -548,13 +569,14 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
     return (
         <div className="forge-mg-scrim" role="dialog" aria-label={`Enhance ${item.name}`}>
             <div className="forge-mg" style={{ "--rc": rc(item.rarity), transform: shakeXY.x || shakeXY.y ? `translate(${shakeXY.x}px, ${shakeXY.y}px)` : undefined }}>
+                {flash ? <div className="forge-mg-flash" key={flash.k} style={{ background: `radial-gradient(circle at 50% 46%, ${flash.color}66, transparent 68%)` }} aria-hidden="true" /> : null}
                 <div className="forge-mg-head">
                     <ItemArt id={item.id} icon={item.icon} className="forge-mg-art" alt={item.name} />
                     <div>
                         <div className="forge-mg-name">{item.name}{item.level > 0 ? <span style={{ marginLeft: 8, display: "inline-flex", verticalAlign: "middle" }}><ForgeRank level={item.level} size={22} /></span> : null}</div>
                         <div className="forge-mg-sub">{item.stats}</div>
                     </div>
-                    <button type="button" className="forge-mg-x" onClick={onCancel} aria-label="Cancel">×</button>
+                    {!done ? <button type="button" className="forge-mg-x" onClick={onCancel} aria-label="Cancel">×</button> : null}
                 </div>
 
                 {!done ? (
@@ -579,16 +601,14 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
                         <div className="forge-mg-tip">Tap when the hammer hits the center. Great+ keeps your combo · Good or a miss breaks it.</div>
                     </>
                 ) : (
+                    // Finished — auto-tempers (no confirm / retry). Shows the final grade for a beat, then the reveal.
                     <div className="forge-mg-result">
                         <div className="forge-result-grade" style={{ color: headline === "pixel" ? "#ffd75e" : headline === "perfect" ? "#8fe3ff" : headline === "great" ? "#8fe39a" : "#d7c48a" }}>
                             {headline === "pixel" ? "PIXEL PERFECT!" : headline === "perfect" ? "PERFECT!" : headline === "great" ? "GREAT!" : "FORGED"}
                         </div>
                         <div className="forge-result-bar"><span style={{ width: `${Math.round(quality * 100)}%` }} /></div>
                         <div className="forge-result-sub">Execution {Math.round(quality * 100)}% · best combo ×{bestCombo}</div>
-                        <button type="button" className="forge-strike big" disabled={Boolean(busy)} onClick={() => onDone({ quality, grade: headline, combo: bestCombo })}>
-                            {busy ? "Forging…" : "🔨 Temper the item"}
-                        </button>
-                        <button type="button" className="forge-mg-cancel" onClick={onCancel}>Not now</button>
+                        <div className="forge-mg-forging">🔨 Tempering the item…</div>
                     </div>
                 )}
             </div>
@@ -656,9 +676,15 @@ const FORGE_CSS = `
 .forge-toast b { font-size: 15px; color: #ffd75e; }
 .forge-toast span { font-size: 12px; }
 @keyframes forgePop { from { opacity: 0; transform: translate(-50%, 14px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+/* Centered pop for normal-flow / grid-centered elements — forgePop's translate(-50%) is ONLY for the left:50% toast. */
+@keyframes forgePopC { from { opacity: 0; transform: translateY(14px) scale(.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
 /* ── mini-game ── */
 .forge-mg-scrim { position: fixed; inset: 0; z-index: 10060; background: radial-gradient(120% 90% at 50% 30%, rgba(60,26,8,0.7), rgba(6,3,1,0.92)); display: grid; place-items: center; padding: 16px; }
-.forge-mg { width: 100%; max-width: 440px; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #2a180c, #140b06); border: 2px solid color-mix(in srgb, var(--rc) 70%, #ff9a3c); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 30px color-mix(in srgb, var(--rc) 30%, transparent); }
+.forge-mg { position: relative; overflow: hidden; width: 100%; max-width: 440px; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #2a180c, #140b06); border: 2px solid color-mix(in srgb, var(--rc) 70%, #ff9a3c); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 30px color-mix(in srgb, var(--rc) 30%, transparent); }
+.forge-mg-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; animation: forgeFlash .45s ease-out forwards; }
+@keyframes forgeFlash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+.forge-mg-forging { margin-top: 14px; text-align: center; font-size: 15px; font-weight: 900; color: #ffcf7a; letter-spacing: 0.02em; animation: forgeForging 1s ease-in-out infinite; }
+@keyframes forgeForging { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
 .forge-mg-head { display: flex; align-items: center; gap: 10px; }
 .forge-mg-art { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
 .forge-mg-name { font-weight: 900; font-size: 15px; color: #ffe0b0; }
@@ -697,7 +723,7 @@ const FORGE_CSS = `
 .forge-result-sub { font-size: 12px; color: #cdb89f; }
 .forge-mg-cancel { display: block; margin: 8px auto 0; background: none; border: none; color: #b9a892; font-size: 12px; cursor: pointer; }
 /* ── salvage preview / reveal modal ── */
-.forge-sv { width: 100%; max-width: 400px; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #2a180c, #140b06); border: 2px solid color-mix(in srgb, var(--rc) 70%, #ff9a3c); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 30px color-mix(in srgb, var(--rc) 30%, transparent); animation: forgePop .3s cubic-bezier(.2,1.3,.3,1) both; }
+.forge-sv { width: 100%; max-width: 400px; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #2a180c, #140b06); border: 2px solid color-mix(in srgb, var(--rc) 70%, #ff9a3c); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 30px color-mix(in srgb, var(--rc) 30%, transparent); animation: forgePopC .3s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-sv-warn { margin: 12px 0 0; font-size: 11px; color: #ffc98a; background: rgba(255,150,60,0.12); border: 1px solid rgba(255,150,60,0.35); border-radius: 9px; padding: 7px 9px; }
 .forge-sv-yield { margin: 12px 0 0; padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); text-align: center; }
 .forge-sv-yield-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #b9a892; }
@@ -713,7 +739,7 @@ const FORGE_CSS = `
 .forge-sv-rewardimg { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55)) drop-shadow(0 0 18px color-mix(in srgb, var(--rc) 50%, transparent)); animation: forgeRewardBob 2.4s ease-in-out infinite; }
 .forge-sv-plus { font-size: 2.1rem; font-weight: 900; color: #ffd75e; text-shadow: 0 2px 12px rgba(255,150,30,0.6); margin-top: 2px; }
 .forge-sv-rewardname { font-size: 13px; font-weight: 800; color: #efe2d2; }
-.forge-sv-tag { margin: 8px auto 0; display: inline-block; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; animation: forgePop .4s cubic-bezier(.2,1.3,.3,1) both; }
+.forge-sv-tag { margin: 8px auto 0; display: inline-block; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; animation: forgePopC .4s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-sv-tag.double { color: #2a1000; background: linear-gradient(180deg,#ffe07a,#f3b23a); }
 .forge-sv-tag.bonus { color: #8fe3ff; background: rgba(143,227,255,0.14); border: 1px solid rgba(143,227,255,0.4); }
 .forge-sv-tag.regalia { color: #ffcf8a; background: rgba(255,180,80,0.16); border: 1px solid rgba(255,180,80,0.5); }
@@ -749,7 +775,7 @@ const FORGE_CSS = `
 .forge-daily-bar { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; margin: 4px 0 3px; }
 .forge-daily-bar span { display: block; height: 100%; background: linear-gradient(90deg, #f3922a, #ffd75e); border-radius: 999px; transition: width .4s ease; }
 .forge-daily-prog { font-size: 10.5px; color: #c8b79f; }
-.forge-daily-claim { flex: 0 0 auto; padding: 6px 13px; border-radius: 9px; font-weight: 900; font-size: 12px; cursor: pointer; border: none; color: #2a1000; background: linear-gradient(180deg,#8fe39a,#4bbf6a); box-shadow: 0 2px 0 #2e7d46; animation: forgePop .4s cubic-bezier(.2,1.3,.3,1) both; }
+.forge-daily-claim { flex: 0 0 auto; padding: 6px 13px; border-radius: 9px; font-weight: 900; font-size: 12px; cursor: pointer; border: none; color: #2a1000; background: linear-gradient(180deg,#8fe39a,#4bbf6a); box-shadow: 0 2px 0 #2e7d46; animation: forgePopC .4s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-daily-tag { flex: 0 0 auto; font-size: 10.5px; color: #b9a892; }
 .forge-daily-tag.done { color: #8fe3a1; font-weight: 800; }
 /* ── Blacksmith's Regalia (salvaging set) ── */
