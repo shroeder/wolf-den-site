@@ -826,6 +826,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     busy={gardenBusy}
                     onBuyFertilizer={buyFert}
                     onUpgrade={buyUpgradeKey}
+                    onOpenPack={openPack}
                 />
             ) : null}
 
@@ -1376,9 +1377,10 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
     );
 }
 
-function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade }) {
+function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
     const [seedInfo, setSeedInfo] = useState(null); // a seed tapped in the bag → detail modal
     const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade just bought → brief celebratory pop
+    const [packMsg, setPackMsg] = useState(null); // "seeds added" confirmation after opening a pack here
     const buyUpgrade = (key) => { setUpgFlash(key); setTimeout(() => setUpgFlash(null), 620); onUpgrade(key); };
     const g = garden;
     const totalSeeds = (g.seedBag || []).reduce((s, x) => s + x.count, 0);
@@ -1406,8 +1408,34 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade }) {
                         <button key={s.id} type="button" onClick={() => setSeedInfo(s)} title={`${s.name} — tap for details`} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 999, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
                             <span style={{ fontSize: 15 }}>{s.emoji}</span>{s.name}<span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span>
                         </button>
-                    )) : <span className="muted" style={{ fontSize: 12 }}>none yet — your farm drops its own from harvests &amp; petting, plus the other games (boss, sailing, chests…).</span>}
+                    )) : <span className="muted" style={{ fontSize: 12 }}>none yet — open a seed pack below, or earn seeds from harvests, petting &amp; the other games (boss, sailing, chests…).</span>}
                 </div>
+            </div>
+
+            {/* Seed packs — open them right here anytime (even with every plot planted → seeds land in your bag). */}
+            <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,215,94,0.05)", border: "1px solid rgba(255,215,94,0.22)" }}>
+                <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#ffd75e", marginBottom: 8 }}>Seed packs</div>
+                {packMsg ? <div style={{ fontSize: 12, color: "#8fe3a1", fontWeight: 700, marginBottom: 8 }}>✨ {packMsg}</div> : null}
+                {(g.seedPacks || []).length ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                        {(g.seedPacks || []).map((p) => {
+                            const pBusy = busy === `pk-${p.id}`;
+                            return (
+                                <button key={p.id} type="button" disabled={Boolean(busy)} onClick={async () => { const r = await onOpenPack?.(p.id); if (r?.ok) setPackMsg(r.applied || "Seeds added to your bag!"); }}
+                                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, border: "1px solid rgba(255,215,94,0.4)", background: "rgba(255,215,94,0.06)", color: "inherit", cursor: pBusy ? "default" : "pointer", textAlign: "left", opacity: pBusy ? 0.6 : 1 }}>
+                                    <span style={{ fontSize: 22 }}>{p.emoji}</span>
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>{p.name} <span className="muted" style={{ fontWeight: 400 }}>×{p.count}</span></span>
+                                        <span className="muted" style={{ fontSize: 11 }}>{p.desc}</span>
+                                    </span>
+                                    <span style={{ fontWeight: 800, fontSize: 12.5, color: "#ffd75e", whiteSpace: "nowrap" }}>{pBusy ? "…" : "Open"}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <span className="muted" style={{ fontSize: 12 }}>No seed packs — grab one in the <a href="/marketplace/store" style={{ color: "#ffd75e", fontWeight: 700 }}>Supplies shop</a>. Basic packs give everyday crops; crates &amp; vaults unlock rarer seeds.</span>
+                )}
             </div>
 
             {/* Seed detail modal — tap a seed in the bag to see what it grows into. Portaled to <body> so a
