@@ -207,13 +207,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     // server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
     const petSlotX = useCallback((i, n) => (n <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (n - 1)) * (100 - FARM_PAD - petMinX)), [gardened, petMinX]);
     const homeX = useCallback((i) => petSlotX(i, pets.length), [petSlotX, pets.length]);
-    // Each pet also gets a home ROW so they scatter across the pasture instead of all lining up along the bottom.
-    // The (i*3)%n shuffle de-correlates row from column, so neighbours in x sit at different depths.
-    const petSlotY = useCallback((i, n) => (n <= 1 ? 82 : 58 + (((i * 3) % n) / (n - 1)) * 32), []);
-    const homeY = useCallback((i) => petSlotY(i, pets.length), [petSlotY, pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => ({
         x: pets.length <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (pets.length - 1)) * (100 - FARM_PAD - petMinX),
-        y: pets.length <= 1 ? 82 : 58 + (((i * 3) % pets.length) / (pets.length - 1)) * 32, // scattered across the grass
+        y: 82 + ((i * 5) % 9), // grounded on the grass (spread is HORIZONTAL — see the wide field below)
         flip: i % 2 === 1,
         dur: 2, // seconds for the current stroll (varies per move → different speeds)
         moving: false,
@@ -317,8 +313,8 @@ export default function FarmClient({ initial, viewingAlias }) {
         const timers = [];
         const push = (t) => timers.push(t);
         const step = (i) => {
-            const nx = clamp(homeX(i) + rand(-5, 5), petMinX, 100 - FARM_PAD);
-            const ny = clamp(homeY(i) + rand(-6, 6), 56, 92); // wander around this pet's home row (scattered depths)
+            const nx = clamp(homeX(i) + rand(-7, 7), petMinX, 100 - FARM_PAD); // roam widely around its home column
+            const ny = 80 + rand(0, 12); // stay grounded on the grass
             const dur = rand(1.3, 3.8); // different speeds each hop
             setPos((prev) => {
                 if (!prev[i]) return prev;
@@ -341,7 +337,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         // Keyed on count only — we deliberately DON'T restart the wander loops when `pets` identity changes
         // (e.g. after petting), which would reset every pet's position mid-stroll.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pets.length, homeX, homeY]);
+    }, [pets.length, homeX]);
 
     const addFloater = useCallback((i, text, color) => {
         const id = ++floatId.current;
@@ -560,9 +556,10 @@ export default function FarmClient({ initial, viewingAlias }) {
         post({ action: "rain" }).then((r) => { if (r?.ok && r.garden) { setGarden(r.garden); if (r.boosted) setHarvestToast({ rain: r.boosted }); } });
     }, [farm.mine, garden, weather.condition, post]);
 
-    // Wider pasture as you own more pets → they spread out evenly and the field scrolls sideways. ~36% of the
-    // viewport per pet gives each one lots of elbow room.
-    const fieldW = Math.max(150, pets.length * 36);
+    // Wide pasture so pets spread out HORIZONTALLY with lots of space between them (the field scrolls sideways).
+    // Generous per-pet width — each pet's home column is evenly spread across this width, so a wider field = more
+    // horizontal separation between pets.
+    const fieldW = Math.max(200, pets.length * 62);
     // Sky follows the player's real local weather.
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
@@ -1827,12 +1824,8 @@ function HeroCard({ m, onClick }) {
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
-                <span className="muted" style={{ fontSize: 12 }}>Lv {m.level} · 🐾 {m.petCount} pet{m.petCount === 1 ? "" : "s"}</span>
+                <span className="muted" style={{ fontSize: 12 }}>🎨 {m.decoCount} decoration{m.decoCount === 1 ? "" : "s"} · ⭐ {m.ratingCount} rating{m.ratingCount === 1 ? "" : "s"}</span>
             </span>
-            {m.petSpriteUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.petSpriteUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, objectFit: "contain", transform: m.petSpriteFlip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.4))" }} />
-            ) : null}
             <span style={{ opacity: 0.45, fontSize: 20, fontWeight: 700 }}>›</span>
         </button>
     );

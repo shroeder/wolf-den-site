@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { petsState } from "@/lib/marketplace/pets.js";
-import { collectibleById, COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel, getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
@@ -75,42 +75,40 @@ const treatXp = (id) => {
 export async function farmDirectory(viewerId, { q = "", limit = 60 } = {}) {
     const term = String(q || "").trim().toLowerCase().replace(/^@/, "");
     const params = [];
-    let where = "alias IS NOT NULL";
-    if (viewerId) { params.push(viewerId); where += ` AND id <> $${params.length}`; }
-    if (term) { params.push(`%${term}%`); where += ` AND (LOWER(alias) LIKE $${params.length} OR LOWER(COALESCE(display_name,'')) LIKE $${params.length})`; }
+    let where = "b.alias IS NOT NULL";
+    if (viewerId) { params.push(viewerId); where += ` AND b.id <> $${params.length}`; }
+    if (term) { params.push(`%${term}%`); where += ` AND (LOWER(b.alias) LIKE $${params.length} OR LOWER(COALESCE(b.display_name,'')) LIKE $${params.length})`; }
     params.push(Math.min(100, limit));
+    // Farm search is about the FARM, not pets: rank by rating quality (tier-weighted likes) then decoration
+    // count, so the best-kept farms surface first.
     const rows = await db
         .query(
-            `SELECT id, alias, display_name, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip,
-                    avatar_url, avatar_config, avatar_cosmetics, equipped_border, featured_collectible
-               FROM mkt_buyer WHERE ${where} ORDER BY last_seen_at DESC NULLS LAST LIMIT $${params.length}`,
+            `SELECT b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip,
+                    b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.equipped_border,
+                    COALESCE(d.deco_count, 0) AS deco_count,
+                    COALESCE(r.rating_count, 0) AS rating_count,
+                    COALESCE(r.rating_score, 0) AS rating_score
+               FROM mkt_buyer b
+               LEFT JOIN (SELECT buyer_id, COUNT(*)::int AS deco_count FROM mkt_deco_placement GROUP BY buyer_id) d ON d.buyer_id = b.id
+               LEFT JOIN (SELECT owner_id, COUNT(*)::int AS rating_count, COALESCE(SUM(tier),0)::int AS rating_score FROM mkt_farm_rating GROUP BY owner_id) r ON r.owner_id = b.id
+              WHERE ${where}
+              ORDER BY rating_score DESC, deco_count DESC, b.last_seen_at DESC NULLS LAST
+              LIMIT $${params.length}`,
             params
         )
         .catch(() => []);
-    const ids = rows.map((r) => r.id);
-    const grantRows = ids.length
-        ? await db.query(`SELECT buyer_id, COUNT(*)::int AS n FROM mkt_cosmetic_unlock WHERE category = 'pet' AND buyer_id = ANY($1) GROUP BY buyer_id`, [ids]).catch(() => [])
-        : [];
-    const grantCount = new Map(grantRows.map((r) => [r.buyer_id, r.n]));
-    const sprites = await getPetSpriteData().catch(() => ({}));
-    return rows.map((r) => {
-        const level = levelForXp(r.xp).level;
-        const levelPets = COLLECTIBLES.filter((c) => c.source === "level" && typeof c.level === "number" && c.level <= level).length;
-        const pet = r.featured_collectible ? sprites[r.featured_collectible] : null;
-        return {
-            id: r.id,
-            alias: r.alias,
-            name: r.display_name || r.alias || "Member",
-            level,
-            petCount: (grantCount.get(r.id) || 0) + levelPets,
-            spriteUrl: r.avatar_sprite_url || null,
-            spriteFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
-            avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || null,
-            border: r.equipped_border && r.equipped_border !== "none" ? r.equipped_border : null,
-            petSpriteUrl: pet?.url || null,
-            petSpriteFlip: pet?.flip === true,
-        };
-    });
+    return rows.map((r) => ({
+        id: r.id,
+        alias: r.alias,
+        name: r.display_name || r.alias || "Member",
+        decoCount: Number(r.deco_count) || 0,
+        ratingCount: Number(r.rating_count) || 0,
+        ratingScore: Number(r.rating_score) || 0,
+        spriteUrl: r.avatar_sprite_url || null,
+        spriteFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
+        avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || null,
+        border: r.equipped_border && r.equipped_border !== "none" ? r.equipped_border : null,
+    }));
 }
 
 // Resolve a farm owner by @alias (for inspecting someone else's farm). Returns { id, name, alias } or null.

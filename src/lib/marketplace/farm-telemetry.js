@@ -158,24 +158,43 @@ export async function getFarmTelemetry() {
         });
     }
     const statusRank = (s) => (s === "active" ? 2 : s === "idle" ? 1 : 0);
-    members.sort((a, b) => statusRank(b.status) - statusRank(a.status) || b.pets.owned - a.pets.owned || b.pets.totalXp - a.pets.totalXp);
+    // Sort by FARM activity (harvests + placed decorations), not pets — this screen is about the farm.
+    members.sort((a, b) => statusRank(b.status) - statusRank(a.status)
+        || (b.crops.harvestedEver + b.deco.placed) - (a.crops.harvestedEver + a.deco.placed)
+        || b.crops.plantedEver - a.crops.plantedEver);
 
     // ── Feature-adoption gauges — % of ALL members who've used each measurable feature ──
     const countMembers = (fn) => members.filter(fn).length;
+    // Lead with FARM actions (what this screen is about); pet adoption sits at the bottom.
     const adoption = [
-        { key: "equip_pet", label: "Equipped a pet", adopted: countMembers((m) => m.pets.equipped) },
-        { key: "level_pet", label: "Leveling a pet", adopted: countMembers((m) => m.pets.owned > 0) },
-        { key: "pet_lv2", label: "Leveled a pet to Lv2+", adopted: countMembers((m) => m.pets.leveledTo2) },
-        { key: "pet_friend", label: "Petted / fed a friend's pet", adopted: countMembers((m) => m.pets.fedOrPetted > 0) },
         { key: "plant_crop", label: "Planted a crop", adopted: countMembers((m) => m.crops.plantedEver > 0) },
         { key: "harvest_crop", label: "Harvested a crop", adopted: countMembers((m) => m.crops.harvestedEver > 0) },
-        { key: "fertilizer", label: "Holds fertilizer", adopted: countMembers((m) => m.crops.fertilizer > 0) },
+        { key: "fertilizer", label: "Used fertilizer", adopted: countMembers((m) => m.crops.fertilizer > 0) },
         { key: "farm_upgrade", label: "Bought a farm upgrade", adopted: countMembers((m) => m.crops.upgradeLevels > 0) },
         { key: "own_deco", label: "Owns a decoration", adopted: countMembers((m) => m.deco.ownedKinds > 0) },
         { key: "place_deco", label: "Placed a decoration", adopted: countMembers((m) => m.deco.placed > 0) },
         { key: "custom_deco", label: "Made a custom decoration", adopted: countMembers((m) => m.deco.customs > 0) },
         { key: "rate_farm", label: "Rated a farm", adopted: countMembers((m) => m.ratings.given > 0) },
+        { key: "equip_pet", label: "Equipped a pet", adopted: countMembers((m) => m.pets.equipped) },
+        { key: "pet_friend", label: "Petted / fed a friend's pet", adopted: countMembers((m) => m.pets.fedOrPetted > 0) },
     ].map((a) => ({ ...a, total: membersN, pct: pct(a.adopted, membersN) }));
+
+    // Unique FARM actions rolled up — the headline this screen leads with (how many members do each, and the
+    // lifetime volume) instead of pet levels.
+    const farmActions = {
+        planters: countMembers((m) => m.crops.plantedEver > 0),
+        cropsPlanted: sumAgg(cropActivity, "planted"),
+        harvesters: countMembers((m) => m.crops.harvestedEver > 0),
+        cropsHarvested: sumAgg(cropActivity, "harvested"),
+        decorators: countMembers((m) => m.deco.placed > 0),
+        decoPlaced: sumAgg(decoPlacedAgg, "placed"),
+        customMakers: countMembers((m) => m.deco.customs > 0),
+        customDecos: sumAgg(customAgg, "customs"),
+        raters: countMembers((m) => m.ratings.given > 0),
+        ratingsGiven: sumAgg(ratingGiven, "given"),
+        fertilizers: countMembers((m) => m.crops.fertilizer > 0),
+        upgraders: countMembers((m) => m.crops.upgradeLevels > 0),
+    };
 
     // ── Legacy fields (unchanged shape) so the previous screen still renders ──
     const withPet = num(memberRow?.with_pet);
@@ -227,5 +246,5 @@ export async function getFarmTelemetry() {
     if (farm.decoOwners === 0) flags.push({ sev: "info", text: `Decorations haven't been claimed yet — seed the shop / spin drops to kick it off.` });
     flags.push({ sev: "info", text: `Farm (crops, decorations, ratings) is owner-only right now, so those bars stay thin until it opens pack-wide. Pets are already pack-wide.` });
 
-    return { summary, pets: petsBlock, farm, flags, adoption, members };
+    return { summary, farmActions, pets: petsBlock, farm, flags, adoption, members };
 }
