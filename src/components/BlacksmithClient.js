@@ -198,7 +198,10 @@ export default function BlacksmithClient({ initial }) {
                 <div className="forge-parts">
                     {parts.map((p) => (
                         <div key={p.tier} className="forge-part" style={{ "--pc": p.color }}>
-                            <span className="forge-ingot" aria-hidden="true" />
+                            {p.sprite
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img className="forge-partimg" src={p.sprite} alt={p.name} />
+                                : <span className="forge-ingot" aria-hidden="true" />}
                             <span className="forge-part-body">
                                 <b>{p.count}</b>
                                 <span className="forge-part-name">{p.name}</span>
@@ -465,6 +468,7 @@ const FORGE_CSS = `
 .forge-parts:last-child { margin-bottom: 0; }
 .forge-part { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 6px; border-radius: 12px; background: rgba(10,6,3,0.55); border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); }
 .forge-ingot { width: 30px; height: 20px; border-radius: 4px; background: linear-gradient(135deg, color-mix(in srgb, var(--pc) 92%, #fff) , var(--pc) 55%, color-mix(in srgb, var(--pc) 60%, #000)); box-shadow: 0 0 12px color-mix(in srgb, var(--pc) 70%, transparent), inset 0 1px 2px rgba(255,255,255,0.5); clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%); }
+.forge-partimg { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)) drop-shadow(0 0 9px color-mix(in srgb, var(--pc) 55%, transparent)); }
 .forge-part-body { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .forge-part-body b { font-size: 17px; font-weight: 900; color: #fff; }
 .forge-part-name { font-size: 9.5px; font-weight: 700; color: color-mix(in srgb, var(--pc) 75%, #fff); text-align: center; }
