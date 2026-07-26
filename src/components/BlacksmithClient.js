@@ -39,7 +39,7 @@ const BANDS = [
     { key: "great", max: 0.10, score: 2, label: "GREAT", color: "#8fe39a" },
     { key: "good", max: 0.16, score: 1, label: "GOOD", color: "#d7c48a" },
 ];
-const gradeFor = (dist) => BANDS.find((b) => dist <= b.max) || { key: "miss", score: 0, label: "MISS", color: "#ff8f9a" };
+const gradeFor = (dist, widen = 0) => BANDS.find((b) => dist <= b.max + widen) || { key: "miss", score: 0, label: "MISS", color: "#ff8f9a" };
 const STRIKES = 6;
 
 export default function BlacksmithClient({ initial }) {
@@ -75,11 +75,17 @@ export default function BlacksmithClient({ initial }) {
         if (r?.ok) SFX.perfect();
     }, [post]);
 
+    const doUpgrade = useCallback(async (key) => {
+        const r = await post({ action: "upgrade", key }, `up-${key}`);
+        if (r?.ok) SFX.great();
+        else if (r?.error) setToast({ kind: "err", text: r.error === "no_gold" ? "Not enough gold for that upgrade." : "Couldn't buy that." });
+    }, [post]);
+
     // Called by the mini-game with the player's execution → server rolls the stat bump.
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { SFX.win(); setToast({ kind: "enhance", name: item.name, level: r.level, gained: r.gained, grade: r.grade, xp: r.xp }); setTimeout(() => setToast(null), 4200); }
+        if (r?.ok) { SFX.win(); setToast({ kind: "enhance", name: item.name, level: r.level, gained: r.gained, grade: r.grade, xp: r.xp, doubled: r.doubled }); setTimeout(() => setToast(null), 4200); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -135,6 +141,7 @@ export default function BlacksmithClient({ initial }) {
                 <div className="forge-tabs">
                     <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}>⚒️ Enhance ({enhance.length})</button>
                     <button type="button" className={tab === "salvage" ? "on" : ""} onClick={() => setTab("salvage")}>♻️ Salvage ({salvage.length})</button>
+                    <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}>⚙️ Perks</button>
                 </div>
 
                 {tab === "enhance" ? (
@@ -150,7 +157,7 @@ export default function BlacksmithClient({ initial }) {
                             </button>
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
                     </div>
-                ) : (
+                ) : tab === "salvage" ? (
                     <div className="forge-grid">
                         {salvage.length ? salvage.map((it) => (
                             <button key={it.id} type="button" className="forge-card is-salvage" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => doSalvage(it)}>
@@ -162,6 +169,24 @@ export default function BlacksmithClient({ initial }) {
                             </button>
                         )) : <div className="forge-empty">Nothing spare to salvage — every item you own is equipped.</div>}
                     </div>
+                ) : (
+                    <div className="forge-upgrades">
+                        {(forge.upgrades || []).map((u) => (
+                            <div key={u.key} className="forge-upg">
+                                <div className="forge-upg-body">
+                                    <b>{u.name}{u.level > 0 ? <span className="forge-upg-lvl">Lv {u.level}{u.max ? `/${u.max}` : ""}</span> : null}</b>
+                                    <span>{u.desc}</span>
+                                    {u.level > 0 ? <em className="forge-upg-eff">now: {u.unit === "%" ? u.effect : `${u.level} ${u.unit}${u.level === 1 ? "" : "s"}`}</em> : null}
+                                </div>
+                                {u.cost != null ? (
+                                    <button type="button" className="forge-upg-buy" disabled={Boolean(busy) || (forge.gold || 0) < u.cost} onClick={() => doUpgrade(u.key)}>
+                                        {busy === `up-${u.key}` ? "…" : `🪙 ${u.cost.toLocaleString()}`}
+                                    </button>
+                                ) : <span className="forge-upg-max">MAX</span>}
+                            </div>
+                        ))}
+                        <div className="forge-gold">🪙 {(forge.gold || 0).toLocaleString()} gold on hand</div>
+                    </div>
                 )}
 
                 {/* salvage reward burst */}
@@ -172,13 +197,14 @@ export default function BlacksmithClient({ initial }) {
                 ) : null}
             </section>
 
-            {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
+            {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHand={forge.steadyHand || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
 
             {toast ? (
                 <div className={`forge-toast${toast.kind === "err" ? " is-err" : ""}`} role="status">
                     {toast.kind === "enhance" ? (
                         <>
                             <b>{toast.name} → +{toast.level}!</b>
+                            {toast.doubled ? <span style={{ color: "#ffd75e", fontWeight: 800 }}>✦ MASTER&apos;S TOUCH — double gains!</span> : null}
                             <span>{toast.grade === "pixel" ? "PIXEL-PERFECT strike" : toast.grade === "perfect" ? "Perfect strike" : "Forged"} · {toast.gained} · +{toast.xp} XP</span>
                         </>
                     ) : <span>{toast.text}</span>}
@@ -192,9 +218,11 @@ const salvageErr = (e) => ({ kind: "err", text: { equipped: "That's equipped —
 const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need ${need?.qty} of tier ${need?.tier}.` : e === "not_equipped" ? "Equip it first." : "Enhance failed — try again.");
 
 // ── The hammer-&-anvil timing mini-game ─────────────────────────────────────────────────────────────────────
-function EnhanceMinigame({ item, parts, onCancel, onDone, busy }) {
+function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }) {
     const [marker, setMarker] = useState(0.5); // 0..1 position on the heat bar
     const [strikeNo, setStrikeNo] = useState(0);
+    const [saves, setSaves] = useState(steadyHand); // Steady Hand: slips that won't break the combo
+    const savesRef = useRef(steadyHand);
     const [combo, setCombo] = useState(0);
     const [bestCombo, setBestCombo] = useState(0);
     const [score, setScore] = useState(0);
@@ -227,8 +255,10 @@ function EnhanceMinigame({ item, parts, onCancel, onDone, busy }) {
     const strike = useCallback(() => {
         if (done) return;
         const dist = Math.abs(markerRef.current - 0.5);
-        const g = gradeFor(dist);
-        const keepCombo = g.score >= 2; // Great+ keeps the combo; Good & Miss reset it
+        const g = gradeFor(dist, steadyHand * 0.015); // Steady Hand widens the timing bands
+        let keepCombo = g.score >= 2; // Great+ keeps the combo; Good & Miss reset it
+        let saved = false;
+        if (!keepCombo && savesRef.current > 0) { keepCombo = true; saved = true; savesRef.current -= 1; setSaves(savesRef.current); } // a slip forgiven
         const curCombo = comboRef.current;
         const mult = 1 + curCombo * 0.2;
         const add = g.score * mult;
@@ -238,8 +268,8 @@ function EnhanceMinigame({ item, parts, onCancel, onDone, busy }) {
         setBestCombo((b) => Math.max(b, nextCombo));
         setScore((s) => s + add);
         setMaxScore((m) => m + 4 * mult);
-        setPop({ label: g.label, color: g.color, k: Date.now(), combo: nextCombo });
-        SFX[g.key] ? SFX[g.key]() : SFX.miss();
+        setPop({ label: saved ? `${g.label} · SAVED` : g.label, color: saved ? "#8fe3ff" : g.color, k: Date.now(), combo: nextCombo });
+        (saved ? SFX.great : SFX[g.key] || SFX.miss)();
         // juice: spark burst + a shake scaled by grade
         const n = g.score >= 3 ? 14 : g.score >= 2 ? 9 : g.score >= 1 ? 5 : 2;
         setSparks(Array.from({ length: n }, (_, i) => ({ id: Date.now() + i, a: Math.random() * 360, d: 30 + Math.random() * 60, c: g.color })));
@@ -250,7 +280,7 @@ function EnhanceMinigame({ item, parts, onCancel, onDone, busy }) {
         const nextStrike = strikeNo + 1;
         if (nextStrike >= STRIKES) { setDone(true); cancelAnimationFrame(raf.current); }
         else { t0.current = 0; setStrikeNo(nextStrike); }
-    }, [done, strikeNo]);
+    }, [done, strikeNo, steadyHand]);
 
     // keyboard: space/enter to strike
     useEffect(() => {
@@ -289,6 +319,7 @@ function EnhanceMinigame({ item, parts, onCancel, onDone, busy }) {
                         </div>
                         <div className="forge-mg-meta">
                             <span>Combo <b style={{ color: combo > 1 ? "#ffd75e" : undefined }}>{combo}</b></span>
+                            {steadyHand > 0 ? <span title="Steady Hand — slips forgiven">🛡️ {saves}</span> : null}
                             <span className="forge-dots">{Array.from({ length: STRIKES }).map((_, i) => <i key={i} className={i < strikeNo ? "hit" : i === strikeNo ? "now" : ""} />)}</span>
                         </div>
                         <button type="button" className="forge-strike" onPointerDown={(e) => { e.preventDefault(); strike(); }}>STRIKE!</button>
@@ -396,4 +427,16 @@ const FORGE_CSS = `
 .forge-result-bar span { display: block; height: 100%; background: linear-gradient(90deg, #f3922a, #ffd75e); box-shadow: 0 0 12px #ffcf7a; transition: width .6s cubic-bezier(.2,1,.3,1); }
 .forge-result-sub { font-size: 12px; color: #cdb89f; }
 .forge-mg-cancel { display: block; margin: 8px auto 0; background: none; border: none; color: #b9a892; font-size: 12px; cursor: pointer; }
+/* ── perks / upgrades ── */
+.forge-upgrades { display: flex; flex-direction: column; gap: 9px; }
+.forge-upg { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 13px; background: linear-gradient(180deg, rgba(30,18,10,0.85), rgba(14,8,4,0.9)); border: 1px solid rgba(255,150,60,0.32); }
+.forge-upg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.forge-upg-body b { font-size: 13px; color: #ffe0b0; display: flex; align-items: center; gap: 8px; }
+.forge-upg-body span { font-size: 11px; color: #c8b79f; }
+.forge-upg-lvl { font-size: 10px; font-weight: 800; color: #2a1000; background: linear-gradient(180deg,#ffd75e,#f3b23a); border-radius: 999px; padding: 1px 7px; }
+.forge-upg-eff { font-size: 10.5px; color: #8fe3a1; font-style: normal; font-weight: 700; }
+.forge-upg-buy { flex: 0 0 auto; padding: 8px 12px; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer; border: 1px solid rgba(255,215,94,0.55); background: rgba(255,215,94,0.14); color: #ffd75e; white-space: nowrap; }
+.forge-upg-buy:disabled { opacity: 0.5; cursor: default; }
+.forge-upg-max { flex: 0 0 auto; font-size: 11px; font-weight: 900; color: #8fe3a1; letter-spacing: 0.06em; }
+.forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 2px; }
 `;

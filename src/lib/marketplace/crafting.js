@@ -6,6 +6,7 @@ import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -37,6 +38,38 @@ const SALVAGE = {
 const rarityTier = (r) => SALVAGE[r]?.tier || 1;
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const GRADE_RANK = { good: 1, great: 2, perfect: 3, pixel: 4 };
+
+// Owner-buyable forge upgrades. `per` = effect per level; `steady_hand` levels are combo-saves + band-widening
+// applied client-side in the mini-game. Cost is gold, climbing per level.
+export const FORGE_UPGRADES = {
+    efficient: { name: "Efficient Salvage", desc: "Chance for DOUBLE parts when you salvage.", max: 5, per: 0.07, base: 1500, unit: "%" },
+    keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.05, base: 2500, unit: "%" },
+    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.045, base: 3500, unit: "%" },
+    steady_hand: { name: "Steady Hand", desc: "A slip won't break your combo (per forge) + wider timing windows.", max: 3, per: 1, base: 4000, unit: "save" },
+};
+const upgCost = (u, level) => Math.round(u.base * Math.pow(1.9, level));
+async function upgradeLevels(buyerId) {
+    const rows = await db.query(`SELECT key, level FROM mkt_forge_upgrade WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const m = {};
+    for (const r of rows) m[r.key] = r.level;
+    return m;
+}
+const chance = (upg, key) => (FORGE_UPGRADES[key].per * (upg[key] || 0));
+
+// Buy the next level of a forge upgrade (gold sink).
+export async function buyForgeUpgrade(buyerId, key) {
+    const u = FORGE_UPGRADES[key];
+    if (!buyerId || !u) return { ok: false, error: "bad_upgrade" };
+    const cur = (await upgradeLevels(buyerId))[key] || 0;
+    if (cur >= u.max) return { ok: false, error: "maxed" };
+    const cost = upgCost(u, cur);
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
+    if (!paid) return { ok: false, error: "no_gold", ...(await getForgeState(buyerId)) };
+    await logCoin(buyerId, -cost, "forge_upgrade", { balanceAfter: paid.gold, meta: { key, level: cur + 1 } }).catch(() => {});
+    await db.query(`INSERT INTO mkt_forge_upgrade (buyer_id, key, level) VALUES ($1,$2,1) ON CONFLICT (buyer_id, key) DO UPDATE SET level = mkt_forge_upgrade.level + 1`, [buyerId, key]).catch(() => {});
+    await logCraft(buyerId, "upgrade", { meta: { key, level: cur + 1 } });
+    return { ok: true, key, level: cur + 1, ...(await getForgeState(buyerId)) };
+}
 
 // Enhance cost: parts of the item's rarity tier, quantity grows LOGARITHMICALLY with the item's enhance level.
 function enhanceCost(item, level) {
@@ -71,13 +104,18 @@ export async function salvageItem(buyerId, itemId) {
     if (!del) return { ok: false, error: "not_owned" };
     await db.query(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {}); // the item is gone — drop its enhancement
     const cfg = SALVAGE[item.rarity] || SALVAGE.common;
-    const n = randInt(cfg.min, cfg.max);
+    const upg = await upgradeLevels(buyerId);
+    let n = randInt(cfg.min, cfg.max);
+    let doubled = false;
+    if (Math.random() < chance(upg, "efficient")) { n *= 2; doubled = true; } // Efficient Salvage
     await addParts(buyerId, cfg.tier, n);
+    let bonusTier = null;
+    if (cfg.tier < MAX_TIER && Math.random() < chance(upg, "keen_eye")) { await addParts(buyerId, cfg.tier + 1, 1); bonusTier = cfg.tier + 1; } // Keen Eye
     const xp = 6 + cfg.tier * 4;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
-    await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n }).catch(() => {});
-    await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n } });
-    return { ok: true, gained: { tier: cfg.tier, n }, xp, ...(await getForgeState(buyerId)) };
+    await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier }).catch(() => {});
+    await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier } });
+    return { ok: true, gained: { tier: cfg.tier, n }, doubled, bonusTier, xp, ...(await getForgeState(buyerId)) };
 }
 
 // ── Combine 5 of a tier → 1 of the next ──
@@ -107,7 +145,10 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // Enhancement deepens the item's OWN identity: it rolls onto the stats the item already carries.
     const pool = Object.keys(item.stats || {}).filter((k) => STAT_META[k]);
     const keys = pool.length ? pool : ["might"];
-    const points = Math.max(1, 1 + Math.round(q * 3) + (grade === "pixel" ? 1 : 0)); // execution → magnitude of the roll
+    let points = Math.max(1, 1 + Math.round(q * 3) + (grade === "pixel" ? 1 : 0)); // execution → magnitude of the roll
+    const upg = await upgradeLevels(buyerId);
+    let doubled = false;
+    if (Math.random() < chance(upg, "masters_touch")) { points *= 2; doubled = true; } // Master's Touch
     const gained = {};
     for (let i = 0; i < points; i += 1) { const k = keys[Math.floor(Math.random() * keys.length)]; gained[k] = (gained[k] || 0) + 1; }
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
@@ -124,19 +165,21 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const xp = 12 + Math.round(q * 48) + (grade === "pixel" ? 15 : grade === "perfect" ? 8 : 0);
     await awardXp(buyerId, "craft_enhance", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_enhance", { itemId, level: level + 1, grade, quality: q, combo }).catch(() => {});
-    await logCraft(buyerId, "enhance", { itemId, tier, score: Math.round(q * 1000), grade, meta: { level: level + 1, gained, combo } });
-    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), xp, grade, ...(await getForgeState(buyerId)) };
+    await logCraft(buyerId, "enhance", { itemId, tier, score: Math.round(q * 1000), grade, meta: { level: level + 1, gained, combo, doubled } });
+    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), doubled, xp, grade, ...(await getForgeState(buyerId)) };
 }
 
 // ── Full forge state for the UI ──
 export async function getForgeState(buyerId) {
     if (!buyerId) return null;
-    const [bySlot, parts, ownedRows, enhRows, spriteMap] = await Promise.all([
+    const [bySlot, parts, ownedRows, enhRows, spriteMap, upg, goldRow] = await Promise.all([
         getEquippedIds(buyerId),
         partCounts(buyerId),
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT item_id, level, stat_bonus, best_grade FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         itemSpriteMap().catch(() => ({})),
+        upgradeLevels(buyerId),
+        db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
     const equippedIds = new Set(Object.values(bySlot));
     const enhById = new Map();
@@ -154,5 +197,9 @@ export async function getForgeState(buyerId) {
     const salvage = (ownedRows || []).map((r) => r.item_id).filter((id) => !equippedIds.has(id)).map(dress).filter(Boolean).sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));
     const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; return { ...d, cost: enhanceCost(itemById(id), d.level) }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
     const partList = PART_TIERS.map((p) => ({ ...p, count: parts[p.tier] || 0, canCombine: (parts[p.tier] || 0) >= COMBINE_COST && p.tier < MAX_TIER }));
-    return { parts: partList, salvage, enhance, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    const upgrades = Object.entries(FORGE_UPGRADES).map(([key, u]) => {
+        const level = upg[key] || 0;
+        return { key, name: u.name, desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? `${Math.round(u.per * level * 100)}%` : `${level}` };
+    });
+    return { parts: partList, salvage, enhance, upgrades, steadyHand: upg.steady_hand || 0, gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }
