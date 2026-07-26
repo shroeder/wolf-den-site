@@ -574,6 +574,24 @@ export default function FarmClient({ initial, viewingAlias }) {
     const objFilter = visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none";
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
+    // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS), plus the
+    // native Fullscreen API where supported to also hide the browser chrome.
+    const sceneWrapRef = useRef(null);
+    const [fullscreen, setFullscreen] = useState(false);
+    const toggleFullscreen = useCallback(() => {
+        setFullscreen((v) => {
+            const next = !v;
+            try { if (next) sceneWrapRef.current?.requestFullscreen?.(); else if (typeof document !== "undefined" && document.fullscreenElement) document.exitFullscreen?.(); } catch { /* CSS overlay still fills the screen */ }
+            return next;
+        });
+    }, []);
+    useEffect(() => {
+        const onFs = () => { if (typeof document !== "undefined" && !document.fullscreenElement) setFullscreen(false); };
+        document.addEventListener("fullscreenchange", onFs);
+        return () => document.removeEventListener("fullscreenchange", onFs);
+    }, []);
+    const sceneHeight = fullscreen ? "100dvh" : "min(52vh, 420px)";
+
     return (
         <div className="stack reveal">
             <style>{`
@@ -666,12 +684,12 @@ export default function FarmClient({ initial, viewingAlias }) {
             <FarmDirectory current={viewingAlias} />
 
             {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
-            <div style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
+            <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden" }}>
                     <div
                         ref={fieldRef}
                         style={{
-                            position: "relative", width: `${fieldW}%`, minWidth: "100%", height: "min(52vh, 420px)",
+                            position: "relative", width: `${fieldW}%`, minWidth: "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
@@ -820,6 +838,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
                     {weatherLabel(wx)}
                 </div>
+                {/* Full-screen / immersive toggle. */}
+                <button type="button" onClick={toggleFullscreen} aria-label={fullscreen ? "Exit full screen" : "Full screen"} title={fullscreen ? "Exit full screen" : "Full screen"}
+                    style={{ position: "absolute", bottom: 10, left: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.25)", background: "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: "#e6e6ea", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        {fullscreen
+                            ? <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+                            : <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m10 0h3a2 2 0 0 0 2-2v-3" />}
+                    </svg>
+                    {fullscreen ? "Exit" : "Full screen"}
+                </button>
             </div>
 
             {farm.mine && garden ? (
