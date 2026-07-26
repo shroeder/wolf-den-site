@@ -198,8 +198,8 @@ const pickFarmBg = (tod, condition) =>
 
 // Fixed backdrops for the Inside (barn) and Garden views — generated once, hardcoded like FARM_BG.
 const VIEW_BG = {
-    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-1785106907576.png",
-    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-1785106961425.png",
+    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-flat-1785108049136.png",
+    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-flat-1785108098669.png",
 };
 
 export default function FarmClient({ initial, viewingAlias }) {
@@ -1189,7 +1189,9 @@ function OwnerWalker({ owner, mine, minX = FARM_PAD, onTap }) {
         timers.push(setTimeout(step, 900));
         return () => { alive = false; timers.forEach(clearTimeout); };
     }, [minX]);
-    const flip = Boolean(pos.flip) !== Boolean(owner.avatarFlip);
+    // The avatar is a FRONT-facing portrait (no left/right walking pose), so mirroring it by travel direction just
+    // reads as moonwalking. Keep only the avatar's own stored flip; don't flip on movement.
+    const flip = Boolean(owner.avatarFlip);
     return (
         <button
             type="button"
