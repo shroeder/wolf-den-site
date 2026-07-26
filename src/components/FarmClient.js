@@ -648,6 +648,15 @@ export default function FarmClient({ initial, viewingAlias }) {
                 /* Rarity-framed portrait tile so a pet sprite reads as an intentional framed portrait, not a raw square. */
                 .farm-portrait { position: relative; display: inline-block; border-radius: 20px; overflow: hidden; }
                 .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
+                .farm-rank { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.35); background: linear-gradient(180deg, rgba(255,214,110,0.14), rgba(255,255,255,0.02) 60%); }
+                .farm-rank-crest { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; font-weight: 900; color: #3a2c08; background: linear-gradient(180deg, #ffe488, #f3b23a); box-shadow: 0 3px 0 #b57f22, 0 0 14px rgba(255,214,110,0.5); }
+                .farm-rank-body { flex: 1; min-width: 0; }
+                .farm-rank-top { display: flex; align-items: baseline; gap: 8px; }
+                .farm-rank-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #cdb98a; }
+                .farm-rank-name { font-size: 15px; font-weight: 900; color: #ffe488; }
+                .farm-rank-bar { height: 6px; border-radius: 999px; background: rgba(0,0,0,0.28); overflow: hidden; margin: 5px 0 3px; }
+                .farm-rank-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f3b23a, #ffe488); box-shadow: 0 0 8px rgba(255,214,110,0.6); transition: width .6s cubic-bezier(.3,1.2,.4,1); }
+                .farm-rank-next { font-size: 10.5px; color: #b9a892; }
             `}</style>
 
             {farm.mine ? (
@@ -676,6 +685,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <button type="button" className="farm-jbtn" style={{ marginLeft: "auto" }} onClick={() => window.location.assign("/marketplace/farm")}>🏡 My farm</button>
                 </div>
             ) : null}
+
+            {farm.mine && farm.rating ? <FarmRankBadge byTier={farm.rating.byTier} /> : null}
 
             {farm.rating ? (
                 <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
@@ -1333,6 +1344,33 @@ function ChargeDots({ left, allowance }) {
 
 // Farm-rating card: a polished, juicy way to Like / Love / Admire a friend's farm (or, on your own farm, a
 // clean tally of the love you've received). Big tier buttons with an active glow + lift + burst; charge dots.
+// Farm Rank — a dopamine progression from the tier-weighted likes your farm has earned (like 1 · love 2 · admire 3).
+const FARM_RANKS = [
+    { min: 0, name: "New Sprout" }, { min: 3, name: "Seedling Plot" }, { min: 8, name: "Budding Homestead" },
+    { min: 18, name: "Growing Farmstead" }, { min: 35, name: "Thriving Farm" }, { min: 60, name: "Bountiful Estate" },
+    { min: 100, name: "Grand Plantation" }, { min: 160, name: "Legendary Grange" }, { min: 260, name: "Mythic Cornucopia" },
+];
+function FarmRankBadge({ byTier = {} }) {
+    const score = (byTier[1] || 0) + (byTier[2] || 0) * 2 + (byTier[3] || 0) * 3;
+    let idx = 0;
+    for (let i = 0; i < FARM_RANKS.length; i += 1) if (score >= FARM_RANKS[i].min) idx = i;
+    const cur = FARM_RANKS[idx];
+    const next = FARM_RANKS[idx + 1] || null;
+    const pct = next ? Math.max(4, Math.min(100, Math.round(((score - cur.min) / (next.min - cur.min)) * 100))) : 100;
+    return (
+        <div className="farm-rank">
+            <div className="farm-rank-crest">{idx + 1}</div>
+            <div className="farm-rank-body">
+                <div className="farm-rank-top">
+                    <span className="farm-rank-label">Farm Rank</span>
+                    <b className="farm-rank-name">{cur.name}</b>
+                </div>
+                <div className="farm-rank-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
+                <span className="farm-rank-next">{next ? `${next.min - score} more to ${next.name} — earn ratings from friends` : "Top rank — a legend of the land!"}</span>
+            </div>
+        </div>
+    );
+}
 function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
     const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
     const left = charge?.left ?? 0;
