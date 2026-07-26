@@ -53,15 +53,16 @@ function regaliaBonus(equippedCount) {
 // Owner-buyable forge upgrades. `per` = effect per level; `steady_hand` levels are combo-saves + band-widening
 // applied client-side in the mini-game. Cost is gold, climbing per level.
 export const FORGE_UPGRADES = {
-    efficient: { name: "Efficient Salvage", desc: "Chance for DOUBLE parts when you salvage.", max: 5, per: 0.0233, base: 1500, unit: "%" },
-    keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.0167, base: 2500, unit: "%" },
-    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 3500, unit: "%" },
-    steady_hand: { name: "Steady Hand", desc: "Chance a slip won't break your combo when you enhance.", max: 5, per: 0.05, base: 4000, unit: "%" },
+    efficient: { name: "Efficient Salvage", desc: "Chance for DOUBLE parts when you salvage.", max: 5, per: 0.0233, base: 250, unit: "%" },
+    keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.0167, base: 300, unit: "%" },
+    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 400, unit: "%" },
+    steady_hand: { name: "Steady Hand", desc: "Chance a slip won't break your combo when you enhance.", max: 5, per: 0.05, base: 350, unit: "%" },
 };
 // Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
 const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️" };
 const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo-save chance" };
-const upgCost = (u, level) => Math.round(u.base * Math.pow(1.9, level));
+// Gold cost of the NEXT level: affordable base, doubling each level — mirrors the sailing/dig upgrade curves.
+const upgCost = (u, level) => Math.round(u.base * Math.pow(2, level));
 async function upgradeLevels(buyerId) {
     const rows = await db.query(`SELECT key, level FROM mkt_forge_upgrade WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const m = {};
