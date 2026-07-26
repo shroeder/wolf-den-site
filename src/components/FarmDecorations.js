@@ -282,12 +282,8 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                             <button type="button" onClick={() => { setScale(1); setRot(0); commit(1, 0); }} style={{ alignSelf: "flex-start", fontSize: 11.5, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Reset size &amp; rotation</button>
                         </div>
                     ) : null}
-                    {placed && mine ? (
-                        // Destructive-looking + secondary on purpose: this REMOVES the placed piece (it returns to
-                        // your tray). Styled danger-red so it never gets mistaken for the safe Close button below.
-                        // No confirm dialog by design — one tap, but it visually reads as the removal action.
-                        <button type="button" disabled={busy} onClick={() => { onPickup(item.placementId); onClose(); }} style={{ width: "100%", padding: 11, fontWeight: 800, fontSize: 13.5, background: "rgba(224,91,106,0.12)", color: "#ff8f9a", border: "1px solid rgba(224,91,106,0.5)", borderRadius: 11, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>🗑️ Remove from farm (returns to your tray)</button>
-                    ) : null}
+                    {/* Close FIRST — the safe, default action sits on top. */}
+                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 12, fontWeight: 900, background: "rgba(255,255,255,0.12)", color: "inherit", border: "1px solid rgba(255,255,255,0.24)", borderRadius: 11, cursor: "pointer" }}>Close</button>
                     {canBuy && afford ? (
                         <button type="button" disabled={busy} onClick={() => { onBuy(item.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.6 : 1 }}>🪙 Buy · {item.price.toLocaleString()}g{item.source === "special" ? " (premium)" : ""}</button>
                     ) : null}
@@ -303,8 +299,10 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     {!placed && item.owned ? (
                         <div className="muted" style={{ textAlign: "center", fontSize: 12 }}>You own this — drag it from your tray to place it.</div>
                     ) : null}
-                    {/* The safe, obvious tap — clearly the primary neutral action so it can't be confused with Remove. */}
-                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 12, fontWeight: 900, background: "rgba(255,255,255,0.12)", color: "inherit", border: "1px solid rgba(255,255,255,0.24)", borderRadius: 11, cursor: "pointer" }}>Done</button>
+                    {/* Destructive — plain red "Remove", below Close so it's never the reflex tap. No confirm (by design). */}
+                    {placed && mine ? (
+                        <button type="button" disabled={busy} onClick={() => { onPickup(item.placementId); onClose(); }} style={{ width: "100%", padding: 11, fontWeight: 800, fontSize: 13.5, background: "rgba(224,91,106,0.14)", color: "#ff6b74", border: "1px solid rgba(224,91,106,0.6)", borderRadius: 11, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>Remove</button>
+                    ) : null}
                 </div>
             </div>
         </div>
@@ -433,7 +431,7 @@ const customErr = (e) => ({ no_credits: "You're out of creations — grab a bund
 
 // ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a Creation
 // (bought on /marketplace/creations; owner can self-grant). Personal-only + never tradeable.
-export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onClose }) {
+export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onSuggest, onClose }) {
     const [draft, setDraft] = useState(custom?.draft || null);
     const [credits, setCredits] = useState(custom?.credits || 0);
     const [name, setName] = useState(draft?.name || "");
@@ -441,6 +439,7 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
     const [correction, setCorrection] = useState(""); // a tweak note for a redraw; the original prompt is preserved
     const [chosen, setChosen] = useState(draft?.options?.[draft.options.length - 1]?.url || null);
     const [gen, setGen] = useState(false);
+    const [suggesting, setSuggesting] = useState(false);
     const [err, setErr] = useState(null);
     const attemptsLeft = draft ? Math.max(0, (draft.maxAttempts || 4) - draft.attempts) : 4;
 
@@ -453,6 +452,14 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
         if (r.draft) { setDraft(r.draft); setChosen(r.draft.options?.[r.draft.options.length - 1]?.url || null); setCorrection(""); }
         if (r.credits != null) setCredits(r.credits);
         return r;
+    };
+    const doSuggest = async () => {
+        if (!name.trim()) { setErr("Enter a name first — then I'll suggest a description you can tweak."); return; }
+        setSuggesting(true); setErr(null);
+        const r = await onSuggest?.(name.trim());
+        setSuggesting(false);
+        if (r?.ok && r.description) setPrompt(r.description);
+        else setErr("Couldn't suggest one just now — type your own description.");
     };
     const doStart = () => { if (prompt.trim().length < 4) { setErr("Describe your decoration (a few words at least)."); return; } run(() => onStart(name, prompt)); };
     const doRefine = () => { if (!correction.trim()) { setErr("Add a quick note on what to change."); return; } run(() => onRefine(draft.id, correction)); };
@@ -478,8 +485,15 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
                         <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Describe what you want and our art pipeline draws it. Not quite right? Add a quick tweak and it redraws — your description stays, the tweak nudges it. It&apos;s yours alone, forever.</p>
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Name</label>
                         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="e.g. Wolf Totem" style={CINP} />
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, margin: "12px 0 4px" }}>Describe it</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 4px" }}>
+                            <label style={{ fontSize: 12, fontWeight: 700 }}>Describe it</label>
+                            <button type="button" onClick={doSuggest} disabled={suggesting || !name.trim()}
+                                style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: "#c9a2ff", background: "rgba(201,162,255,0.12)", border: "1px solid rgba(201,162,255,0.4)", borderRadius: 8, padding: "3px 9px", cursor: suggesting || !name.trim() ? "default" : "pointer", opacity: suggesting || !name.trim() ? 0.55 : 1 }}>
+                                {suggesting ? "✨ Thinking…" : "✨ Suggest from name"}
+                            </button>
+                        </div>
                         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} maxLength={300} rows={3} placeholder="e.g. a carved wooden wolf totem with glowing blue eyes" style={{ ...CINP, resize: "vertical" }} />
+                        <div className="muted" style={{ fontSize: 10.5, marginTop: 3 }}>Tip: name it, tap ✨ to draft a description, then edit it however you like.</div>
                         <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>💡 Original ideas only — the art filter blocks named brands &amp; copyrighted characters (Pokémon, Nintendo, Disney, etc.). Describe your own creature or object and it&apos;ll draw.</div>
                         {err ? <div style={{ color: "#ff9a9a", fontSize: 12.5, marginTop: 8 }}>{err}</div> : null}
                         {credits > 0 ? (

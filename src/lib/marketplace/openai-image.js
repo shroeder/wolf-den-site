@@ -94,6 +94,43 @@ export async function refineDecoPrompt(description, correction = "") {
     }
 }
 
+// Turn a decoration's NAME into a short, editable one-line visual description the player can tweak before
+// drawing (they type a name, we imagine what it looks like). Best-effort — null on any failure.
+export async function describeDecoFromName(name) {
+    const key = process.env.OPENAI_API_KEY;
+    const nm = String(name || "").trim().slice(0, 60);
+    if (!key || nm.length < 2) return null;
+    try {
+        const resp = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                max_tokens: 90,
+                temperature: 0.8,
+                messages: [
+                    {
+                        role: "system",
+                        content:
+                            "Given a decoration's NAME, write ONE short vivid sentence describing what it looks like — its form, materials, colors, and a standout detail — as a single decorative object a player would place on a farm. No preamble, no quotes, max 30 words. Never reference a real brand or copyrighted character.",
+                    },
+                    { role: "user", content: `Name: ${nm}` },
+                ],
+            }),
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json().catch(() => null);
+        const out = (data?.choices?.[0]?.message?.content || "")
+            .trim()
+            .replace(/^["']|["']$/g, "")
+            .replace(/\s+/g, " ")
+            .slice(0, 300);
+        return out.length >= 3 ? out : null;
+    } catch {
+        return null;
+    }
+}
+
 // Public: DETECT which way a rendered sprite faces WITHOUT modifying the image. Returns "left" | "right" |
 // "unknown" for a genuine model answer. THROWS on an infra failure (no key / fetch / non-200) so the caller
 // can leave the sprite unchecked and retry later instead of permanently recording a wrong "no-flip". Used to

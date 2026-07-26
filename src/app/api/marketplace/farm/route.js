@@ -4,7 +4,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState } from "@/lib/marketplace/farm-decorations.js";
-import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState } from "@/lib/marketplace/custom-deco.js";
+import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { useConsumable as openConsumable } from "@/lib/marketplace/consumables.js";
 import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
@@ -84,6 +84,7 @@ export async function POST(request) {
             else if (b?.action === "deco_remove") res = await removeDecoration(buyer.id, Number(b?.placementId));
             // ── Custom (player-made) decorations ──
             else if (b?.action === "deco_custom_state") res = { ok: true, custom: await getCustomState(buyer.id) };
+            else if (b?.action === "deco_custom_suggest") res = await suggestDecoDescription(String(b?.name || ""));
             else if (b?.action === "deco_custom_start") res = await startCustomDeco(buyer.id, String(b?.name || ""), String(b?.prompt || ""));
             else if (b?.action === "deco_custom_refine") res = await refineCustomDeco(buyer.id, Number(b?.id), String(b?.correction || ""));
             else if (b?.action === "deco_custom_finalize") { res = await finalizeCustomDeco(buyer.id, Number(b?.id), String(b?.chosenUrl || "")); if (res?.ok) res = { ...res, ...(await decoState(buyer.id)) }; }

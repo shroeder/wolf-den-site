@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { generateImage, refineDecoPrompt } from "@/lib/marketplace/openai-image.js";
+import { generateImage, refineDecoPrompt, describeDecoFromName } from "@/lib/marketplace/openai-image.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
 // Player-made decorations: describe → the art pipeline draws ONE image → if you don't love it, add a short
@@ -9,10 +9,11 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 // finalized custom is granted into mkt_deco_owned as 'custom:<id>' + its sprite into mkt_deco_sprite, so it
 // flows through the normal place/inspect system. Personal-only, never tradeable.
 const MAX_ATTEMPTS = 4; // 1 initial + 3 correction redraws (each is a single image now, so cheaper than the old 3-up)
-// House art style — MUST match our pets/heroes/items/boss/backgrounds (all "bold stylized illustration, clean
-// confident outlines, cel-shaded flat vibrant colors, polished RPG game-art style") so creations don't look
-// like a different game. Decoration-specific: a single object, isolated, no sticker halo (de-halo handles it).
-const ART = "2D video-game decoration art, a single decorative object, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, polished RPG game-art style, centered and fully isolated on a transparent background, no white sticker border, no ground shadow, no text, no logo, no watermark, no border";
+// House art style — matches our pets/heroes/items/boss/backgrounds (bold stylized illustration, cel-shaded flat
+// vibrant colors, polished RPG game-art) so creations look part of the same game — but with NO outline enforced
+// (decorations must be outline-free). Decoration-specific: a single object, isolated, no sticker halo (de-halo
+// also strips any white border at render time).
+const ART = "2D video-game decoration art, a single decorative object, bold stylized illustration, cel-shaded flat vibrant colors, soft clean edges with NO outline — absolutely no black outline, no dark contour lines, no ink outline around the subject — strong readable silhouette, polished RPG game-art style, centered and fully isolated on a transparent background, no white sticker border, no ground shadow, no text, no logo, no watermark, no border";
 // Build the final image prompt. We first run the player's raw wording through a refinement pass (the image
 // model takes terse descriptions too literally and misses the point) to get a vivid, concrete subject that
 // captures their intent; on any failure we fall back to their literal words. The ART style suffix is always
@@ -57,6 +58,12 @@ async function genOne(prompt, attempt) {
 }
 
 const mapDraft = (r) => ({ id: Number(r.id), name: r.name, prompt: r.prompt, attempts: r.attempts, maxAttempts: MAX_ATTEMPTS, options: r.options || [], status: r.status });
+
+// Suggest an editable description from a decoration's name (the player can then tweak it before drawing).
+export async function suggestDecoDescription(name) {
+    const desc = await describeDecoFromName(name).catch(() => null);
+    return desc ? { ok: true, description: desc } : { ok: false, error: "no_suggestion" };
+}
 
 export async function getCustomState(buyerId) {
     if (!buyerId) return { credits: 0, draft: null };

@@ -534,6 +534,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [post]);
     const customRefine = useCallback((id, correction) => post({ action: "deco_custom_refine", id, correction }), [post]);
+    const customSuggest = useCallback((name) => post({ action: "deco_custom_suggest", name }), [post]);
     const customFinalize = useCallback(async (id, chosenUrl) => {
         const r = await post({ action: "deco_custom_finalize", id, chosenUrl });
         if (r?.ok && r.catalog) setFarm((f) => ({ ...f, placements: r.placements || f.placements, decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, custom: { ...(f.decorations?.custom || {}), draft: null }, placedTotal: r.placedTotal, placedCap: r.placedCap } }));
@@ -566,7 +567,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     const bgUrl = pickFarmBg(wx.tod, wx.condition);
     // Time-of-day tint applied ONLY to world objects (pets/crops/decorations/farmer), never the backdrop — the
     // illustrated backdrop is already the right time of day, so we just knock down the flat-lit sprites.
-    const objFilter = wx.tod === "night" ? "brightness(0.78) saturate(0.9)" : wx.tod === "dusk" ? "brightness(0.88) saturate(0.95)" : wx.tod === "dawn" ? "brightness(0.94) saturate(0.98)" : "none";
+    // No color-muting overlay — sprites keep their full vibrant colors at every time of day (the illustrated
+    // backdrop already conveys night/dusk). Only a whisper of brightness at dusk/dawn for ambiance; night = none.
+    const objFilter = wx.tod === "dusk" ? "brightness(0.94)" : wx.tod === "dawn" ? "brightness(0.98)" : "none";
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
@@ -899,6 +902,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onStart={customStart}
                     onRefine={customRefine}
                     onFinalize={customFinalize}
+                    onSuggest={customSuggest}
                     onClose={() => setCustomOpen(false)}
                 />
             ) : null}
