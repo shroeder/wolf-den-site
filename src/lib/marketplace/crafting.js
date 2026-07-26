@@ -17,8 +17,8 @@ export const HEARTH_BG = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.co
 
 // Tiered forge parts (1..5) — themed to a smithy, with rarity-ladder colors + a react-icons glyph fallback.
 export const PART_TIERS = [
-    { tier: 1, name: "Cinder Scrap", color: "#c39b6a", glyph: "GiMetalBar", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/cinder-scrap-1785085294182.png" },
-    { tier: 2, name: "Iron Filings", color: "#cfd6dd", glyph: "GiStakeHammer", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/iron-filings-1785085314204.png" },
+    { tier: 1, name: "Cinder Scrap", color: "#c39b6a", glyph: "GiMetalBar", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/cinder-scrap-v2-1785086093272.png" },
+    { tier: 2, name: "Iron Filings", color: "#cfd6dd", glyph: "GiStakeHammer", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/iron-filings-v2-1785086110602.png" },
     { tier: 3, name: "Tempered Steel", color: "#6fb0e6", glyph: "GiIngot", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/tempered-steel-1785085332258.png" },
     { tier: 4, name: "Mythril Dust", color: "#b98cff", glyph: "GiCrystalize", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/mythril-dust-1785085353020.png" },
     { tier: 5, name: "Emberheart Shard", color: "#ffb020", glyph: "GiCrystalCluster", sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/parts/emberheart-shard-1785085371947.png" },
