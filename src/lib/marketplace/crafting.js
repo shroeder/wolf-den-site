@@ -95,6 +95,11 @@ async function partCounts(buyerId) {
 }
 const parseBonus = (raw) => (typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : raw || {});
 
+// Log a forge open (for the admin adoption/abandonment funnel). Best-effort.
+export async function logForgeOpen(buyerId) {
+    if (buyerId) await logCraft(buyerId, "open_forge", {});
+}
+
 // ── Salvage an unequipped owned item into parts ──
 export async function salvageItem(buyerId, itemId) {
     const item = itemById(itemId);
