@@ -321,7 +321,7 @@ export default function BlacksmithClient({ initial }) {
                 )}
             </section>
 
-            {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHand={forge.steadyHand || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
+            {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHandChance={forge.steadyHandChance || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
 
             {toast ? (
                 <div className={`forge-toast${toast.kind === "err" ? " is-err" : ""}`} role="status">
@@ -342,11 +342,9 @@ const salvageErr = (e) => ({ kind: "err", text: { equipped: "That's equipped —
 const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need ${need?.qty} of tier ${need?.tier}.` : e === "not_equipped" ? "Equip it first." : "Enhance failed — try again.");
 
 // ── The hammer-&-anvil timing mini-game ─────────────────────────────────────────────────────────────────────
-function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }) {
+function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, busy }) {
     const [marker, setMarker] = useState(0.5); // 0..1 position on the heat bar
     const [strikeNo, setStrikeNo] = useState(0);
-    const [saves, setSaves] = useState(steadyHand); // Steady Hand: slips that won't break the combo
-    const savesRef = useRef(steadyHand);
     const [combo, setCombo] = useState(0);
     const [bestCombo, setBestCombo] = useState(0);
     const [score, setScore] = useState(0);
@@ -379,10 +377,10 @@ function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }
     const strike = useCallback(() => {
         if (done) return;
         const dist = Math.abs(markerRef.current - 0.5);
-        const g = gradeFor(dist, steadyHand * 0.015); // Steady Hand widens the timing bands
+        const g = gradeFor(dist);
         let keepCombo = g.score >= 2; // Great+ keeps the combo; Good & Miss reset it
         let saved = false;
-        if (!keepCombo && savesRef.current > 0) { keepCombo = true; saved = true; savesRef.current -= 1; setSaves(savesRef.current); } // a slip forgiven
+        if (!keepCombo && steadyHandChance > 0 && Math.random() < steadyHandChance) { keepCombo = true; saved = true; } // Steady Hand: a slip forgiven (chance)
         const curCombo = comboRef.current;
         const mult = 1 + curCombo * 0.2;
         const add = g.score * mult;
@@ -404,7 +402,7 @@ function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }
         const nextStrike = strikeNo + 1;
         if (nextStrike >= STRIKES) { setDone(true); cancelAnimationFrame(raf.current); }
         else { t0.current = 0; setStrikeNo(nextStrike); }
-    }, [done, strikeNo, steadyHand]);
+    }, [done, strikeNo, steadyHandChance]);
 
     // keyboard: space/enter to strike
     useEffect(() => {
@@ -443,7 +441,7 @@ function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }
                         </div>
                         <div className="forge-mg-meta">
                             <span>Combo <b style={{ color: combo > 1 ? "#ffd75e" : undefined }}>{combo}</b></span>
-                            {steadyHand > 0 ? <span title="Steady Hand — slips forgiven">🛡️ {saves}</span> : null}
+                            {steadyHandChance > 0 ? <span title="Steady Hand — chance a slip won't break your combo">🛡️ {Math.round(steadyHandChance * 100)}%</span> : null}
                             <span className="forge-dots">{Array.from({ length: STRIKES }).map((_, i) => <i key={i} className={i < strikeNo ? "hit" : i === strikeNo ? "now" : ""} />)}</span>
                         </div>
                         <button type="button" className="forge-strike" onPointerDown={(e) => { e.preventDefault(); strike(); }}>STRIKE!</button>
