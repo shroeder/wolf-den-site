@@ -225,15 +225,27 @@ export default function BlacksmithClient({ initial }) {
                         </div>
                         <div className="forge-regalia-row">
                             {forge.regalia.pieces.map((p) => (
-                                <span key={p.id} className={`forge-regalia-piece${p.equipped ? " is-equipped" : p.owned ? " is-owned" : ""}`} title={`${p.name}${p.equipped ? " — worn" : p.owned ? " — owned (equip it!)" : " — not forged yet"}`}>
-                                    {p.owned && p.sprite ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={p.sprite} alt={p.name} />
-                                    ) : <span className="forge-regalia-glyph">{p.owned ? "★" : "?"}</span>}
-                                </span>
+                                <div key={p.id} className="forge-regalia-slot">
+                                    <span className={`forge-regalia-piece${p.equipped ? " is-equipped" : p.owned ? " is-owned" : ""}`} title={p.equipped ? "Worn" : p.owned ? "Owned — equip it!" : "Not forged yet"}>
+                                        {p.sprite ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={p.sprite} alt={p.name} className={p.owned ? "" : "is-locked"} />
+                                        ) : <span className="forge-regalia-glyph">?</span>}
+                                        {p.equipped ? <span className="forge-regalia-badge worn">✓</span> : !p.owned ? <span className="forge-regalia-badge lock">🔒</span> : null}
+                                    </span>
+                                    <span className="forge-regalia-name">{p.name}</span>
+                                </div>
                             ))}
                         </div>
-                        <div className="forge-regalia-bonus" style={{ color: forge.regalia.bonus.tier > 0 ? "#8fe3a1" : "#b9a892" }}>{forge.regalia.bonus.label}</div>
+                        <div className="forge-regalia-tiers">
+                            {(forge.regalia.tiers || []).map((t) => (
+                                <div key={t.need} className={`forge-regalia-tier${t.active ? " is-active" : ""}`}>
+                                    <span className="forge-regalia-tierN">{t.need}-pc</span>
+                                    <span className="forge-regalia-tierLbl">{t.effect}</span>
+                                    {t.active ? <span className="forge-regalia-tierOn">ACTIVE</span> : null}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ) : null}
             </section>
@@ -584,14 +596,25 @@ const FORGE_CSS = `
 .forge-daily-tag.done { color: #8fe3a1; font-weight: 800; }
 /* ── Blacksmith's Regalia (salvaging set) ── */
 .forge-regalia { margin: 0; padding: 10px 12px; border-radius: 14px; background: linear-gradient(180deg, rgba(40,24,10,0.6), rgba(14,8,4,0.7)); border: 1px solid rgba(255,180,80,0.3); }
-.forge-regalia-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.forge-regalia-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
 .forge-regalia-title { font-size: 12.5px; font-weight: 900; color: #ffcf8a; letter-spacing: 0.02em; }
 .forge-regalia-count { font-size: 10.5px; color: #c8b79f; }
-.forge-regalia-row { display: flex; gap: 8px; }
-.forge-regalia-piece { width: 46px; height: 46px; border-radius: 10px; display: grid; place-items: center; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
+.forge-regalia-row { display: flex; gap: 6px; }
+.forge-regalia-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.forge-regalia-piece { position: relative; width: 100%; max-width: 54px; aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
 .forge-regalia-piece.is-owned { border-color: rgba(255,215,94,0.55); }
 .forge-regalia-piece.is-equipped { border-color: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.5); background: rgba(255,180,80,0.12); }
-.forge-regalia-piece img { width: 40px; height: 40px; object-fit: contain; }
+.forge-regalia-piece img { width: 82%; height: 82%; object-fit: contain; }
+.forge-regalia-piece img.is-locked { filter: grayscale(0.75) brightness(0.5); opacity: 0.6; }
 .forge-regalia-glyph { font-size: 20px; font-weight: 900; color: #6a5a48; }
-.forge-regalia-bonus { font-size: 11px; font-weight: 700; margin-top: 8px; }
+.forge-regalia-badge { position: absolute; bottom: 2px; right: 2px; font-size: 10px; line-height: 1; text-shadow: 0 1px 2px #000; }
+.forge-regalia-badge.worn { color: #ffd75e; font-weight: 900; }
+.forge-regalia-name { font-size: 8.5px; line-height: 1.12; text-align: center; color: #cbb79c; font-weight: 700; }
+.forge-regalia-tiers { display: flex; flex-direction: column; gap: 6px; margin-top: 11px; }
+.forge-regalia-tier { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 9px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); }
+.forge-regalia-tier.is-active { border-color: rgba(143,227,161,0.5); background: rgba(75,191,106,0.12); }
+.forge-regalia-tierN { flex: none; font-size: 10px; font-weight: 900; color: #ffcf8a; background: rgba(255,180,80,0.16); border-radius: 999px; padding: 2px 8px; }
+.forge-regalia-tier.is-active .forge-regalia-tierN { color: #8fe3a1; background: rgba(143,227,161,0.18); }
+.forge-regalia-tierLbl { flex: 1; min-width: 0; font-size: 11px; color: #d8c8b2; }
+.forge-regalia-tierOn { flex: none; font-size: 8.5px; font-weight: 900; letter-spacing: 0.06em; color: #8fe3a1; }
 `;

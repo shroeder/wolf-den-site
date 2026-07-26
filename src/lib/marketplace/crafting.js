@@ -276,7 +276,11 @@ export async function getForgeState(buyerId) {
     const ownedIdSet = new Set((ownedRows || []).map((r) => r.item_id));
     const regaliaPieces = REGALIA_IDS.map((id) => { const it = itemById(id); return { id, name: it?.name || id, slot: it?.slot, icon: it?.icon, sprite: spriteMap[id] || null, owned: ownedIdSet.has(id), equipped: equippedIds.has(id) }; });
     const regEquipped = regaliaPieces.filter((r) => r.equipped).length;
-    const regalia = { pieces: regaliaPieces, owned: regaliaPieces.filter((r) => r.owned).length, equipped: regEquipped, total: REGALIA_IDS.length, bonus: regaliaBonus(regEquipped), dropRate: REGALIA_DROP };
+    const regaliaTiers = [
+        { need: 3, effect: "+10% double-parts chance on salvage", active: regEquipped >= 3 },
+        { need: 5, effect: "+15% double-parts & +1 part every salvage", active: regEquipped >= 5 },
+    ];
+    const regalia = { pieces: regaliaPieces, owned: regaliaPieces.filter((r) => r.owned).length, equipped: regEquipped, total: REGALIA_IDS.length, bonus: regaliaBonus(regEquipped), tiers: regaliaTiers, dropRate: REGALIA_DROP };
     const upgrades = Object.entries(FORGE_UPGRADES).map(([key, u]) => {
         const level = upg[key] || 0;
         const pct = (lv) => `${Math.round(u.per * lv * 100)}%`;
