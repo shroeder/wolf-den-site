@@ -262,7 +262,7 @@ export async function GET(request, { params }) {
                 slot: i.slot,
                 equipped: equippedIds.has(i.id),
                 enhanceLevel: i.enhanceLevel || 0,
-                forge: forgeRank(i.enhanceLevel || 0), // { level, tier, color, emblem, label } or null
+                forge: forgeRank(i.enhanceLevel || 0), // { level, stars, color, rainbow, tierName, maxed } or null
                 stats: describeStats(i.stats),
                 signature: i.signature ? `${i.signature.label}: ${i.signature.desc}` : null,
                 flavor: i.flavor || null,
