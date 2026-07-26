@@ -86,6 +86,14 @@ export async function buyForgeUpgrade(buyerId, key) {
     return { ok: true, key, level: cur + 1, ...(await getForgeState(buyerId)) };
 }
 
+// ⚠️ TEST/DEBUG ONLY — owner dev tool to seed parts for testing the Forge. REMOVE BEFORE PUBLIC LAUNCH.
+// (Route is owner-gated, so this is owner-only; still, delete this + its action + the UI panel before release.)
+export async function debugAddParts(buyerId, tier, n = 10) {
+    const t = Math.max(1, Math.min(MAX_TIER, Number(tier) || 1));
+    await addParts(buyerId, t, Math.max(1, Number(n) || 1));
+    return { ok: true, ...(await getForgeState(buyerId)) };
+}
+
 // Enhance cost: parts of the item's rarity tier, quantity grows LOGARITHMICALLY with the item's enhance level.
 function enhanceCost(item, level) {
     return { tier: rarityTier(item.rarity), qty: Math.max(2, Math.round(2 + 1.8 * Math.log2(level + 2))) };
@@ -273,7 +281,7 @@ export async function getForgeState(buyerId) {
     const salvage = (ownedRows || []).map((r) => r.item_id).filter((id) => !equippedIds.has(id)).map(dress).filter(Boolean)
         .map((d) => { const cfg = SALVAGE[d.rarity] || SALVAGE.common; return { ...d, salvageMin: cfg.min, salvageMax: cfg.max }; })
         .sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));
-    const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; return { ...d, cost: enhanceCost(itemById(id), d.level) }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
+    const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; const c = enhanceCost(itemById(id), d.level); return { ...d, cost: c, have: parts[c.tier] || 0, affordable: (parts[c.tier] || 0) >= c.qty }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
     const partList = PART_TIERS.map((p) => ({ ...p, count: parts[p.tier] || 0, canCombine: (parts[p.tier] || 0) >= COMBINE_COST && p.tier < MAX_TIER }));
     // Blacksmith's Regalia collection (the salvaging set).
     const ownedIdSet = new Set((ownedRows || []).map((r) => r.item_id));

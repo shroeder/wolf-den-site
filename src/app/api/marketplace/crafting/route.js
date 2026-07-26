@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getForgeState, salvageItem, combineParts, enhanceItem, buyForgeUpgrade, claimForgeDaily } from "@/lib/marketplace/crafting.js";
+import { getForgeState, salvageItem, combineParts, enhanceItem, buyForgeUpgrade, claimForgeDaily, debugAddParts } from "@/lib/marketplace/crafting.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -38,6 +38,7 @@ export async function POST(request) {
             else if (b?.action === "enhance") res = await enhanceItem(buyer.id, String(b?.itemId || ""), { quality: Number(b?.quality) || 0, grade: String(b?.grade || "good"), combo: Number(b?.combo) || 0 });
             else if (b?.action === "upgrade") res = await buyForgeUpgrade(buyer.id, String(b?.key || ""));
             else if (b?.action === "claim_daily") res = await claimForgeDaily(buyer.id, String(b?.key || ""));
+            else if (b?.action === "debug_add_parts") res = await debugAddParts(buyer.id, Number(b?.tier), Number(b?.n) || 10); // ⚠️ TEST-ONLY — remove before launch
             else return NextResponse.json({ error: "bad_action" }, { status: 400 });
             return NextResponse.json(res, { status: res?.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
         } catch (error) {

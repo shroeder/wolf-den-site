@@ -55,6 +55,7 @@ export default function BlacksmithClient({ initial }) {
     const [busy, setBusy] = useState(null);
     const [tab, setTab] = useState("enhance");
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
+    const [enhanceResult, setEnhanceResult] = useState(null); // the juiced post-enhance reveal
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
     const [toast, setToast] = useState(null);
 
@@ -92,11 +93,11 @@ export default function BlacksmithClient({ initial }) {
         if (r?.ok) SFX.perfect();
     }, [post]);
 
-    // Called by the mini-game with the player's execution → server rolls the stat bump.
+    // Called by the mini-game with the player's execution → server rolls the stat bump → juiced result modal.
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { SFX.win(); setToast({ kind: "enhance", name: item.name, level: r.level, gained: r.gained, grade: r.grade, xp: r.xp, doubled: r.doubled }); setTimeout(() => setToast(null), 4200); }
+        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, grade: r.grade, xp: r.xp, doubled: r.doubled }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -262,17 +263,22 @@ export default function BlacksmithClient({ initial }) {
                 {tab === "enhance" ? (
                     <div className="forge-grid">
                         {enhance.length ? enhance.map((it) => (
-                            <button key={it.id} type="button" className="forge-card is-enhance" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setEnhancing(it); }}>
+                            <button key={it.id} type="button" className={`forge-card is-enhance${it.affordable ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
+                                onClick={() => {
+                                    if (!it.affordable) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage or combine more first.` }); return; }
+                                    ac(); setEnhancing(it);
+                                }}>
                                 {it.level > 0 ? <span className="forge-cardrank"><ForgeRank level={it.level} size={30} /></span> : null}
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
                                 {it.bonus ? <span className="forge-card-bonus">forged: {it.bonus}</span> : null}
-                                <span className="forge-card-cost">
+                                <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
                                     {parts[it.cost.tier - 1]?.sprite
                                         // eslint-disable-next-line @next/next/no-img-element
                                         ? <img className="forge-cost-ico" src={parts[it.cost.tier - 1].sprite} alt="" /> : null}
-                                    {it.cost.qty} × {parts[it.cost.tier - 1]?.name || `T${it.cost.tier}`}
+                                    {it.have}/{it.cost.qty} {parts[it.cost.tier - 1]?.name || `T${it.cost.tier}`}
+                                    {it.affordable ? null : <span className="forge-card-locktag">🔒</span>}
                                 </span>
                             </button>
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
@@ -328,18 +334,36 @@ export default function BlacksmithClient({ initial }) {
 
             {salvaging ? <SalvageModal item={salvaging} parts={parts} odds={forge.salvageOdds || {}} onConfirm={() => doSalvage(salvaging)} onClose={() => setSalvaging(null)} /> : null}
 
+            {enhanceResult ? <EnhanceResultModal res={enhanceResult} onClose={() => setEnhanceResult(null)} /> : null}
+
             {toast ? (
                 <div className={`forge-toast${toast.kind === "err" ? " is-err" : ""}`} role="status">
-                    {toast.kind === "enhance" ? (
-                        <>
-                            <b>{toast.name} → +{toast.level}!</b>
-                            {toast.doubled ? <span style={{ color: "#ffd75e", fontWeight: 800 }}>✦ MASTER&apos;S TOUCH — double gains!</span> : null}
-                            <span>{toast.grade === "pixel" ? "PIXEL-PERFECT strike" : toast.grade === "perfect" ? "Perfect strike" : "Forged"} · {toast.gained} · +{toast.xp} XP</span>
-                        </>
-                    ) : <span>{toast.text}</span>}
+                    <span>{toast.text}</span>
                 </div>
             ) : null}
+
+            {/* ⚠️ TEST-ONLY dev tools (owner) — REMOVE BEFORE PUBLIC LAUNCH. Seeds parts to test the Forge. */}
+            <ForgeDebugPanel parts={parts} busy={busy} onAdd={(tier) => post({ action: "debug_add_parts", tier, n: 10 }, `dbg-${tier}`)} />
         </div>
+    );
+}
+
+// ⚠️ TEST-ONLY — owner dev panel to seed parts. DELETE this component + its render + the server action before launch.
+function ForgeDebugPanel({ parts, busy, onAdd }) {
+    return (
+        <section className="card forge-panel forge-debug">
+            <h3 className="forge-panel-h" style={{ color: "#ff8f9a" }}>🧪 Dev tools — remove before launch</h3>
+            <div className="forge-debug-row">
+                {parts.map((p) => (
+                    <button key={p.tier} type="button" className="forge-debug-btn" disabled={Boolean(busy)} onClick={() => onAdd(p.tier)}>
+                        {p.sprite
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={p.sprite} alt="" /> : null}
+                        +10 {p.name}
+                    </button>
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -417,6 +441,31 @@ function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
                         <button type="button" className="forge-strike big" onClick={onClose}>Nice!</button>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+// ── The juiced post-enhance reveal (fires after you Temper the item) ────────────────────────────────────────
+function EnhanceResultModal({ res, onClose }) {
+    const gradeMeta = { pixel: { label: "PIXEL-PERFECT", color: "#ffd75e" }, perfect: { label: "PERFECT", color: "#8fe3ff" }, great: { label: "GREAT", color: "#8fe39a" }, good: { label: "FORGED", color: "#d7c48a" } }[res.grade] || { label: "FORGED", color: "#d7c48a" };
+    return (
+        <div className="forge-mg-scrim" role="dialog" aria-label={`${res.name} enhanced`} onPointerDown={onClose}>
+            <div className="forge-sv forge-er" style={{ "--rc": rc(res.rarity) }} onPointerDown={(e) => e.stopPropagation()}>
+                <div className="forge-sv-result">
+                    <div className="forge-er-grade" style={{ color: gradeMeta.color }}>{gradeMeta.label} STRIKE!</div>
+                    <div className="forge-sv-reward">
+                        <div className="forge-er-artwrap">
+                            <ItemArt id={res.id} icon={res.icon} className="forge-er-art" alt={res.name} />
+                            <span className="forge-er-rank"><ForgeRank level={res.level} size={42} /></span>
+                        </div>
+                        <div className="forge-sv-plus">{res.name} → +{res.level}</div>
+                    </div>
+                    {res.doubled ? <div className="forge-sv-tag double">✦ MASTER&apos;S TOUCH — double gains!</div> : null}
+                    {res.gained ? <div className="forge-er-gain">{res.gained}</div> : null}
+                    <div className="forge-sv-xp">+{res.xp} XP</div>
+                    <button type="button" className="forge-strike big" onClick={onClose}>Forged!</button>
+                </div>
             </div>
         </div>
     );
@@ -640,7 +689,8 @@ const FORGE_CSS = `
 .forge-strike.big { margin-top: 12px; }
 .forge-mg-tip { font-size: 10.5px; color: #b9a892; text-align: center; margin-top: 8px; }
 .forge-mg-result { text-align: center; padding: 12px 4px 4px; }
-.forge-result-grade { font-size: 1.7rem; font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.7); animation: forgePop .4s cubic-bezier(.2,1.4,.3,1) both; }
+.forge-result-grade { font-size: 1.7rem; font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.7); animation: forgeGradeIn .4s cubic-bezier(.2,1.4,.3,1) both; }
+@keyframes forgeGradeIn { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
 .forge-result-bar { height: 12px; border-radius: 999px; background: rgba(0,0,0,0.5); overflow: hidden; margin: 12px 0 6px; border: 1px solid rgba(255,150,60,0.4); }
 .forge-result-bar span { display: block; height: 100%; background: linear-gradient(90deg, #f3922a, #ffd75e); box-shadow: 0 0 12px #ffcf7a; transition: width .6s cubic-bezier(.2,1,.3,1); }
 .forge-result-sub { font-size: 12px; color: #cdb89f; }
@@ -669,6 +719,23 @@ const FORGE_CSS = `
 .forge-sv-xp { margin-top: 10px; font-size: 12px; font-weight: 800; color: #8fe3a1; }
 @keyframes forgeReveal { 0% { opacity: 0; transform: scale(.4) translateY(10px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes forgeRewardBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+/* ── enhance reveal ── */
+.forge-er-grade { font-size: 1.5rem; font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); margin-bottom: 6px; animation: forgeGradeIn .4s cubic-bezier(.2,1.4,.3,1) both; }
+.forge-er-artwrap { position: relative; display: inline-block; }
+.forge-er-art { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55)) drop-shadow(0 0 18px color-mix(in srgb, var(--rc) 55%, transparent)); animation: forgeRewardBob 2.4s ease-in-out infinite; }
+.forge-er-rank { position: absolute; top: -6px; right: -10px; }
+.forge-er-gain { margin-top: 8px; font-size: 15px; font-weight: 800; color: #8fe3ff; }
+/* ── locked enhance card (can't afford the parts) ── */
+.forge-card.is-locked { opacity: 0.82; }
+.forge-card.is-locked .forge-art { filter: grayscale(0.5) brightness(0.85); }
+.forge-card-cost.is-short { color: #ff8f9a; font-weight: 800; }
+.forge-card-locktag { margin-left: 3px; }
+/* ⚠️ TEST-ONLY dev panel — remove before launch */
+.forge-debug { border-color: rgba(255,143,154,0.4) !important; }
+.forge-debug-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.forge-debug-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 6px 9px; border-radius: 9px; cursor: pointer; color: #ffd7db; border: 1px solid rgba(255,143,154,0.4); background: rgba(255,143,154,0.1); }
+.forge-debug-btn img { width: 18px; height: 18px; object-fit: contain; }
+.forge-debug-btn:disabled { opacity: 0.5; cursor: default; }
 /* ── perks / upgrades (uses the shared .sail-upgrades pattern; only the gold line is bespoke) ── */
 .forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 10px; }
 /* ── daily forge tasks ── */
