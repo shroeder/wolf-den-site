@@ -181,25 +181,13 @@ const fieldBackground = (tod, condition) => {
     const g = grassStops(tod);
     return `linear-gradient(180deg, ${s[0]} 0%, ${s[1]} 36%, ${s[2]} 50%, ${g[0]} 60%, ${g[1]} 100%)`;
 };
-// Illustrated farm backdrops per time of day (generated via /api/admin/farm-bg). Mirror-tiled behind the pets;
-// falls back to the CSS gradient scene above until these are filled in. Storm/overcast reuse the base image +
-// the weather overlays on top.
-const FARM_BG = {
-    day: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838066440-671862.png",
-    dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838089019-734565.png",
-    night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838349373-318702.png",
-    dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838132569-798406.png",
-    storm: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838156570-858112.png",
-    snow: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838178566-149863.png",
-};
-// Storm/snow get their own painted scene when available; otherwise use the time-of-day image + weather overlays.
-const pickFarmBg = (tod, condition) =>
-    (condition === "storm" && FARM_BG.storm) || (condition === "snow" && FARM_BG.snow) || FARM_BG[tod] || FARM_BG.day || null;
-
-// Fixed backdrops for the Inside (barn) and Garden views — generated once, hardcoded like FARM_BG.
+// Fixed backdrops per view — WIDE feather-blended panoramas (~4.15:1, unique across their width, no repeat) so
+// each view scrolls nice and wide without any visible tiling. `outside` is the default pasture when the member
+// hasn't set a custom background.
 const VIEW_BG = {
-    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-flat-1785108049136.png",
-    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-flat-1785108098669.png",
+    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/1785109210983-552528.png",
+    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/1785109356165-855215.png",
+    outside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/1785109488802-952055.png",
 };
 
 export default function FarmClient({ initial, viewingAlias }) {
@@ -578,41 +566,37 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // ── Three farm views: 🌾 Garden (plant/harvest), 🏡 Outside (pasture + your custom bg), 🛖 Inside (barn).
     // Pets auto-split by index parity (even → Outside, odd → Inside); crops live in the Garden; a decoration
-    // belongs to Outside OR Inside; only Outside scrolls sideways. (`view` state is declared earlier.) ──
+    // belongs to Outside OR Inside; every view scrolls its own wide panorama. (`view` state declared earlier.) ──
     const petView = (i) => (i % 2 === 0 ? "outside" : "inside");
     const viewPetCount = view === "garden" ? 0 : pets.filter((_, i) => petView(i) === view).length;
-    const scrolls = view === "outside"; // only the open pasture scrolls
-    // Field width: Outside scrolls a LITTLE (snug now that pets are split); Inside/Garden fit exactly (no scroll).
-    const fieldW = scrolls ? Math.max(115, viewPetCount * 55) : 100;
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
     const visTod = wx.tod;
-    // Backdrop per view: Inside = fixed barn, Garden = fixed soil beds, Outside = your custom bg (or the live
-    // preview) or the weather set. Custom backgrounds only apply Outside.
+    // Backdrop per view: Inside = barn panorama, Garden = soil-bed panorama, Outside = your custom bg (or the live
+    // preview) or the default pasture panorama. Custom backgrounds only apply Outside. Every one of these is a WIDE
+    // feather-blended panorama, so the scene always scrolls sideways across a single UNIQUE image (no tiling).
+    const customBg = view === "outside" ? (farm.customBgDraft || farm.customBg) : null;
     const bgUrl = view === "inside" ? VIEW_BG.inside
         : view === "garden" ? VIEW_BG.garden
-        : (farm.customBgDraft || farm.customBg || pickFarmBg(visTod, wx.condition));
+        : (customBg || VIEW_BG.outside);
     const showWeather = view === "outside"; // weather effects only in the open pasture
     const canDecorate = view !== "garden"; // decorate Outside & Inside; the Garden is just for planting
     // No color-muting at night outdoors; the barn keeps its own warm light.
     const objFilter = view === "inside" ? "none" : (visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none");
-    const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
+    // Time-of-day mood tint for the DEFAULT outside pasture (a custom bg carries its own mood, so leave it alone).
+    const bgTint = (view === "outside" && !customBg)
+        ? (visTod === "night" ? "linear-gradient(180deg, rgba(10,14,42,0.52), rgba(6,10,30,0.6))"
+            : visTod === "dusk" ? "linear-gradient(180deg, rgba(74,36,12,0.28), rgba(42,18,28,0.32))"
+            : visTod === "dawn" ? "linear-gradient(180deg, rgba(255,224,180,0.16), rgba(255,206,170,0.05))"
+            : null)
+        : null;
 
-    // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS), plus the
-    // native Fullscreen API where supported to also hide the browser chrome.
+    // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS). We do NOT
+    // use the native Fullscreen API — it renders ONLY the scene element's subtree, which hid the decorate tray and
+    // every modal (they're position:fixed siblings at higher z-index) so nothing was clickable in fullscreen. The
+    // CSS overlay (z 9995) keeps those siblings on top and fully interactive, exactly like windowed mode.
     const sceneWrapRef = useRef(null);
     const [fullscreen, setFullscreen] = useState(false);
-    const toggleFullscreen = useCallback(() => {
-        setFullscreen((v) => {
-            const next = !v;
-            try { if (next) sceneWrapRef.current?.requestFullscreen?.(); else if (typeof document !== "undefined" && document.fullscreenElement) document.exitFullscreen?.(); } catch { /* CSS overlay still fills the screen */ }
-            return next;
-        });
-    }, []);
-    useEffect(() => {
-        const onFs = () => { if (typeof document !== "undefined" && !document.fullscreenElement) setFullscreen(false); };
-        document.addEventListener("fullscreenchange", onFs);
-        return () => document.removeEventListener("fullscreenchange", onFs);
-    }, []);
+    const toggleFullscreen = useCallback(() => setFullscreen((v) => !v), []);
     // In fullscreen the field fills the fixed container exactly (100% of it) rather than 100dvh, which on mobile
     // overflows past the visible area and clips the bottom of the farm.
     const sceneHeight = fullscreen ? "100%" : "min(52vh, 420px)";
@@ -756,44 +740,25 @@ export default function FarmClient({ initial, viewingAlias }) {
                 ))}
             </div>
 
-            {/* The scene — pasture (Outside) scrolls; Garden & Inside are fixed. */}
+            {/* The scene — every view scrolls sideways across its own wide unique panorama. */}
             <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
-                            position: "relative", width: `${fieldW}%`, minWidth: "100%", height: sceneHeight,
+                            position: "relative", width: "max-content", minWidth: "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Backdrop — Outside mirror-tiles a strip for seamless scrolling; the fixed views (barn / garden) use a single cover image. */}
+                        {/* Backdrop — ONE wide, unique panorama (no tiling). The in-flow image sets the field's true
+                            width at scene height, so the scene scrolls sideways across the whole unique image. */}
                         {bgUrl ? (
-                            scrolls ? (
-                                <div className="farm-bg-strip" aria-hidden="true">
-                                    {Array.from({ length: bgCopies }).map((_, k) => (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img key={k} src={bgUrl} alt="" />
-                                    ))}
-                                </div>
-                            ) : (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={bgUrl} alt="" aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }} />
-                            )
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
                         ) : null}
-                        {/* CSS-scene fallback (drifting clouds + fence) — only in the open pasture with no illustrated backdrop */}
-                        {scrolls && !bgUrl && ["clear", "cloudy"].includes(wx.condition) && wx.tod !== "night"
-                            ? Array.from({ length: wx.condition === "cloudy" ? 7 : 4 }).map((_, k) => (
-                                <div key={k} style={{ position: "absolute", top: `${8 + (k % 3) * 9}%`, left: `${(k * 23 + 6) % 96}%`, width: 78 + (k % 3) * 26, height: 22 + (k % 2) * 8, borderRadius: 22, background: wx.condition === "cloudy" ? "rgba(230,232,235,0.9)" : "rgba(255,255,255,0.82)", filter: "blur(1px)", animation: `farmCloud ${9 + (k % 4) * 2}s ease-in-out ${k * 0.6}s infinite alternate` }} />
-                            ))
-                            : null}
-                        {scrolls && !bgUrl ? (
-                            <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 40, opacity: 0.92 }}>
-                                <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(90deg, #8a5c31 0 5px, transparent 5px 42px)" }} />
-                                <div style={{ position: "absolute", left: 0, right: 0, top: 8, height: 6, background: "#b07a45" }} />
-                                <div style={{ position: "absolute", left: 0, right: 0, top: 26, height: 6, background: "#b07a45" }} />
-                            </div>
-                        ) : null}
+                        {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
+                        {bgTint ? <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: bgTint, pointerEvents: "none", zIndex: 400 }} /> : null}
 
                         {/* World OBJECTS layer — pets, crops, decorations, the farmer. The time-of-day tint is applied
                             to THIS layer only, so the illustrated backdrop keeps its own night/dusk mood while the

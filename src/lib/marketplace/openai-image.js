@@ -242,6 +242,48 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     return blob.url;
 }
 
+// WIDE panorama scene — gpt-image-1 tops out at 1536x1024 (1.5:1), so we generate N panels of ONE continuous
+// scene and feather-blend them into a single ~3-4x-wide image. The farm uses this so a backdrop can scroll wide
+// while staying fully UNIQUE (no mirror-tiling / visible repeat). Returns the stored Blob URL.
+export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", panels = 3, overlap = 180 } = {}) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("Missing OPENAI_API_KEY");
+    const W = 1536, H = 1024;
+    const N = Math.max(2, Math.min(4, panels));
+    const spots = ["the far-LEFT section", "a LEFT-CENTER section", "a RIGHT-CENTER section", "the far-RIGHT section"];
+    const bufs = [];
+    for (let i = 0; i < N; i++) {
+        // Each panel is a different slice of ONE continuous horizontal scene; pin the horizon/ground/lighting so
+        // adjacent panels line up and the feathered seam is invisible.
+        const p = `${prompt}\n\nThis is ${spots[i] || "another section"} of ONE long continuous horizontal panorama. Keep the horizon line, ground/floor height, lighting, color palette and art style EXACTLY consistent across the whole width so sections join seamlessly. Vary only the incidental details (which trees, bushes, props appear) so no two sections look identical.`;
+        const resp = await fetch(IMAGES_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({ model: "gpt-image-1", prompt: p, size: `${W}x${H}`, background: "opaque", quality: "medium", n: 1 }),
+        });
+        if (!resp.ok) { const t = await resp.text().catch(() => ""); throw new Error(`OpenAI wide-scene ${resp.status}: ${t.slice(0, 200)}`); }
+        const b64 = (await resp.json().catch(() => null))?.data?.[0]?.b64_json;
+        if (!b64) throw new Error("OpenAI returned no image");
+        bufs.push(Buffer.from(b64, "base64"));
+    }
+    // Feather mask: a single-channel alpha ramp 0→255 over the first `overlap` px, then fully opaque. Applied to
+    // each panel after the first so its left edge fades over the previous panel — hiding the join.
+    const ramp = Buffer.alloc(W * H);
+    for (let y = 0; y < H; y++) { const row = y * W; for (let x = 0; x < W; x++) ramp[row + x] = x < overlap ? Math.round((x / overlap) * 255) : 255; }
+    const finalW = W + (N - 1) * (W - overlap);
+    const layers = [];
+    for (let i = 0; i < N; i++) {
+        const left = i * (W - overlap);
+        if (i === 0) { layers.push({ input: bufs[0], left: 0, top: 0 }); continue; }
+        const faded = await sharp(bufs[i]).joinChannel(ramp, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
+        layers.push({ input: faded, left, top: 0 });
+    }
+    const out = await sharp({ create: { width: finalW, height: H, channels: 4, background: { r: 18, g: 22, b: 14, alpha: 1 } } })
+        .composite(layers).png({ compressionLevel: 9 }).toBuffer();
+    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, out, { access: "public", contentType: "image/png" });
+    return blob.url;
+}
+
 // Image-to-image: transform a reference PNG with a prompt (gpt-image-1 edits). Used to redraw a member's
 // avatar as a full-body sprite so it actually matches their avatar. Returns the stored Blob URL.
 export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai" } = {}) {

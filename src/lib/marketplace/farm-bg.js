@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { generateSceneImage } from "@/lib/marketplace/openai-image.js";
+import { generateWideSceneImage } from "@/lib/marketplace/openai-image.js";
 
 // ── Custom farm background (one static, player-generated scene that replaces the weather backdrops) ──────────
 // Same SAFE token flow as custom decorations: the 3 creation tokens are charged ATOMICALLY before the AI runs
@@ -13,11 +13,11 @@ export const FARM_BG_COST = 3; // creation tokens per generated background
 // lower half, so the bottom must be open, flat, walkable ground (grass/soil/dirt) with no water, cliffs, roads,
 // buildings or big objects blocking it — the player's theme just decorates the UPPER background/horizon.
 const buildBgPrompt = (desc) =>
-    `A wide, seamless, side-on LANDSCAPE BACKGROUND for a cozy 2D farming game where crops and animals stand on the ground. ` +
+    `A FLAT, STRAIGHT-ON, side-on LANDSCAPE BACKGROUND for a cozy 2D farming game where animals and decorations stand on the ground — like a stage backdrop viewed dead-on. ` +
     `Player's theme for the scenery: ${String(desc).trim().slice(0, 300)}. ` +
-    `COMPOSITION RULES (important): the LOWER HALF must be a flat, open, walkable field of grass/soil/dirt with plenty of clear empty space for crops to be planted — no water, no cliffs, no roads, no rivers, no fences, no buildings or large objects in the foreground. ` +
-    `Put all the themed scenery (mountains, sky, trees, structures, etc.) in the UPPER background / on the horizon only. Gentle, subtle ground so tiles read clearly. ` +
-    `Horizontal panorama, rich saturated storybook color, soft depth. NO characters, NO people, NO animals, NO text, NO letters, NO UI, NO frame or border. The scene fills the entire frame.`;
+    `COMPOSITION RULES (important): the LOWER THIRD must be a flat, open, walkable strip of grass/soil/dirt with plenty of clear empty space — no water, no cliffs, no roads, no rivers, no fences, no buildings or large objects in the foreground. ` +
+    `Put all the themed scenery (mountains, sky, trees, structures, etc.) in the UPPER background / on the horizon only. ` +
+    `Orthographic / flat 2D — NO perspective, NO vanishing point, NO tilted or receding ground. Rich saturated storybook color. NO characters, NO people, NO animals, NO text, NO letters, NO UI, NO frame or border. The scene fills the entire frame.`;
 
 export async function getFarmBgState(buyerId) {
     if (!buyerId) return { bg: null, draft: null, credits: 0, cost: FARM_BG_COST };
@@ -36,7 +36,8 @@ export async function startFarmBg(buyerId, prompt) {
     ).catch(() => null);
     if (!paid) return { ok: false, error: "no_credits" };
     let url = null;
-    try { url = await generateSceneImage(buildBgPrompt(desc), { pathPrefix: "marketplace/farm-bg" }); } catch { url = null; }
+    // 3 creation tokens → a 3-panel WIDE panorama (feather-blended, unique across its width, no repeat).
+    try { url = await generateWideSceneImage(buildBgPrompt(desc), { pathPrefix: "marketplace/farm-bg", panels: 3 }); } catch { url = null; }
     if (!url) {
         await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + $2 WHERE id = $1`, [buyerId, FARM_BG_COST]).catch(() => {}); // refund
         return { ok: false, error: "gen_failed", ...(await getFarmBgState(buyerId)) };
