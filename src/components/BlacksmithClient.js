@@ -241,9 +241,18 @@ export default function BlacksmithClient({ initial }) {
             {/* Actions — enhance / salvage / perks. */}
             <section className="card forge-panel">
                 <div className="forge-tabs">
-                    <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}><GiAnvilImpact aria-hidden="true" /> Enhance <span className="forge-tab-ct">{enhance.length}</span></button>
-                    <button type="button" className={tab === "salvage" ? "on" : ""} onClick={() => setTab("salvage")}><GiCrackedShield aria-hidden="true" /> Salvage <span className="forge-tab-ct">{salvage.length}</span></button>
-                    <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}><GiUpgrade aria-hidden="true" /> Perks</button>
+                    <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}>
+                        <GiAnvilImpact aria-hidden="true" />
+                        <span className="forge-tab-lbl">Enhance<em className="forge-tab-ct">{enhance.length}</em></span>
+                    </button>
+                    <button type="button" className={tab === "salvage" ? "on" : ""} onClick={() => setTab("salvage")}>
+                        <GiCrackedShield aria-hidden="true" />
+                        <span className="forge-tab-lbl">Salvage<em className="forge-tab-ct">{salvage.length}</em></span>
+                    </button>
+                    <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}>
+                        <GiUpgrade aria-hidden="true" />
+                        <span className="forge-tab-lbl">Perks</span>
+                    </button>
                 </div>
 
                 {tab === "enhance" ? (
@@ -485,14 +494,16 @@ const FORGE_CSS = `
 .forge-part-name { font-size: 9.5px; font-weight: 700; color: color-mix(in srgb, var(--pc) 75%, #fff); text-align: center; }
 .forge-combine { margin-top: 2px; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 8px; cursor: pointer; border: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); background: color-mix(in srgb, var(--pc) 22%, transparent); color: #fff; }
 .forge-part-hint { font-size: 9px; color: #b9a892; }
-/* Segmented control (one grouped pill, not three clashing blocks) with themed react-icons. */
+/* Segmented control (one grouped pill, not three clashing blocks) — stacked icon over label so all
+   three segments always share the width equally and never clip on narrow phones. */
 .forge-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border-radius: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
-.forge-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #c8b49b; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
-.forge-tabs button svg { width: 17px; height: 17px; flex: none; opacity: 0.85; }
+.forge-tabs button { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 10px; cursor: pointer; border: none; background: transparent; color: #c8b49b; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+.forge-tabs button svg { width: 20px; height: 20px; flex: none; opacity: 0.9; }
+.forge-tab-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+.forge-tab-ct { font-style: normal; font-size: 10px; font-weight: 900; padding: 0 6px; border-radius: 999px; background: rgba(0,0,0,0.25); color: #e8d6c0; }
 @media (hover: hover) { .forge-tabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #f2e0c8; } }
 .forge-tabs button.on { background: linear-gradient(180deg, #ff9a3c, #e0631a); color: #2a1000; box-shadow: 0 2px 8px rgba(255,120,20,0.4), inset 0 1px 0 rgba(255,255,255,0.35); }
 .forge-tabs button.on svg { opacity: 1; }
-.forge-tab-ct { font-size: 11px; font-weight: 900; padding: 1px 6px; border-radius: 999px; background: rgba(0,0,0,0.22); }
 .forge-tabs button.on .forge-tab-ct { background: rgba(0,0,0,0.16); color: #2a1000; }
 .forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 8px 10px; border-radius: 14px; cursor: pointer; text-align: center;
