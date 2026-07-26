@@ -43,8 +43,11 @@ const BANDS = [
 const gradeFor = (dist, widen = 0) => BANDS.find((b) => dist <= b.max + widen) || { key: "miss", score: 0, label: "MISS", color: "#ff8f9a" };
 const STRIKES = 6;
 
+const EMPTY_FORGE = { parts: [], salvage: [], enhance: [], upgrades: [], dailies: [], regalia: null, hearthBg: null };
+
 export default function BlacksmithClient({ initial }) {
-    const [forge, setForge] = useState(initial);
+    // Always keep forge a valid object (never null) so render-time reads like dep arrays don't crash while loading.
+    const [forge, setForge] = useState(initial || EMPTY_FORGE);
     const [loading, setLoading] = useState(!initial);
     const [forbidden, setForbidden] = useState(false);
     const [busy, setBusy] = useState(null);
@@ -118,7 +121,7 @@ export default function BlacksmithClient({ initial }) {
     }, [initial]);
 
     if (forbidden) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">The Forge is owner-only right now.</p></section></div>;
-    if (!forge) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">{loading ? "Stoking the hearth…" : "Couldn't load the Forge — try again."}</p></section></div>;
+    if (loading) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">Stoking the hearth…</p></section></div>;
 
     const parts = forge.parts || [];
     const salvage = forge.salvage || [];
