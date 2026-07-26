@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById, STAT_META, describeStats } from "@/lib/marketplace/items.js";
-import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -39,6 +39,16 @@ const SALVAGE = {
 const rarityTier = (r) => SALVAGE[r]?.tier || 1;
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const GRADE_RANK = { good: 1, great: 2, perfect: 3, pixel: 4 };
+
+// Blacksmith's Regalia — the "salvaging set". Pieces drop rarely from salvaging; wearing 3/5 boosts salvage
+// output (a crafting-only bonus, kept out of combat).
+const REGALIA_IDS = ["regalia_visor", "regalia_plate", "regalia_girdle", "regalia_boots", "regalia_cloak"];
+const REGALIA_DROP = 0.05; // per-salvage chance to receive an unowned Regalia piece
+function regaliaBonus(equippedCount) {
+    if (equippedCount >= 5) return { tier: 2, doubleBonus: 0.15, flatParts: 1, label: "Full set: +15% double-parts & +1 part per salvage" };
+    if (equippedCount >= 3) return { tier: 1, doubleBonus: 0.1, flatParts: 0, label: "3 pieces: +10% double-parts chance" };
+    return { tier: 0, doubleBonus: 0, flatParts: 0, label: "Wear 3 pieces for a salvage bonus" };
+}
 
 // Owner-buyable forge upgrades. `per` = effect per level; `steady_hand` levels are combo-saves + band-widening
 // applied client-side in the mini-game. Cost is gold, climbing per level.
@@ -136,25 +146,33 @@ export async function claimForgeDaily(buyerId, key) {
 export async function salvageItem(buyerId, itemId) {
     const item = itemById(itemId);
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
-    if (new Set(Object.values(await getEquippedIds(buyerId))).has(itemId)) return { ok: false, error: "equipped" };
+    const equippedSet = new Set(Object.values(await getEquippedIds(buyerId)));
+    if (equippedSet.has(itemId)) return { ok: false, error: "equipped" };
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
     await db.query(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {}); // the item is gone — drop its enhancement
     const cfg = SALVAGE[item.rarity] || SALVAGE.common;
     const upg = await upgradeLevels(buyerId);
+    const rb = regaliaBonus(REGALIA_IDS.filter((r) => equippedSet.has(r)).length); // Blacksmith's Regalia salvage bonus
     let n = randInt(cfg.min, cfg.max);
     let doubled = false;
-    if (Math.random() < chance(upg, "efficient")) { n *= 2; doubled = true; } // Efficient Salvage
+    if (Math.random() < chance(upg, "efficient") + rb.doubleBonus) { n *= 2; doubled = true; } // Efficient Salvage + Regalia
+    n += rb.flatParts;
     await addParts(buyerId, cfg.tier, n);
     let bonusTier = null;
     if (cfg.tier < MAX_TIER && Math.random() < chance(upg, "keen_eye")) { await addParts(buyerId, cfg.tier + 1, 1); bonusTier = cfg.tier + 1; } // Keen Eye
+    // Rare Regalia piece drop (the "salvaging set" loop) — only pieces you don't own yet.
+    let regaliaDrop = null;
+    const ownedReg = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, REGALIA_IDS]).catch(() => [])).map((r) => r.item_id));
+    const unowned = REGALIA_IDS.filter((r) => !ownedReg.has(r));
+    if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantItem(buyerId, pick, "forge").catch(() => {}); regaliaDrop = itemById(pick)?.name || pick; }
     const xp = 6 + cfg.tier * 4;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
-    await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier }).catch(() => {});
-    await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier } });
+    await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier, regaliaDrop }).catch(() => {});
+    await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier, regaliaDrop } });
     await bumpDaily(buyerId, "salvages", 1);
     grantEventBadge(buyerId, "forge_first").catch(() => {});
-    return { ok: true, gained: { tier: cfg.tier, n }, doubled, bonusTier, xp, ...(await getForgeState(buyerId)) };
+    return { ok: true, gained: { tier: cfg.tier, n }, doubled, bonusTier, regaliaDrop, xp, ...(await getForgeState(buyerId)) };
 }
 
 // ── Combine 5 of a tier → 1 of the next ──
@@ -249,9 +267,14 @@ export async function getForgeState(buyerId) {
     const salvage = (ownedRows || []).map((r) => r.item_id).filter((id) => !equippedIds.has(id)).map(dress).filter(Boolean).sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));
     const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; return { ...d, cost: enhanceCost(itemById(id), d.level) }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
     const partList = PART_TIERS.map((p) => ({ ...p, count: parts[p.tier] || 0, canCombine: (parts[p.tier] || 0) >= COMBINE_COST && p.tier < MAX_TIER }));
+    // Blacksmith's Regalia collection (the salvaging set).
+    const ownedIdSet = new Set((ownedRows || []).map((r) => r.item_id));
+    const regaliaPieces = REGALIA_IDS.map((id) => { const it = itemById(id); return { id, name: it?.name || id, slot: it?.slot, icon: it?.icon, sprite: spriteMap[id] || null, owned: ownedIdSet.has(id), equipped: equippedIds.has(id) }; });
+    const regEquipped = regaliaPieces.filter((r) => r.equipped).length;
+    const regalia = { pieces: regaliaPieces, owned: regaliaPieces.filter((r) => r.owned).length, equipped: regEquipped, total: REGALIA_IDS.length, bonus: regaliaBonus(regEquipped), dropRate: REGALIA_DROP };
     const upgrades = Object.entries(FORGE_UPGRADES).map(([key, u]) => {
         const level = upg[key] || 0;
         return { key, name: u.name, desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? `${Math.round(u.per * level * 100)}%` : `${level}` };
     });
-    return { parts: partList, salvage, enhance, upgrades, dailies, steadyHand: upg.steady_hand || 0, gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    return { parts: partList, salvage, enhance, upgrades, dailies, regalia, steadyHand: upg.steady_hand || 0, gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }

@@ -524,6 +524,14 @@ export const ITEMS = [
     { id: "clover_signet", name: "Clover Signet", slot: "ring", rarity: "rare", icon: "GiClover", flavor: "A pressed four-leaf clover set under glass.", stats: { fortune: 7, crit_chance: 3 }, farm: { seedLuck: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 850, sort: 935 },
     { id: "deep_seed_pouch", name: "Deep Seed Pouch", slot: "belt", rarity: "epic", icon: "GiSwapBag", flavor: "Bottomless — the good soil's secrets travel with you.", stats: { fortune: 6, might: 4 }, farm: { growSpeed: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2100, sort: 936 },
     { id: "foxglove_charm", name: "Foxglove Charm", slot: "amulet", rarity: "epic", icon: "GiThreeLeaves", flavor: "Wildflower magic, carried close to the heart.", stats: { fortune: 8, crit_chance: 3 }, farm: { harvestLuck: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2300, sort: 937 },
+
+    // ===== BLACKSMITH'S REGALIA (source: "forge") — the "salvaging set". Pieces drop rarely from salvaging at
+    // the Forge (owner-only); wearing 3/5 boosts your salvage output. Not sold, not level-granted.
+    { id: "regalia_visor", name: "Smith's Visor", slot: "helmet", rarity: "epic", icon: "GiVisoredHelm", flavor: "Soot-blackened, its slit glows with hearthlight.", stats: { crit_chance: 8, ferocity: 10 }, forgeSet: true, source: "forge", sort: 950 },
+    { id: "regalia_plate", name: "Forgeplate", slot: "chest", rarity: "epic", icon: "GiBreastplate", flavor: "Hammered from a hundred salvaged blades.", stats: { might: 8, ferocity: 14 }, forgeSet: true, source: "forge", sort: 951 },
+    { id: "regalia_girdle", name: "Ember Girdle", slot: "belt", rarity: "epic", icon: "GiBelt", flavor: "Warm to the touch, always.", stats: { might: 10, fortune: 8 }, forgeSet: true, source: "forge", sort: 952 },
+    { id: "regalia_boots", name: "Cinderstride Boots", slot: "boots", rarity: "epic", icon: "GiLeatherBoot", flavor: "Leave faintly glowing footprints on cold stone.", stats: { ferocity: 18 }, forgeSet: true, source: "forge", sort: 953 },
+    { id: "regalia_cloak", name: "Bellows Cloak", slot: "back", rarity: "epic", icon: "GiCape", flavor: "Billows like a forge fire catching air.", stats: { fortune: 12, crit_power: 8 }, forgeSet: true, source: "forge", sort: 954 },
 ];
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────

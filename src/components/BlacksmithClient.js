@@ -68,6 +68,7 @@ export default function BlacksmithClient({ initial }) {
             setSalvageBurst({ k: Date.now(), n: r.gained.n, name: t?.name || "parts", color: t?.color || "#ffd75e" });
             SFX.great();
             setTimeout(() => setSalvageBurst(null), 1400);
+            if (r.regaliaDrop) { SFX.win(); setToast({ kind: "regalia", text: `⚒️ You forged a Blacksmith's Regalia piece — ${r.regaliaDrop}! Equip it to boost your salvaging.` }); }
         } else if (r?.error) setToast(salvageErr(r.error));
     }, [post, forge.parts]);
 
@@ -162,6 +163,27 @@ export default function BlacksmithClient({ initial }) {
                         </div>
                     ))}
                 </div>
+
+                {/* Blacksmith's Regalia — the salvaging set (pieces drop from salvaging; wearing them boosts output). */}
+                {forge.regalia ? (
+                    <div className="forge-regalia">
+                        <div className="forge-regalia-head">
+                            <span className="forge-regalia-title">Blacksmith&apos;s Regalia</span>
+                            <span className="forge-regalia-count">{forge.regalia.equipped}/{forge.regalia.total} worn · {forge.regalia.owned}/{forge.regalia.total} found</span>
+                        </div>
+                        <div className="forge-regalia-row">
+                            {forge.regalia.pieces.map((p) => (
+                                <span key={p.id} className={`forge-regalia-piece${p.equipped ? " is-equipped" : p.owned ? " is-owned" : ""}`} title={`${p.name}${p.equipped ? " — worn" : p.owned ? " — owned (equip it!)" : " — not forged yet"}`}>
+                                    {p.owned && p.sprite ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={p.sprite} alt={p.name} />
+                                    ) : <span className="forge-regalia-glyph">{p.owned ? "★" : "?"}</span>}
+                                </span>
+                            ))}
+                        </div>
+                        <div className="forge-regalia-bonus" style={{ color: forge.regalia.bonus.tier > 0 ? "#8fe3a1" : "#b9a892" }}>{forge.regalia.bonus.label}</div>
+                    </div>
+                ) : null}
 
                 <div className="forge-tabs">
                     <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}>⚒️ Enhance ({enhance.length})</button>
@@ -479,4 +501,16 @@ const FORGE_CSS = `
 .forge-daily-claim { flex: 0 0 auto; padding: 6px 13px; border-radius: 9px; font-weight: 900; font-size: 12px; cursor: pointer; border: none; color: #2a1000; background: linear-gradient(180deg,#8fe39a,#4bbf6a); box-shadow: 0 2px 0 #2e7d46; animation: forgePop .4s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-daily-tag { flex: 0 0 auto; font-size: 10.5px; color: #b9a892; }
 .forge-daily-tag.done { color: #8fe3a1; font-weight: 800; }
+/* ── Blacksmith's Regalia (salvaging set) ── */
+.forge-regalia { margin: 0 0 14px; padding: 10px 12px; border-radius: 14px; background: linear-gradient(180deg, rgba(40,24,10,0.6), rgba(14,8,4,0.7)); border: 1px solid rgba(255,180,80,0.3); }
+.forge-regalia-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.forge-regalia-title { font-size: 12.5px; font-weight: 900; color: #ffcf8a; letter-spacing: 0.02em; }
+.forge-regalia-count { font-size: 10.5px; color: #c8b79f; }
+.forge-regalia-row { display: flex; gap: 8px; }
+.forge-regalia-piece { width: 46px; height: 46px; border-radius: 10px; display: grid; place-items: center; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
+.forge-regalia-piece.is-owned { border-color: rgba(255,215,94,0.55); }
+.forge-regalia-piece.is-equipped { border-color: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.5); background: rgba(255,180,80,0.12); }
+.forge-regalia-piece img { width: 40px; height: 40px; object-fit: contain; }
+.forge-regalia-glyph { font-size: 20px; font-weight: 900; color: #6a5a48; }
+.forge-regalia-bonus { font-size: 11px; font-weight: 700; margin-top: 8px; }
 `;
