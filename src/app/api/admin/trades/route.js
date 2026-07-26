@@ -54,20 +54,18 @@ export async function POST(request) {
                 // On a NEW trade with cards coming in, mint a scan-to-earn claim so the customer can bank
                 // XP + trade badges. The app shows its QR. Only for real card trades (cards in > 0).
                 let claim = null;
-                if (created) {
-                    const stats = tradeStatsFromLines(body.lines || [], body.marketTotal);
-                    if (stats.cardCount > 0) {
-                        const minted = await createTradeClaim({ tradeId: trade.id, ...stats }).catch(() => null);
-                        if (minted?.token) {
-                            claim = { token: minted.token, url: `${SITE_URL}/marketplace/claim-trade/${minted.token}`, potentialXp: tradeXp(stats), ...stats };
-                        }
+                const stats = tradeStatsFromLines(body.lines || [], body.marketTotal);
+                if (created && stats.cardCount > 0) {
+                    const minted = await createTradeClaim({ tradeId: trade.id, ...stats }).catch(() => null);
+                    if (minted?.token) {
+                        claim = { token: minted.token, url: `${SITE_URL}/marketplace/claim-trade/${minted.token}`, potentialXp: tradeXp(stats), ...stats };
                     }
                 }
                 // Notify all admin devices whenever a trade completes at the shop — so you always know (even if a
                 // helper's phone recorded it) and can tap through to inspect it. Best-effort; never fails the trade.
                 if (created) {
                     const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
-                    const cardCount = Number(trade.lines?.filter((l) => l.direction === "IN").reduce((s, l) => s + (Number(l.quantity) || 0), 0)) || 0;
+                    const cardCount = stats.cardCount || 0;
                     const bits = [`${cardCount} card${cardCount === 1 ? "" : "s"} in`];
                     if (trade.creditTotal > 0) bits.push(`${money(trade.creditTotal)} credit`);
                     if (trade.cashTotal > 0) bits.push(`${money(trade.cashTotal)} cash`);
