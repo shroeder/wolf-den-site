@@ -9,15 +9,16 @@ import { useItemSprite } from "@/components/ItemArt";
 
 // The Sets menu icon: the die-cut Warplate Helm sprite (falls back to a helmet emoji until it loads) — a real
 // piece of gear reads far better here than the old puzzle-piece glyph.
-function SetsHelmet() {
+function SetsHelmet({ size = 18 }) {
     const sprite = useItemSprite("warplate_helm");
-    if (sprite) return <img src={sprite} alt="" width={18} height={18} style={{ width: 18, height: 18, objectFit: "contain", verticalAlign: "-0.28em" }} />;
+    if (sprite) return <img src={sprite} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: "contain", verticalAlign: "-0.28em" }} />;
     return <span aria-hidden="true">🪖</span>;
 }
+const renderIcon = (l) => (l.Icon ? <l.Icon className="game-nav-ico" aria-hidden="true" /> : l.sprite === "helmet" ? <SetsHelmet /> : <span aria-hidden="true">{l.emoji}</span>);
+const renderBigIcon = (l) => (l.Icon ? <l.Icon aria-hidden="true" /> : l.sprite === "helmet" ? <SetsHelmet size={28} /> : <span aria-hidden="true">{l.emoji}</span>);
 
-// In-game menu bar: a horizontal, scrollable strip of the game areas, shown at the top of every game page
-// so you can hop Boss → Spin → Pets → Gear etc. without going back to the hub. Mounted once in the
-// marketplace layout; it self-hides on non-game pages (vendor marketplace, social, profile, checkout…).
+// In-game menu bar: a horizontal, scrollable strip of the game areas + a pinned button that opens a full,
+// CATEGORIZED grid menu of everything. Mounted once in the marketplace layout; self-hides on non-game pages.
 const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
     { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
@@ -40,97 +41,197 @@ const LINKS = [
 
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
-// Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them
-// so you don't get dumped out of the game when you (e.g.) tap into another player's profile or the badge list.
+// Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them.
 const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm"];
 
 export default function GameNav() {
     const pathname = usePathname() || "";
-    // The Forge (blacksmith/crafting) is OWNER-ONLY in Phase 1 — only append its pill for the owner.
     const [owner, setOwner] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
     useEffect(() => {
         let alive = true;
         fetch("/api/marketplace/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.buyer?.owner) setOwner(true); }).catch(() => {});
         return () => { alive = false; };
     }, []);
-    // Farm is live for everyone — always in the menu.
+    // Farm is live for everyone; the Forge is owner-only.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, ...(owner ? [{ href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
-    // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
-    // each in-game navigation so the count drops as soon as you open them.
+
     const [chests, setChests] = useState(0);
-    const [spins, setSpins] = useState(0); // unused spins (free + tokens) → red badge on the Spin tab
-    const [questsReady, setQuestsReady] = useState(0); // completed-but-unclaimed quests → red badge on Quests
-    const [cropsReady, setCropsReady] = useState(0); // ripe crops on the owner's farm → red badge on Farm
-    const [sailAttn, setSailAttn] = useState(false); // boat landed & waiting to dig → red-alert dot on Sailing
+    const [spins, setSpins] = useState(0);
+    const [questsReady, setQuestsReady] = useState(0);
+    const [cropsReady, setCropsReady] = useState(0);
+    const [sailAttn, setSailAttn] = useState(false);
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
         const loadChests = () => {
-            fetch("/api/marketplace/chests", { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => {
-                    if (!alive) return;
-                    setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
-                })
-                .catch(() => {});
-            fetch("/api/marketplace/spin", { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { if (alive && d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); })
-                .catch(() => {});
-            fetch("/api/marketplace/quests", { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); })
-                .catch(() => {});
-            fetch("/api/marketplace/sailing/status", { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); })
-                .catch(() => {});
+            fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); }).catch(() => {});
+            fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
+            fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
+            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); }).catch(() => {});
         };
         loadChests();
-        // Live-update the chest badge after any action (opening a chest, earning one) — not just on nav.
         const onRefresh = () => loadChests();
         window.addEventListener("wolfden-hud-refresh", onRefresh);
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
-
-    // Ripe-crop count for the Farm badge — every member has a farm now.
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
-        const load = () => fetch("/api/marketplace/farm", { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => { if (alive) setCropsReady(d?.garden?.readyCount || 0); })
-            .catch(() => {});
+        const load = () => fetch("/api/marketplace/farm", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setCropsReady(d?.garden?.readyCount || 0); }).catch(() => {});
         load();
         const onRefresh = () => load();
         window.addEventListener("wolfden-hud-refresh", onRefresh);
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
 
+    // Close on Escape + lock body scroll while the full menu is open. (Tile clicks close it directly.)
+    useEffect(() => {
+        if (!menuOpen) return undefined;
+        const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+        window.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    }, [menuOpen]);
+
     if (!inGame) return null;
 
+    const badgeInfo = (href) => {
+        if (href === "/marketplace/inventory" && chests > 0) return { badge: chests, title: `${chests} chest${chests === 1 ? "" : "s"} to open` };
+        if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${spins} spin${spins === 1 ? "" : "s"} ready` };
+        if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${questsReady} quest${questsReady === 1 ? "" : "s"} to claim` };
+        if (href === "/marketplace/farm" && cropsReady > 0) return { badge: cropsReady, title: `${cropsReady} crop${cropsReady === 1 ? "" : "s"} ready` };
+        return { badge: null, title: null };
+    };
+    const dotFor = (href) => href === "/marketplace/sailing" && sailAttn;
+
+    // The full, categorized grid menu — organized so you can see everything at once.
+    const SECTIONS = [
+        { title: "Play", items: [
+            { href: "/marketplace/boss", emoji: "⚔️", label: "Boss Fight", sub: "Join the raid" },
+            { href: "/marketplace/sailing", emoji: "⛵", label: "Sailing", sub: "Voyage & dig" },
+            { href: "/marketplace/farm", emoji: "🏡", label: "Farm", sub: "Grow & harvest" },
+            { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Daily Spin", sub: "Spin the wheel" },
+            { href: "/marketplace/quests", emoji: "📜", label: "Quests", sub: "Daily bounties" },
+            { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties", sub: "Post & claim" },
+        ] },
+        { title: "Gear & Pets", items: [
+            { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
+            { href: "/marketplace/pets", emoji: "🐾", label: "Pets", sub: "Collect & equip" },
+            { href: "/marketplace/sets", sprite: "helmet", label: "Sets", sub: "Set bonuses" },
+            ...(owner ? [{ href: "/marketplace/blacksmith", emoji: "🔨", label: "The Forge", sub: "Salvage & enhance", owner: true }] : []),
+        ] },
+        { title: "Shop & Trade", items: [
+            { href: "/marketplace/store", emoji: "🛒", label: "Store", sub: "Buy supplies" },
+            { href: "/marketplace/creations", emoji: "🎨", label: "Creations", sub: "Custom AI art" },
+            { href: "/marketplace/trade", emoji: "🤝", label: "Trades", sub: "Swap gear & gold" },
+            { href: "/marketplace/credit", emoji: "💳", label: "Store Credit", sub: "Credit + coins" },
+        ] },
+        { title: "Progress & Social", items: [
+            { href: "/marketplace/track", emoji: "🏆", label: "Rewards", sub: "Reward track" },
+            { href: "/marketplace/badges", emoji: "🎖️", label: "Badges", sub: "Earn & show off" },
+            { href: "/marketplace/leaderboard", emoji: "🥇", label: "Ranks", sub: "Leaderboard" },
+            { href: "/marketplace/invite", emoji: "🎁", label: "Invite", sub: "500 gold each" },
+            { href: "/marketplace/friends", emoji: "👥", label: "Friends", sub: "Add & message" },
+            { href: "/marketplace/inbox", emoji: "✉️", label: "Inbox", sub: "Messages" },
+        ] },
+        { title: "You", items: [
+            { href: "/marketplace/play", emoji: "🎮", label: "Game Home", sub: "The hub" },
+            { href: "/marketplace/profile", emoji: "👤", label: "Profile", sub: "Your card" },
+            { href: "/marketplace/profile/avatar", emoji: "🧑‍🎨", label: "Avatar", sub: "Build your look" },
+        ] },
+    ];
+
     return (
-        <nav className="game-nav" aria-label="Game menu">
-            {/* Coins live in the top HUD strip (RewardNudge), not here — keeps this row purely navigation. */}
-            <div className="game-nav-scroll">
-                {links.map((l) => {
-                    const chestBadge = l.href === "/marketplace/inventory" && chests > 0 ? chests : null;
-                    const spinBadge = l.href === "/marketplace/spin" && spins > 0 ? spins : null;
-                    const questBadge = l.href === "/marketplace/quests" && questsReady > 0 ? questsReady : null;
-                    const cropBadge = l.href === "/marketplace/farm" && cropsReady > 0 ? cropsReady : null;
-                    const badge = chestBadge ?? spinBadge ?? questBadge ?? cropBadge;
-                    const badgeTitle = chestBadge ? `${chestBadge} chest${chestBadge === 1 ? "" : "s"} to open` : spinBadge ? `${spinBadge} spin${spinBadge === 1 ? "" : "s"} ready` : questBadge ? `${questBadge} quest${questBadge === 1 ? "" : "s"} ready to claim` : cropBadge ? `${cropBadge} crop${cropBadge === 1 ? "" : "s"} ready to harvest` : null;
-                    const dot = l.href === "/marketplace/sailing" && sailAttn;
-                    return (
-                        <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
-                            {l.Icon ? <l.Icon className="game-nav-ico" aria-hidden="true" /> : l.sprite === "helmet" ? <SetsHelmet /> : <span aria-hidden="true">{l.emoji}</span>} {l.label}
-                            {badge ? <span className="game-nav-badge" title={badgeTitle}>{badge}</span> : null}
-                            {dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
-                        </Link>
-                    );
-                })}
-            </div>
-        </nav>
+        <>
+            <style>{GAMENAV_CSS}</style>
+            <nav className="game-nav" aria-label="Game menu">
+                <div className="game-nav-scroll">
+                    <button type="button" className="game-nav-menu-btn" aria-label="Open full menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.6" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6" /></svg>
+                        Menu
+                    </button>
+                    {links.map((l) => {
+                        const { badge, title } = badgeInfo(l.href);
+                        const dot = dotFor(l.href);
+                        return (
+                            <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
+                                {renderIcon(l)} {l.label}
+                                {badge ? <span className="game-nav-badge" title={title}>{badge}</span> : null}
+                                {dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
+
+            {menuOpen ? (
+                <div className="gm-overlay" onClick={() => setMenuOpen(false)} role="presentation">
+                    <div className="gm-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="All game areas">
+                        <div className="gm-head">
+                            <strong>Where to?</strong>
+                            <button type="button" className="gm-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}>×</button>
+                        </div>
+                        <div className="gm-body">
+                            {SECTIONS.map((sec) => (
+                                <div key={sec.title} className="gm-section">
+                                    <div className="gm-section-title">{sec.title}</div>
+                                    <div className="gm-grid">
+                                        {sec.items.map((it) => {
+                                            const { badge, title } = badgeInfo(it.href);
+                                            const dot = dotFor(it.href);
+                                            return (
+                                                <Link key={it.href} href={it.href} className={`gm-tile${isOn(pathname, it.href) ? " is-active" : ""}${it.owner ? " is-owner" : ""}`} onClick={() => setMenuOpen(false)}>
+                                                    <span className="gm-tile-ico">{renderBigIcon(it)}</span>
+                                                    <span className="gm-tile-label">{it.label}</span>
+                                                    <span className="gm-tile-sub">{it.sub}</span>
+                                                    {it.owner ? <span className="gm-tile-owner">owner</span> : null}
+                                                    {badge ? <span className="gm-tile-badge" title={title}>{badge}</span> : null}
+                                                    {dot ? <span className="gm-tile-dot" title="Needs attention" /> : null}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+        </>
     );
 }
+
+const GAMENAV_CSS = `
+.game-nav-menu-btn { position: sticky; left: 0; z-index: 3; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; margin-right: 4px;
+    border: none; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 13px; white-space: nowrap;
+    color: #1c130a; background: linear-gradient(180deg, #ffd75e, #f3b23a); box-shadow: 0 2px 0 #b57f22, 3px 0 10px 2px rgba(0,0,0,0.45); }
+.game-nav-menu-btn:active { transform: translateY(1px); }
+.game-nav-menu-btn svg { display: block; }
+.gm-overlay { position: fixed; inset: 0; z-index: 10070; background: rgba(6,8,12,0.72); backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center; padding: 0; animation: gmFade .18s ease both; }
+@keyframes gmFade { from { opacity: 0; } to { opacity: 1; } }
+.gm-panel { width: 100%; max-width: 640px; max-height: 88dvh; display: flex; flex-direction: column; border-radius: 20px 20px 0 0; overflow: hidden;
+    background: linear-gradient(180deg, #1a1d24, #12141a); border: 1px solid rgba(255,215,110,0.25); border-bottom: none; box-shadow: 0 -16px 50px rgba(0,0,0,0.6); animation: gmUp .26s cubic-bezier(.2,1,.3,1) both; }
+@keyframes gmUp { from { transform: translateY(40px); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
+.gm-head { display: flex; align-items: center; padding: 14px 16px 10px; }
+.gm-head strong { font-size: 17px; color: #ffe0b0; }
+.gm-close { margin-left: auto; width: 32px; height: 32px; border-radius: 999px; border: none; background: rgba(255,255,255,0.08); color: #e8e2d6; font-size: 20px; cursor: pointer; line-height: 1; }
+.gm-body { overflow-y: auto; padding: 0 14px 20px; -webkit-overflow-scrolling: touch; }
+.gm-section { margin-top: 12px; }
+.gm-section-title { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #9fb0c0; margin: 0 4px 8px; }
+.gm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 9px; }
+.gm-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px; border-radius: 15px; text-align: center; text-decoration: none;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.09); color: #eef2f7; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.gm-tile:hover { transform: translateY(-2px); border-color: rgba(255,215,110,0.5); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.gm-tile.is-active { border-color: #ffd75e; background: linear-gradient(180deg, rgba(255,215,94,0.16), rgba(255,215,94,0.05)); }
+.gm-tile.is-owner { border-color: rgba(255,150,60,0.5); }
+.gm-tile-ico { font-size: 26px; line-height: 1; height: 30px; display: grid; place-items: center; }
+.gm-tile-ico svg { width: 26px; height: 26px; }
+.gm-tile-label { font-size: 12.5px; font-weight: 800; line-height: 1.1; }
+.gm-tile-sub { font-size: 9.5px; color: #9fb0c0; line-height: 1.15; }
+.gm-tile-owner { position: absolute; top: 6px; left: 6px; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #ffb877; background: rgba(255,140,60,0.18); border: 1px solid rgba(255,140,60,0.5); border-radius: 999px; padding: 0 5px; }
+.gm-tile-badge { position: absolute; top: 6px; right: 6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #e0433f; color: #fff; font-size: 10px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+.gm-tile-dot { position: absolute; top: 8px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: #ff9a3c; box-shadow: 0 0 8px #ff9a3c; }
+`;
