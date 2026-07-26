@@ -339,8 +339,9 @@ export async function GET(request, { params }) {
                 coinLedger: {
                     earned: coins?.earned || 0,
                     spent: coins?.spent || 0,
+                    balance: (coins?.events || []).find((e) => e.balanceAfter != null)?.balanceAfter ?? null, // newest known running balance
                     events: (coins?.events || []).map((e) => ({ delta: e.delta, balanceAfter: e.balanceAfter, reason: e.reason, label: coinLabel(e.reason), meta: e.meta, at: iso(e.at) })),
-                    breakdown: (coinBd || []).map((b) => ({ reason: b.reason, n: b.n, earned: b.earned, spent: b.spent })),
+                    breakdown: (coinBd || []).map((b) => ({ reason: b.reason, n: b.n, earned: b.earned, spent: b.spent, label: coinLabel(b.reason) })),
                 },
                 trades,
             }, { headers: { "Cache-Control": "no-store" } });
