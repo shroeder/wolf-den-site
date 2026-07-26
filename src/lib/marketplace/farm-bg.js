@@ -9,10 +9,15 @@ import { generateSceneImage } from "@/lib/marketplace/openai-image.js";
 
 export const FARM_BG_COST = 3; // creation tokens per generated background
 
+// Internal prompt rails so a generated scene actually WORKS as a farm backdrop: the crop plots + pets sit on the
+// lower half, so the bottom must be open, flat, walkable ground (grass/soil/dirt) with no water, cliffs, roads,
+// buildings or big objects blocking it — the player's theme just decorates the UPPER background/horizon.
 const buildBgPrompt = (desc) =>
-    `A wide painterly LANDSCAPE BACKGROUND for a cozy top-down farming game — a scenic countryside/pasture vista: ${String(desc).trim().slice(0, 400)}. ` +
-    `Horizontal panorama, rich saturated storybook color, soft depth, with gently rolling ground across the bottom third for crops to sit on. ` +
-    `NO characters, NO animals, NO people, NO text, NO letters, NO UI, NO frame or border. The scene fills the entire frame.`;
+    `A wide, seamless, side-on LANDSCAPE BACKGROUND for a cozy 2D farming game where crops and animals stand on the ground. ` +
+    `Player's theme for the scenery: ${String(desc).trim().slice(0, 300)}. ` +
+    `COMPOSITION RULES (important): the LOWER HALF must be a flat, open, walkable field of grass/soil/dirt with plenty of clear empty space for crops to be planted — no water, no cliffs, no roads, no rivers, no fences, no buildings or large objects in the foreground. ` +
+    `Put all the themed scenery (mountains, sky, trees, structures, etc.) in the UPPER background / on the horizon only. Gentle, subtle ground so tiles read clearly. ` +
+    `Horizontal panorama, rich saturated storybook color, soft depth. NO characters, NO people, NO animals, NO text, NO letters, NO UI, NO frame or border. The scene fills the entire frame.`;
 
 export async function getFarmBgState(buyerId) {
     if (!buyerId) return { bg: null, draft: null, credits: 0, cost: FARM_BG_COST };
