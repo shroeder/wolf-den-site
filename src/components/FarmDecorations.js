@@ -283,7 +283,10 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                         </div>
                     ) : null}
                     {placed && mine ? (
-                        <button type="button" disabled={busy} onClick={() => { onPickup(item.placementId); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ff9ec2,#e0559a)", color: "#3a0a22", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #a83b73", opacity: busy ? 0.6 : 1 }}>✋ Pick up (back to your tray)</button>
+                        // Destructive-looking + secondary on purpose: this REMOVES the placed piece (it returns to
+                        // your tray). Styled danger-red so it never gets mistaken for the safe Close button below.
+                        // No confirm dialog by design — one tap, but it visually reads as the removal action.
+                        <button type="button" disabled={busy} onClick={() => { onPickup(item.placementId); onClose(); }} style={{ width: "100%", padding: 11, fontWeight: 800, fontSize: 13.5, background: "rgba(224,91,106,0.12)", color: "#ff8f9a", border: "1px solid rgba(224,91,106,0.5)", borderRadius: 11, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>🗑️ Remove from farm (returns to your tray)</button>
                     ) : null}
                     {canBuy && afford ? (
                         <button type="button" disabled={busy} onClick={() => { onBuy(item.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.6 : 1 }}>🪙 Buy · {item.price.toLocaleString()}g{item.source === "special" ? " (premium)" : ""}</button>
@@ -300,7 +303,8 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     {!placed && item.owned ? (
                         <div className="muted" style={{ textAlign: "center", fontSize: 12 }}>You own this — drag it from your tray to place it.</div>
                     ) : null}
-                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
+                    {/* The safe, obvious tap — clearly the primary neutral action so it can't be confused with Remove. */}
+                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 12, fontWeight: 900, background: "rgba(255,255,255,0.12)", color: "inherit", border: "1px solid rgba(255,255,255,0.24)", borderRadius: 11, cursor: "pointer" }}>Done</button>
                 </div>
             </div>
         </div>
@@ -352,7 +356,7 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
                         ) : (
                             <>
                                 <p className="muted" style={{ margin: "0 0 10px", fontSize: 12, textAlign: "center" }}>
-                                    {editing ? "Drag pieces around the field to arrange them; tap the ✕ to pick one up (not over your crops)." : "Place a decoration as many times as you like — you own it forever. Tap “✋ Arrange” to move or pick up placed pieces."}
+                                    {editing ? "Drag pieces around the field to arrange them; tap a piece to open it, then Remove to send it back to your tray." : "Place a decoration as many times as you like — you own it forever. Tap “✋ Arrange” to move or remove placed pieces."}
                                 </p>
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
                                     {owned.map((o) => (

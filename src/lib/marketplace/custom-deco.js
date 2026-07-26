@@ -9,7 +9,10 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 // finalized custom is granted into mkt_deco_owned as 'custom:<id>' + its sprite into mkt_deco_sprite, so it
 // flows through the normal place/inspect system. Personal-only, never tradeable.
 const MAX_ATTEMPTS = 4; // 1 initial + 3 correction redraws (each is a single image now, so cheaper than the old 3-up)
-const ART = "cute polished 2D game decoration sprite, painterly cartoon style, warm storybook lighting, clean crisp edges with NO outline and NO white sticker border, subject fully isolated on a transparent background, centered, no ground shadow, no text";
+// House art style — MUST match our pets/heroes/items/boss/backgrounds (all "bold stylized illustration, clean
+// confident outlines, cel-shaded flat vibrant colors, polished RPG game-art style") so creations don't look
+// like a different game. Decoration-specific: a single object, isolated, no sticker halo (de-halo handles it).
+const ART = "2D video-game decoration art, a single decorative object, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, polished RPG game-art style, centered and fully isolated on a transparent background, no white sticker border, no ground shadow, no text, no logo, no watermark, no border";
 // Build the final image prompt. We first run the player's raw wording through a refinement pass (the image
 // model takes terse descriptions too literally and misses the point) to get a vivid, concrete subject that
 // captures their intent; on any failure we fall back to their literal words. The ART style suffix is always
