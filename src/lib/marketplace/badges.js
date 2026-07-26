@@ -457,8 +457,9 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0, fi
     const ids = rows.map((r) => r.id);
     const badgeRows = await db
         .query(
-            `SELECT ub.buyer_id, b.slug, b.label, b.icon, b.color, b.admin_only
+            `SELECT ub.buyer_id, b.slug, b.label, b.icon, b.color, b.admin_only, sp.url AS sprite_url
                FROM mkt_user_badge ub JOIN mkt_badge b ON b.slug = ub.badge_slug
+               LEFT JOIN mkt_badge_sprite sp ON sp.slug = b.slug
               WHERE ub.buyer_id = ANY($1)
               ORDER BY b.sort_order ASC`,
             [ids]
@@ -467,7 +468,7 @@ export async function listMembersWithBadges({ q = "", limit = 40, offset = 0, fi
     const byBuyer = new Map();
     for (const br of badgeRows) {
         if (!byBuyer.has(br.buyer_id)) byBuyer.set(br.buyer_id, []);
-        byBuyer.get(br.buyer_id).push({ slug: br.slug, label: br.label, icon: br.icon || null, color: br.color || null, adminOnly: br.admin_only !== false });
+        byBuyer.get(br.buyer_id).push({ slug: br.slug, label: br.label, icon: br.icon || null, color: br.color || null, adminOnly: br.admin_only !== false, spriteUrl: br.sprite_url || null });
     }
 
     return rows.map((r) => {

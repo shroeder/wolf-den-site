@@ -93,9 +93,10 @@ export async function ensureAlias(buyerId, seed) {
 export async function getUserBadges(buyerId) {
     if (!buyerId) return [];
     return db.query(
-        `SELECT b.slug, b.label, b.description, b.icon, b.color
+        `SELECT b.slug, b.label, b.description, b.icon, b.color, s.url AS sprite_url
            FROM mkt_user_badge ub
            JOIN mkt_badge b ON b.slug = ub.badge_slug
+           LEFT JOIN mkt_badge_sprite s ON s.slug = b.slug
           WHERE ub.buyer_id = $1
           ORDER BY b.sort_order ASC, b.label ASC`,
         [buyerId]

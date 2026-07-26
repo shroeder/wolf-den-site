@@ -212,6 +212,20 @@ export async function GET(request, { params }) {
                 refund: "💵 Store-credit refund",
                 adjust: "⚙️ Store-credit adjustment",
             };
+            // Friendly, icon-led labels for the coin ledger reason keys, so the true up/down statement reads
+            // like plain English instead of raw snake_case keys.
+            const COIN_REASON = {
+                raid_win: "⚔️ Raid win", raid_loss: "🛡️ Raid loss", spin_prize: "🎡 Spin prize", boss_reward: "🐉 Boss reward",
+                quest_reward: "📜 Quest reward", badge_reward: "🎖️ Badge reward", chest_reward: "🧰 Chest reward",
+                checkin: "📅 Daily check-in", bounty: "🎯 Bounty", giveaway: "🎁 Giveaway", sell_gear: "💰 Sold gear",
+                xp_accrual: "✨ XP accrual", coin_purchase: "🪙 Bought coins", admin_grant: "⚙️ Admin grant",
+                buy_gear: "🛒 Bought gear", buy_pet: "🐾 Bought pet", buy_badge: "🎖️ Bought badge", buy_cosmetic: "🎨 Bought cosmetic",
+                buy_consumable: "🧪 Bought supply", buy_daily_deal: "🔥 Daily deal", upgrade: "⬆️ Upgrade", cooldown_skip: "⏩ Cooldown skip",
+                buy_digs: "⛏️ Bought digs", buy_spin: "🎟️ Bought spin", merchant_buy: "⛵ Merchant buy", happy_hour: "🍻 Happy hour",
+                trade: "🤝 Trade", trade_escrow: "🤝 Trade escrow", harvest: "🌾 Harvest", harvest_loot: "🎁 Harvest loot",
+                farm_upgrade: "🌱 Farm upgrade", loot_pig: "🐷 Loot pig", cheer: "📣 Cheer", seed_buy: "🌱 Seed",
+            };
+            const coinLabel = (reason) => COIN_REASON[reason] || String(reason || "coins").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
             // The merchandise amount for a purchase_spend event: prefer the stamped meta amount (exact, new
             // rows). Older rows only have points, which already had the Happy-Hour multiplier baked in, so we
             // estimate whole dollars (spend was always whole dollars) — flagged approx so the UI can mark it.
@@ -302,7 +316,7 @@ export async function GET(request, { params }) {
                     }),
                 },
                 chestTiers: CHEST_ORDER.map((t) => ({ tier: t, label: CHEST_TIERS[t].label, emoji: CHEST_TIERS[t].emoji })),
-                badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon })),
+                badges: (badges || []).map((b) => ({ label: b.label, icon: b.icon, slug: b.slug, spriteUrl: b.sprite_url || null })),
                 redemptions: (redemptions || []).map((r) => ({ label: r.reward_label, at: iso(r.redeemed_at) })),
                 // Real purchases + store-credit money moves (incl. in-store QR redemptions).
                 purchases,
@@ -322,7 +336,7 @@ export async function GET(request, { params }) {
                 coinLedger: {
                     earned: coins?.earned || 0,
                     spent: coins?.spent || 0,
-                    events: (coins?.events || []).map((e) => ({ delta: e.delta, balanceAfter: e.balanceAfter, reason: e.reason, meta: e.meta, at: iso(e.at) })),
+                    events: (coins?.events || []).map((e) => ({ delta: e.delta, balanceAfter: e.balanceAfter, reason: e.reason, label: coinLabel(e.reason), meta: e.meta, at: iso(e.at) })),
                     breakdown: (coinBd || []).map((b) => ({ reason: b.reason, n: b.n, earned: b.earned, spent: b.spent })),
                 },
                 trades,
