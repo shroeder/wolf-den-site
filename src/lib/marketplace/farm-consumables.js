@@ -36,14 +36,18 @@ export async function applyGrowthTonic(buyerId, cut = 0.6) {
     return { seedId: row.seed_id, name: def?.name || "your crop", emoji: def?.emoji || "🌱" };
 }
 
-// Seed Packet — grant `n` random seeds, weighted heavily toward common with a slim rare/epic tail (a modest
-// bundle, not a shortcut to the jackpot crops). Returns a { name, emoji, count } tally for the toast.
-export async function grantSeedBundle(buyerId, n = 3) {
+// Seed pack — grant `n` random seeds using the pack tier's rarity `weights` (basic packs skew common/rare;
+// pricier crate/vault tiers unlock epic/legendary/mythic). Falls back to the modest basic mix when no weights
+// are given. Returns a { name, emoji, count } tally for the toast.
+export async function grantSeedBundle(buyerId, n = 3, weights = null) {
     const count = Math.max(1, Math.min(10, Number(n) || 1));
+    const mix = weights && typeof weights === "object" && Object.keys(weights).length ? weights : { common: 78, rare: 20, epic: 2 };
     const tally = new Map();
     for (let i = 0; i < count; i += 1) {
-        const rarity = weightedPick({ common: 78, rare: 20, epic: 2 });
-        const pool = seedsOfRarity(rarity);
+        let rarity = weightedPick(mix);
+        let pool = seedsOfRarity(rarity);
+        // Guard: if a tier's rolled rarity has no crops defined, fall back to any common seed rather than nothing.
+        if (!pool.length) { rarity = "common"; pool = seedsOfRarity("common"); }
         const sid = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "wheat";
         await grantSeed(buyerId, sid).catch(() => {});
         tally.set(sid, (tally.get(sid) || 0) + 1);

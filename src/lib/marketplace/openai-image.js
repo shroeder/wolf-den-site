@@ -52,6 +52,48 @@ export async function faceBufferRight(buffer) {
     return orientFacingRight(buffer, key);
 }
 
+// Turn a player's short (often vague, over-literal) decoration description into ONE vivid, concrete visual
+// prompt that captures their INTENT — inferring sensible materials, colors, shape, mood, style — for the cute
+// 2D decoration art model. The image model takes terse prompts too literally and misses the point; this pass
+// fixes that. Best-effort: returns null on any failure so the caller falls back to the raw wording. Never adds
+// brands/copyrighted characters (those get refused downstream anyway).
+export async function refineDecoPrompt(description, correction = "") {
+    const key = process.env.OPENAI_API_KEY;
+    const desc = String(description || "").trim().slice(0, 300);
+    if (!key || desc.length < 3) return null;
+    try {
+        const sys =
+            "You are a prompt engineer for a whimsical 2D farm game's decoration art generator. Rewrite the player's short description of a decoration into ONE vivid, concrete visual description of a SINGLE decorative object or creature. Generously interpret their intent: infer sensible materials, colors, shapes, mood, lighting and style so the art looks intentional and charming rather than a clumsy literal reading. Keep it ONE standalone decoration a player would place on a farm, isolated on a transparent background. Never reference a real brand, company, or copyrighted/trademarked character. Output ONLY the description as a noun phrase — no 'a picture of', no preamble, no quotes — 40 words max.";
+        const user =
+            correction && correction.trim()
+                ? `Description: ${desc}\nThe player asked to adjust the PREVIOUS version like this: ${correction.trim().slice(0, 200)}\nRewrite the full description with that adjustment applied.`
+                : `Description: ${desc}`;
+        const resp = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                max_tokens: 120,
+                temperature: 0.7,
+                messages: [
+                    { role: "system", content: sys },
+                    { role: "user", content: user },
+                ],
+            }),
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json().catch(() => null);
+        let out = (data?.choices?.[0]?.message?.content || "").trim();
+        out = out
+            .replace(/^["']|["']$/g, "")
+            .replace(/\s+/g, " ")
+            .slice(0, 400);
+        return out.length >= 3 ? out : null;
+    } catch {
+        return null;
+    }
+}
+
 // Public: DETECT which way a rendered sprite faces WITHOUT modifying the image. Returns "left" | "right" |
 // "unknown" for a genuine model answer. THROWS on an infra failure (no key / fetch / non-200) so the caller
 // can leave the sprite unchecked and retry later instead of permanently recording a wrong "no-flip". Used to

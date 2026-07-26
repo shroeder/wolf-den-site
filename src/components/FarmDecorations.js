@@ -58,8 +58,10 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
             if (r && insideField(e.clientX, e.clientY)) {
                 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
                 // getBoundingClientRect() already accounts for the field's horizontal scroll, so % is correct wherever you're scrolled.
-                const xPct = clamp(((e.clientX - r.left) / r.width) * 100, 2, 98);
-                const yPct = clamp(((e.clientY - r.top) / r.height) * 100, 4, 98);
+                // Near-full range so decorations can be placed across the WHOLE farm (a hair of margin keeps a
+                // bottom-anchored sprite from clipping off an edge).
+                const xPct = clamp(((e.clientX - r.left) / r.width) * 100, 1, 99);
+                const yPct = clamp(((e.clientY - r.top) / r.height) * 100, 2, 100);
                 onPlaceAt(d.o.id, xPct, yPct);
             }
         } else {
@@ -171,8 +173,8 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
         g.moved = true;
         e.preventDefault();
         const rect = fieldRef.current.getBoundingClientRect();
-        g.x = Math.max(2, Math.min(98, ((e.clientX - rect.left) / rect.width) * 100));
-        g.y = Math.max(4, Math.min(98, ((e.clientY - rect.top) / rect.height) * 100));
+        g.x = Math.max(1, Math.min(99, ((e.clientX - rect.left) / rect.width) * 100));
+        g.y = Math.max(2, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
         setDrag({ id: g.id, x: g.x, y: g.y });
     };
     const end = (e) => {

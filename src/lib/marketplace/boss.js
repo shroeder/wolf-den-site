@@ -11,6 +11,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -710,9 +711,12 @@ async function finalizeBossKill(bossId) {
     // REAL-WORLD PRIZE — ticket-weighted lottery (fallback to damage-weighted if nobody cleared a ticket).
     // Only drawn when there's an actual prize to hand out. This person becomes the claim/announcement winner.
     let raffleWinner = null;
-    if (pool.length && boss.prize_name) {
-        const totalTickets = pool.reduce((s, p) => s + p.tickets, 0);
-        raffleWinner = weightedDraw(pool, totalTickets > 0 ? (p) => p.tickets : (p) => p.dmg);
+    // The Wolf Den (owner) is EXCLUDED from winning the real-world prize — they still earn in-game rewards below,
+    // just never the physical raffle. Filter only the raffle pool, not the reward/chest pool.
+    const rafflePool = pool.filter((p) => !isOwner(p.id));
+    if (rafflePool.length && boss.prize_name) {
+        const totalTickets = rafflePool.reduce((s, p) => s + p.tickets, 0);
+        raffleWinner = weightedDraw(rafflePool, totalTickets > 0 ? (p) => p.tickets : (p) => p.dmg);
         if (raffleWinner) {
             await db.query(`UPDATE boss_event SET winner_buyer_id = $2, winner_tickets = $3, winner_drawn_at = NOW() WHERE id = $1`, [bossId, raffleWinner.id, raffleWinner.tickets]).catch(() => {});
         }

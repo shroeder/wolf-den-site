@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { generateImage } from "@/lib/marketplace/openai-image.js";
+import { generateImage, refineDecoPrompt } from "@/lib/marketplace/openai-image.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
 // Player-made decorations: describe → the art pipeline draws ONE image → if you don't love it, add a short
@@ -10,12 +10,16 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 // flows through the normal place/inspect system. Personal-only, never tradeable.
 const MAX_ATTEMPTS = 4; // 1 initial + 3 correction redraws (each is a single image now, so cheaper than the old 3-up)
 const ART = "cute polished 2D game decoration sprite, painterly cartoon style, warm storybook lighting, clean crisp edges with NO outline and NO white sticker border, subject fully isolated on a transparent background, centered, no ground shadow, no text";
-// Original description is always the base; an optional correction note is layered on to steer a redraw.
-const buildPrompt = (desc, correction) => {
-    const base = `A ${String(desc || "").slice(0, 300)}.`;
+// Build the final image prompt. We first run the player's raw wording through a refinement pass (the image
+// model takes terse descriptions too literally and misses the point) to get a vivid, concrete subject that
+// captures their intent; on any failure we fall back to their literal words. The ART style suffix is always
+// appended. Original description is the base; an optional correction note steers a redraw.
+async function buildPrompt(desc, correction) {
     const note = String(correction || "").trim() ? ` Adjustments to apply: ${String(correction).trim().slice(0, 200)}.` : "";
-    return `${base}${note} ${ART}.`;
-};
+    const refined = await refineDecoPrompt(String(desc || ""), String(correction || "")).catch(() => null);
+    const subject = refined || `A ${String(desc || "").slice(0, 300)}.${note}`;
+    return `${subject} ${ART}.`;
+}
 
 // Turn a raw OpenAI image error into a short, member-friendly reason (so a refused prompt explains itself
 // instead of an opaque "hiccup"), while keeping the raw text for the admin console. This is a PAID action,
@@ -77,7 +81,7 @@ export async function startCustomDeco(buyerId, name, prompt) {
     if (!paid) return { ok: false, error: "no_credits" };
     const row = await db.queryOne(`INSERT INTO mkt_custom_deco (buyer_id, name, prompt) VALUES ($1, $2, $3) RETURNING id`, [buyerId, nm, desc]).catch(() => null);
     if (!row) { await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); return { ok: false, error: "db" }; }
-    const gen = await genOne(buildPrompt(desc), 1);
+    const gen = await genOne(await buildPrompt(desc), 1);
     if (!gen.urls.length) {
         await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); // refund
         // 'failed' (not 'abandoned') + the raw reason, so a policy refusal is distinguishable from a user abandon.
@@ -96,7 +100,7 @@ export async function refineCustomDeco(buyerId, id, correction) {
     const row = await db.queryOne(`SELECT * FROM mkt_custom_deco WHERE id = $1 AND buyer_id = $2 AND status = 'drafting'`, [Number(id), buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_found" };
     if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "no_attempts", draft: mapDraft(row) };
-    const gen = await genOne(buildPrompt(row.prompt, correction), row.attempts + 1);
+    const gen = await genOne(await buildPrompt(row.prompt, correction), row.attempts + 1);
     if (!gen.urls.length) {
         await db.query(`UPDATE mkt_custom_deco SET last_error = $2, updated_at = NOW() WHERE id = $1`, [Number(id), gen.error?.raw || null]).catch(() => {});
         return { ok: false, error: "gen_failed", reason: gen.error?.reason || null, draft: mapDraft(row) };

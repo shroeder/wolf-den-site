@@ -5,7 +5,9 @@ import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, reso
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState } from "@/lib/marketplace/custom-deco.js";
-import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, buyAndPlantSeed } from "@/lib/marketplace/farm-crops.js";
+import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
+import { useConsumable as openConsumable } from "@/lib/marketplace/consumables.js";
+import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -62,7 +64,12 @@ export async function POST(request) {
             else if (b?.action === "pig_claim") res = await claimPig(buyer.id);
             // ── Farming ──
             else if (b?.action === "plant") res = await plantSeed(buyer.id, Number(b?.slot), String(b?.seedId || ""));
-            else if (b?.action === "seed_buy_plant") res = await buyAndPlantSeed(buyer.id, b?.slot != null ? Number(b?.slot) : null, String(b?.seedId || ""));
+            else if (b?.action === "pack_open") {
+                // Open a seed pack right on the farm (only seed packs — never arbitrary consumables).
+                const packId = String(b?.packId || "");
+                if (!SEED_PACK_IDS.includes(packId)) res = { ok: false, error: "bad_pack" };
+                else { const r = await openConsumable(buyer.id, packId); res = r?.ok ? { ...r, garden: await getGarden(buyer.id) } : r; }
+            }
             else if (b?.action === "harvest") res = await harvestPlot(buyer.id, Number(b?.slot));
             else if (b?.action === "fertilizer_buy") res = await buyFertilizer(buyer.id);
             else if (b?.action === "fertilizer_use") res = await applyFertilizer(buyer.id, Number(b?.slot));

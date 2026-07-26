@@ -140,15 +140,17 @@ export async function decoState(buyerId) {
     return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), catalog, custom: customState, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
 }
 
-const clampPct = (v, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(2, Math.min(98, n)) : def; };
+// Near-full range so decorations can live anywhere on the farm (matches the client drag clamps). A hair of
+// margin keeps a bottom-anchored sprite from clipping off an edge.
+const clampPct = (v, def, lo = 1, hi = 100) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
 
 // Place a decoration you OWN at (x, y). Owning is a permanent unlock, so you can place the same decoration as
 // many times as you like (reusable). Guards: you own it, the spot isn't over the plots, and you're under the
 // global 500-item placement cap.
 export async function placeDecoration(buyerId, decoId, x, y) {
     if (!buyerId || (!isDecoration(decoId) && !isCustom(decoId))) return { ok: false, error: "bad_decoration" };
-    const px = clampPct(x, 50);
-    const py = clampPct(y, 55);
+    const px = clampPct(x, 50, 1, 99);
+    const py = clampPct(y, 55, 2, 100);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = $2 AND qty > 0`, [buyerId, decoId]).catch(() => null);
     if (!owned) return { ok: false, error: "not_owned" };
     const total = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ n: 0 }));
@@ -183,8 +185,8 @@ export async function transformDecoration(buyerId, placementId, { scale, rot } =
 // Reposition a placed decoration (drag). Decorations can go anywhere on the farm — you place them freely.
 export async function moveDecoration(buyerId, placementId, x, y) {
     if (!buyerId || !placementId) return { ok: false, error: "bad_request" };
-    const px = clampPct(x, 50);
-    const py = clampPct(y, 55);
+    const px = clampPct(x, 50, 1, 99);
+    const py = clampPct(y, 55, 2, 100);
     const moved = await db.queryOne(`UPDATE mkt_deco_placement SET x = $3, y = $4 WHERE id = $1 AND buyer_id = $2 RETURNING id`, [placementId, buyerId, px, py]).catch(() => null);
     if (!moved) return { ok: false, error: "not_found" };
     await trackActivity(buyerId, "arrange_deco", { placementId, kind: "move" }).catch(() => {});

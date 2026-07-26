@@ -10,6 +10,7 @@ import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } fr
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
+import { SEED_PACKS } from "@/lib/marketplace/seed-packs.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
 // Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
@@ -70,7 +71,8 @@ export const CONSUMABLES = {
     // FARM supplies — buyable boosts for the garden loop. Growth Tonic / Fertilizer Crate speed crops; Seed
     // Packet restocks the seed bag; Harvest Charm sweetens the next few harvests' loot rolls.
     farm_growth_tonic: { name: "Growth Tonic", emoji: "🧴", kind: "farm", desc: "Speed up your slowest-growing crop by 60%.", price: 600, effect: { type: "farm_grow", cut: 0.6 } },
-    farm_seed_packet: { name: "Seed Packet", emoji: "🌱", kind: "farm", desc: "Tear open for 3 random crop seeds.", price: 500, effect: { type: "farm_seed", count: 3 } },
+    // Seed packs (farm_seed_packet / _crate / _vault) are injected below from SEED_PACKS — the tiered bags are
+    // the only way to get seeds now.
     farm_harvest_charm: { name: "Harvest Charm", emoji: "🍀", kind: "farm", desc: "Your next 5 harvests roll for better loot.", price: 1200, effect: { type: "farm_harvest_luck", charges: 5 } },
     farm_fertilizer_crate: { name: "Fertilizer Crate", emoji: "📦", kind: "farm", desc: "A crate of 5 fertilizer for your crops.", price: 1500, effect: { type: "farm_fertilizer", count: 5 } },
     // Drop-only bumper crate — a bigger fertilizer haul from the better chests.
@@ -86,13 +88,18 @@ export const CONSUMABLES = {
     sail_raiding_horn: { name: "Raiding Horn", emoji: "📯", kind: "sail", desc: "Sound the horn to regain one spent daily raid.", price: 900, effect: { type: "sail_raid" } },
 };
 
+// Inject the tiered seed packs from the shared catalog (single source of truth for tiers/weights/prices).
+for (const p of SEED_PACKS) {
+    CONSUMABLES[p.id] = { name: p.name, emoji: p.emoji, kind: "farm", desc: p.desc, price: p.price, effect: { type: "farm_seed", count: p.count, weights: p.weights } };
+}
+
 // Buyable order (shop). Relics + drop-only treats are intentionally excluded — they're chest/boss-only.
 const SHOP_ORDER = [
     "scroll_wisdom", "scroll_ancient", "pot_adrenaline", "pot_secondwind", "pot_berserker", "pot_fury", "stone_ember", "stone_storm",
     "treat_bone", "treat_snack", "treat_toy", "treat_feast", "treat_golden", "treat_kibble",
     "spin_lucky_coin",
     // Non-combat activity supplies.
-    "farm_growth_tonic", "farm_seed_packet", "farm_harvest_charm", "farm_fertilizer_crate", "farm_pet_whistle", "farm_kindness_token",
+    "farm_growth_tonic", "farm_seed_packet", "farm_seed_crate", "farm_seed_vault", "farm_harvest_charm", "farm_fertilizer_crate", "farm_pet_whistle", "farm_kindness_token",
     "sail_tailwind_charm", "sail_prospectors_charm", "sail_raiding_horn",
 ];
 
@@ -288,7 +295,7 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
             const res = await applyGrowthTonic(buyerId, e.cut ?? 0.6).catch(() => null);
             appliedF = res ? `${res.emoji} ${res.name} surges ahead — ${pct}% of its grow time gone!` : "Crop growth sped up!";
         } else if (e.type === "farm_seed") {
-            const res = await grantSeedBundle(buyerId, e.count ?? 3).catch(() => null);
+            const res = await grantSeedBundle(buyerId, e.count ?? 3, e.weights).catch(() => null);
             const list = res?.got?.map((g) => `${g.emoji} ${g.name}${g.count > 1 ? ` ×${g.count}` : ""}`).join(", ");
             appliedF = list ? `Seeds added: ${list}` : `+${e.count ?? 3} seeds added to your bag`;
         } else if (e.type === "farm_fertilizer") {

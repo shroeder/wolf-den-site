@@ -10,6 +10,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { SEED_PACK_IDS, seedPackById } from "@/lib/marketplace/seed-packs.js";
 import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
@@ -33,25 +34,20 @@ export const SEEDS = {
     strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 300, sell: 280, xp: 20, rarity: "rare" },
     corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 420, sell: 420, xp: 26, rarity: "rare" },
     // Epic — half a day; from raids, gold chests, boss kills.
-    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 665, xp: 40, rarity: "epic" },
-    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 1050, xp: 62, rarity: "epic" },
+    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 600, sell: 460, xp: 40, rarity: "epic" },
+    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 900, sell: 720, xp: 62, rarity: "epic" },
     // Legendary — overnight; from gold chests + boss kills only.
-    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 1960, xp: 130, rarity: "legendary" },
+    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1440, sell: 1150, xp: 130, rarity: "legendary" },
     // Mythic — a day and a half; the jackpot, only from the very best sources.
-    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 4200, xp: 300, rarity: "mythic" },
+    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2160, sell: 2400, xp: 300, rarity: "mythic" },
 };
 // How good the shared-pool loot odds are for a crop's rarity (shown in the seed picker).
 export const LOOT_LABEL = { common: "Basic loot", rare: "Better loot", epic: "Good loot", legendary: "Great loot", mythic: "Best loot" };
 
-// Buyable straight from the farm (no trip to the consumables shop): common + rare seeds can be purchased for
-// gold. Epic+ stay drop-only (aspirational — earn them from raids/chests/boss). Price ≈ 75% of the crop's sell
-// value, so a finished harvest still nets a small profit for the grow time + the loot roll on top.
-const SEED_BUYABLE_RARITIES = new Set(["common", "rare"]);
-export function seedBuyPrice(id) {
-    const s = SEEDS[id];
-    if (!s || !SEED_BUYABLE_RARITIES.has(s.rarity)) return null;
-    return Math.max(10, Math.round(s.sell * 0.75));
-}
+// Base chance a harvest yields a BONUS reward on top of the guaranteed gold + XP (~5%). Harvest-luck sources
+// nudge it up from here; kept low so the bonus feels special instead of firing every harvest.
+const HARVEST_BONUS_CHANCE = 0.05;
+
 export const seedById = (id) => SEEDS[id] || null;
 const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === r);
 
@@ -199,10 +195,11 @@ function defaultPlotPos(i, n) {
 // fertilizer stock, and how many crops are ready right now (for the alert badge).
 export async function getGarden(buyerId) {
     if (!buyerId) return null;
-    const [buyer, plots, seeds] = await Promise.all([
+    const [buyer, plots, seeds, packRows] = await Promise.all([
         loadFarmBuyer(buyerId),
         db.query(`SELECT slot, seed_id, planted_at, ready_at, fertilized FROM mkt_farm_plot WHERE buyer_id = $1 ORDER BY slot`, [buyerId]).catch(() => []),
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
+        db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0 AND consumable_id = ANY($2)`, [buyerId, SEED_PACK_IDS]).catch(() => []),
     ]);
     const up = buyer?.farm_upgrades || {};
     const n = plotCount(up);
@@ -234,37 +231,22 @@ export async function getGarden(buyerId) {
         const level = lvl(up, key);
         return { key, name: def.name, emoji: def.emoji, desc: def.desc, level, max: def.max, cost: level >= def.max ? null : upgradeCost(key, level), eff: upgradeEffect(key, level) };
     });
-    // Seeds you can buy right here on the farm (common + rare) — so you never have to leave to plant.
-    const seedShop = Object.keys(SEEDS)
-        .filter((id) => seedBuyPrice(id) != null)
-        .map((id) => ({ id, ...SEEDS[id], price: seedBuyPrice(id), loot: LOOT_LABEL[SEEDS[id].rarity] || null }));
+    // Seed packs the member owns → openable right on the farm (order matches the tier ladder). Seeds ONLY come
+    // from packs now (buy them in the shop, open them here).
+    const seedPacks = SEED_PACK_IDS
+        .map((id) => { const owned = (packRows || []).find((r) => r.consumable_id === id); const def = seedPackById(id); return owned && def ? { id, count: owned.count, name: def.name, emoji: def.emoji, tier: def.tier, desc: def.desc } : null; })
+        .filter(Boolean);
     return {
         plots: gardenPlots,
         plotCount: n,
         seedBag,
-        seedShop,
+        seedPacks,
         upgrades,
         fertilizer: buyer?.farm_fertilizer || 0,
         fertilizerPrice: FERTILIZER_PRICE,
         gold: buyer?.gold || 0,
         readyCount,
     };
-}
-
-// Buy a seed straight from the farm and (optionally) plant it into `slot` in one tap. Common/rare only.
-export async function buyAndPlantSeed(buyerId, slot, seedId) {
-    const price = seedBuyPrice(seedId);
-    if (!buyerId || price == null || !SEEDS[seedId]) return { ok: false, error: "not_buyable" };
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold", ...(await getGarden(buyerId)) };
-    await logCoin(buyerId, -price, "seed_buy", { balanceAfter: paid.gold, meta: { seedId } }).catch(() => {});
-    await grantSeed(buyerId, seedId); // into the bag
-    // Plant the just-bought seed (consumes it from the bag). If slot is null/invalid it stays in the bag.
-    if (slot != null && Number.isFinite(Number(slot))) {
-        const res = await plantSeed(buyerId, Number(slot), seedId);
-        if (res.ok || res.garden) return res;
-    }
-    return { ok: true, garden: await getGarden(buyerId) };
 }
 
 // Plant a seed you hold into an empty plot. Grow time is scaled by the Green Thumb upgrade.
@@ -329,9 +311,14 @@ export async function harvestPlot(buyerId, slot) {
         const used = await db.queryOne(`UPDATE mkt_buyer SET farm_harvest_luck = farm_harvest_luck - 1 WHERE id = $1 AND farm_harvest_luck > 0 RETURNING farm_harvest_luck`, [buyerId]).catch(() => null);
         charmActive = Boolean(used);
     }
-    // Shared loot pool — one random reward, odds weighted by rarity; Lucky Harvest + deco harvest-luck + an
-    // active Harvest Charm bump the tier.
-    const loot = await rollHarvestReward(buyerId, rarity, luckyHarvestLevel(buyer?.farm_upgrades || {}), (buffs?.harvestLuck || 0) / 100 + (charmActive ? 0.2 : 0));
+    // Bonus loot: MOST harvests are just the guaranteed gold + XP. Only ~5% of the time do you ALSO pull an
+    // extra reward from the shared pool (chest / bonus seed / treat / spin / bonus gold). Harvest-luck sources
+    // (Lucky Harvest deco/gear + an active Harvest Charm) raise both the odds a little AND the tier when it fires.
+    let loot = { label: null, chest: null, tier: 0 };
+    const bonusChance = HARVEST_BONUS_CHANCE + (buffs?.harvestLuck || 0) / 400 + (charmActive ? 0.05 : 0);
+    if (Math.random() < bonusChance) {
+        loot = await rollHarvestReward(buyerId, rarity, luckyHarvestLevel(buyer?.farm_upgrades || {}), charmActive ? 0.2 : 0);
+    }
     const bonus = loot.label;
     const chest = loot.chest;
     // Seed Saver upgrade (+ deco seed-luck) — chance to recover the seed you planted (rare crops stay sustainable).
@@ -355,9 +342,10 @@ export async function harvestPlot(buyerId, slot) {
     }
     // Epic-or-better harvest also credits the "harvest a rare crop" quest.
     if (rarity === "epic" || rarity === "legendary" || rarity === "mythic") await bumpQuestProgress(buyerId, "harvest_rare", 1).catch(() => {});
-    // Farm-native seed drop: a modest chance for the harvest itself to yield back a fresh seed, so the farm
-    // sustains its own supply (on top of the Seed Saver recovery above). Best-effort, Forager-scaled inside.
-    const foundSeed = await dropSeedFrom(buyerId, "harvest_crop").catch(() => null);
+    // Seeds now come from packs, not from every harvest — the old always-on seed drop is gone (it's part of why
+    // harvests "rewarded too often"). A bonus seed can still come from the ~5% loot roll above, and the Seed
+    // Saver upgrade still recovers the planted seed. Kept null so the client toast simply omits it.
+    const foundSeed = null;
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };

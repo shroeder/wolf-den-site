@@ -4,4 +4,6 @@
 //
 // To rotate: run `node -e "console.log(require('web-push').generateVAPIDKeys())"`, replace this public
 // key, and set the new private key in VAPID_PRIVATE_KEY. (Rotating invalidates existing subscriptions.)
-export const VAPID_PUBLIC_KEY = "BNJ2KXZv5qPLWT3-FI5EfaTP924-Pm3zK7tr21ocR2NRU-CIqTYDCMjrscfXlwWAJt63_ANW5i9wPAmlh7WNdGE";
+// Rotated 2026-07-25 to a fresh pair whose matching private key is being set in VAPID_PRIVATE_KEY so the
+// browser nudges (sailing "land ho"/idle reminders, DMs, friend reqs, badges) can finally go live.
+export const VAPID_PUBLIC_KEY = "BKpsnDNXZxcZEwKWkv0XCpLjcPkMeObSSpkBMqA6mkHjIGrgM9pWXQ-zqJ5UVvzoQl2lqwn7t8FbLghA9hsr0xE";

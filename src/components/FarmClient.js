@@ -157,7 +157,7 @@ const SKY = {
     dawn: ["#f7b267", "#f9dcb0", "#bfe0ee"],
     day: ["#7ec2f0", "#a9d8f5", "#d7eefb"],
     dusk: ["#e08a54", "#c77b9e", "#5b6fa8"],
-    night: ["#0c1830", "#152343", "#26365f"],
+    night: ["#1a2c4a", "#243660", "#3a4f7d"],
 };
 const skyStops = (tod, condition) => {
     if (condition === "storm") return ["#3a4048", "#4a5058", "#727a84"];
@@ -207,9 +207,13 @@ export default function FarmClient({ initial, viewingAlias }) {
     // server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
     const petSlotX = useCallback((i, n) => (n <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (n - 1)) * (100 - FARM_PAD - petMinX)), [gardened, petMinX]);
     const homeX = useCallback((i) => petSlotX(i, pets.length), [petSlotX, pets.length]);
+    // Each pet also gets a home ROW so they scatter across the pasture instead of all lining up along the bottom.
+    // The (i*3)%n shuffle de-correlates row from column, so neighbours in x sit at different depths.
+    const petSlotY = useCallback((i, n) => (n <= 1 ? 82 : 58 + (((i * 3) % n) / (n - 1)) * 32), []);
+    const homeY = useCallback((i) => petSlotY(i, pets.length), [petSlotY, pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => ({
         x: pets.length <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (pets.length - 1)) * (100 - FARM_PAD - petMinX),
-        y: 80 + ((i * 7) % 12), // low on the grass
+        y: pets.length <= 1 ? 82 : 58 + (((i * 3) % pets.length) / (pets.length - 1)) * 32, // scattered across the grass
         flip: i % 2 === 1,
         dur: 2, // seconds for the current stroll (varies per move → different speeds)
         moving: false,
@@ -314,7 +318,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         const push = (t) => timers.push(t);
         const step = (i) => {
             const nx = clamp(homeX(i) + rand(-5, 5), petMinX, 100 - FARM_PAD);
-            const ny = 78 + rand(0, 14); // stay low on the grass
+            const ny = clamp(homeY(i) + rand(-6, 6), 56, 92); // wander around this pet's home row (scattered depths)
             const dur = rand(1.3, 3.8); // different speeds each hop
             setPos((prev) => {
                 if (!prev[i]) return prev;
@@ -337,7 +341,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         // Keyed on count only — we deliberately DON'T restart the wander loops when `pets` identity changes
         // (e.g. after petting), which would reset every pet's position mid-stroll.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pets.length, homeX]);
+    }, [pets.length, homeX, homeY]);
 
     const addFloater = useCallback((i, text, color) => {
         const id = ++floatId.current;
@@ -433,7 +437,11 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [post]);
     const plantSeedAt = useCallback(async (slot, seedId) => { setPlanting(null); await gardenAct({ action: "plant", slot, seedId }, `p-${slot}`); }, [gardenAct]);
-    const buyAndPlant = useCallback(async (slot, seedId) => { setPlanting(null); await gardenAct({ action: "seed_buy_plant", slot, seedId }, `bp-${seedId}`); }, [gardenAct]);
+    const openPack = useCallback(async (packId) => {
+        const r = await gardenAct({ action: "pack_open", packId }, `pk-${packId}`);
+        if (r?.ok) SFX?.coin?.();
+        return r;
+    }, [gardenAct]);
     const harvestAt = useCallback(async (slot) => {
         const r = await gardenAct({ action: "harvest", slot }, `h-${slot}`);
         if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed }); SFX.coin(); }
@@ -561,7 +569,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const bgUrl = pickFarmBg(wx.tod, wx.condition);
     // Time-of-day tint applied ONLY to world objects (pets/crops/decorations/farmer), never the backdrop — the
     // illustrated backdrop is already the right time of day, so we just knock down the flat-lit sprites.
-    const objFilter = wx.tod === "night" ? "brightness(0.6) saturate(0.82)" : wx.tod === "dusk" ? "brightness(0.82) saturate(0.92)" : wx.tod === "dawn" ? "brightness(0.92) saturate(0.97)" : "none";
+    const objFilter = wx.tod === "night" ? "brightness(0.78) saturate(0.9)" : wx.tod === "dusk" ? "brightness(0.88) saturate(0.95)" : wx.tod === "dawn" ? "brightness(0.94) saturate(0.98)" : "none";
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
@@ -899,7 +907,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {planting != null && garden ? (
-                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} onPick={plantSeedAt} onBuyPlant={buyAndPlant} onClose={() => setPlanting(null)} />
+                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} onPick={plantSeedAt} onOpenPack={openPack} onClose={() => setPlanting(null)} />
             ) : null}
 
             {inspectSlot != null && garden ? (
@@ -1472,10 +1480,11 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade }) {
 }
 
 // Centered "pick a seed" modal, opened by tapping an empty plot out in the field.
-function SeedPickerModal({ garden, slot, busy, onPick, onBuyPlant, onClose }) {
+function SeedPickerModal({ garden, slot, busy, onPick, onOpenPack, onClose }) {
     const bag = garden.seedBag || [];
-    const shop = garden.seedShop || [];
-    const gold = garden.gold || 0;
+    const packs = garden.seedPacks || [];
+    const [opened, setOpened] = useState(null);
+    const open = async (packId) => { const r = await onOpenPack(packId); if (r?.ok) setOpened(r.applied || "Seeds added to your bag!"); };
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Plant a seed" style={{ width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
@@ -1495,35 +1504,34 @@ function SeedPickerModal({ garden, slot, busy, onPick, onBuyPlant, onClose }) {
                                 </span>
                             </span>
                         </button>
-                    )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds in your bag yet — buy one below, or find your own by harvesting, tending pets, and playing the other games (boss, sailing, chests…).</div>}
+                    )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds in your bag yet — open a seed pack below (or earn seeds from harvests, tending pets, and the other games).</div>}
                 </div>
 
-                {/* Buy seeds straight from the farm — no trip to the shop. Buys + plants into this plot in one tap. */}
-                {shop.length ? (
-                    <>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0 8px" }}>
-                            <span style={{ fontWeight: 800, fontSize: 13.5 }}>🛒 Buy &amp; plant a seed</span>
-                            <span className="muted" style={{ fontSize: 11.5, marginLeft: "auto" }}>🪙 {gold.toLocaleString()}</span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                            {shop.map((s) => {
-                                const afford = gold >= s.price;
-                                const bBusy = busy === `bp-${s.id}`;
-                                return (
-                                    <button key={s.id} type="button" disabled={Boolean(busy) || !afford} onClick={() => onBuyPlant(slot, s.id)}
-                                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}55`, background: afford ? "rgba(255,215,94,0.06)" : "rgba(255,255,255,0.03)", color: "inherit", cursor: afford ? "pointer" : "default", opacity: afford ? 1 : 0.55, textAlign: "left" }}>
-                                        <span style={{ fontSize: 22 }}>{s.emoji}</span>
-                                        <span style={{ flex: 1, minWidth: 0 }}>
-                                            <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>{s.name}</span>
-                                            <span className="muted" style={{ fontSize: 11 }}>⏳ {Math.round(s.growMin / 60)}h · sells 🪙 {s.sell.toLocaleString()}{s.loot ? ` · 🎁 ${s.loot}` : ""}</span>
-                                        </span>
-                                        <span style={{ fontWeight: 800, fontSize: 12.5, color: afford ? "#ffd75e" : "#c98a19", whiteSpace: "nowrap" }}>{bBusy ? "…" : `🪙 ${s.price.toLocaleString()}`}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </>
-                ) : null}
+                {/* Seeds come from packs now: open one you own → seeds land in your bag → tap one above to plant. */}
+                <div style={{ margin: "16px 0 8px" }}>
+                    <span style={{ fontWeight: 800, fontSize: 13.5 }}>🎁 Open a seed pack</span>
+                </div>
+                {opened ? <div style={{ fontSize: 12, color: "#8fe3a1", margin: "0 0 8px", fontWeight: 700 }}>✨ {opened}</div> : null}
+                {packs.length ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                        {packs.map((p) => {
+                            const pBusy = busy === `pk-${p.id}`;
+                            return (
+                                <button key={p.id} type="button" disabled={Boolean(busy)} onClick={() => open(p.id)}
+                                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, border: "1px solid rgba(255,215,94,0.4)", background: "rgba(255,215,94,0.06)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+                                    <span style={{ fontSize: 22 }}>{p.emoji}</span>
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>{p.name} <span className="muted" style={{ fontWeight: 400 }}>×{p.count}</span></span>
+                                        <span className="muted" style={{ fontSize: 11 }}>{p.desc}</span>
+                                    </span>
+                                    <span style={{ fontWeight: 800, fontSize: 12.5, color: "#ffd75e", whiteSpace: "nowrap" }}>{pBusy ? "…" : "Open"}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="muted" style={{ fontSize: 12 }}>No seed packs yet — grab one in the <a href="/marketplace/store" style={{ color: "#ffd75e", fontWeight: 700 }}>Supplies shop</a>. Basic packs give everyday crops; pricier crates &amp; vaults unlock rare, epic &amp; legendary seeds.</div>
+                )}
 
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Cancel</button>
             </div>

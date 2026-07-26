@@ -10695,7 +10695,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
         radial-gradient(1px 1px at 74% 34%, rgba(200,220,255,0.85), transparent 100%),
         radial-gradient(1px 1px at 24% 26%, #fff, transparent 100%),
         radial-gradient(1.5px 1.5px at 62% 16%, #fff, transparent 100%),
-        linear-gradient(180deg, #060d24 0%, #0c1738 34%, #14244c 52%, #1a2f5c 64%, #16294f 100%);
+        linear-gradient(180deg, #16264a 0%, #1d2f5c 34%, #26386b 52%, #2d4176 64%, #273a6a 100%);
     background-repeat: no-repeat; }
 .sail-nightsky::after { content: ""; position: absolute; inset: 0; pointer-events: none;
     background:
