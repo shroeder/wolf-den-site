@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { GiAnvilImpact, GiCrackedShield, GiUpgrade } from "react-icons/gi";
 
 import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
@@ -240,9 +241,9 @@ export default function BlacksmithClient({ initial }) {
             {/* Actions — enhance / salvage / perks. */}
             <section className="card forge-panel">
                 <div className="forge-tabs">
-                    <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}>⚒️ Enhance ({enhance.length})</button>
-                    <button type="button" className={tab === "salvage" ? "on" : ""} onClick={() => setTab("salvage")}>♻️ Salvage ({salvage.length})</button>
-                    <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}>⚙️ Perks</button>
+                    <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}><GiAnvilImpact aria-hidden="true" /> Enhance <span className="forge-tab-ct">{enhance.length}</span></button>
+                    <button type="button" className={tab === "salvage" ? "on" : ""} onClick={() => setTab("salvage")}><GiCrackedShield aria-hidden="true" /> Salvage <span className="forge-tab-ct">{salvage.length}</span></button>
+                    <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}><GiUpgrade aria-hidden="true" /> Perks</button>
                 </div>
 
                 {tab === "enhance" ? (
@@ -254,7 +255,12 @@ export default function BlacksmithClient({ initial }) {
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
                                 {it.bonus ? <span className="forge-card-bonus">forged: {it.bonus}</span> : null}
-                                <span className="forge-card-cost">🔩 {it.cost.qty} × {parts[it.cost.tier - 1]?.name || `T${it.cost.tier}`}</span>
+                                <span className="forge-card-cost">
+                                    {parts[it.cost.tier - 1]?.sprite
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        ? <img className="forge-cost-ico" src={parts[it.cost.tier - 1].sprite} alt="" /> : null}
+                                    {it.cost.qty} × {parts[it.cost.tier - 1]?.name || `T${it.cost.tier}`}
+                                </span>
                             </button>
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
                     </div>
@@ -265,7 +271,12 @@ export default function BlacksmithClient({ initial }) {
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats" style={{ color: rc(it.rarity) }}>{it.rarity}</span>
-                                <span className="forge-card-cost">→ {parts[it.salvageTier - 1]?.name || `T${it.salvageTier}`} parts</span>
+                                <span className="forge-card-cost">
+                                    {parts[it.salvageTier - 1]?.sprite
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        ? <img className="forge-cost-ico" src={parts[it.salvageTier - 1].sprite} alt="" /> : null}
+                                    yields {parts[it.salvageTier - 1]?.name || `T${it.salvageTier}`}
+                                </span>
                                 {busy === `sv-${it.id}` ? <span className="forge-working">forging…</span> : null}
                             </button>
                         )) : <div className="forge-empty">Nothing spare to salvage — every item you own is equipped.</div>}
@@ -474,9 +485,15 @@ const FORGE_CSS = `
 .forge-part-name { font-size: 9.5px; font-weight: 700; color: color-mix(in srgb, var(--pc) 75%, #fff); text-align: center; }
 .forge-combine { margin-top: 2px; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 8px; cursor: pointer; border: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); background: color-mix(in srgb, var(--pc) 22%, transparent); color: #fff; }
 .forge-part-hint { font-size: 9px; color: #b9a892; }
-.forge-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-.forge-tabs button { flex: 1; padding: 9px; border-radius: 11px; font-weight: 800; font-size: 13px; cursor: pointer; border: 1px solid rgba(255,150,60,0.3); background: rgba(10,6,3,0.5); color: #e8d6c0; }
-.forge-tabs button.on { background: linear-gradient(180deg, #ff9a3c, #e0631a); color: #2a1000; border-color: transparent; box-shadow: 0 3px 0 #9c4410; }
+/* Segmented control (one grouped pill, not three clashing blocks) with themed react-icons. */
+.forge-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border-radius: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
+.forge-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #c8b49b; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+.forge-tabs button svg { width: 17px; height: 17px; flex: none; opacity: 0.85; }
+@media (hover: hover) { .forge-tabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #f2e0c8; } }
+.forge-tabs button.on { background: linear-gradient(180deg, #ff9a3c, #e0631a); color: #2a1000; box-shadow: 0 2px 8px rgba(255,120,20,0.4), inset 0 1px 0 rgba(255,255,255,0.35); }
+.forge-tabs button.on svg { opacity: 1; }
+.forge-tab-ct { font-size: 11px; font-weight: 900; padding: 1px 6px; border-radius: 999px; background: rgba(0,0,0,0.22); }
+.forge-tabs button.on .forge-tab-ct { background: rgba(0,0,0,0.16); color: #2a1000; }
 .forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 8px 10px; border-radius: 14px; cursor: pointer; text-align: center;
     background: linear-gradient(180deg, rgba(30,18,10,0.85), rgba(14,8,4,0.9)); border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); color: #efe2d2; transition: transform .12s ease, box-shadow .12s ease; }
@@ -486,7 +503,8 @@ const FORGE_CSS = `
 .forge-card-name { font-size: 12px; font-weight: 800; line-height: 1.15; }
 .forge-card-stats { font-size: 10.5px; color: #c8b79f; text-transform: capitalize; }
 .forge-card-bonus { font-size: 10px; color: #ffcf7a; font-weight: 700; }
-.forge-card-cost { font-size: 10px; color: #a99; margin-top: 2px; }
+.forge-card-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #b9a892; margin-top: 3px; }
+.forge-cost-ico { width: 16px; height: 16px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5)); }
 .forge-lvl { position: absolute; top: 6px; right: 6px; font-size: 12px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffd75e,#f3b23a); border-radius: 999px; padding: 1px 7px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 .forge-lvl.inline { position: static; margin-left: 6px; }
 .forge-cardrank { position: absolute; top: 6px; right: 6px; z-index: 2; }
