@@ -43,7 +43,7 @@ const GRADE_RANK = { good: 1, great: 2, perfect: 3, pixel: 4 };
 // Blacksmith's Regalia — the "salvaging set". Pieces drop rarely from salvaging; wearing 3/5 boosts salvage
 // output (a crafting-only bonus, kept out of combat).
 const REGALIA_IDS = ["regalia_visor", "regalia_plate", "regalia_girdle", "regalia_boots", "regalia_cloak"];
-const REGALIA_DROP = 0.05; // per-salvage chance to receive an unowned Regalia piece
+const REGALIA_DROP = 0.001; // per-salvage chance to receive an unowned Regalia piece (0.1% — a rare treasure)
 function regaliaBonus(equippedCount) {
     if (equippedCount >= 5) return { tier: 2, doubleBonus: 0.15, flatParts: 1, label: "Full set: +15% double-parts & +1 part per salvage" };
     if (equippedCount >= 3) return { tier: 1, doubleBonus: 0.1, flatParts: 0, label: "3 pieces: +10% double-parts chance" };
