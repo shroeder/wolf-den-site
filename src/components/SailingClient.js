@@ -7,6 +7,7 @@ import CoinCta from "@/components/CoinCta";
 import MerchantScene from "@/components/MerchantScene";
 import RaidScene from "@/components/RaidScene";
 import HowToPlay from "@/components/HowToPlay";
+import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
@@ -838,6 +839,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </span>
                 </div>
             </section>
+
+            <FeatureDailies feature="sailing" />
 
             {/* Your fragment hold — one row per shard tier, each forging its matching chest. */}
             <section className="card sail-hold">

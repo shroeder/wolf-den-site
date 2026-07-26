@@ -5,6 +5,7 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { bumpFeatureDaily } from "@/lib/marketplace/feature-dailies.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
 const ALL_QUESTS_XP = 300;
@@ -125,6 +126,8 @@ export async function resetDailyQuests(buyerId) {
 
 // Bump progress on any of today's unclaimed quests matching a metric (e.g. "boss_damage", "chest_open").
 export async function bumpQuestProgress(buyerId, metric, amount = 1) {
+    // Feature dailies (farm/sailing) ride the same metric pump — free tracking, no scattered hooks.
+    bumpFeatureDaily(buyerId, metric, amount).catch(() => {});
     const keys = KEYS_BY_METRIC[metric];
     if (!buyerId || !keys?.length || amount <= 0) return;
     const day = await ensureDailyQuests(buyerId);

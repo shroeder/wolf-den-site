@@ -9,6 +9,7 @@ import PetArt from "@/components/PetArt";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
+import FeatureDailies from "@/components/FeatureDailies";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
@@ -687,6 +688,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {farm.mine && farm.rating ? <FarmRankBadge byTier={farm.rating.byTier} /> : null}
+
+            {farm.mine ? <FeatureDailies feature="farm" /> : null}
 
             {farm.rating ? (
                 <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
