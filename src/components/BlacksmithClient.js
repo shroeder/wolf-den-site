@@ -82,6 +82,11 @@ export default function BlacksmithClient({ initial }) {
         else if (r?.error) setToast({ kind: "err", text: r.error === "no_gold" ? "Not enough gold for that upgrade." : "Couldn't buy that." });
     }, [post]);
 
+    const doClaimDaily = useCallback(async (key) => {
+        const r = await post({ action: "claim_daily", key }, `dl-${key}`);
+        if (r?.ok) SFX.perfect();
+    }, [post]);
+
     // Called by the mini-game with the player's execution → server rolls the stat bump.
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
@@ -120,6 +125,25 @@ export default function BlacksmithClient({ initial }) {
                         "Better timing = better roll + more XP. Enhance as many times as you like; the part cost climbs slowly.",
                     ]}
                 />
+
+                {/* Daily forge tasks. */}
+                {(forge.dailies || []).length ? (
+                    <div className="forge-dailies">
+                        <div className="forge-dailies-title">🔥 Today&apos;s forge tasks</div>
+                        {(forge.dailies || []).map((q) => (
+                            <div key={q.key} className={`forge-daily${q.done ? " is-done" : ""}${q.claimed ? " is-claimed" : ""}`}>
+                                <div className="forge-daily-body">
+                                    <b>{q.label}</b>
+                                    <div className="forge-daily-bar"><span style={{ width: `${Math.round((q.progress / q.need) * 100)}%` }} /></div>
+                                    <span className="forge-daily-prog">{q.progress}/{q.need} · {q.rewardLabel}</span>
+                                </div>
+                                {q.claimed ? <span className="forge-daily-tag done">✓ claimed</span>
+                                    : q.done ? <button type="button" className="forge-daily-claim" disabled={Boolean(busy)} onClick={() => doClaimDaily(q.key)}>{busy === `dl-${q.key}` ? "…" : "Claim"}</button>
+                                        : <span className="forge-daily-tag">{q.need - q.progress} to go</span>}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
 
                 {/* Parts rail — your tiered materials, always in view. */}
                 <div className="forge-parts">
@@ -441,4 +465,18 @@ const FORGE_CSS = `
 .forge-upg-buy:disabled { opacity: 0.5; cursor: default; }
 .forge-upg-max { flex: 0 0 auto; font-size: 11px; font-weight: 900; color: #8fe3a1; letter-spacing: 0.06em; }
 .forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 2px; }
+/* ── daily forge tasks ── */
+.forge-dailies { margin: 0 0 14px; padding: 10px 12px; border-radius: 14px; background: rgba(10,6,3,0.55); border: 1px solid rgba(255,150,60,0.28); }
+.forge-dailies-title { font-size: 11px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: #ffb877; margin-bottom: 8px; }
+.forge-daily { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.forge-daily:first-of-type { border-top: none; }
+.forge-daily.is-claimed { opacity: 0.55; }
+.forge-daily-body { flex: 1; min-width: 0; }
+.forge-daily-body b { font-size: 12.5px; color: #efe2d2; font-weight: 700; }
+.forge-daily-bar { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; margin: 4px 0 3px; }
+.forge-daily-bar span { display: block; height: 100%; background: linear-gradient(90deg, #f3922a, #ffd75e); border-radius: 999px; transition: width .4s ease; }
+.forge-daily-prog { font-size: 10.5px; color: #c8b79f; }
+.forge-daily-claim { flex: 0 0 auto; padding: 6px 13px; border-radius: 9px; font-weight: 900; font-size: 12px; cursor: pointer; border: none; color: #2a1000; background: linear-gradient(180deg,#8fe39a,#4bbf6a); box-shadow: 0 2px 0 #2e7d46; animation: forgePop .4s cubic-bezier(.2,1.3,.3,1) both; }
+.forge-daily-tag { flex: 0 0 auto; font-size: 10.5px; color: #b9a892; }
+.forge-daily-tag.done { color: #8fe3a1; font-weight: 800; }
 `;

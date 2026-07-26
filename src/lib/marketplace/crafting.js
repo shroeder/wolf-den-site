@@ -7,6 +7,7 @@ import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -100,6 +101,37 @@ export async function logForgeOpen(buyerId) {
     if (buyerId) await logCraft(buyerId, "open_forge", {});
 }
 
+// ── Daily forge quests (owner-only, lives in the forge) ──
+const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
+const DAILY_FIELDS = new Set(["salvages", "enhances", "combines", "best_grade"]);
+const DAILIES = [
+    { key: "salvage3", label: "Salvage 3 pieces of gear", field: "salvages", need: 3, reward: { gold: 300 }, rewardLabel: "+300 🪙" },
+    { key: "enhance1", label: "Enhance a piece of gear", field: "enhances", need: 1, reward: { partTier: 2, partN: 2 }, rewardLabel: "+2 Iron Filings" },
+    { key: "perfect", label: "Land a Perfect+ strike", field: "best_grade", need: 3, reward: { gold: 500 }, rewardLabel: "+500 🪙" },
+];
+async function bumpDaily(buyerId, field, amount = 1) {
+    if (!DAILY_FIELDS.has(field)) return;
+    await db.query(`INSERT INTO mkt_forge_daily (buyer_id, day) VALUES ($1, ${DAY}) ON CONFLICT (buyer_id, day) DO NOTHING`, [buyerId]).catch(() => {});
+    if (field === "best_grade") await db.query(`UPDATE mkt_forge_daily SET best_grade = GREATEST(best_grade, $2) WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId, amount]).catch(() => {});
+    else await db.query(`UPDATE mkt_forge_daily SET ${field} = ${field} + $2 WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId, amount]).catch(() => {});
+}
+export async function claimForgeDaily(buyerId, key) {
+    const q = DAILIES.find((x) => x.key === key);
+    if (!buyerId || !q) return { ok: false, error: "bad" };
+    const row = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
+    const prog = Number(row?.[q.field] || 0);
+    const claimed = new Set(parseBonus(row?.claimed) || []);
+    if (prog < q.need) return { ok: false, error: "not_done", ...(await getForgeState(buyerId)) };
+    if (claimed.has(key)) return { ok: false, error: "claimed", ...(await getForgeState(buyerId)) };
+    claimed.add(key);
+    await db.query(`UPDATE mkt_forge_daily SET claimed = $2::jsonb WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId, JSON.stringify([...claimed])]).catch(() => {});
+    if (q.reward.gold) { const p = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, q.reward.gold]).catch(() => null); await logCoin(buyerId, q.reward.gold, "forge_daily", { balanceAfter: p?.gold, meta: { key } }).catch(() => {}); }
+    if (q.reward.partTier) await addParts(buyerId, q.reward.partTier, q.reward.partN || 1);
+    await awardXp(buyerId, "forge_daily", { points: 20, gold: 0 }).catch(() => {});
+    await logCraft(buyerId, "daily", { meta: { key } });
+    return { ok: true, key, ...(await getForgeState(buyerId)) };
+}
+
 // ── Salvage an unequipped owned item into parts ──
 export async function salvageItem(buyerId, itemId) {
     const item = itemById(itemId);
@@ -120,6 +152,8 @@ export async function salvageItem(buyerId, itemId) {
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier }).catch(() => {});
     await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier } });
+    await bumpDaily(buyerId, "salvages", 1);
+    grantEventBadge(buyerId, "forge_first").catch(() => {});
     return { ok: true, gained: { tier: cfg.tier, n }, doubled, bonusTier, xp, ...(await getForgeState(buyerId)) };
 }
 
@@ -132,6 +166,8 @@ export async function combineParts(buyerId, tier) {
     await addParts(buyerId, t + 1, 1);
     await awardXp(buyerId, "craft_combine", { points: 8, gold: 0 }).catch(() => {});
     await logCraft(buyerId, "combine", { tier: t, meta: { to: t + 1 } });
+    await bumpDaily(buyerId, "combines", 1);
+    if (t + 1 >= MAX_TIER) grantEventBadge(buyerId, "forge_emberheart").catch(() => {});
     return { ok: true, made: t + 1, ...(await getForgeState(buyerId)) };
 }
 
@@ -171,6 +207,14 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     await awardXp(buyerId, "craft_enhance", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_enhance", { itemId, level: level + 1, grade, quality: q, combo }).catch(() => {});
     await logCraft(buyerId, "enhance", { itemId, tier, score: Math.round(q * 1000), grade, meta: { level: level + 1, gained, combo, doubled } });
+    await bumpDaily(buyerId, "enhances", 1);
+    await bumpDaily(buyerId, "best_grade", GRADE_RANK[grade] || 1);
+    grantEventBadge(buyerId, "forge_first").catch(() => {});
+    if (grade === "pixel") grantEventBadge(buyerId, "forge_pixel").catch(() => {});
+    if (level + 1 >= 10) grantEventBadge(buyerId, "forge_plus10").catch(() => {});
+    const ec = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_craft_event WHERE buyer_id = $1 AND action = 'enhance'`, [buyerId]).catch(() => null);
+    if ((ec?.n || 0) >= 10) grantEventBadge(buyerId, "forge_smith").catch(() => {});
+    if ((ec?.n || 0) >= 50) grantEventBadge(buyerId, "forge_master").catch(() => {});
     return { ok: true, itemId, level: level + 1, gained: describeStats(gained), doubled, xp, grade, ...(await getForgeState(buyerId)) };
 }
 
@@ -186,6 +230,9 @@ export async function getForgeState(buyerId) {
         upgradeLevels(buyerId),
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
+    const dRow = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
+    const claimedSet = new Set(parseBonus(dRow?.claimed) || []);
+    const dailies = DAILIES.map((q) => { const prog = Number(dRow?.[q.field] || 0); return { key: q.key, label: q.label, need: q.need, progress: Math.min(prog, q.need), done: prog >= q.need, claimed: claimedSet.has(q.key), rewardLabel: q.rewardLabel }; });
     const equippedIds = new Set(Object.values(bySlot));
     const enhById = new Map();
     for (const r of enhRows) enhById.set(r.item_id, { level: r.level, bonus: parseBonus(r.stat_bonus), bestGrade: r.best_grade });
@@ -206,5 +253,5 @@ export async function getForgeState(buyerId) {
         const level = upg[key] || 0;
         return { key, name: u.name, desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? `${Math.round(u.per * level * 100)}%` : `${level}` };
     });
-    return { parts: partList, salvage, enhance, upgrades, steadyHand: upg.steady_hand || 0, gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    return { parts: partList, salvage, enhance, upgrades, dailies, steadyHand: upg.steady_hand || 0, gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }
