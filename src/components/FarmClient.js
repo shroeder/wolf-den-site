@@ -563,13 +563,13 @@ export default function FarmClient({ initial, viewingAlias }) {
     const fieldW = Math.max(200, pets.length * 62);
     // Sky follows the player's real local weather.
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
-    // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
-    const bgUrl = pickFarmBg(wx.tod, wx.condition);
-    // Time-of-day tint applied ONLY to world objects (pets/crops/decorations/farmer), never the backdrop — the
-    // illustrated backdrop is already the right time of day, so we just knock down the flat-lit sprites.
-    // No color-muting overlay — sprites keep their full vibrant colors at every time of day (the illustrated
-    // backdrop already conveys night/dusk). Only a whisper of brightness at dusk/dawn for ambiance; night = none.
-    const objFilter = wx.tod === "dusk" ? "brightness(0.94)" : wx.tod === "dawn" ? "brightness(0.98)" : "none";
+    // The farm never goes dark: night is rendered with the bright DAY scene (Luke doesn't want a dark/muting
+    // night). The weather label below still shows the real time of day — only the VISUALS stay bright.
+    const visTod = wx.tod === "night" ? "day" : wx.tod;
+    // Illustrated backdrop for the (visual) time of day (falls back to the CSS gradient scene when not generated).
+    const bgUrl = pickFarmBg(visTod, wx.condition);
+    // No color-muting overlay — sprites keep their full vibrant colors; only a whisper of brightness at dusk/dawn.
+    const objFilter = visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none";
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
     return (
@@ -670,7 +670,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         ref={fieldRef}
                         style={{
                             position: "relative", width: `${fieldW}%`, minWidth: "100%", height: "min(52vh, 420px)",
-                            background: fieldBackground(wx.tod, wx.condition),
+                            background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
@@ -722,7 +722,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             placements={farm.placements || []}
                             editing={farm.mine && decoEditing}
                             fieldRef={fieldRef}
-                            tod={wx.tod}
+                            tod={visTod}
                             onMove={decoMove}
                             onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
                         />

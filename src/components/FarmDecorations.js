@@ -18,9 +18,21 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
     const dragRef = useRef(null); // { decoId, pointerId, el }
     const [ghost, setGhost] = useState(null); // { emoji, spriteUrl, x0, y0 } — initial paint only
 
+    // Robust scroll-aware field geometry: the VISIBLE viewport is the scroller (fieldRef's parent), and the
+    // field's true left edge = viewport-left minus how far it's scrolled. Using offsetWidth + scrollLeft avoids
+    // getBoundingClientRect quirks on a wide horizontally-scrolled element (the cause of "can't place when
+    // scrolled right").
+    const fieldMetrics = () => {
+        const field = fieldRef?.current;
+        const scroller = field?.parentElement;
+        if (!field || !scroller) return null;
+        const sc = scroller.getBoundingClientRect(); // the visible farm viewport
+        return { sc, left: sc.left - (scroller.scrollLeft || 0), top: sc.top, width: field.offsetWidth || sc.width, height: sc.height };
+    };
+    // Droppable = anywhere over the VISIBLE farm viewport (you can only drop where you can see).
     const insideField = (cx, cy) => {
-        const r = fieldRef?.current?.getBoundingClientRect();
-        return r ? cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom : false;
+        const m = fieldMetrics();
+        return m ? cx >= m.sc.left && cx <= m.sc.right && cy >= m.sc.top && cy <= m.sc.bottom : false;
     };
     const positionGhost = (cx, cy) => {
         const g = ghostRef.current;
@@ -54,14 +66,14 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
         if (!d || e.pointerId !== d.pointerId) return;
         if (d.active) {
             try { d.el?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
-            const r = fieldRef?.current?.getBoundingClientRect();
-            if (r && insideField(e.clientX, e.clientY)) {
+            const m = fieldMetrics();
+            if (m && insideField(e.clientX, e.clientY)) {
                 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-                // getBoundingClientRect() already accounts for the field's horizontal scroll, so % is correct wherever you're scrolled.
+                // % of the FULL field, scroll-aware, so it drops where you released wherever you're scrolled.
                 // Near-full range so decorations can be placed across the WHOLE farm (a hair of margin keeps a
                 // bottom-anchored sprite from clipping off an edge).
-                const xPct = clamp(((e.clientX - r.left) / r.width) * 100, 1, 99);
-                const yPct = clamp(((e.clientY - r.top) / r.height) * 100, 2, 100);
+                const xPct = clamp(((e.clientX - m.left) / m.width) * 100, 1, 99);
+                const yPct = clamp(((e.clientY - m.top) / m.height) * 100, 2, 100);
                 onPlaceAt(d.o.id, xPct, yPct);
             }
         } else {
@@ -172,9 +184,14 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
         if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 7) return; // still a tap until it moves enough
         g.moved = true;
         e.preventDefault();
-        const rect = fieldRef.current.getBoundingClientRect();
-        g.x = Math.max(1, Math.min(99, ((e.clientX - rect.left) / rect.width) * 100));
-        g.y = Math.max(2, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+        // Scroll-aware geometry (same as the tray drop) so moving a placed piece works wherever you're scrolled.
+        const field = fieldRef.current;
+        const scroller = field.parentElement;
+        const sc = scroller ? scroller.getBoundingClientRect() : field.getBoundingClientRect();
+        const left = sc.left - (scroller?.scrollLeft || 0);
+        const width = field.offsetWidth || sc.width;
+        g.x = Math.max(1, Math.min(99, ((e.clientX - left) / width) * 100));
+        g.y = Math.max(2, Math.min(100, ((e.clientY - sc.top) / sc.height) * 100));
         setDrag({ id: g.id, x: g.x, y: g.y });
     };
     const end = (e) => {
