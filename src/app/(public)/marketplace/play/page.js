@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FaDharmachakra } from "react-icons/fa6";
 
 import GameHubStats from "@/components/GameHubStats";
+import GettingStarted from "@/components/GettingStarted";
 import HelmetSprite from "@/components/HelmetSprite";
 import RaidDefenseReport from "@/components/RaidDefenseReport";
 import ReferralInvite from "@/components/ReferralInvite";
@@ -48,6 +49,7 @@ export default async function GamePlayHub({ searchParams }) {
     return (
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
+            {buyer ? <GettingStarted /> : null}
             {buyer ? <RaidDefenseReport /> : null}
             {buyer ? <SpinNudge /> : null}
             <section className="card game-hub-hero">
