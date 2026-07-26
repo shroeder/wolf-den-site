@@ -46,8 +46,15 @@ const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplac
 
 export default function GameNav() {
     const pathname = usePathname() || "";
+    // The Forge (blacksmith/crafting) is OWNER-ONLY in Phase 1 — only append its pill for the owner.
+    const [owner, setOwner] = useState(false);
+    useEffect(() => {
+        let alive = true;
+        fetch("/api/marketplace/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.owner) setOwner(true); }).catch(() => {});
+        return () => { alive = false; };
+    }, []);
     // Farm is live for everyone — always in the menu.
-    const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }];
+    const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, ...(owner ? [{ href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
     // Unopened-chest reminder: badge the Gear pill (chests are opened on the inventory page). Refetch on
     // each in-game navigation so the count drops as soon as you open them.

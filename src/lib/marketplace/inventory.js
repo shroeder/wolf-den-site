@@ -58,11 +58,26 @@ export async function getEquippedIds(buyerId) {
     return bySlot;
 }
 
-// Aggregated equipped stats — used by the boss combat.
+// Forge enhancement stat bonuses for a member's given items → merged combat-stat totals. Only the items that
+// are actually equipped should be passed in (enhancement rides with the item wherever it's equipped).
+async function enhanceBonusFor(buyerId, itemIds) {
+    if (!buyerId || !itemIds?.length) return {};
+    const rows = await db.query(`SELECT stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, itemIds]).catch(() => []);
+    const total = {};
+    for (const r of rows) {
+        const b = typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {});
+        for (const [k, v] of Object.entries(b)) total[k] = (total[k] || 0) + (Number(v) || 0);
+    }
+    return total;
+}
+
+// Aggregated equipped stats — used by the boss combat. Includes set bonuses + Forge enhancement bonuses.
 export async function getEquippedStats(buyerId) {
     if (!buyerId) return {};
-    const bySlot = await getEquippedIds(buyerId);
-    return withSetBonuses(Object.values(bySlot));
+    const ids = Object.values(await getEquippedIds(buyerId));
+    const total = withSetBonuses(ids);
+    for (const [k, v] of Object.entries(await enhanceBonusFor(buyerId, ids))) total[k] = (total[k] || 0) + v;
+    return total;
 }
 
 // Equipped item IDs for many members at once (Map buyer_id -> [item_id]). Used by the auto-tick to apply
@@ -82,7 +97,22 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
     const rows = await db.query(`SELECT buyer_id, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1)`, [buyerIds]).catch(() => []);
     const byBuyer = new Map();
     for (const r of rows) { if (!byBuyer.has(r.buyer_id)) byBuyer.set(r.buyer_id, []); byBuyer.get(r.buyer_id).push(r.item_id); }
-    for (const [id, ids] of byBuyer) out.set(id, withSetBonuses(ids));
+    // Forge enhancement bonuses for all these members' EQUIPPED items, in one query.
+    const enhRows = await db.query(`SELECT buyer_id, item_id, stat_bonus FROM mkt_item_enhance WHERE buyer_id = ANY($1)`, [buyerIds]).catch(() => []);
+    const enhByBuyer = new Map();
+    for (const r of enhRows) {
+        if (!byBuyer.get(r.buyer_id)?.includes(r.item_id)) continue; // enhancement only counts while the item is equipped
+        const b = typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {});
+        if (!enhByBuyer.has(r.buyer_id)) enhByBuyer.set(r.buyer_id, {});
+        const acc = enhByBuyer.get(r.buyer_id);
+        for (const [k, v] of Object.entries(b)) acc[k] = (acc[k] || 0) + (Number(v) || 0);
+    }
+    for (const [id, ids] of byBuyer) {
+        const total = withSetBonuses(ids);
+        const enh = enhByBuyer.get(id);
+        if (enh) for (const [k, v] of Object.entries(enh)) total[k] = (total[k] || 0) + v;
+        out.set(id, total);
+    }
     return out;
 }
 

@@ -16,6 +16,7 @@ import SignOutButton from "@/components/SignOutButton";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { getBadgeBoard } from "@/lib/marketplace/badges.js";
 import { getMyBossSummary } from "@/lib/marketplace/boss.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
@@ -107,7 +108,7 @@ export default async function ProfileHubPage() {
             <section className="card">
                 <h2 style={{ marginTop: 0 }}>Jump in</h2>
                 <div className="hub-tiles">
-                    {TILES.map((t) => {
+                    {(isOwner(buyer.id) ? [{ href: "/marketplace/blacksmith", icon: "🔨", label: "The Forge", sub: "Salvage & enhance gear" }, ...TILES] : TILES).map((t) => {
                         const badge = t.href === "/marketplace/trade" && tradeCount > 0 ? tradeCount : null;
                         const dot = t.href === "/marketplace/sailing" && sailAttention;
                         return (
