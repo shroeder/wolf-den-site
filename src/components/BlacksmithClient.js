@@ -128,34 +128,53 @@ export default function BlacksmithClient({ initial }) {
     const enhance = forge.enhance || [];
     const bg = forge.hearthBg && !forge.hearthBg.startsWith("__") ? forge.hearthBg : null;
 
+    // Live status line for the hero scene (mirrors the farm/sailing HUD strips).
+    const totalParts = parts.reduce((s, p) => s + (p.count || 0), 0);
+    const bestLvl = enhance.reduce((m, it) => Math.max(m, it.level || 0), 0);
+    const statusBits = [`${totalParts} part${totalParts === 1 ? "" : "s"} ready`];
+    if (bestLvl > 0) statusBits.push(`best forge +${bestLvl}`);
+    if (forge.regalia?.equipped) statusBits.push(`${forge.regalia.equipped}/${forge.regalia.total} regalia worn`);
+
     return (
-        <div className="stack reveal">
+        <div className="stack reveal forge">
             <style>{FORGE_CSS}</style>
-            <section className="forge-scene" style={bg ? { backgroundImage: `linear-gradient(180deg, rgba(20,10,4,0.28), rgba(20,10,4,0.72)), url(${bg})` } : undefined}>
+
+            <HowToPlay
+                id="forge"
+                emoji="🔥"
+                title="the Forge"
+                accent="#ff9a3c"
+                tagline="Salvage spare gear into parts, then hammer them into your equipped gear to make it stronger."
+                steps={[
+                    "Salvage gear you're not using — each piece breaks into forge parts (rarer gear → higher-tier parts).",
+                    "Combine 5 parts of a tier into 1 of the next tier.",
+                    "Enhance an equipped item: time your hammer strikes on the anvil — Great, Perfect & Pixel-Perfect keep your combo and roll bigger stat gains.",
+                    "Better timing = better roll + more XP. Enhance as many times as you like; the part cost climbs slowly.",
+                ]}
+            />
+
+            {/* The hearth — an immersive scene, like the farm's pasture and sailing's open sea. */}
+            <div className="forge-scene" style={bg ? { backgroundImage: `linear-gradient(180deg, rgba(20,10,4,0.15), rgba(20,10,4,0.82)), url(${bg})` } : undefined}>
                 <div className="forge-emberlayer" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ left: `${(i * 7 + 4) % 100}%`, animationDelay: `${(i * 0.7) % 5}s`, animationDuration: `${4 + (i % 5)}s` }} />)}</div>
-                <div className="forge-head">
-                    <h1 className="forge-title">The Forge</h1>
-                    <span className="forge-owner">owner</span>
+                <div className="forge-scene-inner">
+                    <div className="forge-head">
+                        <h1 className="forge-title">The Forge</h1>
+                        <span className="forge-owner">owner</span>
+                    </div>
+                    <p className="forge-tagline">{statusBits.join(" · ")}</p>
                 </div>
+                {salvageBurst ? (
+                    <div className="forge-burst" key={salvageBurst.k} style={{ "--pc": salvageBurst.color }}>
+                        <span>+{salvageBurst.n}</span> {salvageBurst.name}
+                    </div>
+                ) : null}
+            </div>
 
-                <HowToPlay
-                    id="forge"
-                    emoji="🔥"
-                    title="the Forge"
-                    accent="#ff9a3c"
-                    tagline="Salvage spare gear into parts, then hammer them into your equipped gear to make it stronger."
-                    steps={[
-                        "Salvage gear you're not using — each piece breaks into forge parts (rarer gear → higher-tier parts).",
-                        "Combine 5 parts of a tier into 1 of the next tier.",
-                        "Enhance an equipped item: time your hammer strikes on the anvil — Great, Perfect & Pixel-Perfect keep your combo and roll bigger stat gains.",
-                        "Better timing = better roll + more XP. Enhance as many times as you like; the part cost climbs slowly.",
-                    ]}
-                />
-
-                {/* Daily forge tasks. */}
-                {(forge.dailies || []).length ? (
+            {/* Daily forge tasks. */}
+            {(forge.dailies || []).length ? (
+                <section className="card forge-panel">
+                    <h3 className="forge-panel-h">🔥 Today&apos;s forge tasks</h3>
                     <div className="forge-dailies">
-                        <div className="forge-dailies-title">🔥 Today&apos;s forge tasks</div>
                         {(forge.dailies || []).map((q) => (
                             <div key={q.key} className={`forge-daily${q.done ? " is-done" : ""}${q.claimed ? " is-claimed" : ""}`}>
                                 <div className="forge-daily-body">
@@ -169,9 +188,12 @@ export default function BlacksmithClient({ initial }) {
                             </div>
                         ))}
                     </div>
-                ) : null}
+                </section>
+            ) : null}
 
-                {/* Parts rail — your tiered materials, always in view. */}
+            {/* Materials — tiered parts + the Blacksmith's Regalia set. */}
+            <section className="card forge-panel">
+                <h3 className="forge-panel-h">⛓️ Forge materials</h3>
                 <div className="forge-parts">
                     {parts.map((p) => (
                         <div key={p.tier} className="forge-part" style={{ "--pc": p.color }}>
@@ -209,7 +231,10 @@ export default function BlacksmithClient({ initial }) {
                         <div className="forge-regalia-bonus" style={{ color: forge.regalia.bonus.tier > 0 ? "#8fe3a1" : "#b9a892" }}>{forge.regalia.bonus.label}</div>
                     </div>
                 ) : null}
+            </section>
 
+            {/* Actions — enhance / salvage / perks. */}
+            <section className="card forge-panel">
                 <div className="forge-tabs">
                     <button type="button" className={tab === "enhance" ? "on" : ""} onClick={() => setTab("enhance")}>⚒️ Enhance ({enhance.length})</button>
                     <button type="button" className={tab === "salvage" ? "on" : ""} onClick={() => setTab("salvage")}>♻️ Salvage ({salvage.length})</button>
@@ -260,13 +285,6 @@ export default function BlacksmithClient({ initial }) {
                         <div className="forge-gold">🪙 {(forge.gold || 0).toLocaleString()} gold on hand</div>
                     </div>
                 )}
-
-                {/* salvage reward burst */}
-                {salvageBurst ? (
-                    <div className="forge-burst" key={salvageBurst.k} style={{ "--pc": salvageBurst.color }}>
-                        <span>+{salvageBurst.n}</span> {salvageBurst.name}
-                    </div>
-                ) : null}
             </section>
 
             {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHand={forge.steadyHand || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
@@ -416,17 +434,24 @@ function EnhanceMinigame({ item, parts, steadyHand = 0, onCancel, onDone, busy }
 }
 
 const FORGE_CSS = `
-.forge-scene { position: relative; border-radius: 18px; overflow: hidden; padding: 16px 14px 22px;
+/* ── The hearth scene — an immersive banner (like the farm pasture / sailing sea) ── */
+.forge-scene { position: relative; border-radius: 16px; overflow: hidden; height: min(34vh, 260px); min-height: 168px;
+    display: flex; flex-direction: column; justify-content: flex-end;
     background: radial-gradient(120% 90% at 50% 0%, #3a2312, #1a0f07 70%); background-size: cover; background-position: center;
-    box-shadow: inset 0 0 90px rgba(0,0,0,0.55), 0 10px 30px rgba(0,0,0,0.4); border: 1px solid rgba(255,150,60,0.28); }
-.forge-emberlayer { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    box-shadow: inset 0 -40px 70px rgba(0,0,0,0.6), 0 10px 30px rgba(0,0,0,0.4); border: 1px solid rgba(255,150,60,0.28); }
+.forge-emberlayer { position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
 .forge-emberlayer span { position: absolute; bottom: -10px; width: 4px; height: 4px; border-radius: 50%; background: radial-gradient(circle, #ffcf7a, #ff7a1a 60%, transparent); opacity: 0; animation: forgeEmber linear infinite; }
 @keyframes forgeEmber { 0% { transform: translateY(0) scale(1); opacity: 0; } 12% { opacity: 0.9; } 100% { transform: translateY(-320px) scale(0.4); opacity: 0; } }
-.forge-scene > * { position: relative; z-index: 1; }
-.forge-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.forge-title { margin: 0; font-size: 1.7rem; font-weight: 900; color: #ffe0b0; text-shadow: 0 2px 10px rgba(255,120,20,0.55), 0 1px 2px #000; letter-spacing: 0.02em; }
+.forge-scene-inner { position: relative; z-index: 2; padding: 16px; }
+.forge-head { display: flex; align-items: center; gap: 10px; }
+.forge-title { margin: 0; font-size: 1.7rem; font-weight: 900; color: #ffe0b0; text-shadow: 0 2px 10px rgba(255,120,20,0.55), 0 1px 3px #000; letter-spacing: 0.02em; }
 .forge-owner { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #ffb877; background: rgba(255,140,60,0.16); border: 1px solid rgba(255,140,60,0.5); border-radius: 999px; padding: 2px 8px; }
-.forge-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 4px 0 14px; }
+.forge-tagline { margin: 5px 0 0; font-size: 12.5px; font-weight: 600; color: #f0d9bd; text-shadow: 0 1px 4px #000; }
+/* ── Panels below the scene — the game's standard card, with a forge-warm header ── */
+.forge-panel { }
+.forge-panel-h { margin: 0 0 11px; font-size: 12px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: #ffb877; display: flex; align-items: center; gap: 6px; }
+.forge-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 0 0 12px; }
+.forge-parts:last-child { margin-bottom: 0; }
 .forge-part { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 6px; border-radius: 12px; background: rgba(10,6,3,0.55); border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); }
 .forge-ingot { width: 30px; height: 20px; border-radius: 4px; background: linear-gradient(135deg, color-mix(in srgb, var(--pc) 92%, #fff) , var(--pc) 55%, color-mix(in srgb, var(--pc) 60%, #000)); box-shadow: 0 0 12px color-mix(in srgb, var(--pc) 70%, transparent), inset 0 1px 2px rgba(255,255,255,0.5); clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%); }
 .forge-part-body { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
@@ -513,8 +538,7 @@ const FORGE_CSS = `
 .forge-upg-max { flex: 0 0 auto; font-size: 11px; font-weight: 900; color: #8fe3a1; letter-spacing: 0.06em; }
 .forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 2px; }
 /* ── daily forge tasks ── */
-.forge-dailies { margin: 0 0 14px; padding: 10px 12px; border-radius: 14px; background: rgba(10,6,3,0.55); border: 1px solid rgba(255,150,60,0.28); }
-.forge-dailies-title { font-size: 11px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: #ffb877; margin-bottom: 8px; }
+.forge-dailies { margin: 0; }
 .forge-daily { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.06); }
 .forge-daily:first-of-type { border-top: none; }
 .forge-daily.is-claimed { opacity: 0.55; }
@@ -527,7 +551,7 @@ const FORGE_CSS = `
 .forge-daily-tag { flex: 0 0 auto; font-size: 10.5px; color: #b9a892; }
 .forge-daily-tag.done { color: #8fe3a1; font-weight: 800; }
 /* ── Blacksmith's Regalia (salvaging set) ── */
-.forge-regalia { margin: 0 0 14px; padding: 10px 12px; border-radius: 14px; background: linear-gradient(180deg, rgba(40,24,10,0.6), rgba(14,8,4,0.7)); border: 1px solid rgba(255,180,80,0.3); }
+.forge-regalia { margin: 0; padding: 10px 12px; border-radius: 14px; background: linear-gradient(180deg, rgba(40,24,10,0.6), rgba(14,8,4,0.7)); border: 1px solid rgba(255,180,80,0.3); }
 .forge-regalia-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .forge-regalia-title { font-size: 12.5px; font-weight: 900; color: #ffcf8a; letter-spacing: 0.02em; }
 .forge-regalia-count { font-size: 10.5px; color: #c8b79f; }
