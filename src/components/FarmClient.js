@@ -563,12 +563,14 @@ export default function FarmClient({ initial, viewingAlias }) {
     const fieldW = Math.max(200, pets.length * 62);
     // Sky follows the player's real local weather.
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
-    // The farm never goes dark: night is rendered with the bright DAY scene (Luke doesn't want a dark/muting
-    // night). The weather label below still shows the real time of day — only the VISUALS stay bright.
-    const visTod = wx.tod === "night" ? "day" : wx.tod;
-    // Illustrated backdrop for the (visual) time of day (falls back to the CSS gradient scene when not generated).
+    // Show the REAL time-of-day scene — including the illustrated NIGHT backdrop — but NEVER mute the sprite
+    // colors. The muting overlay was the thing to kill (it washed everything out); the night scene itself is
+    // fine, and pets/crops/decorations stay full-color against it (objFilter is 'none' at night below).
+    const visTod = wx.tod;
+    // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
     const bgUrl = pickFarmBg(visTod, wx.condition);
-    // No color-muting overlay — sprites keep their full vibrant colors; only a whisper of brightness at dusk/dawn.
+    // No color-muting overlay — sprites keep their full vibrant colors at night; only a whisper of brightness at
+    // dusk/dawn for ambiance. Night = none (full color).
     const objFilter = visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none";
     const bgCopies = Math.min(20, Math.max(6, Math.ceil(fieldW / 40)));
 
