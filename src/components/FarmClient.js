@@ -591,7 +591,30 @@ export default function FarmClient({ initial, viewingAlias }) {
         document.addEventListener("fullscreenchange", onFs);
         return () => document.removeEventListener("fullscreenchange", onFs);
     }, []);
-    const sceneHeight = fullscreen ? "100dvh" : "min(52vh, 420px)";
+    // In fullscreen the field fills the fixed container exactly (100% of it) rather than 100dvh, which on mobile
+    // overflows past the visible area and clips the bottom of the farm.
+    const sceneHeight = fullscreen ? "100%" : "min(52vh, 420px)";
+
+    // Click-and-drag to scroll the pasture sideways on desktop (mouse). Touch keeps native scroll; skipped while
+    // decorating so it never fights piece-dragging.
+    const dragScroll = useRef({ active: false, startX: 0, startScroll: 0, moved: false });
+    // Plain handlers (not hooks) — the DOM ref mutation for scrollLeft is fine here.
+    const onScrollPointerDown = (e) => {
+        if (e.pointerType !== "mouse" || decoEditing) return;
+        dragScroll.current = { active: true, startX: e.clientX, startScroll: scrollRef.current?.scrollLeft || 0, moved: false };
+    };
+    const onScrollPointerMove = (e) => {
+        const d = dragScroll.current;
+        if (!d.active || !scrollRef.current) return;
+        const dx = e.clientX - d.startX;
+        if (Math.abs(dx) > 4) d.moved = true;
+        if (d.moved) {
+            e.preventDefault();
+            const target = d.startScroll - dx;
+            requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollLeft = target; });
+        }
+    };
+    const onScrollPointerUp = () => { dragScroll.current.active = false; };
 
     return (
         <div className="stack reveal">
@@ -698,8 +721,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             <FarmDirectory current={viewingAlias} />
 
             {/* The pasture — a seamless, weather-aware scene that scrolls sideways */}
-            <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
-                <div ref={scrollRef} className="farm-scroll" style={{ width: "100%", overflowX: "auto", overflowY: "hidden" }}>
+            <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
+                <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
