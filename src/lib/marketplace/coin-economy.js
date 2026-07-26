@@ -85,7 +85,7 @@ export async function getCoinEconomy({ days = 30 } = {}) {
         inflation: daily.length ? daily[daily.length - 1].supply - (daily[0].supply - daily[0].net) : 0,
         daily, // [{ date, minted, burned, net, supply }] — supply is the inflation curve
         bySource, // [{ reason, label, earned, spent, net, n }]
-        topHolders: (holderRows || []).map((h) => ({ name: nameOf(h), alias: h.alias || null, gold: Number(h.gold) || 0 })),
-        topGrowers: (moverRows || []).map((m) => ({ name: nameOf(m), alias: m.alias || null, earned: Number(m.earned) || 0, spent: Number(m.spent) || 0, net: (Number(m.earned) || 0) - (Number(m.spent) || 0) })),
+        topHolders: (holderRows || []).map((h) => ({ id: h.id, name: nameOf(h), alias: h.alias || null, gold: Number(h.gold) || 0 })),
+        topGrowers: (moverRows || []).map((m) => ({ id: m.buyer_id, name: nameOf(m), alias: m.alias || null, earned: Number(m.earned) || 0, spent: Number(m.spent) || 0, net: (Number(m.earned) || 0) - (Number(m.spent) || 0) })),
     };
 }
