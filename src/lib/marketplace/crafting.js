@@ -58,6 +58,9 @@ export const FORGE_UPGRADES = {
     masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.045, base: 3500, unit: "%" },
     steady_hand: { name: "Steady Hand", desc: "A slip won't break your combo (per forge) + wider timing windows.", max: 3, per: 1, base: 4000, unit: "save" },
 };
+// Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
+const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️" };
+const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo saves" };
 const upgCost = (u, level) => Math.round(u.base * Math.pow(1.9, level));
 async function upgradeLevels(buyerId) {
     const rows = await db.query(`SELECT key, level FROM mkt_forge_upgrade WHERE buyer_id = $1`, [buyerId]).catch(() => []);
@@ -276,7 +279,12 @@ export async function getForgeState(buyerId) {
     const regalia = { pieces: regaliaPieces, owned: regaliaPieces.filter((r) => r.owned).length, equipped: regEquipped, total: REGALIA_IDS.length, bonus: regaliaBonus(regEquipped), dropRate: REGALIA_DROP };
     const upgrades = Object.entries(FORGE_UPGRADES).map(([key, u]) => {
         const level = upg[key] || 0;
-        return { key, name: u.name, desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? `${Math.round(u.per * level * 100)}%` : `${level}` };
+        const pct = (lv) => `${Math.round(u.per * lv * 100)}%`;
+        const saves = (lv) => `${lv} save${lv === 1 ? "" : "s"}`;
+        const eff = u.unit === "%"
+            ? { label: UPG_EFF_LABEL[key], now: level ? pct(level) : "—", next: pct(level + 1) }
+            : { label: UPG_EFF_LABEL[key], now: level ? saves(level) : "—", next: saves(level + 1) };
+        return { key, name: u.name, emoji: UPG_EMOJI[key], desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? pct(level) : `${level}`, eff };
     });
     return { parts: partList, salvage, enhance, upgrades, dailies, regalia, steadyHand: upg.steady_hand || 0, gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }

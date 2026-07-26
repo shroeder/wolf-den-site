@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
+import CoinCta from "@/components/CoinCta";
 
 // ── The Forge (owner-gated blacksmith). Salvage unequipped gear → tiered parts → combine 5→1 → enhance equipped
 // gear via a hammer-&-anvil timing mini-game whose execution drives the stat roll. Juiced to high heaven.
@@ -267,23 +268,33 @@ export default function BlacksmithClient({ initial }) {
                         )) : <div className="forge-empty">Nothing spare to salvage — every item you own is equipped.</div>}
                     </div>
                 ) : (
-                    <div className="forge-upgrades">
-                        {(forge.upgrades || []).map((u) => (
-                            <div key={u.key} className="forge-upg">
-                                <div className="forge-upg-body">
-                                    <b>{u.name}{u.level > 0 ? <span className="forge-upg-lvl">Lv {u.level}{u.max ? `/${u.max}` : ""}</span> : null}</b>
-                                    <span>{u.desc}</span>
-                                    {u.level > 0 ? <em className="forge-upg-eff">now: {u.unit === "%" ? u.effect : `${u.level} ${u.unit}${u.level === 1 ? "" : "s"}`}</em> : null}
-                                </div>
-                                {u.cost != null ? (
-                                    <button type="button" className="forge-upg-buy" disabled={Boolean(busy) || (forge.gold || 0) < u.cost} onClick={() => doUpgrade(u.key)}>
-                                        {busy === `up-${u.key}` ? "…" : `🪙 ${u.cost.toLocaleString()}`}
-                                    </button>
-                                ) : <span className="forge-upg-max">MAX</span>}
-                            </div>
-                        ))}
+                    <>
+                        <div className="sail-upgrades is-forge">
+                            {(forge.upgrades || []).map((u) => {
+                                const affordable = u.cost != null && (forge.gold || 0) >= u.cost;
+                                return (
+                                    <div className={`sail-upg${u.cost == null ? " is-maxed" : ""}`} key={u.key}>
+                                        <div className="sail-upg-top">
+                                            <span className="sail-upg-title"><span className="sail-upg-ico">{u.emoji}</span>{u.name}</span>
+                                            <span className="muted sail-upg-lv">Lv {u.level}/{u.max}</span>
+                                        </div>
+                                        <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.max ? Math.min(100, (u.level / u.max) * 100) : 0}%` }} /></div>
+                                        <p className="muted sail-upg-desc">{u.desc}</p>
+                                        {u.eff ? (
+                                            <div className="sail-upg-effect">
+                                                <span>{u.eff.label}</span>
+                                                <b>{u.eff.now}{u.cost == null ? "" : <> → <span className="sail-upg-next">{u.eff.next}</span></>}</b>
+                                            </div>
+                                        ) : null}
+                                        {u.cost == null ? <button type="button" className="pill" disabled>✓ Maxed</button>
+                                            : !affordable ? <CoinCta price={u.cost} have={forge.gold || 0} className="sail-upg-cta" />
+                                                : <button type="button" className="btn-ghost sail-upg-buy" disabled={Boolean(busy)} onClick={() => doUpgrade(u.key)}>{busy === `up-${u.key}` ? "…" : `🪙 ${u.cost.toLocaleString()}`}</button>}
+                                    </div>
+                                );
+                            })}
+                        </div>
                         <div className="forge-gold">🪙 {(forge.gold || 0).toLocaleString()} gold on hand</div>
-                    </div>
+                    </>
                 )}
             </section>
 
@@ -525,18 +536,8 @@ const FORGE_CSS = `
 .forge-result-bar span { display: block; height: 100%; background: linear-gradient(90deg, #f3922a, #ffd75e); box-shadow: 0 0 12px #ffcf7a; transition: width .6s cubic-bezier(.2,1,.3,1); }
 .forge-result-sub { font-size: 12px; color: #cdb89f; }
 .forge-mg-cancel { display: block; margin: 8px auto 0; background: none; border: none; color: #b9a892; font-size: 12px; cursor: pointer; }
-/* ── perks / upgrades ── */
-.forge-upgrades { display: flex; flex-direction: column; gap: 9px; }
-.forge-upg { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 13px; background: linear-gradient(180deg, rgba(30,18,10,0.85), rgba(14,8,4,0.9)); border: 1px solid rgba(255,150,60,0.32); }
-.forge-upg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.forge-upg-body b { font-size: 13px; color: #ffe0b0; display: flex; align-items: center; gap: 8px; }
-.forge-upg-body span { font-size: 11px; color: #c8b79f; }
-.forge-upg-lvl { font-size: 10px; font-weight: 800; color: #2a1000; background: linear-gradient(180deg,#ffd75e,#f3b23a); border-radius: 999px; padding: 1px 7px; }
-.forge-upg-eff { font-size: 10.5px; color: #8fe3a1; font-style: normal; font-weight: 700; }
-.forge-upg-buy { flex: 0 0 auto; padding: 8px 12px; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer; border: 1px solid rgba(255,215,94,0.55); background: rgba(255,215,94,0.14); color: #ffd75e; white-space: nowrap; }
-.forge-upg-buy:disabled { opacity: 0.5; cursor: default; }
-.forge-upg-max { flex: 0 0 auto; font-size: 11px; font-weight: 900; color: #8fe3a1; letter-spacing: 0.06em; }
-.forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 2px; }
+/* ── perks / upgrades (uses the shared .sail-upgrades pattern; only the gold line is bespoke) ── */
+.forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 10px; }
 /* ── daily forge tasks ── */
 .forge-dailies { margin: 0; }
 .forge-daily { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.06); }
