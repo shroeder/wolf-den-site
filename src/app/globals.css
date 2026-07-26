@@ -10738,9 +10738,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-ambient-boat.is-waveable:active .sail-wave-btn { transform: translateX(-50%) scale(0.9); }
 @keyframes sailWaveBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
 /* Forge rank badge — the visual quality of an ENHANCED item (an AI tier emblem + aura + "+level" tag). */
-.forge-rank { position: relative; display: inline-grid; place-items: center; border-radius: 50%; flex: 0 0 auto; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rk) 70%, transparent)); }
-.forge-rank b { font-weight: 900; font-size: 0.72em; }
-.forge-rank em { position: absolute; right: -6px; bottom: -5px; font-style: normal; font-weight: 900; font-size: 9px; line-height: 1; color: #1a0f06; background: var(--rk); border-radius: 999px; padding: 1px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+/* Forge rank = 1–3 colored stars (count + color encode the enhance level; no numbers). */
+.forge-rank { display: inline-flex; align-items: center; gap: 0px; line-height: 1; flex: 0 0 auto; }
+.forge-rank .forge-star { font-size: var(--star, 15px); line-height: 1; color: var(--rk, #c08a52); text-shadow: 0 0 5px color-mix(in srgb, var(--rk) 65%, transparent), 0 1px 1px rgba(0,0,0,0.65); }
+.forge-rank.is-rainbow .forge-star { background: linear-gradient(92deg, #ff5b6e, #ffb020, #ffe23f, #4fe08a, #5bd4ff, #b061ff, #ff8adf); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 7px rgba(255,255,255,0.45); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5)); }
+.forge-rank.is-max .forge-star { animation: forgeStarMax 1.7s ease-in-out infinite; }
+@keyframes forgeStarMax { 0%,100% { filter: brightness(1) drop-shadow(0 0 3px transparent); } 50% { filter: brightness(1.35) drop-shadow(0 0 6px currentColor); } }
 /* "You waved!" reward pop, floating over the scene. */
 .sail-wavefx { position: absolute; left: 50%; top: 15%; transform: translateX(-50%); z-index: 7; pointer-events: none;
     font-weight: 800; font-size: 0.9rem; color: #eaf6ff; white-space: nowrap; background: rgba(12,20,32,0.86);

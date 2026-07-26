@@ -1,26 +1,28 @@
-// Visual forge-rank for enhanced gear — a rank that extends N times as an item's enhancement level climbs.
-// Reflected across the site (owner-gated) + the admin app. AI-generated emblem sprite per tier (the top emblem
-// + color are reused for tiers beyond the set, while the roman-numeral label keeps climbing forever).
-// Isomorphic (no server-only) so both React and server routes can use it.
+// Visual forge-rank for enhanced gear — colored STARS that reflect the enhancement level with NO numbers.
+// Each color tier holds 3 levels (1★ · 2★ · 3★); climbing past 3★ bumps to the next color. It caps at the top
+// tier (peak enchantment). Isomorphic (no server-only) so both React and server routes can use it.
 
-export const RANK_EMBLEMS = [
-    "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/rank-1-1785049033419.png",
-    "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/rank-2-1785049053993.png",
-    "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/rank-3-1785049073030.png",
-    "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/rank-4-1785049093262.png",
-    "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/rank-5-1785049113146.png",
+// The color ladder: our rarity palette (bronze → silver → gold → platinum-blue → amethyst-purple → emerald-green)
+// then an invented top tier (prismatic/rainbow). 3 stars each → MAX_FORGE_LEVEL = 21 (the peak).
+export const STAR_TIERS = [
+    { name: "Bronze", color: "#c08a52", rainbow: false },
+    { name: "Silver", color: "#cfd6dd", rainbow: false },
+    { name: "Gold", color: "#ffcf3f", rainbow: false },
+    { name: "Platinum", color: "#5bd4ff", rainbow: false },
+    { name: "Amethyst", color: "#b061ff", rainbow: false },
+    { name: "Emerald", color: "#3fe08a", rainbow: false },
+    { name: "Prismatic", color: "#ff8adf", rainbow: true },
 ];
+export const MAX_FORGE_LEVEL = STAR_TIERS.length * 3; // 21 — the peak (3 prismatic stars)
 
-const RANK_COLORS = ["#c08a52", "#c7d0d8", "#6fb0e6", "#b98cff", "#ffb020"];
-const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
-const roman = (n) => ROMAN[n] || String(n);
-
-// level → visual rank. Every 4 enhance levels bumps the tier; tiers extend forever.
+// level → { stars: 1..3, color, rainbow, tierName, maxed }. Null for un-enhanced gear.
 export function forgeRank(level) {
     const lv = Number(level) || 0;
     if (lv < 1) return null;
-    const tier = Math.floor((lv - 1) / 4) + 1;
-    const idx = Math.min(tier, RANK_EMBLEMS.length) - 1;
-    const emblem = RANK_EMBLEMS[idx] && !RANK_EMBLEMS[idx].startsWith("__") ? RANK_EMBLEMS[idx] : null;
-    return { level: lv, tier, color: RANK_COLORS[Math.min(tier, RANK_COLORS.length) - 1], emblem, label: `Forged ${roman(tier)}` };
+    const capped = Math.min(lv, MAX_FORGE_LEVEL);
+    const tierIdx = Math.floor((capped - 1) / 3);
+    const t = STAR_TIERS[tierIdx];
+    const stars = ((capped - 1) % 3) + 1;
+    const maxed = lv >= MAX_FORGE_LEVEL;
+    return { level: lv, stars, color: t.color, rainbow: t.rainbow, tierName: t.name, tierIdx, maxed, label: `${t.name} ${"★".repeat(stars)}${maxed ? " · MAX" : ""}` };
 }

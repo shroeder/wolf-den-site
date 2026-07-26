@@ -2,18 +2,19 @@
 
 import { forgeRank } from "@/lib/marketplace/forge-rank.js";
 
-// A small overlay badge for an enhanced item: the AI tier emblem (or a numeral fallback), a colored aura, and a
-// "+level" tag. Renders nothing for un-enhanced gear. Owner-gated by virtue of who has enhancement data.
-export default function ForgeRank({ level, size = 26, showLevel = true, title = true }) {
+// A small overlay badge for an enhanced item: 1–3 colored stars whose count + color encode the enhancement level
+// (no numbers). 1★→3★ within a color, then it climbs to the next color; caps at prismatic (peak). Renders
+// nothing for un-enhanced gear.
+export default function ForgeRank({ level, size = 26, title = true }) {
     const r = forgeRank(level);
     if (!r) return null;
     return (
-        <span className="forge-rank" title={title ? `${r.label} · +${r.level}` : undefined} style={{ "--rk": r.color, width: size, height: size }}>
-            {r.emblem ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.emblem} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} />
-            ) : <b style={{ color: r.color }}>{r.tier}</b>}
-            {showLevel ? <em>+{r.level}</em> : null}
+        <span
+            className={`forge-rank${r.rainbow ? " is-rainbow" : ""}${r.maxed ? " is-max" : ""}`}
+            title={title ? r.label : undefined}
+            style={{ "--rk": r.color, "--star": `${Math.round(size * 0.62)}px` }}
+        >
+            {Array.from({ length: r.stars }).map((_, i) => <b key={i} className="forge-star">★</b>)}
         </span>
     );
 }

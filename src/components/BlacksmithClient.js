@@ -189,6 +189,7 @@ export default function BlacksmithClient({ initial }) {
             {/* Materials — tiered parts + the Blacksmith's Regalia set. */}
             <section className="card forge-panel">
                 <h3 className="forge-panel-h">⛓️ Forge materials</h3>
+                <p className="forge-panel-sub">Salvage gear for parts. Combine <b>{forge.combineCost || 5}</b> of a tier into <b>1</b> of the next, rarer tier — higher tiers enhance stronger gear.</p>
                 <div className="forge-parts">
                     {parts.map((p) => (
                         <div key={p.tier} className="forge-part" style={{ "--pc": p.color }}>
@@ -201,10 +202,19 @@ export default function BlacksmithClient({ initial }) {
                                 <span className="forge-part-name">{p.name}</span>
                             </span>
                             {p.canCombine ? (
-                                <button type="button" className="forge-combine" disabled={Boolean(busy)} onClick={() => doCombine(p.tier)} title={`Combine ${forge.combineCost} → 1 ${parts[p.tier]?.name || "next tier"}`}>
-                                    {busy === `cb-${p.tier}` ? "…" : `Combine ${forge.combineCost}→1`}
+                                <button type="button" className="forge-combine" disabled={Boolean(busy)} onClick={() => doCombine(p.tier)} title={`Combine ${forge.combineCost} ${p.name} into 1 ${parts[p.tier]?.name || "next tier"}`}>
+                                    {busy === `cb-${p.tier}` ? "…" : (
+                                        <>
+                                            <span className="forge-combine-n">{forge.combineCost}</span>
+                                            <span className="forge-combine-arrow">→</span>
+                                            {parts[p.tier]?.sprite
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                ? <img className="forge-combine-ico" src={parts[p.tier].sprite} alt="" /> : null}
+                                            <span className="forge-combine-next">1 {parts[p.tier]?.name || "next"}</span>
+                                        </>
+                                    )}
                                 </button>
-                            ) : p.tier < (forge.maxTier || 5) ? <span className="forge-part-hint">{Math.max(0, (forge.combineCost || 5) - p.count)} to combine</span> : <span className="forge-part-hint">top tier</span>}
+                            ) : p.tier < (forge.maxTier || 5) ? <span className="forge-part-hint">{Math.max(0, (forge.combineCost || 5) - p.count)} more → {parts[p.tier]?.name || "next tier"}</span> : <span className="forge-part-hint">top tier</span>}
                         </div>
                     ))}
                 </div>
@@ -263,23 +273,26 @@ export default function BlacksmithClient({ initial }) {
                 {tab === "enhance" ? (
                     <div className="forge-grid">
                         {enhance.length ? enhance.map((it) => (
-                            <button key={it.id} type="button" className={`forge-card is-enhance${it.affordable ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
+                            <button key={it.id} type="button" className={`forge-card is-enhance${it.maxed ? " is-maxed" : it.affordable ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
                                 onClick={() => {
+                                    if (it.maxed) { setToast({ kind: "err", text: `${it.name} is at PEAK enchantment — it can't be forged any higher.` }); return; }
                                     if (!it.affordable) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage or combine more first.` }); return; }
                                     ac(); setEnhancing(it);
                                 }}>
-                                {it.level > 0 ? <span className="forge-cardrank"><ForgeRank level={it.level} size={30} /></span> : null}
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
                                 <span className="forge-card-name">{it.name}</span>
+                                {it.level > 0 ? <span className="forge-card-rankline"><ForgeRank level={it.level} size={22} /></span> : null}
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
                                 {it.bonus ? <span className="forge-card-bonus">forged: {it.bonus}</span> : null}
-                                <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
-                                    {parts[it.cost.tier - 1]?.sprite
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        ? <img className="forge-cost-ico" src={parts[it.cost.tier - 1].sprite} alt="" /> : null}
-                                    {it.have}/{it.cost.qty} {parts[it.cost.tier - 1]?.name || `T${it.cost.tier}`}
-                                    {it.affordable ? null : <span className="forge-card-locktag">🔒</span>}
-                                </span>
+                                {it.maxed ? <span className="forge-card-cost forge-card-max">✦ PEAK — maxed</span> : (
+                                    <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
+                                        {parts[it.cost.tier - 1]?.sprite
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            ? <img className="forge-cost-ico" src={parts[it.cost.tier - 1].sprite} alt="" /> : null}
+                                        {it.have}/{it.cost.qty} {parts[it.cost.tier - 1]?.name || `T${it.cost.tier}`}
+                                        {it.affordable ? null : <span className="forge-card-locktag">🔒</span>}
+                                    </span>
+                                )}
                             </button>
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
                     </div>
@@ -368,7 +381,7 @@ function ForgeDebugPanel({ parts, busy, onAdd }) {
 }
 
 const salvageErr = (e) => ({ kind: "err", text: { equipped: "That's equipped — unequip it first.", not_owned: "You don't own that.", bad_item: "Unknown item." }[e] || "Couldn't salvage that." });
-const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need ${need?.qty} of tier ${need?.tier}.` : e === "not_equipped" ? "Equip it first." : "Enhance failed — try again.");
+const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need ${need?.qty} of tier ${need?.tier}.` : e === "not_equipped" ? "Equip it first." : e === "maxed" ? "This piece is at peak enchantment — it can't go higher." : "Enhance failed — try again.");
 
 // ── Salvage preview → confirm → loot reveal ─────────────────────────────────────────────────────────────────
 // Shows what you MIGHT get (yield range + perk odds) before committing, then reveals what you DID get with juice.
@@ -633,6 +646,8 @@ const FORGE_CSS = `
 /* ── Panels below the scene — the game's standard card, with a forge-warm header ── */
 .forge-panel { }
 .forge-panel-h { margin: 0 0 11px; font-size: 12px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: #ffb877; display: flex; align-items: center; gap: 6px; }
+.forge-panel-sub { margin: -6px 0 12px; font-size: 11.5px; line-height: 1.35; color: #b9a892; }
+.forge-panel-sub b { color: #ffcf7a; }
 .forge-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin: 0 0 12px; }
 .forge-parts:last-child { margin-bottom: 0; }
 .forge-part { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 9px 6px; border-radius: 12px; background: rgba(10,6,3,0.55); border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); }
@@ -641,8 +656,12 @@ const FORGE_CSS = `
 .forge-part-body { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .forge-part-body b { font-size: 17px; font-weight: 900; color: #fff; }
 .forge-part-name { font-size: 9.5px; font-weight: 700; color: color-mix(in srgb, var(--pc) 75%, #fff); text-align: center; }
-.forge-combine { margin-top: 2px; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 8px; cursor: pointer; border: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); background: color-mix(in srgb, var(--pc) 22%, transparent); color: #fff; }
-.forge-part-hint { font-size: 9px; color: #b9a892; }
+.forge-combine { margin-top: 3px; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex-wrap: wrap; font-size: 10px; font-weight: 800; padding: 4px 6px; border-radius: 8px; cursor: pointer; line-height: 1.15; border: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); background: color-mix(in srgb, var(--pc) 22%, transparent); color: #fff; }
+.forge-combine-n { font-weight: 900; }
+.forge-combine-arrow { opacity: 0.85; }
+.forge-combine-ico { width: 16px; height: 16px; object-fit: contain; }
+.forge-combine-next { font-weight: 800; }
+.forge-part-hint { font-size: 9px; color: #b9a892; text-align: center; line-height: 1.2; }
 /* Segmented control (one grouped pill, not three clashing blocks) — stacked icon over label so all
    three segments always share the width equally and never clip on narrow phones. */
 .forge-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border-radius: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
@@ -664,10 +683,12 @@ const FORGE_CSS = `
 .forge-card-stats { font-size: 10.5px; color: #c8b79f; text-transform: capitalize; }
 .forge-card-bonus { font-size: 10px; color: #ffcf7a; font-weight: 700; }
 .forge-card-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #b9a892; margin-top: 3px; }
+.forge-card.is-maxed { border-color: rgba(255,215,94,0.6); box-shadow: 0 0 0 1px rgba(255,215,94,0.3), 0 0 16px rgba(255,215,94,0.18); }
+.forge-card-max { color: #ffd75e; font-weight: 900; }
 .forge-cost-ico { width: 16px; height: 16px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5)); }
 .forge-lvl { position: absolute; top: 6px; right: 6px; font-size: 12px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffd75e,#f3b23a); border-radius: 999px; padding: 1px 7px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 .forge-lvl.inline { position: static; margin-left: 6px; }
-.forge-cardrank { position: absolute; top: 6px; right: 6px; z-index: 2; }
+.forge-card-rankline { display: block; margin: 1px 0 1px; line-height: 1; }
 .forge-working { font-size: 10px; color: #ffb877; }
 .forge-empty { grid-column: 1/-1; text-align: center; color: #c8b79f; font-size: 13px; padding: 22px; }
 .forge-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10062; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;

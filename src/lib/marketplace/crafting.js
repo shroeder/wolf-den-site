@@ -8,6 +8,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
+import { MAX_FORGE_LEVEL } from "@/lib/marketplace/forge-rank.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -223,6 +224,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     if (!new Set(Object.values(await getEquippedIds(buyerId))).has(itemId)) return { ok: false, error: "not_equipped" };
     const cur = await db.queryOne(`SELECT level, stat_bonus, best_grade FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     const level = cur?.level || 0;
+    if (level >= MAX_FORGE_LEVEL) return { ok: false, error: "maxed", ...(await getForgeState(buyerId)) }; // peak enchantment reached
     const { tier, qty } = enhanceCost(item, level);
     const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough", need: { tier, qty }, ...(await getForgeState(buyerId)) };
@@ -293,7 +295,7 @@ export async function getForgeState(buyerId) {
     const salvage = (ownedRows || []).map((r) => r.item_id).filter((id) => !equippedIds.has(id)).map(dress).filter(Boolean)
         .map((d) => { const cfg = SALVAGE[d.rarity] || SALVAGE.common; return { ...d, salvageMin: cfg.min, salvageMax: cfg.max }; })
         .sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));
-    const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; const c = enhanceCost(itemById(id), d.level); return { ...d, cost: c, have: parts[c.tier] || 0, affordable: (parts[c.tier] || 0) >= c.qty }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
+    const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; const c = enhanceCost(itemById(id), d.level); const maxed = d.level >= MAX_FORGE_LEVEL; return { ...d, cost: c, have: parts[c.tier] || 0, affordable: (parts[c.tier] || 0) >= c.qty, maxed }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
     const partList = PART_TIERS.map((p) => ({ ...p, count: parts[p.tier] || 0, canCombine: (parts[p.tier] || 0) >= COMBINE_COST && p.tier < MAX_TIER }));
     // Blacksmith's Regalia collection (the salvaging set).
     const ownedIdSet = new Set((ownedRows || []).map((r) => r.item_id));
