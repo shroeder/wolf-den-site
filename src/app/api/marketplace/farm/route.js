@@ -5,6 +5,7 @@ import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, reso
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
+import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, clearFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { useConsumable as openConsumable } from "@/lib/marketplace/consumables.js";
 import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
@@ -88,6 +89,12 @@ export async function POST(request) {
             else if (b?.action === "deco_custom_start") res = await startCustomDeco(buyer.id, String(b?.name || ""), String(b?.prompt || ""));
             else if (b?.action === "deco_custom_refine") res = await refineCustomDeco(buyer.id, Number(b?.id), String(b?.correction || ""));
             else if (b?.action === "deco_custom_finalize") { res = await finalizeCustomDeco(buyer.id, Number(b?.id), String(b?.chosenUrl || "")); if (res?.ok) res = { ...res, ...(await decoState(buyer.id)) }; }
+            // ── Custom farm background (3 creations; live-preview draft → accept) ──
+            else if (b?.action === "farm_bg_state") res = { ok: true, ...(await getFarmBgState(buyer.id)) };
+            else if (b?.action === "farm_bg_start") res = await startFarmBg(buyer.id, String(b?.prompt || ""));
+            else if (b?.action === "farm_bg_finalize") res = await finalizeFarmBg(buyer.id);
+            else if (b?.action === "farm_bg_discard") res = await discardFarmBgDraft(buyer.id);
+            else if (b?.action === "farm_bg_clear") res = await clearFarmBg(buyer.id);
             else return NextResponse.json({ error: "bad_action" }, { status: 400 });
             // Return the whole result either way (so error responses still carry budget/cost/wallet for the UI).
             return NextResponse.json(res, { status: res?.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });

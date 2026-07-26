@@ -507,6 +507,17 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [post]);
     const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
+
+    // ── Custom farm background (3 creations; generate → LIVE preview on the scene → accept/discard) ──
+    const [bgOpen, setBgOpen] = useState(false);
+    const [bgBusy, setBgBusy] = useState(false);
+    const bgAct = useCallback(async (body) => {
+        setBgBusy(true);
+        const r = await post(body);
+        setBgBusy(false);
+        if (r && ("bg" in r || "draft" in r)) setFarm((f) => ({ ...f, customBg: r.bg ?? null, customBgDraft: r.draft ?? null }));
+        return r;
+    }, [post]);
     const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y }), [decoAct]);
     const decoMove = useCallback(async (placementId, x, y) => {
         // Optimistically move it in local state so it stays put on drop (no snap-back); reconcile / revert on the response.
@@ -569,7 +580,8 @@ export default function FarmClient({ initial, viewingAlias }) {
     // fine, and pets/crops/decorations stay full-color against it (objFilter is 'none' at night below).
     const visTod = wx.tod;
     // Illustrated backdrop for the current time of day (falls back to the CSS gradient scene when not generated).
-    const bgUrl = pickFarmBg(visTod, wx.condition);
+    // A pending preview (customBgDraft) shows LIVE on the scene; else the accepted custom bg; else the weather set.
+    const bgUrl = farm.customBgDraft || farm.customBg || pickFarmBg(visTod, wx.condition);
     // No color-muting overlay — sprites keep their full vibrant colors at night; only a whisper of brightness at
     // dusk/dawn for ambiance. Night = none (full color).
     const objFilter = visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none";
@@ -875,6 +887,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
                     {weatherLabel(wx)}
                 </div>
+                {/* Custom AI background generator (owner) — sits just above the full-screen toggle. */}
+                {farm.mine ? (
+                    <button type="button" onClick={() => setBgOpen(true)} aria-label="Custom background" title="Generate a custom farm background"
+                        style={{ position: "absolute", bottom: 52, left: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 999, border: "1px solid rgba(201,162,255,0.5)", background: "linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96))", color: "#d9c9ff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
+                        <span style={{ fontSize: 15 }} aria-hidden="true">🎨</span>Backdrop
+                    </button>
+                ) : null}
                 {/* Full-screen / immersive toggle. */}
                 <button type="button" onClick={toggleFullscreen} aria-label={fullscreen ? "Exit full screen" : "Full screen"} title={fullscreen ? "Exit full screen" : "Full screen"}
                     style={{ position: "absolute", bottom: 10, left: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.25)", background: "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: "#e6e6ea", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
@@ -886,6 +905,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     {fullscreen ? "Exit" : "Full screen"}
                 </button>
             </div>
+
+            {bgOpen ? <FarmBgCreator bg={farm.customBg} draft={farm.customBgDraft} busy={bgBusy} onAct={bgAct} onClose={() => setBgOpen(false)} /> : null}
 
             {farm.mine && garden ? (
                 <GardenPanel
@@ -1397,6 +1418,60 @@ function FarmRankBadge({ byTier = {} }) {
         </div>
     );
 }
+const bgErr = (e) => ({ no_credits: "You need 3 creations to generate a background.", describe_it: "Describe your background first.", gen_failed: "The art pipeline hiccuped — your creations were refunded. Try again.", no_draft: "Generate one first." }[e] || "Something went wrong — try again.");
+
+// Custom farm-background generator — a bottom sheet so the scene stays visible for a LIVE preview. Generating
+// charges 3 creations up front (safe: charged before the AI, refunded only on genuine failure); the generated
+// draft shows live on the farm above until you Accept or Discard it.
+function FarmBgCreator({ bg, draft, busy, onAct, onClose }) {
+    const [desc, setDesc] = useState("");
+    const [credits, setCredits] = useState(null);
+    const [err, setErr] = useState(null);
+    useEffect(() => {
+        let alive = true;
+        onAct({ action: "farm_bg_state" }).then((r) => { if (alive && r?.credits != null) setCredits(r.credits); });
+        return () => { alive = false; };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const generate = async () => {
+        setErr(null);
+        const r = await onAct({ action: "farm_bg_start", prompt: desc });
+        if (r?.credits != null) setCredits(r.credits);
+        if (!r?.ok) setErr(bgErr(r?.error));
+    };
+    const accept = async () => { await onAct({ action: "farm_bg_finalize" }); onClose(); };
+    const discard = async () => { const r = await onAct({ action: "farm_bg_discard" }); if (r?.credits != null) setCredits(r.credits); };
+    const removeBg = async () => { await onAct({ action: "farm_bg_clear" }); onClose(); };
+    const low = (credits ?? 0) < 3;
+    return (
+        <div role="dialog" aria-label="Custom farm background" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10050, background: "linear-gradient(180deg, rgba(30,24,44,0.98), rgba(18,14,28,0.99))", borderTop: "1px solid rgba(201,162,255,0.4)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)", padding: "14px 16px calc(16px + env(safe-area-inset-bottom))", animation: "pigPop .3s ease both" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 17 }} aria-hidden="true">🎨</span>
+                <b style={{ fontSize: 15, color: "#e6d9ff" }}>Custom farm background</b>
+                <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: low ? "#9aa0a6" : "#c9a2ff" }}>{credits ?? "…"} creation{credits === 1 ? "" : "s"}</span>
+                <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "#b9a2d6", fontSize: 22, lineHeight: 1, cursor: "pointer", padding: "0 2px" }}>×</button>
+            </div>
+            {draft ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 12.5, color: "#cdbde8" }}>👀 It&apos;s live on your farm above — keep it?</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button type="button" disabled={busy} onClick={accept} style={{ flex: 1, padding: 11, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy ? 0.6 : 1 }}>✓ Use this</button>
+                        <button type="button" disabled={busy || low} onClick={generate} style={{ flex: "0 0 auto", padding: "11px 13px", fontWeight: 800, borderRadius: 11, border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9c9ff", cursor: "pointer", opacity: busy || low ? 0.5 : 1 }}>🎲 Redo · 3</button>
+                        <button type="button" disabled={busy} onClick={discard} style={{ flex: "0 0 auto", padding: "11px 13px", fontWeight: 800, borderRadius: 11, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.06)", color: "#cfcfd6", cursor: "pointer" }}>Discard</button>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} maxLength={300} placeholder="Describe your dream farm backdrop — e.g. 'a misty mountain valley at golden hour with a winding river'" style={{ width: "100%", resize: "none", borderRadius: 11, border: "1px solid rgba(201,162,255,0.35)", background: "rgba(0,0,0,0.3)", color: "#efe7ff", padding: "9px 11px", fontSize: 13, fontFamily: "inherit" }} />
+                    <button type="button" disabled={busy || low || desc.trim().length < 4} onClick={generate} style={{ width: "100%", padding: 12, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy || low || desc.trim().length < 4 ? 0.55 : 1 }}>{busy ? "Painting your world…" : "Generate · 3 creations"}</button>
+                    {low ? <a href="/marketplace/creations" style={{ fontSize: 12, fontWeight: 800, color: "#c9a2ff", textAlign: "center" }}>Get more creations →</a> : null}
+                    {bg ? <button type="button" disabled={busy} onClick={removeBg} style={{ fontSize: 12, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer" }}>Remove custom background (back to weather scenes)</button> : null}
+                </div>
+            )}
+            {err ? <div style={{ marginTop: 8, fontSize: 12, color: "#ffb3bd", textAlign: "center" }}>{err}</div> : null}
+        </div>
+    );
+}
+
 function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
     const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
     const left = charge?.left ?? 0;
