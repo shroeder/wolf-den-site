@@ -71,14 +71,10 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
     const waveCount = Math.max(1, Math.ceil(roster.length / GROUP));
     const [wave, setWave] = useState(0);
     const [phase, setPhase] = useState("in"); // in → attack → out → (next wave) in
-    const reduced = useRef(false);
-    useEffect(() => {
-        reduced.current = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    }, []);
 
-    // The turn-based state machine. Timings tuned so a full wave is a satisfying ~4.5s beat.
+    // The turn-based state machine. Timings tuned so a full wave is a satisfying ~4.5s beat. Always runs — the
+    // scene rotating through fighters is core gameplay, not decorative motion, so it ignores reduce-motion.
     useEffect(() => {
-        if (reduced.current) return undefined;
         const ms = phase === "in" ? 850 : phase === "attack" ? 620 : 560;
         const t = setTimeout(() => {
             if (phase === "in") setPhase("attack");
@@ -112,7 +108,6 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
     const [sparks, setSparks] = useState([]);
     const sid = useRef(0);
     useEffect(() => {
-        if (reduced.current) return undefined;
         let alive = true;
         let timer;
         const tick = () => {

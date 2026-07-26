@@ -15,8 +15,7 @@ export default function UserLevel({ level, animate = true }) {
 
     useEffect(() => {
         if (!level) return undefined;
-        const reduce = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (!animate || reduce) {
+        if (!animate) {
             // Defer into a frame so we don't setState synchronously in the effect body.
             const id = requestAnimationFrame(() => {
                 setFill(pct);

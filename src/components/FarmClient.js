@@ -609,7 +609,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-deco-fab { transition: transform .12s ease, filter .12s ease, box-shadow .12s ease; }
                 @media (hover: hover) { .farm-deco-fab:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 7px 20px rgba(0,0,0,0.5); } }
                 .farm-deco-fab:active { transform: translateY(1px) scale(0.97); }
-                @media (prefers-reduced-motion: no-preference) { .farm-deco-fab { animation: farmBob 3.4s ease-in-out infinite; } }
+                .farm-deco-fab { animation: farmBob 3.4s ease-in-out infinite; }
                 /* Visit-a-farm opener: an inviting, tappable bar (not a flat box). */
                 .farm-visit { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.3); background: linear-gradient(180deg, rgba(255,214,110,0.1), rgba(255,255,255,0.02)); color: inherit; cursor: pointer; text-align: left; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
                 .farm-visit:hover { transform: translateY(-1px); border-color: rgba(255,214,110,0.55); background: linear-gradient(180deg, rgba(255,214,110,0.16), rgba(255,255,255,0.03)); }

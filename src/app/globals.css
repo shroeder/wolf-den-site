@@ -1792,7 +1792,6 @@ textarea {
     animation: fade-in-up 180ms ease both;
 }
 
-
 .shop-grid {
     display: grid;
     gap: 0.6rem;
@@ -1925,12 +1924,6 @@ textarea {
     width: 4.5rem;
     height: 1.3rem;
     border-radius: 999px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .shop-skeleton-block {
-        animation: none;
-    }
 }
 
 .shop-tile {
@@ -4635,12 +4628,6 @@ body.tv-mode .shop-mobile-cart-fab {
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .lf-list-hint {
-        animation: none;
-    }
-}
-
 .lf-list-fab-count {
     min-width: 1.5rem;
     height: 1.5rem;
@@ -5533,11 +5520,6 @@ body.tv-mode .shop-mobile-cart-fab {
     50% { box-shadow: 0 0 115px rgba(56, 189, 248, 0.55); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .levelup-confetti > span, .levelup-emoji { animation: none; }
-    .levelup-card, .levelup-card.is-milestone { animation: levelup-fade 0.3s ease; }
-}
-
 /* XP level badge + progress-to-next bar. */
 .user-level {
     margin-top: 0.5rem;
@@ -5590,10 +5572,6 @@ body.tv-mode .shop-mobile-cart-fab {
 @keyframes level-shine {
     0% { transform: translateX(-100%); }
     60%, 100% { transform: translateX(100%); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .user-level-bar > span { transition: none; }
-    .user-level-shine { animation: none; opacity: 0; }
 }
 
 /* ===== Rewards hub (profile) ===== */
@@ -6035,10 +6013,6 @@ body.tv-mode .shop-mobile-cart-fab {
     to { width: var(--pct, 0%); }
 }
 .track-ach-progress { font-size: 0.78rem; margin-top: 6px; font-weight: 600; }
-@media (prefers-reduced-motion: reduce) {
-    .track-ach-bar > span { animation: none; }
-    .track-node.is-next .track-node-marker { animation: none; }
-}
 
 /* ===== Custom profile borders (cosmetic avatar frames) ===== */
 /* Box-shadow rings/glows so every frame renders on ANY avatar without being clipped by its overflow. */
@@ -6148,9 +6122,6 @@ body.tv-mode .shop-mobile-cart-fab {
     0%, 100% { box-shadow: 0 0 0 3px #2dd4bf, 0 0 10px rgba(45, 212, 191, 0.6); }
     50% { box-shadow: 0 0 0 3px #5eead4, 0 0 20px rgba(45, 212, 191, 0.95); }
 }
-@media (prefers-reduced-motion: reduce) {
-    [class*="av-border-"] { animation: none !important; }
-}
 
 /* Border picker (profile) */
 .border-swatches {
@@ -6233,9 +6204,6 @@ body.tv-mode .shop-mobile-cart-fab {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .bg-nebula, .bg-aurora, .bg-galaxy, .bg-prismatic { animation: none; }
 }
 
 /* Background picker (profile) */
@@ -6634,7 +6602,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dm-typing span:nth-child(2) { animation-delay: 0.2s; }
 .dm-typing span:nth-child(3) { animation-delay: 0.4s; }
 @keyframes dm-typing { 0%, 60%, 100% { opacity: 0.3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
-@media (prefers-reduced-motion: reduce) { .dm-typing span { animation: none; } }
 
 .dm-seen { align-self: flex-end; font-size: 0.7rem; margin-top: 2px; }
 
@@ -6744,7 +6711,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     margin-left: auto;
     margin-right: auto;
 }
-@media (prefers-reduced-motion: reduce) { .social-panel { animation: none; } }
 .social-topbar {
     display: flex;
     align-items: center;
@@ -7350,7 +7316,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .storecredit-callout-sub { color: #d9cdb4; font-size: 0.9rem; margin-top: 2px; }
 .storecredit-callout-sub b { color: #ffd75e; }
 .storecredit-callout-cta { flex: none; }
-@media (prefers-reduced-motion: reduce) { .storecredit-callout-coin { animation: none; } }
 /* Premium gold CTA — used across the rewards surfaces (home callout, rewards page, post-checkout). */
 .btn-gold {
     flex: 0 0 auto;
@@ -8920,10 +8885,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 @keyframes frame-flicker { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
 @keyframes frame-hue { to { filter: hue-rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-    .frame-ember::after, .frame-mythic::after, .frame-runed::after, .frame-celestial::after,
-    .frame-role_dev::after, .frame-role_admin::after { animation: none; }
-}
 
 /* Frame picker swatch: a mini card showing the frame's texture behind its icon. */
 .frame-swatch { background: #14141f; }
@@ -9076,9 +9037,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .av-effect-frost { animation: av-twinkle 2.6s ease-in-out infinite; }
 @keyframes av-twinkle { 0%, 100% { opacity: 0.5; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.15); } }
 @keyframes av-float { 0% { transform: translateY(2px); opacity: 0.6; } 50% { opacity: 1; } 100% { transform: translateY(-3px); opacity: 0.5; } }
-@media (prefers-reduced-motion: reduce) {
-    .av-aura-aura_violet, .av-aura-aura_rainbow, .av-effect { animation: none; }
-}
 
 /* Avatar cosmetics picker */
 .cos-picker { display: grid; gap: 16px; }
@@ -9107,7 +9065,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .av-svg-crown { top: 0.02em; width: 0.58em; transform: translateX(-50%); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
 .av-svg-halo { top: -0.12em; width: 0.66em; transform: translateX(-50%); filter: drop-shadow(0 0 3px rgba(255, 225, 120, 0.9)); animation: av-halo 2.8s ease-in-out infinite; }
 @keyframes av-halo { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .av-svg-halo { animation: none; } }
 
 /* ---- Collection grid (unlockable game-icon items — seed of the gear system) ---- */
 .collectible-count { margin: 0 0 10px; font-weight: 600; }
@@ -9214,7 +9171,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-floater { position: absolute; font-weight: 800; font-size: 1rem; color: #ffd75e; text-shadow: 0 1px 2px #000; pointer-events: none; animation: boss-float 0.85s ease-out forwards; }
 .boss-floater.is-crit { font-size: 1.5rem; color: #ff5a5a; }
 @keyframes boss-float { 0% { opacity: 1; transform: translateY(0) scale(0.8); } 100% { opacity: 0; transform: translateY(-42px) scale(1.2); } }
-@media (prefers-reduced-motion: reduce) { .boss-enemy { animation: none; } .boss-fighter { transition: none; } }
 
 .boss-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .boss-attack { font-size: 1rem; padding: 10px 22px; }
@@ -9304,13 +9260,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .collectible.rar-mythic.is-unlocked { border-color: rgba(180, 90, 255, 0.7); box-shadow: 0 0 16px rgba(180, 90, 255, 0.4); animation: collectible-mythic 3s ease-in-out infinite; }
 @keyframes collectible-mythic { 50% { box-shadow: 0 0 22px rgba(90, 180, 255, 0.55); border-color: rgba(90, 180, 255, 0.7); } }
 
-@media (prefers-reduced-motion: reduce) {
-    .bg-voidstorm, .bg-empyrean, .bg-singularity,
-    .frame-runed::after, .frame-celestial::after,
-    .av-aura-aura_ember, .av-aura-aura_cosmic,
-    .collectible.rar-mythic.is-unlocked { animation: none; }
-}
-
 /* XP-gain toast (fires on return after earning XP) */
 .xp-toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1300;
@@ -9376,7 +9325,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .battle-buff-emoji { font-size: 1.1em; }
 .battle-buff-mult { font-weight: 900; background: rgba(0,0,0,0.28); padding: 1px 7px; border-radius: 999px; }
 @keyframes battle-buff-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 16px rgba(255,90,40,0.7), inset 0 0 0 1px rgba(255,255,255,0.35); } 50% { transform: scale(1.045); box-shadow: 0 0 26px rgba(255,120,50,0.95), inset 0 0 0 1px rgba(255,255,255,0.55); } }
-@media (prefers-reduced-motion: reduce) { .battle-buff { animation: none; } }
 
 .battle-boss { position: absolute; right: -7%; bottom: 5%; z-index: 4; animation: battle-boss-idle 3.6s ease-in-out infinite; transform-origin: bottom right; }
 .battle-boss-art { display: block; height: clamp(165px, 41vw, 310px); width: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.55)); }
@@ -9436,7 +9384,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .bhc .user-badge { font-size: 0.58rem; padding: 2px 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
 .bhc .user-badge-icon { font-size: 1.75em; } /* let the redone art read on the compact hub card without inflating the label */
 .bhc.is-you { box-shadow: 0 0 0 1.5px rgba(255,215,94,0.75), 0 5px 16px rgba(0,0,0,0.6); }
-@media (prefers-reduced-motion: reduce) { .bhc-slot { animation: none; } }
 
 /* ===== Boss: Cheer the hero on stage ===== */
 /* The slot has pointer-events:none, so the button must opt back in to be tappable. */
@@ -9474,7 +9421,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes cheerToast { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .boss2-cheerhint { margin-top: 8px; font-size: 0.8rem; color: #cdbfa6; text-align: center; }
 .boss2-cheerhint b { color: #ffd75e; }
-@media (prefers-reduced-motion: reduce) { .cheer-btn, .cheer-fx, .cheer-ring, .cheer-pom, .cheer-pop, .cheer-toast { animation: none; } }
 
 .adv-name { position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); max-width: 110px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.66); color: #f4ead2; font-size: 0.7rem; font-weight: 800; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
 .adv.is-you .adv-name { background: rgba(120,86,10,0.85); color: #ffe9a8; box-shadow: 0 0 0 1px rgba(255,215,94,0.55); }
@@ -9504,9 +9450,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes battle-chip { 0% { opacity: 0; transform: translate(-50%, 0) scale(0.7); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -22px) scale(1); } }
 .battle-floater { position: absolute; font-weight: 800; font-size: clamp(1rem, 3.4vw, 1.4rem); color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; z-index: 7; animation: boss2-float 0.85s ease-out forwards; }
 .battle-floater.is-crit { font-size: clamp(1.5rem, 5vw, 2.1rem); color: #ff5a5a; }
-@media (prefers-reduced-motion: reduce) {
-    .battle-bg, .battle-boss, .adv-body, .adv-sprite, .adv-pet, .adv-aura { animation: none !important; }
-}
 .boss2-figure { animation: boss2-breathe 3.4s ease-in-out infinite; }
 .boss2-enemy { font-size: 8.5rem; line-height: 1; color: #e0443a; filter: drop-shadow(0 0 22px rgba(224, 68, 40, 0.6)); }
 .boss2-art { display: block; width: 210px; height: 210px; object-fit: contain; filter: drop-shadow(0 6px 22px rgba(224, 68, 40, 0.5)); }
@@ -9528,7 +9471,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss2-floater { position: absolute; font-weight: 800; font-size: 1.2rem; color: #ffd75e; text-shadow: 0 1px 3px #000; pointer-events: none; animation: boss2-float 0.85s ease-out forwards; }
 .boss2-floater.is-crit { font-size: 1.9rem; color: #ff5a5a; }
 @keyframes boss2-float { 0% { opacity: 1; transform: translateY(0) scale(0.8); } 100% { opacity: 0; transform: translateY(-48px) scale(1.3); } }
-@media (prefers-reduced-motion: reduce) { .boss2-figure { animation: none; } }
 
 .boss2-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .boss2-attack { width: 100%; max-width: 440px; text-align: center; justify-content: center; padding: 14px; font-size: 1.05rem; }
@@ -9557,7 +9499,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-burst.is-crit .boss-burst-dmg { color: #ff5a5a; }
 .boss-burst.is-crit .boss-burst-name { color: #ff8a5a; }
 @keyframes boss-burst-in { 0% { opacity: 0; transform: scale(0.5); } 15% { opacity: 1; transform: scale(1.12); } 35% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05) translateY(-16px); } }
-@media (prefers-reduced-motion: reduce) { .boss-burst { animation: none; } }
 
 .boss-defeated { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 16px; border-radius: 16px; border: 1px solid rgba(255,215,94,0.45); background: radial-gradient(120% 120% at 50% 0%, rgba(255,215,94,0.18), transparent 65%); text-align: center; }
 .boss-defeated-title { font-size: clamp(1.2rem, 4.5vw, 1.8rem); font-weight: 900; color: #ffd75e; text-shadow: 0 2px 8px #000; }
@@ -9704,13 +9645,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     .fb-scene { animation-name: fbZoomMobile; }
 }
 @keyframes fbZoomMobile { 0% { transform: scale(1); } 36% { transform: scale(1); } 62% { transform: scale(1.12); } 80% { transform: scale(1.09); } 100% { transform: scale(1.02); } }
-@media (prefers-reduced-motion: reduce) {
-    .fb-scene, .fb-arena, .fb-boss, .fb-hero, .fb-flash, .fb-shards span, .fb-dmg, .fb-title, .fb-slain, .fb-caption { animation: none !important; }
-    .fb-flash, .fb-shards, .fb-dmg, .fb-title { display: none; }
-    .fb-slain, .fb-caption { opacity: 1; }
-    .fb-hero { transform: translateX(8%); }
-    .fb-actions { opacity: 1; pointer-events: auto; }
-}
 
 /* Boss RECAP page — final battle stats for a defeated boss (linked from the defeat notifications). */
 .boss-recap-hero { text-align: center; background: radial-gradient(120% 120% at 50% 0%, rgba(255,90,90,0.14), transparent 60%); }
@@ -9740,7 +9674,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .coinfx-coin { position: absolute; left: 50%; top: 50%; font-size: clamp(1.3rem, 4.5vw, 2rem); will-change: transform, opacity; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); animation: coinfx-fly 1.15s cubic-bezier(0.15, 0.7, 0.25, 1) forwards; }
 @keyframes coinfx-amount { 0% { transform: scale(0.3); opacity: 0; } 22% { transform: scale(1.18); opacity: 1; } 68% { transform: scale(1); opacity: 1; } 100% { transform: scale(1) translateY(-26px); opacity: 0; } }
 @keyframes coinfx-fly { 0% { transform: translate(-50%, -50%) scale(0.4) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(calc(-50% + var(--cx)), calc(-50% + var(--cy))) scale(1) rotate(var(--cr)); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .coinfx-coin { display: none; } .coinfx-amount { animation-duration: 0.6s; } }
 .boss2-victory { position: relative; text-align: center; padding: 26px 28px; max-width: 440px; width: 92%; background: linear-gradient(180deg, #1b1e26, #12141a); border: 2px solid #ffd75e; border-radius: 20px; box-shadow: 0 0 50px rgba(255,215,94,0.45); animation: petLevelPop 0.5s cubic-bezier(.2,.9,.3,1.3); }
 .boss2-victory-x { font-size: 4rem; animation: vicBounce 0.9s ease-in-out infinite; }
 /* Celebrating pack — the members' hero sprites bouncing for joy. */
@@ -9751,7 +9684,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss2-vic-reward { color: #ffd75e; font-weight: 800; margin: 8px 0 14px; }
 .boss2-vic-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .boss2-vic-confetti span { position: absolute; top: -14px; width: 9px; height: 14px; border-radius: 2px; animation: spinConfetti 3.4s linear forwards; }
-@media (prefers-reduced-motion: reduce) { .boss2-vic-hero, .boss2-victory-x { animation: none; } }
 
 /* Boss admin status chips */
 .boss-status { font-size: 0.7rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; vertical-align: middle; text-transform: uppercase; }
@@ -9791,10 +9723,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 @keyframes elite-prism { to { background-position: 300% 0; } }
 @keyframes elite-throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-@media (prefers-reduced-motion: reduce) {
-    .equip-card.rar-ascendant, .equip-slot.filled.rar-ascendant, .equip-card.rar-eternal, .equip-slot.filled.rar-eternal,
-    .chest-reward.rar-eternal, .chest-reward.rar-ascendant .chest-reward-glyph, .chest-reward.rar-eternal .chest-reward-name { animation: none; }
-}
 
 .equip { display: flex; flex-direction: column; gap: 14px; }
 
@@ -9888,7 +9816,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     0%, 100% { box-shadow: 0 0 16px -5px var(--rar), inset 0 0 18px -12px var(--rar); }
     50% { box-shadow: 0 0 30px -2px var(--rar), inset 0 0 24px -8px var(--rar); }
 }
-@media (prefers-reduced-motion: reduce) { .equip-card.rar-mythic, .equip-slot.filled.rar-mythic { animation: none; } }
 .equip-card-name { font-size: 0.78rem; font-weight: 700; line-height: 1.15; }
 .equip-card-stats { font-size: 0.68rem; color: #b7ab90; line-height: 1.2; }
 .equip-card-sea { font-size: 0.66rem; font-weight: 700; color: #7fd8ff; line-height: 1.2; margin-top: 1px; }
@@ -9962,11 +9889,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes petStarPop {
     0% { transform: scale(1); } 30% { transform: scale(2.4); filter: drop-shadow(0 0 12px #ffd75e); }
     60% { transform: scale(0.8); } 100% { transform: scale(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .petfeed-reveal, .petfeed-reveal img, .petfeed-rays, .petfeed-star.is-new { animation: none !important; }
-    .petfeed-reveal img { filter: brightness(1) drop-shadow(0 0 14px color-mix(in srgb, var(--rar, #ffd75e) 70%, transparent)); }
-    .petfeed-rays { opacity: 0.7; }
 }
 
 .equip-gold { float: right; font-size: 0.85rem; font-weight: 800; color: #ffd75e; }
@@ -10366,10 +10288,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 /* A Lv3+ gold ring behind the card icon. */
 .pet-icon[data-petlvl="3"], .pet-icon[data-petlvl="4"], .pet-icon[data-petlvl="5"] { border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,215,94,0.35); }
-@media (prefers-reduced-motion: reduce) {
-    .pet-icon[data-petlvl="5"], .petx-hero-icon[data-petlvl="5"] { animation: none; }
-    .pet-icon::after, .pet-icon::before, .petx-hero-icon::after, .petx-hero-icon::before { animation: none; opacity: 0.85; }
-}
 /* Evolution reveal: old sprite flashes out, new evolved sprite bursts in (Pokémon-style). */
 .petx-evo { position: relative; width: 168px; height: 168px; margin: 0 auto; animation: petEvoPop 2s ease both; }
 .petx-evo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
@@ -10383,10 +10301,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes evoNewIn { 0%, 66% { opacity: 0; } 76% { opacity: 1; } 100% { opacity: 1; } }
 @keyframes evoFlash { 0%, 55% { opacity: 0; } 70% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes petEvoPop { 0%, 60% { transform: scale(1); } 74% { transform: scale(1.16); } 100% { transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) {
-    .petx-evo, .petx-evo-old, .petx-evo-new, .petx-evo-flash { animation: none; }
-    .petx-evo-old { opacity: 0; } .petx-evo-new { opacity: 1; }
-}
 /* Level-up celebration flourish */
 .petx-levelup .petx-cele-tag { background: linear-gradient(90deg,#ffd75e,#ff9a6a); color: #0f0f12; }
 .petx-levelup .pet-stars { margin: 6px 0 10px; justify-content: center; display: flex; }
@@ -10456,10 +10370,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1) rotate(var(--rot)); }
 }
 .quest-cele-inner .button.gold { margin-top: 6px; min-width: 130px; }
-@media (prefers-reduced-motion: reduce) {
-    .quest-cele-flash, .quest-coin, .quest-cele-badge, .quest-cele-inner { animation: none; }
-    .quest-cele-flash, .quest-coin { display: none; }
-}
 
 /* ============ Loot chests + reveal ============ */
 .chest-card { border-color: rgba(255, 215, 94, 0.35); }
@@ -10551,12 +10461,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes chest-badge-pop { from { opacity: 0; transform: scale(0.7) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .chest-modal-actions { position: relative; z-index: 1; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
 .chest-modal-actions .button, .chest-modal-actions .pill { min-width: 130px; }
-@media (prefers-reduced-motion: reduce) {
-    .chest-img-big, .chest-opening, .chest-glowpad, .chest-reward, .chest-reward-wrap.slam,
-    .chest-flash, .chest-rays, .chest-particle, .chest-rarity-tag, .chest-reward-glyph { animation: none; }
-    .chest-flash { display: none; }
-    .chest-particle { display: none; }
-}
 
 /* ── Store credit page ─────────────────────────────────────────────────────────────────────────────── */
 .credit-balance { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px;
@@ -10618,7 +10522,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .credit-buy:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 .credit-buy:not(:disabled):active { transform: scale(0.98); }
 .credit-done { text-align: center; }
-@media (prefers-reduced-motion: reduce) { .credit-balance::after, .credit-hero-glow, .credit-hero-coin { animation: none; } }
 .credit-qr { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
 .credit-qr img { border-radius: 12px; background: #fff; padding: 8px; }
 .credit-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -10648,7 +10551,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-reward-dots { display: flex; gap: 5px; margin-top: 6px; }
 .boss-reward-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.22); transition: background 0.2s ease; }
 .boss-reward-dots span.is-on { background: #ffd75e; }
-@media (prefers-reduced-motion: reduce) { .boss-reward-rotate { animation: none; } }
 
 /* ── Top HUD strip: dopamine coin chip + the rank-progress nudge, one slim row (replaces the nav gold pill) ── */
 .hud-strip { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
@@ -10683,7 +10585,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .coin-hud.is-low { animation: coinLowGlow 1.6s ease-in-out infinite; }
 @keyframes coinLowGlow { 0%, 100% { box-shadow: 0 2px 9px rgba(240,160,40,0.5), inset 0 1px 0 rgba(255,255,255,0.65); } 50% { box-shadow: 0 0 16px 2px rgba(255,150,40,0.95), inset 0 1px 0 rgba(255,255,255,0.65); } }
 .coin-hud.is-low .coin-hud-plus { animation-duration: 1.1s; }
-@media (prefers-reduced-motion: reduce) { .coin-hud::after, .coin-hud-icon, .coin-hud-plus, .coin-hud.is-low { animation: none; } }
 .boss2-sub { font-size: 0.78rem; text-align: center; margin: 2px 0 8px; }
 
 /* Active-heroes mini cards: dressed in each member's signature color + their equipped profile background,
@@ -10777,7 +10678,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-sky-scroll img:nth-child(even) { transform: scaleX(-1); }
 .sail-sky-scroll.is-scrolling { animation: skyScroll 55s linear infinite; }
 @keyframes skyScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) { .sail-sky-scroll.is-scrolling { animation: none; } }
 /* Moonless CSS night sky — a deep-blue gradient with a hand-scattered starfield in the upper sky. No moon
    (the painted night art's moon mirror-tiled onto every copy), and it's uniform so there's zero seam. */
 .sail-nightsky { position: absolute; inset: 0; z-index: 0;
@@ -10804,7 +10704,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
         radial-gradient(1px 1px at 37% 33%, #fff, transparent 100%);
     background-repeat: no-repeat; animation: sailStarTwinkle 3.6s ease-in-out infinite alternate; }
 @keyframes sailStarTwinkle { from { opacity: 0.25; } to { opacity: 0.95; } }
-@media (prefers-reduced-motion: reduce) { .sail-nightsky::after { animation: none; opacity: 0.6; } }
 /* Ambient traffic — other sailors drifting across the horizon behind your boat. */
 .sail-ambient { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .sail-ambient-boat { position: absolute; left: -22%; opacity: 0; will-change: left, opacity;
@@ -10825,7 +10724,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
 @keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
 @keyframes sailAmbientRev { 0% { left: 118%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: -22%; opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sail-ambient { display: none; } }
 /* Wave button floating above a passing sailor (the ambient layer is pointer-events:none, so opt back in). */
 .sail-wave-btn { position: absolute; left: 50%; bottom: 100%; margin-bottom: 15px; transform: translateX(-50%); z-index: 4;
     pointer-events: auto; cursor: pointer; border: none; border-radius: 999px; padding: 2px 8px; font-size: 0.85rem; line-height: 1.25;
@@ -10889,7 +10787,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-weight: 900; font-size: clamp(1.1rem, 4.8vw, 1.45rem); color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.85);
     background: linear-gradient(to top, rgba(24,12,0,0.78), rgba(24,12,0,0.3) 60%, transparent); }
 .merchant-sub { margin: 8px 2px 0; font-size: 0.85rem; text-align: center; }
-@media (prefers-reduced-motion: reduce) { .merchant-figure, .merchant-coin { animation: none !important; } .merchant-coin { opacity: 0.9; } }
 .merchant-won { margin: 10px 0; text-align: center; font-weight: 800; color: #ffe08a; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); border-radius: 12px; padding: 8px 12px; }
 /* The coin-catch minigame field — set on the merchant's beach so it feels like a place, not a flat canvas. */
 .mg-area { position: relative; width: 100%; height: clamp(320px, 62vw, 420px); margin: 12px 0 0; border-radius: 14px 14px 0 0; overflow: hidden;
@@ -10947,7 +10844,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 16px rgba(90,190,255,0.5); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
 .mg-pad-label { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; pointer-events: none;
     font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; color: rgba(180,215,255,0.7); }
-@media (prefers-reduced-motion: reduce) { .mg-tosser, .mg-gold, .mg-combo.is-hot { animation: none; } }
 /* Pet offer + shop. */
 .merchant-pet { display: flex; gap: 12px; align-items: center; margin: 12px 0; padding: 10px; border-radius: 12px; border: 1px solid rgba(124,201,255,0.4); background: rgba(124,201,255,0.08); }
 .merchant-pet img { width: 72px; height: 72px; object-fit: contain; flex: none; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
@@ -10972,7 +10868,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .mg-recap-pet { border: none !important; background: none !important; justify-content: center; }
 .mg-recap-btn { margin-top: 14px; min-width: 150px; }
 .mg-recap-btn:disabled { opacity: 0.5; cursor: default; }
-@media (prefers-reduced-motion: reduce) { .merchant-cine, .mg-recap, .mg-recap-scrim { animation: none; } }
 /* The boat sits big and centered; travel is shown by the voyage bar, not by moving the boat. */
 .sail-boat { position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%); z-index: 3;
     animation: sailBob 3.4s ease-in-out infinite; }
@@ -11138,7 +11033,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-mood-overcast .sail-clouds i { opacity: 0.85; filter: blur(15px); }
 .sail-mood-overcast .sail-reflection { opacity: 0.45; }
 .sail-mood-overcast .sail-depth { background: linear-gradient(to bottom, rgba(200,210,222,0.1), rgba(3,16,28,0.42)); }
-@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-sailing { animation: none; transform: rotate(-3deg); } .sail-mist, .sail-wind, .sail-wake, .sail-glints, .sail-clouds, .sail-nearwater, .sail-bowwave, .sail-reflection, .sail-wildlife, .sail-rain { display: none; } }
 .sail-boat-img { display: block; width: clamp(190px, 54vw, 320px); height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Magical auras on the epic tiers — the art carries the colour, this adds the glow (gold / fire / spirit). */
@@ -11259,7 +11153,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     box-shadow: inset 0 0 0 2px var(--accent), 0 0 22px -2px var(--accent); animation: sailUpgFlash 0.7s ease-out both; }
 @keyframes sailUpgPop { 0% { transform: scale(1); } 35% { transform: scale(1.045); } 100% { transform: scale(1); } }
 @keyframes sailUpgFlash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sail-upg.is-bought { animation: none; } .sail-upg.is-bought::after { animation: none; opacity: 0; } }
 /* Section header accent bar so the whole upgrade AREA reads as a titled panel. */
 .sail-upg-h { display: flex; align-items: center; gap: 9px; }
 .sail-upg-h::before { content: ""; width: 4px; height: 1.05em; border-radius: 2px; background: linear-gradient(#ffd75e, #ff9d3d); box-shadow: 0 0 10px -2px #ffb43c; }
@@ -11280,7 +11173,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upgrade-sparks i:nth-child(4) { --sx: 26px; --sy: -8px; }
 .sail-upgrade-sparks i:nth-child(5) { --sx: 4px; --sy: -26px; }
 @keyframes upgSpark { 0%, 38% { opacity: 0; transform: translate(0,0) scale(0.4); } 42% { opacity: 1; transform: translate(0,0) scale(1); } 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0.3); } }
-@media (prefers-reduced-motion: reduce) { .sail-upgrade-boat, .sail-upgrade-hammer, .sail-upgrade-sparks i { animation: none; } }
 /* Owner-only "test final blow" box on the boss page (dashed to read as a dev tool). */
 .boss-owner-test { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 6px 0 10px; padding: 10px 12px;
     border: 1px dashed rgba(255,215,94,0.5); border-radius: 12px; background: rgba(255,215,94,0.06); text-align: center; font-size: 0.85rem; color: #e6d3b0; }
@@ -11321,7 +11213,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-inspect-lock { position: absolute; top: 6px; left: 8px; font-size: 1.9rem; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
 .sail-inspect-status { font-size: 0.82rem; font-weight: 800; color: #cbb27a; margin-bottom: 12px; }
 .sail-inspect-status.is-on { color: #7cffb2; }
-@media (prefers-reduced-motion: reduce) { .sail-levelup-badge, .sail-form-hero { animation: none; } }
 @media (max-width: 420px) { .sail-upgrades { grid-template-columns: 1fr; } }
 
 /* NEW BOAT FORM — a grand cinematic reveal of the actual hull you just unlocked. */
@@ -11351,7 +11242,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes formBurst { 0%, 100% { transform: scale(0.9); opacity: 0.75; } 50% { transform: scale(1.08); opacity: 1; } }
 @keyframes formBoatIn { 0% { opacity: 0; transform: scale(0.3) rotate(-12deg); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
 @keyframes formBoatBob { 0%, 100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(-7px) rotate(1.2deg); } }
-@media (prefers-reduced-motion: reduce) { .sail-formreveal-rays, .sail-formreveal-burst, .sail-formreveal-boat, .sail-formreveal-name, .sail-formreveal-ribbon { animation: none; } }
 
 .sail-reward-overlay { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.72); padding: 20px; }
@@ -11360,7 +11250,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-reward-gold { font-size: 1.3rem; font-weight: 800; color: #ffd75e; margin: 4px 0; }
 .sail-reward-lvl { color: #37f5c0; font-weight: 700; margin: 4px 0; }
 @keyframes sailPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .sail-boat { animation: none !important; } }
 
 /* ===== Sailing: excavation dig minigame ===== */
 .dig-wrap { position: relative; border-radius: 14px; overflow: hidden; padding: 12px; background-size: cover; background-position: center; box-shadow: inset 0 0 70px rgba(0,0,0,0.5); }
@@ -11528,8 +11417,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     animation: digToolFx 1.5s ease-out both; }
 .dig-toolfx b { color: #ffb86b; }
 @keyframes digToolFx { 0% { opacity: 0; transform: scale(0.85); } 12% { opacity: 1; transform: scale(1.05); } 25% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .dig-toolfx { animation: none; } }
-@media (prefers-reduced-motion: reduce) { .dig-chestcell, .dig-chunks i, .dig-clue, .dig-ping i, .dig-chest-burst i { animation: none; } .dig-ping, .dig-chest-burst { display: none; } }
 
 /* ===== Sailing: fragment art, the hold card, and the dig recap ===== */
 .frag-icon { display: inline-block; vertical-align: -0.15em; flex: 0 0 auto; }
@@ -11598,7 +11485,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Buy-more-digs button under the excavation grid — a stone palette so it reads as a dig tool, not the gold CTA. */
 /* Secondary — a small centered ghost button so digging the tiles is clearly the main action. */
 .sail-digbuy { display: flex; width: fit-content; margin: 12px auto 0; font-size: 0.8rem; padding: 7px 14px; }
-@media (prefers-reduced-motion: reduce) { .sail-recap-frag, .sail-recap-rock, .sail-forge-chest, .sail-levelup-ribbon { animation: none; } }
 
 /* ===== Sailing: dopamine (CTA, land-ho, confetti) ===== */
 .sail-cta { position: relative; display: inline-flex; align-items: center; gap: 11px; font-weight: 900; font-size: 1.24rem;
@@ -11688,7 +11574,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     88% { opacity: 1; }
     100% { opacity: 0; left: 116%; transform: translateY(calc(-16px - (var(--i) * 2px))) rotate(680deg); }
 }
-@media (prefers-reduced-motion: reduce) { .sail-boat-inner.is-gusting { animation: none; } .sail-gustfx { display: none; } }
 
 .sail-confetti { position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
 .sail-confetti span { position: absolute; left: 50%; top: 42%; width: 9px; height: 13px; border-radius: 2px;
@@ -11697,7 +11582,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes sailConfetti {
     0% { opacity: 1; transform: rotate(calc(var(--i) * 42deg)) translateY(0) scale(1); }
     100% { opacity: 0; transform: rotate(calc(var(--i) * 42deg)) translateY(calc(-100px - var(--i) * 4px)) rotate(240deg) scale(0.5); } }
-@media (prefers-reduced-motion: reduce) { .sail-cta, .sail-cta::after, .sail-cta-dig, .sail-cta-svg, .sail-boat-inner.is-casting { animation: none; } .sail-confetti { display: none; } }
 
 /* ═══════════════════════ RAIDS ═══════════════════════ */
 /* Raid CTA — a dangerous crimson counterpart to the calm blue tailwind/dig CTAs. */
@@ -11924,7 +11808,3 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .raid-loot-tag { font-size: 0.72rem; font-weight: 800; color: #ffd86a; text-transform: uppercase; letter-spacing: 0.5px; }
 .raid-loot-name { font-weight: 800; }
 .raid-loot-note { font-size: 0.76rem; }
-@media (prefers-reduced-motion: reduce) {
-    .raid-boat, .raid-rider, .raid-pet, .raid-wake, .raid-atmo i, .raid-sealine::before, .raid-vs-mini, .sail-raid-crest,
-    .raid-vignette, .raid-intro-vs, .raid-intro-me, .raid-intro-foe, .raid-intro-x, .raid-loot, .raid-result-banner { animation: none !important; }
-}
