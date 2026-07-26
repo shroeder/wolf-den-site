@@ -4,6 +4,7 @@ import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
 import { createTradeClaim, tradeStatsFromLines, tradeXp } from "@/lib/marketplace/trade-claim.js";
 import { SITE_URL } from "@/lib/site";
 import { createTrade, listTrades } from "@/lib/trades/trades.js";
+import { sendAdminPush } from "@/lib/push/send.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -61,6 +62,23 @@ export async function POST(request) {
                             claim = { token: minted.token, url: `${SITE_URL}/marketplace/claim-trade/${minted.token}`, potentialXp: tradeXp(stats), ...stats };
                         }
                     }
+                }
+                // Notify all admin devices whenever a trade completes at the shop — so you always know (even if a
+                // helper's phone recorded it) and can tap through to inspect it. Best-effort; never fails the trade.
+                if (created) {
+                    const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+                    const cardCount = Number(trade.lines?.filter((l) => l.direction === "IN").reduce((s, l) => s + (Number(l.quantity) || 0), 0)) || 0;
+                    const bits = [`${cardCount} card${cardCount === 1 ? "" : "s"} in`];
+                    if (trade.creditTotal > 0) bits.push(`${money(trade.creditTotal)} credit`);
+                    if (trade.cashTotal > 0) bits.push(`${money(trade.cashTotal)} cash`);
+                    if (trade.giftCardTotal > 0) bits.push(`${money(trade.giftCardTotal)} gift card`);
+                    if (claim) bits.push("QR reward ready");
+                    sendAdminPush({
+                        title: "🤝 Trade completed",
+                        body: bits.join(" · "),
+                        route: "trades",
+                        data: { tradeId: String(trade.id), ...(claim ? { claimToken: claim.token } : {}) },
+                    }).catch((e) => logger.warn?.("admin.trades.push.failure", { error: e?.message }));
                 }
                 logger.info("admin.trades.create.success", { tradeId: trade.id, created, claimed: Boolean(claim) });
                 return NextResponse.json({ ok: true, trade, created, claim }, { status: created ? 201 : 200 });
