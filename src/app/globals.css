@@ -10725,14 +10725,18 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
 @keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
 @keyframes sailAmbientRev { 0% { left: 118%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: -22%; opacity: 0; } }
-/* Wave button floating above a passing sailor (the ambient layer is pointer-events:none, so opt back in). */
-.sail-wave-btn { position: absolute; left: 50%; bottom: 100%; margin-bottom: 15px; transform: translateX(-50%); z-index: 4;
-    pointer-events: auto; cursor: pointer; border: none; border-radius: 999px; padding: 2px 8px; font-size: 0.85rem; line-height: 1.25;
-    background: rgba(16,24,40,0.85); box-shadow: 0 2px 7px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,215,94,0.55);
-    animation: sailWaveBob 1.5s ease-in-out infinite; }
-.sail-wave-btn:disabled { opacity: 0.5; cursor: default; animation: none; }
-.sail-wave-btn:not(:disabled):active { transform: translateX(-50%) scale(0.88); }
-@keyframes sailWaveBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+/* The WHOLE passing boat is the wave target when waveable — opt it back into pointer events (the ambient layer
+   is pointer-events:none) and add a generous invisible hit box so a small, drifting boat is easy to tap. */
+.sail-ambient-boat.is-waveable { pointer-events: auto; cursor: pointer; }
+.sail-ambient-boat.is-waveable::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 200%; min-width: 150px; height: 260%; min-height: 120px; z-index: 3; }
+/* Visual "wave" affordance floating above a waveable sailor — non-interactive (the boat itself handles the tap). */
+.sail-wave-btn { position: absolute; left: 50%; bottom: 100%; margin-bottom: 13px; transform: translateX(-50%); z-index: 5;
+    pointer-events: none; white-space: nowrap; border-radius: 999px; padding: 4px 11px; font-size: 0.78rem; font-weight: 800; line-height: 1.2; color: #fff;
+    background: rgba(16,24,40,0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,215,94,0.75);
+    animation: sailWaveBob 1.4s ease-in-out infinite; }
+.sail-ambient-boat.is-waveable:active .sail-wave-btn { transform: translateX(-50%) scale(0.9); }
+@keyframes sailWaveBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
 /* "You waved!" reward pop, floating over the scene. */
 .sail-wavefx { position: absolute; left: 50%; top: 15%; transform: translateX(-50%); z-index: 7; pointer-events: none;
     font-weight: 800; font-size: 0.9rem; color: #eaf6ff; white-space: nowrap; background: rgba(12,20,32,0.86);

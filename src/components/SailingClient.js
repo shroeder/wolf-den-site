@@ -328,7 +328,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 const dir = sailingNow ? "left" : (Math.random() < 0.5 ? "left" : "right");
                 // Slow crawl while sailing (distant ships shouldn't whip by); a tailwind briefly speeds them up.
                 // Boosting ships whip across within the gust window so the speed-up ends with the animation, not after.
-                const dur = boosting ? 2.8 + Math.random() * 1.4 : sailingNow ? 20 + Math.random() * 9 : 15 + Math.random() * 8;
+                // Slower crawl while sailing so a passing sailor LINGERS long enough to tap the wave (was 20–29s).
+                const dur = boosting ? 2.8 + Math.random() * 1.4 : sailingNow ? 30 + Math.random() * 12 : 15 + Math.random() * 8;
                 setAmbient((a) => [...a, {
                     id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
                     tier: Number((pick.art.match(/boat-tier(\d+)/) || [])[1]) || 1, // deck height differs by boat form
@@ -664,8 +665,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             {mood === "storm" ? <div className="sail-rain" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div> : null}
                             {/* Other sailors drifting across the horizon behind your boat (each waveable while sailing). */}
                             <div className="sail-ambient">
-                                {ambient.map((b) => (
-                                    <span key={b.id} className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}`} style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}>
+                                {ambient.map((b) => {
+                                    // Wave to a real passing sailor — the WHOLE boat is the tap target (with a big
+                                    // invisible hit area via .is-waveable::after), not just the tiny 👋 badge, so a
+                                    // small drifting boat is easy to tap.
+                                    const waveable = liveStatus === "sailing" && Boolean(b.name) && (state.waves?.left || 0) > 0;
+                                    return (
+                                    <span key={b.id}
+                                        className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}${waveable ? " is-waveable" : ""}`}
+                                        style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}
+                                        {...(waveable ? { role: "button", tabIndex: 0, "aria-label": `Wave to ${b.name}`, onClick: (e) => { e.stopPropagation(); if (!busy) act("wave"); }, onKeyDown: (e) => { if ((e.key === "Enter" || e.key === " ") && !busy) { e.preventDefault(); act("wave"); } } } : {})}
+                                    >
                                         <span className="sail-ambient-hull" style={{ "--rider-b": `${deckPct(b.tier)}%`, "--pet-b": `${deckPct(b.tier)}%` }}>
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={b.art} alt="" />
@@ -679,15 +689,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                             ) : null}
                                         </span>
                                         {b.name ? <span className="sail-ambient-name">{b.name}</span> : null}
-                                        {/* Wave to a real passing sailor — a few times a day, right above them. */}
-                                        {liveStatus === "sailing" && b.name && (state.waves?.left || 0) > 0 ? (
-                                            <button type="button" className="sail-wave-btn" disabled={busy}
-                                                onClick={(e) => { e.stopPropagation(); act("wave"); }} aria-label={`Wave to ${b.name}`}>
-                                                👋
-                                            </button>
-                                        ) : null}
+                                        {waveable ? <span className="sail-wave-btn" aria-hidden="true">👋 Wave</span> : null}
                                     </span>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <div className={`sail-boat${liveStatus === "sailing" ? " is-underway" : ""}`}>
                                 <div
