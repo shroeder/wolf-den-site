@@ -42,6 +42,16 @@ export const SEEDS = {
 };
 // How good the shared-pool loot odds are for a crop's rarity (shown in the seed picker).
 export const LOOT_LABEL = { common: "Basic loot", rare: "Better loot", epic: "Good loot", legendary: "Great loot", mythic: "Best loot" };
+
+// Buyable straight from the farm (no trip to the consumables shop): common + rare seeds can be purchased for
+// gold. Epic+ stay drop-only (aspirational — earn them from raids/chests/boss). Price ≈ 75% of the crop's sell
+// value, so a finished harvest still nets a small profit for the grow time + the loot roll on top.
+const SEED_BUYABLE_RARITIES = new Set(["common", "rare"]);
+export function seedBuyPrice(id) {
+    const s = SEEDS[id];
+    if (!s || !SEED_BUYABLE_RARITIES.has(s.rarity)) return null;
+    return Math.max(10, Math.round(s.sell * 0.75));
+}
 export const seedById = (id) => SEEDS[id] || null;
 const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === r);
 
@@ -224,16 +234,37 @@ export async function getGarden(buyerId) {
         const level = lvl(up, key);
         return { key, name: def.name, emoji: def.emoji, desc: def.desc, level, max: def.max, cost: level >= def.max ? null : upgradeCost(key, level), eff: upgradeEffect(key, level) };
     });
+    // Seeds you can buy right here on the farm (common + rare) — so you never have to leave to plant.
+    const seedShop = Object.keys(SEEDS)
+        .filter((id) => seedBuyPrice(id) != null)
+        .map((id) => ({ id, ...SEEDS[id], price: seedBuyPrice(id), loot: LOOT_LABEL[SEEDS[id].rarity] || null }));
     return {
         plots: gardenPlots,
         plotCount: n,
         seedBag,
+        seedShop,
         upgrades,
         fertilizer: buyer?.farm_fertilizer || 0,
         fertilizerPrice: FERTILIZER_PRICE,
         gold: buyer?.gold || 0,
         readyCount,
     };
+}
+
+// Buy a seed straight from the farm and (optionally) plant it into `slot` in one tap. Common/rare only.
+export async function buyAndPlantSeed(buyerId, slot, seedId) {
+    const price = seedBuyPrice(seedId);
+    if (!buyerId || price == null || !SEEDS[seedId]) return { ok: false, error: "not_buyable" };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
+    if (!paid) return { ok: false, error: "no_gold", ...(await getGarden(buyerId)) };
+    await logCoin(buyerId, -price, "seed_buy", { balanceAfter: paid.gold, meta: { seedId } }).catch(() => {});
+    await grantSeed(buyerId, seedId); // into the bag
+    // Plant the just-bought seed (consumes it from the bag). If slot is null/invalid it stays in the bag.
+    if (slot != null && Number.isFinite(Number(slot))) {
+        const res = await plantSeed(buyerId, Number(slot), seedId);
+        if (res.ok || res.garden) return res;
+    }
+    return { ok: true, garden: await getGarden(buyerId) };
 }
 
 // Plant a seed you hold into an empty plot. Grow time is scaled by the Green Thumb upgrade.

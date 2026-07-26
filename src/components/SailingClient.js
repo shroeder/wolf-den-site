@@ -6,6 +6,7 @@ import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
 import MerchantScene from "@/components/MerchantScene";
 import RaidScene from "@/components/RaidScene";
+import HowToPlay from "@/components/HowToPlay";
 import useScrollLock from "@/lib/useScrollLock";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
@@ -531,6 +532,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 <div className="sail-head">
                     <h1 style={{ margin: 0 }}>⛵ Sailing</h1>
                 </div>
+
+                <HowToPlay
+                    id="sailing"
+                    emoji="⛵"
+                    title="Sailing"
+                    tagline="Send your ship on voyages to haul back treasure, then dig up the loot you find."
+                    steps={[
+                        "Tap Set sail to send your ship out — it voyages on its own while you're away.",
+                        "Events pop up along the way: catch tailwinds and pick up chests & cargo.",
+                        "When you land, dig up buried chests — follow the 🔥 HOT tiles to uncover them.",
+                        "Spend your haul on hull upgrades to sail farther and dig deeper each run.",
+                    ]}
+                    accent="#54a0e0"
+                />
 
                 {/* Real-world ambiance opt-in: match the sky/weather/time to where the player actually is. */}
                 {geoPrompt ? (
