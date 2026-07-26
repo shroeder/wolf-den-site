@@ -45,6 +45,8 @@ const STRIKES = 6;
 
 export default function BlacksmithClient({ initial }) {
     const [forge, setForge] = useState(initial);
+    const [loading, setLoading] = useState(!initial);
+    const [forbidden, setForbidden] = useState(false);
     const [busy, setBusy] = useState(null);
     const [tab, setTab] = useState("enhance");
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
@@ -97,6 +99,26 @@ export default function BlacksmithClient({ initial }) {
     }, [post]);
 
     useEffect(() => { const t = toast && toast.kind !== "enhance" ? setTimeout(() => setToast(null), 2600) : null; return () => t && clearTimeout(t); }, [toast]);
+
+    // When the server couldn't resolve the session (e.g. a bearer-token app session on a full-page nav), fetch
+    // the OWNER-GATED forge state from the API — it carries the token and 403s non-owners.
+    useEffect(() => {
+        if (initial) return undefined;
+        let alive = true;
+        fetch("/api/marketplace/crafting", { cache: "no-store" })
+            .then(async (r) => {
+                if (!alive) return;
+                if (r.status === 403 || r.status === 401) { setForbidden(true); setLoading(false); return; }
+                const d = await r.json().catch(() => null);
+                if (d && (d.parts || d.salvage)) setForge(d);
+                setLoading(false);
+            })
+            .catch(() => { if (alive) setLoading(false); });
+        return () => { alive = false; };
+    }, [initial]);
+
+    if (forbidden) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">The Forge is owner-only right now.</p></section></div>;
+    if (!forge) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">{loading ? "Stoking the hearth…" : "Couldn't load the Forge — try again."}</p></section></div>;
 
     const parts = forge.parts || [];
     const salvage = forge.salvage || [];
