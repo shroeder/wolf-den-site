@@ -131,16 +131,21 @@ async function rollMiniWheel(buyerId) {
     };
 }
 
-// The BONUS GAME: grant 3 wheel-exclusive gear pieces and return their reveal cards.
+const gearSprite = (id) => `/images/spin/gear/${id === "wg_ring" ? "wg-gauntlet" : id.replace("_", "-")}.png`;
+const gearCard = (id) => { const it = itemById(id); return { id, name: it?.name || "Wheel Gear", rarity: it?.rarity || "epic", sprite: gearSprite(id) }; };
+
+// The BONUS GAME is a MATCH-3: a 3×3 board of face-down tiles. ONE gear piece (the weighted winner) has three
+// tiles; the other five gear each have fewer, so only the winner can ever reach three-of-a-kind. The player
+// flips tiles until they match three — and wins that ONE piece (granted here, up front, so it's tamper-proof).
 async function rollBonusGame(buyerId) {
-    const reveals = [];
-    for (let i = 0; i < 3; i += 1) {
-        const g = pickWeighted(WHEEL_GEAR);
-        const item = itemById(g.id);
-        await grantItem(buyerId, g.id, "wheel_bonus").catch(() => {});
-        reveals.push({ id: g.id, name: item?.name || "Wheel Gear", rarity: item?.rarity || "epic", sprite: `/images/spin/gear/${g.id === "wg_ring" ? "wg-gauntlet" : g.id.replace("_", "-")}.png` });
-    }
-    return { reveals };
+    const winner = pickWeighted(WHEEL_GEAR);
+    await grantItem(buyerId, winner.id, "wheel_bonus").catch(() => {});
+    const others = WHEEL_GEAR.filter((g) => g.id !== winner.id).map((g) => g.id);
+    const tiles = [winner.id, winner.id, winner.id];          // exactly three of the winner
+    const decoyCounts = [2, 1, 1, 1, 1];                       // six decoy tiles, none reaching three
+    decoyCounts.forEach((c, i) => { const id = others[i % others.length]; for (let k = 0; k < c; k += 1) tiles.push(id); });
+    for (let i = tiles.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
+    return { tiles: tiles.map(gearCard), winnerId: winner.id, need: 3, winner: gearCard(winner.id) };
 }
 
 // Weighted pick of a prize INDEX. forceRare restricts to rare segments (pity).

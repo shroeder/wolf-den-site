@@ -102,7 +102,7 @@ export default function SpinWheel() {
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
             // Route to the right outcome.
             if (d.prize?.miniWheel && d.miniWheel) { setMini({ ...d.miniWheel, rot: 0, spinning: false, revealed: false }); playWin("bonus"); return; }
-            if (d.prize?.bonusGame && d.bonusGame) { setBonus({ reveals: d.bonusGame.reveals, picks: [], done: false }); playWin("bonus"); return; }
+            if (d.prize?.bonusGame && d.bonusGame) { setBonus({ tiles: d.bonusGame.tiles, winnerId: d.bonusGame.winnerId, need: d.bonusGame.need || 3, winner: d.bonusGame.winner, flipped: [], counts: {}, done: false, won: null }); playWin("bonus"); return; }
             setResult(d.prize);
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
             if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), 4600); }
@@ -157,13 +157,16 @@ export default function SpinWheel() {
         playWin("mini");
     }, []);
 
-    const revealBonus = useCallback((slot) => {
+    const revealBonus = useCallback((i) => {
         setBonus((b) => {
-            if (!b || b.picks.length >= 3 || b.picks.some((p) => p.slot === slot)) return b;
-            const reveal = b.reveals[b.picks.length];
-            tick(0.06); playWin("rare");
-            const picks = [...b.picks, { slot, ...reveal }];
-            return { ...b, picks, done: picks.length >= 3 };
+            if (!b || b.done || b.flipped.includes(i)) return b;
+            const id = b.tiles[i].id;
+            const counts = { ...b.counts, [id]: (b.counts[id] || 0) + 1 };
+            const flipped = [...b.flipped, i];
+            const matched = counts[id] >= b.need;
+            tick(0.06);
+            if (matched) playWin("rare");
+            return { ...b, flipped, counts, done: matched, won: matched ? b.tiles[i] : null };
         });
     }, []);
 
@@ -283,32 +286,41 @@ export default function SpinWheel() {
                 </div>
             ) : null}
 
-            {/* ── BONUS GAME modal (pick 3 boxes → wheel-exclusive gear) ── */}
+            {/* ── BONUS GAME modal (match 3 tiles → win that wheel-exclusive gear) ── */}
             {bonus ? (
                 <div className="cw-modal">
                     <div className="cw-modal-card">
-                        <div className="cw-modal-title">🎁 Bonus Game — pick 3!</div>
-                        <p className="cw-modal-sub">{bonus.done ? "Your wheel-exclusive gear:" : `Pick a box to reveal gear · ${bonus.picks.length}/3`}</p>
-                        <div className="cw-boxes">
-                            {Array.from({ length: 6 }).map((_, slot) => {
-                                const pick = bonus.picks.find((p) => p.slot === slot);
+                        <div className="cw-modal-title">🎁 Match 3 to Win!</div>
+                        <p className="cw-modal-sub">{bonus.done ? "Three of a kind!" : "Flip tiles — match 3 of one gear to win it."}</p>
+                        <div className="cw-tiles">
+                            {bonus.tiles.map((t, i) => {
+                                const open = bonus.flipped.includes(i);
+                                const isWin = bonus.done && open && bonus.won?.id === t.id;
                                 return (
-                                    <button key={slot} type="button" className={`cw-box${pick ? ` is-open rar-${pick.rarity}` : ""}`} disabled={Boolean(pick) || bonus.picks.length >= 3} onClick={() => revealBonus(slot)}>
-                                        {pick ? (
+                                    <button key={i} type="button" className={`cw-tile${open ? " is-open" : ""}${isWin ? " is-win" : ""} rar-${t.rarity}`} disabled={open || bonus.done} onClick={() => revealBonus(i)}>
+                                        {open ? (
                                             <>
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={pick.sprite} alt="" className="cw-box-img" />
-                                                <span className="cw-box-name">{pick.name}</span>
+                                                <img src={t.sprite} alt="" className="cw-tile-img" />
                                             </>
                                         ) : (
                                             // eslint-disable-next-line @next/next/no-img-element
-                                            <img src="/images/spin/prizes/mystery-box.png" alt="" className="cw-box-img is-closed" />
+                                            <img src="/images/spin/prizes/mystery-box.png" alt="" className="cw-tile-img is-closed" />
                                         )}
                                     </button>
                                 );
                             })}
                         </div>
-                        {bonus.done ? <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect gear</button> : null}
+                        {bonus.done ? (
+                            <>
+                                <div className="cw-modal-won">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={bonus.won.sprite} alt="" className="cw-modal-won-img" />
+                                    <span>You won <b>{bonus.won.name}</b>!</span>
+                                </div>
+                                <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect</button>
+                            </>
+                        ) : null}
                     </div>
                 </div>
             ) : null}
@@ -427,14 +439,14 @@ const CW_CSS = `
 .cw-modal-won b { color: #fff; }
 .cw-modal-won-img { width: 42px; height: 42px; object-fit: contain; }
 .cw-collect { margin-top: 14px; padding: 11px 28px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12; }
-.cw-boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 6px 0 4px; }
-.cw-box { aspect-ratio: 1; border-radius: 14px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); cursor: pointer; display: grid; place-items: center; padding: 6px; transition: transform .15s; }
-.cw-box:not(:disabled):hover { transform: translateY(-2px); border-color: rgba(255,215,94,0.6); }
-.cw-box.is-open { cursor: default; border-color: rgba(176,97,255,0.7); background: rgba(176,97,255,0.1); animation: cwPop .35s cubic-bezier(.2,1.4,.35,1) both; }
-.cw-box.is-open.rar-legendary { border-color: #ffb020; background: rgba(255,176,32,0.12); }
-.cw-box-img { width: 74%; height: 74%; object-fit: contain; }
-.cw-box-img.is-closed { opacity: 0.9; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
-.cw-box-name { font-size: 9.5px; font-weight: 800; color: #e6d3ff; margin-top: 2px; line-height: 1.1; }
+.cw-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 6px auto 4px; max-width: 280px; }
+.cw-tile { aspect-ratio: 1; border-radius: 14px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); cursor: pointer; display: grid; place-items: center; padding: 5px; transition: transform .15s, border-color .15s; }
+.cw-tile:not(:disabled):hover { transform: translateY(-2px); border-color: rgba(255,215,94,0.6); }
+.cw-tile.is-open { cursor: default; border-color: rgba(176,97,255,0.6); background: rgba(176,97,255,0.09); animation: cwPop .3s cubic-bezier(.2,1.4,.35,1) both; }
+.cw-tile.is-win { border-color: #ffd75e; background: rgba(255,215,94,0.16); box-shadow: 0 0 16px rgba(255,215,94,0.8); animation: cwWin .5s ease both; }
+@keyframes cwWin { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
+.cw-tile-img { width: 82%; height: 82%; object-fit: contain; }
+.cw-tile-img.is-closed { opacity: 0.92; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
 
 .cw-celebrate { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; background: rgba(6,4,10,0.72); backdrop-filter: blur(3px); }
 .cw-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
