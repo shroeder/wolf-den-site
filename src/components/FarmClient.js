@@ -208,16 +208,15 @@ export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
     const [farm, setFarm] = useState(initial);
     const pets = useMemo(() => farm.pets || [], [farm.pets]);
-    // On your own farm the fenced garden sits in the front-left corner, so keep the pets penned to the RIGHT
-    // of it — they get the whole rest of the pasture to roam but never wander onto the crops.
-    const gardened = Boolean(initial.mine && initial.garden);
-    const petMinX = gardened ? 44 : FARM_PAD; // left edge of the pets' roaming band
+    // Pets roam the FULL width of the backdrop now that the garden is its own view (no crops to avoid) — evenly
+    // spread from the left edge to the right so they're never bunched or missing from the left side.
+    const petMinX = FARM_PAD; // left edge of the pets' roaming band
     // Each pet gets a "home" slot spread evenly across its band and wanders around it. Deterministic init so
     // server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
-    const petSlotX = useCallback((i, n) => (n <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (n - 1)) * (100 - FARM_PAD - petMinX)), [gardened, petMinX]);
+    const petSlotX = useCallback((i, n) => (n <= 1 ? 50 : petMinX + (i / (n - 1)) * (100 - FARM_PAD - petMinX)), [petMinX]);
     const homeX = useCallback((i) => petSlotX(i, pets.length), [petSlotX, pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => ({
-        x: pets.length <= 1 ? (gardened ? 72 : 50) : petMinX + (i / (pets.length - 1)) * (100 - FARM_PAD - petMinX),
+        x: pets.length <= 1 ? 50 : petMinX + (i / (pets.length - 1)) * (100 - FARM_PAD - petMinX),
         y: 82 + ((i * 5) % 9), // grounded on the grass (spread is HORIZONTAL — see the wide field below)
         flip: i % 2 === 1,
         dur: 2, // seconds for the current stroll (varies per move → different speeds)
@@ -852,10 +851,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                                     }}
                                 >
                                     {/* fixed-size sprite stage: the shadow stays planted on the ground while the sprite hops above it */}
-                                    <span style={{ position: "relative", display: "block", width: 58, height: 58, margin: "0 auto" }}>
+                                    <span style={{ position: "relative", display: "block", width: 46, height: 46, margin: "0 auto" }}>
                                         <span
                                             className={p.moving ? "farm-shadow-hop" : ""}
-                                            style={{ position: "absolute", left: "50%", bottom: -2, width: 42, height: 9, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", animationDuration: p.moving ? `${p.hopMs}ms` : undefined, zIndex: 0 }}
+                                            style={{ position: "absolute", left: "50%", bottom: -2, width: 34, height: 7, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", animationDuration: p.moving ? `${p.hopMs}ms` : undefined, zIndex: 0 }}
                                         />
                                         <span
                                             className={p.moving ? "farm-hop" : "farm-idle"}
@@ -865,10 +864,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                                             <img
                                                 src={pet.spriteUrl}
                                                 alt={pet.name}
-                                                width={58}
-                                                height={58}
+                                                width={46}
+                                                height={46}
                                                 draggable={false}
-                                                style={{ width: 58, height: 58, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+                                                style={{ width: 46, height: 46, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
                                             />
                                             {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                         </span>
