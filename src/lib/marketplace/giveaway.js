@@ -35,7 +35,7 @@ export async function giveawayChest({ tier = "wooden", count = 1 } = {}) {
     const n = Math.max(1, Math.min(10, Math.round(Number(count) || 1)));
     const ids = await activeHeroIds();
     for (const id of ids) {
-        await addChests(id, { [tier]: n });
+        await addChests(id, { [tier]: n }, { source: "giveaway" });
         await recordGift(id, { kind: "chest", title: "🎁 Free loot!", body: n > 1 ? `${n}× ${def.label} landed in your stash — open them now!` : `A ${def.label} landed in your stash — open it now!`, icon: def.emoji });
     }
     await pushAll(ids, {

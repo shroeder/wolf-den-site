@@ -8,6 +8,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
+import { addChests } from "@/lib/marketplace/chests.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { SEED_PACK_IDS, seedPackById } from "@/lib/marketplace/seed-packs.js";
@@ -161,7 +162,7 @@ async function rollHarvestReward(buyerId, rarity, luckyLevel = 0, bonusPromote =
         else if (pick.type === "xp") await awardXp(buyerId, "harvest", { points: pick.amount, gold: 0 });
         else if (pick.type === "treat") await grantConsumable(buyerId, pick.id, 1);
         else if (pick.type === "spin") await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens, 0) + $2 WHERE id = $1`, [buyerId, pick.n]);
-        else if (pick.type === "chest") await db.query(`INSERT INTO mkt_user_chest (buyer_id, tier, count) VALUES ($1, $2, 1) ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + 1`, [buyerId, pick.chestTier]);
+        else if (pick.type === "chest") await addChests(buyerId, { [pick.chestTier]: 1 }, { source: "harvest" }).catch(() => {});
         else if (pick.type === "seed") {
             const band = pick.band || ["common"];
             const p = seedsOfRarity(band[Math.floor(Math.random() * band.length)]);

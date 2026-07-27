@@ -78,7 +78,9 @@ function rollRarity(weights) {
     return Object.keys(weights)[0];
 }
 
-export async function addChests(buyerId, tally) {
+// Grant chests. `ctx` = { source, meta } records WHERE each chest came from in the audit log (mkt_chest_grant),
+// so "where did this member get that chest?" is always answerable. Logging is best-effort — never blocks a grant.
+export async function addChests(buyerId, tally, { source = "unknown", meta = null } = {}) {
     for (const [t, n] of Object.entries(tally)) {
         if (!n) continue;
         await db.query(
@@ -86,7 +88,21 @@ export async function addChests(buyerId, tally) {
              ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + $3`,
             [buyerId, t, n]
         ).catch(() => {});
+        await db.query(
+            `INSERT INTO mkt_chest_grant (buyer_id, tier, count, source, meta) VALUES ($1, $2, $3, $4, $5::jsonb)`,
+            [buyerId, t, n, String(source || "unknown").slice(0, 40), JSON.stringify(meta || {})]
+        ).catch(() => {});
     }
+}
+
+// Read a member's chest-grant history (newest first) — what they got, where from, when.
+export async function chestGrantHistory(buyerId, { limit = 100 } = {}) {
+    if (!buyerId) return [];
+    const rows = await db.query(
+        `SELECT tier, count, source, meta, created_at FROM mkt_chest_grant WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT $2`,
+        [buyerId, Math.min(500, Math.max(1, limit))]
+    ).catch(() => []);
+    return rows.map((r) => ({ tier: r.tier, count: Number(r.count), source: r.source, meta: r.meta || {}, at: r.created_at }));
 }
 
 // Grant loot chests for level-ups. CONSERVATIVE: no retroactive flood — the first time we see a member we
@@ -101,7 +117,7 @@ export async function syncLevelChests(buyerId) {
     // First encounter: seed to current level, one welcome chest, NO back-fill.
     if (row.chest_level === 0) {
         const tally = { [tierForLevel(level)]: 1 };
-        await addChests(buyerId, tally);
+        await addChests(buyerId, tally, { source: "level_up", meta: { level, welcome: true } });
         await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
         return tally;
     }
@@ -119,7 +135,7 @@ export async function syncLevelChests(buyerId) {
             for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < e.chance) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
         }
     }
-    await addChests(buyerId, tally);
+    await addChests(buyerId, tally, { source: "level_up", meta: { level } });
     await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
     return tally;
 }

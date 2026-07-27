@@ -97,7 +97,7 @@ async function grantPrize(buyerId, prize) {
         await db.query(`UPDATE mkt_buyer SET gold = gold + 300 WHERE id = $1`, [buyerId]).catch(() => {});
         return { emoji: "🪙", text: "300 gold" };
     }
-    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
     if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% off an in-game 🪙 gold-shop item` }; }
     if (prize.kind === "token") { await grantSpinTokens(buyerId, prize.n || 1); return { emoji: prize.emoji, text: `+${prize.n || 1} spin` }; }
     if (prize.kind === "pet") {

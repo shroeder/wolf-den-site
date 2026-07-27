@@ -785,7 +785,7 @@ async function finalizeBossKill(bossId) {
         if (Math.random() >= 0.2 + ratio * 0.8) continue; // didn't roll a chest this time
         const tier = Math.random() < 0.4 + ratio * 0.3 ? "iron" : "wooden"; // capped at Iron
         chestByBuyer.set(p.id, tier);
-        await addChests(p.id, { [tier]: 1 }).catch(() => {});
+        await addChests(p.id, { [tier]: 1 }, { source: "boss_kill", meta: { boss: boss.name } }).catch(() => {});
     }
 
     // Pack-wide celebration pop-up — personalized to what each member actually won.

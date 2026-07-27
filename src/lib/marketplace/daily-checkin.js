@@ -150,7 +150,7 @@ export async function claimDailyCheckin(buyerId) {
     if (reward.gold) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, reward.gold]).catch(() => {});
     if (reward.gold) await logCoin(buyerId, reward.gold, "checkin", { meta: { streak: nextStreak } }).catch(() => {});
     if (reward.treat && CONSUMABLES[reward.treat]) await grantConsumable(buyerId, reward.treat, 1).catch(() => {});
-    if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }).catch(() => {});
+    if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }, { source: "daily_checkin", meta: { streak: nextStreak } }).catch(() => {});
     await trackActivity(buyerId, "daily_checkin", { streak: nextStreak }).catch(() => {});
     // Every 7-day streak milestone also grants a spin-wheel token.
     if (nextStreak % 7 === 0) await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {});

@@ -25,7 +25,7 @@ async function grantDonationRewards(buyerId, before, after) {
     for (const t of REWARD_TIERS) {
         if (before < t.at && after >= t.at) {
             if (t.treat) await grantConsumable(buyerId, t.treat, 1).catch(() => {});
-            if (t.chest) await addChests(buyerId, { [t.chest]: 1 }).catch(() => {});
+            if (t.chest) await addChests(buyerId, { [t.chest]: 1 }, { source: "happy_hour" }).catch(() => {});
             granted.push(t.label);
         }
     }

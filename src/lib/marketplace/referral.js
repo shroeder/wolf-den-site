@@ -48,12 +48,12 @@ export async function maybeGrantReferral(newBuyerId) {
     // New member's welcome bonus.
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [newBuyerId, REF_JOINER_GOLD]).catch(() => {});
     await logCoin(newBuyerId, REF_JOINER_GOLD, "referral_joined").catch(() => {});
-    await addChests(newBuyerId, REF_JOINER_CHEST).catch(() => {});
+    await addChests(newBuyerId, REF_JOINER_CHEST, { source: "referral", meta: { role: "joiner" } }).catch(() => {});
 
     // Referrer's reward.
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [referrerId, REF_REFERRER_GOLD]).catch(() => {});
     await logCoin(referrerId, REF_REFERRER_GOLD, "referral_bonus").catch(() => {});
-    await addChests(referrerId, REF_REFERRER_CHEST).catch(() => {});
+    await addChests(referrerId, REF_REFERRER_CHEST, { source: "referral", meta: { role: "referrer" } }).catch(() => {});
     // Now that this referral has converted, grant any invite badges the referrer newly qualifies for.
     await syncEarnedBadges(referrerId).catch(() => {}); // Recruiter / Pack Builder / Pack Leader
 

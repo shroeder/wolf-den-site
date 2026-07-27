@@ -842,7 +842,7 @@ async function resolveDueEncounter(buyerId) {
     if (et >= BADGE_ENC_TESTED) await grantEventBadge(buyerId, "sea_tested").catch(() => {});
     if (et >= BADGE_ENC_VETERAN) await grantEventBadge(buyerId, "sea_veteran").catch(() => {});
     if (loot.kind === "fragment") await grantFragment(buyerId, loot.n || 1).catch(() => {});
-    else if (loot.kind === "chest") await addChests(buyerId, { [loot.tier]: 1 }).catch(() => {});
+    else if (loot.kind === "chest") await addChests(buyerId, { [loot.tier]: 1 }, { source: "sailing" }).catch(() => {});
     else if (loot.kind === "consumable") await grantConsumable(buyerId, loot.id, 1).catch(() => {});
     await trackActivity(buyerId, "sail_encounter", { type: enc.id, outcome: loot.kind, gold: coins }).catch(() => {});
 }
@@ -1484,7 +1484,7 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
         const i = CHEST_ORDER.indexOf(tierKey);
         if (i >= 0 && i < CHEST_ORDER.length - 1) tierKey = CHEST_ORDER[i + 1];
     }
-    await addChests(buyerId, { [tierKey]: 1 }).catch(() => {});
+    await addChests(buyerId, { [tierKey]: 1 }, { source: "sailing_forge" }).catch(() => {});
     await trackActivity(buyerId, "sail_forge", { tier: tierKey, upgraded: tierKey !== fragmentTier }).catch(() => {});
     // Chest-points (tier-weighted 1–4) drive the dig-tool unlocks + their invest tiers.
     await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});

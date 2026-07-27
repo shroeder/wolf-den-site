@@ -188,7 +188,7 @@ export async function claimQuest(buyerId, questKey) {
     if (!row) return { ok: false, error: "not_claimable" };
     if (row.reward_gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, row.reward_gold]).catch(() => {});
     if (row.reward_gold > 0) await logCoin(buyerId, row.reward_gold, "quest_reward", { meta: { quest: questKey } }).catch(() => {});
-    if (row.reward_chest) await addChests(buyerId, { [row.reward_chest]: 1 }).catch(() => {});
+    if (row.reward_chest) await addChests(buyerId, { [row.reward_chest]: 1 }, { source: "quest", meta: { quest: row.key } }).catch(() => {});
     // Clearing ALL of today's quests earns a bonus spin token + a chunk of bonus XP (deduped per day).
     let bonusSpin = false;
     let bonusXp = 0;

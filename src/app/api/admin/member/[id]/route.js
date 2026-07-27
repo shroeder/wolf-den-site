@@ -9,7 +9,7 @@ import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { collectibleById, petActive, petPassive } from "@/lib/marketplace/collectibles.js";
-import { CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
+import { CHEST_TIERS, CHEST_ORDER, chestGrantHistory } from "@/lib/marketplace/chests.js";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { getUserBadges } from "@/lib/marketplace/profile.js";
 import { levelForXp, SPEND_XP_PER_DOLLAR } from "@/lib/marketplace/xp.js";
@@ -111,7 +111,7 @@ export async function GET(request, { params }) {
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, purchaseXpRows, creditEvents] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, purchaseXpRows, creditEvents, chestGrants] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
@@ -159,6 +159,8 @@ export async function GET(request, { params }) {
                       ORDER BY created_at DESC LIMIT 120`,
                     [id]
                 ).catch(() => []),
+                // Chest-grant history — every loot chest this member received, and WHERE it came from.
+                chestGrantHistory(id, { limit: 150 }).catch(() => []),
             ]);
             // Hero-card visuals + a featured-pet + pets summary.
             const featuredPet = row.featured_collectible ? collectibleById(row.featured_collectible) : null;
@@ -344,6 +346,8 @@ export async function GET(request, { params }) {
                     breakdown: (coinBd || []).map((b) => ({ reason: b.reason, n: b.n, earned: b.earned, spent: b.spent, label: coinLabel(b.reason) })),
                 },
                 trades,
+                // Chest-grant history: what chest, where from, when.
+                chestGrants: (chestGrants || []).map((g) => ({ tier: g.tier, count: g.count, source: g.source, meta: g.meta, at: iso(g.at) })),
             }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.member.detail.failure" });

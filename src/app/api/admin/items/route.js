@@ -89,7 +89,7 @@ export async function POST(request) {
                 const tier = String(body.chest);
                 const def = CHEST_TIERS[tier];
                 if (!def) return noStore({ error: "unknown_tier" }, { status: 400 });
-                await addChests(buyerId, { [tier]: 1 });
+                await addChests(buyerId, { [tier]: 1 }, { source: "admin_grant" });
                 await recordGift(buyerId, { kind: "chest", title: "🎁 You got a loot chest!", body: `A ${def.label} landed in your stash — open it now!`, icon: def.emoji });
                 after(() => giftNotify(buyerId, `${def.emoji} A gift from The Wolf Den!`, `A ${def.label} just dropped into your stash — tap to rip it open! ✨`, "gift-chest", { type: "gift_chest", tier }));
                 return noStore({ ok: true, kind: "chest", tier });
