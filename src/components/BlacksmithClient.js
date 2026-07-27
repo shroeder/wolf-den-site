@@ -128,7 +128,7 @@ export default function BlacksmithClient({ initial }) {
         return () => { alive = false; };
     }, [initial]);
 
-    if (forbidden) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">The Forge is owner-only right now.</p></section></div>;
+    if (forbidden) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted"><a href="/marketplace/login?returnTo=/marketplace/blacksmith">Sign in</a> to salvage &amp; enhance your gear at the Forge.</p></section></div>;
     if (loading) return <div className="stack reveal"><section className="card" style={{ textAlign: "center", padding: 28 }}><h1 style={{ marginTop: 0 }}>🔨 The Forge</h1><p className="muted">Stoking the hearth…</p></section></div>;
 
     const parts = forge.parts || [];
@@ -167,7 +167,6 @@ export default function BlacksmithClient({ initial }) {
                 <div className="forge-scene-inner">
                     <div className="forge-head">
                         <h1 className="forge-title">The Forge</h1>
-                        <span className="forge-owner">owner</span>
                     </div>
                     <p className="forge-tagline">{statusBits.join(" · ")}</p>
                 </div>
@@ -381,29 +380,7 @@ export default function BlacksmithClient({ initial }) {
                     <span>{toast.text}</span>
                 </div>
             ) : null}
-
-            {/* ⚠️ TEST-ONLY dev tools (owner) — REMOVE BEFORE PUBLIC LAUNCH. Seeds parts to test the Forge. */}
-            <ForgeDebugPanel parts={parts} busy={busy} onAdd={(tier) => post({ action: "debug_add_parts", tier, n: 10 }, `dbg-${tier}`)} />
         </div>
-    );
-}
-
-// ⚠️ TEST-ONLY — owner dev panel to seed parts. DELETE this component + its render + the server action before launch.
-function ForgeDebugPanel({ parts, busy, onAdd }) {
-    return (
-        <section className="card forge-panel forge-debug">
-            <h3 className="forge-panel-h" style={{ color: "#ff8f9a" }}>🧪 Dev tools — remove before launch</h3>
-            <div className="forge-debug-row">
-                {parts.map((p) => (
-                    <button key={p.tier} type="button" className="forge-debug-btn" disabled={Boolean(busy)} onClick={() => onAdd(p.tier)}>
-                        {p.sprite
-                            // eslint-disable-next-line @next/next/no-img-element
-                            ? <img src={p.sprite} alt="" /> : null}
-                        +10 {p.name}
-                    </button>
-                ))}
-            </div>
-        </section>
     );
 }
 
@@ -753,7 +730,6 @@ const FORGE_CSS = `
 .forge-scene-inner { position: relative; z-index: 2; padding: 16px; }
 .forge-head { display: flex; align-items: center; gap: 10px; }
 .forge-title { margin: 0; font-size: 1.7rem; font-weight: 900; color: #ffe0b0; text-shadow: 0 2px 10px rgba(255,120,20,0.55), 0 1px 3px #000; letter-spacing: 0.02em; }
-.forge-owner { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #ffb877; background: rgba(255,140,60,0.16); border: 1px solid rgba(255,140,60,0.5); border-radius: 999px; padding: 2px 8px; }
 .forge-tagline { margin: 5px 0 0; font-size: 12.5px; font-weight: 600; color: #f0d9bd; text-shadow: 0 1px 4px #000; }
 /* ── Founder's medallion (Alstier1) — small hero circle pinned top-right of the hearth ── */
 .forge-founder { position: absolute; top: 12px; right: 12px; z-index: 3; width: 46px; height: 46px; border-radius: 50%; padding: 0; cursor: pointer; overflow: hidden;
@@ -963,11 +939,6 @@ const FORGE_CSS = `
 .forge-card-cost.is-short { color: #ff8f9a; font-weight: 800; }
 .forge-card-locktag { margin-left: 3px; }
 /* ⚠️ TEST-ONLY dev panel — remove before launch */
-.forge-debug { border-color: rgba(255,143,154,0.4) !important; }
-.forge-debug-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.forge-debug-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 6px 9px; border-radius: 9px; cursor: pointer; color: #ffd7db; border: 1px solid rgba(255,143,154,0.4); background: rgba(255,143,154,0.1); }
-.forge-debug-btn img { width: 18px; height: 18px; object-fit: contain; }
-.forge-debug-btn:disabled { opacity: 0.5; cursor: default; }
 /* ── perks / upgrades (uses the shared .sail-upgrades pattern; only the gold line is bespoke) ── */
 .forge-gold { text-align: right; font-size: 12px; font-weight: 800; color: #ffd75e; margin-top: 10px; }
 /* ── daily forge tasks ── */

@@ -47,15 +47,9 @@ const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplac
 
 export default function GameNav() {
     const pathname = usePathname() || "";
-    const [owner, setOwner] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
-    useEffect(() => {
-        let alive = true;
-        fetch("/api/marketplace/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.buyer?.owner) setOwner(true); }).catch(() => {});
-        return () => { alive = false; };
-    }, []);
-    // Farm is live for everyone; the Forge is owner-only.
-    const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, ...(owner ? [{ href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" }] : [])];
+    // Farm + Forge are live for everyone.
+    const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" }];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -128,7 +122,7 @@ export default function GameNav() {
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
             { href: "/marketplace/pets", emoji: "🐾", label: "Pets", sub: "Collect & equip" },
             { href: "/marketplace/sets", sprite: "helmet", label: "Sets", sub: "Set bonuses" },
-            ...(owner ? [{ href: "/marketplace/blacksmith", emoji: "🔨", label: "The Forge", sub: "Salvage & enhance", owner: true }] : []),
+            { href: "/marketplace/blacksmith", emoji: "🔨", label: "The Forge", sub: "Salvage & enhance" },
         ] },
         { title: "Shop & Trade", items: [
             { href: "/marketplace/store", emoji: "🛒", label: "Store", sub: "Buy supplies" },

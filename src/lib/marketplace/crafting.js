@@ -97,14 +97,6 @@ export async function buyForgeUpgrade(buyerId, key) {
     return { ok: true, key, level: cur + 1, ...(await getForgeState(buyerId)) };
 }
 
-// ⚠️ TEST/DEBUG ONLY — owner dev tool to seed parts for testing the Forge. REMOVE BEFORE PUBLIC LAUNCH.
-// (Route is owner-gated, so this is owner-only; still, delete this + its action + the UI panel before release.)
-export async function debugAddParts(buyerId, tier, n = 10) {
-    const t = Math.max(1, Math.min(MAX_TIER, Number(tier) || 1));
-    await addParts(buyerId, t, Math.max(1, Number(n) || 1));
-    return { ok: true, ...(await getForgeState(buyerId)) };
-}
-
 // Enhance cost: parts of the item's rarity tier, quantity RAMPS UP each time you re-forge the same piece.
 // Base 6, then increments of +4, +6, +8 and capped at +8/level → 6, 10, 16, 24, 32, 40, 48 … so deeper
 // forges on an already-enhanced item cost progressively more. (level = the piece's current enhance level.)
