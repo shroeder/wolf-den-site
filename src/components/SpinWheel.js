@@ -89,9 +89,12 @@ export default function SpinWheel() {
         let lastWedge = null;
         let lastTick = 0;
 
+        // Measure from the canvas's own parent (always available in a callback ref, unlike a sibling/parent
+        // ref which may not have attached yet). Fall back to the viewport width, then 300.
+        const host = canvas.parentElement;
         const resize = () => {
-            const w = wrapRef.current?.clientWidth || 300;
-            const size = Math.max(220, Math.min(380, w));
+            const w = host?.clientWidth || (typeof window !== "undefined" ? Math.min(window.innerWidth - 40, 360) : 300) || 300;
+            const size = Math.max(200, Math.min(360, w - 20)); // minus the stage's 10px padding each side
             sizeRef.current = size;
             const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
             canvas.width = size * dpr; canvas.height = size * dpr;
@@ -100,7 +103,7 @@ export default function SpinWheel() {
         };
         resize();
         const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
-        if (ro && wrapRef.current) ro.observe(wrapRef.current);
+        if (ro && host) ro.observe(host);
 
         const draw = (ts) => {
           try {
