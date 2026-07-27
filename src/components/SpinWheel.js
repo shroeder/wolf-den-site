@@ -535,20 +535,22 @@ const CW_CSS = `
 .cw-modal-won-img { width: 42px; height: 42px; object-fit: contain; }
 .cw-collect { margin-top: 14px; padding: 11px 28px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12; }
 /* ── BONUS GAME — full-screen match-3 (first-class, big, juicy, escapable) ── */
-.cw-bonus-full { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; padding: 16px; overflow-y: auto;
+.cw-bonus-full { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; padding: 12px; overflow: hidden;
     background: radial-gradient(120% 90% at 50% 0%, #2a1c40, #0a0612 70%); animation: cwFade .25s ease both; }
 @keyframes cwFade { from { opacity: 0; } to { opacity: 1; } }
 .cw-bonus-close { position: fixed; top: 14px; right: 14px; z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.4); color: #fff; font-size: 18px; font-weight: 900; cursor: pointer; }
-.cw-bonus-inner { width: 100%; max-width: 480px; text-align: center; }
-.cw-bonus-title { font-size: 1.7rem; font-weight: 900; color: #ffe28a; text-shadow: 0 2px 14px rgba(255,180,40,0.6); letter-spacing: 0.02em; }
-.cw-bonus-sub { font-size: 0.92rem; color: #d9c7ff; margin: 4px 0 14px; }
-.cw-bonus-track { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.cw-bonus-track-item { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 7px 3px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); min-width: 44px; }
-.cw-bonus-track-item img { width: 26px; height: 26px; object-fit: contain; }
+/* Fit the whole board in the viewport — never scroll. The grid width is capped by height (dvh) so 3 rows of
+   tiles always fit; header spacing is compact so the board is the star. */
+.cw-bonus-inner { width: 100%; max-width: 480px; max-height: 100dvh; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.cw-bonus-title { font-size: clamp(1.15rem, 5vw, 1.5rem); font-weight: 900; color: #ffe28a; text-shadow: 0 2px 14px rgba(255,180,40,0.6); letter-spacing: 0.02em; }
+.cw-bonus-sub { font-size: 0.86rem; color: #d9c7ff; margin: 3px 0 8px; }
+.cw-bonus-track { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.cw-bonus-track-item { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 6px 2px; border-radius: 9px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); min-width: 38px; }
+.cw-bonus-track-item img { width: 22px; height: 22px; object-fit: contain; }
 .cw-bonus-track-item span { font-size: 10px; font-weight: 900; color: #b7a6e0; font-variant-numeric: tabular-nums; }
 .cw-bonus-track-item.is-hit { border-color: #ffd75e; background: rgba(255,215,94,0.18); box-shadow: 0 0 14px rgba(255,215,94,0.6); }
 .cw-bonus-track-item.is-hit span { color: #ffe28a; }
-.cw-bonus-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 10px; }
+.cw-bonus-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; width: min(94vw, 480px, calc((100dvh - 220px) * 2)); margin: 0 auto; }
 .cw-btile { aspect-ratio: 1; border: none; background: none; padding: 0; cursor: pointer; perspective: 600px; }
 .cw-btile:not(:disabled):active { transform: scale(0.94); }
 .cw-btile-flip { position: relative; display: block; width: 100%; height: 100%; transition: transform .45s cubic-bezier(.3,1.2,.4,1); transform-style: preserve-3d; }
@@ -561,11 +563,11 @@ const CW_CSS = `
 .cw-btile.is-win .cw-btile-front { border-color: #ffd75e; box-shadow: 0 0 22px rgba(255,215,94,0.9); animation: cwWinPulse 1s ease-in-out infinite; }
 .cw-btile.is-dim { opacity: 0.5; }
 @keyframes cwWinPulse { 0%,100% { box-shadow: 0 0 16px rgba(255,215,94,0.7); } 50% { box-shadow: 0 0 30px rgba(255,215,94,1); } }
-.cw-bonus-win { position: relative; margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: cwPop .4s cubic-bezier(.2,1.4,.35,1) both; }
+.cw-bonus-win { position: relative; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: cwPop .4s cubic-bezier(.2,1.4,.35,1) both; }
 .cw-bonus-win-burst { position: absolute; top: -10px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(255,215,94,0.45), transparent 62%); filter: blur(4px); animation: cwHalo 1.6s ease-in-out infinite; }
 .cw-bonus-win-img { position: relative; width: 96px; height: 96px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6)); animation: cwSpin .6s ease both; }
 .cw-bonus-win-txt { position: relative; font-size: 1.15rem; color: #ecd6bc; } .cw-bonus-win-txt b { color: #fff; }
-.cw-bonus-hint { margin-top: 16px; font-size: 11px; color: #9a8fc0; }
+.cw-bonus-hint { margin-top: 10px; font-size: 11px; color: #9a8fc0; }
 
 .cw-celebrate { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; background: rgba(6,4,10,0.72); backdrop-filter: blur(3px); }
 .cw-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
