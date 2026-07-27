@@ -106,3 +106,18 @@ export async function requireAdminAccess(request, permissionKey, logger = authLo
     // Not a valid staff session — fall back to the legacy shared key.
     return verifyAdminApiKey(request, logger);
 }
+
+// Resolve WHO is making an admin request, for audit trails (e.g. the creation-token ledger). Returns the staff
+// user when authed via an admin-app session, or a generic shared-key marker when the legacy API key was used.
+// Call this AFTER requireAdminAccess has already authorized the request.
+export async function getAdminActor(request) {
+    const authHeader = request.headers.get("authorization") || "";
+    const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+    if (bearer) {
+        const session = await resolveAdminAppSession(bearer).catch(() => null);
+        if (session?.user) {
+            return { id: String(session.user.id), label: session.user.display_name || session.user.email || `user ${session.user.id}`, type: "admin_app_session" };
+        }
+    }
+    return { id: "shared_api_key", label: "shared admin key", type: "api_key" };
+}

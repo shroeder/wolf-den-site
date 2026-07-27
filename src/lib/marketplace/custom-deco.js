@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { generateImage, refineDecoPrompt, describeDecoFromName } from "@/lib/marketplace/openai-image.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
 
 // Player-made decorations: describe → the art pipeline draws ONE image → if you don't love it, add a short
 // correction note and it redraws (the original description is preserved, your note nudges it) → pick one. Each
@@ -74,10 +75,14 @@ export async function getCustomState(buyerId) {
     return { credits: b?.c || 0, draft: draftRow ? mapDraft(draftRow) : null };
 }
 
-export async function grantCustomCredit(buyerId, n = 1) {
+// Grant tokens. `ctx` = { source, actorId, actorLabel, meta } identifies WHO gifted them and WHY — every grant is
+// written to the creation-token ledger (mkt_creation_ledger) so gifted creations are always auditable.
+export async function grantCustomCredit(buyerId, n = 1, ctx = {}) {
     if (!buyerId) return { ok: false };
-    await db.query(`UPDATE mkt_buyer SET custom_deco_credits = COALESCE(custom_deco_credits, 0) + $2 WHERE id = $1`, [buyerId, Math.max(1, Number(n) || 1)]).catch(() => {});
+    const amount = Math.max(1, Number(n) || 1);
+    await db.query(`UPDATE mkt_buyer SET custom_deco_credits = COALESCE(custom_deco_credits, 0) + $2 WHERE id = $1`, [buyerId, amount]).catch(() => {});
     const b = await db.queryOne(`SELECT COALESCE(custom_deco_credits, 0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    await logCreationLedger(buyerId, amount, { source: ctx.source || "admin_grant", actorId: ctx.actorId ?? null, actorLabel: ctx.actorLabel ?? null, balanceAfter: b?.c ?? null, meta: ctx.meta || {} });
     return { ok: true, credits: b?.c || 0 };
 }
 
@@ -89,11 +94,13 @@ export async function startCustomDeco(buyerId, name, prompt) {
     if (desc.length < 4) return { ok: false, error: "describe_it" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits - 1 WHERE id = $1 AND COALESCE(custom_deco_credits, 0) > 0 RETURNING custom_deco_credits`, [buyerId]).catch(() => null);
     if (!paid) return { ok: false, error: "no_credits" };
+    await logCreationLedger(buyerId, -1, { source: "spend_deco", actorId: buyerId, actorLabel: "self", balanceAfter: paid.custom_deco_credits, meta: { name: nm } });
     const row = await db.queryOne(`INSERT INTO mkt_custom_deco (buyer_id, name, prompt) VALUES ($1, $2, $3) RETURNING id`, [buyerId, nm, desc]).catch(() => null);
-    if (!row) { await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); return { ok: false, error: "db" }; }
+    if (!row) { await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); await logCreationLedger(buyerId, 1, { source: "refund_deco", actorId: "system", actorLabel: "system", meta: { reason: "db_error" } }); return { ok: false, error: "db" }; }
     const gen = await genOne(await buildPrompt(desc), 1);
     if (!gen.urls.length) {
         await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); // refund
+        await logCreationLedger(buyerId, 1, { source: "refund_deco", actorId: "system", actorLabel: "system", meta: { reason: gen.error?.reason || "gen_failed" } });
         // 'failed' (not 'abandoned') + the raw reason, so a policy refusal is distinguishable from a user abandon.
         await db.query(`UPDATE mkt_custom_deco SET status = 'failed', last_error = $2, updated_at = NOW() WHERE id = $1`, [row.id, gen.error?.raw || null]).catch(() => {});
         return { ok: false, error: "gen_failed", reason: gen.error?.reason || null };

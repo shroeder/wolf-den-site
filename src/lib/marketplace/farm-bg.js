@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { generateWideSceneImage } from "@/lib/marketplace/openai-image.js";
+import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
 
 // ── Custom farm background (one static, player-generated scene that replaces the weather backdrops) ──────────
 // Same SAFE token flow as custom decorations: the 3 creation tokens are charged ATOMICALLY before the AI runs
@@ -35,11 +36,13 @@ export async function startFarmBg(buyerId, prompt) {
         [buyerId, FARM_BG_COST]
     ).catch(() => null);
     if (!paid) return { ok: false, error: "no_credits" };
+    await logCreationLedger(buyerId, -FARM_BG_COST, { source: "spend_farm_bg", actorId: buyerId, actorLabel: "self", balanceAfter: paid.custom_deco_credits, meta: {} });
     let url = null;
     // 3 creation tokens → a 3-panel WIDE panorama (feather-blended, unique across its width, no repeat).
     try { url = await generateWideSceneImage(buildBgPrompt(desc), { pathPrefix: "marketplace/farm-bg", panels: 3 }); } catch { url = null; }
     if (!url) {
         await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + $2 WHERE id = $1`, [buyerId, FARM_BG_COST]).catch(() => {}); // refund
+        await logCreationLedger(buyerId, FARM_BG_COST, { source: "refund_farm_bg", actorId: "system", actorLabel: "system", meta: { reason: "gen_failed" } });
         return { ok: false, error: "gen_failed", ...(await getFarmBgState(buyerId)) };
     }
     await db.query(`UPDATE mkt_buyer SET farm_bg_draft_url = $2 WHERE id = $1`, [buyerId, url]).catch(() => {});

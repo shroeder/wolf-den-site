@@ -39,7 +39,7 @@ export async function finalizeCreationPurchase(purchaseId, { squarePaymentId = n
         const balance = await getTokenBalance(await purchaseBuyerId(purchaseId));
         return { granted: false, tokens: 0, coins: 0, tokenBalance: balance };
     }
-    const res = await grantCustomCredit(won.buyer_id, won.tokens).catch(() => null);
+    const res = await grantCustomCredit(won.buyer_id, won.tokens, { source: "purchase", actorId: won.buyer_id, actorLabel: "self (paid)", meta: { purchaseId, coins: won.coins } }).catch(() => null);
     await grantCoins(won.buyer_id, won.coins);
     await grantEventBadge(won.buyer_id, "creation_patron").catch(() => {}); // backed the artists — bought a bundle
     return { granted: true, tokens: won.tokens, coins: won.coins, tokenBalance: res?.credits ?? (await getTokenBalance(won.buyer_id)) };
@@ -65,7 +65,7 @@ export async function getTokenBalance(buyerId) {
 export async function grantCreationTierToOwner(buyerId, tierId) {
     const tier = getCreationTier(tierId);
     if (!buyerId || !tier) return { ok: false, error: "bad_tier" };
-    const res = await grantCustomCredit(buyerId, tier.tokens).catch(() => null);
+    const res = await grantCustomCredit(buyerId, tier.tokens, { source: "owner_grant", actorId: buyerId, actorLabel: "owner test grant", meta: { tierId, coins: tier.coins } }).catch(() => null);
     await grantCoins(buyerId, tier.coins);
     return { ok: true, tokens: tier.tokens, coins: tier.coins, tokenBalance: res?.credits ?? (await getTokenBalance(buyerId)) };
 }
