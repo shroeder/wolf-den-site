@@ -7,14 +7,12 @@ import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import CoinCta from "@/components/CoinCta";
-import { avatarUrlFor } from "@/lib/marketplace/avatar-options.js";
-
-// ── Permanent credit: the Forge was Alstier1's idea. His actual hero sprite is enshrined in the hearth's
-// corner as a small medallion; tapping it tells the story. (Hard-coded from his avatar config on purpose so
-// the tribute never breaks if his account changes — this is a fixed dedication, not live data.)
+// ── Permanent credit: the Forge was Alstier1's idea. His actual AI hero sprite is enshrined in the hearth's
+// corner as a small medallion; tapping it tells the story. (Hard-coded to his sprite blob on purpose so the
+// tribute never breaks if his account/sprite changes — this is a fixed dedication, not live data.)
 const FOUNDER = {
     name: "Alstier1",
-    avatar: avatarUrlFor({ top: "bun", eyes: "surprised", mouth: "tongue", clothing: "hoodie", eyebrows: "defaultNatural", hatColor: "262e33", hairColor: "4a312c", skinColor: "edb98a", facialHair: "beardLight", accessories: "none", clothesColor: "ff5c5c", backgroundColor: "ffd75e", clothingGraphic: "diamond", facialHairColor: "4a312c", accessoriesColor: "262e33" }),
+    sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/sprite/1785069930737-487951.png",
 };
 
 // ── The Forge (owner-gated blacksmith). Salvage unequipped gear → tiered parts → combine 5→1 → enhance equipped
@@ -176,7 +174,7 @@ export default function BlacksmithClient({ initial }) {
 
                 {/* Founder's medallion — Alstier1's hero sprite, permanently enshrined for dreaming up the Forge. */}
                 <button type="button" className="forge-founder" onClick={() => setShowFounder(true)} title={`Forged from an idea by ${FOUNDER.name}`} aria-label={`About the Forge — an idea by ${FOUNDER.name}`}>
-                    {FOUNDER.avatar ? <img src={FOUNDER.avatar} alt={FOUNDER.name} draggable="false" /> : <span aria-hidden="true">⚒️</span>}
+                    {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span aria-hidden="true">⚒️</span>}
                 </button>
             </div>
 
@@ -184,7 +182,7 @@ export default function BlacksmithClient({ initial }) {
                 <div className="forge-founder-scrim" role="dialog" aria-modal="true" onClick={() => setShowFounder(false)}>
                     <div className="forge-founder-card" onClick={(e) => e.stopPropagation()}>
                         <div className="forge-founder-hero">
-                            {FOUNDER.avatar ? <img src={FOUNDER.avatar} alt={FOUNDER.name} draggable="false" /> : <span style={{ fontSize: 44 }} aria-hidden="true">⚒️</span>}
+                            {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span style={{ fontSize: 44 }} aria-hidden="true">⚒️</span>}
                         </div>
                         <div className="forge-founder-kicker">⚒️ Founder&apos;s Tribute</div>
                         <h3 className="forge-founder-name">{FOUNDER.name}</h3>
@@ -762,7 +760,7 @@ const FORGE_CSS = `
     background: radial-gradient(circle at 50% 30%, #ffd75e, #ff9a2e); border: 2px solid rgba(255,224,160,0.9);
     box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 14px rgba(255,160,60,0.55), inset 0 0 0 1px rgba(0,0,0,0.25);
     display: grid; place-items: center; transition: transform .18s cubic-bezier(.2,1.4,.35,1), box-shadow .18s; animation: forgeFounderGlow 3.2s ease-in-out infinite; }
-.forge-founder img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.forge-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45)); }
 .forge-founder span { font-size: 22px; }
 .forge-founder:hover, .forge-founder:focus-visible { transform: scale(1.12) rotate(-3deg); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 22px rgba(255,180,80,0.85); outline: none; }
 @keyframes forgeFounderGlow { 0%,100% { box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 12px rgba(255,160,60,0.45), inset 0 0 0 1px rgba(0,0,0,0.25); } 50% { box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 22px rgba(255,190,90,0.8), inset 0 0 0 1px rgba(0,0,0,0.25); } }
@@ -772,7 +770,7 @@ const FORGE_CSS = `
     animation: forgeFounderPop .32s cubic-bezier(.2,1.4,.35,1) both; }
 .forge-founder-hero { width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
     background: radial-gradient(circle at 50% 30%, #ffd75e, #ff9a2e); border: 3px solid rgba(255,224,160,0.9); box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 26px rgba(255,170,70,0.6); }
-.forge-founder-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.forge-founder-hero img { width: 108%; height: 108%; object-fit: contain; object-position: center 6%; display: block; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
 .forge-founder-kicker { font-size: 10.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffb877; }
 .forge-founder-name { margin: 3px 0 8px; font-size: 1.35rem; font-weight: 900; color: #ffe0b0; text-shadow: 0 2px 8px rgba(255,120,20,0.5); }
 .forge-founder-body { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #ecd6bc; }
