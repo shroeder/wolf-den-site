@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getFeatureDailies, claimFeatureDaily, FEATURE_DAILIES } from "@/lib/marketplace/feature-dailies.js";
+import { getFeatureDailies, claimFeatureDaily, getFeatureClaimCounts, FEATURE_DAILIES } from "@/lib/marketplace/feature-dailies.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -15,7 +15,10 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-            const feature = new URL(request.url).searchParams.get("feature") || "";
+            const params = new URL(request.url).searchParams;
+            // ?counts=1 → claimable-task counts per feature (for nav/tab attention badges).
+            if (params.get("counts")) return NextResponse.json({ counts: await getFeatureClaimCounts(buyer.id) }, { headers: { "Cache-Control": "no-store" } });
+            const feature = params.get("feature") || "";
             if (!VALID.has(feature)) return NextResponse.json({ error: "bad_feature" }, { status: 400 });
             return NextResponse.json({ dailies: await getFeatureDailies(buyer.id, feature) }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {

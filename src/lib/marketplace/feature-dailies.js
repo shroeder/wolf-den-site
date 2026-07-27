@@ -53,6 +53,22 @@ export async function getFeatureDailies(buyerId, feature) {
     });
 }
 
+// Claimable (done-but-unclaimed) task counts per feature, in ONE query — for the nav/tab attention badges.
+export async function getFeatureClaimCounts(buyerId) {
+    const out = {};
+    for (const f of Object.keys(FEATURE_DAILIES)) out[f] = 0;
+    if (!buyerId) return out;
+    const rows = await db.query(`SELECT feature, progress, claimed FROM mkt_feature_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => []);
+    for (const row of rows) {
+        const tasks = FEATURE_DAILIES[row.feature];
+        if (!tasks) continue;
+        const progress = parseJson(row.progress, {});
+        const claimed = new Set(parseJson(row.claimed, []));
+        out[row.feature] = tasks.filter((t) => Math.min(Number(progress[t.metric] || 0), t.need) >= t.need && !claimed.has(t.key)).length;
+    }
+    return out;
+}
+
 export async function claimFeatureDaily(buyerId, feature, key) {
     const tasks = FEATURE_DAILIES[feature];
     const t = tasks?.find((x) => x.key === key);

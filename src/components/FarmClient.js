@@ -246,6 +246,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [garden, setGarden] = useState(initial.garden || null);
     const [gardenBusy, setGardenBusy] = useState(null);
     const [bountyTick, setBountyTick] = useState(0); // bumps after a mission-progressing action → FeatureDailies re-fetches
+    const [farmClaimable, setFarmClaimable] = useState(0); // claimable farm daily-quests → Garden-tab attention badge
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
@@ -770,6 +771,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-viewtabs button > span { font-size: 16px; }
                 .farm-viewtabs button.on { background: linear-gradient(180deg, #7ed57e, #4bbf6a); color: #10240f; box-shadow: 0 2px 6px rgba(75,191,106,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
                 @media (hover: hover) { .farm-viewtabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0e0; } }
+                .farm-viewtabs button.has-attn:not(.on) { box-shadow: inset 0 0 0 1px rgba(224,67,63,0.55); }
+                .farm-viewtabs .farm-tab-badge { font-size: 10px; font-weight: 900; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #e0433f; color: #fff; display: inline-grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.45); animation: farmTabPulse 1.6s ease-in-out infinite; }
+                @keyframes farmTabPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
             `}</style>
 
             {farm.mine ? (
@@ -801,7 +805,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {farm.mine && farm.rating ? <FarmRankBadge byTier={farm.rating.byTier} /> : null}
 
-            {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
+            {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} onClaimable={setFarmClaimable} /> : null}
 
             {farm.rating ? (
                 <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
@@ -811,11 +815,16 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* Three farm areas: Garden (crops) · Outside (pasture) · Inside (barn). */}
             <div className="farm-viewtabs">
-                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]].map(([v, ico, label]) => (
-                    <button key={v} type="button" className={view === v ? "on" : ""} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
-                        <span aria-hidden="true">{ico}</span>{label}
-                    </button>
-                ))}
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]].map(([v, ico, label]) => {
+                    // Garden tab shows an attention badge when there's stuff to grab: crops ready + claimable quests.
+                    const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) + farmClaimable : 0;
+                    return (
+                        <button key={v} type="button" className={`${view === v ? "on" : ""}${attn ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
+                            <span aria-hidden="true">{ico}</span>{label}
+                            {attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span> : null}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,

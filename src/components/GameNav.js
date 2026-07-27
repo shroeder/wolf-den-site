@@ -62,6 +62,7 @@ export default function GameNav() {
     const [questsReady, setQuestsReady] = useState(0);
     const [cropsReady, setCropsReady] = useState(0);
     const [sailAttn, setSailAttn] = useState(false);
+    const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
@@ -70,6 +71,7 @@ export default function GameNav() {
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); }).catch(() => {});
+            fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
         };
         loadChests();
         const onRefresh = () => loadChests();
@@ -98,11 +100,15 @@ export default function GameNav() {
 
     if (!inGame) return null;
 
+    const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
     const badgeInfo = (href) => {
-        if (href === "/marketplace/inventory" && chests > 0) return { badge: chests, title: `${chests} chest${chests === 1 ? "" : "s"} to open` };
-        if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${spins} spin${spins === 1 ? "" : "s"} ready` };
-        if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${questsReady} quest${questsReady === 1 ? "" : "s"} to claim` };
-        if (href === "/marketplace/farm" && cropsReady > 0) return { badge: cropsReady, title: `${cropsReady} crop${cropsReady === 1 ? "" : "s"} ready` };
+        if (href === "/marketplace/inventory" && chests > 0) return { badge: chests, title: `${plural(chests, "chest")} to open` };
+        if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${plural(spins, "spin")} ready` };
+        if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };
+        // Feature pills also badge their claimable daily-quests (farm crops + quests together).
+        if (href === "/marketplace/farm") { const n = cropsReady + (featureClaims.farm || 0); if (n > 0) return { badge: n, title: [cropsReady ? `${plural(cropsReady, "crop")} ready` : null, featureClaims.farm ? `${plural(featureClaims.farm, "quest")} to claim` : null].filter(Boolean).join(" · ") }; }
+        if (href === "/marketplace/sailing" && (featureClaims.sailing || 0) > 0) return { badge: featureClaims.sailing, title: `${plural(featureClaims.sailing, "quest")} to claim` };
+        if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };
         return { badge: null, title: null };
     };
     const dotFor = (href) => href === "/marketplace/sailing" && sailAttn;
