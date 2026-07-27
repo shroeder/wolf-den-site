@@ -98,9 +98,13 @@ export async function debugAddParts(buyerId, tier, n = 10) {
     return { ok: true, ...(await getForgeState(buyerId)) };
 }
 
-// Enhance cost: parts of the item's rarity tier, quantity grows LOGARITHMICALLY with the item's enhance level.
+// Enhance cost: parts of the item's rarity tier, quantity RAMPS UP each time you re-forge the same piece.
+// Base 6, then increments of +4, +6, +8 and capped at +8/level → 6, 10, 16, 24, 32, 40, 48 … so deeper
+// forges on an already-enhanced item cost progressively more. (level = the piece's current enhance level.)
 function enhanceCost(item, level) {
-    return { tier: rarityTier(item.rarity), qty: Math.max(2, Math.round(2 + 1.8 * Math.log2(level + 2))) };
+    let qty = 6;
+    for (let k = 0; k < level; k += 1) qty += Math.min(8, 4 + 2 * k);
+    return { tier: rarityTier(item.rarity), qty };
 }
 
 async function logCraft(buyerId, action, { itemId = null, tier = null, score = null, grade = null, meta = null } = {}) {
