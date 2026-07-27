@@ -24,8 +24,11 @@ const ownedBonusParts = (p) => {
     // Farm passives (seedLuck/growSpeed/petXp) help the FARM; combat passives buff the boss. Use each stat's OWN
     // description so a "Seed Luck" bonus reads like seed luck — not the old hardcoded "boss damage" for everything.
     const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨", desc: "Stacks across your whole menagerie" };
-    const suffix = ["seedLuck", "growSpeed", "petXp"].includes(p.stat) ? "%" : "";
-    return { icon: m.icon, name: `+${p.value}${suffix} ${m.label}`, desc: `${m.desc} Stacks across every pet you own.` };
+    const isFarm = ["seedLuck", "growSpeed", "petXp"].includes(p.stat);
+    const suffix = isFarm ? "%" : "";
+    // Farm passives apply only while this pet is your equipped farm companion; combat passives stack across your
+    // whole menagerie. Say which so the player isn't misled.
+    return { icon: m.icon, name: `+${p.value}${suffix} ${m.label}`, desc: `${m.desc} ${isFarm ? "Active while this pet is equipped." : "Stacks across every pet you own."}` };
 };
 
 // One effect row in the pet modal: an icon tile + a tiny label, the effect name, and a muted one-line detail.
