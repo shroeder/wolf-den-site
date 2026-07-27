@@ -362,15 +362,17 @@ export async function getBadgeBonusTotals(buyerId) {
 // ── Collection milestones ── as your badge count climbs, hit these thresholds for a chunk of gold + a chest
 // (escalating chest tiers). Claimed on the Badges page. The high tiers are long-term aspirations as more
 // badges are added over time.
+// Chest rewards are capped at MYTHIC on purpose — the top two tiers (Ascendant/Eternal) are far too strong to
+// hand out for a badge count right now. The high milestones escalate the QUANTITY of mythic chests instead.
 export const BADGE_MILESTONES = [
-    { count: 10,  gold: 100,  chest: "wooden" },
-    { count: 25,  gold: 250,  chest: "iron" },
-    { count: 50,  gold: 500,  chest: "gold" },
-    { count: 100, gold: 1000, chest: "mythic" },
-    { count: 250, gold: 2500, chest: "ascendant" },
-    { count: 500, gold: 5000, chest: "eternal" },
+    { count: 10,  gold: 100,  chest: "wooden", chestCount: 1 },
+    { count: 25,  gold: 250,  chest: "iron",   chestCount: 1 },
+    { count: 50,  gold: 500,  chest: "gold",   chestCount: 1 },
+    { count: 100, gold: 1000, chest: "mythic", chestCount: 1 },
+    { count: 250, gold: 2500, chest: "mythic", chestCount: 2 },
+    { count: 500, gold: 5000, chest: "mythic", chestCount: 3 },
 ];
-const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal" };
+const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic" };
 
 // How many badges a member holds right now (earned count, excluding nothing — every held badge counts).
 async function earnedBadgeCount(buyerId) {
@@ -387,7 +389,7 @@ export async function getBadgeMilestones(buyerId) {
     ]);
     const claimed = new Set((Array.isArray(row?.claimed) ? row.claimed : []).map(Number));
     const tiers = BADGE_MILESTONES.map((mst) => ({
-        count: mst.count, gold: mst.gold, chest: mst.chest, chestLabel: CHEST_LABEL[mst.chest] || mst.chest,
+        count: mst.count, gold: mst.gold, chest: mst.chest, chestCount: mst.chestCount || 1, chestLabel: CHEST_LABEL[mst.chest] || mst.chest,
         reached: count >= mst.count, claimed: claimed.has(mst.count), claimable: count >= mst.count && !claimed.has(mst.count),
     }));
     return { earnedCount: count, tiers, claimable: tiers.filter((t) => t.claimable).length };
@@ -415,7 +417,7 @@ export async function claimBadgeMilestone(buyerId, count) {
     // Grant the chest (best-effort; logged to the chest-grant ledger with its source).
     try {
         const { addChests } = await import("@/lib/marketplace/chests.js");
-        await addChests(buyerId, { [mst.chest]: 1 }, { source: "badge_milestone", meta: { count: mst.count } });
+        await addChests(buyerId, { [mst.chest]: mst.chestCount || 1 }, { source: "badge_milestone", meta: { count: mst.count } });
     } catch { /* best-effort */ }
     await trackActivity(buyerId, "badge_milestone", { count: mst.count, gold: mst.gold, chest: mst.chest }).catch(() => {});
     return { ok: true, gold: upd.gold, milestones: await getBadgeMilestones(buyerId) };

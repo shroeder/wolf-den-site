@@ -84,7 +84,7 @@ export default function BadgeCollectionClient({ badges = [], initialMilestones =
             if (r?.ok) {
                 if (r.milestones) setMilestones(r.milestones);
                 const t = (initialMilestones?.tiers || milestones?.tiers || []).find((x) => x.count === count);
-                setFlash({ count, gold: BADGE_GOLD[count], chest: t?.chestLabel });
+                setFlash({ count, gold: BADGE_GOLD[count], chest: t?.chestLabel, chestCount: t?.chestCount || 1 });
                 setTimeout(() => setFlash(null), 3200);
             }
         } finally { setClaiming(null); }
@@ -109,7 +109,7 @@ export default function BadgeCollectionClient({ badges = [], initialMilestones =
                                 <div className="bc-ms-target">{t.count}<span>badges</span></div>
                                 <div className="bc-ms-reward">
                                     <span className="bc-ms-gold">🪙 {t.gold.toLocaleString()}</span>
-                                    <span className="bc-ms-chest">{t.chestLabel} chest</span>
+                                    <span className="bc-ms-chest">{t.chestCount > 1 ? `${t.chestCount}× ` : ""}{t.chestLabel} chest{t.chestCount > 1 ? "s" : ""}</span>
                                 </div>
                                 {t.claimed ? <span className="bc-ms-state done">Claimed ✓</span>
                                     : t.claimable ? <button type="button" className="bc-ms-claim" disabled={claiming === t.count} onClick={() => claim(t.count)}>{claiming === t.count ? "…" : "Claim"}</button>
@@ -157,7 +157,7 @@ export default function BadgeCollectionClient({ badges = [], initialMilestones =
                     <div className="bc-flash-card">
                         <div className="bc-flash-emoji">🏆</div>
                         <b>Milestone claimed!</b>
-                        <span>{flash.count} badges → 🪙 {flash.gold?.toLocaleString()}{flash.chest ? ` + a ${flash.chest} chest` : ""}</span>
+                        <span>{flash.count} badges → 🪙 {flash.gold?.toLocaleString()}{flash.chest ? ` + ${flash.chestCount > 1 ? `${flash.chestCount} ${flash.chest} chests` : `a ${flash.chest} chest`}` : ""}</span>
                     </div>
                 </div>
             ) : null}
