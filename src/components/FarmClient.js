@@ -1372,17 +1372,17 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
     }
     const busyHere = busy === `h-${p.slot}` || busy === `p-${p.slot}` || busy === `f-${p.slot}`;
     const canPlant = empty && totalSeeds > 0;
-    const tappable = empty ? canPlant : true; // growing/ready plots are always tappable
+    const tappable = true; // empty plots ALWAYS open the seed picker (which offers seeds to plant, or a buy-a-pack shortcut when the bag's empty)
     const onClick = () => {
         if (suppressClickRef?.current) { suppressClickRef.current = false; return; } // that was a drag, not a tap
         if (busyHere) return;
-        if (empty) { if (canPlant) onPlant(p.slot); return; }
+        if (empty) { onPlant(p.slot); return; } // open the picker even with 0 seeds → it shows the "buy a seed pack" shortcut
         if (ready) onHarvest(p.slot);
         else onInspect(p.slot); // growing → open the inspect modal (don't silently fertilize)
     };
     const plantScale = ready ? 1 : 0.4 + 0.6 * progress; // grows from a seedling as it matures
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
-        : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — harvest crops, tend pets, or play the other games to find seeds")
+        : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — tap to get seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
     return (
         <button type="button" onClick={onClick} title={title}
@@ -1395,9 +1395,9 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
                     <span style={{ position: "absolute", left: "50%", bottom: 1, transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1s linear" }}>
                         <span style={{ display: "block", fontSize: 28, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 7px rgba(140,240,150,0.9))" : "drop-shadow(0 2px 2px rgba(0,0,0,0.45))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{ready ? p.emoji : p.sprout}</span>
                     </span>
-                ) : canPlant ? (
-                    <span style={{ position: "absolute", left: "50%", bottom: 6, transform: "translateX(-50%)", fontSize: 19, color: "#ffe27a", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
-                ) : null}
+                ) : (
+                    <span style={{ position: "absolute", left: "50%", bottom: 6, transform: "translateX(-50%)", fontSize: 19, color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
+                )}
             </span>
             {/* a soft ground shadow so the mound reads as sitting ON the grass */}
             <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: -3, transform: "translateX(-50%)", width: 46, height: 10, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0) 72%)", zIndex: 0 }} />
