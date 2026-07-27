@@ -783,20 +783,24 @@ export default function FarmClient({ initial, viewingAlias }) {
             {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,
                 so you can scroll sideways to see the WHOLE painting (it's wider than the viewport). */}
             <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
-                <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
+                <div ref={scrollRef} className="farm-scroll" onPointerDown={fullscreen ? undefined : onScrollPointerDown} onPointerMove={fullscreen ? undefined : onScrollPointerMove} onPointerUp={fullscreen ? undefined : onScrollPointerUp} onPointerLeave={fullscreen ? undefined : onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: fullscreen ? "hidden" : "auto", overflowY: "hidden", cursor: fullscreen ? "default" : "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
-                            position: "relative", width: "max-content", minWidth: "100%", height: sceneHeight,
+                            // Fullscreen: fill the viewport as a single cover (NO horizontal scroll). Windowed: the
+                            // field is as wide as the image so you can scroll sideways to see the whole painting.
+                            position: "relative", width: fullscreen ? "100%" : "max-content", minWidth: "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Backdrop — the single image at full height (width auto); its natural width sets the field
-                            width, so the scene scrolls sideways to reveal the whole image. */}
+                        {/* Backdrop — windowed: full height, natural width (its width sets the scrollable field).
+                            Fullscreen: a single cover filling the viewport, no horizontal scroll. */}
                         {bgUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
+                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={fullscreen
+                                ? { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", userSelect: "none", pointerEvents: "none" }
+                                : { display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
                         ) : null}
                         {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
 
