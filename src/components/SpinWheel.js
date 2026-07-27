@@ -60,7 +60,6 @@ export default function SpinWheel() {
     const [lowCoins, setLowCoins] = useState(false);
 
     const wrapRef = useRef(null);
-    const canvasRef = useRef(null);
     const sizeRef = useRef(300);
     const angleRef = useRef(0);            // current wheel rotation (radians)
     const spinRef = useRef(null);          // active spin animation descriptor
@@ -79,12 +78,13 @@ export default function SpinWheel() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount (setState is post-await, not sync)
     useEffect(() => { load(); }, [load]);
 
-    // ── the render loop (drives bulbs + the spin). Gated on sign-in because the <canvas> only mounts once
-    // `st` loads (before that we render a "Loading…" placeholder), so this must (re)run when it appears. ──
-    const ready = Boolean(st?.signedIn);
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return undefined;
+    // ── the render loop (drives bulbs + the spin). Attached via a CALLBACK REF so setup runs the exact moment
+    // the <canvas> mounts — the <canvas> only appears after `st` loads (a "Loading…" placeholder shows first),
+    // and a callback ref is the one thing guaranteed to fire when that node attaches/detaches. ──
+    const loopCleanup = useRef(null);
+    const canvasCb = useCallback((canvas) => {
+        if (loopCleanup.current) { loopCleanup.current(); loopCleanup.current = null; }
+        if (!canvas) return;
         const ctx = canvas.getContext("2d");
         let lastWedge = null;
         let lastTick = 0;
@@ -103,6 +103,7 @@ export default function SpinWheel() {
         if (ro && wrapRef.current) ro.observe(wrapRef.current);
 
         const draw = (ts) => {
+          try {
             const size = sizeRef.current;
             const prizes = prizesRef.current;
             const n = prizes.length || 1;
@@ -202,12 +203,12 @@ export default function SpinWheel() {
             ctx.beginPath(); ctx.moveTo(cx - size * 0.035, py - size * 0.03); ctx.lineTo(cx + size * 0.035, py - size * 0.03); ctx.lineTo(cx, py + size * 0.03); ctx.closePath();
             ctx.fillStyle = "#ff4d5e"; ctx.shadowColor = "rgba(255,77,94,0.8)"; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
             ctx.strokeStyle = rim; ctx.lineWidth = 2; ctx.stroke();
-
-            rafRef.current = requestAnimationFrame(draw);
+          } catch { /* never let one bad frame kill the wheel */ }
+          rafRef.current = requestAnimationFrame(draw);
         };
         rafRef.current = requestAnimationFrame(draw);
-        return () => { cancelAnimationFrame(rafRef.current); if (ro) ro.disconnect(); };
-    }, [ready]);
+        loopCleanup.current = () => { cancelAnimationFrame(rafRef.current); if (ro) ro.disconnect(); };
+    }, []);
 
     const doSpinRequest = useCallback(async () => {
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
@@ -286,7 +287,7 @@ export default function SpinWheel() {
             </div>
 
             <div className={`cw-stage${st.golden ? " is-golden" : ""}`} ref={wrapRef}>
-                <canvas ref={canvasRef} className="cw-canvas" />
+                <canvas ref={canvasCb} className="cw-canvas" />
             </div>
 
             {/* Lucky Charge meter → GOLDEN SPIN */}
