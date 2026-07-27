@@ -242,6 +242,53 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     return blob.url;
 }
 
+// TRUE wide scene via OUTPAINTING — generate a base tile, then extend it RIGHT step-by-step by feeding the real
+// right-edge pixels back with a fill-mask so the model paints a genuine continuation (no seams, no repeat — not a
+// "clever tile"). Sequential, so keep `steps` modest under a serverless time budget. Returns the stored Blob URL.
+export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pathPrefix = "marketplace/boss-bg", steps = 3, quality = "medium" } = {}) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("Missing OPENAI_API_KEY");
+    const W = 1536, H = 1024, SEED = 800, NEW = W - SEED;
+    const genBase = async () => {
+        const r = await fetch(IMAGES_URL, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({ model: "gpt-image-1", prompt: basePrompt, size: `${W}x${H}`, background: "opaque", quality, n: 1 }) });
+        if (!r.ok) throw new Error(`OpenAI base ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`);
+        const b64 = (await r.json().catch(() => null))?.data?.[0]?.b64_json;
+        if (!b64) throw new Error("OpenAI returned no image");
+        return Buffer.from(b64, "base64");
+    };
+    // Reused mask: keep the left SEED px (opaque), let the right NEW px be repainted (transparent alpha).
+    const mask = Buffer.alloc(W * H * 4);
+    for (let y = 0; y < H; y += 1) { const row = y * W; for (let x = 0; x < W; x += 1) mask[(row + x) * 4 + 3] = x < SEED ? 255 : 0; }
+    const maskPng = await sharp(mask, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+    const extend = async (panorama, panoW) => {
+        const seed = await sharp(panorama).extract({ left: panoW - SEED, top: 0, width: SEED, height: H }).toBuffer();
+        const canvas = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: seed, left: 0, top: 0 }]).png().toBuffer();
+        const form = new FormData();
+        form.append("model", "gpt-image-1");
+        form.append("image", new Blob([canvas], { type: "image/png" }), "canvas.png");
+        form.append("mask", new Blob([maskPng], { type: "image/png" }), "mask.png");
+        form.append("prompt", contPrompt);
+        form.append("size", `${W}x${H}`);
+        form.append("quality", quality);
+        form.append("n", "1");
+        const r = await fetch(IMAGE_EDITS_URL, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
+        if (!r.ok) throw new Error(`OpenAI outpaint ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`);
+        const b64 = (await r.json().catch(() => null))?.data?.[0]?.b64_json;
+        if (!b64) throw new Error("OpenAI returned no image");
+        const fresh = await sharp(Buffer.from(b64, "base64")).resize(W, H).extract({ left: SEED, top: 0, width: NEW, height: H }).toBuffer();
+        const grown = await sharp({ create: { width: panoW + NEW, height: H, channels: 4, background: { r: 20, g: 24, b: 16, alpha: 1 } } })
+            .composite([{ input: panorama, left: 0, top: 0 }, { input: fresh, left: panoW, top: 0 }]).png().toBuffer();
+        return { buf: grown, width: panoW + NEW };
+    };
+    let buf = await genBase();
+    let width = W;
+    for (let i = 0; i < Math.max(1, Math.min(6, steps)); i += 1) { const r = await extend(buf, width); buf = r.buf; width = r.width; }
+    const out = await sharp(buf).flatten({ background: { r: 20, g: 24, b: 16 } }).png({ compressionLevel: 9 }).toBuffer();
+    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, out, { access: "public", contentType: "image/png" });
+    return blob.url;
+}
+
 // WIDE panorama scene — gpt-image-1 tops out at 1536x1024 (1.5:1), so we generate N panels of ONE continuous
 // scene and feather-blend them into a single ~3-4x-wide image. The farm uses this so a backdrop can scroll wide
 // while staying fully UNIQUE (no mirror-tiling / visible repeat). Returns the stored Blob URL.

@@ -12,7 +12,7 @@ import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // custom-decoration generation draws several AI images
+export const maxDuration = 300; // custom bg outpainting runs several AI generations sequentially
 export const dynamic = "force-dynamic";
 
 // Every signed-in member has a farm. GET ?u=<alias> inspects another member's farm (view-only).
