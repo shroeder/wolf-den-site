@@ -24,7 +24,7 @@ const ACHIEVEMENT_PET_RULES = {
     toucan: (m) => m.bountiesWon >= 3,
     // Pet-LEVELING achievement pets.
     spirit_fox: (m) => (m.petLevelsTotal || 0) >= 10,
-    runebound_drake: (m) => (m.petsMaxed || 0) >= 5,
+    runebound_drake: (m) => (m.petsMaxed || 0) >= 25,
     radiant_phoenix: (m) => Boolean(m.maxedLegendaryPlus),
     // APEX pets (Ascendant / Eternal) — used to unlock for merely OWNING any elite item (far too easy).
     // Now a hard, distinct feat: an elite relic PLUS proven boss dominance (raffle wins).
