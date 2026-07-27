@@ -32,17 +32,24 @@ const WHEELS = [
     {
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
-            { label: "100 gold", emoji: "🪙", weight: 28, kind: "gold", amount: 100 },
-            { label: "100 XP", emoji: "⭐", weight: 18, kind: "xp", amount: 100 },
-            { label: "Pet Treat", emoji: "🦴", weight: 16, kind: "treat", treat: "treat_bone" },
-            { label: "Common Seed", emoji: "🌱", weight: 12, kind: "seed" },
-            { label: "250 gold", emoji: "🪙", weight: 14, kind: "gold", amount: 250 },
-            { label: "+1 Spin", emoji: "🎟️", weight: 10, kind: "token", n: 1 },
-            { label: "250 XP", emoji: "🌟", weight: 8, kind: "xp", amount: 250 },
-            { label: "Farm Decoration", emoji: "🪴", weight: 7, rare: true, tier: "rare", kind: "deco" },
-            { label: "Wooden Chest", emoji: "📦", weight: 8, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
-            { label: "500 gold", emoji: "💰", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 500 },
-            { label: "50% Gold-Shop Coupon", emoji: "🏷️", weight: 4, rare: true, tier: "rare", kind: "coupon" },
+            // Bread-and-butter — small, frequent, but with system flavor instead of only raw gold/XP.
+            { label: "100 gold", emoji: "🪙", weight: 20, kind: "gold", amount: 100 },
+            { label: "150 XP", emoji: "⭐", weight: 13, kind: "xp", amount: 150 },
+            { label: "Pet Treat", emoji: "🦴", weight: 11, kind: "consumable", consumable: "treat_bone", n: 1 },
+            { label: "Farm Seed", emoji: "🌱", weight: 9, kind: "seed" },
+            { label: "5 Fertilizer", emoji: "📦", weight: 8, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
+            { label: "3 Dig Fragments", emoji: "⚓", weight: 8, kind: "fragment", n: 3 },
+            { label: "250 gold", emoji: "🪙", weight: 10, kind: "gold", amount: 250 },
+            // The "fun" middle — an instant BONUS SPIN (not a banked token), and a boss potion.
+            { label: "BONUS SPIN", emoji: "🎡", weight: 8, tier: "bonus", kind: "respin" },
+            { label: "Adrenaline Vial", emoji: "🧪", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
+            // Rare tier.
+            { label: "Farm Decoration", emoji: "🪴", weight: 5, rare: true, tier: "rare", kind: "deco" },
+            { label: "Wooden Chest", emoji: "📦", weight: 5, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            { label: "500 gold", emoji: "💰", weight: 4, rare: true, tier: "rare", kind: "gold", amount: 500 },
+            { label: "Berserker's Brew", emoji: "🍺", weight: 2, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
+            { label: "50% Gold-Shop Coupon", emoji: "🏷️", weight: 3, rare: true, tier: "rare", kind: "coupon" },
+            // The thrill.
             { label: "MINI JACKPOT · 1,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 1000 },
             { label: "JACKPOT · 2,500 gold", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 2500 },
         ],
@@ -81,6 +88,9 @@ async function grantPrize(buyerId, prize) {
         return { emoji: prize.emoji, text: `${prize.amount.toLocaleString()} XP` };
     }
     if (prize.kind === "treat") { await grantConsumable(buyerId, prize.treat, 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "fragment") { try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, prize.n || 1); } catch { /* best-effort */ } return { emoji: prize.emoji, text: prize.label }; }
+    if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { emoji: prize.emoji, text: "Spin again — on the house!" }; }
     if (prize.kind === "seed") {
         const commons = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === "common");
         const sid = commons[Math.floor(Math.random() * commons.length)];
@@ -125,7 +135,7 @@ const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 export async function getSpinState(buyerId) {
     if (!buyerId) return { signedIn: false };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count, COALESCE(spins_since_rare,0) AS pity FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const level = levelForXp(row?.xp || 0).level;
     const wheel = wheelForLevel(level);
     const freeAvailable = asDay(row?.free_spin_day) !== today();
@@ -141,6 +151,11 @@ export async function getSpinState(buyerId) {
         freeAvailable,
         tokenCost,
         extraSpinsToday: boughtToday,
+        // "Lucky Charge" — the pity meter, surfaced. Fills each spin; at full the NEXT spin is a GOLDEN SPIN
+        // (a guaranteed rare-or-better). Gives every spin a visible goal to build toward.
+        charge: Math.min(PITY, row?.pity || 0),
+        chargeMax: PITY,
+        golden: (row?.pity || 0) >= PITY - 1,
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
             return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
@@ -175,7 +190,7 @@ export async function doSpin(buyerId) {
     await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
-    const prizeOut = { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal"), jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare) };
+    const prizeOut = { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal"), jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare), respin: Boolean(prize.kind === "respin"), golden: forceRare };
     return { ok: true, prizeIndex: idx, prize: prizeOut, ...(await getSpinState(buyerId)) };
 }
 
