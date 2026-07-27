@@ -7,7 +7,8 @@ const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legen
 // ── Decorate DOCK: a bottom tray you drag decorations OUT of, straight onto the farm scene (which stays fully
 // visible above it). Drag a chip up, release over the field → it drops there. Also carries the placed-count,
 // a Shop button, and Done. This is the "grab from a drawer while watching the farm" flow.
-export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, onOpenCreator, onDone }) {
+export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, onOpenCreator, onDone, spriteBrightness = 1, onSpriteBrightness }) {
+    const [bright, setBright] = useState(Number(spriteBrightness) || 1);
     const { catalog = [], placedTotal = 0, placedCap = 500 } = deco || {};
     const atCap = placedTotal >= placedCap;
     const ownedItems = catalog.filter((d) => d.owned);
@@ -106,6 +107,13 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                     ) : null}
                     <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>✓ Done</button>
                 </div>
+                {onSpriteBrightness ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 12px 4px" }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6d7c2" }} title="Global brightness for all your farm sprites (a real filter, not an overlay)">🔆 All sprites</span>
+                        <input type="range" min="0.3" max="2.2" step="0.05" value={bright} onChange={(e) => setBright(Number(e.target.value))} onPointerUp={() => onSpriteBrightness(bright)} onKeyUp={() => onSpriteBrightness(bright)} style={{ flex: 1, accentColor: "#ffd27a" }} />
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "#ffd27a", width: 38, textAlign: "right" }}>{Math.round(bright * 100)}%</span>
+                    </div>
+                ) : null}
                 <div style={{ fontSize: 10.5, color: "#9fbf9f", padding: "0 12px 6px" }}>
                     {atCap ? "Farm full (500 placed) — tap a placed piece to pick it up."
                         : editing ? "Pull a decoration UP onto the farm to place it; swipe the tray sideways to browse. Drag placed pieces to move; tap for details."
@@ -167,7 +175,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
 // ── Scene layer: renders a member's PLACED decorations inside the pasture field. TAP any decoration to open its
 // inspect modal (details/effects + pick up). When "editing" (decorate mode), you can also DRAG to reposition —
 // a short movement is treated as a tap (inspect), a longer one as a drag (move). No always-visible ✕.
-export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day" }) {
+export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day", spriteBrightness = 1 }) {
     const [drag, setDrag] = useState(null); // { id, x, y } live position during an actual drag
     const gr = useRef({}); // gesture: { id, pointerId, sx, sy, moved, x, y, el }
     const suppressClick = useRef(false); // set after a real drag so the trailing click doesn't also inspect
@@ -228,19 +236,21 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                         }}
                         title={editing ? `${p.name} — drag to move, click to inspect / remove` : `${p.name} — tap for details`}
                     >
-                        {p.light && tod !== "day" ? (
+                        {/* Real ADDITIVE light (screen blend) — brightens locally, never a wash overlay. A player
+                            light is always on; a decoration's intrinsic glow shows only at dusk/night. */}
+                        {p.light?.on && (p.light.always || tod !== "day") ? (
                             <span aria-hidden="true" style={{
-                                position: "absolute", left: "50%", top: `${size * 0.42}px`, width: p.light.r * 2, height: p.light.r * 2,
+                                position: "absolute", left: "50%", top: `${size * 0.42}px`, width: p.light.radius * 2, height: p.light.radius * 2,
                                 transform: "translate(-50%, -50%)", borderRadius: "50%", pointerEvents: "none", zIndex: 0, mixBlendMode: "screen",
-                                background: `radial-gradient(circle, rgba(${p.light.rgb},0.62) 0%, rgba(${p.light.rgb},0.28) 32%, rgba(${p.light.rgb},0) 68%)`,
+                                background: `radial-gradient(circle, rgba(${p.light.rgb},${(p.light.intensity ?? 0.7)}) 0%, rgba(${p.light.rgb},${(p.light.intensity ?? 0.7) * 0.45}) 32%, rgba(${p.light.rgb},0) 68%)`,
                                 animation: p.light.flicker ? "decoFlicker 2.6s ease-in-out infinite" : "decoGlow 4.5s ease-in-out infinite",
                             }} />
                         ) : null}
                         {p.spriteUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} draggable={false} style={{ position: "relative", zIndex: 1, width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }} />
+                            <img src={p.spriteUrl} alt={p.name} width={size} height={size} draggable={false} style={{ position: "relative", zIndex: 1, width: size, height: size, objectFit: "contain", transform: p.flip ? "scaleX(-1)" : "none", filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.4)) brightness(${(p.brightness ?? 1) * spriteBrightness})`, pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }} />
                         ) : (
-                            <span style={{ position: "relative", zIndex: 1, fontSize: 40, filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))", pointerEvents: "none" }}>{p.emoji}</span>
+                            <span style={{ position: "relative", zIndex: 1, fontSize: 40, filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.4)) brightness(${(p.brightness ?? 1) * spriteBrightness})`, pointerEvents: "none" }}>{p.emoji}</span>
                         )}
                     </div>
                 );
@@ -256,10 +266,17 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
     const [scale, setScale] = useState(Number(item?.scale ?? 1));
     const [rot, setRot] = useState(Number(item?.rot ?? 0));
     const [flip, setFlip] = useState(Boolean(item?.flip));
+    const [brightness, setBrightness] = useState(Number(item?.brightness ?? 1));
+    const [lightOn, setLightOn] = useState(Boolean(item?.lightOn));
+    const [lightColor, setLightColor] = useState(item?.lightColor || "#ffd27a");
+    const [lightIntensity, setLightIntensity] = useState(Number(item?.lightIntensity ?? 0.7));
+    const [lightRadius, setLightRadius] = useState(Number(item?.lightRadius ?? 70));
     if (!item) return null;
     const ring = item.rarityColor || RARITY_RING[item.rarity] || "#8fbf6a";
     const placed = Boolean(item.placementId);
     const commit = (s, r, f = flip) => onTransform?.(item.placementId, { scale: s, rot: r, flip: f });
+    const commitLight = (patch) => onTransform?.(item.placementId, { light: { on: lightOn, color: lightColor, intensity: lightIntensity, radius: lightRadius, ...patch } });
+    const LIGHT_SWATCHES = ["#ffd27a", "#fff4e0", "#ffcf3f", "#7ac8ff", "#8fe39a", "#c9a2ff", "#ff7a6b", "#ff9ecb"];
     const canBuy = !placed && !item.owned && item.buyable;
     const afford = gold >= (item.price || 0);
     return (
@@ -300,6 +317,39 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                 <button type="button" onClick={() => { const nf = !flip; setFlip(nf); commit(scale, rot, nf); }} style={{ fontSize: 12, fontWeight: 800, color: flip ? "#c9a2ff" : "#cfd6dd", background: flip ? "rgba(201,162,255,0.16)" : "rgba(255,255,255,0.06)", border: `1px solid ${flip ? "rgba(201,162,255,0.5)" : "rgba(255,255,255,0.18)"}`, borderRadius: 9, padding: "6px 13px", cursor: "pointer" }}>↔ Flip{flip ? " · on" : ""}</button>
                                 <button type="button" onClick={() => { setScale(1); setRot(0); setFlip(false); commit(1, 0, false); }} style={{ fontSize: 11.5, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Reset</button>
+                            </div>
+                            {/* 🔆 Per-sprite brightness — a real filter on the sprite, not an overlay. */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>🔆 Bright</span>
+                                <input type="range" min="0.3" max="2.2" step="0.05" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} onPointerUp={() => onTransform?.(item.placementId, { brightness })} onKeyUp={() => onTransform?.(item.placementId, { brightness })} style={{ flex: 1, accentColor: "#ffd27a" }} />
+                                <span style={{ fontSize: 11.5, fontWeight: 800, color: "#ffd27a", width: 40, textAlign: "right" }}>{Math.round(brightness * 100)}%</span>
+                            </div>
+                            {/* 💡 Light — place real additive light in the scene (color / intensity / falloff). */}
+                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 8, marginTop: 2 }}>
+                                <button type="button" onClick={() => { const on = !lightOn; setLightOn(on); commitLight({ on }); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", fontSize: 12.5, fontWeight: 800, color: lightOn ? "#ffe6a6" : "#cfd6dd", background: lightOn ? "rgba(255,207,122,0.14)" : "rgba(255,255,255,0.06)", border: `1px solid ${lightOn ? "rgba(255,207,122,0.5)" : "rgba(255,255,255,0.18)"}`, borderRadius: 9, padding: "7px 12px", cursor: "pointer" }}>
+                                    <span>💡</span> Light {lightOn ? "· on" : "· off"}
+                                    <span style={{ marginLeft: "auto", width: 16, height: 16, borderRadius: "50%", background: lightColor, boxShadow: lightOn ? `0 0 8px ${lightColor}` : "none", border: "1px solid rgba(255,255,255,0.3)" }} />
+                                </button>
+                                {lightOn ? (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                                            {LIGHT_SWATCHES.map((c) => (
+                                                <button key={c} type="button" aria-label={`light ${c}`} onClick={() => { setLightColor(c); commitLight({ color: c }); }} style={{ width: 22, height: 22, borderRadius: "50%", background: c, cursor: "pointer", border: `2px solid ${lightColor.toLowerCase() === c ? "#fff" : "rgba(255,255,255,0.25)"}`, boxShadow: `0 0 6px ${c}88` }} />
+                                            ))}
+                                            <input type="color" value={lightColor} onChange={(e) => { setLightColor(e.target.value); }} onBlur={() => commitLight({ color: lightColor })} aria-label="custom light color" style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>Glow</span>
+                                            <input type="range" min="0.15" max="1" step="0.05" value={lightIntensity} onChange={(e) => setLightIntensity(Number(e.target.value))} onPointerUp={() => commitLight({ intensity: lightIntensity })} onKeyUp={() => commitLight({ intensity: lightIntensity })} style={{ flex: 1, accentColor: lightColor }} />
+                                            <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6d7c2", width: 40, textAlign: "right" }}>{Math.round(lightIntensity * 100)}%</span>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>Falloff</span>
+                                            <input type="range" min="30" max="260" step="5" value={lightRadius} onChange={(e) => setLightRadius(Number(e.target.value))} onPointerUp={() => commitLight({ radius: lightRadius })} onKeyUp={() => commitLight({ radius: lightRadius })} style={{ flex: 1, accentColor: lightColor }} />
+                                            <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6d7c2", width: 40, textAlign: "right" }}>{lightRadius}px</span>
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                     ) : null}

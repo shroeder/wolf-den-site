@@ -212,7 +212,7 @@ export async function claimPig(buyerId) {
 export async function getFarm(ownerId, viewerId) {
     if (!ownerId) return null;
     const [owner, state, sprites, levelSprites, pettedRows] = await Promise.all([
-        db.queryOne(`SELECT id, display_name, alias, avatar_sprite_url, avatar_sprite_flip, equipped_border, farm_bg_url, farm_bg_draft_url FROM mkt_buyer WHERE id = $1`, [ownerId]).catch(() => null),
+        db.queryOne(`SELECT id, display_name, alias, avatar_sprite_url, avatar_sprite_flip, equipped_border, farm_bg_url, farm_bg_draft_url, COALESCE(sprite_brightness, 1.0) AS sprite_brightness FROM mkt_buyer WHERE id = $1`, [ownerId]).catch(() => null),
         petsState(ownerId).catch(() => null),
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
@@ -261,6 +261,7 @@ export async function getFarm(ownerId, viewerId) {
         garden,
         customBg: owner.farm_bg_url || null, // player-generated background (replaces weather backdrops); shown to everyone
         customBgDraft: mine ? (owner.farm_bg_draft_url || null) : null, // your pending, not-yet-accepted preview
+        spriteBrightness: Number(owner.sprite_brightness ?? 1), // global brightness multiplier for this farm's sprites
         canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
         canFeed: Boolean(viewerId), // feed with your own treats
         petXp: PET_PET_XP,

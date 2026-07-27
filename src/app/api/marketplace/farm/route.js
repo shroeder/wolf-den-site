@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
-import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState } from "@/lib/marketplace/farm-decorations.js";
+import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState, setSpriteBrightness } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
 import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, clearFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
@@ -81,7 +81,8 @@ export async function POST(request) {
             else if (b?.action === "deco_buy") res = await buyDecoration(buyer.id, String(b?.decoId || ""));
             else if (b?.action === "deco_place") res = await placeDecoration(buyer.id, String(b?.decoId || ""), b?.x, b?.y, String(b?.view || "outside"));
             else if (b?.action === "deco_move") res = await moveDecoration(buyer.id, Number(b?.placementId), b?.x, b?.y);
-            else if (b?.action === "deco_transform") res = await transformDecoration(buyer.id, Number(b?.placementId), { scale: b?.scale, rot: b?.rot, flip: b?.flip });
+            else if (b?.action === "deco_transform") res = await transformDecoration(buyer.id, Number(b?.placementId), { scale: b?.scale, rot: b?.rot, flip: b?.flip, brightness: b?.brightness, light: b?.light });
+            else if (b?.action === "sprite_brightness") res = await setSpriteBrightness(buyer.id, b?.value);
             else if (b?.action === "deco_remove") res = await removeDecoration(buyer.id, Number(b?.placementId));
             // ── Custom (player-made) decorations ──
             else if (b?.action === "deco_custom_state") res = { ok: true, custom: await getCustomState(buyer.id) };

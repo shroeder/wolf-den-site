@@ -530,10 +530,31 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [decoAct]);
     const decoPickup = useCallback((placementId) => decoAct({ action: "deco_remove", placementId }), [decoAct]);
-    // Resize / rotate a placed decoration — optimistic so the scene updates live under the inspect modal.
-    const decoTransform = useCallback(async (placementId, { scale, rot, flip }) => {
-        setFarm((f) => ({ ...f, placements: (f.placements || []).map((q) => (q.id === placementId ? { ...q, ...(scale != null ? { scale } : {}), ...(rot != null ? { rot } : {}), ...(flip != null ? { flip } : {}) } : q)) }));
-        return decoAct({ action: "deco_transform", placementId, scale, rot, flip });
+    // Resize / rotate / light / brightness a placed decoration — optimistic so the scene updates live under the
+    // inspect modal. Light is resolved client-side for the instant preview; the server returns the canonical shape.
+    const decoTransform = useCallback(async (placementId, { scale, rot, flip, brightness, light }) => {
+        setFarm((f) => ({ ...f, placements: (f.placements || []).map((q) => {
+            if (q.id !== placementId) return q;
+            const next = { ...q };
+            if (scale != null) next.scale = scale;
+            if (rot != null) next.rot = rot;
+            if (flip != null) next.flip = flip;
+            if (brightness != null) next.brightness = brightness;
+            if (light) {
+                if (light.on != null) next.lightOn = light.on;
+                if (light.color != null) next.lightColor = light.color;
+                if (light.intensity != null) next.lightIntensity = light.intensity;
+                if (light.radius != null) next.lightRadius = light.radius;
+                const rgb = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(next.lightColor || "");
+                next.light = next.lightOn ? { on: true, always: true, rgb: rgb ? `${parseInt(rgb[1], 16)},${parseInt(rgb[2], 16)},${parseInt(rgb[3], 16)}` : "255,210,122", radius: Number(next.lightRadius ?? 70), intensity: Number(next.lightIntensity ?? 0.7), flicker: q.light?.flicker || false } : (q.light?.always ? null : q.light);
+            }
+            return next;
+        }) }));
+        return decoAct({ action: "deco_transform", placementId, scale, rot, flip, brightness, light });
+    }, [decoAct]);
+    const setSpriteBright = useCallback(async (value) => {
+        setFarm((f) => ({ ...f, spriteBrightness: value })); // optimistic
+        return decoAct({ action: "sprite_brightness", value });
     }, [decoAct]);
     const fieldRef = useRef(null);
     const scrollRef = useRef(null); // the horizontal pasture scroller — preserved across deco re-renders so a placed piece doesn't scroll away
@@ -789,6 +810,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                 editing={farm.mine && decoEditing}
                                 fieldRef={fieldRef}
                                 tod={visTod}
+                                spriteBrightness={farm.spriteBrightness ?? 1}
                                 onMove={decoMove}
                                 onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
                             />
@@ -834,7 +856,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                                 width={58}
                                                 height={58}
                                                 draggable={false}
-                                                style={{ width: 58, height: 58, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9))" : "none", WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+                                                style={{ width: 58, height: 58, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
                                             />
                                             {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                         </span>
@@ -849,7 +871,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         })}
 
                         {/* The farmer strolls the Outside & Inside (not the tidy Garden) — tap to connect */}
-                        {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} groundShift={groundShift} onTap={() => setOwnerMenu(true)} /> : null}
+                        {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} groundShift={groundShift} brightness={farm.spriteBrightness ?? 1} onTap={() => setOwnerMenu(true)} /> : null}
 
                         {/* Wild Loot Pig only shows up Outside in the open pasture */}
                         {view === "outside" && pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
@@ -939,6 +961,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onInspect={(cat) => setInspectDeco(cat)}
                     onOpenCreator={() => setCustomOpen(true)}
                     onDone={stopDecorating}
+                    spriteBrightness={farm.spriteBrightness ?? 1}
+                    onSpriteBrightness={setSpriteBright}
                 />
             ) : null}
 
@@ -1138,7 +1162,7 @@ function LootPig({ onFinish, crown }) {
 
 // The farm owner's avatar strolling their own pasture. Taps open a connect menu (profile / message / trade /
 // add friend). On your OWN farm it's just you (tap → your profile).
-function OwnerWalker({ owner, mine, minX = FARM_PAD, groundShift = 0, onTap }) {
+function OwnerWalker({ owner, mine, minX = FARM_PAD, groundShift = 0, brightness = 1, onTap }) {
     const [pos, setPos] = useState({ x: Math.max(20, minX + 8), y: 86, flip: false, dur: 3, moving: false });
     const gy = Math.min(95, pos.y + groundShift); // drop onto the barn straw floor indoors (see groundShift)
     useEffect(() => {
@@ -1170,7 +1194,7 @@ function OwnerWalker({ owner, mine, minX = FARM_PAD, groundShift = 0, onTap }) {
                 <span className={pos.moving ? "farm-shadow-hop" : ""} style={{ position: "absolute", left: "50%", bottom: -2, width: 46, height: 10, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0, animationDuration: pos.moving ? "480ms" : undefined }} />
                 <span className={pos.moving ? "farm-hop" : "farm-idle"} style={{ position: "absolute", inset: 0, display: "block", animationDuration: pos.moving ? "480ms" : undefined }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={owner.avatarUrl} alt={owner.name} width={66} height={66} style={{ width: 66, height: 66, objectFit: "contain", transform: flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.5))" }} />
+                    <img src={owner.avatarUrl} alt={owner.name} width={66} height={66} style={{ width: 66, height: 66, objectFit: "contain", transform: flip ? "scaleX(-1)" : "none", filter: `drop-shadow(0 2px 5px rgba(0,0,0,0.5)) brightness(${brightness})` }} />
                 </span>
             </span>
             <span style={{ display: "flex", justifyContent: "center", marginTop: 3 }}>
