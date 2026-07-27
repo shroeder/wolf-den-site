@@ -757,19 +757,18 @@ const FORGE_CSS = `
 .forge-tagline { margin: 5px 0 0; font-size: 12.5px; font-weight: 600; color: #f0d9bd; text-shadow: 0 1px 4px #000; }
 /* ── Founder's medallion (Alstier1) — small hero circle pinned top-right of the hearth ── */
 .forge-founder { position: absolute; top: 12px; right: 12px; z-index: 3; width: 46px; height: 46px; border-radius: 50%; padding: 0; cursor: pointer; overflow: hidden;
-    background: radial-gradient(circle at 50% 30%, #ffd75e, #ff9a2e); border: 2px solid rgba(255,224,160,0.9);
-    box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 14px rgba(255,160,60,0.55), inset 0 0 0 1px rgba(0,0,0,0.25);
-    display: grid; place-items: center; transition: transform .18s cubic-bezier(.2,1.4,.35,1), box-shadow .18s; animation: forgeFounderGlow 3.2s ease-in-out infinite; }
-.forge-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45)); }
+    background: radial-gradient(circle at 50% 30%, #221610, #0c0704); border: 2px solid rgba(255,160,60,0.35);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.55), inset 0 0 8px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,150,60,0.15);
+    display: grid; place-items: center; transition: transform .18s cubic-bezier(.2,1.4,.35,1), box-shadow .18s, border-color .18s; }
+.forge-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
 .forge-founder span { font-size: 22px; }
-.forge-founder:hover, .forge-founder:focus-visible { transform: scale(1.12) rotate(-3deg); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 22px rgba(255,180,80,0.85); outline: none; }
-@keyframes forgeFounderGlow { 0%,100% { box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 12px rgba(255,160,60,0.45), inset 0 0 0 1px rgba(0,0,0,0.25); } 50% { box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 22px rgba(255,190,90,0.8), inset 0 0 0 1px rgba(0,0,0,0.25); } }
+.forge-founder:hover, .forge-founder:focus-visible { transform: scale(1.12) rotate(-3deg); border-color: rgba(255,190,90,0.7); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 16px rgba(255,170,70,0.5); outline: none; }
 .forge-founder-scrim { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; background: rgba(8,4,2,0.72); backdrop-filter: blur(3px); animation: forgeFounderFade .2s ease both; }
 .forge-founder-card { position: relative; max-width: 340px; width: 100%; text-align: center; padding: 22px 22px 18px; border-radius: 18px;
     background: linear-gradient(180deg, #2a180c, #160c06); border: 1px solid rgba(255,150,60,0.4); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(255,140,40,0.28);
     animation: forgeFounderPop .32s cubic-bezier(.2,1.4,.35,1) both; }
 .forge-founder-hero { width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
-    background: radial-gradient(circle at 50% 30%, #ffd75e, #ff9a2e); border: 3px solid rgba(255,224,160,0.9); box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 26px rgba(255,170,70,0.6); }
+    background: radial-gradient(circle at 50% 28%, #241811, #0b0603); border: 3px solid rgba(255,170,70,0.4); box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 0 14px rgba(0,0,0,0.6), 0 0 20px rgba(255,150,60,0.25); }
 .forge-founder-hero img { width: 108%; height: 108%; object-fit: contain; object-position: center 6%; display: block; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
 .forge-founder-kicker { font-size: 10.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #ffb877; }
 .forge-founder-name { margin: 3px 0 8px; font-size: 1.35rem; font-weight: 900; color: #ffe0b0; text-shadow: 0 2px 8px rgba(255,120,20,0.5); }
