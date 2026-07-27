@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { FaDharmachakra } from "react-icons/fa6";
 
-import ForgeAnnounce from "@/components/ForgeAnnounce";
 import GameHubStats from "@/components/GameHubStats";
 import GettingStarted from "@/components/GettingStarted";
 import HelmetSprite from "@/components/HelmetSprite";
@@ -51,7 +50,6 @@ export default async function GamePlayHub({ searchParams }) {
     return (
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
-            {buyer ? <ForgeAnnounce /> : null}
             {buyer ? <GettingStarted /> : null}
             {buyer ? <RaidDefenseReport /> : null}
             {buyer ? <SpinNudge /> : null}

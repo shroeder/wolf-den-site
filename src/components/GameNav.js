@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
+import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
 
@@ -57,13 +58,14 @@ export default function GameNav() {
     const [questsReady, setQuestsReady] = useState(0);
     const [cropsReady, setCropsReady] = useState(0);
     const [sailAttn, setSailAttn] = useState(false);
+    const [signedIn, setSignedIn] = useState(false); // gates the one-time Forge announcement to real members
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
         const loadChests = () => {
             fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); }).catch(() => {});
-            fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
+            fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
@@ -147,6 +149,7 @@ export default function GameNav() {
 
     return (
         <>
+            {signedIn ? <ForgeAnnounce /> : null}
             <style>{GAMENAV_CSS}</style>
             <nav className="game-nav" aria-label="Game menu">
                 <div className="game-nav-scroll">
