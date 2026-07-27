@@ -97,7 +97,7 @@ export default function BlacksmithClient({ initial }) {
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, grade: r.grade, xp: r.xp, doubled: r.doubled }); }
+        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, grade: r.grade, xp: r.xp, doubled: r.doubled }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -468,15 +468,32 @@ function EnhanceResultModal({ res, onClose }) {
             <div className="forge-sv forge-er" style={{ "--rc": rc(res.rarity) }} onPointerDown={(e) => e.stopPropagation()}>
                 <div className="forge-sv-result">
                     <div className="forge-er-grade" style={{ color: gradeMeta.color }}>{gradeMeta.label} STRIKE!</div>
-                    <div className="forge-sv-reward">
-                        <div className="forge-er-artwrap">
-                            <ItemArt id={res.id} icon={res.icon} className="forge-er-art" alt={res.name} />
-                            <span className="forge-er-rank"><ForgeRank level={res.level} size={42} /></span>
-                        </div>
-                        <div className="forge-sv-plus">{res.name} → +{res.level}</div>
+                    {/* Big, glowing item on a burst of light — the star of the reveal. */}
+                    <div className="forge-er-stage">
+                        <span className="forge-er-rays" aria-hidden="true" />
+                        <span className="forge-er-glow" aria-hidden="true" />
+                        <ItemArt id={res.id} icon={res.icon} className="forge-er-art" alt={res.name} />
                     </div>
+                    <div className="forge-er-name">{res.name}</div>
+                    <div className="forge-er-rankrow"><ForgeRank level={res.level} size={30} /></div>
                     {res.doubled ? <div className="forge-sv-tag double">✦ MASTER&apos;S TOUCH — double gains!</div> : null}
-                    {res.gained ? <div className="forge-er-gain">{res.gained}</div> : null}
+                    {/* Additive stat breakdown: base + forge = total, so it's crystal-clear the bonus STACKS on the item. */}
+                    {Array.isArray(res.statLines) && res.statLines.length ? (
+                        <div className="forge-er-stats">
+                            {res.statLines.map((s) => (
+                                <div key={s.key} className={`forge-er-statrow${s.gained ? " up" : ""}`}>
+                                    <span className="forge-er-stat-label">{s.icon} {s.label}</span>
+                                    <span className="forge-er-stat-calc">
+                                        <span className="base">{s.base}{s.suffix}</span>
+                                        {s.forge > 0 ? <span className="add">+{s.forge}{s.suffix}</span> : null}
+                                        <span className="eq">=</span>
+                                        <b className="total">{s.base + s.forge}{s.suffix}</b>
+                                    </span>
+                                </div>
+                            ))}
+                            <div className="forge-er-note">{res.allMaxed ? "✦ Stats maxed — further forging earns prestige only" : "Forge bonus adds on top of the item’s base stats"}</div>
+                        </div>
+                    ) : null}
                     <div className="forge-sv-xp">+{res.xp} XP</div>
                     <button type="button" className="forge-strike big" onClick={onClose}>Forged!</button>
                 </div>
@@ -767,12 +784,33 @@ const FORGE_CSS = `
 .forge-sv-xp { margin-top: 10px; font-size: 12px; font-weight: 800; color: #8fe3a1; }
 @keyframes forgeReveal { 0% { opacity: 0; transform: scale(.4) translateY(10px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes forgeRewardBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-/* ── enhance reveal ── */
-.forge-er-grade { font-size: 1.5rem; font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); margin-bottom: 6px; animation: forgeGradeIn .4s cubic-bezier(.2,1.4,.3,1) both; }
-.forge-er-artwrap { position: relative; display: inline-block; }
-.forge-er-art { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55)) drop-shadow(0 0 18px color-mix(in srgb, var(--rc) 55%, transparent)); animation: forgeRewardBob 2.4s ease-in-out infinite; }
-.forge-er-rank { position: absolute; top: -6px; right: -10px; }
-.forge-er-gain { margin-top: 8px; font-size: 15px; font-weight: 800; color: #8fe3ff; }
+/* ── enhance reveal (big, juicy, self-contained) ── */
+.forge-er { overflow: hidden; } /* clip the light rays so the glow never bleeds past the card */
+.forge-er-grade { font-size: 1.55rem; font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); margin-bottom: 2px; animation: forgeGradeIn .4s cubic-bezier(.2,1.4,.3,1) both; }
+.forge-er-stage { position: relative; display: grid; place-items: center; width: 100%; height: 150px; margin: 2px 0 4px; }
+.forge-er-rays { position: absolute; width: 300px; height: 300px; border-radius: 50%; pointer-events: none;
+    background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 30%, transparent) 0deg 6deg, transparent 6deg 18deg);
+    -webkit-mask-image: radial-gradient(circle, #000 8%, rgba(0,0,0,0.35) 32%, transparent 62%); mask-image: radial-gradient(circle, #000 8%, rgba(0,0,0,0.35) 32%, transparent 62%);
+    opacity: 0.7; animation: forgeRaySpin 14s linear infinite; }
+.forge-er-glow { position: absolute; width: 180px; height: 180px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, var(--rc) 55%, transparent) 0%, transparent 68%); filter: blur(4px); animation: forgeGlowPulse 2.4s ease-in-out infinite; }
+.forge-er-art { position: relative; z-index: 1; width: 128px; height: 128px; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)) drop-shadow(0 0 22px color-mix(in srgb, var(--rc) 65%, transparent)); animation: forgeArtIn .5s cubic-bezier(.2,1.5,.35,1) both, forgeRewardBob 2.6s ease-in-out .5s infinite; }
+.forge-er-name { font-size: 1.5rem; font-weight: 900; color: #ffd75e; text-shadow: 0 2px 12px rgba(255,150,30,0.55); line-height: 1.1; }
+.forge-er-rankrow { display: flex; justify-content: center; margin-top: 5px; }
+.forge-er-stats { margin: 12px 0 2px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.08); text-align: left; }
+.forge-er-statrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 13px; }
+.forge-er-statrow + .forge-er-statrow { border-top: 1px solid rgba(255,255,255,0.05); }
+.forge-er-statrow.up .total { animation: forgeStatPulse .7s ease-out both; }
+.forge-er-stat-label { color: #e6d7c2; font-weight: 700; }
+.forge-er-stat-calc { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.forge-er-stat-calc .base { color: #b9a892; }
+.forge-er-stat-calc .add { color: #8fe39a; font-weight: 900; }
+.forge-er-stat-calc .eq { color: #7c6f5f; }
+.forge-er-stat-calc .total { color: #fff6e2; font-weight: 900; font-size: 15px; }
+.forge-er-note { margin-top: 8px; font-size: 10.5px; color: #b9a892; text-align: center; font-weight: 600; }
+@keyframes forgeRaySpin { to { transform: rotate(360deg); } }
+@keyframes forgeGlowPulse { 0%,100% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 1; } }
+@keyframes forgeArtIn { 0% { opacity: 0; transform: scale(.4) translateY(12px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes forgeStatPulse { 0% { color: #8fe39a; transform: scale(1.28); } 100% { color: #fff6e2; transform: scale(1); } }
 /* ── locked enhance card (can't afford the parts) ── */
 .forge-card.is-locked { opacity: 0.82; }
 .forge-card.is-locked .forge-art { filter: grayscale(0.5) brightness(0.85); }
