@@ -530,8 +530,8 @@ export default function FarmClient({ initial, viewingAlias }) {
         setBgBusy(true);
         const r = await post(body);
         setBgBusy(false);
-        // customBg shows only while equipped (r.on); a removed-but-saved bg keeps r.bg but stays hidden.
-        if (r && ("bg" in r || "draft" in r)) setFarm((f) => ({ ...f, customBg: (r.on && r.bg) ? r.bg : null, customBgDraft: r.draft ?? null }));
+        // Reflect the equipped library background (activeUrl) + any live draft preview on the scene.
+        if (r && ("library" in r || "draft" in r || "activeUrl" in r)) setFarm((f) => ({ ...f, customBg: r.activeUrl ?? null, customBgDraft: r.draft ?? null }));
         return r;
     }, [post]);
     const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y, view }), [decoAct, view]);
@@ -1468,38 +1468,34 @@ function FarmRankBadge({ byTier = {} }) {
 }
 const bgErr = (e) => ({ no_credits: "You need 3 creations to generate a background.", describe_it: "Describe your background first.", gen_failed: "The art pipeline hiccuped — your creations were refunded. Try again.", no_draft: "Generate one first." }[e] || "Something went wrong — try again.");
 
-// Custom farm-background generator — a bottom sheet so the scene stays visible for a LIVE preview. Generating
-// charges 3 creations up front (safe: charged before the AI, refunded only on genuine failure); the generated
-// draft shows live on the farm above until you Accept or Discard it.
+// Custom farm-background LIBRARY — a bottom sheet so the scene stays visible for a LIVE preview. You keep every
+// background you generate; tap one to equip it (or the Default tile to go back to the weather scenes), and delete
+// any you don't want. Generating charges 3 creations up front (refunded only on genuine failure).
 function FarmBgCreator({ draft, busy, onAct, onClose }) {
     const [desc, setDesc] = useState("");
-    const [credits, setCredits] = useState(null);
-    const [free, setFree] = useState(false); // owners/admins generate without spending tokens
-    const [saved, setSaved] = useState(false); // a background exists (may be removed but kept)
-    const [on, setOn] = useState(false); // the saved background is currently equipped/shown
+    const [st, setSt] = useState({ library: [], activeId: null, credits: null, free: false });
     const [err, setErr] = useState(null);
-    const sync = (r) => { if (r?.credits != null) setCredits(r.credits); if (r?.free != null) setFree(Boolean(r.free)); if (r?.saved != null) setSaved(Boolean(r.saved)); if (r?.on != null) setOn(Boolean(r.on)); };
+    const [confirmId, setConfirmId] = useState(null); // a background pending delete-confirm
+    const sync = (r) => { if (r && "library" in r) setSt({ library: r.library || [], activeId: r.activeId ?? null, credits: r.credits ?? null, free: Boolean(r.free) }); };
     useEffect(() => {
         let alive = true;
         onAct({ action: "farm_bg_state" }).then((r) => { if (alive) sync(r); });
         return () => { alive = false; };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
-    const generate = async () => {
-        setErr(null);
-        const r = await onAct({ action: "farm_bg_start", prompt: desc });
-        sync(r);
-        if (!r?.ok) setErr(bgErr(r?.error));
-    };
-    const accept = async () => { await onAct({ action: "farm_bg_finalize" }); onClose(); };
-    const discard = async () => { const r = await onAct({ action: "farm_bg_discard" }); sync(r); };
-    const removeBg = async () => { sync(await onAct({ action: "farm_bg_clear" })); }; // UNEQUIP — keeps it saved
-    const reequip = async () => { sync(await onAct({ action: "farm_bg_reequip" })); }; // put the saved one back on
+    const generate = async () => { setErr(null); const r = await onAct({ action: "farm_bg_start", prompt: desc }); sync(r); if (!r?.ok) setErr(bgErr(r?.error)); };
+    const accept = async () => { sync(await onAct({ action: "farm_bg_finalize" })); setDesc(""); };
+    const discard = async () => { sync(await onAct({ action: "farm_bg_discard" })); };
+    const equip = async (id) => { sync(await onAct({ action: "farm_bg_equip", id })); };
+    const unequip = async () => { sync(await onAct({ action: "farm_bg_unequip" })); };
+    const del = async (id) => { setConfirmId(null); sync(await onAct({ action: "farm_bg_delete", id })); };
+    const { library, activeId, credits, free } = st;
     const low = !free && (credits ?? 0) < 3;
+    const tile = { position: "relative", flex: "0 0 auto", width: 88, height: 58, borderRadius: 10, overflow: "hidden", cursor: "pointer", padding: 0, background: "rgba(0,0,0,0.35)" };
     return (
-        <div role="dialog" aria-label="Custom farm background" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10050, background: "linear-gradient(180deg, rgba(30,24,44,0.98), rgba(18,14,28,0.99))", borderTop: "1px solid rgba(201,162,255,0.4)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)", padding: "14px 16px calc(16px + env(safe-area-inset-bottom))", animation: "pigPop .3s ease both" }}>
+        <div role="dialog" aria-label="Custom farm backgrounds" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10050, background: "linear-gradient(180deg, rgba(30,24,44,0.98), rgba(18,14,28,0.99))", borderTop: "1px solid rgba(201,162,255,0.4)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)", padding: "14px 16px calc(16px + env(safe-area-inset-bottom))", animation: "pigPop .3s ease both", maxHeight: "80dvh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 17 }} aria-hidden="true">🎨</span>
-                <b style={{ fontSize: 15, color: "#e6d9ff" }}>Custom farm background</b>
+                <b style={{ fontSize: 15, color: "#e6d9ff" }}>My farm backgrounds</b>
                 <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: free ? "#8fe39a" : low ? "#9aa0a6" : "#c9a2ff" }}>{free ? "Owner · free" : `${credits ?? "…"} creation${credits === 1 ? "" : "s"}`}</span>
                 <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "#b9a2d6", fontSize: 22, lineHeight: 1, cursor: "pointer", padding: "0 2px" }}>×</button>
             </div>
@@ -1507,18 +1503,46 @@ function FarmBgCreator({ draft, busy, onAct, onClose }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ fontSize: 12.5, color: "#cdbde8" }}>👀 It&apos;s live on your farm above — keep it?</div>
                     <div style={{ display: "flex", gap: 8 }}>
-                        <button type="button" disabled={busy} onClick={accept} style={{ flex: 1, padding: 11, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy ? 0.6 : 1 }}>✓ Use this</button>
+                        <button type="button" disabled={busy} onClick={accept} style={{ flex: 1, padding: 11, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy ? 0.6 : 1 }}>✓ Save &amp; use</button>
                         <button type="button" disabled={busy || low} onClick={generate} style={{ flex: "0 0 auto", padding: "11px 13px", fontWeight: 800, borderRadius: 11, border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9c9ff", cursor: "pointer", opacity: busy || low ? 0.5 : 1 }}>🎲 Redo · 3</button>
                         <button type="button" disabled={busy} onClick={discard} style={{ flex: "0 0 auto", padding: "11px 13px", fontWeight: 800, borderRadius: 11, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.06)", color: "#cfcfd6", cursor: "pointer" }}>Discard</button>
                     </div>
                 </div>
             ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} maxLength={300} placeholder="Describe your dream farm backdrop — e.g. 'a misty mountain valley at golden hour with a winding river'" style={{ width: "100%", resize: "none", borderRadius: 11, border: "1px solid rgba(201,162,255,0.35)", background: "rgba(0,0,0,0.3)", color: "#efe7ff", padding: "9px 11px", fontSize: 13, fontFamily: "inherit" }} />
-                    <button type="button" disabled={busy || low || desc.trim().length < 4} onClick={generate} style={{ width: "100%", padding: 12, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy || low || desc.trim().length < 4 ? 0.55 : 1 }}>{busy ? "Painting your world…" : free ? "Generate (owner · free)" : "Generate · 3 creations"}</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {/* Library gallery — tap to equip; the Default tile goes back to the weather scenes. */}
+                    <div>
+                        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#b9a2d6", marginBottom: 5 }}>{library.length ? "Tap one to equip" : "You haven't made any yet — generate one below"}</div>
+                        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+                            {/* Default (weather scenes) */}
+                            <button type="button" onClick={unequip} disabled={busy} title="Default weather scenes" style={{ ...tile, display: "grid", placeItems: "center", border: `2px solid ${activeId == null ? "#8fe39a" : "rgba(255,255,255,0.18)"}` }}>
+                                <span style={{ fontSize: 20 }} aria-hidden="true">🌤️</span>
+                                <span style={{ position: "absolute", bottom: 2, left: 0, right: 0, fontSize: 9, fontWeight: 800, color: "#cfe8cf", textAlign: "center" }}>Default</span>
+                                {activeId == null ? <span style={{ position: "absolute", top: 2, left: 2, fontSize: 9, fontWeight: 900, color: "#0e2c14", background: "#8fe39a", borderRadius: 5, padding: "0 4px" }}>ON</span> : null}
+                            </button>
+                            {library.map((bg) => (
+                                <div key={bg.id} style={{ position: "relative", flex: "0 0 auto" }}>
+                                    <button type="button" onClick={() => equip(bg.id)} disabled={busy} title={bg.prompt || "Custom background"} style={{ ...tile, border: `2px solid ${bg.active ? "#8fe39a" : "rgba(201,162,255,0.4)"}` }}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={bg.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        {bg.active ? <span style={{ position: "absolute", top: 2, left: 2, fontSize: 9, fontWeight: 900, color: "#0e2c14", background: "#8fe39a", borderRadius: 5, padding: "0 4px" }}>ON</span> : null}
+                                    </button>
+                                    {confirmId === bg.id ? (
+                                        <div style={{ position: "absolute", inset: 0, borderRadius: 10, background: "rgba(10,6,16,0.9)", display: "grid", gridTemplateRows: "1fr 1fr", gap: 2, padding: 3 }}>
+                                            <button type="button" onClick={() => del(bg.id)} style={{ fontSize: 10, fontWeight: 900, color: "#fff", background: "#c0392b", border: "none", borderRadius: 6, cursor: "pointer" }}>Delete</button>
+                                            <button type="button" onClick={() => setConfirmId(null)} style={{ fontSize: 10, fontWeight: 800, color: "#cfcfd6", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 6, cursor: "pointer" }}>Keep</button>
+                                        </div>
+                                    ) : (
+                                        <button type="button" aria-label="Delete background" onClick={() => setConfirmId(bg.id)} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: "rgba(20,12,28,0.95)", border: "1px solid rgba(255,255,255,0.3)", color: "#ff9aa6", fontSize: 13, lineHeight: "18px", cursor: "pointer", padding: 0 }}>×</button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Generate a new one */}
+                    <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} maxLength={300} placeholder="Describe a new backdrop — e.g. 'a misty mountain valley at golden hour with a winding river'" style={{ width: "100%", resize: "none", borderRadius: 11, border: "1px solid rgba(201,162,255,0.35)", background: "rgba(0,0,0,0.3)", color: "#efe7ff", padding: "9px 11px", fontSize: 13, fontFamily: "inherit" }} />
+                    <button type="button" disabled={busy || low || desc.trim().length < 4} onClick={generate} style={{ width: "100%", padding: 12, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy || low || desc.trim().length < 4 ? 0.55 : 1 }}>{busy ? "Painting your world…" : free ? "Generate new (owner · free)" : "Generate new · 3 creations"}</button>
                     {low ? <a href="/marketplace/creations" style={{ fontSize: 12, fontWeight: 800, color: "#c9a2ff", textAlign: "center" }}>Get more creations →</a> : null}
-                    {saved && on ? <button type="button" disabled={busy} onClick={removeBg} style={{ fontSize: 12, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer" }}>Remove background (keeps it saved — back to weather scenes)</button> : null}
-                    {saved && !on ? <button type="button" disabled={busy} onClick={reequip} style={{ fontSize: 12.5, fontWeight: 800, color: "#8fe39a", background: "rgba(126,213,126,0.12)", border: "1px solid rgba(126,213,126,0.4)", borderRadius: 9, padding: "8px 10px", cursor: "pointer" }}>✓ Re-equip your saved background</button> : null}
                 </div>
             )}
             {err ? <div style={{ marginTop: 8, fontSize: 12, color: "#ffb3bd", textAlign: "center" }}>{err}</div> : null}
