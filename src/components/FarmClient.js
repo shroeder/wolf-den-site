@@ -587,6 +587,10 @@ export default function FarmClient({ initial, viewingAlias }) {
     // baked into the artwork itself). A tiny brightness nudge on the SPRITES at dusk/dawn keeps them from glowing
     // like noon against a darker painted backdrop.
     const objFilter = view === "inside" ? "none" : (visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none");
+    // The barn's straw floor sits lower than the open grass, so drop sprites down onto it — otherwise the hero and
+    // pets float against the back wall. (Feet are anchored by translate(-50%,-100%), so a bigger y = lower = on the floor.)
+    const groundShift = view === "inside" ? 9 : 0;
+    const petGroundY = (y) => Math.min(95, y + groundShift);
 
     // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS). We do NOT
     // use the native Fullscreen API — it renders ONLY the scene element's subtree, which hid the decorate tray and
@@ -807,9 +811,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                                     onClick={() => setInspect(pet)}
                                     title={`${pet.name} · Lv ${pet.level} · tap to inspect`}
                                     style={{
-                                        position: "absolute", left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -100%)",
+                                        position: "absolute", left: `${p.x}%`, top: `${petGroundY(p.y)}%`, transform: "translate(-50%, -100%)",
                                         transition: `left ${p.dur}s linear, top ${p.dur}s linear`,
-                                        background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(p.y),
+                                        background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(petGroundY(p.y)),
                                         WebkitTapHighlightColor: "transparent", outline: "none", WebkitTouchCallout: "none",
                                     }}
                                 >
@@ -845,7 +849,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         })}
 
                         {/* The farmer strolls the Outside & Inside (not the tidy Garden) — tap to connect */}
-                        {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} onTap={() => setOwnerMenu(true)} /> : null}
+                        {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} groundShift={groundShift} onTap={() => setOwnerMenu(true)} /> : null}
 
                         {/* Wild Loot Pig only shows up Outside in the open pasture */}
                         {view === "outside" && pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
@@ -1134,8 +1138,9 @@ function LootPig({ onFinish, crown }) {
 
 // The farm owner's avatar strolling their own pasture. Taps open a connect menu (profile / message / trade /
 // add friend). On your OWN farm it's just you (tap → your profile).
-function OwnerWalker({ owner, mine, minX = FARM_PAD, onTap }) {
+function OwnerWalker({ owner, mine, minX = FARM_PAD, groundShift = 0, onTap }) {
     const [pos, setPos] = useState({ x: Math.max(20, minX + 8), y: 86, flip: false, dur: 3, moving: false });
+    const gy = Math.min(95, pos.y + groundShift); // drop onto the barn straw floor indoors (see groundShift)
     useEffect(() => {
         let alive = true;
         const timers = [];
@@ -1159,7 +1164,7 @@ function OwnerWalker({ owner, mine, minX = FARM_PAD, onTap }) {
             type="button"
             onClick={onTap}
             title={mine ? "You" : `Tap to connect with ${owner.name}`}
-            style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s linear, top ${pos.dur}s linear`, background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(pos.y) + 1, WebkitTapHighlightColor: "transparent", outline: "none", WebkitTouchCallout: "none" }}
+            style={{ position: "absolute", left: `${pos.x}%`, top: `${gy}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s linear, top ${pos.dur}s linear`, background: "none", border: "none", padding: 0, cursor: "pointer", zIndex: Math.round(gy) + 1, WebkitTapHighlightColor: "transparent", outline: "none", WebkitTouchCallout: "none" }}
         >
             <span style={{ position: "relative", display: "block", width: 66, height: 66, margin: "0 auto" }}>
                 <span className={pos.moving ? "farm-shadow-hop" : ""} style={{ position: "absolute", left: "50%", bottom: -2, width: 46, height: 10, transform: "translateX(-50%)", borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0, animationDuration: pos.moving ? "480ms" : undefined }} />
