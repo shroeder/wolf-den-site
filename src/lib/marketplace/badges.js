@@ -274,6 +274,68 @@ export async function getBadgePassives(buyerId) {
     return total;
 }
 
+// ── Collection milestones ── as your badge count climbs, hit these thresholds for a chunk of gold + a chest
+// (escalating chest tiers). Claimed on the Badges page. The high tiers are long-term aspirations as more
+// badges are added over time.
+export const BADGE_MILESTONES = [
+    { count: 10,  gold: 100,  chest: "wooden" },
+    { count: 25,  gold: 250,  chest: "iron" },
+    { count: 50,  gold: 500,  chest: "gold" },
+    { count: 100, gold: 1000, chest: "mythic" },
+    { count: 250, gold: 2500, chest: "ascendant" },
+    { count: 500, gold: 5000, chest: "eternal" },
+];
+const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal" };
+
+// How many badges a member holds right now (earned count, excluding nothing — every held badge counts).
+async function earnedBadgeCount(buyerId) {
+    const row = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_user_badge WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    return row?.n || 0;
+}
+
+// Milestone board for a member: each tier with reached/claimed + which are claimable now.
+export async function getBadgeMilestones(buyerId) {
+    if (!buyerId) return { earnedCount: 0, tiers: [], claimable: 0 };
+    const [count, row] = await Promise.all([
+        earnedBadgeCount(buyerId),
+        db.queryOne(`SELECT COALESCE(badge_milestones_claimed, '[]'::jsonb) AS claimed FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+    ]);
+    const claimed = new Set((Array.isArray(row?.claimed) ? row.claimed : []).map(Number));
+    const tiers = BADGE_MILESTONES.map((mst) => ({
+        count: mst.count, gold: mst.gold, chest: mst.chest, chestLabel: CHEST_LABEL[mst.chest] || mst.chest,
+        reached: count >= mst.count, claimed: claimed.has(mst.count), claimable: count >= mst.count && !claimed.has(mst.count),
+    }));
+    return { earnedCount: count, tiers, claimable: tiers.filter((t) => t.claimable).length };
+}
+
+// Claim one reached-but-unclaimed collection milestone → gold + a chest. Idempotent (a claimed tier is a no-op).
+export async function claimBadgeMilestone(buyerId, count) {
+    const mst = BADGE_MILESTONES.find((x) => x.count === Number(count));
+    if (!buyerId || !mst) return { ok: false, error: "bad_milestone" };
+    const have = await earnedBadgeCount(buyerId);
+    if (have < mst.count) return { ok: false, error: "not_reached" };
+    // Atomically add this tier to the claimed set only if it isn't already there (guards double-claims).
+    const upd = await db
+        .queryOne(
+            `UPDATE mkt_buyer
+                SET badge_milestones_claimed = COALESCE(badge_milestones_claimed, '[]'::jsonb) || to_jsonb($2::int),
+                    gold = gold + $3
+              WHERE id = $1 AND NOT (COALESCE(badge_milestones_claimed, '[]'::jsonb) @> to_jsonb($2::int))
+              RETURNING gold`,
+            [buyerId, mst.count, mst.gold]
+        )
+        .catch(() => null);
+    if (!upd) return { ok: false, error: "already_claimed" };
+    await logCoin(buyerId, mst.gold, "badge_milestone", { balanceAfter: upd.gold, meta: { count: mst.count } }).catch(() => {});
+    // Grant the chest (best-effort; logged to the chest-grant ledger with its source).
+    try {
+        const { addChests } = await import("@/lib/marketplace/chests.js");
+        await addChests(buyerId, { [mst.chest]: 1 }, { source: "badge_milestone", meta: { count: mst.count } });
+    } catch { /* best-effort */ }
+    await trackActivity(buyerId, "badge_milestone", { count: mst.count, gold: mst.gold, chest: mst.chest }).catch(() => {});
+    return { ok: true, gold: upd.gold, milestones: await getBadgeMilestones(buyerId) };
+}
+
 // Current vs. required for a rule — drives the track's progress bars. Booleans read as 0/1.
 export function progressForRule(rule, threshold, m) {
     const t = Number(threshold || 0);
@@ -348,7 +410,7 @@ export async function getBadgeBoard(buyerId) {
             const t = Math.max(1, target);
             progress = { current: Math.max(0, Math.min(current, t)), target: t, pct: Math.max(0, Math.min(100, Math.round((current / t) * 100))) };
         }
-        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly, earned, progress };
+        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly, earned, progress, bonus: BADGE_PASSIVES[b.slug] || null };
     });
     // Next = closest unearned UNLOCKABLE badge by progress (admin-assigned ones can't be "earned" by progress).
     const next = badges

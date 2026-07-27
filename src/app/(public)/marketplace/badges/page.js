@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import BadgeShopClient from "@/components/BadgeShopClient";
+import BadgeCollectionClient from "@/components/BadgeCollectionClient";
 import NextBadgeNudge from "@/components/NextBadgeNudge";
 import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
-import { getBadgeBoard } from "@/lib/marketplace/badges.js";
+import { getBadgeBoard, getBadgeMilestones } from "@/lib/marketplace/badges.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 
@@ -26,9 +27,10 @@ export default async function BadgesPage() {
         );
     }
 
-    const [board, profile] = await Promise.all([
+    const [board, profile, milestones] = await Promise.all([
         getBadgeBoard(buyer.id).catch(() => null),
         getProfile(buyer.id).catch(() => null),
+        getBadgeMilestones(buyer.id).catch(() => null),
     ]);
     const badges = board?.badges || [];
 
@@ -63,33 +65,7 @@ export default async function BadgesPage() {
                 <BadgeShopClient />
             </section>
 
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>All badges</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Everything you can earn — with your progress toward the ones you haven&apos;t yet.</p>
-                <div className="badge-board">
-                    {badges.map((b) => (
-                        <div key={b.slug} className={`badge-tile${b.earned ? " is-earned" : " is-locked"}`} style={b.earned && b.color ? { borderColor: b.color } : undefined}>
-                            <span className="badge-tile-icon" style={{ background: b.earned ? b.color || "#333" : undefined }} aria-hidden="true">{b.icon || "🏅"}</span>
-                            <span className="badge-tile-label">{b.label}</span>
-                            {b.description ? <span className="badge-tile-desc muted">{b.description}</span> : null}
-                            {b.earned ? (
-                                <span className="badge-tile-status is-earned">Earned ✓</span>
-                            ) : b.progress ? (
-                                <span className="badge-tile-progress">
-                                    <span className="badge-tile-bar"><span style={{ width: `${b.progress.pct}%` }} /></span>
-                                    <span className="badge-tile-status muted">{b.progress.current.toLocaleString()} / {b.progress.target.toLocaleString()}</span>
-                                </span>
-                            ) : b.goldPrice != null ? (
-                                <span className="badge-tile-status muted">💰 {b.goldPrice.toLocaleString()} · in shop</span>
-                            ) : b.dropOnly ? (
-                                <span className="badge-tile-status muted">Drop only 🎁</span>
-                            ) : (
-                                <span className="badge-tile-status muted">{b.adminOnly ? "Awarded by staff" : "Locked"}</span>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </section>
+            <BadgeCollectionClient badges={badges} initialMilestones={milestones} earnedCount={board?.earnedCount || 0} totalCount={board?.totalCount || 0} />
         </div>
     );
 }
