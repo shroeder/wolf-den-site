@@ -59,12 +59,22 @@ export default function SpinWheel() {
     const timerRef = useRef(null);
     const chainRef = useRef(0);
     const runSpinRef = useRef(null);
+    const bonusRef = useRef(null);
+    useEffect(() => { bonusRef.current = bonus; }, [bonus]); // current bonus state for the flip guard (no stale closure)
+
+    // Open the match-3 board from a fresh bonusGame payload OR a bonusResume (revealed tiles pre-filled).
+    const openBonus = useCallback((payload) => {
+        if (!payload) return;
+        const flipped = {};
+        if (payload.revealed) for (const [i, card] of Object.entries(payload.revealed)) flipped[i] = card;
+        setBonus({ size: payload.size, need: payload.need || 3, roster: payload.roster || [], flipped, done: false, won: null, busy: false });
+    }, []);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/spin", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
-        if (d) setSt(d);
-    }, []);
+        if (d) { setSt(d); if (d.bonusResume && !bonusRef.current) openBonus(d.bonusResume); } // resume an unfinished game
+    }, [openBonus]);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount (setState is post-await, not sync)
     useEffect(() => { load(); return () => { clearTimeout(timerRef.current); cancelAnimationFrame(rafRef.current); }; }, [load]);
 
@@ -102,7 +112,7 @@ export default function SpinWheel() {
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
             // Route to the right outcome.
             if (d.prize?.miniWheel && d.miniWheel) { setMini({ ...d.miniWheel, rot: 0, spinning: false, revealed: false }); playWin("bonus"); return; }
-            if (d.prize?.bonusGame && d.bonusGame) { setBonus({ size: d.bonusGame.size, need: d.bonusGame.need || 3, roster: d.bonusGame.roster || [], flipped: {}, done: false, won: null, busy: false }); playWin("bonus"); return; }
+            if (d.prize?.bonusGame && d.bonusGame) { openBonus(d.bonusGame); playWin("bonus"); return; }
             setResult(d.prize);
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
             if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), 4600); }
@@ -110,7 +120,7 @@ export default function SpinWheel() {
             if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
             else chainRef.current = 0;
         }, SPIN_MS);
-    }, [startTickLoop]);
+    }, [startTickLoop, openBonus]);
     useEffect(() => { runSpinRef.current = runSpin; }, [runSpin]);
 
     const spin = useCallback(async () => {
@@ -156,28 +166,44 @@ export default function SpinWheel() {
         setMini((m) => (m ? { ...m, revealed: true } : m));
         playWin("mini");
     }, []);
+    // Fallback: force the reveal if the CSS transitionend never fires (so the mini wheel can't get stuck).
+    useEffect(() => {
+        if (!mini || !mini.spinning || mini.revealed) return undefined;
+        const t = setTimeout(() => onMiniLanded(), 4200);
+        return () => clearTimeout(t);
+    }, [mini, onMiniLanded]);
 
     const revealBonus = useCallback(async (i) => {
-        let allow = false;
-        setBonus((b) => { if (!b || b.done || b.busy || b.flipped[i]) return b; allow = true; return { ...b, busy: true }; });
-        if (!allow) return;
+        const b = bonusRef.current; // read CURRENT state via ref — the old `allow`-in-updater trick never ran in time
+        if (!b || b.done || b.busy || b.flipped[i]) return;
+        setBonus((s) => (s ? { ...s, busy: true } : s));
+        tick(0.05);
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "bonus_flip", index: i }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
-        tick(0.06);
-        setBonus((b) => {
-            if (!b) return b;
-            if (!d?.ok) return { ...b, busy: false };
-            const flipped = { ...b.flipped, [d.index]: d.tile };
+        setBonus((s) => {
+            if (!s) return s;
+            if (!d?.ok) return { ...s, busy: false };
+            const flipped = { ...s.flipped, [d.index]: d.tile };
             if (d.done) {
-                playWin("rare");
+                playWin("jackpot");
                 const full = {};
                 (d.board || []).forEach((c, idx) => { full[idx] = c; });
-                return { ...b, flipped: { ...full, ...flipped }, done: true, won: d.winner, busy: false };
+                return { ...s, flipped: { ...full, ...flipped }, done: true, won: d.winner, busy: false };
             }
-            return { ...b, flipped, busy: false };
+            return { ...s, flipped, busy: false };
         });
         if (d?.done && typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
     }, []);
+
+    // Owner-only: trigger a sub-game directly for testing.
+    const ownerTrigger = useCallback(async (what) => {
+        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "owner_trigger", what }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        if (!d?.ok) return;
+        setSt((s) => ({ ...s, ...d }));
+        if (what === "bonus" && d.bonusGame) { openBonus(d.bonusGame); playWin("bonus"); }
+        if (what === "mini" && d.miniWheel) { setMini({ ...d.miniWheel, rot: 0, spinning: false, revealed: false }); playWin("bonus"); }
+    }, [openBonus]);
 
     if (!st) return <section className="card"><p className="muted" style={{ margin: 0 }}>Loading…</p></section>;
     if (!st.signedIn) return <section className="card"><p className="muted" style={{ margin: 0 }}>Sign in to spin the daily wheel.</p></section>;
@@ -243,7 +269,14 @@ export default function SpinWheel() {
                 {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
 
-            {st.isOwner ? <button type="button" className="cw-reset" onClick={reset} disabled={spinning}>🛠️ Free reset (owner · debug)</button> : null}
+            {st.isOwner ? (
+                <div className="cw-owner-tools">
+                    <span className="cw-owner-lab">🛠️ Owner debug</span>
+                    <button type="button" className="cw-owner-btn" onClick={reset} disabled={spinning}>Free spin</button>
+                    <button type="button" className="cw-owner-btn" onClick={() => ownerTrigger("bonus")} disabled={spinning || Boolean(bonus)}>🎁 Bonus game</button>
+                    <button type="button" className="cw-owner-btn" onClick={() => ownerTrigger("mini")} disabled={spinning || Boolean(mini)}>🎡 Mini wheel</button>
+                </div>
+            ) : null}
 
             <details className="cw-legend">
                 <summary>🎁 What&apos;s on the wheel <span>{prizes.length} prizes</span></summary>
@@ -265,6 +298,7 @@ export default function SpinWheel() {
             {mini ? (
                 <div className="cw-modal">
                     <div className="cw-modal-card">
+                        {mini.revealed ? <button type="button" className="cw-bonus-close" onClick={() => setMini(null)} aria-label="Close">✕</button> : null}
                         <div className="cw-modal-title">🎡 Mini Wheel Bonus!</div>
                         <div className="cw-mini-stage">
                             <div className="cw-mini-rotor" style={{ transform: `rotate(${mini.rot}deg)`, transition: mini.spinning ? "transform 3600ms cubic-bezier(0.08,0.72,0.05,1)" : "none" }} onTransitionEnd={mini.spinning && !mini.revealed ? onMiniLanded : undefined}>
@@ -295,39 +329,57 @@ export default function SpinWheel() {
                 </div>
             ) : null}
 
-            {/* ── BONUS GAME modal (match-3: flip tiles, win the gear you get 3 of) ── */}
+            {/* ── BONUS GAME — full-screen match-3: flip tiles, win the gear you get 3 of ── */}
             {bonus ? (
-                <div className="cw-modal">
-                    <div className="cw-modal-card cw-modal-wide">
-                        <div className="cw-modal-title">🎁 Match 3 to Win!</div>
-                        <p className="cw-modal-sub">{bonus.done ? "Three of a kind — reveal shows the whole board:" : "Flip tiles — the first gear you get 3 of is yours."}</p>
-                        <div className="cw-tiles">
+                <div className="cw-bonus-full">
+                    <button type="button" className="cw-bonus-close" onClick={() => setBonus(null)} aria-label="Close">✕</button>
+                    <div className="cw-bonus-inner">
+                        <div className="cw-bonus-title">🎁 Match 3 to Win!</div>
+                        <p className="cw-bonus-sub">{bonus.done ? "THREE OF A KIND!" : "Flip tiles — the first gear you match 3 of is yours to keep."}</p>
+
+                        {!bonus.done ? (
+                            <div className="cw-bonus-track">
+                                {bonus.roster.map((g) => {
+                                    const c = Object.values(bonus.flipped).filter((t) => t.id === g.id).length;
+                                    return (
+                                        <div key={g.id} className={`cw-bonus-track-item${c >= bonus.need ? " is-hit" : ""}`} title={g.name}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={g.sprite} alt="" />
+                                            <span>{c}/{bonus.need}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
+
+                        <div className="cw-bonus-grid">
                             {Array.from({ length: bonus.size }).map((_, i) => {
                                 const t = bonus.flipped[i];
                                 const isWin = bonus.done && t && bonus.won?.id === t.id;
                                 return (
-                                    <button key={i} type="button" className={`cw-tile${t ? " is-open" : ""}${isWin ? " is-win" : ""}${t ? ` rar-${t.rarity}` : ""}`} disabled={Boolean(t) || bonus.done || bonus.busy} onClick={() => revealBonus(i)}>
-                                        {t ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={t.sprite} alt="" className="cw-tile-img" />
-                                        ) : (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src="/images/spin/prizes/mystery-box.png" alt="" className="cw-tile-img is-closed" />
-                                        )}
+                                    <button key={i} type="button" className={`cw-btile${t ? " is-open" : ""}${isWin ? " is-win" : ""}${bonus.done && t && !isWin ? " is-dim" : ""}`} disabled={Boolean(t) || bonus.done || bonus.busy} onClick={() => revealBonus(i)}>
+                                        <span className="cw-btile-flip">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <span className="cw-btile-face cw-btile-back"><img src="/images/spin/prizes/mystery-box.png" alt="" draggable="false" /></span>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <span className="cw-btile-face cw-btile-front">{t ? <img src={t.sprite} alt="" draggable="false" /> : null}</span>
+                                        </span>
                                     </button>
                                 );
                             })}
                         </div>
+
                         {bonus.done ? (
-                            <>
-                                <div className="cw-modal-won">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={bonus.won.sprite} alt="" className="cw-modal-won-img" />
-                                    <span>You won <b>{bonus.won.name}</b>!</span>
-                                </div>
-                                <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect</button>
-                            </>
-                        ) : null}
+                            <div className="cw-bonus-win">
+                                <div className="cw-bonus-win-burst" aria-hidden="true" />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={bonus.won.sprite} alt="" className="cw-bonus-win-img" />
+                                <div className="cw-bonus-win-txt">You won <b>{bonus.won.name}</b>!</div>
+                                <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect gear</button>
+                            </div>
+                        ) : (
+                            <p className="cw-bonus-hint">Tap ✕ to step away — your board is saved and you can finish it later.</p>
+                        )}
                     </div>
                 </div>
             ) : null}
@@ -413,8 +465,10 @@ const CW_CSS = `
 @keyframes cwPulse { 0%,100% { box-shadow: 0 3px 0 #b47a12, 0 0 18px rgba(255,206,90,0.6); } 50% { box-shadow: 0 3px 0 #b47a12, 0 0 30px rgba(255,206,90,0.95); } }
 .cw-buy { flex: none; padding: 13px 16px; border-radius: 13px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #e6ebf2; font-weight: 800; font-size: 0.9rem; cursor: pointer; }
 .cw-buy:disabled { opacity: 0.5; cursor: default; }
-.cw-reset { width: 100%; margin-top: 8px; padding: 8px; border-radius: 10px; border: 1px dashed rgba(255,120,120,0.4); background: rgba(255,80,80,0.06); color: #ff9a9a; font-weight: 800; font-size: 0.8rem; cursor: pointer; }
-.cw-reset:disabled { opacity: 0.5; cursor: default; }
+.cw-owner-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 7px 9px; border-radius: 10px; border: 1px dashed rgba(255,120,120,0.35); background: rgba(255,80,80,0.05); }
+.cw-owner-lab { font-size: 10.5px; font-weight: 800; color: #ff9a9a; }
+.cw-owner-btn { padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,140,140,0.4); background: rgba(255,120,120,0.1); color: #ffc7c7; font-weight: 800; font-size: 11.5px; cursor: pointer; }
+.cw-owner-btn:disabled { opacity: 0.5; cursor: default; }
 
 .cw-legend { margin: 14px 0 0; }
 .cw-legend > summary { cursor: pointer; font-weight: 800; font-size: 0.9rem; list-style: none; display: flex; align-items: center; gap: 8px; }
@@ -446,15 +500,38 @@ const CW_CSS = `
 .cw-modal-won b { color: #fff; }
 .cw-modal-won-img { width: 42px; height: 42px; object-fit: contain; }
 .cw-collect { margin-top: 14px; padding: 11px 28px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12; }
-.cw-modal-wide { max-width: 420px; }
-.cw-tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 6px auto 4px; }
-.cw-tile { aspect-ratio: 1; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); cursor: pointer; display: grid; place-items: center; padding: 3px; transition: transform .15s, border-color .15s; }
-.cw-tile:not(:disabled):hover { transform: translateY(-2px); border-color: rgba(255,215,94,0.6); }
-.cw-tile.is-open { cursor: default; border-color: rgba(176,97,255,0.6); background: rgba(176,97,255,0.09); animation: cwPop .3s cubic-bezier(.2,1.4,.35,1) both; }
-.cw-tile.is-win { border-color: #ffd75e; background: rgba(255,215,94,0.16); box-shadow: 0 0 16px rgba(255,215,94,0.8); animation: cwWin .5s ease both; }
-@keyframes cwWin { 0% { transform: scale(1); } 40% { transform: scale(1.14); } 100% { transform: scale(1); } }
-.cw-tile-img { width: 82%; height: 82%; object-fit: contain; }
-.cw-tile-img.is-closed { opacity: 0.92; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
+/* ── BONUS GAME — full-screen match-3 (first-class, big, juicy, escapable) ── */
+.cw-bonus-full { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; padding: 16px; overflow-y: auto;
+    background: radial-gradient(120% 90% at 50% 0%, #2a1c40, #0a0612 70%); animation: cwFade .25s ease both; }
+@keyframes cwFade { from { opacity: 0; } to { opacity: 1; } }
+.cw-bonus-close { position: fixed; top: 14px; right: 14px; z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.4); color: #fff; font-size: 18px; font-weight: 900; cursor: pointer; }
+.cw-bonus-inner { width: 100%; max-width: 480px; text-align: center; }
+.cw-bonus-title { font-size: 1.7rem; font-weight: 900; color: #ffe28a; text-shadow: 0 2px 14px rgba(255,180,40,0.6); letter-spacing: 0.02em; }
+.cw-bonus-sub { font-size: 0.92rem; color: #d9c7ff; margin: 4px 0 14px; }
+.cw-bonus-track { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.cw-bonus-track-item { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 7px 3px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); min-width: 44px; }
+.cw-bonus-track-item img { width: 26px; height: 26px; object-fit: contain; }
+.cw-bonus-track-item span { font-size: 10px; font-weight: 900; color: #b7a6e0; font-variant-numeric: tabular-nums; }
+.cw-bonus-track-item.is-hit { border-color: #ffd75e; background: rgba(255,215,94,0.18); box-shadow: 0 0 14px rgba(255,215,94,0.6); }
+.cw-bonus-track-item.is-hit span { color: #ffe28a; }
+.cw-bonus-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 10px; }
+.cw-btile { aspect-ratio: 1; border: none; background: none; padding: 0; cursor: pointer; perspective: 600px; }
+.cw-btile:not(:disabled):active { transform: scale(0.94); }
+.cw-btile-flip { position: relative; display: block; width: 100%; height: 100%; transition: transform .45s cubic-bezier(.3,1.2,.4,1); transform-style: preserve-3d; }
+.cw-btile.is-open .cw-btile-flip { transform: rotateY(180deg); }
+.cw-btile-face { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; backface-visibility: hidden; -webkit-backface-visibility: hidden; padding: 8px; }
+.cw-btile-back { background: linear-gradient(180deg, #3a2a5e, #241640); border: 1px solid rgba(180,140,255,0.4); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+.cw-btile-back img { width: 76%; height: 76%; object-fit: contain; opacity: 0.95; }
+.cw-btile-front { transform: rotateY(180deg); background: radial-gradient(circle at 50% 35%, rgba(120,90,200,0.4), rgba(20,12,40,0.9)); border: 1px solid rgba(120,220,255,0.35); }
+.cw-btile-front img { width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }
+.cw-btile.is-win .cw-btile-front { border-color: #ffd75e; box-shadow: 0 0 22px rgba(255,215,94,0.9); animation: cwWinPulse 1s ease-in-out infinite; }
+.cw-btile.is-dim { opacity: 0.5; }
+@keyframes cwWinPulse { 0%,100% { box-shadow: 0 0 16px rgba(255,215,94,0.7); } 50% { box-shadow: 0 0 30px rgba(255,215,94,1); } }
+.cw-bonus-win { position: relative; margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: cwPop .4s cubic-bezier(.2,1.4,.35,1) both; }
+.cw-bonus-win-burst { position: absolute; top: -10px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(255,215,94,0.45), transparent 62%); filter: blur(4px); animation: cwHalo 1.6s ease-in-out infinite; }
+.cw-bonus-win-img { position: relative; width: 96px; height: 96px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6)); animation: cwSpin .6s ease both; }
+.cw-bonus-win-txt { position: relative; font-size: 1.15rem; color: #ecd6bc; } .cw-bonus-win-txt b { color: #fff; }
+.cw-bonus-hint { margin-top: 16px; font-size: 11px; color: #9a8fc0; }
 
 .cw-celebrate { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; background: rgba(6,4,10,0.72); backdrop-filter: blur(3px); }
 .cw-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }

@@ -79,7 +79,7 @@ const MINI_WHEEL_PRIZES = [
 // Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3
 // board draws BOARD_ITEMS of these at random, three tiles each.
 const WHEEL_GEAR = ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"];
-const BOARD_ITEMS = 8; // distinct gear on the board (× 3 tiles each = 24 tiles)
+const BOARD_ITEMS = 6; // distinct gear on the board (× 3 tiles each = 18 tiles → big, readable match-3)
 
 function wheelForLevel(level) {
     let w = WHEELS[0];
@@ -225,8 +225,16 @@ const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 export async function getSpinState(buyerId) {
     if (!buyerId) return { signedIn: false };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count, COALESCE(spins_since_rare,0) AS pity FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count, COALESCE(spins_since_rare,0) AS pity, spin_bonus FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const level = levelForXp(row?.xp || 0).level;
+    // Resume an unfinished match-3 bonus board across a refresh so an abandoned game isn't lost.
+    const bonusResume = (() => {
+        const g = row?.spin_bonus;
+        if (!g || !Array.isArray(g.board) || g.done) return null;
+        const revealed = {};
+        for (const i of (g.flipped || [])) revealed[i] = gearCard(g.board[i]);
+        return { size: g.board.length, need: g.need || 3, roster: [...new Set(g.board)].map(gearCard), revealed };
+    })();
     const wheel = wheelForLevel(level);
     const freeAvailable = asDay(row?.free_spin_day) !== today();
     // Extra-spin price escalates 1000, 2000, 3000… per store-day (resets at midnight Central).
@@ -238,6 +246,7 @@ export async function getSpinState(buyerId) {
         gold: row?.gold || 0,
         tokens: row?.tokens || 0,
         spinCount: row?.spin_count || 0,
+        bonusResume, // an unfinished match-3 board to re-open on load
         freeAvailable,
         tokenCost,
         extraSpinsToday: boughtToday,
@@ -299,12 +308,21 @@ export async function doSpin(buyerId) {
     return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, ...(await getSpinState(buyerId)) };
 }
 
-// OWNER-ONLY debug helper: refill the free daily spin (and clear the pity charge) so you can spin freely
-// while testing the wheel. No-op for anyone who isn't the owner. Remove this button before the wheel is done.
+// OWNER-ONLY debug helper: refill the free daily spin so you can spin freely while testing. Gives exactly ONE
+// spin (just clears free_spin_day — no bonus token). No-op for anyone who isn't the owner.
 export async function resetSpin(buyerId) {
     if (!buyerId || !isOwner(buyerId)) return { ok: false, error: "forbidden" };
-    await db.query(`UPDATE mkt_buyer SET free_spin_day = NULL, spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {});
+    await db.query(`UPDATE mkt_buyer SET free_spin_day = NULL WHERE id = $1`, [buyerId]).catch(() => {});
     return { ok: true, ...(await getSpinState(buyerId)) };
+}
+
+// OWNER-ONLY: trigger a sub-game directly for testing (the match-3 BONUS GAME or the MINI WHEEL) without
+// waiting to land on its wedge. No-op for non-owners.
+export async function ownerSpinTrigger(buyerId, what) {
+    if (!buyerId || !isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (what === "bonus") { const bonusGame = await rollBonusGame(buyerId); return { ok: true, bonusGame, ...(await getSpinState(buyerId)) }; }
+    if (what === "mini") { const miniWheel = await rollMiniWheel(buyerId); return { ok: true, miniWheel, ...(await getSpinState(buyerId)) }; }
+    return { ok: false, error: "bad_trigger" };
 }
 
 // The gold cost of the NEXT extra spin today: 1000 for the first, +1000 each additional, reset at the
