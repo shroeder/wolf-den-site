@@ -140,6 +140,7 @@ export default function SpinWheel() {
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
             if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), 4600); }
             playWin(kind || (d.prize?.rare ? "rare" : "normal"));
+            if (d.refunded) setMsg("🍀 Lucky Streak — your spin was FREE! A token was refunded.");
             if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
             else chainRef.current = 0;
         }, SPIN_MS);

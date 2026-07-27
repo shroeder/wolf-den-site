@@ -5,8 +5,9 @@ import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js"
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
-import { grantItem } from "@/lib/marketplace/inventory.js";
+import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { setWheelBonus, setWheelRespinChance } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
@@ -200,8 +201,9 @@ function pickIndex(wheel, forceRare, rand = Math.random) {
 }
 
 // Deliver a prize; returns display { sprite, text }. (MINI WHEEL / BONUS GAME are handled in doSpin.)
-async function grantPrize(buyerId, prize) {
+async function grantPrize(buyerId, prize, opts = {}) {
     const hh = await activeXpMultiplier().catch(() => 1);
+    const goldMult = 1 + (opts.goldPct || 0) / 100; // Wheelwarden set: bonus gold on spin gold prizes.
     const sprite = prize.sprite ? P(prize.sprite) : null;
     if (prize.kind === "major_jackpot") {
         const won = await winJackpotPot(buyerId);
@@ -211,7 +213,7 @@ async function grantPrize(buyerId, prize) {
         return { sprite, text: `MAJOR JACKPOT — ${won.toLocaleString()} gold!`, amount: won };
     }
     if (prize.kind === "gold") {
-        const amt = Math.round(prize.amount * hh);
+        const amt = Math.round(prize.amount * hh * goldMult);
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
         await logCoin(buyerId, amt, "spin_prize", { meta: { prize: prize.label } }).catch(() => {});
         if (prize.mini) await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
@@ -301,6 +303,12 @@ export async function doSpin(buyerId) {
     }
     // Every spin feeds the shared progressive jackpot.
     await bumpJackpotPot(JACKPOT_CONTRIB).catch(() => {});
+    // Wheelwarden's Fortune set (the wheel-exclusive gear worn as a set): faster Lucky Charge, bonus spin gold,
+    // and a free-respin capstone. Read off the equipped loadout (getEquippedIds returns a {slot→id} object,
+    // which setWheelBonus normalizes).
+    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
+    const wheelBonus = setWheelBonus(equipped);            // { charge, goldPct }
+    const respinChance = setWheelRespinChance(equipped);   // capstone: 0..0.5
     const wheel = wheelForLevel(levelForXp(row.xp).level);
     const forceRare = row.pity >= PITY - 1;
     const idx = pickIndex(wheel, forceRare);
@@ -311,8 +319,13 @@ export async function doSpin(buyerId) {
     let bonusGame = null;
     if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel bonus!" }; }
     else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
-    else display = await grantPrize(buyerId, prize);
-    await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + 1 END WHERE id = $1`, [buyerId, Boolean(prize.rare)]).catch(() => {});
+    else display = await grantPrize(buyerId, prize, { goldPct: wheelBonus.goldPct || 0 });
+    // Lucky Charge climbs faster with the wheel set (+charge per spin); resets on a rare pull.
+    const chargeStep = 1 + (wheelBonus.charge || 0);
+    await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + $3 END WHERE id = $1`, [buyerId, Boolean(prize.rare), chargeStep]).catch(() => {});
+    // Capstone: a chance the spin is refunded (a free spin token back).
+    let refunded = false;
+    if (respinChance > 0 && Math.random() < respinChance) { await grantSpinTokens(buyerId, 1).catch(() => {}); refunded = true; }
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
     await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
@@ -325,7 +338,7 @@ export async function doSpin(buyerId) {
         respin: Boolean(prize.kind === "respin"), golden: forceRare,
         miniWheel: Boolean(prize.kind === "mini_wheel"), bonusGame: Boolean(prize.kind === "bonus_game"),
     };
-    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, ...(await getSpinState(buyerId)) };
+    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, ...(await getSpinState(buyerId)) };
 }
 
 // OWNER-ONLY debug helper: refill the free daily spin so you can spin freely while testing. Gives exactly ONE

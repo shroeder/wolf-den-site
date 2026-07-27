@@ -5,13 +5,15 @@ import { createPortal } from "react-dom";
 
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
-import { describeSea } from "@/lib/marketplace/items.js";
+import { describeSea, describeFarm } from "@/lib/marketplace/items.js";
 
 const RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
-// Null-safe: the sailing set's tiers grant SEA affinity (no combat stats), so `stats` can be null — guard it
+// Null-safe: the sailing/farm/wheel sets' tiers grant affinity (no combat stats), so `stats` can be null — guard it
 // (an unguarded Object.entries(null) here 500'd the whole /marketplace/sets page).
 const statText = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${k.replace(/_/g, " ")}`).join(" · ");
-const tierText = (t) => [statText(t.stats), t.sea ? describeSea(t.sea) : ""].filter(Boolean).join(" · ") || "—";
+// Wheelwarden set bonuses read off the wheel: Lucky Charge speed + spin gold.
+const describeWheel = (w) => [w.charge ? `+${w.charge} Lucky Charge/spin` : "", w.goldPct ? `+${w.goldPct}% spin gold` : ""].filter(Boolean).join(" · ");
+const tierText = (t) => [statText(t.stats), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : "", t.wheel ? describeWheel(t.wheel) : ""].filter(Boolean).join(" · ") || "—";
 
 // The gear-sets overview: each set as a card with its pieces shown as tappable ART tiles (equipped / owned /
 // locked), the tiered bonuses, and the full-set capstone. Tapping a piece inspects what it does.

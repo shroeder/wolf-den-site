@@ -95,7 +95,27 @@ export const ITEM_SETS = [
         capstone: { farmGrow: 0.15, desc: "Green Season: your crops grow 15% faster." },
         weakness: null,
     },
+    {
+        // ── WHEEL SET ── the wheel-exclusive gear from the Prize Wheel's match-3 BONUS GAME, made a collect-them-all
+        // set whose bonuses feed the WHEEL itself (Lucky Charge speed + spin gold + a free-respin capstone), read in
+        // spin.js — NOT boss power. `full` = 8 because two pieces share the main_hand slot (blade + axe), so all ten
+        // can never be worn at once; the capstone unlocks at 8 equipped.
+        id: "wheelwarden", name: "Wheelwarden's Fortune",
+        items: ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"],
+        full: 8,
+        bonuses: [
+            { need: 2, wheel: { charge: 1 } },
+            { need: 4, wheel: { charge: 1, goldPct: 12 } },
+            { need: 6, wheel: { charge: 1, goldPct: 8 } },
+        ],
+        capstone: { wheelRespin: 0.18, desc: "Lucky Streak: an 18% chance every spin is FREE — your spin is refunded." },
+        weakness: null,
+    },
 ];
+
+// How many equipped pieces a set's CAPSTONE needs (defaults to all items; `full` overrides when some pieces
+// share a slot and the whole set can't be worn at once — e.g. the wheel set's two main-hand pieces).
+const fullNeed = (set) => set.full || set.items.length;
 
 const SET_BY_ITEM = {};
 for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
@@ -191,6 +211,27 @@ export function setFarmDoubleHarvest(equippedIds) {
     return Math.min(0.75, chance);
 }
 
+// Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `charge` = extra
+// Lucky Charge per spin (faster Golden Spins); `goldPct` = % bonus on spin gold prizes.
+export function setWheelBonus(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    const total = { charge: 0, goldPct: 0 };
+    for (const set of ITEM_SETS) {
+        const n = counts.get(set.id) || 0;
+        for (const tier of set.bonuses) {
+            if (n >= tier.need && tier.wheel) for (const [k, v] of Object.entries(tier.wheel)) total[k] = (total[k] || 0) + v;
+        }
+    }
+    return total;
+}
+// Full-set WHEEL capstone: chance a spin is refunded (free re-spin). Consumed in spin.js doSpin.
+export function setWheelRespinChance(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    let chance = 0;
+    for (const set of ITEM_SETS) if (set.capstone?.wheelRespin && (counts.get(set.id) || 0) >= fullNeed(set)) chance += set.capstone.wheelRespin;
+    return Math.min(0.5, chance);
+}
+
 // A display view of every set the loadout touches: equipped count + each tier with an active flag.
 export function activeSetBonuses(equippedIds) {
     const counts = equippedCounts(equippedIds);
@@ -200,8 +241,8 @@ export function activeSetBonuses(equippedIds) {
             const n = counts.get(set.id) || 0;
             return {
                 id: set.id, name: set.name, equipped: n, total: set.items.length,
-                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea, farm: t.farm })),
-                capstone: set.capstone ? { desc: set.capstone.desc, active: n >= set.items.length } : null,
+                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea, farm: t.farm, wheel: t.wheel })),
+                capstone: set.capstone ? { desc: set.capstone.desc, active: n >= fullNeed(set) } : null,
             };
         });
 }
@@ -267,8 +308,8 @@ export function getSetsOverview(equippedIds, ownedIds) {
             id: set.id, name: set.name, total: set.items.length, equipped, owned,
             weakness: set.weakness || null,
             pieces,
-            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null })),
-            capstone: set.capstone ? { desc: set.capstone.desc, active: equipped >= set.items.length } : null,
+            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null })),
+            capstone: set.capstone ? { desc: set.capstone.desc, active: equipped >= fullNeed(set) } : null,
         };
     });
 }
