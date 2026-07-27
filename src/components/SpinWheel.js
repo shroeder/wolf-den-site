@@ -5,39 +5,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import CoinCta from "@/components/CoinCta";
 import useScrollLock from "@/lib/useScrollLock";
 
-// ── THE PRIZE WHEEL — a canvas-drawn casino wheel: textured jewel wedges, a metallic gold rim studded with
-// chasing marquee bulbs, a chrome hub, peg-tick ratchet audio, a physics spin that lands off-centre (never the
-// same twice) with a settle wobble, and a "Lucky Charge" meter that builds to a guaranteed GOLDEN SPIN. ──
+// ── THE PRIZE WHEEL — built from hand-painted game art (matching the rest of the game): a rotating ornate
+// disc inside a stationary bulb-lit gold frame with a carved wolf-head pointer. Spins with a randomized,
+// off-centre landing + a live ratchet tick, then reveals the prize. A "Lucky Charge" meter builds toward a
+// guaranteed GOLDEN SPIN. ──
 
-const TIER = {
-    normalA: { base: "#2b3350", edge: "#131a2e", text: "#e4ebfb" },
-    normalB: { base: "#26314c", edge: "#0f1528", text: "#e4ebfb" },
-    rare: { base: "#0f6b56", edge: "#073329", text: "#8bf5d6" },
-    bonus: { base: "#7a2b8e", edge: "#340f42", text: "#ffb6f2" },
-    mini: { base: "#5a2fa0", edge: "#22103f", text: "#d3aaff" },
-    jackpot: { base: "#9a6f12", edge: "#3a2606", text: "#ffe28a" },
-};
-const paletteFor = (p, i) => (p.tier && TIER[p.tier]) || (i % 2 ? TIER.normalB : TIER.normalA);
-
-// Short wedge caption from the full label (the legend carries the detail).
-function shortLabel(p) {
-    const l = p.label || "";
-    if (p.tier === "jackpot") return "JACKPOT";
-    if (p.tier === "mini") return "MINI";
-    if (p.kind === "respin" || /BONUS SPIN/i.test(l)) return "SPIN!";
-    const num = l.match(/[\d,]+/);
-    if (/gold/i.test(l) && num) return num[0];
-    if (/XP/.test(l) && num) return `${num[0]} XP`;
-    if (num) return `${num[0]}`;
-    return l.split(" ")[0].slice(0, 8);
-}
+const WEDGES = 10;           // the disc art has 10 painted wedges — land on one for a tidy stop
+const SPIN_MS = 5200;
 
 // ── tiny Web-Audio kit (no assets, CSP-safe) ──
 let _ac = null;
 const ac = () => { if (typeof window === "undefined") return null; try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === "suspended") _ac.resume(); return _ac; } catch { return null; } };
 function tick(v = 0.05) {
     const a = ac(); if (!a) return;
-    try { const o = a.createOscillator(), g = a.createGain(); o.type = "square"; o.frequency.value = 1200; g.gain.setValueAtTime(v, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.03); o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.035); } catch { /* ignore */ }
+    try { const o = a.createOscillator(), g = a.createGain(); o.type = "square"; o.frequency.value = 1100; g.gain.setValueAtTime(v, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.03); o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.035); } catch { /* ignore */ }
 }
 function playWin(kind) {
     const a = ac(); if (!a) return;
@@ -47,11 +28,9 @@ function playWin(kind) {
     });
 }
 
-const TAU = Math.PI * 2;
-const easeOutQuart = (t) => 1 - (1 - t) ** 4;
-
 export default function SpinWheel() {
     const [st, setSt] = useState(null);
+    const [rot, setRot] = useState(0);
     const [spinning, setSpinning] = useState(false);
     const [result, setResult] = useState(null);
     const [celebrate, setCelebrate] = useState(null);
@@ -59,218 +38,79 @@ export default function SpinWheel() {
     const [msg, setMsg] = useState(null);
     const [lowCoins, setLowCoins] = useState(false);
 
-    const wrapRef = useRef(null);
-    const sizeRef = useRef(300);
-    const angleRef = useRef(0);            // current wheel rotation (radians)
-    const spinRef = useRef(null);          // active spin animation descriptor
-    const winnerRef = useRef(null);        // winning wedge index (for the winner glow)
-    const goldenRef = useRef(false);       // charged wheel styling
-    const prizesRef = useRef([]);
+    const discRef = useRef(null);
     const rafRef = useRef(0);
-    const chainRef = useRef(0);            // guard against runaway bonus-spin chains
-    const runSpinRef = useRef(null);       // lets runSpin re-invoke itself for the bonus-spin chain
+    const timerRef = useRef(null);
+    const chainRef = useRef(0);
+    const runSpinRef = useRef(null);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/spin", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
-        if (d) { setSt(d); prizesRef.current = d?.wheel?.prizes || []; goldenRef.current = Boolean(d?.golden); }
+        if (d) setSt(d);
     }, []);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount (setState is post-await, not sync)
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => { load(); return () => { clearTimeout(timerRef.current); cancelAnimationFrame(rafRef.current); }; }, [load]);
 
-    // ── the render loop (drives bulbs + the spin). Attached via a CALLBACK REF so setup runs the exact moment
-    // the <canvas> mounts — the <canvas> only appears after `st` loads (a "Loading…" placeholder shows first),
-    // and a callback ref is the one thing guaranteed to fire when that node attaches/detaches. ──
-    const loopCleanup = useRef(null);
-    const canvasCb = useCallback((canvas) => {
-        if (loopCleanup.current) { loopCleanup.current(); loopCleanup.current = null; }
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        let lastWedge = null;
-        let lastTick = 0;
-
-        // Measure from the canvas's own parent (always available in a callback ref, unlike a sibling/parent
-        // ref which may not have attached yet). Fall back to the viewport width, then 300.
-        const host = canvas.parentElement;
-        const resize = () => {
-            const w = host?.clientWidth || (typeof window !== "undefined" ? Math.min(window.innerWidth - 40, 360) : 300) || 300;
-            const size = Math.max(200, Math.min(360, w - 20)); // minus the stage's 10px padding each side
-            sizeRef.current = size;
-            const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
-            canvas.width = size * dpr; canvas.height = size * dpr;
-            canvas.style.width = `${size}px`; canvas.style.height = `${size}px`;
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Live ratchet: read the disc's actual rotation each frame while spinning, tick as wedges pass the pointer.
+    const startTickLoop = useCallback(() => {
+        let lastWedge = null, lastTick = 0;
+        const step = (ts) => {
+            const el = discRef.current;
+            if (el) {
+                let ang = 0;
+                try { const m = new DOMMatrixReadOnly(getComputedStyle(el).transform); ang = Math.atan2(m.b, m.a); } catch { /* ignore */ }
+                const w = Math.round((ang / (Math.PI * 2)) * WEDGES);
+                if (w !== lastWedge) { if (ts - lastTick > 26) { tick(); lastTick = ts; } lastWedge = w; }
+            }
+            rafRef.current = requestAnimationFrame(step);
         };
-        resize();
-        const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
-        if (ro && host) ro.observe(host);
-
-        const draw = (ts) => {
-          try {
-            const size = sizeRef.current;
-            const prizes = prizesRef.current;
-            const n = prizes.length || 1;
-            const seg = TAU / n;
-            const cx = size / 2, cy = size / 2;
-            const Rwheel = size * 0.412, Rrim = size * 0.44, Rbulb = size * 0.468, Rhub = size * 0.125;
-
-            // advance an active spin
-            const sp = spinRef.current;
-            if (sp) {
-                if (sp.phase === "spin") {
-                    const p = Math.min(1, (ts - sp.start) / sp.dur);
-                    angleRef.current = sp.from + (sp.to - sp.from) * easeOutQuart(p);
-                    if (p >= 1) { spinRef.current = { phase: "wobble", start: ts, dur: 480, base: sp.to, amp: seg * 0.14 }; }
-                } else if (sp.phase === "wobble") {
-                    const p = Math.min(1, (ts - sp.start) / sp.dur);
-                    angleRef.current = sp.base + Math.sin(p * Math.PI * 2) * sp.amp * (1 - p);
-                    if (p >= 1) { angleRef.current = sp.base; spinRef.current = null; sp.done?.(); }
-                }
-                // ratchet tick as wedges pass the pointer
-                const idxUnder = ((Math.round(-angleRef.current / seg) % n) + n) % n;
-                if (idxUnder !== lastWedge) { if (ts - lastTick > 28 && sp.phase === "spin") { tick(); lastTick = ts; } lastWedge = idxUnder; }
-            }
-
-            ctx.clearRect(0, 0, size, size);
-            const golden = goldenRef.current;
-
-            // ambient backglow
-            const bg = ctx.createRadialGradient(cx, cy, Rhub, cx, cy, Rbulb + 10);
-            bg.addColorStop(0, golden ? "rgba(255,200,80,0.10)" : "rgba(120,150,255,0.05)");
-            bg.addColorStop(1, "rgba(0,0,0,0)");
-            ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx, cy, Rbulb + 12, 0, TAU); ctx.fill();
-
-            // ── wheel layer (rotates) ──
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(angleRef.current);
-            for (let i = 0; i < n; i += 1) {
-                const p = prizes[i];
-                const pal = paletteFor(p, i);
-                const a0 = -Math.PI / 2 - seg / 2 + i * seg;
-                const a1 = a0 + seg;
-                const grad = ctx.createRadialGradient(0, 0, Rhub * 0.7, 0, 0, Rwheel);
-                grad.addColorStop(0, pal.edge);
-                grad.addColorStop(1, pal.base);
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, Rwheel, a0, a1); ctx.closePath();
-                ctx.fillStyle = grad; ctx.fill();
-                // winner glow
-                if (winnerRef.current === i) { ctx.save(); ctx.fillStyle = "rgba(255,225,140,0.28)"; ctx.fill(); ctx.restore(); }
-                // gold divider
-                ctx.strokeStyle = "rgba(255,214,120,0.55)"; ctx.lineWidth = 1.5; ctx.stroke();
-                // icon + short caption, radial
-                const mid = a0 + seg / 2;
-                ctx.save();
-                ctx.rotate(mid);
-                ctx.textAlign = "center"; ctx.textBaseline = "middle";
-                ctx.font = `${Math.round(size * 0.055)}px system-ui`;
-                ctx.fillText(p.emoji || "✨", Rwheel * 0.74, 0);
-                ctx.fillStyle = pal.text;
-                ctx.font = `800 ${Math.round(size * 0.032)}px system-ui`;
-                ctx.fillText(shortLabel(p), Rwheel * 0.45, 0);
-                ctx.restore();
-            }
-            ctx.restore();
-
-            // ── metallic gold rim (static) ──
-            const rim = ctx.createLinearGradient(cx - Rrim, cy - Rrim, cx + Rrim, cy + Rrim);
-            [["#7a5410", 0], ["#ffe9a8", 0.25], ["#b5811f", 0.5], ["#ffe9a8", 0.75], ["#7a5410", 1]].forEach(([c, s]) => rim.addColorStop(s, c));
-            ctx.strokeStyle = rim; ctx.lineWidth = size * 0.03; ctx.beginPath(); ctx.arc(cx, cy, Rrim, 0, TAU); ctx.stroke();
-
-            // ── marquee bulbs (static ring, chasing) ──
-            const nb = Math.min(28, Math.max(18, n * 2));
-            const phase = Math.floor(ts / (spinRef.current ? 70 : 190));
-            for (let b = 0; b < nb; b += 1) {
-                const ang = (b / nb) * TAU - Math.PI / 2;
-                const bx = cx + Math.cos(ang) * Rbulb, by = cy + Math.sin(ang) * Rbulb;
-                const lit = (b + phase) % 3 === 0;
-                const r = size * (lit ? 0.016 : 0.012);
-                let core = golden ? "#fff6cf" : "#fff";
-                let mid = golden ? "#ffcf4a" : lit ? "#ffe08a" : "#8a6a2a";
-                if (golden && lit) { const hue = (b * 24 + phase * 40) % 360; mid = `hsl(${hue} 90% 60%)`; core = "#fff"; }
-                const g = ctx.createRadialGradient(bx, by, 0, bx, by, r * 2.4);
-                g.addColorStop(0, core); g.addColorStop(0.5, mid); g.addColorStop(1, "rgba(0,0,0,0)");
-                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, r * 2.2, 0, TAU); ctx.fill();
-            }
-
-            // ── chrome hub (static) ──
-            const hub = ctx.createRadialGradient(cx - Rhub * 0.4, cy - Rhub * 0.4, 1, cx, cy, Rhub);
-            hub.addColorStop(0, "#eef3ff"); hub.addColorStop(0.5, "#9fb0c8"); hub.addColorStop(1, "#3a4560");
-            ctx.fillStyle = hub; ctx.beginPath(); ctx.arc(cx, cy, Rhub, 0, TAU); ctx.fill();
-            ctx.strokeStyle = rim; ctx.lineWidth = size * 0.014; ctx.stroke();
-            ctx.font = `${Math.round(Rhub * 1.1)}px system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText("🐺", cx, cy + 1);
-
-            // ── pointer (static, top) ──
-            const py = cy - Rrim - size * 0.006;
-            ctx.beginPath(); ctx.moveTo(cx - size * 0.035, py - size * 0.03); ctx.lineTo(cx + size * 0.035, py - size * 0.03); ctx.lineTo(cx, py + size * 0.03); ctx.closePath();
-            ctx.fillStyle = "#ff4d5e"; ctx.shadowColor = "rgba(255,77,94,0.8)"; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
-            ctx.strokeStyle = rim; ctx.lineWidth = 2; ctx.stroke();
-          } catch { /* never let one bad frame kill the wheel */ }
-          rafRef.current = requestAnimationFrame(draw);
-        };
-        rafRef.current = requestAnimationFrame(draw);
-        loopCleanup.current = () => { cancelAnimationFrame(rafRef.current); if (ro) ro.disconnect(); };
-    }, []);
-
-    const doSpinRequest = useCallback(async () => {
-        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
-        return r ? await r.json().catch(() => null) : null;
+        rafRef.current = requestAnimationFrame(step);
     }, []);
 
     const runSpin = useCallback(async () => {
-        setSpinning(true); setResult(null); setMsg(null); setCelebrate(null); winnerRef.current = null;
+        setSpinning(true); setResult(null); setMsg(null); setCelebrate(null);
         tick(0.04);
-        const d = await doSpinRequest();
+        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
         if (!d?.ok) { setSpinning(false); chainRef.current = 0; setMsg(d?.error === "no_spins" ? "No spins left — earn or buy one." : "Couldn't spin."); return; }
-        const n = prizesRef.current.length || 1;
-        const seg = TAU / n;
-        // land the winning wedge under the pointer, OFF-CENTRE by a random amount → never the same spin twice
-        const offset = (Math.random() - 0.5) * seg * 0.7;
-        const from = angleRef.current;
-        const residueTarget = -(d.prizeIndex * seg) + offset;
-        const curMod = ((from % TAU) + TAU) % TAU;
-        const desMod = ((residueTarget % TAU) + TAU) % TAU;
-        const turns = 5 + Math.floor(Math.random() * 4); // 5–8 full turns
-        const to = from + turns * TAU + (((desMod - curMod) % TAU) + TAU) % TAU;
-        const dur = 4200 + Math.random() * 1100;
-        spinRef.current = {
-            phase: "spin", start: performance.now(), dur, from, to,
-            done: () => {
-                winnerRef.current = d.prizeIndex;
-                setSpinning(false);
-                setResult(d.prize);
-                setSt((s) => ({ ...s, tokens: d.tokens, freeAvailable: d.freeAvailable, canSpin: d.canSpin, gold: d.gold, spinCount: d.spinCount, charge: d.charge, chargeMax: d.chargeMax, golden: d.golden }));
-                goldenRef.current = Boolean(d.golden);
-                const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
-                if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind }); setTimeout(() => setCelebrate(null), 4200); }
-                playWin(kind || (d.prize?.rare ? "rare" : "normal"));
-                if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
-                // BONUS SPIN → chain automatically (feels like a gift, not a banked token). Guarded.
-                if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1300); }
-                else chainRef.current = 0;
-            },
-        };
-    }, [doSpinRequest]);
+        // Land on a random wedge, off-centre, after 5–8 turns — never the same spin twice.
+        const wedge = Math.floor(Math.random() * WEDGES);
+        const jitter = (Math.random() - 0.5) * (360 / WEDGES) * 0.6;
+        const turns = 5 + Math.floor(Math.random() * 4);
+        setRot((prev) => Math.ceil(prev / 360) * 360 + turns * 360 + wedge * (360 / WEDGES) + jitter);
+        cancelAnimationFrame(rafRef.current); startTickLoop();
+        timerRef.current = setTimeout(() => {
+            cancelAnimationFrame(rafRef.current);
+            setSpinning(false);
+            setResult(d.prize);
+            setSt((s) => ({ ...s, tokens: d.tokens, freeAvailable: d.freeAvailable, canSpin: d.canSpin, gold: d.gold, spinCount: d.spinCount, charge: d.charge, chargeMax: d.chargeMax, golden: d.golden }));
+            const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
+            if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind }); setTimeout(() => setCelebrate(null), 4200); }
+            playWin(kind || (d.prize?.rare ? "rare" : "normal"));
+            if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
+            if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
+            else chainRef.current = 0;
+        }, SPIN_MS);
+    }, [startTickLoop]);
     useEffect(() => { runSpinRef.current = runSpin; }, [runSpin]);
 
     const spin = useCallback(async () => {
-        if (spinning || spinRef.current) return;
+        if (spinning) return;
         if (!st?.canSpin) {
             const rs = await fetch("/api/marketplace/spin", { cache: "no-store" }).catch(() => null);
             const ds = rs?.ok ? await rs.json().catch(() => null) : null;
-            if (ds) { setSt(ds); prizesRef.current = ds?.wheel?.prizes || []; }
+            if (ds) setSt(ds);
             if (!ds?.canSpin) { setMsg("No spins right now — your free spin resets daily; earn or buy a token."); return; }
         }
-        chainRef.current = 0;
-        runSpin();
+        chainRef.current = 0; runSpin();
     }, [spinning, st, runSpin]);
 
     const buy = useCallback(async () => {
         if (spinning) return;
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy" }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
-        if (d?.ok) { setSt(d); prizesRef.current = d?.wheel?.prizes || []; setLowCoins(false); if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); }
+        if (d?.ok) { setSt(d); setLowCoins(false); if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); }
         else { setMsg(d?.error === "not_enough_gold" ? "Not enough coins for a spin." : "Couldn't buy a spin."); setLowCoins(d?.error === "not_enough_gold"); }
     }, [spinning]);
 
@@ -289,11 +129,22 @@ export default function SpinWheel() {
                 <span className="cw-sub">🎟️ {st.tokens} · spun {st.spinCount}×</span>
             </div>
 
-            <div className={`cw-stage${st.golden ? " is-golden" : ""}`} ref={wrapRef}>
-                <canvas ref={canvasCb} className="cw-canvas" />
+            <div className={`cw-stage${st.golden ? " is-golden" : ""}${spinning ? " is-spinning" : ""}`}>
+                <div className="cw-ring">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        ref={discRef}
+                        className="cw-disc"
+                        src="/images/spin/wheel-disc.png"
+                        alt=""
+                        draggable="false"
+                        style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}
+                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="cw-frame" src="/images/spin/wheel-frame.png" alt="" draggable="false" />
+                </div>
             </div>
 
-            {/* Lucky Charge meter → GOLDEN SPIN */}
             <div className={`cw-charge${st.golden ? " is-full" : ""}`}>
                 <span className="cw-charge-lab">{st.golden ? "★ GOLDEN SPIN READY — guaranteed rare+" : "Lucky Charge"}</span>
                 <span className="cw-charge-bar"><span style={{ width: `${st.golden ? 100 : chargePct}%` }} /></span>
@@ -302,8 +153,8 @@ export default function SpinWheel() {
 
             {result ? (
                 <div className={`cw-result tier-${resultKind}`}>
-                    {resultKind === "jackpot" ? "💎 JACKPOT! " : resultKind === "mini" ? "🎰 MINI JACKPOT! " : resultKind === "bonus" ? "🎡 BONUS SPIN! " : "You won "}
-                    <strong>{result.emoji} {result.text}</strong>{resultKind === "bonus" ? "" : "!"}
+                    <span className="cw-result-kicker">{resultKind === "jackpot" ? "💎 JACKPOT!" : resultKind === "mini" ? "🎰 MINI JACKPOT!" : resultKind === "bonus" ? "🎡 BONUS SPIN!" : resultKind === "rare" ? "✨ Rare!" : "You won"}</span>
+                    <span className="cw-result-prize">{result.emoji} {result.text}</span>
                 </div>
             ) : null}
             {msg ? <div className="cw-msg">{msg}{lowCoins ? <span style={{ marginLeft: 8 }}><CoinCta label="Get coins" /></span> : null}</div> : null}
@@ -326,7 +177,7 @@ export default function SpinWheel() {
                 </div>
             </details>
 
-            <p className="cw-hint">One free spin daily. Earn 🎟️ tokens from quests, boss kills & streaks. Every spin builds your Lucky Charge toward a Golden Spin.</p>
+            <p className="cw-hint">One free spin daily. Earn 🎟️ tokens from quests, boss kills &amp; streaks. Every spin builds your Lucky Charge toward a Golden Spin.</p>
 
             {celebrate ? (
                 <div className={`cw-celebrate cw-celebrate-${celebrate.kind}`} onClick={() => setCelebrate(null)}>
@@ -354,31 +205,38 @@ const CW_CSS = `
 .cw-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .cw-title { font-weight: 900; font-size: 1.05rem; }
 .cw-sub { font-size: 11.5px; color: #9aa2ab; font-weight: 700; }
-.cw-stage { position: relative; display: grid; place-items: center; margin: 10px auto 4px; max-width: 380px; padding: 10px; border-radius: 20px;
-    background: radial-gradient(120% 120% at 50% 0%, rgba(120,150,255,0.06), rgba(0,0,0,0.35)); }
-.cw-stage.is-golden { background: radial-gradient(120% 120% at 50% 0%, rgba(255,200,80,0.16), rgba(0,0,0,0.4)); box-shadow: inset 0 0 40px rgba(255,190,70,0.15); }
-.cw-canvas { display: block; touch-action: manipulation; filter: drop-shadow(0 12px 30px rgba(0,0,0,0.5)); }
 
-.cw-charge { display: flex; align-items: center; gap: 8px; margin: 4px 2px 2px; }
+.cw-stage { position: relative; display: grid; place-items: center; margin: 12px auto 6px; width: 100%; max-width: 360px; aspect-ratio: 1; }
+.cw-stage::before { content: ""; position: absolute; inset: 6%; border-radius: 50%; background: radial-gradient(circle, rgba(255,190,70,0.14), transparent 68%); filter: blur(6px); transition: opacity .4s; }
+.cw-stage.is-golden::before { background: radial-gradient(circle, rgba(255,205,80,0.32), transparent 70%); animation: cwHalo 1.6s ease-in-out infinite; }
+@keyframes cwHalo { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+.cw-ring { position: relative; width: 100%; height: 100%; }
+.cw-disc { position: absolute; top: 50%; left: 50%; width: 68%; height: 68%; transform-origin: center; border-radius: 50%; will-change: transform;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.55); }
+.cw-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45)); }
+.cw-stage.is-golden .cw-frame { filter: drop-shadow(0 0 16px rgba(255,200,80,0.7)); }
+.cw-stage.is-spinning .cw-frame { animation: cwFrameBuzz 0.14s steps(2) infinite; }
+@keyframes cwFrameBuzz { 0% { transform: translate(0,0); } 50% { transform: translate(0,-0.6px); } }
+
+.cw-charge { display: flex; align-items: center; gap: 8px; margin: 2px 2px; }
 .cw-charge-lab { font-size: 10.5px; font-weight: 800; color: #9aa2ab; white-space: nowrap; }
 .cw-charge.is-full .cw-charge-lab { color: #ffd75e; }
 .cw-charge-bar { flex: 1; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .cw-charge-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6b8cff, #8fd8ff); transition: width .5s ease; }
-.cw-charge.is-full .cw-charge-bar > span { background: linear-gradient(90deg, #ffb020, #ffe08a); box-shadow: 0 0 10px #ffce5a; animation: cwGlow 1.4s ease-in-out infinite; }
+.cw-charge.is-full .cw-charge-bar > span { background: linear-gradient(90deg, #ffb020, #ffe08a); box-shadow: 0 0 10px #ffce5a; }
 .cw-charge-n { font-size: 10.5px; font-weight: 800; color: #b6bcc4; font-variant-numeric: tabular-nums; }
-@keyframes cwGlow { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
 
-.cw-result { margin: 10px 0 0; text-align: center; font-size: 0.95rem; font-weight: 700; padding: 9px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
-.cw-result.tier-rare { border-color: rgba(92,224,192,0.5); color: #8bf5d6; }
-.cw-result.tier-bonus { border-color: rgba(255,140,240,0.5); color: #ffb6f2; }
-.cw-result.tier-mini { border-color: rgba(200,150,255,0.6); color: #d3aaff; }
-.cw-result.tier-jackpot { border-color: rgba(255,215,94,0.7); color: #ffe28a; background: rgba(255,215,94,0.08); }
-.cw-result strong { color: #fff; }
+.cw-result { margin: 10px 0 0; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); animation: cwPop .35s cubic-bezier(.2,1.4,.35,1) both; }
+.cw-result-kicker { font-size: 11px; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: #9aa2ab; }
+.cw-result-prize { font-size: 1.1rem; font-weight: 900; color: #fff; }
+.cw-result.tier-rare { border-color: rgba(92,224,192,0.5); } .cw-result.tier-rare .cw-result-kicker { color: #8bf5d6; }
+.cw-result.tier-bonus { border-color: rgba(255,140,240,0.5); } .cw-result.tier-bonus .cw-result-kicker { color: #ffb6f2; }
+.cw-result.tier-mini { border-color: rgba(200,150,255,0.6); } .cw-result.tier-mini .cw-result-kicker { color: #d3aaff; }
+.cw-result.tier-jackpot { border-color: rgba(255,215,94,0.7); background: rgba(255,215,94,0.08); } .cw-result.tier-jackpot .cw-result-kicker { color: #ffe28a; }
 .cw-msg { margin: 10px 0 0; text-align: center; font-size: 0.85rem; color: #ffd1a1; }
 
 .cw-actions { display: flex; gap: 10px; margin: 12px 0 0; }
-.cw-go { flex: 1; padding: 13px; border-radius: 13px; border: none; cursor: pointer; font-weight: 900; font-size: 1rem; letter-spacing: 0.03em;
-    color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12, 0 8px 20px -6px rgba(255,176,32,0.6); }
+.cw-go { flex: 1; padding: 13px; border-radius: 13px; border: none; cursor: pointer; font-weight: 900; font-size: 1rem; letter-spacing: 0.03em; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12, 0 8px 20px -6px rgba(255,176,32,0.6); }
 .cw-go:active { transform: translateY(2px); box-shadow: 0 1px 0 #b47a12; }
 .cw-go.is-golden { background: linear-gradient(180deg, #fff0b0, #ffca3a); box-shadow: 0 3px 0 #b47a12, 0 0 24px rgba(255,206,90,0.8); animation: cwPulse 1.3s ease-in-out infinite; }
 @keyframes cwPulse { 0%,100% { box-shadow: 0 3px 0 #b47a12, 0 0 18px rgba(255,206,90,0.6); } 50% { box-shadow: 0 3px 0 #b47a12, 0 0 30px rgba(255,206,90,0.95); } }
