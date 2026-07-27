@@ -43,26 +43,46 @@ const SOURCE_LABEL = {
     chest: "🎁 Chest drop", boss: "⚔️ Boss drop", elite: "🌟 Elite",
 };
 
-// A 1–5 star meter for a pet's level (filled = reached).
-// A clean, scannable group of stat tiles for the menagerie summary — a labeled header + a row of tiles, each
-// with the value big + the stat name below, so the bonuses read at a glance instead of as a jumble of chips.
+// A scannable, self-explaining group for the menagerie summary: a labeled header + one row per bonus, each
+// with an accent icon badge, the value, the stat name, and a plain-English one-liner of what it actually does
+// (so the meaning reads inline instead of hiding in a tooltip / collapsed accordion).
 function MenagerieGroup({ title, sub, tiles, accent = "#ffd75e" }) {
     if (!tiles.length) return null;
     return (
-        <div style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: accent }}>{title}</div>
-            <div className="muted" style={{ fontSize: "0.68rem", margin: "1px 0 8px" }}>{sub}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                {tiles.map((t) => (
-                    <div key={t.key} title={t.hint || undefined} style={{ display: "flex", flexDirection: "column", minWidth: 70, padding: "5px 10px", borderRadius: 10, background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                        <span style={{ fontWeight: 900, fontSize: "1.02rem", color: accent, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{t.value}</span>
-                        <span className="muted" style={{ fontSize: "0.72rem", whiteSpace: "nowrap" }}>{t.label}</span>
-                    </div>
-                ))}
-            </div>
+        <div className="petsum-group" style={{ "--acc": accent }}>
+            <div className="petsum-ghead"><b>{title}</b><small>{sub}</small></div>
+            {tiles.map((t) => (
+                <div key={t.key} className="petsum-row">
+                    <span className="petsum-ico" aria-hidden="true">{t.icon}</span>
+                    <span className="petsum-val">{t.value}</span>
+                    <span className="petsum-body"><b>{t.label}</b>{t.desc ? <small>{t.desc}</small> : null}</span>
+                </div>
+            ))}
         </div>
     );
 }
+
+const PET_SUMMARY_CSS = `
+.petsum-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.petsum-group { --acc: #ffd75e; border-radius: 14px; padding: 11px 12px 7px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 9%, transparent), rgba(255,255,255,0.015));
+    border: 1px solid color-mix(in srgb, var(--acc) 30%, transparent); }
+.petsum-ghead { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; flex-wrap: wrap; }
+.petsum-ghead b { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: var(--acc); }
+.petsum-ghead small { font-size: 0.66rem; color: #9aa2ab; }
+.petsum-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; transition: background .12s ease; }
+.petsum-row + .petsum-row { border-top: 1px solid rgba(255,255,255,0.055); }
+.petsum-row:hover { background: rgba(255,255,255,0.045); }
+.petsum-ico { flex: none; width: 31px; height: 31px; display: grid; place-items: center; font-size: 16px; border-radius: 9px;
+    background: color-mix(in srgb, var(--acc) 18%, transparent); border: 1px solid color-mix(in srgb, var(--acc) 38%, transparent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--acc) 20%, transparent); }
+.petsum-val { flex: none; min-width: 36px; text-align: right; font-weight: 900; font-size: 1.06rem; color: var(--acc); font-variant-numeric: tabular-nums; }
+.petsum-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.22; }
+.petsum-body b { font-size: 0.82rem; color: #f0ede6; }
+.petsum-body small { font-size: 0.7rem; color: #9aa2ab; }
+.petsum-progress { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.petsum-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f3b23a, #ffe488); box-shadow: 0 0 10px rgba(255,215,110,0.6); transition: width .6s cubic-bezier(.3,1.2,.4,1); }
+`;
 
 function Stars({ level = 1, max = 5, className = "" }) {
     return (
@@ -421,27 +441,30 @@ export default function PetsClient() {
                 </div>
                 {state ? (
                     <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+                        <style>{PET_SUMMARY_CSS}</style>
                         {/* headline: collection count + who's equipped */}
                         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-                            <span style={{ fontWeight: 800, fontSize: "1.05rem" }}>{ownedCount}<span className="muted" style={{ fontWeight: 600 }}> / {COLLECTIBLES.length} pets</span></span>
+                            <span style={{ fontWeight: 800, fontSize: "1.05rem" }}>{ownedCount}<span className="muted" style={{ fontWeight: 600 }}> / {COLLECTIBLES.length} pets collected</span></span>
                             {featured ? (
                                 <span title={petPerk(featured).desc} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 999, background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.4)", fontSize: "0.85rem", maxWidth: "100%" }}>
                                     ★ <strong>{featured.name}</strong> <span style={{ opacity: 0.9 }}>· {petPerk(featured).icon} {petPerk(featured).name}</span>
                                 </span>
                             ) : <span className="muted" style={{ marginLeft: "auto" }}>No pet equipped</span>}
                         </div>
-                        {/* two clean stat groups: what every pet stacks + what your earners generate */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+                        {/* collection progress — a little dopamine toward "gotta catch 'em all" */}
+                        <div className="petsum-progress" title={`${ownedCount} of ${COLLECTIBLES.length} pets`}><span style={{ width: `${Math.round((ownedCount / Math.max(1, COLLECTIBLES.length)) * 100)}%` }} /></div>
+                        {/* two self-explaining stat groups: what every pet stacks + what your earners generate */}
+                        <div className="petsum-groups">
                             <MenagerieGroup
-                                title="Passive bonuses" sub="every pet you own stacks these" accent="#ffd75e"
-                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, label: statText({ stat }), value: `+${val}`, hint: PET_STAT_META[stat]?.desc }))}
+                                title="Passive bonuses" sub={`stacked from all ${ownedCount} pets you own`} accent="#ffd75e"
+                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, icon: PET_STAT_META[stat]?.icon || "•", label: PET_STAT_META[stat]?.label || stat, value: `+${val}`, desc: PET_STAT_META[stat]?.desc }))}
                             />
                             <MenagerieGroup
-                                title="Earning" sub="your earner pets, automatically" accent="#8fe39a"
+                                title="Earning" sub="your earner pets, auto-banked" accent="#8fe39a"
                                 tiles={[
-                                    state.income?.xpPerHour > 0 ? { key: "xp", label: "✨ XP / hr", value: `+${state.income.xpPerHour}` } : null,
-                                    state.income?.goldPerHour > 0 ? { key: "gold", label: "🪙 Gold / hr", value: `+${state.income.goldPerHour}` } : null,
-                                    state.income?.raffleTickets > 0 ? { key: "tix", label: "🎟️ Raffle / day", value: `+${state.income.raffleTickets}` } : null,
+                                    state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", label: "XP per hour", value: `+${state.income.xpPerHour}`, desc: "Passive XP, banked and paid when you check in." } : null,
+                                    state.income?.goldPerHour > 0 ? { key: "gold", icon: "🪙", label: "Gold per hour", value: `+${state.income.goldPerHour}`, desc: "Passive gold, banked and paid when you check in." } : null,
+                                    state.income?.raffleTickets > 0 ? { key: "tix", icon: "🎟️", label: "Raffle tickets / day", value: `+${state.income.raffleTickets}`, desc: "Free weekly-boss raffle entries each day — real odds to win." } : null,
                                 ].filter(Boolean)}
                             />
                         </div>
@@ -452,22 +475,11 @@ export default function PetsClient() {
                                 {state.incomeEarned.gold > 0 ? `+${state.incomeEarned.gold} gold` : ""} since your last visit!
                             </div>
                         ) : null}
-                        {/* Plain-English guide so it's clear what each bonus actually does for your hero. */}
-                        <details style={{ borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "8px 12px" }}>
-                            <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: "0.85rem" }}>❔ What each bonus does</summary>
-                            <ul style={{ listStyle: "none", padding: 0, margin: "10px 0 0", display: "grid", gap: 8 }}>
-                                {Object.entries(PET_STAT_META).map(([k, m]) => (
-                                    <li key={k} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: "0.82rem" }}>
-                                        <strong style={{ minWidth: 108, whiteSpace: "nowrap" }}>{m.icon} {m.label}</strong>
-                                        <span className="muted">{m.desc}</span>
-                                    </li>
-                                ))}
-                                <li style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: "0.82rem" }}>
-                                    <strong style={{ minWidth: 108, whiteSpace: "nowrap" }}>⭐ Equipped</strong>
-                                    <span className="muted">Your equipped pet also fights beside you and adds a much bigger active buff on top.</span>
-                                </li>
-                            </ul>
-                        </details>
+                        {/* The equipped pet is the one build-defining extra on top of the stacked passives. */}
+                        <p className="muted" style={{ margin: 0, fontSize: "0.78rem", display: "flex", gap: 7, alignItems: "baseline" }}>
+                            <span aria-hidden="true">⭐</span>
+                            <span>Your <strong style={{ color: "#ffe9a8" }}>equipped</strong> pet fights beside you in the boss raid and adds a much bigger active buff on top of everything above.</span>
+                        </p>
                     </div>
                 ) : null}
             </section>
