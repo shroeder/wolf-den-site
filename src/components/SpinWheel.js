@@ -168,13 +168,6 @@ export default function SpinWheel() {
         else { setMsg(d?.error === "not_enough_gold" ? "Not enough coins for a spin." : "Couldn't buy a spin."); setLowCoins(d?.error === "not_enough_gold"); }
     }, [spinning]);
 
-    const reset = useCallback(async () => {
-        if (spinning) return;
-        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) }).catch(() => null);
-        const d = r ? await r.json().catch(() => null) : null;
-        if (d?.ok) { setSt(d); setMsg(null); if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); }
-    }, [spinning]);
-
     // ── MINI WHEEL bonus round: auto-spin to its winning index, then reveal. ──
     useEffect(() => {
         if (!mini || mini.spinning || mini.revealed) return undefined;
@@ -220,16 +213,6 @@ export default function SpinWheel() {
         });
         if (d?.done && typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
     }, []);
-
-    // Owner-only: trigger a sub-game directly for testing.
-    const ownerTrigger = useCallback(async (what) => {
-        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "owner_trigger", what }) }).catch(() => null);
-        const d = r ? await r.json().catch(() => null) : null;
-        if (!d?.ok) return;
-        setSt((s) => ({ ...s, ...d }));
-        if (what === "bonus" && d.bonusGame) { openBonus(d.bonusGame); playWin("bonus"); }
-        if (what === "mini" && d.miniWheel) { setMini({ ...d.miniWheel, rot: 0, spinning: false, revealed: false }); playWin("bonus"); }
-    }, [openBonus]);
 
     if (!st) return <section className="card"><p className="muted" style={{ margin: 0 }}>Loading…</p></section>;
     if (!st.signedIn) return <section className="card"><p className="muted" style={{ margin: 0 }}>Sign in to spin the daily wheel.</p></section>;
@@ -294,15 +277,6 @@ export default function SpinWheel() {
                 <button type="button" className={`cw-go${st.golden ? " is-golden" : ""}`} onClick={spin} disabled={spinning || !st.canSpin} style={{ opacity: spinning || !st.canSpin ? 0.6 : 1 }}>{spinLabel}</button>
                 {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
-
-            {st.isOwner ? (
-                <div className="cw-owner-tools">
-                    <span className="cw-owner-lab">🛠️ Owner debug</span>
-                    <button type="button" className="cw-owner-btn" onClick={reset} disabled={spinning}>Free spin</button>
-                    <button type="button" className="cw-owner-btn" onClick={() => ownerTrigger("bonus")} disabled={spinning || Boolean(bonus)}>🎁 Bonus game</button>
-                    <button type="button" className="cw-owner-btn" onClick={() => ownerTrigger("mini")} disabled={spinning || Boolean(mini)}>🎡 Mini wheel</button>
-                </div>
-            ) : null}
 
             <details className="cw-legend">
                 <summary>🎁 What&apos;s on the wheel <span>{prizes.length} prizes</span></summary>
@@ -531,10 +505,6 @@ const CW_CSS = `
 @keyframes cwPulse { 0%,100% { box-shadow: 0 3px 0 #b47a12, 0 0 18px rgba(255,206,90,0.6); } 50% { box-shadow: 0 3px 0 #b47a12, 0 0 30px rgba(255,206,90,0.95); } }
 .cw-buy { flex: none; padding: 13px 16px; border-radius: 13px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #e6ebf2; font-weight: 800; font-size: 0.9rem; cursor: pointer; }
 .cw-buy:disabled { opacity: 0.5; cursor: default; }
-.cw-owner-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding: 7px 9px; border-radius: 10px; border: 1px dashed rgba(255,120,120,0.35); background: rgba(255,80,80,0.05); }
-.cw-owner-lab { font-size: 10.5px; font-weight: 800; color: #ff9a9a; }
-.cw-owner-btn { padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,140,140,0.4); background: rgba(255,120,120,0.1); color: #ffc7c7; font-weight: 800; font-size: 11.5px; cursor: pointer; }
-.cw-owner-btn:disabled { opacity: 0.5; cursor: default; }
 
 .cw-legend { margin: 14px 0 0; }
 .cw-legend > summary { cursor: pointer; font-weight: 800; font-size: 0.9rem; list-style: none; display: flex; align-items: center; gap: 8px; }
