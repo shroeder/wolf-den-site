@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import CoinCta from "@/components/CoinCta";
 import useScrollLock from "@/lib/useScrollLock";
@@ -43,6 +44,20 @@ function iconPos(i, offset, deg, r) {
     const th = i * deg + offset;
     const rad = (th * Math.PI) / 180;
     return { left: `${50 + r * Math.sin(rad)}%`, top: `${50 - r * Math.cos(rad)}%`, transform: `translate(-50%, -50%) rotate(${th}deg)` };
+}
+
+// Render full-screen overlays into <body> so `position: fixed` is measured against the VIEWPORT, not a
+// transformed/filtered ancestor (the marketplace page animates its content, which was capturing our fixed
+// overlays — the bonus game ended up centered in a tall scroll container and ran off-screen with no scroll).
+function Portal({ children }) {
+    const [el] = useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
+    useEffect(() => {
+        if (!el) return undefined;
+        document.body.appendChild(el);
+        return () => { document.body.removeChild(el); };
+    }, [el]);
+    if (!el) return null;
+    return createPortal(children, el);
 }
 
 export default function SpinWheel() {
@@ -300,7 +315,7 @@ export default function SpinWheel() {
 
             {/* ── MINI WHEEL modal ── */}
             {mini ? (
-                <div className="cw-modal">
+                <Portal><div className="cw-modal">
                     <div className="cw-modal-card">
                         {mini.revealed ? <button type="button" className="cw-bonus-close" onClick={() => setMini(null)} aria-label="Close">✕</button> : null}
                         <div className="cw-modal-title">🎡 Mini Wheel Bonus!</div>
@@ -330,12 +345,12 @@ export default function SpinWheel() {
                             </>
                         ) : <p className="cw-modal-sub">Spinning for a bonus prize…</p>}
                     </div>
-                </div>
+                </div></Portal>
             ) : null}
 
             {/* ── BONUS GAME — full-screen match-3: flip tiles, win the gear you get 3 of ── */}
             {bonus ? (
-                <div className="cw-bonus-full">
+                <Portal><div className="cw-bonus-full">
                     <button type="button" className="cw-bonus-close" onClick={() => setBonus(null)} aria-label="Close">✕</button>
                     <div className="cw-bonus-inner">
                         <div className="cw-bonus-title">🎁 Match 3 to Win!</div>
@@ -385,11 +400,11 @@ export default function SpinWheel() {
                             <p className="cw-bonus-hint">Tap ✕ to step away — your board is saved and you can finish it later.</p>
                         )}
                     </div>
-                </div>
+                </div></Portal>
             ) : null}
 
             {celebrate ? (
-                <div className={`cw-celebrate cw-celebrate-${celebrate.kind}`} onClick={() => setCelebrate(null)}>
+                <Portal><div className={`cw-celebrate cw-celebrate-${celebrate.kind}`} onClick={() => setCelebrate(null)}>
                     <div className="cw-confetti" aria-hidden="true">
                         {Array.from({ length: celebrate.kind === "jackpot" ? 100 : 54 }).map((_, i) => (
                             <span key={i} style={{ left: `${(i * 97) % 100}%`, animationDelay: `${(i % 12) * 0.07}s`, background: ["#ffd75e", "#ff7ad0", "#5ce0c0", "#8fd8ff", "#ff9f1c"][i % 5] }} />
@@ -404,12 +419,12 @@ export default function SpinWheel() {
                         {result ? <div className="cw-celebrate-sub">{result.text}</div> : null}
                         <button type="button" className="cw-collect" onClick={() => setCelebrate(null)}>Collect</button>
                     </div>
-                </div>
+                </div></Portal>
             ) : null}
 
             {/* ── INSPECT a prize (tap a legend row) ── */}
             {inspect ? (
-                <div className="cw-modal" onClick={() => setInspect(null)}>
+                <Portal><div className="cw-modal" onClick={() => setInspect(null)}>
                     <div className="cw-modal-card cw-inspect" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="cw-bonus-close" onClick={() => setInspect(null)} aria-label="Close">✕</button>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -419,7 +434,7 @@ export default function SpinWheel() {
                         <p className="cw-inspect-desc">{inspect.desc || inspect.label}</p>
                         <div className="cw-inspect-odds">Odds this spin · <b>{inspect.odds}%</b></div>
                     </div>
-                </div>
+                </div></Portal>
             ) : null}
 
             <style>{CW_CSS}</style>
