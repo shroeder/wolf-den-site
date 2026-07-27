@@ -22,6 +22,9 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 
 export const SPIN_TOKEN_COST = 400; // gold to buy one extra spin
 const PITY = 20; // guaranteed rare within this many spins
+// Wheelwarden set "Lucky Spin" proc payout (the set only grants a CHANCE at this per spin, not every spin).
+const LUCKY_CHARGE = 3;   // bonus Lucky Charge on a Lucky Spin
+const LUCKY_GOLD_PCT = 25; // % bonus gold when a Lucky Spin lands on a gold prize
 
 // The wheel carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a rare thrill
 // (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side. Single wheel for
@@ -307,8 +310,9 @@ export async function doSpin(buyerId) {
     // and a free-respin capstone. Read off the equipped loadout (getEquippedIds returns a {slot→id} object,
     // which setWheelBonus normalizes).
     const equipped = await getEquippedIds(buyerId).catch(() => ({}));
-    const wheelBonus = setWheelBonus(equipped);            // { charge, goldPct }
+    const luckChance = setWheelBonus(equipped).luck || 0;  // % CHANCE for a Lucky Spin proc this spin
     const respinChance = setWheelRespinChance(equipped);   // capstone: 0..0.5
+    const lucky = luckChance > 0 && Math.random() * 100 < luckChance; // did the wheel set proc this spin?
     const wheel = wheelForLevel(levelForXp(row.xp).level);
     const forceRare = row.pity >= PITY - 1;
     const idx = pickIndex(wheel, forceRare);
@@ -319,9 +323,9 @@ export async function doSpin(buyerId) {
     let bonusGame = null;
     if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel bonus!" }; }
     else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
-    else display = await grantPrize(buyerId, prize, { goldPct: wheelBonus.goldPct || 0 });
-    // Lucky Charge climbs faster with the wheel set (+charge per spin); resets on a rare pull.
-    const chargeStep = 1 + (wheelBonus.charge || 0);
+    else display = await grantPrize(buyerId, prize, { goldPct: lucky ? LUCKY_GOLD_PCT : 0 });
+    // Lucky Charge climbs 1/spin, plus a burst on a Lucky Spin proc; resets on a rare pull.
+    const chargeStep = 1 + (lucky ? LUCKY_CHARGE : 0);
     await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + $3 END WHERE id = $1`, [buyerId, Boolean(prize.rare), chargeStep]).catch(() => {});
     // Capstone: a chance the spin is refunded (a free spin token back).
     let refunded = false;
@@ -338,7 +342,7 @@ export async function doSpin(buyerId) {
         respin: Boolean(prize.kind === "respin"), golden: forceRare,
         miniWheel: Boolean(prize.kind === "mini_wheel"), bonusGame: Boolean(prize.kind === "bonus_game"),
     };
-    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, ...(await getSpinState(buyerId)) };
+    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, lucky, ...(await getSpinState(buyerId)) };
 }
 
 // OWNER-ONLY debug helper: refill the free daily spin so you can spin freely while testing. Gives exactly ONE

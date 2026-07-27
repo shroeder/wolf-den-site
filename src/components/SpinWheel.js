@@ -75,6 +75,7 @@ export default function SpinWheel() {
     const [inspect, setInspect] = useState(null);  // a legend prize the player tapped to inspect
     useScrollLock(Boolean(celebrate) || Boolean(mini) || Boolean(bonus) || Boolean(inspect));
     const [msg, setMsg] = useState(null);
+    const [refundFlash, setRefundFlash] = useState(false); // Wheelwarden capstone: "FREE SPIN!" celebration
     const [lowCoins, setLowCoins] = useState(false);
 
     const rotorRef = useRef(null);
@@ -140,7 +141,8 @@ export default function SpinWheel() {
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
             if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), 4600); }
             playWin(kind || (d.prize?.rare ? "rare" : "normal"));
-            if (d.refunded) setMsg("🍀 Lucky Streak — your spin was FREE! A token was refunded.");
+            if (d.refunded) { setRefundFlash(true); setTimeout(() => { try { playWin("bonus"); } catch { /* ignore */ } }, 120); setTimeout(() => setRefundFlash(false), 3000); }
+            else if (d.lucky) setMsg("✨ Lucky Spin! Wheelwarden's Fortune surged your Lucky Charge.");
             if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
             else chainRef.current = 0;
         }, SPIN_MS);
@@ -452,6 +454,21 @@ export default function SpinWheel() {
                 </div></Portal>
             ) : null}
 
+            {/* ── Wheelwarden capstone: a juicy, non-blocking "FREE SPIN!" burst when a spin is refunded ── */}
+            {refundFlash ? (
+                <Portal><div className="cw-refund" aria-hidden="true">
+                    <div className="cw-refund-confetti">
+                        {Array.from({ length: 44 }).map((_, i) => (
+                            <span key={i} style={{ left: `${(i * 97) % 100}%`, animationDelay: `${(i % 10) * 0.05}s`, background: ["#8fe39a", "#ffd75e", "#5ce0c0", "#8fd8ff", "#ff9f1c"][i % 5] }} />
+                        ))}
+                    </div>
+                    <div className="cw-refund-pill">
+                        <span className="cw-refund-clover">🍀</span>
+                        <span className="cw-refund-txt"><b>FREE SPIN!</b><small>Lucky Streak — your spin was refunded</small></span>
+                    </div>
+                </div></Portal>
+            ) : null}
+
             <style>{CW_CSS}</style>
         </section>
     );
@@ -625,4 +642,19 @@ const CW_CSS = `
 .cw-celebrate-sub { font-size: 1rem; color: #ecd6bc; margin-top: 4px; }
 @keyframes cwPop { from { opacity: 0; transform: scale(.85) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes cwSpin { from { transform: rotate(-30deg) scale(.6); } to { transform: rotate(0) scale(1); } }
+
+/* Wheelwarden free-spin flash — non-blocking celebratory burst */
+.cw-refund { position: fixed; inset: 0; z-index: 330; display: grid; place-items: center; pointer-events: none; }
+.cw-refund-confetti { position: absolute; inset: 0; overflow: hidden; }
+.cw-refund-confetti span { position: absolute; top: -14px; width: 8px; height: 13px; border-radius: 2px; opacity: 0; animation: cwRefundFall 1.5s ease-in forwards; }
+@keyframes cwRefundFall { 0% { transform: translateY(0) rotate(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(105vh) rotate(680deg); opacity: 0; } }
+.cw-refund-pill { display: inline-flex; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 999px;
+    background: linear-gradient(180deg, #1f3a22, #12240f); border: 1px solid rgba(143,227,154,0.7);
+    box-shadow: 0 16px 44px rgba(0,0,0,0.6), 0 0 34px rgba(143,227,154,0.5); animation: cwRefundPop .5s cubic-bezier(.2,1.5,.35,1) both; }
+@keyframes cwRefundPop { 0% { opacity: 0; transform: scale(.6) translateY(10px); } 60% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+.cw-refund-clover { font-size: 34px; animation: cwRefundSpin .6s ease both, cwBob 1.8s ease-in-out .6s infinite; }
+@keyframes cwRefundSpin { from { transform: rotate(-40deg) scale(.4); } to { transform: rotate(0) scale(1); } }
+.cw-refund-txt { display: flex; flex-direction: column; line-height: 1.15; }
+.cw-refund-txt b { font-size: 1.2rem; font-weight: 900; color: #b6f2be; letter-spacing: 0.03em; text-shadow: 0 0 12px rgba(143,227,154,0.6); }
+.cw-refund-txt small { font-size: 0.72rem; color: #cfe8d6; }
 `;

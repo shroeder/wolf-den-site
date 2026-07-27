@@ -103,12 +103,14 @@ export const ITEM_SETS = [
         id: "wheelwarden", name: "Wheelwarden's Fortune",
         items: ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"],
         full: 8,
+        // `luck` = % CHANCE per spin to trigger a Lucky Spin (a burst of Lucky Charge + bonus gold on gold prizes),
+        // NOT a guaranteed every-spin bonus — kept as a proc so the set is a fun edge, not an auto-win.
         bonuses: [
-            { need: 2, wheel: { charge: 1 } },
-            { need: 4, wheel: { charge: 1, goldPct: 12 } },
-            { need: 6, wheel: { charge: 1, goldPct: 8 } },
+            { need: 2, wheel: { luck: 10 } },
+            { need: 4, wheel: { luck: 10 } },
+            { need: 6, wheel: { luck: 12 } },
         ],
-        capstone: { wheelRespin: 0.18, desc: "Lucky Streak: an 18% chance every spin is FREE — your spin is refunded." },
+        capstone: { wheelRespin: 0.12, desc: "Lucky Streak: a 12% chance each spin is FREE — your spin is refunded." },
         weakness: null,
     },
 ];
@@ -211,11 +213,12 @@ export function setFarmDoubleHarvest(equippedIds) {
     return Math.min(0.75, chance);
 }
 
-// Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `charge` = extra
-// Lucky Charge per spin (faster Golden Spins); `goldPct` = % bonus on spin gold prizes.
+// Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `luck` = % chance
+// per spin to trigger a Lucky Spin (bonus Lucky Charge + bonus gold on gold prizes). It's a proc, not a
+// guaranteed per-spin bonus.
 export function setWheelBonus(equippedIds) {
     const counts = equippedCounts(equippedIds);
-    const total = { charge: 0, goldPct: 0 };
+    const total = { luck: 0 };
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
         for (const tier of set.bonuses) {
