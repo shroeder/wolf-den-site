@@ -10,7 +10,10 @@ import useScrollLock from "@/lib/useScrollLock";
 // off-centre landing + a live ratchet tick, then reveals the prize. A "Lucky Charge" meter builds toward a
 // guaranteed GOLDEN SPIN. ──
 
-const WEDGES = 10;           // the disc art has 10 painted wedges — land on one for a tidy stop
+const WEDGES = 10;           // the disc art has 10 painted wedges — one prize each
+const WEDGE_DEG = 360 / WEDGES;
+const WEDGE_OFFSET = 18;     // the disc art has gold dividers at 0°,36°… so wedge centers sit at 18°,54°…
+const ICON_R = 33;           // icon ring radius, % of the rotor from its center
 const SPIN_MS = 5200;
 
 // ── tiny Web-Audio kit (no assets, CSP-safe) ──
@@ -38,7 +41,7 @@ export default function SpinWheel() {
     const [msg, setMsg] = useState(null);
     const [lowCoins, setLowCoins] = useState(false);
 
-    const discRef = useRef(null);
+    const rotorRef = useRef(null);
     const rafRef = useRef(0);
     const timerRef = useRef(null);
     const chainRef = useRef(0);
@@ -56,7 +59,7 @@ export default function SpinWheel() {
     const startTickLoop = useCallback(() => {
         let lastWedge = null, lastTick = 0;
         const step = (ts) => {
-            const el = discRef.current;
+            const el = rotorRef.current;
             if (el) {
                 let ang = 0;
                 try { const m = new DOMMatrixReadOnly(getComputedStyle(el).transform); ang = Math.atan2(m.b, m.a); } catch { /* ignore */ }
@@ -74,11 +77,17 @@ export default function SpinWheel() {
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
         if (!d?.ok) { setSpinning(false); chainRef.current = 0; setMsg(d?.error === "no_spins" ? "No spins left — earn or buy one." : "Couldn't spin."); return; }
-        // Land on a random wedge, off-centre, after 5–8 turns — never the same spin twice.
-        const wedge = Math.floor(Math.random() * WEDGES);
-        const jitter = (Math.random() - 0.5) * (360 / WEDGES) * 0.6;
+        // Land the WON wedge under the top pointer: icon i sits at (i*WEDGE_DEG + WEDGE_OFFSET); rotating the
+        // wheel by -(that) brings it to 12 o'clock. Small jitter so it isn't robotic, 5–8 full turns.
+        const idx = Math.max(0, Math.min(WEDGES - 1, d.prizeIndex));
+        const jitter = (Math.random() - 0.5) * WEDGE_DEG * 0.4;
         const turns = 5 + Math.floor(Math.random() * 4);
-        setRot((prev) => Math.ceil(prev / 360) * 360 + turns * 360 + wedge * (360 / WEDGES) + jitter);
+        const targetMod = (((-(idx * WEDGE_DEG + WEDGE_OFFSET)) % 360) + 360) % 360;
+        setRot((prev) => {
+            let next = Math.ceil(prev / 360) * 360 + turns * 360 + targetMod + jitter;
+            if (next <= prev + 360) next += 360;
+            return next;
+        });
         cancelAnimationFrame(rafRef.current); startTickLoop();
         timerRef.current = setTimeout(() => {
             cancelAnimationFrame(rafRef.current);
@@ -139,15 +148,27 @@ export default function SpinWheel() {
 
             <div className={`cw-stage${st.golden ? " is-golden" : ""}${spinning ? " is-spinning" : ""}`}>
                 <div className="cw-ring">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        ref={discRef}
-                        className="cw-disc"
-                        src="/images/spin/wheel-disc.png"
-                        alt=""
-                        draggable="false"
+                    <div
+                        ref={rotorRef}
+                        className="cw-rotor"
                         style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}
-                    />
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
+                        <div className="cw-icons">
+                            {prizes.map((p, i) => {
+                                const th = i * WEDGE_DEG + WEDGE_OFFSET;
+                                const rad = (th * Math.PI) / 180;
+                                const x = 50 + ICON_R * Math.sin(rad);
+                                const y = 50 - ICON_R * Math.cos(rad);
+                                return (
+                                    <div key={i} className={`cw-ico tier-${p.tier}`} style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-50%, -50%) rotate(${th}deg)` }}>
+                                        <span className="cw-ico-emoji">{p.emoji}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="cw-frame" src="/images/spin/wheel-frame.png" alt="" draggable="false" />
                 </div>
@@ -221,8 +242,16 @@ const CW_CSS = `
 .cw-stage.is-golden::before { background: radial-gradient(circle, rgba(255,205,80,0.32), transparent 70%); animation: cwHalo 1.6s ease-in-out infinite; }
 @keyframes cwHalo { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
 .cw-ring { position: relative; width: 100%; height: 100%; }
-.cw-disc { position: absolute; top: 50%; left: 50%; width: 68%; height: 68%; transform-origin: center; border-radius: 50%; will-change: transform;
-    box-shadow: 0 8px 26px rgba(0,0,0,0.55); }
+.cw-rotor { position: absolute; top: 50%; left: 50%; width: 68%; height: 68%; transform-origin: center; will-change: transform; }
+.cw-disc { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 8px 26px rgba(0,0,0,0.55); }
+.cw-icons { position: absolute; inset: 0; }
+.cw-ico { position: absolute; width: 15%; height: 15%; display: grid; place-items: center; border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, rgba(20,14,6,0.82), rgba(8,5,2,0.9)); border: 1.5px solid rgba(255,214,120,0.7);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,235,180,0.25); }
+.cw-ico-emoji { font-size: min(4.4vw, 17px); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6)); }
+.cw-ico.tier-jackpot { border-color: #ffe28a; box-shadow: 0 0 10px rgba(255,215,94,0.9), inset 0 1px 2px rgba(255,235,180,0.3); }
+.cw-ico.tier-bonus { border-color: #ff9ce8; box-shadow: 0 0 8px rgba(255,120,220,0.7); }
+.cw-ico.tier-rare { border-color: #6ff0d0; box-shadow: 0 0 8px rgba(92,224,192,0.6); }
 .cw-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45)); }
 .cw-stage.is-golden .cw-frame { filter: drop-shadow(0 0 16px rgba(255,200,80,0.7)); }
 .cw-stage.is-spinning .cw-frame { animation: cwFrameBuzz 0.14s steps(2) infinite; }

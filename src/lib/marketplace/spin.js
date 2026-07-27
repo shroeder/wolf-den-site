@@ -29,30 +29,22 @@ const COUPON_MAX = 4000;
 // (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side. Single wheel for
 // everyone (the old bronze/silver/gold tiers were collapsed to one). The 🌱 Common Seed wedge is live now
 // that the farm is public (grantSeed/SEEDS handler wired below).
+// The wheel art has 10 painted wedges, so the prize list is exactly 10 — one per wedge, shown right on the
+// wheel. System-flavored (fertilizer / fragments / a boss potion) so it's not just gold/XP, plus the thrill.
 const WHEELS = [
     {
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
-            // Bread-and-butter — small, frequent, but with system flavor instead of only raw gold/XP.
-            { label: "100 gold", emoji: "🪙", weight: 20, kind: "gold", amount: 100 },
-            { label: "150 XP", emoji: "⭐", weight: 13, kind: "xp", amount: 150 },
-            { label: "Pet Treat", emoji: "🦴", weight: 11, kind: "consumable", consumable: "treat_bone", n: 1 },
-            { label: "Farm Seed", emoji: "🌱", weight: 9, kind: "seed" },
-            { label: "5 Fertilizer", emoji: "📦", weight: 8, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
-            { label: "3 Dig Fragments", emoji: "⚓", weight: 8, kind: "fragment", n: 3 },
-            { label: "250 gold", emoji: "🪙", weight: 10, kind: "gold", amount: 250 },
-            // The "fun" middle — an instant BONUS SPIN (not a banked token), and a boss potion.
+            { label: "100 gold", emoji: "🪙", weight: 24, kind: "gold", amount: 100 },
+            { label: "Pet Treat", emoji: "🦴", weight: 13, kind: "consumable", consumable: "treat_bone", n: 1 },
+            { label: "Farm Seed", emoji: "🌱", weight: 11, kind: "seed" },
+            { label: "5 Fertilizer", emoji: "🪣", weight: 9, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
+            { label: "3 Dig Fragments", emoji: "⚓", weight: 9, kind: "fragment", n: 3 },
+            { label: "250 gold", emoji: "💰", weight: 12, kind: "gold", amount: 250 },
             { label: "BONUS SPIN", emoji: "🎡", weight: 8, tier: "bonus", kind: "respin" },
-            { label: "Adrenaline Vial", emoji: "🧪", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
-            // Rare tier.
-            { label: "Farm Decoration", emoji: "🪴", weight: 5, rare: true, tier: "rare", kind: "deco" },
-            { label: "Wooden Chest", emoji: "📦", weight: 5, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
-            { label: "500 gold", emoji: "💰", weight: 4, rare: true, tier: "rare", kind: "gold", amount: 500 },
-            { label: "Berserker's Brew", emoji: "🍺", weight: 2, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
-            { label: "50% Gold-Shop Coupon", emoji: "🏷️", weight: 3, rare: true, tier: "rare", kind: "coupon" },
-            // The thrill.
-            { label: "MINI JACKPOT · 1,000 gold", emoji: "🎰", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: 1000 },
-            { label: "JACKPOT · 2,500 gold", emoji: "💎", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 2500 },
+            { label: "Adrenaline Vial", emoji: "🧪", weight: 6, rare: true, tier: "rare", kind: "consumable", consumable: "pot_adrenaline", n: 1 },
+            { label: "Wooden Chest", emoji: "🎁", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            { label: "JACKPOT · 2,500 gold", emoji: "💎", weight: 2, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 2500 },
         ],
     },
 ];
