@@ -3,22 +3,20 @@
 import { useMemo, useState } from "react";
 
 import BadgeArt from "@/components/BadgeArt";
+import { bonusChips, BONUS_META } from "@/lib/marketplace/badge-bonus-meta.js";
 
 // The Badges collection hub — collection milestones, a "closest to unlocking" spotlight, and a filterable grid
-// where every badge shows what it does + any passive bonus it grants. Replaces the old never-ending flat list.
+// where every badge shows what it does + the system bonus it grants. Replaces the old never-ending flat list.
 
 const CHEST_TONE = { wooden: "#b07a43", iron: "#c7d0d8", gold: "#ffd75e", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 
-// A badge's passive bonuses → short chips (⚔️ Might, 🎯 Crit, 💥 Crit Power). Empty when the badge has no buff.
-function bonusChips(bonus) {
-    if (!bonus) return [];
-    const out = [];
-    if (bonus.might) out.push(`⚔️ +${bonus.might} Might`);
-    if (bonus.crit_chance) out.push(`🎯 +${bonus.crit_chance}% Crit`);
-    if (bonus.crit_power) out.push(`💥 +${bonus.crit_power}% Crit Power`);
-    return out;
-}
-const bonusWeight = (b) => (b ? (b.might || 0) + (b.crit_chance || 0) + (b.crit_power || 0) : 0);
+// Total bonus magnitude across all domains — for sorting earned badges by "buff strength".
+const bonusWeight = (b) => {
+    if (!b) return 0;
+    let n = 0;
+    for (const dom of Object.keys(BONUS_META)) for (const v of Object.values(b[dom] || {})) n += v || 0;
+    return n;
+};
 
 function BadgeCard({ b, featured = false }) {
     const chips = bonusChips(b.bonus);
@@ -30,7 +28,7 @@ function BadgeCard({ b, featured = false }) {
             <span className="bc-name">{b.label}</span>
             {b.description ? <span className="bc-desc">{b.description}</span> : null}
             {chips.length ? (
-                <span className="bc-bonus">{chips.map((c) => <span key={c} className="bc-bonus-chip">{c}</span>)}</span>
+                <span className="bc-bonus">{chips.map((c, i) => <span key={i} className={`bc-bonus-chip dom-${c.domain}`}><span className="bc-chip-ico">{c.icon}</span>{c.text}</span>)}</span>
             ) : null}
             {b.earned ? (
                 <span className="bc-status is-earned">Earned ✓</span>
@@ -207,7 +205,12 @@ const BC_CSS = `
 .bc-name { font-weight: 800; font-size: 0.9rem; line-height: 1.15; }
 .bc-desc { font-size: 0.74rem; line-height: 1.32; color: #aeb4bc; }
 .bc-bonus { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
-.bc-bonus-chip { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; color: #ffd9a1; background: rgba(255,150,60,0.14); border: 1px solid rgba(255,150,60,0.35); }
+.bc-bonus-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; color: var(--chip, #ffd9a1); background: color-mix(in srgb, var(--chip) 15%, transparent); border: 1px solid color-mix(in srgb, var(--chip) 42%, transparent); }
+.bc-chip-ico { font-size: 10px; }
+.bc-bonus-chip.dom-combat { --chip: #ff9a5c; }
+.bc-bonus-chip.dom-sea { --chip: #66d6ff; }
+.bc-bonus-chip.dom-farm { --chip: #8fe08f; }
+.bc-bonus-chip.dom-forge { --chip: #ffc24a; }
 .bc-status { font-size: 0.76rem; font-weight: 800; margin-top: 2px; }
 .bc-status.is-earned { color: #7dbf72; }
 .bc-status.muted { color: #9aa2ab; }

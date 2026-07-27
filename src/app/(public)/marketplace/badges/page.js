@@ -4,6 +4,7 @@ import BadgeShopClient from "@/components/BadgeShopClient";
 import BadgeCollectionClient from "@/components/BadgeCollectionClient";
 import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import { getBadgeBoard, getBadgeMilestones } from "@/lib/marketplace/badges.js";
+import { activeDomains } from "@/lib/marketplace/badge-bonus-meta.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 
@@ -32,36 +33,38 @@ export default async function BadgesPage() {
         getBadgeMilestones(buyer.id).catch(() => null),
     ]);
     const badges = board?.badges || [];
-    const p = board?.passives || {};
-    const powers = [
-        { key: "might", ico: "⚔️", val: p.might ? `+${p.might}` : null, lab: "Might" },
-        { key: "crit_chance", ico: "🎯", val: p.crit_chance ? `+${p.crit_chance}%` : null, lab: "Crit Chance" },
-        { key: "crit_power", ico: "💥", val: p.crit_power ? `+${p.crit_power}%` : null, lab: "Crit Power" },
-    ].filter((x) => x.val);
+    const domains = activeDomains(board?.bonusTotals);
 
     return (
         <div className="stack reveal">
-            {/* Compact hero: title + a couple of numbers, then the juiced badge-power panel. */}
+            {/* Compact hero: title + a couple of numbers, then the juiced badge-power panel (all systems). */}
             <section className="card badges-hero">
                 <div className="bh-head">
                     <h1>🎖️ Your Badges</h1>
                     <span className="bh-count"><b>{board?.earnedCount || 0}</b><span>/ {board?.totalCount || 0}</span></span>
                 </div>
-                {powers.length ? (
+                {domains.length ? (
                     <div className="bh-power">
-                        <div className="bh-power-label">⚡ Badge Power <span>— buffs your daily boss strike</span></div>
-                        <div className="bh-power-tiles">
-                            {powers.map((x) => (
-                                <div key={x.key} className={`bh-tile ${x.key}`}>
-                                    <span className="bh-ico">{x.ico}</span>
-                                    <span className="bh-val">{x.val}</span>
-                                    <span className="bh-lab">{x.lab}</span>
+                        <div className="bh-power-label">⚡ Badge Power <span>— bonuses your badges grant across every system</span></div>
+                        <div className="bh-domains">
+                            {domains.map((d) => (
+                                <div key={d.domain} className="bh-domain" style={{ "--acc": d.accent }}>
+                                    <div className="bh-domain-head"><span className="bh-domain-ico">{d.icon}</span><b>{d.label}</b><em>{d.blurb}</em></div>
+                                    <div className="bh-domain-tiles">
+                                        {d.stats.map((s) => (
+                                            <div key={s.key} className="bh-stat">
+                                                <span className="bh-stat-ico">{s.icon}</span>
+                                                <span className="bh-stat-val">+{s.value}{s.suffix}</span>
+                                                <span className="bh-stat-lab">{s.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 ) : (
-                    <div className="bh-power bh-power-empty">⚡ Earn badges with <b>⚔️ / 🎯 / 💥</b> bonuses to power up your daily boss strike.</div>
+                    <div className="bh-power bh-power-empty">⚡ Every badge grants a bonus to the system it belongs to — combat, sailing, farming or the forge. Earn some to power up.</div>
                 )}
             </section>
 

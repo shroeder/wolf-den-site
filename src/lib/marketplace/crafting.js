@@ -7,7 +7,7 @@ import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { grantEventBadge } from "@/lib/marketplace/badges.js";
+import { grantEventBadge, getBadgeForge } from "@/lib/marketplace/badges.js";
 import { MAX_FORGE_LEVEL } from "@/lib/marketplace/forge-rank.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
@@ -73,7 +73,8 @@ async function upgradeLevels(buyerId) {
     for (const r of rows) m[r.key] = r.level;
     return m;
 }
-const chance = (upg, key) => (FORGE_UPGRADES[key].per * (upg[key] || 0));
+// Perk odds = bought upgrade levels + earned forge-badge bonus (badge values are in percentage POINTS).
+const chance = (upg, key, bf) => (FORGE_UPGRADES[key].per * (upg[key] || 0)) + ((bf && bf[key]) || 0) / 100;
 
 // Buy the next level of a forge upgrade (gold sink).
 export async function buyForgeUpgrade(buyerId, key) {
@@ -185,10 +186,11 @@ export async function salvageItem(buyerId, itemId) {
     await db.query(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {}); // the item is gone — drop its enhancement
     const cfg = SALVAGE[item.rarity] || SALVAGE.common;
     const upg = await upgradeLevels(buyerId);
+    const bf = await getBadgeForge(buyerId).catch(() => ({})); // earned forge badges boost salvage/enhance odds
     const rb = regaliaBonus(REGALIA_IDS.filter((r) => equippedSet.has(r)).length); // Blacksmith's Regalia salvage bonus
     let n = randInt(cfg.min, cfg.max);
     let doubled = false;
-    if (Math.random() < chance(upg, "efficient") + rb.doubleBonus) { n *= 2; doubled = true; } // Efficient Salvage + Regalia
+    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus) { n *= 2; doubled = true; } // Efficient Salvage + Regalia
     n += rb.flatParts;
     // Melt-down recovery: ~40% of the parts forged into this item (same tier as its salvage parts).
     let enhanceBonus = 0;
@@ -200,7 +202,7 @@ export async function salvageItem(buyerId, itemId) {
     }
     await addParts(buyerId, cfg.tier, n);
     let bonusTier = null;
-    if (cfg.tier < MAX_TIER && Math.random() < chance(upg, "keen_eye")) { await addParts(buyerId, cfg.tier + 1, 1); bonusTier = cfg.tier + 1; } // Keen Eye
+    if (cfg.tier < MAX_TIER && Math.random() < chance(upg, "keen_eye", bf)) { await addParts(buyerId, cfg.tier + 1, 1); bonusTier = cfg.tier + 1; } // Keen Eye
     // Rare Regalia piece drop (the "salvaging set" loop) — only pieces you don't own yet.
     let regaliaDrop = null;
     const ownedReg = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, REGALIA_IDS]).catch(() => [])).map((r) => r.item_id));
@@ -252,8 +254,9 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // away. Master's Touch bumps you up one tier.
     let scenario = q >= 0.92 ? 4 : q >= 0.75 ? 3 : q >= 0.5 ? 2 : q >= 0.25 ? 1 : 0;
     const upg = await upgradeLevels(buyerId);
+    const bf = await getBadgeForge(buyerId).catch(() => ({})); // earned forge badges boost double-gain odds
     let doubled = false;
-    if (scenario > 0 && Math.random() < chance(upg, "masters_touch")) { scenario = Math.min(4, scenario + 1); doubled = true; }
+    if (scenario > 0 && Math.random() < chance(upg, "masters_touch", bf)) { scenario = Math.min(4, scenario + 1); doubled = true; }
 
     const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
     const ADDABLE = ["might", "crit_chance", "crit_power", "ferocity", "fortune"]; // stats a strong forge can ADD (never extra_strike)
@@ -303,13 +306,14 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
 // ── Full forge state for the UI ──
 export async function getForgeState(buyerId) {
     if (!buyerId) return null;
-    const [bySlot, parts, ownedRows, enhRows, spriteMap, upg, goldRow] = await Promise.all([
+    const [bySlot, parts, ownedRows, enhRows, spriteMap, upg, bf, goldRow] = await Promise.all([
         getEquippedIds(buyerId),
         partCounts(buyerId),
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT item_id, level, stat_bonus, best_grade FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         itemSpriteMap().catch(() => ({})),
         upgradeLevels(buyerId),
+        getBadgeForge(buyerId).catch(() => ({})), // earned forge badges boost the displayed + real odds
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
     const dRow = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
@@ -345,8 +349,8 @@ export async function getForgeState(buyerId) {
     // Odds shown in the salvage preview modal (so the reward feels earned, not random).
     const rbNow = regaliaBonus(regEquipped);
     const salvageOdds = {
-        doublePct: Math.round((chance(upg, "efficient") + rbNow.doubleBonus) * 100),
-        bonusPartPct: Math.round(chance(upg, "keen_eye") * 100),
+        doublePct: Math.round((chance(upg, "efficient", bf) + rbNow.doubleBonus) * 100),
+        bonusPartPct: Math.round(chance(upg, "keen_eye", bf) * 100),
         regaliaFlat: rbNow.flatParts,
         regaliaDropPct: regaliaPieces.some((p) => !p.owned) ? +(REGALIA_DROP * 100).toFixed(1) : 0,
     };
@@ -359,5 +363,5 @@ export async function getForgeState(buyerId) {
             : { label: UPG_EFF_LABEL[key], now: level ? saves(level) : "—", next: saves(level + 1) };
         return { key, name: u.name, emoji: UPG_EMOJI[key], desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? pct(level) : `${level}`, eff };
     });
-    return { parts: partList, salvage, enhance, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand"), gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    return { parts: partList, salvage, enhance, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }

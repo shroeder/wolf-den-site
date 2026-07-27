@@ -238,40 +238,125 @@ async function rewardBadgeEarned(buyerId, slug) {
     await logCoin(buyerId, BADGE_REWARD_GOLD, "badge_reward", { meta: { slug } }).catch(() => {});
 }
 
-// PASSIVE combat effects per badge — they buff your DAILY BOSS STRIKE (Might / Crit Chance / Crit Power)
-// and stack across every badge you hold, like the pet menagerie. Small on purpose (badges are numerous) but
-// enough that collecting badges is build-relevant. Only mapped badges give a passive; the rest stay prestige.
-const BADGE_PASSIVES = {
-    // Boss prestige → raw power
-    boss_challenger: { might: 1 }, boss_raider: { might: 2 }, boss_slayer: { might: 3 }, boss_veteran: { might: 2 },
-    boss_warlord: { might: 4 }, boss_legend: { might: 6, crit_power: 4 }, boss_champion: { crit_chance: 4 },
-    boss_relic: { might: 3 }, transcendent: { might: 5 }, eternal_bearer: { might: 8, crit_power: 6 },
-    // Trading → power / crit
-    trader: { might: 1 }, deal_maker: { might: 2 }, trader_cards_100: { might: 2 }, trader_cards_500: { might: 4 },
-    trade_value_500: { might: 2 }, trade_value_2k: { might: 3 }, trade_value_10k: { might: 6 },
-    high_roller: { crit_chance: 3 }, whale_trader: { crit_chance: 5 },
-    // Generosity → power
-    first_donation: { might: 1 }, generous_soul: { might: 2 }, benefactor: { might: 4 },
-    // Wealth → power
-    gilded: { might: 3 }, big_baller: { might: 5 }, one_percent: { might: 10, crit_power: 6 },
-    // Meta + lucky drops
-    decorated: { might: 3 }, lucky_find: { crit_chance: 3 }, treasure_hunter: { might: 4 }, mythic_find: { crit_power: 6 },
-    // Mystery-bag badges
-    mystery_first: { might: 1 }, mystery_big_hit: { crit_chance: 4 }, mystery_20: { might: 3 }, mystery_100: { might: 6, crit_power: 4 },
+// ── PER-BADGE BONUSES ── every badge grants a bonus, in the vocabulary of the SYSTEM it belongs to, scaled by
+// how hard it is to earn. Four quarantined domains (mirroring how gear/pets feed them), so a farming badge
+// buffs farming, a sailing badge buffs the seas, etc. — they stack across every badge you hold.
+//   • combat  { might, crit_chance, crit_power }   → your daily boss strike        (boss.js)
+//   • sea     { broadside, ironclad, plunder, bounty, dredge, trove, tailwind } → raids/digging/voyages (sailing.js)
+//   • farm    { growSpeed, seedLuck, harvestLuck, petXp, fertPower, goldHarvest } → your farm            (farm-bonus.js)
+//   • forge   { efficient, keen_eye, masters_touch, steady_hand }  → smithing odds (crafting.js)
+// Authoring helpers keep the map readable; zero args are dropped.
+const C = (might = 0, crit_chance = 0, crit_power = 0) => { const o = {}; if (might) o.might = might; if (crit_chance) o.crit_chance = crit_chance; if (crit_power) o.crit_power = crit_power; return { combat: o }; };
+const S = (sea) => ({ sea });
+const F = (farm) => ({ farm });
+const G = (forge) => ({ forge });
+
+const BADGE_BONUSES = {
+    // ── Staff / identity / prestige (hand-assigned) → modest Might, a nod for the recognition ──
+    owner: C(5), site_admin: C(2), secret: C(3), staff: C(2), event_coordinator: C(2), volunteer: C(1),
+    judge: C(2), developer: C(2), loyal: C(2), helping_paw: C(2), mvp: C(3), opening_day: C(3), first_week: C(2),
+    founding_member: C(3), tournament_champ: C(3, 2), draft_king: C(3, 2), commander: C(2), lore_master: C(2),
+    featured_artist: C(2), trade_master: C(3), content_creator: C(2), og: C(3), birthday_star: C(1), generous: C(2),
+    hype_master: C(2), rival: C(2, 2),
+    // ── Level (prestige) → scaling power ──
+    night_hunter: C(2), alpha: C(3), ascended: C(4, 3), veteran: C(5, 0, 3), living_legend: C(7, 4, 4),
+    // ── Wealth / spend → power ──
+    big_spender: C(2), whale: C(3), high_roller_badge: C(4), legendary_spend: C(6, 0, 4),
+    gold_hoarder: C(2), gilded: C(3), big_baller: C(5), one_percent: C(10, 0, 6),
+    // ── Bounties → power ──
+    bounty_poster: C(1), bounty_hunter: C(2), bounty_pro: C(3), bounty_legend: C(5, 3),
+    // ── Trading → power / crit ──
+    first_trade: C(1), trader: C(2), deal_maker: C(3), trader_cards_100: C(2), trader_cards_500: C(4),
+    trade_value_500: C(2), trade_value_2k: C(3), trade_value_10k: C(6), high_roller: C(0, 3), whale_trader: C(0, 5),
+    // ── Donations / generosity → power ──
+    first_donation: C(1), generous_soul: C(2), benefactor: C(4), patron: C(2), gold_benefactor: C(3), philanthropist: C(5, 0, 3),
+    // ── Events / tenure / activity / social → loyalty power ──
+    event_regular: C(1), event_grinder: C(2), event_legend: C(3), event_god: C(5),
+    one_year: C(2), two_year: C(4), on_a_roll: C(1), ever_present: C(3), always_here: C(4),
+    well_connected: C(1), pack_leader: C(2), social_butterfly: C(3), chatterbox: C(1), town_crier: C(2),
+    collector: C(1), curator: C(2), hoarder: C(3),
+    // ── Wheel / mystery / credit / meta / lucky drops → power ──
+    wheel_regular: C(1), wheel_devotee: C(3), jackpot: C(0, 3),
+    mystery_first: C(1), mystery_big_hit: C(0, 4), mystery_20: C(3), mystery_100: C(6, 0, 4),
+    credit_patron: C(1), credit_backer: C(2), credit_benefactor: C(4),
+    well_rounded: C(3, 2), completionist: C(2), decorated: C(3),
+    lucky_find: C(0, 3), treasure_hunter: C(4), boss_relic: C(3), mythic_find: C(0, 0, 6),
+    // ── Referrals → power ──
+    referral_recruiter: C(2), referral_packbuilder: C(3), referral_packleader: C(5),
+    // ── Boss combat + gear tier → power ──
+    boss_challenger: C(1), boss_raider: C(2), boss_slayer: C(3), boss_veteran: C(2), boss_warlord: C(4),
+    boss_legend: C(6, 0, 4), boss_champion: C(0, 4), transcendent: C(5), ascendant_gear: C(3), eternal_bearer: C(8, 0, 6),
+    // ── Cheer (boss-fight social) → power ──
+    cheer_given_100: C(2), cheer_given_500: C(3, 2), cheer_given_1000: C(4, 3),
+    cheer_recv_100: C(0, 2), cheer_recv_500: C(0, 3), cheer_recv_1000: C(0, 4, 3),
+
+    // ── SAILING: voyages → tailwind, merchant/waves → sea gold, encounters → armor ──
+    first_voyage: S({ tailwind: 1 }), sail_regular: S({ tailwind: 2 }), sail_voyager: S({ tailwind: 4 }),
+    sail_leviathan: S({ tailwind: 3, bounty: 3 }), sail_admiral: S({ tailwind: 4, bounty: 4, broadside: 3 }),
+    merchant_met: S({ bounty: 2 }), merchant_perfect: S({ bounty: 3 }),
+    wave_friendly: S({ tailwind: 1 }), wave_ambassador: S({ tailwind: 2, bounty: 1 }), wave_beloved: S({ tailwind: 3, bounty: 2 }),
+    sea_tested: S({ ironclad: 2 }), sea_veteran: S({ ironclad: 3 }),
+    // ── RAIDING → broadside / ironclad / plunder ──
+    raid_marauder: S({ broadside: 3 }), raid_scourge: S({ broadside: 5, plunder: 3 }), raid_untouchable: S({ ironclad: 4 }),
+    raid_plunderer: S({ plunder: 5 }), raid_defender: S({ ironclad: 3 }), raid_bastion: S({ ironclad: 5 }),
+    // ── DIGGING → dredge / trove ──
+    dig_excavator: S({ trove: 4 }), dig_goldtouch: S({ trove: 3, dredge: 2 }), dig_cleansweep: S({ dredge: 4 }),
+    // ── Upgrade mastery (ship + dig) ──
+    sail_shipwright: S({ broadside: 2, dredge: 2 }), sail_sovereign: S({ broadside: 3, ironclad: 3, dredge: 3, trove: 3, tailwind: 3, bounty: 3 }),
+
+    // ── FARMING → grow speed / harvest / gold / etc. ──
+    farm_first: F({ growSpeed: 2 }), farm_hand: F({ growSpeed: 3 }), farm_master: F({ growSpeed: 5 }),
+    green_thumb: F({ growSpeed: 6, harvestLuck: 4 }), master_gardener: F({ growSpeed: 8, harvestLuck: 6, goldHarvest: 6 }),
+    botanist: F({ seedLuck: 6 }), decorator: F({ growSpeed: 2 }), landscaper: F({ growSpeed: 3, goldHarvest: 3 }),
+    well_liked: F({ goldHarvest: 3 }), adored: F({ goldHarvest: 6 }), fertilizer_baron: F({ fertPower: 6 }),
+    pig_whisperer: F({ harvestLuck: 3 }), pig_tycoon: F({ harvestLuck: 5, goldHarvest: 4 }),
+    farm_cultivator: F({ growSpeed: 4, seedLuck: 4 }), farm_steward: F({ growSpeed: 8, seedLuck: 8, harvestLuck: 6, goldHarvest: 6, fertPower: 6 }),
+    // ── PETS → pet XP (pasture leveling), the pet system's own currency ──
+    pet_tamer: F({ petXp: 2 }), pet_keeper: F({ petXp: 3 }), pet_whisperer: F({ petXp: 5 }), pet_trained: F({ petXp: 1 }),
+    pet_seasoned: F({ petXp: 3 }), beastmaster: F({ petXp: 6 }), pack_master: F({ petXp: 3 }), pet_devoted: F({ petXp: 5 }),
+    pet_pal: F({ petXp: 2 }), farm_giver: F({ petXp: 4 }),
+    // ── CREATIONS (art/decorations) → farm gold & growth ──
+    creation_first: F({ goldHarvest: 2 }), creation_artisan: F({ goldHarvest: 3 }), creation_gallery: F({ goldHarvest: 5 }),
+    creation_curator: F({ growSpeed: 2 }), creation_patron: F({ goldHarvest: 3 }),
+
+    // ── FORGING → smithing odds ──
+    forge_first: G({ efficient: 1 }), forge_smith: G({ masters_touch: 1 }), forge_master: G({ masters_touch: 3 }),
+    forge_plus10: G({ steady_hand: 3 }), forge_pixel: G({ steady_hand: 2 }), forge_emberheart: G({ keen_eye: 3 }),
+    forge_artisan: G({ efficient: 2, keen_eye: 2 }), forge_grandmaster: G({ efficient: 4, keen_eye: 4, masters_touch: 4, steady_hand: 4 }),
 };
 
-// Sum the passive stats from every badge a member holds. Cheap (one held-slugs read); safe to call in the
-// combat path. Returns e.g. { might: 6, fortune: 5 }.
-export async function getBadgePassives(buyerId) {
+// Sum one bonus DOMAIN across every badge a member holds. Cheap (one held-slugs read); safe on hot paths.
+async function sumBadgeDomain(buyerId, domain) {
     if (!buyerId) return {};
     const held = await heldSlugs(buyerId).catch(() => new Set());
     const total = {};
     for (const slug of held) {
-        const p = BADGE_PASSIVES[slug];
-        if (!p) continue;
-        for (const [k, v] of Object.entries(p)) total[k] = (total[k] || 0) + v;
+        const d = BADGE_BONUSES[slug]?.[domain];
+        if (!d) continue;
+        for (const [k, v] of Object.entries(d)) total[k] = (total[k] || 0) + v;
     }
     return total;
+}
+// Domain-specific aggregators, each folded into that system's own bonus sum (mirrors gear/pets).
+export const getBadgePassives = (buyerId) => sumBadgeDomain(buyerId, "combat"); // → boss strike (unchanged callers)
+export const getBadgeSea = (buyerId) => sumBadgeDomain(buyerId, "sea");         // → equippedSeaAffinity (sailing)
+export const getBadgeFarm = (buyerId) => sumBadgeDomain(buyerId, "farm");       // → farmBonuses (farm)
+export const getBadgeForge = (buyerId) => sumBadgeDomain(buyerId, "forge");     // → forge smithing odds (crafting)
+
+// All four domain totals from ONE held-slugs read — for the Badges page's "Badge Power" summary.
+export async function getBadgeBonusTotals(buyerId) {
+    if (!buyerId) return { combat: {}, sea: {}, farm: {}, forge: {} };
+    const held = await heldSlugs(buyerId).catch(() => new Set());
+    const totals = { combat: {}, sea: {}, farm: {}, forge: {} };
+    for (const slug of held) {
+        const b = BADGE_BONUSES[slug];
+        if (!b) continue;
+        for (const dom of ["combat", "sea", "farm", "forge"]) {
+            if (!b[dom]) continue;
+            for (const [k, v] of Object.entries(b[dom])) totals[dom][k] = (totals[dom][k] || 0) + v;
+        }
+    }
+    return totals;
 }
 
 // ── Collection milestones ── as your badge count climbs, hit these thresholds for a chunk of gold + a chest
@@ -399,7 +484,8 @@ function qualifies(rule, threshold, m) {
 // The full badge board for a member: every badge with earned/locked state + progress on the unlockables,
 // plus the single "next badge" (closest unearned unlockable). Powers the Badges hub + the next-badge nudge.
 export async function getBadgeBoard(buyerId) {
-    const [all, held, m, passives] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId), getBadgePassives(buyerId)]);
+    const [all, held, m, totals] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId), getBadgeBonusTotals(buyerId)]);
+    const passives = totals.combat; // { might, crit_chance, crit_power } — buffs your daily boss strike
     // Secret badges stay hidden until you actually hold one — no locked/mystery slot teasing them.
     const visible = all.filter((b) => !b.secret || held.has(b.slug));
     const badges = visible.map((b) => {
@@ -410,7 +496,7 @@ export async function getBadgeBoard(buyerId) {
             const t = Math.max(1, target);
             progress = { current: Math.max(0, Math.min(current, t)), target: t, pct: Math.max(0, Math.min(100, Math.round((current / t) * 100))) };
         }
-        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly, earned, progress, bonus: BADGE_PASSIVES[b.slug] || null };
+        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly, earned, progress, bonus: BADGE_BONUSES[b.slug] || null };
     });
     // Next = closest unearned UNLOCKABLE badge by progress (admin-assigned ones can't be "earned" by progress).
     const next = badges
@@ -422,6 +508,7 @@ export async function getBadgeBoard(buyerId) {
         totalCount: badges.length,
         next: next ? { label: next.label, icon: next.icon, color: next.color, ...next.progress } : null,
         passives, // { might, crit_chance, crit_power } summed from earned badges — buffs your daily boss strike
+        bonusTotals: totals, // { combat, sea, farm, forge } — every earned badge's bonuses, grouped by system
     };
 }
 
