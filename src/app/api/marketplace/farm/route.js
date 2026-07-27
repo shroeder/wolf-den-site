@@ -7,7 +7,7 @@ import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, re
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
 import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, equipFarmBg, unequipFarmBg, deleteFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
-import { useConsumable as openConsumable } from "@/lib/marketplace/consumables.js";
+import { useConsumable as openConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -70,6 +70,16 @@ export async function POST(request) {
                 const packId = String(b?.packId || "");
                 if (!SEED_PACK_IDS.includes(packId)) res = { ok: false, error: "bad_pack" };
                 else { const r = await openConsumable(buyer.id, packId); res = r?.ok ? { ...r, garden: await getGarden(buyer.id) } : r; }
+            }
+            else if (b?.action === "seedpack_buy") {
+                // Buy a seed pack with gold AND open it right here → seeds land in the bag, ready to plant. No shop trip.
+                const packId = String(b?.packId || "");
+                if (!SEED_PACK_IDS.includes(packId)) res = { ok: false, error: "bad_pack" };
+                else {
+                    const buy = await buyConsumable(buyer.id, packId);
+                    if (!buy?.ok) res = buy; // not_enough_gold / not_for_sale
+                    else { const r = await openConsumable(buyer.id, packId); res = { ...(r?.ok ? r : {}), ok: true, bought: true, gold: buy.gold, garden: await getGarden(buyer.id) }; }
+                }
             }
             else if (b?.action === "harvest") res = await harvestPlot(buyer.id, Number(b?.slot));
             else if (b?.action === "fertilizer_buy") res = await buyFertilizer(buyer.id);

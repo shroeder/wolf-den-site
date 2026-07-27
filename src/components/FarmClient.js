@@ -13,6 +13,7 @@ import FeatureDailies from "@/components/FeatureDailies";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
+import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
 
 // A pet's OWNED (just-by-having-it) passive bonus, split into { icon, name, desc } so the modal can lay it out
 // as a clean labeled row instead of a run-on sentence. Earner stats explain the real income; combat stats show
@@ -456,6 +457,12 @@ export default function FarmClient({ initial, viewingAlias }) {
     const openPack = useCallback(async (packId) => {
         const r = await gardenAct({ action: "pack_open", packId }, `pk-${packId}`);
         if (r?.ok) SFX?.coin?.();
+        return r;
+    }, [gardenAct]);
+    // Buy a seed pack right here (no shop trip) — spends gold, opens it, seeds land in the bag. Updates the wallet.
+    const buySeedPack = useCallback(async (packId) => {
+        const r = await gardenAct({ action: "seedpack_buy", packId }, `bp-${packId}`);
+        if (r?.ok) { SFX?.coin?.(); if (r.gold != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.gold } } : f)); }
         return r;
     }, [gardenAct]);
     const harvestAt = useCallback(async (slot) => {
@@ -1057,7 +1064,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {planting != null && garden ? (
-                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} onPick={plantSeedAt} onOpenPack={openPack} onClose={() => setPlanting(null)} />
+                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} gold={farm.wallet?.gold || 0} onPick={plantSeedAt} onOpenPack={openPack} onBuyPack={buySeedPack} onClose={() => setPlanting(null)} />
             ) : null}
 
             {inspectSlot != null && garden ? (
@@ -1771,11 +1778,18 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
 }
 
 // Centered "pick a seed" modal, opened by tapping an empty plot out in the field.
-function SeedPickerModal({ garden, slot, busy, onPick, onOpenPack, onClose }) {
+function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onBuyPack, onClose }) {
     const bag = garden.seedBag || [];
     const packs = garden.seedPacks || [];
     const [opened, setOpened] = useState(null);
+    const [err, setErr] = useState(null);
     const open = async (packId) => { const r = await onOpenPack(packId); if (r?.ok) setOpened(r.applied || "Seeds added to your bag!"); };
+    const buy = async (packId) => {
+        setErr(null);
+        const r = await onBuyPack?.(packId);
+        if (r?.ok) setOpened(r.applied || "Seeds added to your bag!");
+        else setErr(r?.error === "not_enough_gold" ? "Not enough gold for that pack." : "Couldn't buy that pack — try again.");
+    };
     return (
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Plant a seed" style={{ width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
@@ -1798,13 +1812,11 @@ function SeedPickerModal({ garden, slot, busy, onPick, onOpenPack, onClose }) {
                     )) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds in your bag yet — open a seed pack below (or earn seeds from harvests, tending pets, and the other games).</div>}
                 </div>
 
-                {/* Seeds come from packs now: open one you own → seeds land in your bag → tap one above to plant. */}
-                <div style={{ margin: "16px 0 8px" }}>
-                    <span style={{ fontWeight: 800, fontSize: 13.5 }}>🎁 Open a seed pack</span>
-                </div>
-                {opened ? <div style={{ fontSize: 12, color: "#8fe3a1", margin: "0 0 8px", fontWeight: 700 }}>✨ {opened}</div> : null}
+                {opened ? <div style={{ fontSize: 12, color: "#8fe3a1", margin: "14px 0 0", fontWeight: 700 }}>✨ {opened}</div> : null}
+                {/* Packs you already own — open one → seeds land in your bag → tap one above to plant. */}
                 {packs.length ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 14 }}>
+                        <span style={{ fontWeight: 800, fontSize: 13.5, marginBottom: 2 }}>🎁 Open a seed pack you own</span>
                         {packs.map((p) => {
                             const pBusy = busy === `pk-${p.id}`;
                             return (
@@ -1820,12 +1832,31 @@ function SeedPickerModal({ garden, slot, busy, onPick, onOpenPack, onClose }) {
                             );
                         })}
                     </div>
-                ) : (
-                    <>
-                        <a href="/marketplace/store" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 12px", borderRadius: 12, fontWeight: 900, fontSize: 13.5, textDecoration: "none", color: "#3a2c08", background: "linear-gradient(180deg,#ffe488,#f3b23a)", boxShadow: "0 3px 0 #b57f22" }}>🛒 Buy a seed pack — Supplies shop →</a>
-                        <div className="muted" style={{ fontSize: 11.5, marginTop: 7, textAlign: "center" }}>Basic packs give everyday crops; crates &amp; vaults unlock rare, epic &amp; legendary seeds. You also earn seeds from harvests, tending pets &amp; the other games.</div>
-                    </>
-                )}
+                ) : null}
+
+                {/* Buy a seed pack right here — spends gold, opens it, seeds land in your bag. No shop trip. */}
+                <div style={{ margin: "16px 0 8px", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 800, fontSize: 13.5 }}>🛒 Buy a seed pack</span>
+                    <span className="muted" style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>🪙 {gold.toLocaleString()}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    {SEED_PACKS.map((p) => {
+                        const bBusy = busy === `bp-${p.id}`;
+                        const afford = gold >= p.price;
+                        return (
+                            <button key={p.id} type="button" disabled={Boolean(busy) || !afford} onClick={() => buy(p.id)}
+                                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, border: "1px solid rgba(255,215,94,0.4)", background: afford ? "rgba(255,215,94,0.08)" : "rgba(255,255,255,0.03)", color: "inherit", cursor: afford ? "pointer" : "default", textAlign: "left", opacity: !afford ? 0.6 : 1 }}>
+                                <span style={{ fontSize: 22 }}>{p.emoji}</span>
+                                <span style={{ flex: 1, minWidth: 0 }}>
+                                    <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>{p.name}</span>
+                                    <span className="muted" style={{ fontSize: 11 }}>{p.desc}</span>
+                                </span>
+                                <span style={{ fontWeight: 900, fontSize: 12.5, color: afford ? "#ffd75e" : "#9aa0a6", whiteSpace: "nowrap" }}>{bBusy ? "…" : `🪙 ${p.price.toLocaleString()}`}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+                {err ? <div style={{ fontSize: 12, color: "#ffb3bd", marginTop: 8, textAlign: "center" }}>{err}</div> : null}
 
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Cancel</button>
             </div>
