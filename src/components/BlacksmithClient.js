@@ -97,7 +97,7 @@ export default function BlacksmithClient({ initial }) {
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, grade: r.grade, xp: r.xp, doubled: r.doubled }); }
+        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -463,6 +463,42 @@ function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
 // ── The juiced post-enhance reveal (fires after you Temper the item) ────────────────────────────────────────
 function EnhanceResultModal({ res, onClose }) {
     const gradeMeta = { pixel: { label: "PIXEL-PERFECT", color: "#ffd75e" }, perfect: { label: "PERFECT", color: "#8fe3ff" }, great: { label: "GREAT", color: "#8fe39a" }, good: { label: "FORGED", color: "#d7c48a" } }[res.grade] || { label: "FORGED", color: "#d7c48a" };
+    // Peak dopamine: first TALLY the mini-game performance (accuracy → combo → touch → points earned), animating
+    // it up so the player sees what their strikes DID, THEN reveal the forged item + additive stats.
+    const acc = Math.round((res.quality || 0) * 100);
+    const combo = res.combo || 0;
+    const gainedPts = Array.isArray(res.statLines) ? res.statLines.reduce((s, l) => s + (l.gained || 0), 0) : 0;
+    const [phase, setPhase] = useState("tally"); // tally → reveal
+    const [accShown, setAccShown] = useState(0);
+    useEffect(() => {
+        if (phase !== "tally") return undefined;
+        let raf = 0; const t0 = performance.now(); const dur = 850;
+        const tick = (t) => { const k = Math.min(1, (t - t0) / dur); setAccShown(Math.round(acc * k)); if (k < 1) raf = requestAnimationFrame(tick); };
+        raf = requestAnimationFrame(tick);
+        const adv = setTimeout(() => setPhase("reveal"), 2200); // auto-advance to the reveal
+        return () => { cancelAnimationFrame(raf); clearTimeout(adv); };
+    }, [phase, acc]);
+
+    if (phase === "tally") {
+        return (
+            <div className="forge-mg-scrim" role="dialog" aria-label="Forge tally" onPointerDown={() => setPhase("reveal")}>
+                <div className="forge-sv forge-er" style={{ "--rc": rc(res.rarity) }} onPointerDown={(e) => e.stopPropagation()}>
+                    <div className="forge-sv-result">
+                        <div className="forge-er-grade" style={{ color: gradeMeta.color }}>{gradeMeta.label} STRIKE!</div>
+                        <div className="forge-tally">
+                            <div className="forge-tally-row" style={{ animationDelay: "0ms" }}><span>🎯 Accuracy</span><b style={{ color: "#8fe3ff" }}>{accShown}%</b></div>
+                            <div className="forge-tally-row" style={{ animationDelay: "420ms" }}><span>⚡ Best combo</span><b style={{ color: "#ffcf7a" }}>×{combo}</b></div>
+                            {res.doubled ? <div className="forge-tally-row" style={{ animationDelay: "840ms" }}><span>✦ Master&apos;s Touch</span><b style={{ color: "#ffd75e" }}>DOUBLE!</b></div> : null}
+                            <div className="forge-tally-sum" style={{ animationDelay: res.doubled ? "1260ms" : "980ms" }}>
+                                <span>⚒ Forge yield</span><b>{gainedPts > 0 ? `+${gainedPts}` : "maxed"}</b>
+                            </div>
+                        </div>
+                        <button type="button" className="forge-tally-skip" onClick={() => setPhase("reveal")}>Tap to reveal →</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="forge-mg-scrim" role="dialog" aria-label={`${res.name} enhanced`} onPointerDown={onClose}>
             <div className="forge-sv forge-er" style={{ "--rc": rc(res.rarity) }} onPointerDown={(e) => e.stopPropagation()}>
@@ -814,6 +850,15 @@ const FORGE_CSS = `
 @keyframes forgeGlowPulse { 0%,100% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 1; } }
 @keyframes forgeArtIn { 0% { opacity: 0; transform: scale(.4) translateY(12px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes forgeStatPulse { 0% { color: #8fe39a; transform: scale(1.28); } 100% { color: #fff6e2; transform: scale(1); } }
+/* ── post-forge TALLY (performance → yield, animated up before the reveal) ── */
+.forge-tally { margin: 14px auto 4px; max-width: 300px; display: flex; flex-direction: column; gap: 7px; }
+.forge-tally-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 800; color: #e6d7c2; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 8px 12px; opacity: 0; animation: forgeTallyIn .42s cubic-bezier(.2,1.4,.3,1) both; }
+.forge-tally-row b { font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 900; }
+.forge-tally-sum { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffe07a,#f3b23a); border-radius: 11px; padding: 9px 13px; opacity: 0; animation: forgeTallyPop .5s cubic-bezier(.2,1.5,.3,1) both; box-shadow: 0 4px 14px rgba(243,178,58,0.4); }
+.forge-tally-sum b { font-size: 18px; font-weight: 900; }
+.forge-tally-skip { display: block; margin: 12px auto 0; background: none; border: none; color: #b9a892; font-size: 12px; font-weight: 700; cursor: pointer; }
+@keyframes forgeTallyIn { 0% { opacity: 0; transform: translateX(-14px); } 100% { opacity: 1; transform: translateX(0); } }
+@keyframes forgeTallyPop { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
 /* ── locked enhance card (can't afford the parts) ── */
 .forge-card.is-locked { opacity: 0.82; }
 .forge-card.is-locked .forge-art { filter: grayscale(0.5) brightness(0.85); }
