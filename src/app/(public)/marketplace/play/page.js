@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FaDharmachakra } from "react-icons/fa6";
 
+import ForgeAnnounce from "@/components/ForgeAnnounce";
 import GameHubStats from "@/components/GameHubStats";
 import GettingStarted from "@/components/GettingStarted";
 import HelmetSprite from "@/components/HelmetSprite";
@@ -28,6 +29,7 @@ const FEATURES = [
     { href: "/marketplace/spin", Icon: FaDharmachakra, title: "Daily Spin", desc: "One free spin a day — gold, XP, chests… and the jackpot.", tone: "spin" },
     { href: "/marketplace/pets", emoji: "🐾", title: "Pets", desc: "Collect companions, equip one, and level it up.", tone: "pets" },
     { href: "/marketplace/inventory", emoji: "🛡️", title: "Gear", desc: "Your loadout, the gold shop, and loot chests.", tone: "gear" },
+    { href: "/marketplace/blacksmith", emoji: "🔨", title: "The Forge", desc: "Salvage & enhance your gear — hammer it stronger on the anvil.", tone: "boss" },
     { href: "/marketplace/sets", sprite: "helmet", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
     { href: "/marketplace/quests", emoji: "📜", title: "Quests", desc: "Fresh daily bounties → gold, chests & tokens.", tone: "quests" },
     { href: "/marketplace/track", emoji: "🏆", title: "Rewards Track", desc: "See your next unlock and everything you've earned.", tone: "track" },
@@ -49,6 +51,7 @@ export default async function GamePlayHub({ searchParams }) {
     return (
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
+            {buyer ? <ForgeAnnounce /> : null}
             {buyer ? <GettingStarted /> : null}
             {buyer ? <RaidDefenseReport /> : null}
             {buyer ? <SpinNudge /> : null}
