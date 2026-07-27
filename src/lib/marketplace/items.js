@@ -533,14 +533,19 @@ export const ITEMS = [
     { id: "regalia_boots", name: "Cinderstride Boots", slot: "boots", rarity: "epic", icon: "GiLeatherBoot", flavor: "Leave faintly glowing footprints on cold stone.", stats: { ferocity: 18 }, forgeSet: true, source: "forge", sort: 953 },
     { id: "regalia_cloak", name: "Bellows Cloak", slot: "back", rarity: "epic", icon: "GiCape", flavor: "Billows like a forge fire catching air.", stats: { fortune: 12, crit_power: 8 }, forgeSet: true, source: "forge", sort: 954 },
 
-    // ── Wheel-exclusive gear — only from the Prize Wheel's pick-a-box BONUS GAME (source "wheel_bonus"). Epic,
-    // low level req so it's usable, AI sprites in mkt_item_sprite (mig250). Not in any other drop table. ──
-    { id: "wg_helm", name: "Dire Wolf Helm", slot: "helmet", rarity: "epic", icon: "GiWolfHead", flavor: "Won from the wheel — the pack marches with you.", stats: { might: 8, crit_chance: 8 }, reqLevel: 5, source: "wheel_bonus", sort: 970 },
-    { id: "wg_blade", name: "Fanged Saber", slot: "main_hand", rarity: "epic", icon: "GiSaber", flavor: "A lucky pull with a wicked edge.", stats: { might: 20, crit_power: 8 }, reqLevel: 5, source: "wheel_bonus", sort: 971 },
-    { id: "wg_shield", name: "Wolfcrest Aegis", slot: "off_hand", rarity: "epic", icon: "GiShield", flavor: "Fortune favors the guarded.", stats: { ferocity: 14, might: 8 }, reqLevel: 5, source: "wheel_bonus", sort: 972 },
-    { id: "wg_cloak", name: "Nightprowler Cloak", slot: "back", rarity: "epic", icon: "GiCape", flavor: "Slips through the dark like a rumor.", stats: { might: 10, fortune: 8 }, reqLevel: 5, source: "wheel_bonus", sort: 973 },
-    { id: "wg_amulet", name: "Wolf-Fang Amulet", slot: "amulet", rarity: "epic", icon: "GiFangs", flavor: "Still warm from the wheel's glow.", stats: { crit_power: 14, fortune: 8 }, reqLevel: 5, source: "wheel_bonus", sort: 974 },
-    { id: "wg_ring", name: "Ironclaw Band", slot: "ring", rarity: "epic", icon: "GiClaws", flavor: "A clawed circlet, jackpot-forged.", stats: { might: 10, crit_chance: 6 }, reqLevel: 5, source: "wheel_bonus", sort: 975 },
+    // ── Wheel-exclusive gear — only from the Prize Wheel's match-3 BONUS GAME (source "wheel_bonus"). RARE
+    // (blue) on purpose — a fun pull, not the strong purple/epic gear we don't normally hand out. AI sprites in
+    // mkt_item_sprite (mig250/251). Not in any other drop table. ──
+    { id: "wg_helm", name: "Dire Wolf Helm", slot: "helmet", rarity: "rare", icon: "GiWolfHead", flavor: "Won from the wheel — the pack marches with you.", stats: { might: 6, crit_chance: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 970 },
+    { id: "wg_blade", name: "Fanged Saber", slot: "main_hand", rarity: "rare", icon: "GiSaber", flavor: "A lucky pull with a keen edge.", stats: { might: 12, crit_power: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 971 },
+    { id: "wg_shield", name: "Wolfcrest Aegis", slot: "off_hand", rarity: "rare", icon: "GiShield", flavor: "Fortune favors the guarded.", stats: { ferocity: 9, might: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 972 },
+    { id: "wg_cloak", name: "Nightprowler Cloak", slot: "back", rarity: "rare", icon: "GiCape", flavor: "Slips through the dark like a rumor.", stats: { might: 6, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 973 },
+    { id: "wg_amulet", name: "Wolf-Fang Amulet", slot: "amulet", rarity: "rare", icon: "GiFangs", flavor: "Still warm from the wheel's glow.", stats: { crit_power: 9, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 974 },
+    { id: "wg_ring", name: "Ironclaw Band", slot: "ring", rarity: "rare", icon: "GiClaws", flavor: "A clawed circlet, wheel-forged.", stats: { might: 6, crit_chance: 4 }, reqLevel: 5, source: "wheel_bonus", sort: 975 },
+    { id: "wg_chest", name: "Wolfhide Cuirass", slot: "chest", rarity: "rare", icon: "GiChestArmor", flavor: "Supple hide, steel where it counts.", stats: { ferocity: 11, might: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 976 },
+    { id: "wg_belt", name: "Fangbite Belt", slot: "belt", rarity: "rare", icon: "GiBelt", flavor: "Buckled with a snarling wolf.", stats: { might: 7, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 977 },
+    { id: "wg_boots", name: "Prowler Boots", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Quiet on any trail.", stats: { ferocity: 11 }, reqLevel: 5, source: "wheel_bonus", sort: 978 },
+    { id: "wg_axe", name: "Moonhowl Axe", slot: "main_hand", rarity: "rare", icon: "GiBattleAxe", flavor: "It hums under a full moon.", stats: { might: 13, crit_chance: 4 }, reqLevel: 5, source: "wheel_bonus", sort: 979 },
 ];
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────

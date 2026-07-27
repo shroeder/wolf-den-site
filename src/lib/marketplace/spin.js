@@ -76,12 +76,10 @@ const MINI_WHEEL_PRIZES = [
     { label: "1,000 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1000 },
 ];
 
-// Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). Weighted so the flashier
-// pieces are a touch rarer.
-const WHEEL_GEAR = [
-    { id: "wg_helm", weight: 20 }, { id: "wg_shield", weight: 20 }, { id: "wg_ring", weight: 20 },
-    { id: "wg_cloak", weight: 16 }, { id: "wg_amulet", weight: 14 }, { id: "wg_blade", weight: 10 },
-];
+// Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3
+// board draws BOARD_ITEMS of these at random, three tiles each.
+const WHEEL_GEAR = ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"];
+const BOARD_ITEMS = 8; // distinct gear on the board (× 3 tiles each = 24 tiles)
 
 function wheelForLevel(level) {
     let w = WHEELS[0];
@@ -132,20 +130,43 @@ async function rollMiniWheel(buyerId) {
 }
 
 const gearSprite = (id) => `/images/spin/gear/${id === "wg_ring" ? "wg-gauntlet" : id.replace("_", "-")}.png`;
-const gearCard = (id) => { const it = itemById(id); return { id, name: it?.name || "Wheel Gear", rarity: it?.rarity || "epic", sprite: gearSprite(id) }; };
+const gearCard = (id) => { const it = itemById(id); return { id, name: it?.name || "Wheel Gear", rarity: it?.rarity || "rare", sprite: gearSprite(id) }; };
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-// The BONUS GAME is a MATCH-3: a 3×3 board of face-down tiles. ONE gear piece (the weighted winner) has three
-// tiles; the other five gear each have fewer, so only the winner can ever reach three-of-a-kind. The player
-// flips tiles until they match three — and wins that ONE piece (granted here, up front, so it's tamper-proof).
+// The BONUS GAME is a MATCH-3: a board of face-down tiles, THREE of every gear on it (so the end reveal is
+// honest — every piece really is there three times). The player flips tiles until they get three of a kind;
+// the FIRST gear to reach three (by their own flip order) is what they win. The board is kept SERVER-SIDE so
+// tiles stay hidden — the client flips one at a time via `bonusFlip`, and the win is granted there.
 async function rollBonusGame(buyerId) {
-    const winner = pickWeighted(WHEEL_GEAR);
-    await grantItem(buyerId, winner.id, "wheel_bonus").catch(() => {});
-    const others = WHEEL_GEAR.filter((g) => g.id !== winner.id).map((g) => g.id);
-    const tiles = [winner.id, winner.id, winner.id];          // exactly three of the winner
-    const decoyCounts = [2, 1, 1, 1, 1];                       // six decoy tiles, none reaching three
-    decoyCounts.forEach((c, i) => { const id = others[i % others.length]; for (let k = 0; k < c; k += 1) tiles.push(id); });
-    for (let i = tiles.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
-    return { tiles: tiles.map(gearCard), winnerId: winner.id, need: 3, winner: gearCard(winner.id) };
+    const chosen = shuffle([...WHEEL_GEAR]).slice(0, BOARD_ITEMS);
+    const tiles = shuffle(chosen.flatMap((id) => [id, id, id]));
+    await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ board: tiles, flipped: [], done: false, need: 3 })]).catch(() => {});
+    return { size: tiles.length, need: 3, roster: chosen.map(gearCard) };
+}
+
+// Flip one tile of the active match-3 board. Reveals its gear; when the player reaches three of a kind, grants
+// that piece and returns the FULL board so the client can reveal everything.
+export async function bonusFlip(buyerId, index) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const row = await db.queryOne(`SELECT spin_bonus FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const g = row?.spin_bonus;
+    if (!g || !Array.isArray(g.board)) return { ok: false, error: "no_game" };
+    if (g.done) return { ok: false, error: "done" };
+    const i = Number(index);
+    if (!(i >= 0 && i < g.board.length) || g.flipped.includes(i)) return { ok: false, error: "bad_flip" };
+    g.flipped.push(i);
+    const revealedId = g.board[i];
+    const count = g.flipped.filter((fi) => g.board[fi] === revealedId).length;
+    let winner = null; let fullBoard = null;
+    if (count >= (g.need || 3)) {
+        g.done = true;
+        await grantItem(buyerId, revealedId, "wheel_bonus").catch(() => {});
+        await trackActivity(buyerId, "spin_bonus_win", { item: revealedId }).catch(() => {});
+        winner = gearCard(revealedId);
+        fullBoard = g.board.map(gearCard);
+    }
+    await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify(g)]).catch(() => {});
+    return { ok: true, index: i, tile: gearCard(revealedId), done: Boolean(winner), winner, board: fullBoard };
 }
 
 // Weighted pick of a prize INDEX. forceRare restricts to rare segments (pity).

@@ -102,7 +102,7 @@ export default function SpinWheel() {
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
             // Route to the right outcome.
             if (d.prize?.miniWheel && d.miniWheel) { setMini({ ...d.miniWheel, rot: 0, spinning: false, revealed: false }); playWin("bonus"); return; }
-            if (d.prize?.bonusGame && d.bonusGame) { setBonus({ tiles: d.bonusGame.tiles, winnerId: d.bonusGame.winnerId, need: d.bonusGame.need || 3, winner: d.bonusGame.winner, flipped: [], counts: {}, done: false, won: null }); playWin("bonus"); return; }
+            if (d.prize?.bonusGame && d.bonusGame) { setBonus({ size: d.bonusGame.size, need: d.bonusGame.need || 3, roster: d.bonusGame.roster || [], flipped: {}, done: false, won: null, busy: false }); playWin("bonus"); return; }
             setResult(d.prize);
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
             if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), 4600); }
@@ -157,17 +157,26 @@ export default function SpinWheel() {
         playWin("mini");
     }, []);
 
-    const revealBonus = useCallback((i) => {
+    const revealBonus = useCallback(async (i) => {
+        let allow = false;
+        setBonus((b) => { if (!b || b.done || b.busy || b.flipped[i]) return b; allow = true; return { ...b, busy: true }; });
+        if (!allow) return;
+        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "bonus_flip", index: i }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        tick(0.06);
         setBonus((b) => {
-            if (!b || b.done || b.flipped.includes(i)) return b;
-            const id = b.tiles[i].id;
-            const counts = { ...b.counts, [id]: (b.counts[id] || 0) + 1 };
-            const flipped = [...b.flipped, i];
-            const matched = counts[id] >= b.need;
-            tick(0.06);
-            if (matched) playWin("rare");
-            return { ...b, flipped, counts, done: matched, won: matched ? b.tiles[i] : null };
+            if (!b) return b;
+            if (!d?.ok) return { ...b, busy: false };
+            const flipped = { ...b.flipped, [d.index]: d.tile };
+            if (d.done) {
+                playWin("rare");
+                const full = {};
+                (d.board || []).forEach((c, idx) => { full[idx] = c; });
+                return { ...b, flipped: { ...full, ...flipped }, done: true, won: d.winner, busy: false };
+            }
+            return { ...b, flipped, busy: false };
         });
+        if (d?.done && typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
     }, []);
 
     if (!st) return <section className="card"><p className="muted" style={{ margin: 0 }}>Loading…</p></section>;
@@ -286,23 +295,21 @@ export default function SpinWheel() {
                 </div>
             ) : null}
 
-            {/* ── BONUS GAME modal (match 3 tiles → win that wheel-exclusive gear) ── */}
+            {/* ── BONUS GAME modal (match-3: flip tiles, win the gear you get 3 of) ── */}
             {bonus ? (
                 <div className="cw-modal">
-                    <div className="cw-modal-card">
+                    <div className="cw-modal-card cw-modal-wide">
                         <div className="cw-modal-title">🎁 Match 3 to Win!</div>
-                        <p className="cw-modal-sub">{bonus.done ? "Three of a kind!" : "Flip tiles — match 3 of one gear to win it."}</p>
+                        <p className="cw-modal-sub">{bonus.done ? "Three of a kind — reveal shows the whole board:" : "Flip tiles — the first gear you get 3 of is yours."}</p>
                         <div className="cw-tiles">
-                            {bonus.tiles.map((t, i) => {
-                                const open = bonus.flipped.includes(i);
-                                const isWin = bonus.done && open && bonus.won?.id === t.id;
+                            {Array.from({ length: bonus.size }).map((_, i) => {
+                                const t = bonus.flipped[i];
+                                const isWin = bonus.done && t && bonus.won?.id === t.id;
                                 return (
-                                    <button key={i} type="button" className={`cw-tile${open ? " is-open" : ""}${isWin ? " is-win" : ""} rar-${t.rarity}`} disabled={open || bonus.done} onClick={() => revealBonus(i)}>
-                                        {open ? (
-                                            <>
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={t.sprite} alt="" className="cw-tile-img" />
-                                            </>
+                                    <button key={i} type="button" className={`cw-tile${t ? " is-open" : ""}${isWin ? " is-win" : ""}${t ? ` rar-${t.rarity}` : ""}`} disabled={Boolean(t) || bonus.done || bonus.busy} onClick={() => revealBonus(i)}>
+                                        {t ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={t.sprite} alt="" className="cw-tile-img" />
                                         ) : (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src="/images/spin/prizes/mystery-box.png" alt="" className="cw-tile-img is-closed" />
@@ -439,8 +446,9 @@ const CW_CSS = `
 .cw-modal-won b { color: #fff; }
 .cw-modal-won-img { width: 42px; height: 42px; object-fit: contain; }
 .cw-collect { margin-top: 14px; padding: 11px 28px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12; }
-.cw-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 6px auto 4px; max-width: 280px; }
-.cw-tile { aspect-ratio: 1; border-radius: 14px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); cursor: pointer; display: grid; place-items: center; padding: 5px; transition: transform .15s, border-color .15s; }
+.cw-modal-wide { max-width: 420px; }
+.cw-tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 6px auto 4px; }
+.cw-tile { aspect-ratio: 1; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); cursor: pointer; display: grid; place-items: center; padding: 3px; transition: transform .15s, border-color .15s; }
 .cw-tile:not(:disabled):hover { transform: translateY(-2px); border-color: rgba(255,215,94,0.6); }
 .cw-tile.is-open { cursor: default; border-color: rgba(176,97,255,0.6); background: rgba(176,97,255,0.09); animation: cwPop .3s cubic-bezier(.2,1.4,.35,1) both; }
 .cw-tile.is-win { border-color: #ffd75e; background: rgba(255,215,94,0.16); box-shadow: 0 0 16px rgba(255,215,94,0.8); animation: cwWin .5s ease both; }
