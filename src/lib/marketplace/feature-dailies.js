@@ -66,6 +66,8 @@ export async function getFeatureClaimCounts(buyerId) {
         const claimed = new Set(parseJson(row.claimed, []));
         out[row.feature] = tasks.filter((t) => Math.min(Number(progress[t.metric] || 0), t.need) >= t.need && !claimed.has(t.key)).length;
     }
+    // The Forge runs its own daily system (not FEATURE_DAILIES) — fold its claimable count in for the nav badge.
+    try { const { forgeDailyClaimable } = await import("@/lib/marketplace/crafting.js"); out.forge = await forgeDailyClaimable(buyerId); } catch { out.forge = 0; }
     return out;
 }
 

@@ -163,6 +163,15 @@ export async function claimForgeDaily(buyerId, key) {
     return { ok: true, key, ...(await getForgeState(buyerId)) };
 }
 
+// Count of forge daily tasks that are DONE but unclaimed — for the Forge nav attention badge.
+export async function forgeDailyClaimable(buyerId) {
+    if (!buyerId) return 0;
+    const row = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
+    if (!row) return 0;
+    const claimed = new Set(parseClaimed(row.claimed));
+    return DAILIES.filter((q) => Number(row[q.field] || 0) >= q.need && !claimed.has(q.key)).length;
+}
+
 // ── Salvage an unequipped owned item into parts ──
 export async function salvageItem(buyerId, itemId) {
     const item = itemById(itemId);

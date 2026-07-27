@@ -171,6 +171,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [detailItem, setDetailItem] = useState(null); // inventory item detail sheet (inspect → equip / sell)
     const [setDetail, setSetDetail] = useState(null); // the full set breakdown modal (from a set card or an item's set link)
     const [sellArmed, setSellArmed] = useState(false); // two-tap sell confirm inside the sheet (no native popup)
+    const [salvageArmed, setSalvageArmed] = useState(false); // two-tap salvage confirm (sends the piece to the Forge for parts)
+    const [salvaged, setSalvaged] = useState(null); // brief "salvaged into N parts" toast
     const [coinBurst, setCoinBurst] = useState(null); // coin-shower juice on a sale
     const burstKey = useRef(0);
     const [chargeClaim, setChargeClaim] = useState(null); // { token, qr, rewardLabel, itemName } — QR to show staff
@@ -234,10 +236,27 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     }
 
     function openDetail(item) {
-        setSellArmed(false); setDetailItem(item);
+        setSellArmed(false); setSalvageArmed(false); setDetailItem(item);
         trackClient("inspect_item", { itemId: item.id, name: item.name, shop: Boolean(item.shop) });
     }
-    function closeDetail() { setDetailItem(null); setSellArmed(false); }
+    function closeDetail() { setDetailItem(null); setSellArmed(false); setSalvageArmed(false); }
+
+    // Salvage an unequipped piece at the Forge → tiered parts (the item is consumed). Refresh the bag after.
+    async function doSalvage(item) {
+        if (!item || item.equipped || item.shop) return;
+        setBusy(true); setErr("");
+        try {
+            const r = await fetch("/api/marketplace/crafting", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: item.id, action: "salvage" }) });
+            const d = await r.json().catch(() => null);
+            if (!r.ok || !d?.ok) { setErr(d?.error === "equipped" ? "Unequip it first." : "Couldn't salvage that."); return; }
+            closeDetail();
+            await load();
+            const g = d.gained;
+            setSalvaged(g ? `Salvaged into ${g.n} tier-${g.tier} part${g.n === 1 ? "" : "s"}${d.doubled ? " (doubled!)" : ""}` : "Salvaged into parts");
+            setTimeout(() => setSalvaged(null), 3000);
+            if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
+        } finally { setBusy(false); }
+    }
 
     // A quick, bright "coin" chime via Web Audio (no asset, CSP-safe). Best-effort — silent if blocked.
     function playCoinSound() {
@@ -593,7 +612,14 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 sellArmed ? (
                                     <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>
                                 ) : (
-                                    <button type="button" className="pill" onClick={() => setSellArmed(true)} disabled={busy}>🪙 Sell for {detailItem.sellValue}</button>
+                                    <button type="button" className="pill" onClick={() => { setSellArmed(true); setSalvageArmed(false); }} disabled={busy}>🪙 Sell for {detailItem.sellValue}</button>
+                                )
+                            ) : null}
+                            {!detailItem.shop && !detailItem.equipped ? (
+                                salvageArmed ? (
+                                    <button type="button" className="button" onClick={() => doSalvage(detailItem)} disabled={busy} style={{ borderColor: "rgba(255,154,60,0.6)", color: "#ffb877" }}>🔨 Confirm — salvage for parts</button>
+                                ) : (
+                                    <button type="button" className="pill" onClick={() => { setSalvageArmed(true); setSellArmed(false); }} disabled={busy} title="Break it down at the Forge into crafting parts">🔨 Salvage</button>
                                 )
                             ) : null}
                             <button type="button" className="pill" onClick={closeDetail} style={{ marginLeft: "auto" }}>Close</button>
@@ -625,6 +651,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             ), document.body) : null}
 
             {err ? <p style={{ color: "#ff6b6b" }}>{err}</p> : null}
+            {salvaged ? createPortal((
+                <div style={{ position: "fixed", left: "50%", bottom: 84, transform: "translateX(-50%)", zIndex: 10070, padding: "10px 16px", borderRadius: 12, background: "linear-gradient(180deg,#2a180c,#160c06)", border: "1px solid rgba(255,154,60,0.5)", color: "#ffcf9a", fontWeight: 800, fontSize: 13, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>🔨 {salvaged}</div>
+            ), document.body) : null}
         </div>
     );
 }
