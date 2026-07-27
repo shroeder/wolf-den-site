@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSpinState, doSpin, buySpinToken } from "@/lib/marketplace/spin.js";
+import { getSpinState, doSpin, buySpinToken, resetSpin } from "@/lib/marketplace/spin.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -26,7 +26,9 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ error: "not_signed_in" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const res = body?.action === "buy" ? await buySpinToken(buyer.id) : await doSpin(buyer.id);
+            const res = body?.action === "buy" ? await buySpinToken(buyer.id)
+                : body?.action === "reset" ? await resetSpin(buyer.id)
+                    : await doSpin(buyer.id);
             return NextResponse.json(res, { status: res.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.spin.action.failure" });

@@ -13,6 +13,7 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. A pity counter guarantees a rare prize every PITY spins. Gold
@@ -156,6 +157,7 @@ export async function getSpinState(buyerId) {
         charge: Math.min(PITY, row?.pity || 0),
         chargeMax: PITY,
         golden: (row?.pity || 0) >= PITY - 1,
+        isOwner: isOwner(buyerId), // owner-only free-reset button (debugging)
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
             return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
@@ -192,6 +194,14 @@ export async function doSpin(buyerId) {
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
     const prizeOut = { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal"), jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare), respin: Boolean(prize.kind === "respin"), golden: forceRare };
     return { ok: true, prizeIndex: idx, prize: prizeOut, ...(await getSpinState(buyerId)) };
+}
+
+// OWNER-ONLY debug helper: refill the free daily spin (and clear the pity charge) so you can spin freely
+// while testing the wheel. No-op for anyone who isn't the owner. Remove this button before the wheel is done.
+export async function resetSpin(buyerId) {
+    if (!buyerId || !isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    await db.query(`UPDATE mkt_buyer SET free_spin_day = NULL, spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {});
+    return { ok: true, ...(await getSpinState(buyerId)) };
 }
 
 // The gold cost of the NEXT extra spin today: 1000 for the first, +1000 each additional, reset at the

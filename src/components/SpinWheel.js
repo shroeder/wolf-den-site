@@ -114,6 +114,14 @@ export default function SpinWheel() {
         else { setMsg(d?.error === "not_enough_gold" ? "Not enough coins for a spin." : "Couldn't buy a spin."); setLowCoins(d?.error === "not_enough_gold"); }
     }, [spinning]);
 
+    // Owner-only debug reset: refill the free spin so you can keep testing.
+    const reset = useCallback(async () => {
+        if (spinning) return;
+        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reset" }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        if (d?.ok) { setSt(d); setMsg(null); if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); }
+    }, [spinning]);
+
     if (!st) return <section className="card"><p className="muted" style={{ margin: 0 }}>Loading…</p></section>;
     if (!st.signedIn) return <section className="card"><p className="muted" style={{ margin: 0 }}>Sign in to spin the daily wheel.</p></section>;
 
@@ -163,6 +171,8 @@ export default function SpinWheel() {
                 <button type="button" className={`cw-go${st.golden ? " is-golden" : ""}`} onClick={spin} disabled={spinning || !st.canSpin} style={{ opacity: spinning || !st.canSpin ? 0.6 : 1 }}>{spinLabel}</button>
                 {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
+
+            {st.isOwner ? <button type="button" className="cw-reset" onClick={reset} disabled={spinning}>🛠️ Free reset (owner · debug)</button> : null}
 
             <details className="cw-legend">
                 <summary>🎁 What&apos;s on the wheel <span>{prizes.length} prizes</span></summary>
@@ -242,6 +252,8 @@ const CW_CSS = `
 @keyframes cwPulse { 0%,100% { box-shadow: 0 3px 0 #b47a12, 0 0 18px rgba(255,206,90,0.6); } 50% { box-shadow: 0 3px 0 #b47a12, 0 0 30px rgba(255,206,90,0.95); } }
 .cw-buy { flex: none; padding: 13px 16px; border-radius: 13px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #e6ebf2; font-weight: 800; font-size: 0.9rem; cursor: pointer; }
 .cw-buy:disabled { opacity: 0.5; cursor: default; }
+.cw-reset { width: 100%; margin-top: 8px; padding: 8px; border-radius: 10px; border: 1px dashed rgba(255,120,120,0.4); background: rgba(255,80,80,0.06); color: #ff9a9a; font-weight: 800; font-size: 0.8rem; cursor: pointer; }
+.cw-reset:disabled { opacity: 0.5; cursor: default; }
 
 .cw-legend { margin: 14px 0 0; }
 .cw-legend > summary { cursor: pointer; font-weight: 800; font-size: 0.9rem; list-style: none; display: flex; align-items: center; gap: 8px; }
