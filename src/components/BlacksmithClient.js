@@ -957,7 +957,9 @@ const FORGE_CSS = `
 @keyframes forgeTallyPop { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
 /* ── locked enhance card (can't afford the parts) ── */
 .forge-card.is-locked { opacity: 0.82; }
-.forge-card.is-locked .forge-art { filter: grayscale(0.5) brightness(0.85); }
+/* Locked cards dim the item but KEEP its rarity glow (re-declare the drop-shadows — filter overrides, not
+   appends — so epic/purple pieces still glow when they're locked, just like the affordable rare ones). */
+.forge-card.is-locked .forge-art { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 12px color-mix(in srgb, var(--rc) 48%, transparent)) grayscale(0.4) brightness(0.88); }
 .forge-card-cost.is-short { color: #ff8f9a; font-weight: 800; }
 .forge-card-locktag { margin-left: 3px; }
 /* ⚠️ TEST-ONLY dev panel — remove before launch */
