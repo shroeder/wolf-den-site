@@ -30,6 +30,12 @@ const ACHIEVEMENT_PET_RULES = {
     // Now a hard, distinct feat: an elite relic PLUS proven boss dominance (raffle wins).
     molten_phoenix: (m) => (m.eliteItems || 0) >= 1 && (m.bossesWon || 0) >= 3, // Ascendant relic + 3 boss wins
     eternal_wolf: (m) => (m.eternalItems || 0) >= 1 && (m.bossesWon || 0) >= 5, // Eternal relic + 5 boss wins
+    // FORGE pets — earned by using The Forge (metrics from getMemberMetrics: mkt_craft_event + mkt_item_enhance).
+    ember_whelp: (m) => (m.forgeSalvages || 0) >= 10,      // salvage 10 items
+    cinder_hound: (m) => (m.forgeEnhances || 0) >= 10,     // enhance gear 10 times
+    anvil_golem: (m) => (m.forgeCombines || 0) >= 8,       // combine parts 8 times
+    molten_salamander: (m) => (m.maxForgeLevel || 0) >= 8, // enhance a piece to +8
+    forgeheart_wyrm: (m) => (m.maxForgeLevel || 0) >= 15,  // enhance a piece to +15 (Master rank)
 };
 
 // Grant any achievement pets the member has newly qualified for. Best-effort; returns newly-granted ids.

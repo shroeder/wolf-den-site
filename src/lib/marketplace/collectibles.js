@@ -15,6 +15,8 @@ import {
     GiAnglerFish, GiSeaDragon, GiFishMonster,
     // Farm/pastoral pets
     GiPig, GiRooster, GiScarecrow, GiMouse, GiGoose,
+    // Forge pets
+    GiSmallFire, GiHound, GiRockGolem, GiSalamander, GiFireBreath,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -40,6 +42,8 @@ export const PET_PASSIVE_STAT = {
     // Achievement
     ladybug: "seedLuck", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
     flamingo: "xp_gain", toucan: "gold_find",
+    // Forge (earned by using The Forge) — all combat passives, fitting their smithing/battle theme.
+    ember_whelp: "crit_chance", cinder_hound: "ferocity", anvil_golem: "might", molten_salamander: "crit_power", forgeheart_wyrm: "might",
     // Chest
     tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
     corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
@@ -133,6 +137,13 @@ export const COLLECTIBLES = [
     { id: "spirit_fox", name: "Spirit Fox", Icon: GiSpectre, color: "#8fd3ff", rarity: "legendary", source: "achievement", activeStat: "xp_gain", achievement: "Gain 20 total pet levels", spritePrompt: "a glowing ethereal nine-tailed spirit fox wreathed in soft blue flame" },
     { id: "runebound_drake", name: "Runebound Drake", Icon: GiDragonHead, color: "#7a9bff", rarity: "mythic", source: "achievement", activeStat: "ferocity", achievement: "Max 25 pets to Lv 5", spritePrompt: "a majestic rune-etched drake crackling with arcane blue energy" },
     { id: "radiant_phoenix", name: "Radiant Phoenix", Icon: GiDragonSpiral, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "ferocity", achievement: "Max a Legendary-or-higher pet to Lv 5", spritePrompt: "a radiant golden phoenix reborn in brilliant blazing light" },
+    // ── FORGE pets — earned by using The Forge (salvage / enhance / combine). Combat companions born of the
+    // smithy; unlock rules in ACHIEVEMENT_PET_RULES (pets.js), signature perks in pet-perks.js. ──
+    { id: "ember_whelp", name: "Ember Whelp", Icon: GiSmallFire, color: "#ff8a3c", rarity: "rare", source: "achievement", activeStat: "crit_chance", achievement: "Salvage 10 items at the Forge", spritePrompt: "a tiny mischievous ember whelp, a baby fire-lizard made of glowing coals and dancing orange flame, wisps of smoke curling off its back" },
+    { id: "cinder_hound", name: "Cinder Hound", Icon: GiHound, color: "#e0632c", rarity: "rare", source: "achievement", activeStat: "ferocity", achievement: "Enhance gear 10 times at the Forge", spritePrompt: "a fierce hound wreathed in cinders and smoke, glowing ember cracks along its body and molten paws, eyes like hot coals" },
+    { id: "anvil_golem", name: "Anvil Golem", Icon: GiRockGolem, color: "#9aa0a6", rarity: "epic", source: "achievement", activeStat: "might", achievement: "Combine forge parts 8 times", spritePrompt: "a stout sturdy golem forged from a blacksmith's anvil and iron blocks, glowing molten seams between its plates, one arm ending in a great hammer" },
+    { id: "molten_salamander", name: "Molten Salamander", Icon: GiSalamander, color: "#ff6a2c", rarity: "epic", source: "achievement", activeStat: "crit_power", achievement: "Enhance a piece to +8 at the Forge", spritePrompt: "a sleek salamander with cracked obsidian skin glowing with rivers of lava, dripping molten magma and trailing fire as it moves" },
+    { id: "forgeheart_wyrm", name: "Forgeheart Wyrm", Icon: GiFireBreath, color: "#ffb020", rarity: "legendary", source: "achievement", activeStat: "might", achievement: "Enhance a piece to a Master rank (+15)", spritePrompt: "a majestic wyrm plated in rune-etched forged steel with a blazing molten forge-heart glowing through its chest, wings of hammered gold-orange metal, radiating heat" },
 
     // ── Rare-chest drops ───────────────────────────────────────────────────────────────────────────
     { id: "tropical_fish", name: "Reef Fish", Icon: GiTropicalFish, color: "#5ad0d0", rarity: "common", source: "chest", chestTier: "wooden", activeStat: "fortune", hint: "A flash of color", spritePrompt: "a bright tropical reef fish" },

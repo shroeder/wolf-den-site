@@ -137,6 +137,17 @@ export async function getMemberMetrics(buyerId) {
         [buyerId]
     ).catch(() => null);
 
+    // Forge (crafting) counts — drive the forge-themed achievement pets. Enhances/salvages/combines from the
+    // craft-event log, plus the highest enhancement level reached on any owned piece (0..MAX_FORGE_LEVEL=21).
+    const forgeRow = await db.queryOne(
+        `SELECT COUNT(*) FILTER (WHERE action = 'enhance')::int AS enhances,
+                COUNT(*) FILTER (WHERE action = 'salvage')::int AS salvages,
+                COUNT(*) FILTER (WHERE action = 'combine')::int AS combines
+           FROM mkt_craft_event WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
+    const forgeLevelRow = await db.queryOne(`SELECT COALESCE(MAX(level), 0)::int AS n FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+
     // Farm ratings RECEIVED (Well-Liked / Adored), custom creations FINALIZED (First Creation / Artisan /
     // Gallery), and converted referrals (Recruiter / Pack Builder / Pack Leader) — one cheap count each.
     const [ratingRow, creationRow, referralRow] = await Promise.all([
@@ -225,6 +236,10 @@ export async function getMemberMetrics(buyerId) {
         cheersGiven: Number(buyer?.cheers_given || 0),
         cheersReceived: Number(buyer?.cheers_received || 0),
         creditPurchased: Math.round(Number(creditRow?.c || 0) / 100), // lifetime $ of store credit bought
+        forgeEnhances: forgeRow?.enhances || 0,
+        forgeSalvages: forgeRow?.salvages || 0,
+        forgeCombines: forgeRow?.combines || 0,
+        maxForgeLevel: forgeLevelRow?.n || 0,
     };
 }
 

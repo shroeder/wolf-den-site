@@ -64,6 +64,10 @@ export const PET_PERKS = {
     ladybug: { name: "Lucky Spots", key: "fortune" }, bee: { name: "Sting Rush", key: "crit_chance" }, sloth: { name: "Dead Weight", key: "execute" },
     beaver: { name: "Hard Worker", key: "might" }, raccoon: { name: "Bandit Ambush", key: "first_hit" }, flamingo: { name: "Pink Rush", key: "first_hit" },
     toucan: { name: "Bright Beak", key: "crit_power" },
+    // Forge (earned at The Forge)
+    ember_whelp: { name: "Ember Spark", key: "first_hit" }, cinder_hound: { name: "Cinder Rush", key: "chain_strike" },
+    anvil_golem: { name: "Hammerfall", key: "execute" }, molten_salamander: { name: "Magma Burst", key: "erupt" },
+    forgeheart_wyrm: { name: "Forgefire", key: "onslaught" },
     // Chest
     tropical_fish: { name: "Reef Flare", key: "erupt" }, axolotl: { name: "Regen Surge", key: "chain_strike" }, butterfly: { name: "Flutter Flurry", key: "chain_strike" },
     squid: { name: "Ink Ambush", key: "crit_chance" }, jellyfish: { name: "Sting Surge", key: "erupt" }, octopus: { name: "Eight Arms", key: "extra_strike" },
