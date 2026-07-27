@@ -5,7 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { addChests } from "@/lib/marketplace/chests.js";
@@ -431,6 +431,12 @@ export async function buyUpgrade(buyerId, key) {
     if (!paid) return { ok: false, error: "insufficient" };
     await db.query(`UPDATE mkt_buyer SET farm_upgrades = jsonb_set(COALESCE(farm_upgrades,'{}'::jsonb), $2, to_jsonb($3::int), true) WHERE id = $1`, [buyerId, `{${key}}`, level + 1]).catch(() => {});
     await logCoin(buyerId, -cost, "farm_upgrade", { balanceAfter: paid.gold, meta: { key, level: level + 1 } }).catch(() => {});
+    // Mastery badges: maxing THIS upgrade earns Cultivator; maxing every farm upgrade earns Steward.
+    if (level + 1 >= FARM_UPGRADES[key].max) {
+        await grantEventBadge(buyerId, "farm_cultivator").catch(() => {});
+        const allMaxed = Object.keys(FARM_UPGRADES).every((k) => (k === key ? level + 1 : lvl(up, k)) >= FARM_UPGRADES[k].max);
+        if (allMaxed) await grantEventBadge(buyerId, "farm_steward").catch(() => {});
+    }
     return { ok: true, garden: await getGarden(buyerId) };
 }
 

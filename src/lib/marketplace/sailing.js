@@ -1733,6 +1733,12 @@ async function buyUpgrade(buyerId, kind) {
     const tier = boatTier(lv);
     if (tier >= 10) await grantEventBadge(buyerId, "sail_leviathan").catch(() => {});
     if (tier >= 11) await grantEventBadge(buyerId, "sail_admiral").catch(() => {});
+    // Mastery badges: maxing THIS track earns Shipwright; maxing every boat + dig track earns Sovereign.
+    if (cur + 1 >= UPGRADE_MAX[kind]) {
+        await grantEventBadge(buyerId, "sail_shipwright").catch(() => {});
+        const allMaxed = Object.entries(UPGRADE_COLS).every(([k, c]) => ((row?.[c] || 0) + (c === col ? 1 : 0)) >= UPGRADE_MAX[k]);
+        if (allMaxed) await grantEventBadge(buyerId, "sail_sovereign").catch(() => {});
+    }
     return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
 }
 export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");

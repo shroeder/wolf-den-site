@@ -87,6 +87,12 @@ export async function buyForgeUpgrade(buyerId, key) {
     await logCoin(buyerId, -cost, "forge_upgrade", { balanceAfter: paid.gold, meta: { key, level: cur + 1 } }).catch(() => {});
     await db.query(`INSERT INTO mkt_forge_upgrade (buyer_id, key, level) VALUES ($1,$2,1) ON CONFLICT (buyer_id, key) DO UPDATE SET level = mkt_forge_upgrade.level + 1`, [buyerId, key]).catch(() => {});
     await logCraft(buyerId, "upgrade", { meta: { key, level: cur + 1 } });
+    // Mastery badges: maxing THIS perk earns Artisan; maxing every perk earns Grandmaster.
+    if (cur + 1 >= u.max) {
+        grantEventBadge(buyerId, "forge_artisan").catch(() => {});
+        const after = await upgradeLevels(buyerId);
+        if (Object.keys(FORGE_UPGRADES).every((k) => (after[k] || 0) >= FORGE_UPGRADES[k].max)) grantEventBadge(buyerId, "forge_grandmaster").catch(() => {});
+    }
     return { ok: true, key, level: cur + 1, ...(await getForgeState(buyerId)) };
 }
 
