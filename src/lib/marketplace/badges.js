@@ -230,7 +230,7 @@ export async function getMemberMetrics(buyerId) {
 
 // Earning a badge grants a little XP + gold, so every unlock feels rewarding (not just cosmetic).
 const BADGE_REWARD_XP = 120;
-const BADGE_REWARD_GOLD = 250;
+const BADGE_REWARD_GOLD = 120;
 async function rewardBadgeEarned(buyerId, slug) {
     // dedupeKey keys off the slug so re-syncs never double-pay, even though the INSERT is idempotent.
     await awardXp(buyerId, "badge_earned", { points: BADGE_REWARD_XP, dedupeKey: `badge_reward:${slug}` }).catch(() => {});

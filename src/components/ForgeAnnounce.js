@@ -86,7 +86,7 @@ export default function ForgeAnnounce() {
 
                     <a href="/marketplace/blacksmith" className="fga-cta" onClick={dismiss}>
                         <span className="fga-cta-sheen" aria-hidden="true" />
-                        Enter the Forge →
+                        <span className="fga-cta-label">Enter the Forge →</span>
                     </a>
                     <button type="button" className="fga-later" onClick={dismiss}>Maybe later</button>
                 </div>
@@ -149,8 +149,10 @@ const FGA_CSS = `
     transition: transform .12s ease, box-shadow .12s ease; }
 .fga-cta:hover { transform: translateY(-1px); box-shadow: 0 5px 0 #b06a12, 0 10px 26px rgba(255,140,30,0.5); }
 .fga-cta:active { transform: translateY(2px); box-shadow: 0 2px 0 #b06a12, 0 5px 14px rgba(255,140,30,0.4); }
-.fga-cta-sheen { position: absolute; top: 0; left: 0; width: 40%; height: 100%; transform: skewX(-20deg);
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent); animation: fgaSheen 2.6s ease-in-out infinite; }
+/* Label sits ABOVE the sheen so the sweep never washes out the (dark) text. */
+.fga-cta-label { position: relative; z-index: 1; color: #2a1000; text-shadow: 0 1px 0 rgba(255,255,255,0.25); }
+.fga-cta-sheen { position: absolute; top: 0; left: 0; z-index: 0; width: 40%; height: 100%; transform: skewX(-20deg);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: fgaSheen 2.6s ease-in-out infinite; }
 @keyframes fgaSheen { 0% { left: -50% } 55%,100% { left: 130% } }
 .fga-later { margin-top: 9px; background: none; border: none; color: #a08b70; font-size: 0.82rem; font-weight: 700; cursor: pointer; padding: 6px; }
 .fga-later:hover { color: #cbb79a; }

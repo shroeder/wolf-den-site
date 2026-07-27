@@ -12,17 +12,21 @@ import useScrollLock from "@/lib/useScrollLock";
 
 const WEDGES = 20;
 const WEDGE_DEG = 360 / WEDGES;
-const WEDGE_OFFSET = 9;      // icon ring rotation start (disc is a decorative backdrop; icons form the ring)
+const WEDGE_OFFSET = 0;      // icon ring phase: disc dividers sit at 9°,27°… so wedge CENTERS are at 0°,18°… (measured from the art). Icons were landing on the divider lines at offset 9.
 const ICON_R = 34;          // icon-ring radius, % of the rotor from center (fits inside the frame's hole)
 const SPIN_MS = 5600;
 
 const MINI_WEDGES = 8;
 const MINI_DEG = 360 / MINI_WEDGES;
-const MINI_OFFSET = 22.5;
+const MINI_OFFSET = 18;      // mini disc wedge centers measured at ≈17.8° from the art (was 22.5, sitting off-center)
 const MINI_ICON_R = 33;
 
 // Human tier names for the prize-inspect card.
 const TIER_LABEL = { normal: "Common", rare: "Rare", bonus: "Bonus round", mini: "Mini Jackpot", jackpot: "Grand Jackpot" };
+
+// Gear rarity colors (match the inventory) — drives the juiced match-3 win reveal.
+const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
+const rarCol = (r) => RARITY_COLOR[r] || "#4aa3ff";
 
 // ── tiny Web-Audio kit (no assets, CSP-safe) ──
 let _ac = null;
@@ -389,11 +393,21 @@ export default function SpinWheel() {
                         </div>
 
                         {bonus.done ? (
-                            <div className="cw-bonus-win">
+                            <div className="cw-bonus-win" style={{ "--rar": rarCol(bonus.won.rarity) }}>
+                                <div className="cw-bonus-win-rays" aria-hidden="true" />
+                                <div className="cw-bonus-win-confetti" aria-hidden="true">
+                                    {Array.from({ length: 40 }).map((_, i) => (
+                                        <span key={i} style={{ left: `${(i * 97) % 100}%`, animationDelay: `${(i % 10) * 0.05}s`, background: ["#ffd75e", "#ff7ad0", "#5ce0c0", "#8fd8ff", "#ff9f1c", rarCol(bonus.won.rarity)][i % 6] }} />
+                                    ))}
+                                </div>
                                 <div className="cw-bonus-win-burst" aria-hidden="true" />
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={bonus.won.sprite} alt="" className="cw-bonus-win-img" />
+                                <div className="cw-bonus-win-frame">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={bonus.won.sprite} alt="" className="cw-bonus-win-img" />
+                                </div>
+                                <div className="cw-bonus-win-rar">{(bonus.won.rarity || "rare").toUpperCase()}{bonus.won.slot ? ` · ${bonus.won.slot.replace("_", " ")}` : ""}</div>
                                 <div className="cw-bonus-win-txt">You won <b>{bonus.won.name}</b>!</div>
+                                {bonus.won.stats ? <div className="cw-bonus-win-stats">{bonus.won.stats}</div> : null}
                                 <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect gear</button>
                             </div>
                         ) : (
@@ -578,10 +592,26 @@ const CW_CSS = `
 .cw-btile.is-win .cw-btile-front { border-color: #ffd75e; box-shadow: 0 0 22px rgba(255,215,94,0.9); animation: cwWinPulse 1s ease-in-out infinite; }
 .cw-btile.is-dim { opacity: 0.5; }
 @keyframes cwWinPulse { 0%,100% { box-shadow: 0 0 16px rgba(255,215,94,0.7); } 50% { box-shadow: 0 0 30px rgba(255,215,94,1); } }
-.cw-bonus-win { position: relative; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: cwPop .4s cubic-bezier(.2,1.4,.35,1) both; }
-.cw-bonus-win-burst { position: absolute; top: -10px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(255,215,94,0.45), transparent 62%); filter: blur(4px); animation: cwHalo 1.6s ease-in-out infinite; }
-.cw-bonus-win-img { position: relative; width: 96px; height: 96px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6)); animation: cwSpin .6s ease both; }
-.cw-bonus-win-txt { position: relative; font-size: 1.15rem; color: #ecd6bc; } .cw-bonus-win-txt b { color: #fff; }
+.cw-bonus-win { position: relative; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; animation: cwPop .4s cubic-bezier(.2,1.4,.35,1) both; --rar: #4aa3ff; }
+/* rotating rarity-colored ray burst behind the prize */
+.cw-bonus-win-rays { position: absolute; top: -34px; width: 260px; height: 260px; border-radius: 50%; pointer-events: none;
+    background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rar) 55%, transparent) 0deg 8deg, transparent 8deg 20deg);
+    -webkit-mask: radial-gradient(circle, transparent 34px, #000 40px, transparent 122px); mask: radial-gradient(circle, transparent 34px, #000 40px, transparent 122px);
+    opacity: 0.55; animation: cwRays 9s linear infinite; }
+@keyframes cwRays { to { transform: rotate(360deg); } }
+.cw-bonus-win-burst { position: absolute; top: -18px; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--rar) 55%, transparent), transparent 62%); filter: blur(5px); animation: cwHalo 1.6s ease-in-out infinite; }
+.cw-bonus-win-confetti { position: absolute; top: -30px; left: 50%; width: 300px; height: 220px; transform: translateX(-50%); overflow: hidden; pointer-events: none; }
+.cw-bonus-win-confetti span { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: cwBonusConfetti 1.5s ease-in forwards; }
+@keyframes cwBonusConfetti { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(230px) rotate(540deg); opacity: 0; } }
+.cw-bonus-win-frame { position: relative; width: 116px; height: 116px; display: grid; place-items: center; border-radius: 22px; margin-bottom: 2px;
+    background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--rar) 32%, transparent), rgba(10,6,20,0.65));
+    border: 2px solid var(--rar); box-shadow: 0 0 26px color-mix(in srgb, var(--rar) 75%, transparent), inset 0 0 18px color-mix(in srgb, var(--rar) 30%, transparent); animation: cwFramePulse 1.3s ease-in-out infinite; }
+@keyframes cwFramePulse { 0%,100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.045); filter: brightness(1.12); } }
+.cw-bonus-win-img { position: relative; width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6)); animation: cwSpin .6s ease both, cwBob 2.4s ease-in-out .6s infinite; }
+@keyframes cwBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.cw-bonus-win-rar { position: relative; font-size: 0.8rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: var(--rar); text-shadow: 0 0 12px color-mix(in srgb, var(--rar) 70%, transparent); }
+.cw-bonus-win-txt { position: relative; font-size: 1.2rem; color: #ecd6bc; } .cw-bonus-win-txt b { color: #fff; }
+.cw-bonus-win-stats { position: relative; font-size: 0.9rem; font-weight: 800; color: #d7e9ff; background: rgba(255,255,255,0.06); border: 1px solid color-mix(in srgb, var(--rar) 45%, transparent); border-radius: 999px; padding: 4px 12px; }
 .cw-bonus-hint { margin-top: 10px; font-size: 11px; color: #9a8fc0; }
 
 .cw-celebrate { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; background: rgba(6,4,10,0.72); backdrop-filter: blur(3px); }
