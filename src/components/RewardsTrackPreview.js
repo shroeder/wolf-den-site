@@ -1,12 +1,14 @@
 import Link from "next/link";
 
+import BadgeArt from "@/components/BadgeArt";
+
 // A compact, always-visible teaser of the next things a member will unlock on the rewards track — the
 // engagement carrot. Shows the next few unreached level milestones with what unlocks there + the XP to
 // the very next one, and a prominent CTA into the full track. Presentational (data from getRewardsTrack).
 function levelItems(node) {
     const items = [];
     if (node.rank) items.push({ key: "rank", icon: node.rank.emoji, label: node.rank.title, rank: true });
-    (node.badges || []).forEach((b) => items.push({ key: `b-${b.slug}`, icon: b.icon, label: b.label }));
+    (node.badges || []).forEach((b) => items.push({ key: `b-${b.slug}`, slug: b.slug, icon: b.icon, label: b.label }));
     (node.perks || []).forEach((p, i) => items.push({ key: `p-${i}`, icon: p.icon, label: p.label }));
     return items;
 }
@@ -38,7 +40,7 @@ export default function RewardsTrackPreview({ track, heading = "🎁 Up next to 
                                 {shown.length ? (
                                     shown.map((it) => (
                                         <span key={it.key} className={`track-chip${it.rank ? " is-rank" : ""}`}>
-                                            <span aria-hidden="true">{it.icon}</span> {it.label}
+                                            <span aria-hidden="true">{it.slug ? <BadgeArt slug={it.slug} icon={it.icon} /> : it.icon}</span> {it.label}
                                         </span>
                                     ))
                                 ) : (

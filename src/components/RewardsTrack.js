@@ -39,7 +39,7 @@ export default function RewardsTrack({ track }) {
                                     ) : null}
                                     {n.badges.map((b) => (
                                         <span key={b.slug} className="track-unlock is-badge" style={{ borderColor: b.color || undefined }}>
-                                            {b.held ? "✅" : b.icon} {b.label}
+                                            {b.held ? "✅" : <BadgeArt slug={b.slug} icon={b.icon} />} {b.label}
                                         </span>
                                     ))}
                                     {n.perks.map((p, i) => (

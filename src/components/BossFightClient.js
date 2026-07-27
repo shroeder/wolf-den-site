@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
+import BadgeArt from "@/components/BadgeArt";
 import BossBattleScene, { AURA_COL, BORDER_COL } from "@/components/BossBattleScene";
 import BossFinalBlow from "@/components/BossFinalBlow";
 import ItemArt from "@/components/ItemArt";
@@ -235,7 +236,7 @@ export default function BossFightClient() {
                             {cheerToast.fragment ? " · 🧩 fragment!" : ""}
                         </div>
                         {cheerToast.badges?.length ? cheerToast.badges.map((b) => (
-                            <div key={b.slug} className="cheer-toast-badge">🏅 {b.icon} {b.label} unlocked!</div>
+                            <div key={b.slug} className="cheer-toast-badge"><BadgeArt slug={b.slug} icon={b.icon} /> {b.label} unlocked!</div>
                         )) : null}
                     </div>
                 ) : null}
@@ -380,7 +381,7 @@ export default function BossFightClient() {
                                 <>
                                     <div className="herochip-av">
                                         <AvatarStack avatarUrl={f.avatarUrl} border={f.border || "none"} cosmetics={f.avatarCosmetics} size={48} initial={(f.name || "?").slice(0, 1).toUpperCase()} />
-                                        {f.badge ? <span className="herochip-badge" title={f.badge.label}>{f.badge.icon}</span> : null}
+                                        {f.badge ? <span className="herochip-badge" title={f.badge.label}><BadgeArt slug={f.badge.slug} icon={f.badge.icon} /></span> : null}
                                         {f.dmgRank ? <span className={`herochip-rank rank-${f.dmgRank}`} title={`#${f.dmgRank} damage dealer`} aria-label={`Number ${f.dmgRank} damage`}>{["🥇", "🥈", "🥉"][f.dmgRank - 1]}</span> : null}
                                     </div>
                                     <span className="herochip-name">{f.name}{f.you ? " (you)" : ""}</span>

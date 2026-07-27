@@ -362,14 +362,14 @@ export async function getBossState(buyerId = null) {
     if (contribIds.length) {
         const brows = await db
             .query(
-                `SELECT DISTINCT ON (ub.buyer_id) ub.buyer_id, b.icon, b.label
+                `SELECT DISTINCT ON (ub.buyer_id) ub.buyer_id, b.slug, b.icon, b.label
                    FROM mkt_user_badge ub JOIN mkt_badge b ON b.slug = ub.badge_slug
                   WHERE ub.buyer_id = ANY($1)
                   ORDER BY ub.buyer_id, b.sort_order ASC, b.label ASC`,
                 [contribIds]
             )
             .catch(() => []);
-        badgeByBuyer = new Map(brows.map((r) => [r.buyer_id, { icon: r.icon || "🏅", label: r.label }]));
+        badgeByBuyer = new Map(brows.map((r) => [r.buyer_id, { slug: r.slug, icon: r.icon || "🏅", label: r.label }]));
     }
 
     // Whole-pack fighters for the scene — EVERY registered member, attackers ranked first. Intentionally
