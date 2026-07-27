@@ -602,7 +602,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // ── Three farm views: 🌾 Garden (plant/harvest), 🏡 Outside (pasture + your custom bg), 🛖 Inside (barn).
     // Pets auto-split by index parity (even → Outside, odd → Inside); crops live in the Garden; a decoration
-    // belongs to Outside OR Inside; each view shows a single cover backdrop. (`view` state declared earlier.) ──
+    // belongs to Outside OR Inside; each view's single backdrop scrolls sideways. (`view` state declared earlier.) ──
     const petView = (i) => (i % 2 === 0 ? "outside" : "inside");
     const viewPetCount = view === "garden" ? 0 : pets.filter((_, i) => petView(i) === view).length;
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
@@ -774,21 +774,23 @@ export default function FarmClient({ initial, viewingAlias }) {
                 ))}
             </div>
 
-            {/* The scene — each view shows its backdrop as a single cover image (no wide scroll). */}
+            {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,
+                so you can scroll sideways to see the WHOLE painting (it's wider than the viewport). */}
             <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
-                            position: "relative", width: "100%", minWidth: "100%", height: sceneHeight,
+                            position: "relative", width: "max-content", minWidth: "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Backdrop — a single image shown as a cover (fills the scene, no wide scroll). */}
+                        {/* Backdrop — the single image at full height (width auto); its natural width sets the field
+                            width, so the scene scrolls sideways to reveal the whole image. */}
                         {bgUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", userSelect: "none", pointerEvents: "none" }} />
+                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
                         ) : null}
                         {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
 
