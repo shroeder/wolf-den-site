@@ -187,13 +187,21 @@ const fieldBackground = (tod, condition) => {
     const g = grassStops(tod);
     return `linear-gradient(180deg, ${s[0]} 0%, ${s[1]} 36%, ${s[2]} 50%, ${g[0]} 60%, ${g[1]} 100%)`;
 };
-// Fixed backdrops per view — TRUE wide panoramas built by OUTPAINTING (each step extends the actual pixels, so
-// it's one continuous ~5376px unique scene with no seams and no repeat), in the game's bold CEL-SHADED art style.
-// `outside` is the default pasture when the member hasn't set a custom background.
+// Illustrated weather/time backdrops for the OUTSIDE pasture (the originals — single images, shown as a cover).
+const FARM_BG = {
+    day: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838066440-671862.png",
+    dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838089019-734565.png",
+    night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838349373-318702.png",
+    dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838132569-798406.png",
+    storm: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838156570-858112.png",
+    snow: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838178566-149863.png",
+};
+const pickFarmBg = (tod, condition) =>
+    (condition === "storm" && FARM_BG.storm) || (condition === "snow" && FARM_BG.snow) || FARM_BG[tod] || FARM_BG.day || null;
+// Fixed straight-on backdrops for Inside (barn) and Garden — single images, shown as a cover (no wide scroll).
 const VIEW_BG = {
-    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/wide-inside-1785113831922.png",
-    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/wide-garden-1785114579571.png",
-    outside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/wide-outside-1785113516328.png",
+    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-flat-1785108049136.png",
+    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-flat-1785108098669.png",
 };
 
 export default function FarmClient({ initial, viewingAlias }) {
@@ -516,7 +524,8 @@ export default function FarmClient({ initial, viewingAlias }) {
         setBgBusy(true);
         const r = await post(body);
         setBgBusy(false);
-        if (r && ("bg" in r || "draft" in r)) setFarm((f) => ({ ...f, customBg: r.bg ?? null, customBgDraft: r.draft ?? null }));
+        // customBg shows only while equipped (r.on); a removed-but-saved bg keeps r.bg but stays hidden.
+        if (r && ("bg" in r || "draft" in r)) setFarm((f) => ({ ...f, customBg: (r.on && r.bg) ? r.bg : null, customBgDraft: r.draft ?? null }));
         return r;
     }, [post]);
     const decoPlaceAt = useCallback((decoId, x, y) => decoAct({ action: "deco_place", decoId, x, y, view }), [decoAct, view]);
@@ -593,18 +602,17 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // ── Three farm views: 🌾 Garden (plant/harvest), 🏡 Outside (pasture + your custom bg), 🛖 Inside (barn).
     // Pets auto-split by index parity (even → Outside, odd → Inside); crops live in the Garden; a decoration
-    // belongs to Outside OR Inside; every view scrolls its own wide panorama. (`view` state declared earlier.) ──
+    // belongs to Outside OR Inside; each view shows a single cover backdrop. (`view` state declared earlier.) ──
     const petView = (i) => (i % 2 === 0 ? "outside" : "inside");
     const viewPetCount = view === "garden" ? 0 : pets.filter((_, i) => petView(i) === view).length;
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
     const visTod = wx.tod;
-    // Backdrop per view: Inside = barn panorama, Garden = soil-bed panorama, Outside = your custom bg (or the live
-    // preview) or the default pasture panorama. Custom backgrounds only apply Outside. Every one of these is a WIDE
-    // feather-blended panorama, so the scene always scrolls sideways across a single UNIQUE image (no tiling).
+    // Backdrop per view (single images, shown as a cover): Inside = barn, Garden = soil beds, Outside = your custom
+    // bg (or the live preview) or the weather/time scene. Custom backgrounds only apply Outside.
     const customBg = view === "outside" ? (farm.customBgDraft || farm.customBg) : null;
     const bgUrl = view === "inside" ? VIEW_BG.inside
         : view === "garden" ? VIEW_BG.garden
-        : (customBg || VIEW_BG.outside);
+        : (customBg || pickFarmBg(visTod, wx.condition));
     const showWeather = view === "outside"; // weather effects only in the open pasture
     const canDecorate = view !== "garden"; // decorate Outside & Inside; the Garden is just for planting
     // Sprite brightness only — NO scene tint/overlay (overlays wash the whole scene out; time-of-day mood must be
@@ -766,22 +774,21 @@ export default function FarmClient({ initial, viewingAlias }) {
                 ))}
             </div>
 
-            {/* The scene — every view scrolls sideways across its own wide unique panorama. */}
+            {/* The scene — each view shows its backdrop as a single cover image (no wide scroll). */}
             <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
-                            position: "relative", width: "max-content", minWidth: "100%", height: sceneHeight,
+                            position: "relative", width: "100%", minWidth: "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Backdrop — ONE wide, unique panorama (no tiling). The in-flow image sets the field's true
-                            width at scene height, so the scene scrolls sideways across the whole unique image. */}
+                        {/* Backdrop — a single image shown as a cover (fills the scene, no wide scroll). */}
                         {bgUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
+                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", userSelect: "none", pointerEvents: "none" }} />
                         ) : null}
                         {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
 
@@ -1452,26 +1459,29 @@ const bgErr = (e) => ({ no_credits: "You need 3 creations to generate a backgrou
 // Custom farm-background generator — a bottom sheet so the scene stays visible for a LIVE preview. Generating
 // charges 3 creations up front (safe: charged before the AI, refunded only on genuine failure); the generated
 // draft shows live on the farm above until you Accept or Discard it.
-function FarmBgCreator({ bg, draft, busy, onAct, onClose }) {
+function FarmBgCreator({ draft, busy, onAct, onClose }) {
     const [desc, setDesc] = useState("");
     const [credits, setCredits] = useState(null);
     const [free, setFree] = useState(false); // owners/admins generate without spending tokens
+    const [saved, setSaved] = useState(false); // a background exists (may be removed but kept)
+    const [on, setOn] = useState(false); // the saved background is currently equipped/shown
     const [err, setErr] = useState(null);
+    const sync = (r) => { if (r?.credits != null) setCredits(r.credits); if (r?.free != null) setFree(Boolean(r.free)); if (r?.saved != null) setSaved(Boolean(r.saved)); if (r?.on != null) setOn(Boolean(r.on)); };
     useEffect(() => {
         let alive = true;
-        onAct({ action: "farm_bg_state" }).then((r) => { if (alive && r?.credits != null) { setCredits(r.credits); setFree(Boolean(r.free)); } });
+        onAct({ action: "farm_bg_state" }).then((r) => { if (alive) sync(r); });
         return () => { alive = false; };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
     const generate = async () => {
         setErr(null);
         const r = await onAct({ action: "farm_bg_start", prompt: desc });
-        if (r?.credits != null) setCredits(r.credits);
-        if (r?.free != null) setFree(Boolean(r.free));
+        sync(r);
         if (!r?.ok) setErr(bgErr(r?.error));
     };
     const accept = async () => { await onAct({ action: "farm_bg_finalize" }); onClose(); };
-    const discard = async () => { const r = await onAct({ action: "farm_bg_discard" }); if (r?.credits != null) setCredits(r.credits); };
-    const removeBg = async () => { await onAct({ action: "farm_bg_clear" }); onClose(); };
+    const discard = async () => { const r = await onAct({ action: "farm_bg_discard" }); sync(r); };
+    const removeBg = async () => { sync(await onAct({ action: "farm_bg_clear" })); }; // UNEQUIP — keeps it saved
+    const reequip = async () => { sync(await onAct({ action: "farm_bg_reequip" })); }; // put the saved one back on
     const low = !free && (credits ?? 0) < 3;
     return (
         <div role="dialog" aria-label="Custom farm background" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10050, background: "linear-gradient(180deg, rgba(30,24,44,0.98), rgba(18,14,28,0.99))", borderTop: "1px solid rgba(201,162,255,0.4)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)", padding: "14px 16px calc(16px + env(safe-area-inset-bottom))", animation: "pigPop .3s ease both" }}>
@@ -1495,7 +1505,8 @@ function FarmBgCreator({ bg, draft, busy, onAct, onClose }) {
                     <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} maxLength={300} placeholder="Describe your dream farm backdrop — e.g. 'a misty mountain valley at golden hour with a winding river'" style={{ width: "100%", resize: "none", borderRadius: 11, border: "1px solid rgba(201,162,255,0.35)", background: "rgba(0,0,0,0.3)", color: "#efe7ff", padding: "9px 11px", fontSize: 13, fontFamily: "inherit" }} />
                     <button type="button" disabled={busy || low || desc.trim().length < 4} onClick={generate} style={{ width: "100%", padding: 12, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy || low || desc.trim().length < 4 ? 0.55 : 1 }}>{busy ? "Painting your world…" : free ? "Generate (owner · free)" : "Generate · 3 creations"}</button>
                     {low ? <a href="/marketplace/creations" style={{ fontSize: 12, fontWeight: 800, color: "#c9a2ff", textAlign: "center" }}>Get more creations →</a> : null}
-                    {bg ? <button type="button" disabled={busy} onClick={removeBg} style={{ fontSize: 12, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer" }}>Remove custom background (back to weather scenes)</button> : null}
+                    {saved && on ? <button type="button" disabled={busy} onClick={removeBg} style={{ fontSize: 12, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer" }}>Remove background (keeps it saved — back to weather scenes)</button> : null}
+                    {saved && !on ? <button type="button" disabled={busy} onClick={reequip} style={{ fontSize: 12.5, fontWeight: 800, color: "#8fe39a", background: "rgba(126,213,126,0.12)", border: "1px solid rgba(126,213,126,0.4)", borderRadius: 9, padding: "8px 10px", cursor: "pointer" }}>✓ Re-equip your saved background</button> : null}
                 </div>
             )}
             {err ? <div style={{ marginTop: 8, fontSize: 12, color: "#ffb3bd", textAlign: "center" }}>{err}</div> : null}

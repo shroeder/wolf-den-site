@@ -5,14 +5,14 @@ import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, reso
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState, setSpriteBrightness } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
-import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, clearFarmBg } from "@/lib/marketplace/farm-bg.js";
+import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, clearFarmBg, reequipFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { useConsumable as openConsumable } from "@/lib/marketplace/consumables.js";
 import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // custom bg outpainting runs several AI generations sequentially
+export const maxDuration = 120; // custom-decoration / farm-bg generation draws AI images
 export const dynamic = "force-dynamic";
 
 // Every signed-in member has a farm. GET ?u=<alias> inspects another member's farm (view-only).
@@ -96,6 +96,7 @@ export async function POST(request) {
             else if (b?.action === "farm_bg_finalize") res = await finalizeFarmBg(buyer.id);
             else if (b?.action === "farm_bg_discard") res = await discardFarmBgDraft(buyer.id);
             else if (b?.action === "farm_bg_clear") res = await clearFarmBg(buyer.id);
+            else if (b?.action === "farm_bg_reequip") res = await reequipFarmBg(buyer.id);
             else return NextResponse.json({ error: "bad_action" }, { status: 400 });
             // Return the whole result either way (so error responses still carry budget/cost/wallet for the UI).
             return NextResponse.json(res, { status: res?.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
