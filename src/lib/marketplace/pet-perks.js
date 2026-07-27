@@ -96,14 +96,14 @@ export function petPerkValue(rarity, key) {
     return PET_ACTIVE_BY_RARITY[rarity] || 3;
 }
 
-function perkDesc(key, v) {
+function perkDesc(key, v, level = 1) {
     switch (key) {
         case "might": return `+${v}% damage — passive auto-damage AND your daily strike`;
         case "crit_chance": return `+${v}% crit chance — passive and your daily strike`;
         case "crit_power": return `+${v}% crit damage — passive and your daily strike`;
         case "ferocity": return `+${v}% PASSIVE auto-damage only (24/7)`;
         case "fortune": return `+${v * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day (banked all week)`;
-        case "extra_strike": return `+${v} manual daily strike${v > 1 ? "s" : ""}`;
+        case "extra_strike": { const c = Math.min(100, 20 + 20 * (Math.max(1, level) - 1)); return `${c}% chance for an extra daily strike${c < 100 ? " — rises to 100% by Lv 5" : " (maxed — every day!)"}`; }
         case "first_hit": return `Your first MANUAL strike each day (your daily boss tap) deals ×${v} damage — passive auto-damage isn't affected`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
         case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
@@ -127,7 +127,7 @@ export function petPerk(pet) {
     const def = PET_PERKS[pet.id] || { name: "Companion", key: pet.activeStat || "fortune" };
     const value = petPerkValue(pet.rarity, def.key);
     const meta = PERK_META[def.key] || { icon: "🐾" };
-    const desc = perkDesc(def.key, value) + (def.note ? `. ${def.note}` : "");
+    const desc = perkDesc(def.key, value, pet.level || 1) + (def.note ? `. ${def.note}` : "");
     return { name: def.name, key: def.key, icon: meta.icon, value, desc, note: def.note || null };
 }
 
@@ -183,7 +183,12 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         else if (def.key === "execute") proc.executePct = cap(v * aMult, 1.2);
         else if (def.key === "onslaught") proc.onslaughtPct = cap(v * aMult, 1.2);
         else if (def.key === "first_blood") proc.firstBloodPct = cap(v * aMult, 1.2);
-        else if (def.key === "extra_strike") add("extra_strike", 1); // a pet's extra daily strike is FLAT +1 — never level-scaled (5 free strikes/day was way too strong)
+        else if (def.key === "extra_strike") {
+            // Extra strike is a CHANCE (rolled once/day), not a flat count — so leveling the pet always feels like
+            // an upgrade: 20% at Lv1 → 100% at Lv5 (an extra strike every day). boss.js does the daily roll.
+            const eqLevel = Math.max(1, Number(levelByPet[equippedPet.id]) || 1);
+            proc.extraStrikeChance = Math.min(1, 0.2 + 0.2 * (eqLevel - 1));
+        }
         else add(def.key, v * aMult);
     }
     return { stats, economy, proc };

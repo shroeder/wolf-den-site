@@ -58,6 +58,19 @@ function dailyStrikeCap({ extraStrike = 0, equippedIds = {}, bonusStrikes = 0 })
     return DAILY_ATTACKS + (extraStrike || 0) + signatureStrikeBonus(equippedIds) + setCapstoneStrikeBonus(equippedIds) + (bonusStrikes || 0);
 }
 
+// The equipped pet's "extra strike" perk is a CHANCE (scales 20%→100% with pet level). Resolve it to 0/1 for
+// TODAY with a DETERMINISTIC per-day roll (same buyer + same Chicago date → same result), so the shown "attacks
+// left" and the enforcer always agree, and it can't be re-rolled by refreshing. Lv5 (100%) → always +1.
+function petExtraStrikeToday(buyerId, chance = 0) {
+    if (!buyerId || !chance) return 0;
+    if (chance >= 1) return 1;
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    let h = 2166136261;
+    const s = `${buyerId}:${day}:petstrike`;
+    for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) / 4294967295) < chance ? 1 : 0;
+}
+
 const lvl = (xp) => levelForXp(xp || 0).level;
 
 // Damage formulas (both scale with level). Equipped-gear stats buff the manual strike: might (+% damage),
@@ -159,7 +172,7 @@ export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
             might: (g.might || 0) + (ps.might || 0) + (ps.ferocity || 0),
             crit_chance: (g.crit_chance || 0) + (ps.crit_chance || 0),
             crit_power: (g.crit_power || 0) + (ps.crit_power || 0),
-            extra_strike: (g.extra_strike || 0) + (ps.extra_strike || 0),
+            extra_strike: (g.extra_strike || 0) + (ps.extra_strike || 0) + (pb.proc?.extraStrikeChance || 0), // chance folds in as expected value for the projection
         };
         const manualMult = manualStatMultiplier(combined) * procMultiplier(pb.proc, 1 + combined.extra_strike);
         return sum + memberDailyDamage(lvl(m.xp), manualMult, autoStats(g, ps));
@@ -486,7 +499,7 @@ export async function getBossState(buyerId = null) {
             activeBoosts(buyerId).catch(() => []),
             getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
         ]);
-        const dailyCap = dailyStrikeCap({ extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0), equippedIds: myIds, bonusStrikes });
+        const dailyCap = dailyStrikeCap({ extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0) + petExtraStrikeToday(buyerId, myPet?.proc?.extraStrikeChance || 0), equippedIds: myIds, bonusStrikes });
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
         const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -904,7 +917,7 @@ export async function attackBoss(buyerId) {
         might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb + (badgeStats.might || 0),
         crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (badgeStats.crit_chance || 0),
         crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (badgeStats.crit_power || 0),
-        extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0),
+        extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0) + petExtraStrikeToday(buyerId, petBonus?.proc?.extraStrikeChance || 0),
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
     const dailyCap = dailyStrikeCap({ extraStrike: stats.extra_strike, equippedIds, bonusStrikes: await memberBonusStrikes(buyerId).catch(() => 0) });

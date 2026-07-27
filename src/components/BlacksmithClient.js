@@ -97,7 +97,7 @@ export default function BlacksmithClient({ initial }) {
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo }); }
+        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo, hits: result.hits, score: result.score, maxScore: result.maxScore }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -463,35 +463,59 @@ function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
 // ── The juiced post-enhance reveal (fires after you Temper the item) ────────────────────────────────────────
 function EnhanceResultModal({ res, onClose }) {
     const gradeMeta = { pixel: { label: "PIXEL-PERFECT", color: "#ffd75e" }, perfect: { label: "PERFECT", color: "#8fe3ff" }, great: { label: "GREAT", color: "#8fe39a" }, good: { label: "FORGED", color: "#d7c48a" } }[res.grade] || { label: "FORGED", color: "#d7c48a" };
-    // Peak dopamine: first TALLY the mini-game performance (accuracy → combo → touch → points earned), animating
-    // it up so the player sees what their strikes DID, THEN reveal the forged item + additive stats.
+    // Peak dopamine: first TALLY the mini-game performance — every strike's tier, the best combo, the score — then
+    // CONNECT the dots (performance → grade → forge yield) so the player sees exactly how their run drove the
+    // result, THEN reveal the forged item + additive stats.
     const acc = Math.round((res.quality || 0) * 100);
     const combo = res.combo || 0;
     const gainedPts = Array.isArray(res.statLines) ? res.statLines.reduce((s, l) => s + (l.gained || 0), 0) : 0;
+    const hits = res.hits || {};
+    const TIERS = [
+        { key: "pixel", label: "Pixel-perfect", color: "#ffd75e" },
+        { key: "perfect", label: "Perfect", color: "#8fe3ff" },
+        { key: "great", label: "Great", color: "#8fe39a" },
+        { key: "good", label: "Good", color: "#d7c48a" },
+        { key: "miss", label: "Miss", color: "#ff8f9a" },
+    ].filter((t) => (hits[t.key] || 0) > 0);
+    const perfMsg = acc >= 92 ? "Flawless run!" : acc >= 72 ? "Excellent run!" : acc >= 45 ? "Solid run!" : "Rough run —";
     const [phase, setPhase] = useState("tally"); // tally → reveal
     const [accShown, setAccShown] = useState(0);
     useEffect(() => {
         if (phase !== "tally") return undefined;
-        let raf = 0; const t0 = performance.now(); const dur = 850;
+        let raf = 0; const t0 = performance.now(); const dur = 900;
         const tick = (t) => { const k = Math.min(1, (t - t0) / dur); setAccShown(Math.round(acc * k)); if (k < 1) raf = requestAnimationFrame(tick); };
         raf = requestAnimationFrame(tick);
-        const adv = setTimeout(() => setPhase("reveal"), 2200); // auto-advance to the reveal
+        const adv = setTimeout(() => setPhase("reveal"), 3400); // auto-advance to the reveal (longer — there's more to read)
         return () => { cancelAnimationFrame(raf); clearTimeout(adv); };
     }, [phase, acc]);
 
     if (phase === "tally") {
+        const chainDelay = TIERS.length * 130 + 700;
         return (
             <div className="forge-mg-scrim" role="dialog" aria-label="Forge tally" onPointerDown={() => setPhase("reveal")}>
                 <div className="forge-sv forge-er" style={{ "--rc": rc(res.rarity) }} onPointerDown={(e) => e.stopPropagation()}>
                     <div className="forge-sv-result">
                         <div className="forge-er-grade" style={{ color: gradeMeta.color }}>{gradeMeta.label} STRIKE!</div>
+                        <div className="forge-tally-title">Your run</div>
+                        {/* Every strike's tier — the play-by-play. */}
+                        <div className="forge-tally-hits">
+                            {TIERS.map((t, i) => (
+                                <span key={t.key} className="forge-hit-chip" style={{ color: t.color, borderColor: `${t.color}66`, animationDelay: `${i * 130}ms` }}>
+                                    <b>{hits[t.key]}×</b> {t.label}
+                                </span>
+                            ))}
+                        </div>
                         <div className="forge-tally">
-                            <div className="forge-tally-row" style={{ animationDelay: "0ms" }}><span>🎯 Accuracy</span><b style={{ color: "#8fe3ff" }}>{accShown}%</b></div>
-                            <div className="forge-tally-row" style={{ animationDelay: "420ms" }}><span>⚡ Best combo</span><b style={{ color: "#ffcf7a" }}>×{combo}</b></div>
-                            {res.doubled ? <div className="forge-tally-row" style={{ animationDelay: "840ms" }}><span>✦ Master&apos;s Touch</span><b style={{ color: "#ffd75e" }}>DOUBLE!</b></div> : null}
-                            <div className="forge-tally-sum" style={{ animationDelay: res.doubled ? "1260ms" : "980ms" }}>
-                                <span>⚒ Forge yield</span><b>{gainedPts > 0 ? `+${gainedPts}` : "maxed"}</b>
-                            </div>
+                            <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 120}ms` }}><span>⚡ Best combo</span><b style={{ color: "#ffcf7a" }}>×{combo}</b></div>
+                            <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 340}ms` }}><span>🎯 Score</span><b style={{ color: "#8fe3ff" }}>{accShown}%</b></div>
+                            {res.doubled ? <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 560}ms` }}><span>✦ Master&apos;s Touch</span><b style={{ color: "#ffd75e" }}>DOUBLE!</b></div> : null}
+                        </div>
+                        {/* Connect the dots: run → grade → yield. */}
+                        <div className="forge-tally-chain" style={{ animationDelay: `${chainDelay}ms` }}>
+                            <span className="chain-perf">{perfMsg}</span>
+                            <span className="chain-step"><b style={{ color: gradeMeta.color }}>{gradeMeta.label}</b> grade</span>
+                            <span className="chain-arrow" aria-hidden="true">→</span>
+                            <span className="chain-yield">⚒ {gainedPts > 0 ? `+${gainedPts} forged` : "already maxed"}</span>
                         </div>
                         <button type="button" className="forge-tally-skip" onClick={() => setPhase("reveal")}>Tap to reveal →</button>
                     </div>
@@ -560,6 +584,7 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
     const bestComboRef = useRef(0);
     const lastStrikeAt = useRef(0); // debounce accidental double-taps
     const finished = useRef(false);
+    const hitsRef = useRef({ pixel: 0, perfect: 0, great: 0, good: 0, miss: 0 }); // per-tier strike counts for the tally
     const cost = item.cost;
 
     // Marker oscillation (triangle wave) — speeds up each strike for rising tension.
@@ -585,6 +610,7 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
         lastStrikeAt.current = now;
         const dist = Math.abs(markerRef.current - 0.5);
         const g = gradeFor(dist);
+        hitsRef.current[g.key] = (hitsRef.current[g.key] || 0) + 1; // tally this strike's tier
         let keepCombo = g.score >= 2; // Great+ keeps the combo; Good & Miss reset it
         let saved = false;
         if (!keepCombo && steadyHandChance > 0 && Math.random() < steadyHandChance) { keepCombo = true; saved = true; } // Steady Hand: a slip forgiven (chance)
@@ -618,7 +644,7 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
             cancelAnimationFrame(raf.current);
             const q = maxScoreRef.current > 0 ? Math.max(0, Math.min(1, scoreRef.current / maxScoreRef.current)) : 0;
             const hl = q >= 0.92 ? "pixel" : q >= 0.72 ? "perfect" : q >= 0.45 ? "great" : "good";
-            setTimeout(() => onDone({ quality: q, grade: hl, combo: bestComboRef.current }), 650);
+            setTimeout(() => onDone({ quality: q, grade: hl, combo: bestComboRef.current, hits: { ...hitsRef.current }, score: Math.round(scoreRef.current), maxScore: Math.round(maxScoreRef.current) }), 650);
         } else { t0.current = 0; setStrikeNo(nextStrike); }
     }, [done, strikeNo, steadyHandChance, onDone]);
 
@@ -826,13 +852,14 @@ const FORGE_CSS = `
 /* ── enhance reveal (big, juicy, self-contained) ── */
 .forge-er { overflow: hidden; } /* clip the light rays so the glow never bleeds past the card */
 .forge-er-grade { font-size: 1.55rem; font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); margin-bottom: 2px; animation: forgeGradeIn .4s cubic-bezier(.2,1.4,.3,1) both; }
-.forge-er-stage { position: relative; display: grid; place-items: center; width: 100%; height: 150px; margin: 2px 0 4px; }
-.forge-er-rays { position: absolute; width: 300px; height: 300px; border-radius: 50%; pointer-events: none;
-    background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 30%, transparent) 0deg 6deg, transparent 6deg 18deg);
-    -webkit-mask-image: radial-gradient(circle, #000 8%, rgba(0,0,0,0.35) 32%, transparent 62%); mask-image: radial-gradient(circle, #000 8%, rgba(0,0,0,0.35) 32%, transparent 62%);
-    opacity: 0.7; animation: forgeRaySpin 14s linear infinite; }
-.forge-er-glow { position: absolute; width: 180px; height: 180px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, var(--rc) 55%, transparent) 0%, transparent 68%); filter: blur(4px); animation: forgeGlowPulse 2.4s ease-in-out infinite; }
-.forge-er-art { position: relative; z-index: 1; width: 128px; height: 128px; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)) drop-shadow(0 0 22px color-mix(in srgb, var(--rc) 65%, transparent)); animation: forgeArtIn .5s cubic-bezier(.2,1.5,.35,1) both, forgeRewardBob 2.6s ease-in-out .5s infinite; }
+.forge-er-stage { position: relative; display: grid; place-items: center; width: 100%; height: 184px; margin: 2px 0 4px; }
+/* Rays are a smaller, dimmer frame so the ITEM is the star (not a giant starburst around a tiny sprite). */
+.forge-er-rays { position: absolute; width: 236px; height: 236px; border-radius: 50%; pointer-events: none;
+    background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 26%, transparent) 0deg 6deg, transparent 6deg 18deg);
+    -webkit-mask-image: radial-gradient(circle, #000 14%, rgba(0,0,0,0.3) 38%, transparent 66%); mask-image: radial-gradient(circle, #000 14%, rgba(0,0,0,0.3) 38%, transparent 66%);
+    opacity: 0.5; animation: forgeRaySpin 16s linear infinite; }
+.forge-er-glow { position: absolute; width: 216px; height: 216px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, var(--rc) 55%, transparent) 0%, transparent 66%); filter: blur(5px); animation: forgeGlowPulse 2.4s ease-in-out infinite; }
+.forge-er-art { position: relative; z-index: 1; width: 168px; height: 168px; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)) drop-shadow(0 0 22px color-mix(in srgb, var(--rc) 70%, transparent)); animation: forgeArtIn .5s cubic-bezier(.2,1.5,.35,1) both, forgeRewardBob 2.6s ease-in-out .5s infinite; }
 .forge-er-name { font-size: 1.5rem; font-weight: 900; color: #ffd75e; text-shadow: 0 2px 12px rgba(255,150,30,0.55); line-height: 1.1; }
 .forge-er-rankrow { display: flex; justify-content: center; margin-top: 5px; }
 .forge-er-stats { margin: 12px 0 2px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.08); text-align: left; }
@@ -851,7 +878,16 @@ const FORGE_CSS = `
 @keyframes forgeArtIn { 0% { opacity: 0; transform: scale(.4) translateY(12px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes forgeStatPulse { 0% { color: #8fe39a; transform: scale(1.28); } 100% { color: #fff6e2; transform: scale(1); } }
 /* ── post-forge TALLY (performance → yield, animated up before the reveal) ── */
-.forge-tally { margin: 14px auto 4px; max-width: 300px; display: flex; flex-direction: column; gap: 7px; }
+.forge-tally-title { margin: 8px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #b9a892; }
+.forge-tally-hits { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 320px; margin: 0 auto; }
+.forge-hit-chip { font-size: 12px; font-weight: 700; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; padding: 4px 11px; opacity: 0; animation: forgeTallyPop .4s cubic-bezier(.2,1.5,.3,1) both; }
+.forge-hit-chip b { font-weight: 900; font-variant-numeric: tabular-nums; }
+.forge-tally-chain { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 12px auto 2px; max-width: 320px; padding: 10px 12px; border-radius: 12px; background: rgba(255,207,122,0.1); border: 1px solid rgba(255,207,122,0.32); opacity: 0; animation: forgeTallyPop .5s cubic-bezier(.2,1.5,.3,1) both; }
+.forge-tally-chain .chain-perf { font-size: 13px; font-weight: 900; color: #ffe6a6; width: 100%; }
+.forge-tally-chain .chain-step { font-size: 13px; font-weight: 700; color: #e6d7c2; }
+.forge-tally-chain .chain-arrow { color: #ffcf7a; font-weight: 900; }
+.forge-tally-chain .chain-yield { font-size: 14px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffe07a,#f3b23a); border-radius: 999px; padding: 3px 11px; box-shadow: 0 3px 10px rgba(243,178,58,0.4); }
+.forge-tally { margin: 12px auto 4px; max-width: 300px; display: flex; flex-direction: column; gap: 7px; }
 .forge-tally-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 800; color: #e6d7c2; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 8px 12px; opacity: 0; animation: forgeTallyIn .42s cubic-bezier(.2,1.4,.3,1) both; }
 .forge-tally-row b { font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 900; }
 .forge-tally-sum { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffe07a,#f3b23a); border-radius: 11px; padding: 9px 13px; opacity: 0; animation: forgeTallyPop .5s cubic-bezier(.2,1.5,.3,1) both; box-shadow: 0 4px 14px rgba(243,178,58,0.4); }
