@@ -627,8 +627,8 @@ export default function FarmClient({ initial, viewingAlias }) {
     const objFilter = view === "inside" ? "none" : (visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none");
     // The barn's straw floor sits lower than the open grass, so drop sprites down onto it — otherwise the hero and
     // pets float against the back wall. (Feet are anchored by translate(-50%,-100%), so a bigger y = lower = on the floor.)
-    const groundShift = view === "inside" ? 9 : 0;
-    const petGroundY = (y) => Math.min(95, y + groundShift);
+    const groundShift = view === "inside" ? 13 : 0; // barn straw floor sits lower; controls moved out of the way so we can drop the animals further
+    const petGroundY = (y) => Math.min(97, y + groundShift);
 
     // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS). We do NOT
     // use the native Fullscreen API — it renders ONLY the scene element's subtree, which hid the decorate tray and
@@ -640,6 +640,32 @@ export default function FarmClient({ initial, viewingAlias }) {
     // In fullscreen the field fills the fixed container exactly (100% of it) rather than 100dvh, which on mobile
     // overflows past the visible area and clips the bottom of the farm.
     const sceneHeight = fullscreen ? "100%" : "min(52vh, 420px)";
+
+    // Scene control pills (Backdrop / Decorate / Full screen). Rendered in a TOOLBAR BELOW the scene when windowed
+    // (so they never cover the animals standing on the floor), and as a bottom overlay row when full screen.
+    const CTRL_PILL = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 999, fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 3px 12px rgba(0,0,0,0.4)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent", whiteSpace: "nowrap" };
+    const sceneControls = (
+        <>
+            {farm.mine && view === "outside" ? (
+                <button type="button" onClick={() => setBgOpen(true)} title="Custom farm background" style={{ ...CTRL_PILL, border: "1px solid rgba(201,162,255,0.5)", background: "linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96))", color: "#d9c9ff" }}>
+                    <span style={{ fontSize: 15 }} aria-hidden="true">🎨</span>Backdrop
+                </button>
+            ) : null}
+            {farm.mine && canDecorate && farm.decorations && !decorating ? (
+                <button type="button" onClick={startDecorating} title="Decorate your farm" style={{ ...CTRL_PILL, border: "1px solid rgba(126,213,126,0.55)", background: "linear-gradient(180deg, rgba(28,44,26,0.96), rgba(18,30,16,0.96))", color: "#c8f0c8" }}>
+                    <span style={{ fontSize: 16 }} aria-hidden="true">🪴</span>Decorate
+                </button>
+            ) : null}
+            <button type="button" onClick={toggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen"} style={{ ...CTRL_PILL, border: "1px solid rgba(255,255,255,0.25)", background: "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: "#e6e6ea", marginLeft: fullscreen ? "auto" : undefined }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    {fullscreen
+                        ? <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+                        : <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m10 0h3a2 2 0 0 0 2-2v-3" />}
+                </svg>
+                {fullscreen ? "Exit" : "Full screen"}
+            </button>
+        </>
+    );
 
     // Click-and-drag to scroll the pasture sideways on desktop (mouse). Touch keeps native scroll; skipped while
     // decorating so it never fights piece-dragging.
@@ -910,12 +936,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects only in the open pasture (Outside) — not indoors or in the garden view */}
                 {showWeather ? <FarmWeather condition={wx.condition} /> : null}
-                {/* Floating decorate button — Outside & Inside only (the Garden is for planting). */}
-                {farm.mine && canDecorate && farm.decorations && !decorating ? (
-                    <button type="button" onClick={startDecorating} className="farm-deco-fab" aria-label="Decorate your farm" title="Decorate your farm"
-                        style={{ position: "absolute", right: 10, bottom: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px 9px 12px", borderRadius: 999, border: "1px solid rgba(126,213,126,0.55)", background: "linear-gradient(180deg, rgba(28,44,26,0.96), rgba(18,30,16,0.96))", color: "#c8f0c8", fontWeight: 800, fontSize: 13, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
-                        <span style={{ fontSize: 17 }} aria-hidden="true">🪴</span>Decorate
-                    </button>
+                {/* Full-screen only: the controls sit as a bottom overlay row (there's no "below the scene" here). */}
+                {fullscreen ? (
+                    <div style={{ position: "absolute", left: 10, right: 10, bottom: 10, zIndex: 9998, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>{sceneControls}</div>
                 ) : null}
                 {/* Persistent lock/move toggle — top-right of the scene. Governs dragging BOTH plots and
                     decorations on your own farm. Default is movable. */}
@@ -930,24 +953,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                     title={wx.located ? "Your real local weather + time of day" : "Your local time of day (allow location for live weather)"}>
                     {weatherLabel(wx)}
                 </div>
-                {/* Custom AI background generator — Outside only (Inside is a fixed barn, Garden is fixed soil). */}
-                {farm.mine && view === "outside" ? (
-                    <button type="button" onClick={() => setBgOpen(true)} aria-label="Custom background" title="Generate a custom farm background"
-                        style={{ position: "absolute", bottom: 52, left: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 999, border: "1px solid rgba(201,162,255,0.5)", background: "linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96))", color: "#d9c9ff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
-                        <span style={{ fontSize: 15 }} aria-hidden="true">🎨</span>Backdrop
-                    </button>
-                ) : null}
-                {/* Full-screen / immersive toggle. */}
-                <button type="button" onClick={toggleFullscreen} aria-label={fullscreen ? "Exit full screen" : "Full screen"} title={fullscreen ? "Exit full screen" : "Full screen"}
-                    style={{ position: "absolute", bottom: 10, left: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.25)", background: "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: "#e6e6ea", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        {fullscreen
-                            ? <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
-                            : <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m10 0h3a2 2 0 0 0 2-2v-3" />}
-                    </svg>
-                    {fullscreen ? "Exit" : "Full screen"}
-                </button>
             </div>
+            {/* Windowed: control toolbar BELOW the scene so it never covers the animals on the floor. */}
+            {!fullscreen ? (
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>{sceneControls}</div>
+            ) : null}
 
             {bgOpen ? <FarmBgCreator bg={farm.customBg} draft={farm.customBgDraft} busy={bgBusy} onAct={bgAct} onClose={() => setBgOpen(false)} /> : null}
 

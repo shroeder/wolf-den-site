@@ -531,6 +531,39 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
+                        {/* Compare against whatever's equipped in this slot so you can tell if it's an upgrade. */}
+                        {(() => {
+                            const eqId = equipped[detailItem.slot];
+                            if (detailItem.equipped || !eqId || eqId === detailItem.id) return null;
+                            const cur = itemDef(eqId);
+                            if (!cur) return null;
+                            const keys = Array.from(new Set([...Object.keys(detailItem.stats || {}), ...Object.keys(cur.stats || {})])).filter((k) => STAT_META[k]);
+                            if (!keys.length) return null;
+                            let ups = 0; let downs = 0;
+                            keys.forEach((k) => { const d = (detailItem.stats?.[k] || 0) - (cur.stats?.[k] || 0); if (d > 0) ups += 1; else if (d < 0) downs += 1; });
+                            return (
+                                <div style={{ margin: "10px 0 0", padding: "9px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                                    <div style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9aa0a6", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                                        vs equipped · {cur.name}
+                                        <span style={{ marginLeft: "auto", fontWeight: 900, color: ups > downs ? "#8fe39a" : downs > ups ? "#ff8f9a" : "#cdd9c6" }}>{ups > downs ? "↑ upgrade" : downs > ups ? "↓ downgrade" : "≈ sidegrade"}</span>
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                        {keys.map((k) => {
+                                            const a = detailItem.stats?.[k] || 0; const b = cur.stats?.[k] || 0; const d = a - b; const suf = STAT_META[k].suffix || "";
+                                            return (
+                                                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.85rem", gap: 10 }}>
+                                                    <span>{STAT_META[k].icon} {STAT_META[k].label}</span>
+                                                    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                                                        <span className="muted">{b}{suf} → {a}{suf}</span>{" "}
+                                                        <b style={{ color: d > 0 ? "#8fe39a" : d < 0 ? "#ff8f9a" : "#9aa0a6" }}>{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</b>
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}

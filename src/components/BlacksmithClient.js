@@ -759,6 +759,9 @@ const FORGE_CSS = `
 .forge-card:disabled { opacity: 0.7; cursor: default; }
 /* Bigger item, on a rarity-tinted glow pedestal so it reads at a glance. */
 .forge-art { width: 76px; height: 76px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 14px color-mix(in srgb, var(--rc) 55%, transparent)); }
+/* ItemArt sizes its inner <img> in em (1.55em) by default, so the box alone doesn't enlarge it — make the image
+   FILL its box in the forge card + the result reveal so the item actually reads big. */
+.forge-art .item-art-img, .forge-er-art .item-art-img { width: 100% !important; height: 100% !important; }
 .forge-card-name { font-size: 14px; font-weight: 900; line-height: 1.15; color: #fff4e2; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 /* Inherent stats the item was BORN with — quiet, so the forged bonus can pop against them. */
 .forge-card-stats { font-size: 11px; color: #bda88c; line-height: 1.25; }
