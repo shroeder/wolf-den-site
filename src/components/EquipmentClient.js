@@ -584,6 +584,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             );
                         })()}
                         {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
+                        {detailItem.farm ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#8fe39a" }}>🌱 Farm affinity: {describeFarm(detailItem.farm)} <span className="muted" style={{ fontWeight: 600 }}>— helps you on the farm (crops · seeds · harvests)</span></p> : null}
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
                         {detailItem.setId && (data.setsOverview || []).some((s) => s.id === detailItem.setId) ? (

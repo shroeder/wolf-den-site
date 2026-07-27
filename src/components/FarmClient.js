@@ -950,7 +950,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                                 width={46}
                                                 height={46}
                                                 draggable={false}
-                                                style={{ width: 46, height: 46, objectFit: "contain", transform: pet.flip ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+                                                style={{ width: 46, height: 46, objectFit: "contain", transform: (Boolean(pet.flip) !== Boolean(p.flip)) ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
                                             />
                                             {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                         </span>
@@ -1258,9 +1258,10 @@ function OwnerWalker({ owner, mine, minX = FARM_PAD, groundShift = 0, brightness
         timers.push(setTimeout(step, 900));
         return () => { alive = false; timers.forEach(clearTimeout); };
     }, [minX]);
-    // The avatar is a FRONT-facing portrait (no left/right walking pose), so mirroring it by travel direction just
-    // reads as moonwalking. Keep only the avatar's own stored flip; don't flip on movement.
-    const flip = Boolean(owner.avatarFlip);
+    // The walker is the member's SIDE-facing hero sprite (avatar_sprite_url). Canonical art faces right; a
+    // scaleX(-1) faces it left. owner.avatarFlip = "the art is backwards, mirror it" (the AI facing pass). To
+    // face the way they walk, combine that base correction with travel direction: flip = avatarFlip XOR movingLeft.
+    const flip = Boolean(owner.avatarFlip) !== Boolean(pos.flip);
     return (
         <button
             type="button"
