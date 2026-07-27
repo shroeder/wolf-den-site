@@ -184,13 +184,13 @@ const fieldBackground = (tod, condition) => {
     const g = grassStops(tod);
     return `linear-gradient(180deg, ${s[0]} 0%, ${s[1]} 36%, ${s[2]} 50%, ${g[0]} 60%, ${g[1]} 100%)`;
 };
-// Fixed backdrops per view — WIDE feather-blended panoramas (~4.15:1, unique across their width, no repeat) so
-// each view scrolls nice and wide without any visible tiling. `outside` is the default pasture when the member
-// hasn't set a custom background.
+// Fixed backdrops per view — TRUE wide panoramas built by OUTPAINTING (each step extends the actual pixels, so
+// it's one continuous ~5376px unique scene with no seams and no repeat), in the game's bold CEL-SHADED art style.
+// `outside` is the default pasture when the member hasn't set a custom background.
 const VIEW_BG = {
-    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/1785109210983-552528.png",
-    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/1785109356165-855215.png",
-    outside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/1785109488802-952055.png",
+    inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/wide-inside-1785113831922.png",
+    garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/wide-garden-1785114579571.png",
+    outside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/wide-outside-1785113516328.png",
 };
 
 export default function FarmClient({ initial, viewingAlias }) {
