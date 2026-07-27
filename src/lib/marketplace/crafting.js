@@ -28,7 +28,7 @@ const MAX_TIER = 5;
 const COMBINE_COST = 5; // 5 of tier N → 1 of tier N+1
 // A forged stat tops out at +40% of its BASE value (min +1). Keeps a fully-forged item a MODEST upgrade — never
 // the old runaway doubling. Past the cap the item still LEVELS (prestige border) but gains no more raw stats.
-const ENHANCE_CAP_FRAC = 0.4;
+const ENHANCE_CAP_FRAC = 0.5;
 
 // Salvaging a piece of gear → which tier + how many parts, by rarity.
 const SALVAGE = {
@@ -232,27 +232,36 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough", need: { tier, qty }, ...(await getForgeState(buyerId)) };
     const q = Math.max(0, Math.min(1, Number(quality) || 0));
-    // Enhancement deepens the item's OWN identity: it rolls onto the stats the item already carries. The boost is
-    // deliberately SMALL — a normal strike adds +1 to one of the item's stats, a flawless PIXEL strike adds +2 —
-    // and each stat is capped at ENHANCE_CAP_FRAC of its base, so a fully-forged item is a modest upgrade, not a
-    // doubling. Execution quality (q) still drives XP + the celebration, just not raw stat magnitude.
-    const pool = Object.keys(item.stats || {}).filter((k) => STAT_META[k]);
-    const keys = pool.length ? pool : ["might"];
-    let points = 1 + (grade === "pixel" ? 1 : 0);
+    // SKILL TIERS — the mini-game score decides how many stat points you forge AND how they SPREAD. Higher tiers
+    // add BREADTH (more stats); a flawless run can add brand-new stats to the item (up to four total):
+    //   T1 (score ≥25%): +1 to ONE stat.
+    //   T2 (≥50%): +1 to TWO stats — or +2 to the one, if the item has only a single stat.
+    //   T3 (≥75%): +1 to THREE stats — adding a NEW stat if the item only had two (all three if it has three).
+    //   T4 (≥92%, "perfection"): +1 to FOUR stats — adding new stats up to four total (all four if it has four).
+    // Below 25% the forge WHIFFS: no stat gain (it still levels + grants XP). Each stat is capped so it can't run
+    // away. Master's Touch bumps you up one tier.
+    let scenario = q >= 0.92 ? 4 : q >= 0.75 ? 3 : q >= 0.5 ? 2 : q >= 0.25 ? 1 : 0;
     const upg = await upgradeLevels(buyerId);
     let doubled = false;
-    if (Math.random() < chance(upg, "masters_touch")) { points *= 2; doubled = true; } // Master's Touch fills the cap faster
+    if (scenario > 0 && Math.random() < chance(upg, "masters_touch")) { scenario = Math.min(4, scenario + 1); doubled = true; }
+
+    const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
+    const ADDABLE = ["might", "crit_chance", "crit_power", "ferocity", "fortune"]; // stats a strong forge can ADD (never extra_strike)
+    const newPool = ADDABLE.filter((k) => !existing.includes(k));
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
-    const capOf = (k) => Math.max(1, Math.round((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
+    const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC)); // per-stat forge cap (added stats: +3)
     const gained = {};
-    for (let i = 0; i < points; i += 1) {
-        const room = keys.filter((k) => (nextBonus[k] || 0) < capOf(k));
-        if (!room.length) break; // every stat already at its forge cap — extra points fizzle (the level still rises)
-        const k = room[Math.floor(Math.random() * room.length)];
-        nextBonus[k] = (nextBonus[k] || 0) + 1;
-        gained[k] = (gained[k] || 0) + 1;
+    const apply = (k) => { if ((nextBonus[k] || 0) < capOf(k)) { nextBonus[k] = (nextBonus[k] || 0) + 1; gained[k] = (gained[k] || 0) + 1; } };
+    if (scenario > 0) {
+        // Reach `scenario` DISTINCT stats: existing first, then (T3+) add brand-new stats to fill the count.
+        const targets = existing.slice(0, scenario);
+        if (scenario >= 3) { const pool = [...newPool]; while (targets.length < scenario && pool.length) targets.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); }
+        const stack = targets.length ? targets : (existing.length ? existing : ["might"]);
+        targets.forEach(apply);
+        for (let i = 0, extra = scenario - targets.length; i < extra; i += 1) apply(stack[i % stack.length]); // leftover points double up (e.g. a 1-stat item at T2)
     }
-    const allMaxed = keys.every((k) => (nextBonus[k] || 0) >= capOf(k));
+    const forgedKeys = Object.keys(nextBonus).filter((k) => (nextBonus[k] || 0) > 0);
+    const allMaxed = forgedKeys.length >= Math.min(4, existing.length + newPool.length) && forgedKeys.every((k) => (nextBonus[k] || 0) >= capOf(k));
     const bestGrade = (GRADE_RANK[grade] || 0) > (GRADE_RANK[cur?.best_grade] || 0) ? grade : cur?.best_grade || grade;
     await db
         .query(
@@ -274,9 +283,11 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const ec = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_craft_event WHERE buyer_id = $1 AND action = 'enhance'`, [buyerId]).catch(() => null);
     if ((ec?.n || 0) >= 10) grantEventBadge(buyerId, "forge_smith").catch(() => {});
     if ((ec?.n || 0) >= 50) grantEventBadge(buyerId, "forge_master").catch(() => {});
-    // statLines let the reveal show the additive math plainly (base + forge = total) for every stat on the item.
-    const statLines = keys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0 }));
-    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, allMaxed, doubled, xp, grade, ...(await getForgeState(buyerId)) };
+    // statLines let the reveal show the additive math plainly (base + forge = total) for every stat — INCLUDING
+    // stats this forge just ADDED (base 0), flagged isNew so the reveal can call them out.
+    const statKeys = Array.from(new Set([...existing, ...forgedKeys]));
+    const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k) }));
+    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, allMaxed, scenario, doubled, xp, grade, ...(await getForgeState(buyerId)) };
 }
 
 // ── Full forge state for the UI ──

@@ -97,7 +97,7 @@ export default function BlacksmithClient({ initial }) {
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo, hits: result.hits, score: result.score, maxScore: result.maxScore }); }
+        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, scenario: r.scenario, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo, hits: result.hits, score: result.score, maxScore: result.maxScore }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -468,7 +468,13 @@ function EnhanceResultModal({ res, onClose }) {
     // result, THEN reveal the forged item + additive stats.
     const acc = Math.round((res.quality || 0) * 100);
     const combo = res.combo || 0;
-    const gainedPts = Array.isArray(res.statLines) ? res.statLines.reduce((s, l) => s + (l.gained || 0), 0) : 0;
+    const lines = Array.isArray(res.statLines) ? res.statLines : [];
+    const gainedPts = lines.reduce((s, l) => s + (l.gained || 0), 0);
+    const upgradedCount = lines.filter((l) => (l.gained || 0) > 0).length;
+    const addedCount = lines.filter((l) => l.isNew && (l.gained || 0) > 0).length;
+    // What the skill tier did, in words (breakpoints 25/50/75/~100% → 1..4 stats forged).
+    const scenarioText = gainedPts <= 0 ? "already maxed"
+        : `${upgradedCount} stat${upgradedCount === 1 ? "" : "s"} up${addedCount ? ` · ${addedCount} NEW` : ""}`;
     const hits = res.hits || {};
     const TIERS = [
         { key: "pixel", label: "Pixel-perfect", color: "#ffd75e" },
@@ -515,7 +521,7 @@ function EnhanceResultModal({ res, onClose }) {
                             <span className="chain-perf">{perfMsg}</span>
                             <span className="chain-step"><b style={{ color: gradeMeta.color }}>{gradeMeta.label}</b> grade</span>
                             <span className="chain-arrow" aria-hidden="true">→</span>
-                            <span className="chain-yield">⚒ {gainedPts > 0 ? `+${gainedPts} forged` : "already maxed"}</span>
+                            <span className="chain-yield">⚒ {scenarioText}</span>
                         </div>
                         <button type="button" className="forge-tally-skip" onClick={() => setPhase("reveal")}>Tap to reveal →</button>
                     </div>
@@ -536,13 +542,13 @@ function EnhanceResultModal({ res, onClose }) {
                     </div>
                     <div className="forge-er-name">{res.name}</div>
                     <div className="forge-er-rankrow"><ForgeRank level={res.level} size={30} /></div>
-                    {res.doubled ? <div className="forge-sv-tag double">✦ MASTER&apos;S TOUCH — double gains!</div> : null}
+                    {res.doubled ? <div className="forge-sv-tag double">✦ MASTER&apos;S TOUCH — bumped up a tier!</div> : null}
                     {/* Additive stat breakdown: base + forge = total, so it's crystal-clear the bonus STACKS on the item. */}
                     {Array.isArray(res.statLines) && res.statLines.length ? (
                         <div className="forge-er-stats">
                             {res.statLines.map((s) => (
                                 <div key={s.key} className={`forge-er-statrow${s.gained ? " up" : ""}`}>
-                                    <span className="forge-er-stat-label">{s.icon} {s.label}</span>
+                                    <span className="forge-er-stat-label">{s.icon} {s.label}{s.isNew && s.gained ? <span className="forge-er-newtag">NEW</span> : null}</span>
                                     <span className="forge-er-stat-calc">
                                         <span className="base">{s.base}{s.suffix}</span>
                                         {s.forge > 0 ? <span className="add">+{s.forge}{s.suffix}</span> : null}
@@ -551,7 +557,7 @@ function EnhanceResultModal({ res, onClose }) {
                                     </span>
                                 </div>
                             ))}
-                            <div className="forge-er-note">{res.allMaxed ? "✦ Stats maxed — further forging earns prestige only" : "Forge bonus adds on top of the item’s base stats"}</div>
+                            <div className="forge-er-note">{res.allMaxed ? "✦ Stats maxed — further forging earns prestige only" : addedCount ? "Your score was high enough to forge a whole new stat onto the item!" : "Higher scores forge more stats — a perfect run can add brand-new ones"}</div>
                         </div>
                     ) : null}
                     <div className="forge-sv-xp">+{res.xp} XP</div>
@@ -876,6 +882,7 @@ const FORGE_CSS = `
 .forge-er-stat-calc .eq { color: #7c6f5f; }
 .forge-er-stat-calc .total { color: #fff6e2; font-weight: 900; font-size: 15px; }
 .forge-er-note { margin-top: 8px; font-size: 10.5px; color: #b9a892; text-align: center; font-weight: 600; }
+.forge-er-newtag { margin-left: 6px; font-size: 9px; font-weight: 900; letter-spacing: 0.04em; color: #0e2c14; background: #8fe39a; border-radius: 5px; padding: 1px 5px; vertical-align: middle; }
 @keyframes forgeRaySpin { to { transform: rotate(360deg); } }
 @keyframes forgeGlowPulse { 0%,100% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 1; } }
 @keyframes forgeArtIn { 0% { opacity: 0; transform: scale(.4) translateY(12px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
