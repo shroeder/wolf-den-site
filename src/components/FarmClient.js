@@ -213,16 +213,23 @@ export default function FarmClient({ initial, viewingAlias }) {
     const petMinX = FARM_PAD; // left edge of the pets' roaming band
     // Each pet gets a "home" slot spread evenly across its band and wanders around it. Deterministic init so
     // server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
-    const petSlotX = useCallback((i, n) => (n <= 1 ? 50 : petMinX + (i / (n - 1)) * (100 - FARM_PAD - petMinX)), [petMinX]);
-    const homeX = useCallback((i) => petSlotX(i, pets.length), [petSlotX, pets.length]);
-    const [pos, setPos] = useState(() => pets.map((_, i) => ({
-        x: pets.length <= 1 ? 50 : petMinX + (i / (pets.length - 1)) * (100 - FARM_PAD - petMinX),
-        y: 82 + ((i * 5) % 9), // grounded on the grass (spread is HORIZONTAL — see the wide field below)
-        flip: i % 2 === 1,
-        dur: 2, // seconds for the current stroll (varies per move → different speeds)
-        moving: false,
-        hopMs: 420 + ((i * 53) % 220), // this pet's personal hop cadence (stable)
-    })));
+    const petSlotX = useCallback((idx, count) => (count <= 1 ? 50 : petMinX + (idx / (count - 1)) * (100 - FARM_PAD - petMinX)), [petMinX]);
+    // Each view (Outside/Inside) shows every OTHER pet, so spread by the pet's slot WITHIN its own view (even →
+    // Outside, odd → Inside) — not the global index — so BOTH views fill the full width evenly and the first pet
+    // in each always sits at the far-left edge (never bunched on the right).
+    const viewSlotOf = useCallback((i, n) => ({ idx: Math.floor(i / 2), count: i % 2 === 0 ? Math.ceil(n / 2) : Math.floor(n / 2) }), []);
+    const homeX = useCallback((i) => { const s = viewSlotOf(i, pets.length); return petSlotX(s.idx, s.count); }, [petSlotX, viewSlotOf, pets.length]);
+    const [pos, setPos] = useState(() => pets.map((_, i) => {
+        const s = viewSlotOf(i, pets.length);
+        return {
+            x: petSlotX(s.idx, s.count),
+            y: 82 + ((i * 5) % 9), // grounded on the grass (spread is HORIZONTAL — see the wide field below)
+            flip: i % 2 === 1,
+            dur: 2, // seconds for the current stroll (varies per move → different speeds)
+            moving: false,
+            hopMs: 420 + ((i * 53) % 220), // this pet's personal hop cadence (stable)
+        };
+    }));
     const [floaters, setFloaters] = useState([]);
     const floatId = useRef(0);
     const [busy, setBusy] = useState(null);
