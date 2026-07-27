@@ -79,7 +79,9 @@ export default function SpinWheel() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount (setState is post-await, not sync)
     useEffect(() => { load(); }, [load]);
 
-    // ── the render loop (always running while mounted: drives bulbs + the spin) ──
+    // ── the render loop (drives bulbs + the spin). Gated on sign-in because the <canvas> only mounts once
+    // `st` loads (before that we render a "Loading…" placeholder), so this must (re)run when it appears. ──
+    const ready = Boolean(st?.signedIn);
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return undefined;
@@ -205,7 +207,7 @@ export default function SpinWheel() {
         };
         rafRef.current = requestAnimationFrame(draw);
         return () => { cancelAnimationFrame(rafRef.current); if (ro) ro.disconnect(); };
-    }, []);
+    }, [ready]);
 
     const doSpinRequest = useCallback(async () => {
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
