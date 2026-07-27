@@ -94,34 +94,6 @@ function Stars({ level = 1, max = 5, className = "" }) {
     );
 }
 
-// A short, self-contained "level up!" chime via the Web Audio API (no asset — CSP-safe). Best-effort;
-// browsers may block audio without a prior user gesture (e.g. on page load), which is fine.
-function playLevelUpChime() {
-    try {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return;
-        const ctx = new Ctx();
-        const now = ctx.currentTime;
-        // A bright rising arpeggio (C5–E5–G5–C6) — a classic "reward" flourish.
-        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = "triangle";
-            osc.frequency.value = freq;
-            const t = now + i * 0.09;
-            gain.gain.setValueAtTime(0.0001, t);
-            gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-            osc.connect(gain).connect(ctx.destination);
-            osc.start(t);
-            osc.stop(t + 0.3);
-        });
-        setTimeout(() => ctx.close().catch(() => {}), 1200);
-    } catch {
-        /* audio unavailable — no-op */
-    }
-}
-
 // The dedicated Pets page: every pet, clearly owned vs. locked, with how to unlock each, its passive (owned)
 // and active (equipped) buffs, and equip / buy actions.
 export default function PetsClient() {
@@ -130,36 +102,13 @@ export default function PetsClient() {
     const [busy, setBusy] = useState(null);
     const [err, setErr] = useState(null);
     const [justEquipped, setJustEquipped] = useState(null);
-    const [levelUp, setLevelUp] = useState(null); // { pet, to } — a pet that leveled up since last visit
-
-    // Detect pets that gained a level since the member last looked (covers levels earned while away via the
-    // XP-share/trickle) → fire a dopamine celebration + chime. Seen levels are remembered per pet locally.
-    function detectLevelUps(d) {
-        if (!d?.petLevels || typeof window === "undefined") return;
-        let seen = {};
-        try { seen = JSON.parse(localStorage.getItem("wd_pet_levels_seen") || "{}"); } catch { seen = {}; }
-        const gained = [];
-        const now = {};
-        for (const [pid, info] of Object.entries(d.petLevels)) {
-            now[pid] = info.level;
-            const prev = Number.isFinite(seen[pid]) ? seen[pid] : 1;
-            if (info.level > prev) gained.push({ petId: pid, from: prev, to: info.level });
-        }
-        try { localStorage.setItem("wd_pet_levels_seen", JSON.stringify(now)); } catch { /* ignore */ }
-        if (gained.length) {
-            const top = gained.sort((a, b) => b.to - a.to)[0];
-            const pet = collectibleById(top.petId);
-            // Sprite art at the old + new level, for the evolution reveal (may be null if not generated yet).
-            const sprites = d.petSprites?.[top.petId] || {};
-            if (pet) { setLevelUp({ pet, from: top.from, to: top.to, oldArt: sprites[top.from] || null, newArt: sprites[top.to] || null }); playLevelUpChime(); }
-        }
-    }
+    // Pet level-up / evolution celebration is handled site-wide by <PetLevelUp> (mounted in the layout), so it
+    // fires anywhere in the app — not just here.
 
     async function load() {
         const r = await fetch("/api/marketplace/pets", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (!d) return;
-        detectLevelUps(d);
         setState(d);
     }
     useEffect(() => { load(); }, []);
@@ -284,6 +233,12 @@ export default function PetsClient() {
     const featured = state?.featured ? collectibleById(state.featured) : null;
     const ownedCount = state?.ownedIds?.length || 0;
     const passiveEntries = Object.entries(state?.passiveTotals || {}).sort((a, b) => b[1] - a[1]);
+    // The pet's sprite at its CURRENT level (leveled/evolved art), so cards + detail show the right form —
+    // not always the base level-1 sprite. Null for unowned pets → PetArt falls back to the base sprite.
+    const leveledSprite = (petId) => {
+        const lv = state?.petLevels?.[petId]?.level;
+        return (lv && state?.petSprites?.[petId]?.[lv]) || null;
+    };
 
     // The pet detail as a full in-flow page (breadcrumb back + normal scroll), with the give-a-copy flow
     // folded in as a member SEARCH → hero-card picker (no @handle typing).
@@ -305,7 +260,7 @@ export default function PetsClient() {
                 <div className={`petx-detail-card rarity-${p.rarity}`}>
                     <div className="petx-hero petx-hero-big">
                         <span className="petx-hero-glow" />
-                        <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}><PetArt id={p.id} /></span>
+                        <span className="petx-hero-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: p.color }}><PetArt id={p.id} url={leveledSprite(p.id)?.url} flip={leveledSprite(p.id)?.flip} /></span>
                     </div>
                     <div className="petx-cele-tag">{p.rarity}</div>
                     <h2 className="petx-title">{p.name}</h2>
@@ -336,11 +291,11 @@ export default function PetsClient() {
 
                     <div className="petx-abilities">
                         <div className="petx-ability">
-                            <div className="petx-ability-head">🐾 Passive <span className="muted">· always active while owned</span></div>
+                            <div className="petx-ability-head">🐾 Passive <span className="muted">· always on — every copy you own stacks it</span></div>
                             <div className="petx-ability-body">
                                 <strong>+{lvl ? lvl.value : passive.value} {statText(passive)}</strong>
                                 {lvl && !lvl.maxed ? <span className="muted"> → +{Math.round(passive.value * petPassiveLevelMult(lvl.level + 1))} at Lv {lvl.level + 1}</span> : null}
-                                {" "}— {STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales gently (up to ×2) as this pet levels. Stacks with your whole collection.</span>
+                                {" "}— {PET_STAT_META[passive.stat]?.desc || STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales gently (up to ×2) as this pet levels. Stacks with your whole collection.</span>
                             </div>
                         </div>
                         {(() => {
@@ -358,7 +313,7 @@ export default function PetsClient() {
                             );
                         })()}
                         <div className="petx-ability">
-                            <div className="petx-ability-head">⭐ Signature <span className="muted">· when equipped, grows as you level this pet</span></div>
+                            <div className="petx-ability-head">⭐ Active buff <span className="muted">· only while this pet is equipped — grows as it levels</span></div>
                             <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
                         </div>
                         {petRealWorld(p) ? (
@@ -525,12 +480,12 @@ export default function PetsClient() {
                             <button type="button" key={pet.id} onClick={() => openDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
                                 {lvl ? <span className="pet-level-badge"><Stars level={lvl.level} /></span> : null}
-                                <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}><PetArt id={pet.id} /></div>
+                                <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}><PetArt id={pet.id} url={leveledSprite(pet.id)?.url} flip={leveledSprite(pet.id)?.flip} /></div>
                                 <div className="pet-name">{pet.name}</div>
                                 <div className="pet-rarity">{pet.rarity}</div>
                                 <div className="pet-buffs">
-                                    <span>Own: +{lvl ? lvl.value : passive.value} {statText(passive)}</span>
-                                    <span className="pet-perk">{perk.icon} {perk.name}</span>
+                                    <span title={`Passive (every copy you own stacks this): ${PET_STAT_META[passive.stat]?.desc || ""}`}>🐾 Owned: +{lvl ? lvl.value : passive.value} {statText(passive)}</span>
+                                    <span className="pet-perk" title={`Active buff — only while equipped: ${perk.desc}`}>⭐ Equipped: {perk.icon} {perk.name}</span>
                                 </div>
                                 {owned ? (
                                     <span className="pet-status-owned">✓ Owned{isFeatured ? " · Equipped" : ""}</span>
@@ -568,53 +523,6 @@ export default function PetsClient() {
                         <h2 className="petx-title">{celebrate.name}</h2>
                         <p className="petx-sub">{celebrate.rarity} companion added to your collection.</p>
                         <button type="button" className="btn-gold" onClick={() => setCelebrate(null)}>Awesome</button>
-                    </div>
-                </div>, document.body) : null}
-
-            {/* Level-up celebration — fires when a pet gained a level since the member last looked. */}
-            {mounted && levelUp ? createPortal(
-                <div className="petx-overlay petx-celebrate" onClick={() => setLevelUp(null)}>
-                    <div className={`petx-cele petx-levelup rarity-${levelUp.pet.rarity}`} onClick={(e) => e.stopPropagation()}>
-                        <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 16 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
-                        {(() => {
-                            const oldA = levelUp.oldArt, newA = levelUp.newArt;
-                            const evolves = oldA?.url && newA?.url && oldA.url !== newA.url;
-                            if (evolves) {
-                                // Pokémon-style reveal: old form flashes out, new evolved sprite bursts in.
-                                return (
-                                    <div className="petx-hero petx-hero-big petx-evo">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img className="petx-evo-img petx-evo-old" src={oldA.url} alt="" style={oldA.flip ? { transform: "scaleX(-1)" } : undefined} />
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img className="petx-evo-img petx-evo-new" src={newA.url} alt="" style={newA.flip ? { transform: "scaleX(-1)" } : undefined} />
-                                        <span className="petx-evo-flash" aria-hidden="true" />
-                                    </div>
-                                );
-                            }
-                            if (newA?.url) {
-                                return (
-                                    <div className="petx-hero petx-hero-big petx-evo">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img className="petx-evo-img petx-evo-new" src={newA.url} alt="" style={newA.flip ? { transform: "scaleX(-1)" } : undefined} />
-                                    </div>
-                                );
-                            }
-                            return (
-                                <div className="petx-hero petx-hero-big">
-                                    <span className="petx-hero-glow" />
-                                    <span className="petx-hero-icon" data-petlvl={levelUp.to} style={{ color: levelUp.pet.color }}><PetArt id={levelUp.pet.id} /></span>
-                                </div>
-                            );
-                        })()}
-                        <div className="petx-cele-tag">{levelUp.oldArt?.url && levelUp.newArt?.url && levelUp.oldArt.url !== levelUp.newArt.url ? "✨ Evolved!" : "⬆️ Level up!"}</div>
-                        <h2 className="petx-title">{levelUp.pet.name} reached Lv {levelUp.to}</h2>
-                        <Stars level={levelUp.to} className="lg" />
-                        {(() => {
-                            const info = state?.petLevels?.[levelUp.pet.id];
-                            if (!info) return null;
-                            return <p className="petx-sub">Passive now <strong>+{info.value} {statText({ stat: info.stat })}</strong>{levelUp.to >= 5 ? " — MAX level! 🏆" : ""}</p>;
-                        })()}
-                        <button type="button" className="btn-gold" onClick={() => setLevelUp(null)}>Nice!</button>
                     </div>
                 </div>, document.body) : null}
 

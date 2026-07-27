@@ -18,7 +18,7 @@ const ACHIEVEMENT_PET_RULES = {
     ladybug: (m) => m.wishlist >= 1,
     bee: (m) => m.claimedQuests >= 10,
     sloth: (m) => m.activeDays >= 14,
-    beaver: (m) => m.bountiesPosted >= 5,
+    beaver: (m) => m.bountiesPosted >= 3,
     raccoon: (m) => m.tradeCount >= 5,
     flamingo: (m) => m.friends >= 10,
     toucan: (m) => m.bountiesWon >= 3,

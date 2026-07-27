@@ -22,18 +22,20 @@ function ensureSprites() {
     }
 }
 
-export default function PetArt({ id, className = "", alt = "" }) {
+// Pass `url` (+ optional `flip`) to render a SPECIFIC resolved sprite — e.g. the pet's current-LEVEL art from
+// the pets state — instead of the shared base sprite. Falls back to the base fetch when no url is given.
+export default function PetArt({ id, className = "", alt = "", url = null, flip = false }) {
     const [, force] = useState(0);
     useEffect(() => {
-        if (SPRITES) return undefined;
+        if (url || SPRITES) return undefined; // explicit sprite passed, or base map already loaded
         ensureSprites();
         const fn = () => force((n) => n + 1);
         listeners.add(fn);
         return () => listeners.delete(fn);
-    }, []);
+    }, [url]);
 
     const pet = id ? collectibleById(id) : null;
-    const sprite = SPRITES ? SPRITES[id] : null;
+    const sprite = url ? { url, flip } : (SPRITES ? SPRITES[id] : null);
     if (sprite?.url) {
         return (
             <span className={`${className} pet-art has-sprite`}>

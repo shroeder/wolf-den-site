@@ -13,6 +13,13 @@ export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/pets", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
+            // Lightweight read for the global level-up watcher: just levels + sprites, no income settlement
+            // (so it doesn't consume the "your pets earned X since last visit" banner on the pets page).
+            const peek = new URL(request.url).searchParams.get("peek") === "1";
+            if (peek) {
+                const state = await petsState(buyer?.id || null, { sync: true });
+                return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
+            }
             // Settle passive pet income BEFORE reading state so the gold/xp shown is already up to date.
             const incomeEarned = buyer?.id ? await settlePetIncome(buyer.id).catch(() => ({ xp: 0, gold: 0 })) : { xp: 0, gold: 0 };
             const state = await petsState(buyer?.id || null, { sync: true });
