@@ -21,8 +21,11 @@ const ownedBonusParts = (p) => {
     if (p.stat === "gold_find") return { icon: "💰", name: `+${Math.max(1, Math.round(p.value * GOLD_PER_POINT))} gold / hr`, desc: "Passive income — grows as it levels · every pet you own stacks" };
     if (p.stat === "xp_gain") return { icon: "✨", name: `+${p.value} XP / hr`, desc: "Passive income — grows as it levels · every pet you own stacks" };
     if (p.stat === "fortune") return { icon: "🍀", name: `+${p.value * TICKETS_PER_FORTUNE_PER_DAY} tickets / day`, desc: "Boss-raffle tickets, banked all week · every pet you own stacks" };
-    const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨" };
-    return { icon: m.icon, name: `+${p.value} ${m.label}`, desc: "Buffs your boss damage · stacks across your whole menagerie" };
+    // Farm passives (seedLuck/growSpeed/petXp) help the FARM; combat passives buff the boss. Use each stat's OWN
+    // description so a "Seed Luck" bonus reads like seed luck — not the old hardcoded "boss damage" for everything.
+    const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨", desc: "Stacks across your whole menagerie" };
+    const suffix = ["seedLuck", "growSpeed", "petXp"].includes(p.stat) ? "%" : "";
+    return { icon: m.icon, name: `+${p.value}${suffix} ${m.label}`, desc: `${m.desc} Stacks across every pet you own.` };
 };
 
 // One effect row in the pet modal: an icon tile + a tiny label, the effect name, and a muted one-line detail.
@@ -580,15 +583,10 @@ export default function FarmClient({ initial, viewingAlias }) {
         : (customBg || VIEW_BG.outside);
     const showWeather = view === "outside"; // weather effects only in the open pasture
     const canDecorate = view !== "garden"; // decorate Outside & Inside; the Garden is just for planting
-    // No color-muting at night outdoors; the barn keeps its own warm light.
+    // Sprite brightness only — NO scene tint/overlay (overlays wash the whole scene out; time-of-day mood must be
+    // baked into the artwork itself). A tiny brightness nudge on the SPRITES at dusk/dawn keeps them from glowing
+    // like noon against a darker painted backdrop.
     const objFilter = view === "inside" ? "none" : (visTod === "dusk" ? "brightness(0.94)" : visTod === "dawn" ? "brightness(0.98)" : "none");
-    // Time-of-day mood tint for the DEFAULT outside pasture (a custom bg carries its own mood, so leave it alone).
-    const bgTint = (view === "outside" && !customBg)
-        ? (visTod === "night" ? "linear-gradient(180deg, rgba(10,14,42,0.52), rgba(6,10,30,0.6))"
-            : visTod === "dusk" ? "linear-gradient(180deg, rgba(74,36,12,0.28), rgba(42,18,28,0.32))"
-            : visTod === "dawn" ? "linear-gradient(180deg, rgba(255,224,180,0.16), rgba(255,206,170,0.05))"
-            : null)
-        : null;
 
     // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS). We do NOT
     // use the native Fullscreen API — it renders ONLY the scene element's subtree, which hid the decorate tray and
@@ -758,7 +756,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                             <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
                         ) : null}
                         {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
-                        {bgTint ? <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: bgTint, pointerEvents: "none", zIndex: 400 }} /> : null}
 
                         {/* World OBJECTS layer — pets, crops, decorations, the farmer. The time-of-day tint is applied
                             to THIS layer only, so the illustrated backdrop keeps its own night/dusk mood while the
@@ -1426,28 +1423,30 @@ const bgErr = (e) => ({ no_credits: "You need 3 creations to generate a backgrou
 function FarmBgCreator({ bg, draft, busy, onAct, onClose }) {
     const [desc, setDesc] = useState("");
     const [credits, setCredits] = useState(null);
+    const [free, setFree] = useState(false); // owners/admins generate without spending tokens
     const [err, setErr] = useState(null);
     useEffect(() => {
         let alive = true;
-        onAct({ action: "farm_bg_state" }).then((r) => { if (alive && r?.credits != null) setCredits(r.credits); });
+        onAct({ action: "farm_bg_state" }).then((r) => { if (alive && r?.credits != null) { setCredits(r.credits); setFree(Boolean(r.free)); } });
         return () => { alive = false; };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
     const generate = async () => {
         setErr(null);
         const r = await onAct({ action: "farm_bg_start", prompt: desc });
         if (r?.credits != null) setCredits(r.credits);
+        if (r?.free != null) setFree(Boolean(r.free));
         if (!r?.ok) setErr(bgErr(r?.error));
     };
     const accept = async () => { await onAct({ action: "farm_bg_finalize" }); onClose(); };
     const discard = async () => { const r = await onAct({ action: "farm_bg_discard" }); if (r?.credits != null) setCredits(r.credits); };
     const removeBg = async () => { await onAct({ action: "farm_bg_clear" }); onClose(); };
-    const low = (credits ?? 0) < 3;
+    const low = !free && (credits ?? 0) < 3;
     return (
         <div role="dialog" aria-label="Custom farm background" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 10050, background: "linear-gradient(180deg, rgba(30,24,44,0.98), rgba(18,14,28,0.99))", borderTop: "1px solid rgba(201,162,255,0.4)", boxShadow: "0 -12px 40px rgba(0,0,0,0.6)", padding: "14px 16px calc(16px + env(safe-area-inset-bottom))", animation: "pigPop .3s ease both" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 17 }} aria-hidden="true">🎨</span>
                 <b style={{ fontSize: 15, color: "#e6d9ff" }}>Custom farm background</b>
-                <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: low ? "#9aa0a6" : "#c9a2ff" }}>{credits ?? "…"} creation{credits === 1 ? "" : "s"}</span>
+                <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: free ? "#8fe39a" : low ? "#9aa0a6" : "#c9a2ff" }}>{free ? "Owner · free" : `${credits ?? "…"} creation${credits === 1 ? "" : "s"}`}</span>
                 <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "#b9a2d6", fontSize: 22, lineHeight: 1, cursor: "pointer", padding: "0 2px" }}>×</button>
             </div>
             {draft ? (
@@ -1462,7 +1461,7 @@ function FarmBgCreator({ bg, draft, busy, onAct, onClose }) {
             ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} maxLength={300} placeholder="Describe your dream farm backdrop — e.g. 'a misty mountain valley at golden hour with a winding river'" style={{ width: "100%", resize: "none", borderRadius: 11, border: "1px solid rgba(201,162,255,0.35)", background: "rgba(0,0,0,0.3)", color: "#efe7ff", padding: "9px 11px", fontSize: 13, fontFamily: "inherit" }} />
-                    <button type="button" disabled={busy || low || desc.trim().length < 4} onClick={generate} style={{ width: "100%", padding: 12, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy || low || desc.trim().length < 4 ? 0.55 : 1 }}>{busy ? "Painting your world…" : "Generate · 3 creations"}</button>
+                    <button type="button" disabled={busy || low || desc.trim().length < 4} onClick={generate} style={{ width: "100%", padding: 12, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy || low || desc.trim().length < 4 ? 0.55 : 1 }}>{busy ? "Painting your world…" : free ? "Generate (owner · free)" : "Generate · 3 creations"}</button>
                     {low ? <a href="/marketplace/creations" style={{ fontSize: 12, fontWeight: 800, color: "#c9a2ff", textAlign: "center" }}>Get more creations →</a> : null}
                     {bg ? <button type="button" disabled={busy} onClick={removeBg} style={{ fontSize: 12, fontWeight: 700, color: "#9fb0c0", background: "none", border: "none", cursor: "pointer" }}>Remove custom background (back to weather scenes)</button> : null}
                 </div>

@@ -455,6 +455,7 @@ const customErr = (e) => ({ no_credits: "You're out of creations — grab a bund
 export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onSuggest, onClose }) {
     const [draft, setDraft] = useState(custom?.draft || null);
     const [credits, setCredits] = useState(custom?.credits || 0);
+    const [free, setFree] = useState(Boolean(custom?.free)); // owners/admins draw without spending a token
     const [name, setName] = useState(draft?.name || "");
     const [prompt, setPrompt] = useState(draft?.prompt || "");
     const [correction, setCorrection] = useState(""); // a tweak note for a redraw; the original prompt is preserved
@@ -472,6 +473,7 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
         if (!r?.ok) { setErr(r?.reason || customErr(r?.error)); return r; }
         if (r.draft) { setDraft(r.draft); setChosen(r.draft.options?.[r.draft.options.length - 1]?.url || null); setCorrection(""); }
         if (r.credits != null) setCredits(r.credits);
+        if (r.free != null) setFree(Boolean(r.free));
         return r;
     };
     const doSuggest = async () => {
@@ -491,7 +493,7 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Make your own decoration" style={{ width: "100%", maxWidth: 420, maxHeight: "90dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #c9a2ff", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <strong style={{ fontSize: 17 }}>🎨 Make your own</strong>
-                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: credits > 0 ? "#c9a2ff" : "#9aa0a6" }}>{credits} creation{credits === 1 ? "" : "s"}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: free ? "#8fe39a" : credits > 0 ? "#c9a2ff" : "#9aa0a6" }}>{free ? "Owner · free" : `${credits} creation${credits === 1 ? "" : "s"}`}</span>
                     <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7 }}>×</button>
                 </div>
 
@@ -517,8 +519,8 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
                         <div className="muted" style={{ fontSize: 10.5, marginTop: 3 }}>Tip: name it, tap ✨ to draft a description, then edit it however you like.</div>
                         <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>💡 Original ideas only — the art filter blocks named brands &amp; copyrighted characters (Pokémon, Nintendo, Disney, etc.). Describe your own creature or object and it&apos;ll draw.</div>
                         {err ? <div style={{ color: "#ff9a9a", fontSize: 12.5, marginTop: 8 }}>{err}</div> : null}
-                        {credits > 0 ? (
-                            <button type="button" onClick={doStart} disabled={busy} style={{ ...CPRIMARY, marginTop: 14 }}>🎨 Draw my decoration (uses 1 creation)</button>
+                        {free || credits > 0 ? (
+                            <button type="button" onClick={doStart} disabled={busy} style={{ ...CPRIMARY, marginTop: 14 }}>{free ? "🎨 Draw my decoration (owner · free)" : "🎨 Draw my decoration (uses 1 creation)"}</button>
                         ) : (
                             <div style={{ marginTop: 14, textAlign: "center" }}>
                                 <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re out of creations. Grab a bundle — you also get coins with every buy.</div>

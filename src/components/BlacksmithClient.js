@@ -283,7 +283,7 @@ export default function BlacksmithClient({ initial }) {
                                 <span className="forge-card-name">{it.name}</span>
                                 {it.level > 0 ? <span className="forge-card-rankline"><ForgeRank level={it.level} size={22} /></span> : null}
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
-                                {it.bonus ? <span className="forge-card-bonus">forged: {it.bonus}</span> : null}
+                                {it.bonus ? <span className="forge-card-bonus">⚒ {it.bonus}</span> : null}
                                 {it.maxed ? <span className="forge-card-cost forge-card-max">✦ PEAK — maxed</span> : (
                                     <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
                                         {parts[it.cost.tier - 1]?.sprite
@@ -690,15 +690,18 @@ const FORGE_CSS = `
 .forge-tabs button.on { background: linear-gradient(180deg, #ff9a3c, #e0631a); color: #2a1000; box-shadow: 0 2px 8px rgba(255,120,20,0.4), inset 0 1px 0 rgba(255,255,255,0.35); }
 .forge-tabs button.on svg { opacity: 1; }
 .forge-tabs button.on .forge-tab-ct { background: rgba(0,0,0,0.16); color: #2a1000; }
-.forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
-.forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 8px 10px; border-radius: 14px; cursor: pointer; text-align: center;
-    background: linear-gradient(180deg, rgba(30,18,10,0.85), rgba(14,8,4,0.9)); border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); color: #efe2d2; transition: transform .12s ease, box-shadow .12s ease; }
+.forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(134px, 1fr)); gap: 11px; }
+.forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 9px 11px; border-radius: 14px; cursor: pointer; text-align: center;
+    background: linear-gradient(180deg, rgba(34,20,11,0.9), rgba(14,8,4,0.92)); border: 1px solid color-mix(in srgb, var(--rc) 60%, transparent); color: #efe2d2; transition: transform .12s ease, box-shadow .12s ease; }
 .forge-card:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.5), 0 0 18px color-mix(in srgb, var(--rc) 35%, transparent); }
 .forge-card:disabled { opacity: 0.7; cursor: default; }
-.forge-art { width: 52px; height: 52px; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
-.forge-card-name { font-size: 12px; font-weight: 800; line-height: 1.15; }
-.forge-card-stats { font-size: 10.5px; color: #c8b79f; text-transform: capitalize; }
-.forge-card-bonus { font-size: 10px; color: #ffcf7a; font-weight: 700; }
+/* Bigger item, on a rarity-tinted glow pedestal so it reads at a glance. */
+.forge-art { width: 76px; height: 76px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 14px color-mix(in srgb, var(--rc) 55%, transparent)); }
+.forge-card-name { font-size: 14px; font-weight: 900; line-height: 1.15; color: #fff4e2; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+/* Inherent stats the item was BORN with — quiet, so the forged bonus can pop against them. */
+.forge-card-stats { font-size: 11px; color: #bda88c; line-height: 1.25; }
+/* What the FORGE added — a green pill that clearly stacks ON TOP of the base stats above. */
+.forge-card-bonus { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #a6f0b4; font-weight: 900; line-height: 1.2; background: rgba(80,210,120,0.14); border: 1px solid rgba(143,227,154,0.45); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .forge-card-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #b9a892; margin-top: 3px; }
 .forge-card.is-maxed { border-color: rgba(255,215,94,0.6); box-shadow: 0 0 0 1px rgba(255,215,94,0.3), 0 0 16px rgba(255,215,94,0.18); }
 .forge-card-max { color: #ffd75e; font-weight: 900; }

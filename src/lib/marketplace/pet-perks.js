@@ -10,7 +10,6 @@ export const GOLD_PER_POINT = 0.4;
 // Fortune → boss-raffle tickets: each fortune point banks this many tickets PER DAY the boss is alive (shared
 // by the display here + the draw math in boss.js, so they never drift).
 export const TICKETS_PER_FORTUNE_PER_DAY = 3;
-const EXTRA_STRIKE_BY_RARITY = { common: 1, rare: 1, epic: 1, legendary: 1, mythic: 2, ascendant: 2, eternal: 3 };
 const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2, mythic: 2.6, ascendant: 3.0, eternal: 3.5 };
 const ERUPT_BY_RARITY = {
     common: { chance: 0.08, mult: 1.5 }, rare: { chance: 0.1, mult: 1.6 }, epic: { chance: 0.12, mult: 1.8 },
@@ -87,7 +86,7 @@ export const PET_PERKS = {
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.
 export function petPerkValue(rarity, key) {
-    if (key === "extra_strike") return EXTRA_STRIKE_BY_RARITY[rarity] || 1;
+    if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
     if (key === "erupt") return ERUPT_BY_RARITY[rarity] || ERUPT_BY_RARITY.epic;
     if (key === "chain_strike") return CHAIN_BY_RARITY[rarity] || 0.1;
@@ -184,6 +183,7 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         else if (def.key === "execute") proc.executePct = cap(v * aMult, 1.2);
         else if (def.key === "onslaught") proc.onslaughtPct = cap(v * aMult, 1.2);
         else if (def.key === "first_blood") proc.firstBloodPct = cap(v * aMult, 1.2);
+        else if (def.key === "extra_strike") add("extra_strike", 1); // a pet's extra daily strike is FLAT +1 — never level-scaled (5 free strikes/day was way too strong)
         else add(def.key, v * aMult);
     }
     return { stats, economy, proc };

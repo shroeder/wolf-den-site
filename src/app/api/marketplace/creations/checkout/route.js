@@ -6,13 +6,11 @@ import { createSquareCardPayment, createSquareOrder, getCreationTokensVariationI
 import { sendAdminPush } from "@/lib/push/send.js";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getCreationTier } from "@/lib/marketplace/creation-tokens.js";
 import {
     createPendingCreationPurchase,
     failCreationPurchase,
     finalizeCreationPurchase,
-    grantCreationTierToOwner,
 } from "@/lib/marketplace/creation-tokens-server.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -45,13 +43,9 @@ export async function POST(request) {
             const tier = getCreationTier(body?.tierId);
             if (!tier) return noStore({ error: "Pick a token bundle." }, { status: 400 });
 
-            // ── Owner self-grant (test path): no card, no charge — just grant the tier's tokens + coins. ──
-            if (body?.grant === true) {
-                if (!isOwner(buyer.id)) return noStore({ error: "Not allowed." }, { status: 403 });
-                const g = await grantCreationTierToOwner(buyer.id, tier.id);
-                if (!g.ok) return noStore({ error: "Grant failed." }, { status: 400 });
-                return noStore({ ok: true, granted: true, owner: true, tokens: g.tokens, coins: g.coins, tokenBalance: g.tokenBalance });
-            }
+            // Granting creation tokens is ADMIN-APP ONLY now (POST /api/admin/creations, marketplace.manage +
+            // full audit ledger). The old website owner self-grant path was removed — owners instead create for
+            // FREE (no token needed), so there's no reason to mint tokens to yourself here.
 
             // ── Real charge (dark until PAYMENTS_ENABLED, exactly like store credit). ──
             if (!isPaymentsEnabled()) return noStore({ error: "Payments are currently disabled." }, { status: 403 });
