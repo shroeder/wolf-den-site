@@ -20,6 +20,9 @@ const MINI_DEG = 360 / MINI_WEDGES;
 const MINI_OFFSET = 22.5;
 const MINI_ICON_R = 33;
 
+// Human tier names for the prize-inspect card.
+const TIER_LABEL = { normal: "Common", rare: "Rare", bonus: "Bonus round", mini: "Mini Jackpot", jackpot: "Grand Jackpot" };
+
 // ── tiny Web-Audio kit (no assets, CSP-safe) ──
 let _ac = null;
 const ac = () => { if (typeof window === "undefined") return null; try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === "suspended") _ac.resume(); return _ac; } catch { return null; } };
@@ -50,7 +53,8 @@ export default function SpinWheel() {
     const [celebrate, setCelebrate] = useState(null);
     const [mini, setMini] = useState(null);       // { prizes, index, prize } bonus mini-wheel
     const [bonus, setBonus] = useState(null);      // { reveals } pick-a-box gear game
-    useScrollLock(Boolean(celebrate) || Boolean(mini) || Boolean(bonus));
+    const [inspect, setInspect] = useState(null);  // a legend prize the player tapped to inspect
+    useScrollLock(Boolean(celebrate) || Boolean(mini) || Boolean(bonus) || Boolean(inspect));
     const [msg, setMsg] = useState(null);
     const [lowCoins, setLowCoins] = useState(false);
 
@@ -282,12 +286,12 @@ export default function SpinWheel() {
                 <summary>🎁 What&apos;s on the wheel <span>{prizes.length} prizes</span></summary>
                 <div className="cw-legend-grid">
                     {prizes.map((p, i) => (
-                        <div key={i} className={`cw-leg tier-${p.tier}`}>
+                        <button key={i} type="button" className={`cw-leg tier-${p.tier}`} onClick={() => setInspect(p)} title="Tap to inspect">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             {p.sprite ? <img className="cw-leg-img" src={p.sprite} alt="" /> : null}
                             <span className="cw-leg-label">{p.label}</span>
                             <span className="cw-leg-odds">{p.odds}%</span>
-                        </div>
+                        </button>
                     ))}
                 </div>
             </details>
@@ -403,6 +407,21 @@ export default function SpinWheel() {
                 </div>
             ) : null}
 
+            {/* ── INSPECT a prize (tap a legend row) ── */}
+            {inspect ? (
+                <div className="cw-modal" onClick={() => setInspect(null)}>
+                    <div className="cw-modal-card cw-inspect" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="cw-bonus-close" onClick={() => setInspect(null)} aria-label="Close">✕</button>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {inspect.sprite ? <img className="cw-inspect-img" src={inspect.sprite} alt="" /> : null}
+                        <div className="cw-inspect-name">{inspect.label}</div>
+                        <div className={`cw-inspect-tier tier-${inspect.tier}`}>{TIER_LABEL[inspect.tier] || "Prize"}</div>
+                        <p className="cw-inspect-desc">{inspect.desc || inspect.label}</p>
+                        <div className="cw-inspect-odds">Odds this spin · <b>{inspect.odds}%</b></div>
+                    </div>
+                </div>
+            ) : null}
+
             <style>{CW_CSS}</style>
         </section>
     );
@@ -477,7 +496,9 @@ const CW_CSS = `
 .cw-legend > summary::after { content: "▸"; margin-left: auto; color: #9aa2ab; transition: transform .18s; }
 .cw-legend[open] > summary::after { transform: rotate(90deg); }
 .cw-legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 10px; }
-.cw-leg { display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 9px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); font-size: 12px; }
+.cw-leg { display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 9px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); font-size: 12px; width: 100%; text-align: left; color: inherit; font-family: inherit; cursor: pointer; transition: transform .12s, background .12s, border-color .12s; }
+.cw-leg:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,215,94,0.4); transform: translateY(-1px); }
+.cw-leg:active { transform: translateY(0); }
 .cw-leg-img { width: 22px; height: 22px; object-fit: contain; flex: none; }
 .cw-leg-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cw-leg-odds { font-size: 10.5px; color: #9aa2ab; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -486,6 +507,19 @@ const CW_CSS = `
 .cw-leg.tier-mini { border-color: rgba(200,150,255,0.4); }
 .cw-leg.tier-jackpot { border-color: rgba(255,215,94,0.5); background: rgba(255,215,94,0.06); }
 .cw-hint { margin: 12px 0 0; font-size: 11px; color: #8a9099; text-align: center; line-height: 1.5; }
+
+/* inspect card (tap a legend prize) */
+.cw-inspect { position: relative; max-width: 320px; }
+.cw-inspect-img { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.55)); }
+.cw-inspect-name { font-size: 1.2rem; font-weight: 900; color: #ffe9bf; margin-top: 6px; }
+.cw-inspect-tier { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 10px; border-radius: 999px; color: #cbd2da; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+.cw-inspect-tier.tier-rare { color: #7defd0; border-color: rgba(92,224,192,0.5); background: rgba(92,224,192,0.08); }
+.cw-inspect-tier.tier-bonus { color: #ff9cf0; border-color: rgba(255,140,240,0.5); background: rgba(255,140,240,0.08); }
+.cw-inspect-tier.tier-mini { color: #d3b0ff; border-color: rgba(200,150,255,0.55); background: rgba(200,150,255,0.1); }
+.cw-inspect-tier.tier-jackpot { color: #ffe28a; border-color: rgba(255,215,94,0.6); background: rgba(255,215,94,0.1); }
+.cw-inspect-desc { margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #ecd6bc; }
+.cw-inspect-odds { margin-top: 12px; font-size: 12px; color: #9aa2ab; }
+.cw-inspect-odds b { color: #ffe28a; font-variant-numeric: tabular-nums; }
 
 /* modals (mini wheel + bonus game) */
 .cw-modal { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 18px; background: rgba(6,4,10,0.78); backdrop-filter: blur(4px); }

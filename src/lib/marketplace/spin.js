@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests } from "@/lib/marketplace/chests.js";
-import { grantConsumable } from "@/lib/marketplace/consumables.js";
+import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -28,6 +28,26 @@ const PITY = 20; // guaranteed rare within this many spins
 // that the farm is public (grantSeed/SEEDS handler wired below).
 // Prize sprite path (real AI art, no emoji) — public/images/spin/prizes/<name>.png.
 const P = (name) => `/images/spin/prizes/${name}.png`;
+
+// One-line explainer for a wheel prize — powers the "tap a reward to inspect it" card in the legend.
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+function prizeDesc(p) {
+    switch (p.kind) {
+        case "gold": return p.mini
+            ? `The MINI JACKPOT — instantly bank ${(p.amount || 0).toLocaleString()} gold.`
+            : `Instantly bank ${(p.amount || 0).toLocaleString()} gold.`;
+        case "xp": return `Gain ${(p.amount || 0).toLocaleString()} XP toward your next level.`;
+        case "consumable": return CONSUMABLES[p.consumable]?.desc || p.label;
+        case "seed": return "A random farm seed to plant and grow in your pasture.";
+        case "fragment": return `${p.n || 1} dig fragments for the sailing dig minigame.`;
+        case "chest": return `A ${cap(p.tierId)} loot chest — open it for gear, gold and more.`;
+        case "mini_wheel": return "Spin a bonus Mini Wheel for a second prize on top.";
+        case "respin": return "A free bonus spin — spin again on the house.";
+        case "bonus_game": return "Play a pick-a-box match-3 round to win wheel-exclusive gear.";
+        case "major_jackpot": return "The progressive community jackpot — win the entire pot.";
+        default: return p.label;
+    }
+}
 
 // Progressive jackpot tuning (shared community pot).
 const JACKPOT_BASE = 5000;      // pot reseeds to this when won
@@ -257,7 +277,7 @@ export async function getSpinState(buyerId) {
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
-            return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
+            return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10, desc: prizeDesc(p) })) };
         })(),
         nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
         canSpin: freeAvailable || (row?.tokens || 0) > 0,

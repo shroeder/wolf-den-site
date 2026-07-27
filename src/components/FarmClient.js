@@ -737,7 +737,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 /* Illustrated backdrop tiled with the mirror trick: [A A' A A'] — every other copy flipped, so
                    each junction's edges match and there's no seam even with non-tiling art (same as the sailing sky). */
                 .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; }
-                .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+                .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; pointer-events: none; user-select: none; }
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
                 /* IN-FLOW mirror strip — sets the field's scrollable width (3 copies, every other flipped → seamless). */
                 .farm-bg-tiled { display: flex; height: 100%; width: max-content; user-select: none; }
@@ -862,8 +862,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                                     ))}
                                 </div>
                             ) : (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
+                                // Garden: a fixed, NON-scrolling view (crops sit at fixed % positions). A single
+                                // natural-width image left a gradient gap on the right of wide desktops, so repeat the
+                                // beds across the FULL width with the mirror trick [A A' A …]. The strip is absolutely
+                                // positioned, so it fills edge-to-edge without widening the field — crops stay aligned.
+                                <div className="farm-bg-strip" aria-hidden="true">
+                                    {[0, 1, 2, 3, 4, 5].map((k) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img key={k} src={bgUrl} alt="" draggable={false} />
+                                    ))}
+                                </div>
                             )
                         ) : null}
                         {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
