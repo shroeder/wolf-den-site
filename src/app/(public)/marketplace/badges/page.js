@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import BadgeShopClient from "@/components/BadgeShopClient";
 import BadgeCollectionClient from "@/components/BadgeCollectionClient";
-import NextBadgeNudge from "@/components/NextBadgeNudge";
 import ShowcaseBadgePicker from "@/components/ShowcaseBadgePicker";
 import { getBadgeBoard, getBadgeMilestones } from "@/lib/marketplace/badges.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -33,39 +32,53 @@ export default async function BadgesPage() {
         getBadgeMilestones(buyer.id).catch(() => null),
     ]);
     const badges = board?.badges || [];
+    const p = board?.passives || {};
+    const powers = [
+        { key: "might", ico: "⚔️", val: p.might ? `+${p.might}` : null, lab: "Might" },
+        { key: "crit_chance", ico: "🎯", val: p.crit_chance ? `+${p.crit_chance}%` : null, lab: "Crit Chance" },
+        { key: "crit_power", ico: "💥", val: p.crit_power ? `+${p.crit_power}%` : null, lab: "Crit Power" },
+    ].filter((x) => x.val);
 
     return (
         <div className="stack reveal">
-            <section className="card">
-                <h1 style={{ marginTop: 0 }}>🎖️ Your Badges</h1>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    You&apos;ve earned <strong>{board?.earnedCount || 0}</strong> of {board?.totalCount || 0}. Each badge grants a little XP + gold — and many add a passive that buffs your daily boss strike. Choose up to 3 to show on your card.
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-                    {(() => {
-                        const p = board?.passives || {};
-                        const bits = [];
-                        if (p.might) bits.push(`⚔️ +${p.might} Might`);
-                        if (p.crit_chance) bits.push(`🎯 +${p.crit_chance}% Crit Chance`);
-                        if (p.crit_power) bits.push(`💥 +${p.crit_power}% Crit Power`);
-                        return bits.length ? <div className="badge-passive-strip" style={{ margin: 0 }}>🎖️ Your badges buff your strike: <strong>{bits.join(" · ")}</strong></div> : null;
-                    })()}
-                    <NextBadgeNudge next={board?.next} earnedCount={board?.earnedCount || 0} totalCount={board?.totalCount || 0} href="#customize" />
+            {/* Compact hero: title + a couple of numbers, then the juiced badge-power panel. */}
+            <section className="card badges-hero">
+                <div className="bh-head">
+                    <h1>🎖️ Your Badges</h1>
+                    <span className="bh-count"><b>{board?.earnedCount || 0}</b><span>/ {board?.totalCount || 0}</span></span>
                 </div>
+                {powers.length ? (
+                    <div className="bh-power">
+                        <div className="bh-power-label">⚡ Badge Power <span>— buffs your daily boss strike</span></div>
+                        <div className="bh-power-tiles">
+                            {powers.map((x) => (
+                                <div key={x.key} className={`bh-tile ${x.key}`}>
+                                    <span className="bh-ico">{x.ico}</span>
+                                    <span className="bh-val">{x.val}</span>
+                                    <span className="bh-lab">{x.lab}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="bh-power bh-power-empty">⚡ Earn badges with <b>⚔️ / 🎯 / 💥</b> bonuses to power up your daily boss strike.</div>
+                )}
             </section>
 
-            <section className="card" id="customize">
-                <h2 style={{ marginTop: 0 }}>Show off on your card</h2>
-                <p className="muted" style={{ marginTop: 0 }}>Pick up to 3. Your #1 becomes the folder tab on your card.</p>
-                <ShowcaseBadgePicker badges={profile?.badges || []} current={profile?.showcaseSlugs || []} />
-            </section>
-
-            <section className="card">
-                <h2 style={{ marginTop: 0 }}>💰 Badge shop</h2>
-                <BadgeShopClient />
-            </section>
-
+            {/* The meat — right up top. */}
             <BadgeCollectionClient badges={badges} initialMilestones={milestones} earnedCount={board?.earnedCount || 0} totalCount={board?.totalCount || 0} />
+
+            {/* Chrome, tucked below and collapsed. */}
+            <details className="card badges-collapse">
+                <summary><span className="bc-sum-title">✨ Show off on your card</span><span className="bc-sum-hint">pick up to 3</span></summary>
+                <p className="muted" style={{ margin: "8px 0 0" }}>Your #1 becomes the folder tab on your card.</p>
+                <div style={{ marginTop: 10 }}><ShowcaseBadgePicker badges={profile?.badges || []} current={profile?.showcaseSlugs || []} /></div>
+            </details>
+
+            <details className="card badges-collapse">
+                <summary><span className="bc-sum-title">🛒 Badge shop</span><span className="bc-sum-hint">buy with gold</span></summary>
+                <div style={{ marginTop: 10 }}><BadgeShopClient /></div>
+            </details>
         </div>
     );
 }
