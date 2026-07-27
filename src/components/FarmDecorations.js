@@ -240,7 +240,9 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                             light is always on; a decoration's intrinsic glow shows only at dusk/night. */}
                         {p.light?.on && (p.light.always || tod !== "day") ? (
                             <span aria-hidden="true" style={{
-                                position: "absolute", left: "50%", top: `${size * 0.42}px`, width: p.light.radius * 2, height: p.light.radius * 2,
+                                // The glow lives INSIDE the scale()'d container, so divide its diameter back out — otherwise a
+                                // scaled-up piece balloons the screen-blend circle and washes the whole view.
+                                position: "absolute", left: "50%", top: `${size * 0.42}px`, width: (p.light.radius * 2) / (live.scale || 1), height: (p.light.radius * 2) / (live.scale || 1),
                                 transform: "translate(-50%, -50%)", borderRadius: "50%", pointerEvents: "none", zIndex: 0, mixBlendMode: "screen",
                                 background: `radial-gradient(circle, rgba(${p.light.rgb},${(p.light.intensity ?? 0.7)}) 0%, rgba(${p.light.rgb},${(p.light.intensity ?? 0.7) * 0.45}) 32%, rgba(${p.light.rgb},0) 68%)`,
                                 animation: p.light.flicker ? "decoFlicker 2.6s ease-in-out infinite" : "decoGlow 4.5s ease-in-out infinite",

@@ -246,7 +246,6 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [garden, setGarden] = useState(initial.garden || null);
     const [gardenBusy, setGardenBusy] = useState(null);
     const [bountyTick, setBountyTick] = useState(0); // bumps after a mission-progressing action → FeatureDailies re-fetches
-    const [farmClaimable, setFarmClaimable] = useState(0); // claimable farm daily-quests → Garden-tab attention badge
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
@@ -809,7 +808,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {farm.mine && farm.rating ? <FarmRankBadge byTier={farm.rating.byTier} /> : null}
 
-            {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} onClaimable={setFarmClaimable} /> : null}
+            {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
 
             {farm.rating ? (
                 <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
@@ -819,9 +818,11 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* Three farm areas: Garden (crops) · Outside (pasture) · Inside (barn). */}
             <div className="farm-viewtabs">
-                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]].map(([v, ico, label]) => {
-                    // Garden tab shows an attention badge when there's stuff to grab: crops ready + claimable quests.
-                    const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) + farmClaimable : 0;
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]]
+                    .filter(([v]) => farm.mine || v !== "garden") // the Garden is yours alone — hide it on other members' farms
+                    .map(([v, ico, label]) => {
+                    // Garden tab badge = crops READY TO HARVEST only (quests are claimed above the scene, not in the garden).
+                    const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
                     return (
                         <button key={v} type="button" className={`${view === v ? "on" : ""}${attn ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
                             <span aria-hidden="true">{ico}</span>{label}
@@ -941,7 +942,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                                 width={46}
                                                 height={46}
                                                 draggable={false}
-                                                style={{ width: 46, height: 46, objectFit: "contain", transform: (Boolean(p.flip) !== Boolean(pet.flip)) ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+                                                style={{ width: 46, height: 46, objectFit: "contain", transform: pet.flip ? "scaleX(-1)" : "none", filter: `${canTap ? "drop-shadow(0 0 5px rgba(255,226,122,0.9)) " : ""}brightness(${farm.spriteBrightness ?? 1})`, WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
                                             />
                                             {pet.petted ? <span style={{ position: "absolute", top: -4, right: 0, fontSize: 13 }}>❤️</span> : null}
                                         </span>
@@ -1020,7 +1021,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {/* Decorate DOCK: bottom tray you drag decorations out of, onto the (still-visible) farm scene. */}
-            {decorating && farm.mine && farm.decorations ? (
+            {decorating && canDecorate && farm.mine && farm.decorations ? (
                 <DecoDock
                     deco={farm.decorations}
                     fieldRef={fieldRef}

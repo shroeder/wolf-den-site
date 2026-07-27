@@ -9,12 +9,9 @@ const THEME = {
     sailing: { accent: "#6fd0ff", soft: "rgba(111,208,255,0.13)", border: "rgba(111,208,255,0.4)", title: "Today's voyage bounties", icon: "⚓" },
 };
 
-export default function FeatureDailies({ feature, refreshKey = 0, onClaimable }) {
+export default function FeatureDailies({ feature, refreshKey = 0 }) {
     const [dailies, setDailies] = useState(null);
     const [busy, setBusy] = useState(null);
-
-    // Report claimable (done-but-unclaimed) count up so a parent can show a tab/nav attention badge.
-    useEffect(() => { if (onClaimable) onClaimable((dailies || []).filter((q) => q.done && !q.claimed).length); }, [dailies, onClaimable]);
 
     // Re-fetch on mount, whenever refreshKey bumps (a mission-progressing action happened), and when the tab
     // regains focus — so a completed bounty flips to "Claim" live, not only after a page refresh.
