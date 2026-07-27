@@ -1,27 +1,62 @@
-// One-off: generate the PRIZE WHEEL art in the game's hand-painted fantasy style — a rotating ornate disc +
-// a stationary bulb-lit frame with a wolf-head pointer. Static assets committed to public/images/spin/.
+// Generate ALL prize-wheel art in the game's hand-painted style: a slim bulb-lit frame (big center hole), a
+// 20-wedge disc, a small mini-wheel disc, 16 prize sprites, and 6 wheel-exclusive gear sprites. Static assets
+// under public/images/spin/. Run: node scripts/gen-spin-art.mjs   (add slugs to regen only some)
 import fs from "node:fs";
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
 if (!key) throw new Error("no OPENAI_API_KEY");
 
+const STYLE = "hand-painted mobile fantasy RPG / trading-card-game art style, warm rich saturated color, bold clean rendering, cohesive with a cozy wolf-themed game. Die-cut on a FULLY TRANSPARENT background — nothing behind it, no scene, no shadow. Absolutely NO text, NO words, NO numbers, NO letters.";
+const SPRITE = (subject) => `A single ${subject}, centered, fills the frame, ${STYLE}`;
+
 const JOBS = [
-    {
-        out: "public/images/spin/wheel-disc.png",
-        prompt: `A top-down perfectly circular fantasy PRIZE WHEEL face for a cozy wolf-themed trading-card-game. Hand-painted mobile RPG art style, rich and warm: aged gold filigree, deep walnut wood, and jewel-tone wedge segments (emerald, sapphire, ruby, amethyst, teal, warm amber) alternating evenly around the wheel, separated by ornate golden dividers radiating from the center. A polished engraved gold outer ring frames the wedges. In the very center sits a round medallion embossed with a noble stylized wolf head. Soft painterly texture, gentle rim lighting, luxurious and inviting, perfectly symmetrical and centered, the round wheel fills the whole frame edge to edge. IMPORTANT: NO pointer, NO triangle, NO arrow, NO marker, NO crest sticking out — just the plain round wheel. Absolutely NO text, NO numbers, NO letters. Nothing behind it.`,
-    },
+    { out: "public/images/spin/wheel-frame.png", size: "1024x1024", prompt: `Just a thin decorative gold CIRCLET sitting exactly on the outermost edge of a square image — like a slim porthole rim. The circlet band is extremely narrow (only ~7% of the radius). Everything inside is one enormous empty transparent circle (roughly 85% of the image is transparent hole). Small round glowing golden marquee light bulbs are spaced evenly around the thin gold band. A small carved gold wolf head sits at the top of the ring as a tiny downward pointer. Fully transparent center and transparent outside the ring. ${STYLE}` },
+    { out: "public/images/spin/wheel-disc.png", size: "1024x1024", prompt: `A top-down circular fantasy PRIZE WHEEL face with TWENTY thin equal wedge segments in alternating jewel tones (emerald, sapphire, ruby, amethyst, teal, amber, rose), separated by fine gold dividers radiating from a small central medallion embossed with a wolf head. A polished gold outer ring. Painterly, symmetrical, the round wheel fills the frame. NO pointer, NO triangle, NO arrow, NO marker. ${STYLE}` },
+    { out: "public/images/spin/mini-wheel.png", size: "1024x1024", prompt: `A small top-down fantasy prize wheel with EIGHT equal jewel-tone wedge segments and thin gold dividers, a tiny gold wolf medallion in the center, ornate gold rim, playful and inviting. NO pointer, NO arrow. ${STYLE}` },
+
+    { out: "public/images/spin/prizes/coins-small.png", size: "1024x1024", prompt: SPRITE("small neat stack of shiny gold coins") },
+    { out: "public/images/spin/prizes/coins-big.png", size: "1024x1024", prompt: SPRITE("big overflowing pile of glittering gold coins") },
+    { out: "public/images/spin/prizes/gem-jackpot.png", size: "1024x1024", prompt: SPRITE("huge glowing multifaceted golden diamond gemstone radiating brilliant light, the ultimate jackpot prize") },
+    { out: "public/images/spin/prizes/coin-burst.png", size: "1024x1024", prompt: SPRITE("burst of gold coins exploding joyfully outward from a golden coin") },
+    { out: "public/images/spin/prizes/xp-orb.png", size: "1024x1024", prompt: SPRITE("glowing sky-blue experience orb, a radiant magical star-crystal") },
+    { out: "public/images/spin/prizes/pet-treat.png", size: "1024x1024", prompt: SPRITE("big meaty golden-brown bone pet treat") },
+    { out: "public/images/spin/prizes/seed-pouch.png", size: "1024x1024", prompt: SPRITE("small brown drawstring pouch spilling a few green sprouting seeds") },
+    { out: "public/images/spin/prizes/fertilizer.png", size: "1024x1024", prompt: SPRITE("burlap sack of dark rich fertilizer soil with a green leaf sprouting on top") },
+    { out: "public/images/spin/prizes/dig-shard.png", size: "1024x1024", prompt: SPRITE("glowing carved ancient stone treasure fragment / relic shard with golden runes") },
+    { out: "public/images/spin/prizes/potion-red.png", size: "1024x1024", prompt: SPRITE("glowing red adrenaline potion in a corked glass vial with a sparkle") },
+    { out: "public/images/spin/prizes/potion-brew.png", size: "1024x1024", prompt: SPRITE("frothy amber magical brew in an ornate wooden tankard, a berserker's drink") },
+    { out: "public/images/spin/prizes/chest-wood.png", size: "1024x1024", prompt: SPRITE("small closed wooden treasure chest with dark iron bands and a brass lock") },
+    { out: "public/images/spin/prizes/chest-gold.png", size: "1024x1024", prompt: SPRITE("ornate closed golden treasure chest glowing with warm light") },
+    { out: "public/images/spin/prizes/spin-ticket.png", size: "1024x1024", prompt: SPRITE("ornate golden carnival prize ticket / raffle ticket with a small wheel motif") },
+    { out: "public/images/spin/prizes/mini-wheel.png", size: "1024x1024", prompt: SPRITE("small ornate golden prize wheel with jewel-tone wedges, a playful bonus icon") },
+    { out: "public/images/spin/prizes/mystery-box.png", size: "1024x1024", prompt: SPRITE("mysterious dark gift box sealed with a glowing golden question mark and gold ribbon") },
+    { out: "public/images/spin/prizes/bonus-spin.png", size: "1024x1024", prompt: SPRITE("glowing golden arrow arrows forming a circular refresh loop around a small prize wheel, a free-spin token") },
+
+    { out: "public/images/spin/gear/wg-helm.png", size: "1024x1024", prompt: SPRITE("epic ornate wolf-themed steel-and-gold war helmet with wolf ears") },
+    { out: "public/images/spin/gear/wg-blade.png", size: "1024x1024", prompt: SPRITE("epic curved golden fantasy sword with a wolf-head pommel, glowing edge") },
+    { out: "public/images/spin/gear/wg-shield.png", size: "1024x1024", prompt: SPRITE("epic round ornate shield emblazoned with a golden wolf crest") },
+    { out: "public/images/spin/gear/wg-cloak.png", size: "1024x1024", prompt: SPRITE("epic flowing enchanted deep-blue cloak fastened with a golden wolf clasp") },
+    { out: "public/images/spin/gear/wg-amulet.png", size: "1024x1024", prompt: SPRITE("epic glowing wolf-fang amulet on a golden chain, radiating power") },
+    { out: "public/images/spin/gear/wg-gauntlet.png", size: "1024x1024", prompt: SPRITE("epic ornate armored gauntlet with golden claws and a wolf sigil") },
 ];
 
-fs.mkdirSync("public/images/spin", { recursive: true });
+const only = process.argv.slice(2);
+fs.mkdirSync("public/images/spin/prizes", { recursive: true });
+fs.mkdirSync("public/images/spin/gear", { recursive: true });
+let ok = 0, run = 0;
 for (const job of JOBS) {
-    const resp = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt: job.prompt, size: "1024x1024", background: "transparent", quality: "high", n: 1 }),
-    });
-    if (!resp.ok) { console.error(`✗ ${job.out}: OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`); continue; }
-    const b64 = (await resp.json())?.data?.[0]?.b64_json;
-    if (!b64) { console.error(`✗ ${job.out}: no image`); continue; }
-    fs.writeFileSync(job.out, Buffer.from(b64, "base64"));
-    console.log(`✓ ${job.out} (${fs.statSync(job.out).size} bytes)`);
+    if (only.length && !only.some((s) => job.out.includes(s))) continue;
+    run += 1;
+    try {
+        const resp = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({ model: "gpt-image-1", prompt: job.prompt, size: job.size, background: "transparent", quality: "high", n: 1 }),
+        });
+        if (!resp.ok) { console.error(`✗ ${job.out}: ${resp.status} ${(await resp.text()).slice(0, 160)}`); continue; }
+        const b64 = (await resp.json())?.data?.[0]?.b64_json;
+        if (!b64) { console.error(`✗ ${job.out}: no image`); continue; }
+        fs.writeFileSync(job.out, Buffer.from(b64, "base64"));
+        ok += 1; console.log(`✓ ${job.out}`);
+    } catch (e) { console.error(`✗ ${job.out}: ${e.message}`); }
 }
+console.log(`Done. ${ok}/${run} generated.`);

@@ -5,9 +5,8 @@ import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js"
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
-import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
-import { DECORATIONS } from "@/lib/marketplace/decorations.js";
-import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
+import { grantItem } from "@/lib/marketplace/inventory.js";
+import { itemById } from "@/lib/marketplace/items.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
@@ -22,37 +21,126 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 
 export const SPIN_TOKEN_COST = 400; // gold to buy one extra spin
 const PITY = 20; // guaranteed rare within this many spins
-const COUPON_PCT = 50;
-const COUPON_MAX = 4000;
 
 // The wheel carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a rare thrill
 // (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side. Single wheel for
 // everyone (the old bronze/silver/gold tiers were collapsed to one). The 🌱 Common Seed wedge is live now
 // that the farm is public (grantSeed/SEEDS handler wired below).
-// The wheel art has 10 painted wedges, so the prize list is exactly 10 — one per wedge, shown right on the
-// wheel. System-flavored (fertilizer / fragments / a boss potion) so it's not just gold/XP, plus the thrill.
+// Prize sprite path (real AI art, no emoji) — public/images/spin/prizes/<name>.png.
+const P = (name) => `/images/spin/prizes/${name}.png`;
+
+// Progressive jackpot tuning (shared community pot).
+const JACKPOT_BASE = 5000;      // pot reseeds to this when won
+const JACKPOT_CONTRIB = 15;     // every spin adds this to the pot
+const MINI_JACKPOT_AMT = 1000;  // the fixed MINI JACKPOT wedge
+
+// TWENTY wedges — one prize each, shown on the wheel with real sprites. Regular prizes + four special wedges
+// (MINI/MAJOR jackpot, MINI WHEEL bonus round, BONUS GAME gear pick).
 const WHEELS = [
     {
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
-            { label: "100 gold", emoji: "🪙", weight: 24, kind: "gold", amount: 100 },
-            { label: "Pet Treat", emoji: "🦴", weight: 13, kind: "consumable", consumable: "treat_bone", n: 1 },
-            { label: "Farm Seed", emoji: "🌱", weight: 11, kind: "seed" },
-            { label: "5 Fertilizer", emoji: "🪣", weight: 9, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
-            { label: "3 Dig Fragments", emoji: "⚓", weight: 9, kind: "fragment", n: 3 },
-            { label: "250 gold", emoji: "💰", weight: 12, kind: "gold", amount: 250 },
-            { label: "BONUS SPIN", emoji: "🎡", weight: 8, tier: "bonus", kind: "respin" },
-            { label: "Adrenaline Vial", emoji: "🧪", weight: 6, rare: true, tier: "rare", kind: "consumable", consumable: "pot_adrenaline", n: 1 },
-            { label: "Wooden Chest", emoji: "🎁", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
-            { label: "JACKPOT · 2,500 gold", emoji: "💎", weight: 2, rare: true, jackpot: true, tier: "jackpot", kind: "jackpot", amount: 2500 },
+            { label: "50 gold", sprite: "coins-small", weight: 16, kind: "gold", amount: 50 },
+            { label: "150 XP", sprite: "xp-orb", weight: 12, kind: "xp", amount: 150 },
+            { label: "100 gold", sprite: "coins-small", weight: 15, kind: "gold", amount: 100 },
+            { label: "Pet Treat", sprite: "pet-treat", weight: 10, kind: "consumable", consumable: "treat_bone", n: 1 },
+            { label: "Farm Seed", sprite: "seed-pouch", weight: 9, kind: "seed" },
+            { label: "200 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 200 },
+            { label: "5 Fertilizer", sprite: "fertilizer", weight: 8, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
+            { label: "3 Dig Fragments", sprite: "dig-shard", weight: 8, kind: "fragment", n: 3 },
+            { label: "MINI WHEEL", sprite: "mini-wheel", weight: 5, tier: "bonus", kind: "mini_wheel" },
+            { label: "350 gold", sprite: "coins-big", weight: 8, kind: "gold", amount: 350 },
+            { label: "400 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 400 },
+            { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
+            { label: "BONUS SPIN", sprite: "bonus-spin", weight: 7, tier: "bonus", kind: "respin" },
+            { label: "Wooden Chest", sprite: "chest-wood", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            { label: "BONUS GAME", sprite: "mystery-box", weight: 4, tier: "bonus", kind: "bonus_game" },
+            { label: "500 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 500 },
+            { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
+            { label: "Gold Chest", sprite: "chest-gold", weight: 2, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
+            { label: "MINI JACKPOT", sprite: "coin-burst", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: MINI_JACKPOT_AMT },
+            { label: "MAJOR JACKPOT", sprite: "gem-jackpot", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "major_jackpot" },
         ],
     },
+];
+
+// The MINI WHEEL bonus round — a small secondary wheel of solid prizes.
+const MINI_WHEEL_PRIZES = [
+    { label: "300 gold", sprite: "coins-small", weight: 20, kind: "gold", amount: 300 },
+    { label: "400 XP", sprite: "xp-orb", weight: 14, kind: "xp", amount: 400 },
+    { label: "Hearty Snack", sprite: "pet-treat", weight: 12, kind: "consumable", consumable: "treat_snack", n: 1 },
+    { label: "5 Dig Fragments", sprite: "dig-shard", weight: 12, kind: "fragment", n: 5 },
+    { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
+    { label: "Wooden Chest", sprite: "chest-wood", weight: 10, kind: "chest", tierId: "wooden" },
+    { label: "Adrenaline Vial", sprite: "potion-red", weight: 10, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
+    { label: "1,000 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1000 },
+];
+
+// Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). Weighted so the flashier
+// pieces are a touch rarer.
+const WHEEL_GEAR = [
+    { id: "wg_helm", weight: 20 }, { id: "wg_shield", weight: 20 }, { id: "wg_ring", weight: 20 },
+    { id: "wg_cloak", weight: 16 }, { id: "wg_amulet", weight: 14 }, { id: "wg_blade", weight: 10 },
 ];
 
 function wheelForLevel(level) {
     let w = WHEELS[0];
     for (const cand of WHEELS) if (level >= cand.minLevel) w = cand;
     return w;
+}
+
+// Generic weighted pick → the chosen list ITEM (not index).
+function pickWeighted(list, rand = Math.random) {
+    const total = list.reduce((s, x) => s + (x.weight || 1), 0) || 1;
+    let r = rand() * total;
+    for (const x of list) { r -= x.weight || 1; if (r < 0) return x; }
+    return list[list.length - 1];
+}
+
+// ── Shared progressive jackpot pot ──
+export async function getJackpotPot() {
+    const r = await db.queryOne(`SELECT pot FROM mkt_progressive_jackpot WHERE id = 1`).catch(() => null);
+    return r?.pot != null ? Number(r.pot) : JACKPOT_BASE;
+}
+async function bumpJackpotPot(n) {
+    await db.query(`INSERT INTO mkt_progressive_jackpot (id, pot) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET pot = mkt_progressive_jackpot.pot + $1, updated_at = NOW()`, [n]).catch(() => {});
+}
+// Atomically award the whole pot to the winner and reseed. Returns the amount won.
+async function winJackpotPot(buyerId) {
+    const r = await db
+        .queryOne(
+            `WITH cur AS (SELECT pot FROM mkt_progressive_jackpot WHERE id = 1 FOR UPDATE)
+             UPDATE mkt_progressive_jackpot m SET pot = $2, last_winner = $1, last_won_at = NOW(), updated_at = NOW()
+               FROM cur WHERE m.id = 1 RETURNING cur.pot AS won`,
+            [buyerId, JACKPOT_BASE]
+        )
+        .catch(() => null);
+    return r?.won != null ? Number(r.won) : JACKPOT_BASE;
+}
+
+// The MINI WHEEL bonus round: roll a prize on the small wheel, grant it, and return the wheel + winning index
+// so the client can animate it.
+async function rollMiniWheel(buyerId) {
+    const idx = (() => { const pick = pickWeighted(MINI_WHEEL_PRIZES); return MINI_WHEEL_PRIZES.indexOf(pick); })();
+    const prize = MINI_WHEEL_PRIZES[idx];
+    const display = await grantPrize(buyerId, prize);
+    return {
+        prizes: MINI_WHEEL_PRIZES.map((p) => ({ label: p.label, sprite: P(p.sprite), tier: p.tier || (p.rare ? "rare" : "normal") })),
+        index: idx,
+        prize: { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal") },
+    };
+}
+
+// The BONUS GAME: grant 3 wheel-exclusive gear pieces and return their reveal cards.
+async function rollBonusGame(buyerId) {
+    const reveals = [];
+    for (let i = 0; i < 3; i += 1) {
+        const g = pickWeighted(WHEEL_GEAR);
+        const item = itemById(g.id);
+        await grantItem(buyerId, g.id, "wheel_bonus").catch(() => {});
+        reveals.push({ id: g.id, name: item?.name || "Wheel Gear", rarity: item?.rarity || "epic", sprite: `/images/spin/gear/${g.id === "wg_ring" ? "wg-gauntlet" : g.id.replace("_", "-")}.png` });
+    }
+    return { reveals };
 }
 
 // Weighted pick of a prize INDEX. forceRare restricts to rare segments (pity).
@@ -65,53 +153,36 @@ function pickIndex(wheel, forceRare, rand = Math.random) {
     return pool[pool.length - 1].i;
 }
 
-// Deliver a prize; returns display { emoji, text }.
+// Deliver a prize; returns display { sprite, text }. (MINI WHEEL / BONUS GAME are handled in doSpin.)
 async function grantPrize(buyerId, prize) {
     const hh = await activeXpMultiplier().catch(() => 1);
-    if (prize.kind === "gold" || prize.kind === "jackpot") {
-        const amt = Math.round(prize.amount * (prize.kind === "gold" ? hh : 1)); // jackpot is already huge; don't HH-stack it
+    const sprite = prize.sprite ? P(prize.sprite) : null;
+    if (prize.kind === "major_jackpot") {
+        const won = await winJackpotPot(buyerId);
+        await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, won]).catch(() => {});
+        await logCoin(buyerId, won, "spin_prize", { meta: { prize: "MAJOR JACKPOT" } }).catch(() => {});
+        await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+        return { sprite, text: `MAJOR JACKPOT — ${won.toLocaleString()} gold!`, amount: won };
+    }
+    if (prize.kind === "gold") {
+        const amt = Math.round(prize.amount * hh);
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
         await logCoin(buyerId, amt, "spin_prize", { meta: { prize: prize.label } }).catch(() => {});
-        if (prize.kind === "jackpot") await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
-        const tag = prize.kind === "jackpot" ? " — JACKPOT! 💎" : prize.mini ? " — MINI JACKPOT! 🎰" : "";
-        return { emoji: prize.emoji, text: `${amt.toLocaleString()} gold${tag}` };
+        if (prize.mini) await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+        return { sprite, text: `${amt.toLocaleString()} gold${prize.mini ? " — MINI JACKPOT!" : ""}` };
     }
-    if (prize.kind === "xp") {
-        await awardXp(buyerId, "spin_reward", { points: prize.amount }).catch(() => {});
-        return { emoji: prize.emoji, text: `${prize.amount.toLocaleString()} XP` };
-    }
-    if (prize.kind === "treat") { await grantConsumable(buyerId, prize.treat, 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
-    if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
-    if (prize.kind === "fragment") { try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, prize.n || 1); } catch { /* best-effort */ } return { emoji: prize.emoji, text: prize.label }; }
-    if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { emoji: prize.emoji, text: "Spin again — on the house!" }; }
+    if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
+    if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { sprite, text: prize.label }; }
+    if (prize.kind === "fragment") { try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, prize.n || 1); } catch { /* best-effort */ } return { sprite, text: prize.label }; }
+    if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { sprite, text: "Spin again — on the house!" }; }
+    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { sprite, text: prize.label }; }
     if (prize.kind === "seed") {
         const commons = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === "common");
         const sid = commons[Math.floor(Math.random() * commons.length)];
         await grantSeed(buyerId, sid).catch(() => {});
-        return { emoji: "🌱", text: `${SEEDS[sid]?.name || "Common"} seed!` };
+        return { sprite, text: `${SEEDS[sid]?.name || "Common"} seed!` };
     }
-    if (prize.kind === "deco") {
-        // Grant a random spin/level-source decoration you don't already own (fall back to any spin-source one).
-        const owned = new Set((await db.query(`SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.deco_id));
-        const pool = DECORATIONS.filter((d) => (d.source === "spin" || d.source === "level") && !owned.has(d.id));
-        const list = pool.length ? pool : DECORATIONS.filter((d) => d.source === "spin");
-        const won = list[Math.floor(Math.random() * list.length)];
-        if (won) { await grantDecoration(buyerId, won.id, 1, "spin").catch(() => {}); return { emoji: won.emoji || "🪴", text: `${won.name} decoration!` }; }
-        await db.query(`UPDATE mkt_buyer SET gold = gold + 300 WHERE id = $1`, [buyerId]).catch(() => {});
-        return { emoji: "🪙", text: "300 gold" };
-    }
-    if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { emoji: prize.emoji, text: prize.label }; }
-    if (prize.kind === "coupon") { await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {}); return { emoji: prize.emoji, text: `${COUPON_PCT}% off an in-game 🪙 gold-shop item` }; }
-    if (prize.kind === "token") { await grantSpinTokens(buyerId, prize.n || 1); return { emoji: prize.emoji, text: `+${prize.n || 1} spin` }; }
-    if (prize.kind === "pet") {
-        const owned = new Set((await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => [])).map((r) => r.ref));
-        const pool = COLLECTIBLES.filter((p) => p.source !== "level" && !owned.has(p.id));
-        if (!pool.length) { await db.query(`UPDATE mkt_buyer SET gold = gold + 500 WHERE id = $1`, [buyerId]).catch(() => {}); await logCoin(buyerId, 500, "spin_prize", { meta: { prize: prize.label } }).catch(() => {}); return { emoji: "🪙", text: "500 gold (all pets owned)" }; }
-        const won = pool[Math.floor(Math.random() * pool.length)];
-        await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});
-        return { emoji: "🐾", text: `${won.name} pet!` };
-    }
-    return { emoji: "✨", text: prize.label };
+    return { sprite, text: prize.label };
 }
 
 // Give spin tokens (from quests / boss kills / streaks). Exported for the tie-ins.
@@ -144,15 +215,14 @@ export async function getSpinState(buyerId) {
         freeAvailable,
         tokenCost,
         extraSpinsToday: boughtToday,
-        // "Lucky Charge" — the pity meter, surfaced. Fills each spin; at full the NEXT spin is a GOLDEN SPIN
-        // (a guaranteed rare-or-better). Gives every spin a visible goal to build toward.
         charge: Math.min(PITY, row?.pity || 0),
         chargeMax: PITY,
         golden: (row?.pity || 0) >= PITY - 1,
         isOwner: isOwner(buyerId), // owner-only free-reset button (debugging)
+        jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
-            return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, emoji: p.emoji, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
+            return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10 })) };
         })(),
         nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
         canSpin: freeAvailable || (row?.tokens || 0) > 0,
@@ -174,18 +244,33 @@ export async function doSpin(buyerId) {
         consumed = await db.queryOne(`UPDATE mkt_buyer SET spin_tokens = spin_tokens - 1 WHERE id = $1 AND spin_tokens > 0 RETURNING id`, [buyerId]).catch(() => null);
         if (!consumed) return { ok: false, error: "no_spins" };
     }
+    // Every spin feeds the shared progressive jackpot.
+    await bumpJackpotPot(JACKPOT_CONTRIB).catch(() => {});
     const wheel = wheelForLevel(levelForXp(row.xp).level);
     const forceRare = row.pity >= PITY - 1;
     const idx = pickIndex(wheel, forceRare);
     const prize = wheel.prizes[idx];
-    const display = await grantPrize(buyerId, prize);
+    // Special wedges roll a sub-game; everything else is a direct grant.
+    let display;
+    let miniWheel = null;
+    let bonusGame = null;
+    if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel bonus!" }; }
+    else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
+    else display = await grantPrize(buyerId, prize);
     await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + 1 END WHERE id = $1`, [buyerId, Boolean(prize.rare)]).catch(() => {});
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
     await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
-    const prizeOut = { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal"), jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare), respin: Boolean(prize.kind === "respin"), golden: forceRare };
-    return { ok: true, prizeIndex: idx, prize: prizeOut, ...(await getSpinState(buyerId)) };
+    const prizeOut = {
+        ...display,
+        label: prize.label,
+        tier: prize.tier || (prize.rare ? "rare" : "normal"),
+        jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare),
+        respin: Boolean(prize.kind === "respin"), golden: forceRare,
+        miniWheel: Boolean(prize.kind === "mini_wheel"), bonusGame: Boolean(prize.kind === "bonus_game"),
+    };
+    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, ...(await getSpinState(buyerId)) };
 }
 
 // OWNER-ONLY debug helper: refill the free daily spin (and clear the pity charge) so you can spin freely
