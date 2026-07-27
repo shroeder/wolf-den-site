@@ -119,6 +119,40 @@ export async function recordConsignmentTradeSalesForTrade(tradeId, outLines, { s
     return { recorded };
 }
 
+// Record a MANUAL consignment sale — for a consigned item that left inventory WITHOUT a matching Square order
+// (rung up as a custom/open amount, given away, or manually adjusted out). We still owe the consignor their cut,
+// so this writes revenue the portal counts, exactly like a trade sale. Idempotent per referenceId+variation.
+// `revenue` is the full sale/list value the consignor's payout_rate applies to (e.g. give-away → the list price).
+export async function recordManualConsignmentSale(consignorId, { variationId = null, squareItemId = null, itemName, quantity = 1, revenue, soldAt = null, referenceId = null } = {}) {
+    const cid = String(consignorId || "").trim();
+    const rev = Number(revenue);
+    const qty = Math.max(1, Math.round(Number(quantity) || 1));
+    const name = String(itemName || "").trim();
+    if (!cid || !name || !Number.isFinite(rev) || rev < 0) {
+        return { ok: false, error: "bad_request" };
+    }
+    // A stable reference so a re-run updates the same row instead of double-counting.
+    const ref = String(referenceId || `manual-${variationId || name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`).slice(0, 200);
+    const unitPrice = qty > 0 ? rev / qty : 0;
+    await db.query(
+        `INSERT INTO consignment_sale
+            (consignor_id, source, reference_id, square_item_id, square_variation_id,
+             item_name, quantity, unit_price, revenue, sold_at)
+         VALUES ($1, 'manual', $2, $3, $4, $5, $6, $7, $8, COALESCE($9, NOW()))
+         ON CONFLICT (source, reference_id, square_variation_id)
+         DO UPDATE SET quantity = EXCLUDED.quantity,
+                       unit_price = EXCLUDED.unit_price,
+                       revenue = EXCLUDED.revenue,
+                       item_name = EXCLUDED.item_name,
+                       square_item_id = EXCLUDED.square_item_id,
+                       sold_at = EXCLUDED.sold_at,
+                       updated_at = NOW()`,
+        [cid, ref, squareItemId, variationId, name.slice(0, 200), qty, unitPrice, rev, soldAt]
+    ).catch((error) => { tradeSalesLogger.error("consignment.manual_sale.insert_failed", { consignorId: cid, error: error?.message }); throw error; });
+    tradeSalesLogger.info("consignment.manual_sale.recorded", { consignorId: cid, referenceId: ref, revenue: rev });
+    return { ok: true, referenceId: ref, revenue: rev };
+}
+
 // Trade-sourced consignment sales for a consignor, shaped exactly like searchSalesForVariations() entries
 // so they merge into the portal + admin-app sales list and the owed calculation with no other changes.
 export async function listConsignmentTradeSales(consignorId, { startAt = null, endAt = null } = {}) {
