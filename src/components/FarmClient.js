@@ -244,6 +244,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // scrolling field, while a compact controls panel below shares the exact same live garden.
     const [garden, setGarden] = useState(initial.garden || null);
     const [gardenBusy, setGardenBusy] = useState(null);
+    const [bountyTick, setBountyTick] = useState(0); // bumps after a mission-progressing action → FeatureDailies re-fetches
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
@@ -365,7 +366,11 @@ export default function FarmClient({ initial, viewingAlias }) {
         const res = await fetch("/api/marketplace/farm", {
             method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
         }).catch(() => null);
-        return res ? res.json().catch(() => null) : null;
+        const json = res ? await res.json().catch(() => null) : null;
+        // Nudge the daily-bounty card to re-check after any mission-progressing action, so it flips to "Claim"
+        // live instead of only after a page refresh.
+        if (json?.ok && ["plant", "harvest", "pet", "fertilizer_use", "pack_open", "rain"].includes(body?.action)) setBountyTick((t) => t + 1);
+        return json;
     }, []);
 
     const petIt = useCallback(async (pet) => {
@@ -789,7 +794,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {farm.mine && farm.rating ? <FarmRankBadge byTier={farm.rating.byTier} /> : null}
 
-            {farm.mine ? <FeatureDailies feature="farm" /> : null}
+            {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
 
             {farm.rating ? (
                 <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
@@ -1816,7 +1821,10 @@ function SeedPickerModal({ garden, slot, busy, onPick, onOpenPack, onClose }) {
                         })}
                     </div>
                 ) : (
-                    <div className="muted" style={{ fontSize: 12 }}>No seed packs yet — grab one in the <a href="/marketplace/store" style={{ color: "#ffd75e", fontWeight: 700 }}>Supplies shop</a>. Basic packs give everyday crops; pricier crates &amp; vaults unlock rare, epic &amp; legendary seeds.</div>
+                    <>
+                        <a href="/marketplace/store" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "11px 12px", borderRadius: 12, fontWeight: 900, fontSize: 13.5, textDecoration: "none", color: "#3a2c08", background: "linear-gradient(180deg,#ffe488,#f3b23a)", boxShadow: "0 3px 0 #b57f22" }}>🛒 Buy a seed pack — Supplies shop →</a>
+                        <div className="muted" style={{ fontSize: 11.5, marginTop: 7, textAlign: "center" }}>Basic packs give everyday crops; crates &amp; vaults unlock rare, epic &amp; legendary seeds. You also earn seeds from harvests, tending pets &amp; the other games.</div>
+                    </>
                 )}
 
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Cancel</button>

@@ -9,18 +9,23 @@ const THEME = {
     sailing: { accent: "#6fd0ff", soft: "rgba(111,208,255,0.13)", border: "rgba(111,208,255,0.4)", title: "Today's voyage bounties", icon: "⚓" },
 };
 
-export default function FeatureDailies({ feature }) {
+export default function FeatureDailies({ feature, refreshKey = 0 }) {
     const [dailies, setDailies] = useState(null);
     const [busy, setBusy] = useState(null);
 
+    // Re-fetch on mount, whenever refreshKey bumps (a mission-progressing action happened), and when the tab
+    // regains focus — so a completed bounty flips to "Claim" live, not only after a page refresh.
     useEffect(() => {
         let alive = true;
-        fetch(`/api/marketplace/feature-daily?feature=${feature}`, { cache: "no-store" })
+        const load = () => fetch(`/api/marketplace/feature-daily?feature=${feature}`, { cache: "no-store" })
             .then((r) => (r.ok ? r.json() : null))
             .then((d) => { if (alive && d?.dailies) setDailies(d.dailies); })
             .catch(() => {});
-        return () => { alive = false; };
-    }, [feature]);
+        load();
+        const onFocus = () => { if (document.visibilityState === "visible") load(); };
+        document.addEventListener("visibilitychange", onFocus);
+        return () => { alive = false; document.removeEventListener("visibilitychange", onFocus); };
+    }, [feature, refreshKey]);
 
     const claim = useCallback(async (key) => {
         setBusy(key);

@@ -207,6 +207,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
     const [gusting, setGusting] = useState(false);     // the tailwind gust is currently playing
     const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
+    const [bountyTick, setBountyTick] = useState(0);   // bumps after a voyage action → FeatureDailies re-fetches so a completed bounty flips to Claim live
     const [waveFx, setWaveFx] = useState(null);        // { xp, coins, minutes, k } — the "you waved!" reward toast
     const [ackingEnc, setAckingEnc] = useState(false); // dismissing an encounter recap (awaiting the ack round-trip)
     const [encReady, setEncReady] = useState(false);   // encounter recap accepts its dismiss click (anti-misclick delay)
@@ -432,6 +433,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             const d = await r.json().catch(() => ({}));
             if (d && !d.error) {
                 setState(d);
+                if (!String(action).startsWith("upgrade_")) setBountyTick((t) => t + 1); // any real voyage action can progress a bounty
+
                 const leveled = d.level > prevLevel;
                 if (d.result) { d.result.won ? sfx.win() : sfx.fail(); setResult(d.result); }
                 if (leveled) {
@@ -840,7 +843,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
-            <FeatureDailies feature="sailing" />
+            <FeatureDailies feature="sailing" refreshKey={bountyTick} />
 
             {/* Your fragment hold — one row per shard tier, each forging its matching chest. */}
             <section className="card sail-hold">
