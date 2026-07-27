@@ -740,6 +740,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; }
                 .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
+                /* IN-FLOW mirror strip — sets the field's scrollable width (3 copies, every other flipped → seamless). */
+                .farm-bg-tiled { display: flex; height: 100%; width: max-content; user-select: none; }
+                .farm-bg-tiled img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; pointer-events: none; user-select: none; }
+                .farm-bg-tiled img:nth-child(even) { transform: scaleX(-1); }
                 /* Juicy candy-gold button with a springy 3D press — for the friendly farm actions. */
                 .farm-jbtn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px; font-weight: 800; font-size: 14px; cursor: pointer; border: 1px solid rgba(255,214,110,0.6); background: linear-gradient(180deg, #ffe488, #f3b23a); color: #3a2c08; box-shadow: 0 3px 0 #b57f22, 0 6px 14px rgba(0,0,0,0.35); transition: transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .12s ease, filter .12s ease; }
                 .farm-jbtn:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 0 #b57f22, 0 9px 18px rgba(0,0,0,0.42); }
@@ -844,10 +848,22 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {/* Backdrop — windowed: full height, natural width (its width sets the scrollable field).
                             Fullscreen: a single cover filling the viewport, no horizontal scroll. */}
                         {bgUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={fullscreen
-                                ? { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", userSelect: "none", pointerEvents: "none" }
-                                : { display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
+                            fullscreen ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", userSelect: "none", pointerEvents: "none" }} />
+                            ) : (view === "outside" || view === "inside") ? (
+                                // Outside/Inside: repeat the backdrop 3× with the mirror trick [A A' A] so it scrolls as one
+                                // seamless wide scene (Garden stays a single image because crops sit at fixed positions).
+                                <div className="farm-bg-tiled" aria-hidden="true">
+                                    {[0, 1, 2].map((k) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img key={k} src={bgUrl} alt="" draggable={false} />
+                                    ))}
+                                </div>
+                            ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ display: "block", height: "100%", width: "auto", userSelect: "none", pointerEvents: "none" }} />
+                            )
                         ) : null}
                         {/* Time-of-day mood over the default pasture (night/dusk/dawn); a custom bg keeps its own look. */}
 

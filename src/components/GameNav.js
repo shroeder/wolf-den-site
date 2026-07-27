@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
 import { useItemSprite } from "@/components/ItemArt";
+import useScrollLock from "@/lib/useScrollLock";
 
 // The Sets menu icon: the die-cut Warplate Helm sprite (falls back to a helmet emoji until it loads) — a real
 // piece of gear reads far better here than the old puzzle-piece glyph.
@@ -88,14 +89,14 @@ export default function GameNav() {
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
 
-    // Close on Escape + lock body scroll while the full menu is open. (Tile clicks close it directly.)
+    // Robustly pin the background while the full menu is open (overflow:hidden alone leaks scroll on mobile).
+    useScrollLock(menuOpen);
+    // Close on Escape.
     useEffect(() => {
         if (!menuOpen) return undefined;
         const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
         window.addEventListener("keydown", onKey);
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+        return () => window.removeEventListener("keydown", onKey);
     }, [menuOpen]);
 
     if (!inGame) return null;
