@@ -45,6 +45,7 @@ export default function TownClient({ initial }) {
     const [viewportW, setViewportW] = useState(360);
     const [roster, setRoster] = useState(false);
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
+    const [dragging, setDragging] = useState(false); // true mid-drag → camera follows the finger instantly (no ease)
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
     const drag = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0 });
@@ -125,11 +126,13 @@ export default function TownClient({ initial }) {
     const onPointerMove = useCallback((e) => {
         const d = drag.current; if (!d.down) return;
         const dx = e.clientX - d.lastX;
-        if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 7) d.moved = true;
+        // Only treat as a horizontal pan once it's clearly horizontal — otherwise let the page scroll vertically.
+        if (!d.moved && Math.abs(e.clientX - d.startX) > 8 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY)) { d.moved = true; setDragging(true); }
         if (d.moved) { d.lastX = e.clientX; setPanExtra((p) => clamp(followCam + p - dx, 0, maxScroll) - followCam); }
     }, [followCam, maxScroll]);
     const onPointerUp = useCallback((e) => {
         const d = drag.current; d.down = false;
+        setDragging(false);
         if (d.moved) return; // was a pan, not a tap
         if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return; // doors/avatars handle themselves
         const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
@@ -163,18 +166,27 @@ export default function TownClient({ initial }) {
                 <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the street to walk. Tap a building to head there. Real members who are online show up here.</p>
             </section>
 
-            <div ref={sceneRef} className="tw-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; }} role="presentation">
+            <div ref={sceneRef} className="tw-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
-                    <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.35}px)`, transition: `transform ${camDur}s linear` }}>
+                    <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {[0, 1, 2, 3, 4].map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={k} src={art.sky.url} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
+                {/* Midground rooftops — nearer than the sky, in-between parallax speed, for depth. */}
+                {layered && art.mid?.url ? (
+                    <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.6}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                        {[0, 1, 2, 3, 4, 5].map((k) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={k} src={art.mid.url} alt="" draggable={false} />
+                        ))}
+                    </div>
+                ) : null}
                 {/* The wide world that scrolls under a fixed camera */}
-                <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: `transform ${camDur}s linear` }}>
+                <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
@@ -248,7 +260,7 @@ export default function TownClient({ initial }) {
 }
 
 const TOWN_CSS = `
-.tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: grab; touch-action: none;
+.tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: grab; touch-action: pan-y;
     box-shadow: inset 0 -30px 60px rgba(0,0,0,0.28), 0 10px 30px rgba(0,0,0,0.35); user-select: none; -webkit-user-select: none; background: #1a1330; }
 .tw-scene:active { cursor: grabbing; }
 .tw-world { position: absolute; top: 0; left: 0; height: 100%; will-change: transform; }
@@ -259,6 +271,10 @@ const TOWN_CSS = `
 .tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
+/* Midground rooftops — transparent above, silhouettes at the bottom; sits just above the street. */
+.tw-mid { position: absolute; top: 0; left: 0; height: 56%; display: flex; z-index: 0; pointer-events: none; }
+.tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-mid img:nth-child(even) { transform: scaleX(-1); }
 .tw-cobble { position: absolute; left: 0; bottom: 0; height: 44%; display: flex; overflow: hidden; z-index: 1; box-shadow: inset 0 12px 26px rgba(0,0,0,0.35); }
 .tw-cobble img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-cobble img:nth-child(even) { transform: scaleX(-1); }
