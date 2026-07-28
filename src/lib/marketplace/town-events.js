@@ -13,25 +13,32 @@ import { getSetting } from "@/lib/settings.js";
 // shared HP pool; when it drops (or the timer runs out) rewards are paid to every fighter, scaled by how much
 // damage they personally dealt (active participation = bigger share). Alerts the whole membership via push.
 
+// hp = one WAVE's health; `enemies` roam the plaza and thin out as the wave's hp drops. When a wave is cleared
+// before the minimum, reinforcements arrive (hp refills) — so the fight lasts long enough for people to show up.
 export const TOWN_EVENT_TYPES = {
     bandit_raid: {
-        name: "Bandit Raid", emoji: "🗡️", hp: 1600, rewardGold: 2500, durationMin: 12,
+        name: "Bandit Raid", emoji: "🗡️", hp: 700, enemies: 8, rewardGold: 2500, durationMin: 14,
         pushTitle: "🗡️ Bandits are raiding the Wolf Den!", pushBody: "They're in the plaza — rush the Town and fight them off for gold!",
     },
     goblin_swarm: {
-        name: "Goblin Swarm", emoji: "👺", hp: 1200, rewardGold: 1800, durationMin: 10,
+        name: "Goblin Swarm", emoji: "👺", hp: 600, enemies: 12, rewardGold: 1800, durationMin: 12,
         pushTitle: "👺 A goblin swarm hit the Town!", pushBody: "Pile into the plaza and drive them out — loot for everyone who fights!",
     },
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", hp: 2200, rewardGold: 4000, durationMin: 10,
+        name: "Treasure Golem", emoji: "💎", hp: 1100, enemies: 3, rewardGold: 4000, durationMin: 12,
         pushTitle: "💎 A Treasure Golem lumbered into Town!", pushBody: "Crack it open together — it's stuffed with gold. First to the plaza wins big!",
     },
 };
 
-const PER_HIT_MIN = 9;
-const PER_HIT_MAX = 17;
-const HIT_THROTTLE_MS = 350; // server-side floor between a member's hits (anti-spam)
-const FLAT_MIN_GOLD = 25;    // everyone who lands a hit gets at least this
+const HIT_THROTTLE_MS = 240;   // a strike takes a beat to recover (also anti-spam)
+const FLAT_MIN_GOLD = 25;      // everyone who lands a hit gets at least this
+// Damage per action. Timed-strike TIERS (miss the timing → weak; nail it → perfect crit) + the Power Slash
+// ability. Server-authoritative + bounded, so the worst a cheating client can do is always claim "perfect".
+const STRIKE_DMG = { weak: 5, normal: 11, good: 18, perfect: 30 };
+const POWER_DMG = 48;
+// An event runs at least this long (waves refill until then) so it's a real gathering, not an instant kill.
+const MIN_ACTIVE_MS = 150000;        // ~2.5 min for a real (pushed) event
+const MIN_ACTIVE_SILENT_MS = 45000;  // shorter for owner silent-tests so you're not stuck fighting for minutes
 
 // Resolve any active event whose timer has elapsed (lazy — runs on reads). Idempotent.
 async function resolveExpiredEvents() {
@@ -39,12 +46,37 @@ async function resolveExpiredEvents() {
     for (const r of rows) await resolveTownEvent(r.id, "expired").catch(() => {});
 }
 
+// When a wave is cleared (hp<=0): if the minimum active time has passed, the raid is WON (resolve + pay).
+// Otherwise reinforcements arrive — refill the wave's hp + bump the wave counter. Returns {resolved, hp, wave}.
+async function waveOrResolve(ev) {
+    const startedMs = new Date(ev.started_at).getTime();
+    const minMs = Number(ev.meta?.minMs) || MIN_ACTIVE_MS;
+    if (Date.now() - startedMs >= minMs) {
+        await resolveTownEvent(ev.id, "defeated").catch(() => {});
+        return { resolved: true, hp: 0, wave: Number(ev.meta?.wave) || 1 };
+    }
+    const wave = (Number(ev.meta?.wave) || 1) + 1;
+    const row = await db.queryOne(
+        `UPDATE mkt_town_event SET hp = hp_max, meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{wave}', to_jsonb($2::int))
+          WHERE id = $1 AND status = 'active' RETURNING hp`,
+        [ev.id, wave]
+    ).catch(() => null);
+    return { resolved: false, hp: row?.hp ?? ev.hp_max, wave };
+}
+
 // The current active event (+ your damage + the top fighters), or null. Shape is town-state friendly.
 export async function getActiveTownEvent(buyerId) {
     await resolveExpiredEvents();
-    const ev = await db.queryOne(`SELECT * FROM mkt_town_event WHERE status = 'active' ORDER BY started_at DESC LIMIT 1`).catch(() => null);
+    let ev = await db.queryOne(`SELECT * FROM mkt_town_event WHERE status = 'active' ORDER BY started_at DESC LIMIT 1`).catch(() => null);
     if (!ev) return null;
+    // A wave sitting at 0 (cleared, no one mid-fight) → resolve if past the minimum, else send in reinforcements.
+    if (ev.hp <= 0) {
+        const w = await waveOrResolve(ev);
+        if (w.resolved) return null;
+        ev = { ...ev, hp: w.hp, meta: { ...ev.meta, wave: w.wave } };
+    }
     const type = TOWN_EVENT_TYPES[ev.kind] || {};
+    const enemies = Number(ev.meta?.enemies) || 6;
     const [mine, top, count] = await Promise.all([
         buyerId ? db.queryOne(`SELECT damage, hits FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : Promise.resolve(null),
         db.query(`SELECT h.buyer_id, h.damage, b.display_name, b.alias FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id WHERE h.event_id = $1 ORDER BY h.damage DESC LIMIT 5`, [ev.id]).catch(() => []),
@@ -52,7 +84,9 @@ export async function getActiveTownEvent(buyerId) {
     ]);
     return {
         id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️",
-        hp: ev.hp, hpMax: ev.hp_max, endsAt: ev.ends_at, rewardGold: ev.reward_gold,
+        hp: ev.hp, hpMax: ev.hp_max, endsAt: ev.ends_at, startedAt: ev.started_at, rewardGold: ev.reward_gold,
+        enemies, enemiesLeft: ev.hp <= 0 ? 0 : Math.max(1, Math.ceil((ev.hp / ev.hp_max) * enemies)),
+        wave: Number(ev.meta?.wave) || 1, minMs: Number(ev.meta?.minMs) || MIN_ACTIVE_MS,
         myDamage: mine?.damage || 0, myHits: mine?.hits || 0,
         fighterCount: count?.n || 0,
         fighters: (top || []).map((t) => ({ name: t.display_name || (t.alias ? `@${t.alias}` : "Wolf"), damage: t.damage })),
@@ -69,7 +103,7 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     const row = await db.queryOne(
         `INSERT INTO mkt_town_event (kind, name, status, hp_max, hp, reward_gold, ends_at, meta)
          VALUES ($1, $2, 'active', $3, $3, $4, NOW() + ($5 || ' minutes')::interval, $6) RETURNING id`,
-        [kind, type.name, type.hp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent) })]
+        [kind, type.name, type.hp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent), enemies: type.enemies || 6, minMs: silent ? MIN_ACTIVE_SILENT_MS : MIN_ACTIVE_MS, wave: 1 })]
     ).catch(() => null);
     if (!row) return { ok: false, error: "spawn_failed" };
     if (!silent) {
@@ -104,16 +138,17 @@ export async function runTownHoursTick() {
     return { spawned: res.ok ? kind : null, error: res.error || null };
 }
 
-// Land a hit on the active event. Throttled per member; on the killing blow, resolves + pays out.
-export async function attackTownEvent(buyerId, eventId) {
+// Land an attack on the raid. `move` is the timed-strike tier (weak/normal/good/perfect) or "power" (ability).
+// Throttled per member; clearing a wave sends reinforcements — or wins the raid once the minimum time has passed.
+export async function attackTownEvent(buyerId, eventId, move = "normal") {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const ev = await db.queryOne(`SELECT id, hp, hp_max FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
+    const ev = await db.queryOne(`SELECT id, hp, hp_max, started_at, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev) return { ok: false, error: "no_event" };
     const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < HIT_THROTTLE_MS) {
         return { ok: false, error: "too_fast", hp: ev.hp };
     }
-    const dmg = PER_HIT_MIN + Math.floor(Math.random() * (PER_HIT_MAX - PER_HIT_MIN + 1));
+    const dmg = move === "power" ? POWER_DMG : (STRIKE_DMG[move] ?? STRIKE_DMG.normal);
     const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
     await db.query(
         `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
@@ -121,10 +156,16 @@ export async function attackTownEvent(buyerId, eventId) {
         [eventId, buyerId, dmg]
     ).catch(() => {});
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
-    const hp = updated?.hp ?? ev.hp;
+    let hp = updated?.hp ?? ev.hp;
     let defeated = false;
-    if (hp <= 0) { await resolveTownEvent(eventId, "defeated").catch(() => {}); defeated = true; }
-    return { ok: true, damage: dmg, hp, defeated };
+    let wave = Number(ev.meta?.wave) || 1;
+    if (hp <= 0) {
+        const w = await waveOrResolve(ev);
+        defeated = w.resolved;
+        hp = w.resolved ? 0 : w.hp;
+        wave = w.wave;
+    }
+    return { ok: true, damage: dmg, hp, defeated, wave, crit: move === "perfect", clearedWave: (updated?.hp ?? 0) <= 0 && !defeated };
 }
 
 // Pay out an event once (atomic status flip guards against double-pay). Gold to every fighter, scaled by their

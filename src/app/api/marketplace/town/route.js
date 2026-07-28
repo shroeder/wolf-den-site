@@ -35,7 +35,7 @@ export async function POST(request) {
             if (body?.action === "chat") res = await sendTownChat(buyer.id, body?.body);
             else if (body?.action === "typing") res = await setTownTyping(buyer.id);
             else if (body?.action === "contribute") res = await contributeTownGold(buyer.id, body?.amount);
-            else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId);
+            else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId, body?.move);
             else if (body?.action === "merchant_buy") res = await buyMerchantChest(buyer.id, body?.tier);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);
             else if (body?.action === "spawn_event") res = isOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid", { silent: true }) : { ok: false, error: "forbidden" }; // in-Town owner spawn = silent test (no push)

@@ -72,6 +72,71 @@ function Avatar({ a, isYou, onTap }) {
     );
 }
 
+// Raid combat HUD: a shared HP bar (top) + a timed-strike meter and abilities (bottom). The marker sweeps; tap
+// Strike when it's in the gold zone for a PERFECT slash, or fire the Power Slash on cooldown.
+function RaidCombat({ ev, hp, onAttack, defeated }) {
+    const markerPos = useRef(50);
+    const dir = useRef(1);
+    const markerEl = useRef(null);
+    const [cool, setCool] = useState(false);
+    const [powerCd, setPowerCd] = useState(0);
+    useEffect(() => {
+        let raf; let last = performance.now();
+        const SPEED = 80; // % per second
+        const loop = (now) => {
+            const dt = Math.min(0.05, (now - last) / 1000); last = now;
+            let p = markerPos.current + dir.current * SPEED * dt;
+            if (p >= 100) { p = 100; dir.current = -1; } else if (p <= 0) { p = 0; dir.current = 1; }
+            markerPos.current = p;
+            if (markerEl.current) markerEl.current.style.left = `${p}%`;
+            raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+    }, []);
+    useEffect(() => {
+        if (powerCd <= 0) return undefined;
+        const t = setInterval(() => setPowerCd((c) => Math.max(0, c - 200)), 200);
+        return () => clearInterval(t);
+    }, [powerCd > 0]);
+    const strike = () => {
+        if (cool || defeated) return;
+        const d = Math.abs(markerPos.current - 50);
+        const tier = d <= 7 ? "perfect" : d <= 18 ? "good" : d <= 34 ? "normal" : "weak";
+        onAttack(tier);
+        setCool(true); setTimeout(() => setCool(false), 250);
+    };
+    const power = () => {
+        if (powerCd > 0 || defeated) return;
+        onAttack("power");
+        setPowerCd(5000);
+    };
+    const pct = Math.max(0, Math.min(100, Math.round((hp / ev.hpMax) * 100)));
+    return (
+        <>
+            <div className="tw-raid-bar">
+                <div className="tw-raid-name">{ev.emoji} {ev.name}<span className="muted"> · {ev.fighterCount} fighting{ev.wave > 1 ? ` · wave ${ev.wave}` : ""}</span></div>
+                <div className="tw-raid-hp"><span style={{ width: `${pct}%` }} /></div>
+            </div>
+            {defeated ? (
+                <div className="tw-raid-win">✅ Raid cleared! Gold paid to all who fought.</div>
+            ) : (
+                <div className="tw-raid-controls">
+                    <div className="tw-raid-meter" onClick={strike} role="presentation" aria-label="Timing meter">
+                        <div className="tw-raid-zone" />
+                        <div className="tw-raid-marker" ref={markerEl} />
+                    </div>
+                    <div className="tw-raid-btns">
+                        <button type="button" className="tw-raid-strike" disabled={cool} onClick={strike}>⚔️ Strike</button>
+                        <button type="button" className="tw-raid-power" disabled={powerCd > 0} onClick={power}>🔥 Power{powerCd > 0 ? ` ${Math.ceil(powerCd / 1000)}s` : ""}</button>
+                    </div>
+                    <div className="tw-raid-hint muted">Hit Strike in the gold zone for a PERFECT slash — or tap a foe. Your hits: {ev.myHits}</div>
+                </div>
+            )}
+        </>
+    );
+}
+
 export default function TownClient({ initial }) {
     const [state, setState] = useState(initial || null);
     const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
@@ -238,21 +303,24 @@ export default function TownClient({ initial }) {
         setContribBusy(false);
         if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
     }, [load]);
-    // Attack the active town event — optimistic HP drop + a hit flash; the server is authoritative.
-    const attackEvent = useCallback(async () => {
+    // Attack the active raid with a `move` (weak/normal/good/perfect timing tier, or "power" ability). Optimistic
+    // HP by an estimate; the server is authoritative (and handles wave refills + the win).
+    const EST = { weak: 5, normal: 11, good: 18, perfect: 30, power: 48 };
+    const attackEvent = useCallback(async (move = "normal") => {
         const ev = state?.event; if (!ev) return;
         const now = Date.now();
-        if (now - lastAtk.current < 380) return; // matches the server-side throttle
+        if (now - lastAtk.current < 240) return; // strike recovery / server throttle
         lastAtk.current = now;
-        setEvHp((h) => Math.max(0, (h ?? ev.hp) - 12));
-        setEvFlash({ k: now });
-        setTimeout(() => setEvFlash((f) => (f && f.k === now ? null : f)), 320);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attack", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        setEvHp((h) => Math.max(0, (h ?? ev.hp) - (EST[move] || 11)));
+        setEvFlash({ k: now, crit: move === "perfect" || move === "power" });
+        setTimeout(() => setEvFlash((f) => (f && f.k === now ? null : f)), 300);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attack", eventId: ev.id, move }) }).then((x) => x.json()).catch(() => null);
         if (r?.ok) {
-            setEvHp(r.hp);
-            if (r.defeated) { setEvFlash({ defeated: true, k: now }); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } setTimeout(() => load(), 500); }
+            setEvHp(r.hp); // server value (wave refill jumps it back to full)
+            if (r.defeated) { setEvFlash({ defeated: true, k: now }); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } setTimeout(() => load(), 600); }
+            else if (r.clearedWave) setEvFlash({ k: now, wave: r.wave });
         } else if (r?.hp != null) setEvHp(r.hp);
-    }, [state?.event, load]);
+    }, [state?.event, load]); // eslint-disable-line react-hooks/exhaustive-deps
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
@@ -424,39 +492,29 @@ export default function TownClient({ initial }) {
                     {shownDecos.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
                     {shownDecos.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
                     {shownDecos.has("garden") ? ["30%", "64%", "84%"].map((lx, i) => <div key={i} className="tw-deco tw-deco-garden" style={{ left: lx, top: `${GROUND}%` }} aria-hidden="true">🌷</div>) : null}
+                    {/* Raid: roaming enemies in the plaza — they thin out as the raid HP drops; tap one to strike it */}
+                    {state?.event ? (() => {
+                        const ev = state.event;
+                        const hp = evHp ?? ev.hp;
+                        const left = Math.max(0, Math.ceil((hp / ev.hpMax) * (ev.enemies || 6)));
+                        const url = art[EVENT_ART[ev.kind]]?.url;
+                        return Array.from({ length: Math.min(left, 14) }).map((_, i) => (
+                            <button key={i} type="button" className="tw-enemy" style={{ left: `${8 + (i * 79) % 84}%`, top: `${GROUND - (i % 3)}%`, animationDelay: `${(i % 5) * 0.5}s` }} onClick={(e) => { e.stopPropagation(); attackEvent("normal"); }} aria-label={`Attack the ${ev.name}`}>
+                                {url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={url} alt="" draggable={false} style={{ transform: i % 2 ? "scaleX(-1)" : "none" }} />
+                                ) : <span className="tw-enemy-emoji">{ev.emoji}</span>}
+                            </button>
+                        ));
+                    })() : null}
                     {/* Other players */}
                     {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} />)}
                     {/* You */}
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
                 </div>
 
-                {/* Live town event (bandit raid, etc.) — a shared enemy the whole plaza attacks together */}
-                {state?.event ? (() => {
-                    const ev = state.event;
-                    const hp = evHp ?? ev.hp;
-                    const pct = Math.max(0, Math.min(100, Math.round((hp / ev.hpMax) * 100)));
-                    return (
-                        <div className="tw-event">
-                            <div className="tw-event-bar">
-                                <div className="tw-event-name">{ev.emoji} {ev.name}</div>
-                                <div className="tw-event-hpbar"><span style={{ width: `${pct}%` }} /></div>
-                                <div className="tw-event-hptext">{Math.max(0, hp).toLocaleString()} / {ev.hpMax.toLocaleString()} HP · {ev.fighterCount} fighting</div>
-                            </div>
-                            <button type="button" className={`tw-event-target${evFlash ? " is-hit" : ""}`} onClick={attackEvent} aria-label={`Attack the ${ev.name}`}>
-                                {art[EVENT_ART[ev.kind]]?.url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={art[EVENT_ART[ev.kind]].url} alt={ev.name} draggable={false} />
-                                ) : <span className="tw-event-emoji">{ev.emoji}</span>}
-                                {evFlash && !evFlash.defeated ? <span className="tw-event-hitfx">💥</span> : null}
-                            </button>
-                            {evFlash?.defeated ? (
-                                <div className="tw-event-defeated">✅ Driven off! Gold paid to all who fought.</div>
-                            ) : (
-                                <button type="button" className="tw-event-attack" onClick={attackEvent}>⚔️ Attack! <small>you: {ev.myHits} hits</small></button>
-                            )}
-                        </div>
-                    );
-                })() : null}
+                {/* Raid combat HUD — shared HP bar + timed-strike meter + abilities (enemies roam in-world above) */}
+                {state?.event ? <RaidCombat ev={state.event} hp={evHp ?? state.event.hp} onAttack={attackEvent} defeated={Boolean(evFlash?.defeated)} /> : null}
 
                 {/* Collective-upgrade overlays that span the plaza (don't scroll — they hang over the whole view) */}
                 {shownDecos.has("lights") ? <div className="tw-lights" aria-hidden="true" /> : null}
@@ -831,23 +889,29 @@ const TOWN_CSS = `
 .tw-fund-chip.is-on { color: #8fe39a; border-color: rgba(143,227,154,0.4); background: rgba(143,227,154,0.1); }
 
 /* Live town event (raid) overlay */
-.tw-event { position: absolute; inset: 0; z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10px; pointer-events: none; }
-.tw-event-bar { width: min(88%, 420px); background: rgba(20,10,14,0.82); border: 1px solid rgba(224,67,63,0.55); border-radius: 12px; padding: 7px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
-.tw-event-name { font-size: 0.85rem; font-weight: 900; color: #ffd0c8; text-align: center; }
-.tw-event-hpbar { height: 12px; margin: 5px 0 3px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
-.tw-event-hpbar span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); border-radius: 999px; transition: width .2s ease; }
-.tw-event-hptext { font-size: 0.68rem; color: #e8c9c4; text-align: center; }
-.tw-event-target { pointer-events: auto; margin-top: auto; margin-bottom: 6px; background: none; border: none; cursor: pointer; position: relative; padding: 0; }
-.tw-event-target img { height: 150px; width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.6)); }
-.tw-event-emoji { font-size: 90px; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.6)); }
-.tw-event-target.is-hit { animation: twHit .2s ease; }
-@keyframes twHit { 0% { transform: translateX(0); } 25% { transform: translateX(-4px) scale(1.02); } 75% { transform: translateX(4px); } 100% { transform: translateX(0); } }
-.tw-event-hitfx { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); font-size: 34px; animation: twHitFx .35s ease-out; pointer-events: none; }
-@keyframes twHitFx { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.6); } 40% { opacity: 1; transform: translate(-50%, -6px) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -18px) scale(1); } }
-.tw-event-attack { pointer-events: auto; margin-bottom: 14px; padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: 15px; color: #2a0d0a; background: linear-gradient(180deg,#ff9a3c,#e0433f); box-shadow: 0 4px 0 #a12723, 0 6px 16px rgba(0,0,0,0.5); }
-.tw-event-attack:active { transform: translateY(2px); box-shadow: 0 2px 0 #a12723; }
-.tw-event-attack small { font-weight: 700; opacity: .85; }
-.tw-event-defeated { pointer-events: none; margin-bottom: 20px; padding: 8px 16px; border-radius: 999px; background: rgba(20,40,24,0.9); border: 1px solid rgba(143,227,154,0.5); color: #b8f0c2; font-weight: 800; font-size: 0.85rem; }
+/* Raid: roaming enemies in the plaza (tap to strike) */
+.tw-enemy { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 98; animation: twEnemyRoam 3.4s ease-in-out infinite; }
+.tw-enemy img { height: 70px; width: auto; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); }
+.tw-enemy-emoji { font-size: 44px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+@keyframes twEnemyRoam { 0%,100% { transform: translate(-50%, -100%); } 25% { transform: translate(calc(-50% - 11px), -103%); } 50% { transform: translate(-50%, -100%); } 75% { transform: translate(calc(-50% + 11px), -103%); } }
+/* Raid combat HUD */
+.tw-raid-bar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: min(90%, 440px); z-index: 500; pointer-events: none; background: rgba(20,10,14,0.86); border: 1px solid rgba(224,67,63,0.55); border-radius: 12px; padding: 6px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.tw-raid-name { font-size: 0.82rem; font-weight: 900; color: #ffd0c8; text-align: center; }
+.tw-raid-name .muted { font-weight: 700; font-size: 0.72rem; }
+.tw-raid-hp { height: 12px; margin-top: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.tw-raid-hp span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); border-radius: 999px; transition: width .18s ease; }
+.tw-raid-controls { position: absolute; left: 0; right: 0; bottom: 10px; z-index: 500; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px; }
+.tw-raid-meter { position: relative; width: min(90%, 380px); height: 22px; border-radius: 999px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); overflow: hidden; cursor: pointer; }
+.tw-raid-zone { position: absolute; top: 0; bottom: 0; left: 43%; width: 14%; background: linear-gradient(90deg, rgba(255,215,110,0.2), rgba(255,215,110,0.6), rgba(255,215,110,0.2)); border-left: 1px solid rgba(255,215,110,0.7); border-right: 1px solid rgba(255,215,110,0.7); }
+.tw-raid-marker { position: absolute; top: -2px; bottom: -2px; width: 4px; margin-left: -2px; background: #fff; border-radius: 2px; box-shadow: 0 0 8px rgba(255,255,255,0.9); }
+.tw-raid-btns { display: flex; gap: 10px; }
+.tw-raid-strike { padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: 15px; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22; }
+.tw-raid-strike:active { transform: translateY(2px); box-shadow: 0 2px 0 #b57f22; }
+.tw-raid-power { padding: 11px 20px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: 14px; color: #2a0d0a; background: linear-gradient(180deg,#ff9a3c,#e0433f); box-shadow: 0 4px 0 #a12723; }
+.tw-raid-power:active { transform: translateY(2px); box-shadow: 0 2px 0 #a12723; }
+.tw-raid-strike:disabled, .tw-raid-power:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.tw-raid-hint { font-size: 0.72rem; text-align: center; background: rgba(20,14,30,0.72); padding: 2px 10px; border-radius: 999px; }
+.tw-raid-win { position: absolute; left: 0; right: 0; bottom: 20px; z-index: 500; text-align: center; color: #b8f0c2; font-weight: 800; font-size: 0.9rem; padding: 0 12px; }
 .tw-owner-spawn { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.12); }
 .tw-owner-spawn .muted { font-size: 0.72rem; }
 .tw-owner-spawn button { flex: 0 0 auto; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(224,67,63,0.4); background: rgba(224,67,63,0.12); color: #ffcabf; font-size: 0.76rem; font-weight: 700; cursor: pointer; }
