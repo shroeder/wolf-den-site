@@ -3,24 +3,25 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// ── THE WOLF DEN TOWN (walkable social plaza) ─────────────────────────────────────────────────────────────
-// Your hero sprite walks the square (tap where you want to go); other recently-active members appear as their
-// own hero sprites with a live status, idle-wandering so it feels alive. Buildings ring the plaza and fast-
-// travel into each game system. Movement is smooth via CSS transitions (no canvas / websockets) — poll + tween.
+// ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
+// A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
+// walk it too, as their own hero sprites, with a live status. Buildings line the street and fast-travel into
+// each system. A roster overlay lets you see who's doing what without walking. Movement is smooth via CSS
+// transitions (poll + tween — no canvas / websockets). Positions are % of the WIDE world; y is a ground band.
 
-// Canonical sprite art faces RIGHT; scaleX(-1) faces left. `flip` = the art's backwards-correction. To face the
-// travel direction: mirror when (flip XOR movingLeft) — same convention as the farm.
+const WORLD_W = 2200;   // px width of the whole street (x = 0..100 maps across this)
+const GROUND = 78;      // % from top where the street sits (building bases + avatar feet)
 const spriteTransform = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-function Avatar({ a, isYou }) {
-    // Walk speed: transition duration scales with distance so everyone moves at a steady pace.
-    const dur = clamp((a.moveDist || 0) * 0.06, 0.4, 2.4);
+function Avatar({ a, isYou, onTap }) {
+    const dur = clamp((a.moveDist || 0) * 0.05, 0.4, 2.6);
     return (
         <div
             className={`tw-av${isYou ? " is-you" : ""}`}
-            style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear` }}
+            style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: 300 + Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear` }}
+            onClick={onTap ? (e) => { e.stopPropagation(); onTap(); } : undefined}
         >
             <div className="tw-bubble">{a.status || (isYou ? "🐺 you" : "🐺 around town")}</div>
             <div className={`tw-sprite${a.moving ? " is-walking" : ""}`}>
@@ -39,12 +40,22 @@ function Avatar({ a, isYou }) {
 
 export default function TownClient({ initial }) {
     const [state, setState] = useState(initial || null);
-    const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 76, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
-    const [others, setOthers] = useState({}); // id -> live client position/state
+    const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
+    const [others, setOthers] = useState({});
+    const [viewportW, setViewportW] = useState(360);
+    const [roster, setRoster] = useState(false);
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
 
-    // Poll the server for the roster + statuses; reconcile into `others` (keep ambient positions client-side).
+    // Measure the viewport so the camera can keep the player centered.
+    useEffect(() => {
+        const el = sceneRef.current; if (!el) return undefined;
+        const set = () => setViewportW(el.clientWidth || 360);
+        set();
+        const ro = new ResizeObserver(set); ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/town", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
@@ -55,58 +66,41 @@ export default function TownClient({ initial }) {
             for (const p of d.players || []) {
                 const cur = prev[p.id];
                 const home = { x: p.x, y: p.y };
-                if (p.walking) {
-                    // Real mover — snap toward server position.
-                    next[p.id] = { ...p, home, x: p.x, y: p.y, facing: p.facing, moving: cur ? dist(cur, p) > 1 : false, moveDist: cur ? dist(cur, p) : 0 };
-                } else if (cur) {
-                    // Ambient — keep the client-wandered position, refresh status/roster.
-                    next[p.id] = { ...cur, ...p, home, x: cur.x, y: cur.y, facing: cur.facing };
-                } else {
-                    next[p.id] = { ...p, home, moving: false, moveDist: 0 };
-                }
+                if (p.walking) next[p.id] = { ...p, home, x: p.x, y: p.y, facing: p.facing, moving: cur ? dist(cur, p) > 1 : false, moveDist: cur ? dist(cur, p) : 0 };
+                else if (cur) next[p.id] = { ...cur, ...p, home, x: cur.x, y: cur.y, facing: cur.facing };
+                else next[p.id] = { ...p, home, moving: false, moveDist: 0 };
             }
             return next;
         });
     }, []);
 
-    useEffect(() => {
-        load();
-        const t = setInterval(load, 2500);
-        return () => clearInterval(t);
-    }, [load]);
+    useEffect(() => { load(); const t = setInterval(load, 2500); return () => clearInterval(t); }, [load]);
 
-    // Ambient wander: nudge idle players around their home slot so the plaza feels alive.
+    // Ambient wander for idle players.
     useEffect(() => {
         const t = setInterval(() => {
             setOthers((prev) => {
                 const next = { ...prev };
                 for (const [id, p] of Object.entries(prev)) {
                     if (p.walking) continue;
-                    if (Math.random() < 0.45) {
-                        const nx = clamp((p.home?.x ?? p.x) + (Math.random() - 0.5) * 16, 6, 94);
-                        const ny = clamp((p.home?.y ?? p.y) + (Math.random() - 0.5) * 10, 58, 92);
+                    if (Math.random() < 0.5) {
+                        const nx = clamp((p.home?.x ?? p.x) + (Math.random() - 0.5) * 12, 3, 97);
+                        const ny = clamp((p.home?.y ?? p.y) + (Math.random() - 0.5) * 6, 72, 86);
                         next[id] = { ...p, x: nx, y: ny, facing: nx < p.x ? -1 : 1, moving: true, moveDist: dist(p, { x: nx, y: ny }) };
-                    } else if (p.moving) {
-                        next[id] = { ...p, moving: false };
-                    }
+                    } else if (p.moving) next[id] = { ...p, moving: false };
                 }
                 return next;
             });
-        }, 2600);
+        }, 2800);
         return () => clearInterval(t);
     }, []);
 
-    // Tap the ground to walk there.
-    const walkTo = useCallback((clientX, clientY) => {
-        const el = sceneRef.current;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const x = clamp(((clientX - rect.left) / rect.width) * 100, 3, 97);
-        const y = clamp(((clientY - rect.top) / rect.height) * 100, 52, 93);
+    const walkToWorld = useCallback((worldXPct, worldYPct) => {
         setMe((m) => {
+            const x = clamp(worldXPct, 1, 99);
+            const y = clamp(worldYPct ?? m.y, 70, 88);
             const facing = x < m.x ? -1 : 1;
             const d = dist(m, { x, y });
-            // Persist position (throttled) so future participants see where you are.
             clearTimeout(moveTimer.current);
             moveTimer.current = setTimeout(() => {
                 fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ x, y, facing }) }).catch(() => {});
@@ -115,19 +109,23 @@ export default function TownClient({ initial }) {
         });
     }, []);
 
+    // Convert a screen tap → world %, accounting for the camera offset.
+    const cameraPx = clamp((me.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
     const onSceneClick = useCallback((e) => {
-        if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return; // let doors/avatars handle their own taps
-        walkTo(e.clientX, e.clientY);
-    }, [walkTo]);
+        if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return;
+        const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
+        const worldX = ((e.clientX - rect.left + cameraPx) / WORLD_W) * 100;
+        const worldY = ((e.clientY - rect.top) / rect.height) * 100;
+        walkToWorld(worldX, worldY);
+    }, [cameraPx, walkToWorld]);
 
-    const wave = useCallback(() => {
-        setMe((m) => ({ ...m, wave: true }));
-        setTimeout(() => setMe((m) => ({ ...m, wave: false })), 1600);
-    }, []);
+    const wave = useCallback(() => { setMe((m) => ({ ...m, wave: true })); setTimeout(() => setMe((m) => ({ ...m, wave: false })), 1600); }, []);
 
     const you = state?.you;
+    const art = state?.art || {};
     const buildings = state?.buildings || [];
     const otherList = useMemo(() => Object.values(others), [others]);
+    const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
     if (state && state.owner === false) {
         return <section className="card"><p className="muted" style={{ margin: 0 }}>🏘️ The Wolf Den Town is still being built — check back soon.</p></section>;
@@ -139,32 +137,75 @@ export default function TownClient({ initial }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <h1 style={{ margin: 0, fontSize: "1.25rem" }}>🏘️ Wolf Den Town</h1>
                     <span className="tw-online">🟢 {state?.onlineCount ?? 1} around</span>
+                    <button type="button" className="tw-roster-btn" onClick={() => setRoster(true)}>👥 Who&apos;s around</button>
                     <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "#c58b3a", fontWeight: 800 }}>OWNER PREVIEW</span>
                 </div>
-                <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the ground to walk. Tap a building to head there. You&apos;re seeing real members who are online right now.</p>
+                <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the street to walk. Tap a building to head there. Real members who are online show up here.</p>
             </section>
 
             <div ref={sceneRef} className="tw-scene" onClick={onSceneClick} role="presentation">
-                <div className="tw-sky" aria-hidden="true" />
-                <div className="tw-ground" aria-hidden="true" />
-                {/* Buildings */}
-                {buildings.map((b) => (
-                    <Link key={b.id} href={b.href} className="tw-building" style={{ left: `${b.x}%`, top: `${b.y}%`, zIndex: Math.round(b.y) }} onClick={(e) => e.stopPropagation()}>
-                        <span className="tw-building-roof" aria-hidden="true" />
-                        <span className="tw-building-emoji">{b.emoji}</span>
-                        <span className="tw-building-label">{b.label}</span>
-                    </Link>
-                ))}
-                {/* Other players */}
-                {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} />)}
-                {/* You */}
-                {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you" }} isYou /> : null}
+                {!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null}
+                {/* The wide world that scrolls under a fixed camera */}
+                <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: `transform ${camDur}s linear` }}>
+                    {/* Background: mirror-tiled generated street, else the CSS sky/ground above shows through */}
+                    {art.background ? (
+                        <div className="tw-bg" aria-hidden="true">
+                            {[0, 1, 2, 3].map((k) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={k} src={art.background.url} alt="" draggable={false} />
+                            ))}
+                        </div>
+                    ) : null}
+                    {/* Buildings */}
+                    {buildings.map((b) => {
+                        const bart = art[b.id];
+                        return (
+                            <Link key={b.id} href={b.href} className={`tw-building${bart ? " has-art" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND}%`, zIndex: 100 + Math.round(b.x) }} onClick={(e) => e.stopPropagation()}>
+                                {bart ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
+                                ) : (
+                                    <span className="tw-building-card"><span className="tw-building-emoji">{b.emoji}</span></span>
+                                )}
+                                <span className="tw-building-label">{b.emoji} {b.label}</span>
+                            </Link>
+                        );
+                    })}
+                    {/* Other players */}
+                    {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => walkToWorld(p.x + (p.x > me.x ? -3 : 3), p.y)} />)}
+                    {/* You */}
+                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you" }} isYou /> : null}
+                </div>
+
+                {/* edge hints */}
+                {cameraPx > 4 ? <div className="tw-edge tw-edge-l" aria-hidden="true">‹</div> : null}
+                {cameraPx < WORLD_W - viewportW - 4 ? <div className="tw-edge tw-edge-r" aria-hidden="true">›</div> : null}
             </div>
 
             <section className="card" style={{ padding: "10px 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <button type="button" className="tw-emote" onClick={wave}>👋 Wave</button>
-                <span className="muted" style={{ fontSize: "0.78rem" }}>Others render where they&apos;re last active; once the town ships they&apos;ll walk it with you.</span>
+                <span className="muted" style={{ fontSize: "0.78rem" }}>Members render where they were last active; once the town ships they&apos;ll walk it live with you.</span>
             </section>
+
+            {/* Roster overlay — see who's doing what without walking */}
+            {roster ? (
+                <div className="tw-roster" onClick={() => setRoster(false)} role="presentation">
+                    <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>👥 Around town — {otherList.length + 1}</strong><button type="button" onClick={() => setRoster(false)} aria-label="Close">✕</button></div>
+                        <div className="tw-roster-list">
+                            <div className="tw-roster-row is-you"><span className="tw-roster-name">You</span><span className="tw-roster-status">🐺 walking around</span></div>
+                            {otherList.length === 0 ? <div className="muted" style={{ padding: "10px 4px", fontSize: "0.85rem" }}>Nobody else is around right now.</div> : null}
+                            {otherList.map((p) => (
+                                <div key={p.id} className="tw-roster-row">
+                                    <span className="tw-roster-name">{p.name}</span>
+                                    <span className="tw-roster-status">{p.status}</span>
+                                    <button type="button" className="tw-roster-go" onClick={() => { walkToWorld(p.x + (p.x > me.x ? -3 : 3), p.y); setRoster(false); }}>Walk over →</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             <style>{TOWN_CSS}</style>
         </div>
@@ -172,36 +213,56 @@ export default function TownClient({ initial }) {
 }
 
 const TOWN_CSS = `
-.tw-scene { position: relative; width: 100%; height: min(64vh, 520px); border-radius: 18px; overflow: hidden; cursor: pointer;
-    box-shadow: inset 0 -30px 60px rgba(0,0,0,0.28), 0 10px 30px rgba(0,0,0,0.35); user-select: none; -webkit-user-select: none; }
-.tw-sky { position: absolute; inset: 0 0 42% 0; background: linear-gradient(180deg, #2a2140 0%, #3b2d55 40%, #6b4d7a 78%, #a56b6b 100%); }
-.tw-ground { position: absolute; inset: 46% 0 0 0; background:
-    radial-gradient(120% 80% at 50% -10%, rgba(255,190,120,0.12), transparent 60%),
-    repeating-linear-gradient(90deg, #55402c 0 38px, #5c4630 38px 76px),
-    linear-gradient(180deg, #6a5138, #4a381f); box-shadow: inset 0 8px 24px rgba(0,0,0,0.35); }
+.tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: pointer;
+    box-shadow: inset 0 -30px 60px rgba(0,0,0,0.28), 0 10px 30px rgba(0,0,0,0.35); user-select: none; -webkit-user-select: none; background: #1a1330; }
+.tw-world { position: absolute; top: 0; left: 0; height: 100%; will-change: transform; }
+.tw-bg { position: absolute; inset: 0; display: flex; height: 100%; }
+.tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-bg img:nth-child(even) { transform: scaleX(-1); }
+/* CSS fallback backdrop (before art is generated) */
+.tw-sky { position: absolute; inset: 0 0 34% 0; background: linear-gradient(180deg, #2a2140 0%, #3b2d55 42%, #6b4d7a 80%, #a56b6b 100%); }
+.tw-ground { position: absolute; inset: 66% 0 0 0; background: radial-gradient(120% 80% at 50% -10%, rgba(255,190,120,0.12), transparent 60%), repeating-linear-gradient(90deg, #55402c 0 38px, #5c4630 38px 76px), linear-gradient(180deg, #6a5138, #4a381f); box-shadow: inset 0 8px 24px rgba(0,0,0,0.35); }
+
 .tw-online { font-size: 0.72rem; font-weight: 800; color: #8fe39a; background: rgba(143,227,154,0.12); border: 1px solid rgba(143,227,154,0.35); border-radius: 999px; padding: 2px 9px; }
+.tw-roster-btn { font-size: 0.74rem; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.4); border-radius: 999px; padding: 3px 11px; cursor: pointer; }
 
-.tw-building { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none;
-    padding: 8px 12px 9px; border-radius: 12px; background: linear-gradient(180deg, rgba(40,28,58,0.92), rgba(26,18,40,0.94)); border: 1px solid rgba(255,215,110,0.4);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.45); transition: transform .12s ease, box-shadow .12s ease; color: #ffe9b0; }
-.tw-building:hover { transform: translate(-50%, -50%) translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.55), 0 0 22px rgba(255,215,110,0.35); }
-.tw-building-roof { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 22px solid transparent; border-right: 22px solid transparent; border-bottom: 12px solid rgba(255,140,60,0.85); }
-.tw-building-emoji { font-size: 26px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
-.tw-building-label { font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+.tw-building { position: absolute; transform: translateX(-50%); bottom: auto; display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: #ffe9b0; transition: transform .12s ease; }
+.tw-building { transform: translate(-50%, -100%); }
+.tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
+.tw-building-art { display: block; height: 190px; width: auto; max-width: 260px; object-fit: contain; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.5)); }
+.tw-building-art[style*="scaleX"] { transform-origin: bottom center; }
+.tw-building-card { display: grid; place-items: center; width: 96px; height: 120px; border-radius: 12px; background: linear-gradient(180deg, rgba(40,28,58,0.94), rgba(26,18,40,0.96)); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 10px 22px rgba(0,0,0,0.5); }
+.tw-building-emoji { font-size: 46px; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
+.tw-building-label { position: absolute; bottom: -22px; font-size: 10.5px; font-weight: 800; white-space: nowrap; background: rgba(20,14,30,0.75); border-radius: 6px; padding: 1px 7px; }
 
-.tw-av { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
-.tw-sprite { position: relative; width: 58px; height: 58px; display: grid; place-items: center; }
-.tw-sprite img { width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
-.tw-sprite-fallback { font-size: 40px; }
+.tw-av { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+.tw-sprite { position: relative; width: 60px; height: 60px; display: grid; place-items: center; }
+.tw-sprite img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
+.tw-sprite-fallback { font-size: 42px; }
 .tw-sprite.is-walking { animation: twBob .5s ease-in-out infinite; transform-origin: bottom center; }
 @keyframes twBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-.tw-av.is-you .tw-sprite::after { content: ""; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); width: 40px; height: 8px; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,215,110,0.5), transparent 70%); }
-.tw-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(20,14,30,0.7); border-radius: 6px; padding: 0 6px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.tw-av.is-you .tw-sprite::after { content: ""; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); width: 42px; height: 9px; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,215,110,0.55), transparent 70%); }
+.tw-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(20,14,30,0.72); border-radius: 6px; padding: 0 6px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .tw-av.is-you .tw-name { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
 .tw-bubble { font-size: 10px; font-weight: 700; color: #eadfff; background: rgba(30,20,48,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 2px 8px; margin-bottom: 3px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 .tw-wave { position: absolute; top: -6px; right: -8px; font-size: 20px; animation: twWave .5s ease-in-out infinite; }
 @keyframes twWave { 0%,100% { transform: rotate(-16deg); } 50% { transform: rotate(16deg); } }
 
+.tw-edge { position: absolute; top: 50%; transform: translateY(-50%); font-size: 30px; color: rgba(255,255,255,0.5); pointer-events: none; animation: twEdge 1.4s ease-in-out infinite; }
+.tw-edge-l { left: 8px; } .tw-edge-r { right: 8px; }
+@keyframes twEdge { 0%,100% { opacity: .35; } 50% { opacity: .8; } }
+
 .tw-emote { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,215,110,0.5); background: linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96)); color: #ffe9b0; font-weight: 800; font-size: 13px; cursor: pointer; }
 .tw-emote:active { transform: translateY(1px); }
+
+.tw-roster { position: fixed; inset: 0; z-index: 400; display: flex; align-items: flex-end; justify-content: center; background: rgba(6,4,12,0.6); backdrop-filter: blur(3px); }
+.tw-roster-panel { width: 100%; max-width: 480px; max-height: 70dvh; overflow-y: auto; background: linear-gradient(180deg, #1c1436, #120c22); border: 1px solid rgba(255,215,110,0.3); border-radius: 18px 18px 0 0; padding: 14px 14px 20px; box-shadow: 0 -16px 44px rgba(0,0,0,0.6); animation: twUp .26s cubic-bezier(.2,1,.3,1) both; }
+@keyframes twUp { from { transform: translateY(30px); opacity: .5; } to { transform: none; opacity: 1; } }
+.tw-roster-head { display: flex; align-items: center; margin-bottom: 8px; color: #ffe0b0; }
+.tw-roster-head button { margin-left: auto; background: rgba(255,255,255,0.08); border: none; color: #e8e2d6; width: 28px; height: 28px; border-radius: 999px; font-size: 15px; cursor: pointer; }
+.tw-roster-row { display: flex; align-items: center; gap: 8px; padding: 9px 4px; border-top: 1px solid rgba(255,255,255,0.06); }
+.tw-roster-row.is-you .tw-roster-name { color: #ffe488; }
+.tw-roster-name { font-weight: 800; font-size: 0.9rem; color: #f0ede6; min-width: 90px; }
+.tw-roster-status { font-size: 0.82rem; color: #cbb9e0; flex: 1; }
+.tw-roster-go { font-size: 0.76rem; font-weight: 800; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border: none; border-radius: 8px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
 `;

@@ -9,14 +9,22 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // recently-active members so it never feels empty — they render as ambient avatars (idle-wandering client-side)
 // until the town ships and they can walk it themselves. Positions of real movers live in mkt_town_presence.
 
-// Buildings ring the square; tapping one fast-travels into that system (the menu still works for speed).
+// Buildings line the side-scrolling street at fixed x positions (0..100 % of the WIDE world); tapping one fast-
+// travels into that system (the menu still works for speed). Each optionally shows a generated sprite (mkt_town_art).
 export const TOWN_BUILDINGS = [
-    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 18, y: 30 },
-    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 40, y: 24 },
-    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 62, y: 24 },
-    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 84, y: 30 },
-    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 50, y: 46 },
+    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 8 },
+    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 24 },
+    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 40 },
+    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 56 },
+    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 74 },
+    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 90 },
 ];
+
+// Shared generated art (background + building sprites), keyed. Empty until generated via the admin tool.
+export async function getTownArt() {
+    const rows = await db.query(`SELECT art_key, url, flip FROM mkt_town_art`).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.art_key, { url: r.url, flip: r.flip === true }]));
+}
 
 // Map a member's most-recent activity → a friendly "what they're up to" status. Prefer a known game event,
 // else the page they're on, else a gentle default so everyone has a bubble.
@@ -51,9 +59,10 @@ function hash01(str, salt = 0) {
     for (let i = 0; i < str.length; i += 1) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
     return ((h >>> 0) % 100000) / 100000;
 }
-// Ambient players (not actively walking the town) get a deterministic home slot in the ground band.
+// Ambient players (not actively walking the town) get a deterministic home slot along the street — spread
+// across the WIDE world horizontally, on a tight ground band vertically (it's a side-scroller now).
 function homeSlot(id) {
-    return { x: 8 + hash01(id, 1) * 84, y: 60 + hash01(id, 2) * 30 };
+    return { x: 5 + hash01(id, 1) * 90, y: 74 + hash01(id, 2) * 10 };
 }
 
 export async function getTownState(buyerId) {
@@ -73,6 +82,7 @@ export async function getTownState(buyerId) {
     ).catch(() => []);
 
     const ids = recent.map((r) => r.id);
+    const art = await getTownArt();
     // Latest activity per recent player (for the status bubble) + any who are actually walking the town now.
     const [acts, movers] = await Promise.all([
         ids.length
@@ -116,10 +126,11 @@ export async function getTownState(buyerId) {
             name: me?.display_name || (me?.alias ? `@${me.alias}` : "You"),
             sprite: me?.avatar_sprite_url || null,
             flip: me?.avatar_sprite_url ? me.avatar_sprite_flip === true : false,
-            x: myPos?.x ?? 50, y: myPos?.y ?? 76, facing: myPos?.facing ?? 1,
+            x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
         },
         players,
         buildings: TOWN_BUILDINGS,
+        art,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
 }
@@ -127,8 +138,8 @@ export async function getTownState(buyerId) {
 // Upsert the mover's position (owner-gated during the build). x/y clamped to the plaza; facing derives from dx.
 export async function moveTown(buyerId, { x, y, facing } = {}) {
     if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
-    const cx = Math.max(2, Math.min(98, Number(x) || 50));
-    const cy = Math.max(52, Math.min(94, Number(y) || 76));
+    const cx = Math.max(1, Math.min(99, Number(x) || 50));
+    const cy = Math.max(70, Math.min(88, Number(y) || 80));
     const f = facing === -1 ? -1 : 1;
     await db.query(
         `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, updated_at) VALUES ($1, $2, $3, $4, NOW())
