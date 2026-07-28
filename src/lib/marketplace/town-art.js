@@ -32,8 +32,9 @@ const ART_PROMPTS = {
     shop: `A GENERAL STORE trading post — a wooden shopfront with a striped awning, a couple of barrels and crates of goods by the door, a hanging sign with a coin pouch. ${BUILDING_STYLE}`,
     docks: `A wooden HARBOR DOCKHOUSE with a small moored sailing ship beside it, coiled ropes, barrels and crates, a lantern on a post. ${BUILDING_STYLE}`,
     farm: `A rustic FARM barn — a red-brown barn with a hayloft, a wooden fence gate, a couple of pumpkins and a wheat sheaf by the door, a little scarecrow. ${BUILDING_STYLE}`,
-    // Town NPC — a character sprite (same isolated-cutout treatment as the buildings) who stands by the Forge.
-    smith: `A friendly burly BLACKSMITH — a bearded human smith in a leather apron and rolled sleeves, standing and resting a large hammer on one shoulder, full body, three-quarter view facing slightly forward, warm and welcoming. ${BUILDING_STYLE}`,
+    // Town NPC — a CHARACTER sprite (person, not a building) who stands by the Forge. Uses a character-style
+    // prompt (the building style biased the model into drawing a smithy).
+    smith: `A single 2D video-game CHARACTER sprite of a friendly burly BLACKSMITH: a bearded HUMAN MAN, full body head-to-boots, standing, wearing a leather apron and rolled sleeves, resting a large smithing hammer on one shoulder, three-quarter view facing slightly forward, warm and welcoming. This is a PERSON / character — NOT a building, NOT a house. Painterly fantasy action-RPG style with clean confident outlines and cel-shaded vibrant colors, strong readable silhouette. Isolated as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO background, NO scenery, NO building, NO forge, NO ground, NO sky, NO glow. Nothing but the character. No text, no logo, no watermark, no border.`,
 };
 
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
