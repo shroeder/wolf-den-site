@@ -278,7 +278,7 @@ export default function SpinWheel() {
                 {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
 
-            <details className="cw-legend">
+            <details className="cw-legend" open>
                 <summary>🎁 What&apos;s on the wheel <span>{prizes.length} prizes</span></summary>
                 <div className="cw-legend-grid">
                     {prizes.map((p, i) => (
