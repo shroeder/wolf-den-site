@@ -8,8 +8,9 @@ export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12
 // income settler (pet-income.js) and the perk/owned-bonus display. Nerfed to 1/5 of the original 2.
 export const GOLD_PER_POINT = 0.4;
 // Fortune → boss-raffle tickets: each fortune point banks this many tickets PER DAY the boss is alive (shared
-// by the display here + the draw math in boss.js, so they never drift).
-export const TICKETS_PER_FORTUNE_PER_DAY = 3;
+// by the display here + the draw math in boss.js, so they never drift). Nerfed 3→1 (2026-07-28): at 3/day the
+// guaranteed fortune haul (fortune×3×days = up to ~84/week) swamped the damage-earned tickets — too strong.
+export const TICKETS_PER_FORTUNE_PER_DAY = 1;
 const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2, mythic: 2.6, ascendant: 3.0, eternal: 3.5 };
 const ERUPT_BY_RARITY = {
     common: { chance: 0.08, mult: 1.5 }, rare: { chance: 0.1, mult: 1.6 }, epic: { chance: 0.12, mult: 1.8 },

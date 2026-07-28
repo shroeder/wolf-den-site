@@ -417,8 +417,8 @@ export default function PetsClient() {
                             <MenagerieGroup
                                 title="Earning" sub="your earner pets, auto-banked" accent="#8fe39a"
                                 tiles={[
-                                    state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", label: "XP per hour", value: `+${state.income.xpPerHour}`, desc: "Passive XP, banked and paid when you check in." } : null,
-                                    state.income?.goldPerHour > 0 ? { key: "gold", icon: "🪙", label: "Gold per hour", value: `+${state.income.goldPerHour}`, desc: "Passive gold, banked and paid when you check in." } : null,
+                                    state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", label: "XP per day", value: `+${(state.income.xpPerHour * 24).toLocaleString()}`, desc: "Passive XP, accrued around the clock and banked until you check in." } : null,
+                                    state.income?.goldPerHour > 0 ? { key: "gold", icon: "🪙", label: "Gold per day", value: `+${(state.income.goldPerHour * 24).toLocaleString()}`, desc: "Passive gold, accrued around the clock and banked until you check in." } : null,
                                     state.income?.raffleTickets > 0 ? { key: "tix", icon: "🎟️", label: "Raffle tickets / day", value: `+${state.income.raffleTickets}`, desc: "Free weekly-boss raffle entries each day — real odds to win." } : null,
                                 ].filter(Boolean)}
                             />
