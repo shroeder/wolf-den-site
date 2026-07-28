@@ -28,6 +28,9 @@ export const PET_PASSIVE_BY_RARITY = { common: 1, rare: 2, epic: 4, legendary: 6
 // a combat/econ one. These keys are NOT combat stats, so combinePetBonuses' add() silently ignores them (they
 // never touch the boss); the farm-bonus aggregator reads the EQUIPPED pet's farm passive via petFarmPassive().
 export const FARM_PASSIVE_STATS = new Set(["seedLuck", "growSpeed", "petXp"]);
+// FORGE passive stats — same idea for The Forge: an owned forge pet improves your smithing odds (crafting.js),
+// NOT boss power. These keys aren't combat stats, so the pet combat aggregator ignores them.
+export const FORGE_PASSIVE_STATS = new Set(["efficient", "keen_eye", "masters_touch", "steady_hand"]);
 export const PET_PASSIVE_STAT = {
     // Level
     bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
@@ -42,8 +45,9 @@ export const PET_PASSIVE_STAT = {
     // Achievement
     ladybug: "seedLuck", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
     flamingo: "xp_gain", toucan: "gold_find",
-    // Forge (earned by using The Forge) — all combat passives, fitting their smithing/battle theme.
-    ember_whelp: "crit_chance", cinder_hound: "ferocity", anvil_golem: "might", molten_salamander: "crit_power", forgeheart_wyrm: "might",
+    // Forge (earned by using The Forge) — FORGE passives that improve your smithing odds (crafting.js), fitting
+    // how each is earned: salvagers → part yield, enhancers → enhance odds.
+    ember_whelp: "efficient", cinder_hound: "steady_hand", anvil_golem: "keen_eye", molten_salamander: "masters_touch", forgeheart_wyrm: "masters_touch",
     // Chest
     tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
     corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
@@ -77,6 +81,11 @@ export const PET_STAT_META = {
     seedLuck: { label: "Seed Luck", icon: "🍀", desc: "Better chance to find and keep seeds while you farm." },
     growSpeed: { label: "Grow Speed", icon: "🌱", desc: "Your crops grow faster while this pet is equipped." },
     petXp: { label: "Pet Bond", icon: "🐾", desc: "Your pets earn more XP when you tend them on the farm." },
+    // FORGE passives (forge pets) — these improve your smithing odds at The Forge, not the boss.
+    efficient: { label: "Efficient Salvage", icon: "🛠️", desc: "Better odds of DOUBLE parts when you salvage at the Forge." },
+    keen_eye: { label: "Keen Eye", icon: "👁️", desc: "Better odds of a BONUS higher-tier part when you salvage." },
+    masters_touch: { label: "Master's Touch", icon: "✨", desc: "Better odds an enhancement rolls DOUBLE the gains." },
+    steady_hand: { label: "Steady Hand", icon: "🖐️", desc: "Better odds a slip won't break your combo while enhancing." },
 };
 
 const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal", celestial: "Celestial", primordial: "Primordial" };
@@ -139,11 +148,11 @@ export const COLLECTIBLES = [
     { id: "radiant_phoenix", name: "Radiant Phoenix", Icon: GiDragonSpiral, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "ferocity", achievement: "Max a Legendary-or-higher pet to Lv 5", spritePrompt: "a radiant golden phoenix reborn in brilliant blazing light" },
     // ── FORGE pets — earned by using The Forge (salvage / enhance / combine). Combat companions born of the
     // smithy; unlock rules in ACHIEVEMENT_PET_RULES (pets.js), signature perks in pet-perks.js. ──
-    { id: "ember_whelp", name: "Ember Whelp", Icon: GiSmallFire, color: "#ff8a3c", rarity: "rare", source: "achievement", activeStat: "crit_chance", achievement: "Salvage 50 items at the Forge", spritePrompt: "a tiny mischievous ember whelp, a baby fire-lizard made of glowing coals and dancing orange flame, wisps of smoke curling off its back" },
-    { id: "cinder_hound", name: "Cinder Hound", Icon: GiHound, color: "#e0632c", rarity: "rare", source: "achievement", activeStat: "ferocity", achievement: "Enhance gear 25 times at the Forge", spritePrompt: "a fierce hound wreathed in cinders and smoke, glowing ember cracks along its body and molten paws, eyes like hot coals" },
-    { id: "anvil_golem", name: "Anvil Golem", Icon: GiRockGolem, color: "#9aa0a6", rarity: "epic", source: "achievement", activeStat: "might", achievement: "Combine forge parts 100 times", spritePrompt: "a stout sturdy golem forged from a blacksmith's anvil and iron blocks, glowing molten seams between its plates, one arm ending in a great hammer" },
-    { id: "molten_salamander", name: "Molten Salamander", Icon: GiSalamander, color: "#ff6a2c", rarity: "epic", source: "achievement", activeStat: "crit_power", achievement: "Enhance a piece to +8 at the Forge", spritePrompt: "a sleek salamander with cracked obsidian skin glowing with rivers of lava, dripping molten magma and trailing fire as it moves" },
-    { id: "forgeheart_wyrm", name: "Forgeheart Wyrm", Icon: GiFireBreath, color: "#ffb020", rarity: "legendary", source: "achievement", activeStat: "might", achievement: "Enhance a piece to a Master rank (+15)", spritePrompt: "a majestic wyrm plated in rune-etched forged steel with a blazing molten forge-heart glowing through its chest, wings of hammered gold-orange metal, radiating heat" },
+    { id: "ember_whelp", name: "Ember Whelp", Icon: GiSmallFire, color: "#ff8a3c", rarity: "rare", source: "achievement", activeStat: "efficient", achievement: "Salvage 50 items at the Forge", spritePrompt: "a tiny mischievous ember whelp, a baby fire-lizard made of glowing coals and dancing orange flame, wisps of smoke curling off its back" },
+    { id: "cinder_hound", name: "Cinder Hound", Icon: GiHound, color: "#e0632c", rarity: "rare", source: "achievement", activeStat: "steady_hand", achievement: "Enhance gear 25 times at the Forge", spritePrompt: "a fierce hound wreathed in cinders and smoke, glowing ember cracks along its body and molten paws, eyes like hot coals" },
+    { id: "anvil_golem", name: "Anvil Golem", Icon: GiRockGolem, color: "#9aa0a6", rarity: "epic", source: "achievement", activeStat: "keen_eye", achievement: "Combine forge parts 100 times", spritePrompt: "a stout sturdy golem forged from a blacksmith's anvil and iron blocks, glowing molten seams between its plates, one arm ending in a great hammer" },
+    { id: "molten_salamander", name: "Molten Salamander", Icon: GiSalamander, color: "#ff6a2c", rarity: "epic", source: "achievement", activeStat: "masters_touch", achievement: "Enhance a piece to +8 at the Forge", spritePrompt: "a sleek salamander with cracked obsidian skin glowing with rivers of lava, dripping molten magma and trailing fire as it moves" },
+    { id: "forgeheart_wyrm", name: "Forgeheart Wyrm", Icon: GiFireBreath, color: "#ffb020", rarity: "legendary", source: "achievement", activeStat: "masters_touch", achievement: "Enhance a piece to a Master rank (+15)", spritePrompt: "a majestic wyrm plated in rune-etched forged steel with a blazing molten forge-heart glowing through its chest, wings of hammered gold-orange metal, radiating heat" },
 
     // ── Rare-chest drops ───────────────────────────────────────────────────────────────────────────
     { id: "tropical_fish", name: "Reef Fish", Icon: GiTropicalFish, color: "#5ad0d0", rarity: "common", source: "chest", chestTier: "wooden", activeStat: "fortune", hint: "A flash of color", spritePrompt: "a bright tropical reef fish" },
@@ -216,6 +225,15 @@ export function petFarmPassive(pet) {
     if (!pet) return null;
     const stat = PET_PASSIVE_STAT[pet.id];
     if (!FARM_PASSIVE_STATS.has(stat)) return null;
+    return { stat, value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
+}
+
+// The FORGE passive an owned forge pet contributes (or null). Same magnitude as its owned passive; read by the
+// crafting odds math and summed across owned forge pets. Combat/farm never read it (it's a forge-only stat).
+export function petForgePassive(pet) {
+    if (!pet) return null;
+    const stat = PET_PASSIVE_STAT[pet.id];
+    if (!FORGE_PASSIVE_STATS.has(stat)) return null;
     return { stat, value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
 }
 

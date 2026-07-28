@@ -9,6 +9,8 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { grantEventBadge, getBadgeForge } from "@/lib/marketplace/badges.js";
 import { MAX_FORGE_LEVEL } from "@/lib/marketplace/forge-rank.js";
+import { collectibleById, petForgePassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -73,8 +75,33 @@ async function upgradeLevels(buyerId) {
     for (const r of rows) m[r.key] = r.level;
     return m;
 }
-// Perk odds = bought upgrade levels + earned forge-badge bonus (badge values are in percentage POINTS).
+// Perk odds = bought upgrade levels + forge bonus (badge + pet contributions; both in percentage POINTS).
 const chance = (upg, key, bf) => (FORGE_UPGRADES[key].per * (upg[key] || 0)) + ((bf && bf[key]) || 0) / 100;
+
+// Forge odds granted by every OWNED forge pet (efficient / keen_eye / masters_touch / steady_hand), summed and
+// level-scaled like the pets page — in percentage POINTS, same units as getBadgeForge so they merge cleanly.
+async function petForgeBonus(buyerId) {
+    const [ownedRows, xpRows] = await Promise.all([
+        db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
+        db.query(`SELECT pet_id, xp FROM mkt_pet_level WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+    ]);
+    const xpMap = Object.fromEntries(xpRows.map((r) => [r.pet_id, r.xp]));
+    const out = {};
+    for (const row of ownedRows) {
+        const fp = petForgePassive(collectibleById(row.ref));
+        if (!fp) continue;
+        const lvl = petLevelForXp(xpMap[row.ref] || 0, collectibleById(row.ref)?.rarity);
+        out[fp.stat] = (out[fp.stat] || 0) + fp.value * petPassiveLevelMult(lvl);
+    }
+    return out;
+}
+// Combined forge bonus (earned badges + owned forge pets) — the single object the odds math reads.
+async function getForgeBonus(buyerId) {
+    const [badge, pet] = await Promise.all([getBadgeForge(buyerId).catch(() => ({})), petForgeBonus(buyerId).catch(() => ({}))]);
+    const out = { ...(badge || {}) };
+    for (const [k, v] of Object.entries(pet || {})) out[k] = (out[k] || 0) + v;
+    return out;
+}
 
 // Buy the next level of a forge upgrade (gold sink).
 export async function buyForgeUpgrade(buyerId, key) {
@@ -187,7 +214,7 @@ export async function salvageItem(buyerId, itemId) {
     await db.query(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {}); // the item is gone — drop its enhancement
     const cfg = SALVAGE[item.rarity] || SALVAGE.common;
     const upg = await upgradeLevels(buyerId);
-    const bf = await getBadgeForge(buyerId).catch(() => ({})); // earned forge badges boost salvage/enhance odds
+    const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost salvage odds
     const rb = regaliaBonus(REGALIA_IDS.filter((r) => equippedSet.has(r)).length); // Blacksmith's Regalia salvage bonus
     let n = randInt(cfg.min, cfg.max);
     let doubled = false;
@@ -255,7 +282,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // away. Master's Touch bumps you up one tier.
     let scenario = q >= 0.92 ? 4 : q >= 0.75 ? 3 : q >= 0.5 ? 2 : q >= 0.25 ? 1 : 0;
     const upg = await upgradeLevels(buyerId);
-    const bf = await getBadgeForge(buyerId).catch(() => ({})); // earned forge badges boost double-gain odds
+    const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost double-gain odds
     let doubled = false;
     if (scenario > 0 && Math.random() < chance(upg, "masters_touch", bf)) { scenario = Math.min(4, scenario + 1); doubled = true; }
 
@@ -314,7 +341,7 @@ export async function getForgeState(buyerId) {
         db.query(`SELECT item_id, level, stat_bonus, best_grade FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         itemSpriteMap().catch(() => ({})),
         upgradeLevels(buyerId),
-        getBadgeForge(buyerId).catch(() => ({})), // earned forge badges boost the displayed + real odds
+        getForgeBonus(buyerId).catch(() => ({})), // earned forge badges + owned forge pets boost displayed + real odds
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
     ]);
     const dRow = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
