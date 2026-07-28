@@ -10,10 +10,10 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // around. Real movers walk at their live position; other online members render as ambient (idle-wandering)
 // avatars until the town ships. Positions of real movers live in mkt_town_presence.
 
-// "Online now" window: a member counts as present if they've been active this recently. There's no periodic
-// heartbeat yet, so this is driven by page views / tracked actions — keep it a few minutes so an online member
-// briefly between clicks doesn't flicker out. (Tighten + add a heartbeat ping for sub-minute precision.)
-const ONLINE_WINDOW = "3 minutes";
+// "Online now" window: a member counts as present if they've pinged this recently. PresenceHeartbeat pings
+// every ~40s while the tab is visible, so 90s comfortably spans 2 pings — a live member never flickers out,
+// and someone who closes the tab drops off within ~90s. True real-time presence.
+const ONLINE_WINDOW = "90 seconds";
 
 // Buildings line the side-scrolling street at fixed x positions (0..100 % of the WIDE world); tapping one fast-
 // travels into that system (the menu still works for speed). Each optionally shows a generated sprite (mkt_town_art).
