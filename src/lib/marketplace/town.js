@@ -5,6 +5,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { listFriends } from "@/lib/marketplace/friends.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
 
 // Collective plaza upgrades: the whole pack pools gold to unlock shared decorations that everyone sees.
 export const TOWN_UPGRADES = [
@@ -121,11 +122,12 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, friends, upgrade] = await Promise.all([
+    const [art, petSprites, friends, upgrade, event] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
         buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
         getTownUpgrade().catch(() => null),
+        getActiveTownEvent(buyerId).catch(() => null),
     ]);
     const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
@@ -203,6 +205,7 @@ export async function getTownState(buyerId) {
         buildings: TOWN_BUILDINGS,
         art,
         upgrade,
+        event,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
 }

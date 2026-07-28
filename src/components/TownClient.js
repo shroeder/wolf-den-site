@@ -71,6 +71,10 @@ export default function TownClient({ initial }) {
     const [menuFor, setMenuFor] = useState(null);    // tapped another player → action sheet
     const [boardOpen, setBoardOpen] = useState(false); // Town Hall (events + plaza fund) panel
     const [contribBusy, setContribBusy] = useState(false);
+    const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
+    const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
+    const evIdRef = useRef(null);
+    const lastAtk = useRef(0);
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
     const chatClear = useRef(null);
@@ -124,6 +128,15 @@ export default function TownClient({ initial }) {
         }, 2800);
         return () => clearInterval(t);
     }, []);
+
+    // Keep the optimistic event HP in sync with the poll: reset on a new event, else take the lower (server
+    // is authoritative as it drops, and never let it bounce back up between my clicks).
+    useEffect(() => {
+        const ev = state?.event;
+        if (!ev) { evIdRef.current = null; setEvHp(null); return; }
+        if (evIdRef.current !== ev.id) { evIdRef.current = ev.id; setEvHp(ev.hp); }
+        else setEvHp((cur) => (cur == null ? ev.hp : Math.min(cur, ev.hp)));
+    }, [state?.event]);
 
     const walkToWorld = useCallback((worldXPct, worldYPct) => {
         setPanExtra(0); // walking re-centres the camera on you
@@ -200,6 +213,26 @@ export default function TownClient({ initial }) {
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "contribute", amount }) }).catch(() => null);
         setContribBusy(false);
         if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
+    }, [load]);
+    // Attack the active town event — optimistic HP drop + a hit flash; the server is authoritative.
+    const attackEvent = useCallback(async () => {
+        const ev = state?.event; if (!ev) return;
+        const now = Date.now();
+        if (now - lastAtk.current < 380) return; // matches the server-side throttle
+        lastAtk.current = now;
+        setEvHp((h) => Math.max(0, (h ?? ev.hp) - 12));
+        setEvFlash({ k: now });
+        setTimeout(() => setEvFlash((f) => (f && f.k === now ? null : f)), 320);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attack", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        if (r?.ok) {
+            setEvHp(r.hp);
+            if (r.defeated) { setEvFlash({ defeated: true, k: now }); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } setTimeout(() => load(), 500); }
+        } else if (r?.hp != null) setEvHp(r.hp);
+    }, [state?.event, load]);
+    // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
+    const spawnEvent = useCallback(async (kind) => {
+        await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
+        load();
     }, [load]);
 
     const you = state?.you;
@@ -295,6 +328,34 @@ export default function TownClient({ initial }) {
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
                 </div>
 
+                {/* Live town event (bandit raid, etc.) — a shared enemy the whole plaza attacks together */}
+                {state?.event ? (() => {
+                    const ev = state.event;
+                    const hp = evHp ?? ev.hp;
+                    const pct = Math.max(0, Math.min(100, Math.round((hp / ev.hpMax) * 100)));
+                    return (
+                        <div className="tw-event">
+                            <div className="tw-event-bar">
+                                <div className="tw-event-name">{ev.emoji} {ev.name}</div>
+                                <div className="tw-event-hpbar"><span style={{ width: `${pct}%` }} /></div>
+                                <div className="tw-event-hptext">{Math.max(0, hp).toLocaleString()} / {ev.hpMax.toLocaleString()} HP · {ev.fighterCount} fighting</div>
+                            </div>
+                            <button type="button" className={`tw-event-target${evFlash ? " is-hit" : ""}`} onClick={attackEvent} aria-label={`Attack the ${ev.name}`}>
+                                {art.bandit?.url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={art.bandit.url} alt={ev.name} draggable={false} />
+                                ) : <span className="tw-event-emoji">{ev.emoji}</span>}
+                                {evFlash && !evFlash.defeated ? <span className="tw-event-hitfx">💥</span> : null}
+                            </button>
+                            {evFlash?.defeated ? (
+                                <div className="tw-event-defeated">✅ Driven off! Gold paid to all who fought.</div>
+                            ) : (
+                                <button type="button" className="tw-event-attack" onClick={attackEvent}>⚔️ Attack! <small>you: {ev.myHits} hits</small></button>
+                            )}
+                        </div>
+                    );
+                })() : null}
+
                 {/* Collective-upgrade overlays that span the plaza (don't scroll — they hang over the whole view) */}
                 {unlocked.has("lights") ? <div className="tw-lights" aria-hidden="true" /> : null}
                 {unlocked.has("banners") ? <div className="tw-banners" aria-hidden="true" /> : null}
@@ -315,6 +376,14 @@ export default function TownClient({ initial }) {
                         <button type="button" key={em} onClick={() => quickEmote(em)} aria-label={`Send ${em}`}>{em}</button>
                     ))}
                 </div>
+                {state?.owner && !state?.event ? (
+                    <div className="tw-owner-spawn">
+                        <span className="muted">Owner · spawn event:</span>
+                        <button type="button" onClick={() => spawnEvent("bandit_raid")}>🗡️ Bandits</button>
+                        <button type="button" onClick={() => spawnEvent("goblin_swarm")}>👺 Goblins</button>
+                        <button type="button" onClick={() => spawnEvent("treasure_golem")}>💎 Golem</button>
+                    </div>
+                ) : null}
             </section>
 
             {/* Roster overlay — see who's doing what without walking */}
@@ -530,4 +599,26 @@ const TOWN_CSS = `
 .tw-fund-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .tw-fund-chip { font-size: 0.72rem; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #9a8fb0; }
 .tw-fund-chip.is-on { color: #8fe39a; border-color: rgba(143,227,154,0.4); background: rgba(143,227,154,0.1); }
+
+/* Live town event (raid) overlay */
+.tw-event { position: absolute; inset: 0; z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10px; pointer-events: none; }
+.tw-event-bar { width: min(88%, 420px); background: rgba(20,10,14,0.82); border: 1px solid rgba(224,67,63,0.55); border-radius: 12px; padding: 7px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.tw-event-name { font-size: 0.85rem; font-weight: 900; color: #ffd0c8; text-align: center; }
+.tw-event-hpbar { height: 12px; margin: 5px 0 3px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.tw-event-hpbar span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); border-radius: 999px; transition: width .2s ease; }
+.tw-event-hptext { font-size: 0.68rem; color: #e8c9c4; text-align: center; }
+.tw-event-target { pointer-events: auto; margin-top: auto; margin-bottom: 6px; background: none; border: none; cursor: pointer; position: relative; padding: 0; }
+.tw-event-target img { height: 150px; width: auto; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.6)); }
+.tw-event-emoji { font-size: 90px; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.6)); }
+.tw-event-target.is-hit { animation: twHit .2s ease; }
+@keyframes twHit { 0% { transform: translateX(0); } 25% { transform: translateX(-4px) scale(1.02); } 75% { transform: translateX(4px); } 100% { transform: translateX(0); } }
+.tw-event-hitfx { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); font-size: 34px; animation: twHitFx .35s ease-out; pointer-events: none; }
+@keyframes twHitFx { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.6); } 40% { opacity: 1; transform: translate(-50%, -6px) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -18px) scale(1); } }
+.tw-event-attack { pointer-events: auto; margin-bottom: 14px; padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: 15px; color: #2a0d0a; background: linear-gradient(180deg,#ff9a3c,#e0433f); box-shadow: 0 4px 0 #a12723, 0 6px 16px rgba(0,0,0,0.5); }
+.tw-event-attack:active { transform: translateY(2px); box-shadow: 0 2px 0 #a12723; }
+.tw-event-attack small { font-weight: 700; opacity: .85; }
+.tw-event-defeated { pointer-events: none; margin-bottom: 20px; padding: 8px 16px; border-radius: 999px; background: rgba(20,40,24,0.9); border: 1px solid rgba(143,227,154,0.5); color: #b8f0c2; font-weight: 800; font-size: 0.85rem; }
+.tw-owner-spawn { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.12); }
+.tw-owner-spawn .muted { font-size: 0.72rem; }
+.tw-owner-spawn button { flex: 0 0 auto; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(224,67,63,0.4); background: rgba(224,67,63,0.12); color: #ffcabf; font-size: 0.76rem; font-weight: 700; cursor: pointer; }
 `;
