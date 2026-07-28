@@ -3,6 +3,12 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
+
+const PINT_XP = 40, PINT_GOLD = 15;   // the daily Hearty Pint reward
+const ROUND_COST = 400;               // "buy a round" gold sink
+const ROUND_GIFT_XP = 15;             // each patron currently around gets a small cheers
+const ROUND_HOST_XP = 60;             // the buyer's own toast
 
 // ── THE TAVERN ──────────────────────────────────────────────────────────────────────────────────────────────
 // A cozy, rowdy room you step INTO from the plaza. The barkeep runs three things: live RUMORS (in-character game
@@ -64,7 +70,7 @@ export async function getTavernState(buyerId) {
     if (!buyerId) return null;
     const [row, gold, rumors] = await Promise.all([
         db.queryOne(
-            `SELECT dice_active, dice_state,
+            `SELECT dice_active, dice_state, rounds,
                     (last_drink_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS drank_today, drinks
                FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]
         ).catch(() => null),
@@ -77,7 +83,8 @@ export async function getTavernState(buyerId) {
         dice: st
             ? { active: true, bet: st.bet, dice: st.dice, rerolled: Boolean(st.rerolled), hand: scoreHand(st.dice).label, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET }
             : { active: false, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET },
-        dailyPint: { available: !row?.drank_today, drinks: row?.drinks || 0 },
+        dailyPint: { available: !row?.drank_today, drinks: row?.drinks || 0, xp: PINT_XP, gold: PINT_GOLD },
+        round: { cost: ROUND_COST, bought: row?.rounds || 0 },
         rumors,
     };
 }
@@ -143,7 +150,7 @@ export async function gambitResolve(buyerId) {
     return { ok: true, outcome, bet, payout, jackpot, player: { dice: playerDice, hand: ph.label }, gambler: { dice: gamblerDice, hand: gh.label }, gold };
 }
 
-// The daily pint — once per store-local day. Cosmetic cheer (tracks a lifetime count for a future badge).
+// The daily Hearty Pint — once per store-local day. Now a REAL reward (XP + a little gold), not just cosmetic.
 export async function claimDailyPint(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await db.queryOne(`SELECT (last_drink_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS today FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null);
@@ -154,7 +161,28 @@ export async function claimDailyPint(buyerId) {
          ON CONFLICT (buyer_id) DO UPDATE SET last_drink_day = (NOW() AT TIME ZONE 'America/Chicago')::date, drinks = mkt_tavern.drinks + 1, updated_at = NOW()`,
         [buyerId]
     );
+    await awardXp(buyerId, "tavern_pint", { points: PINT_XP, gold: PINT_GOLD, dedupeKey: `pint:${buyerId}:${Date.now()}` }).catch(() => {});
     bumpTownQuest(buyerId, "patron", 1).catch(() => {});
     const drinks = (await db.queryOne(`SELECT drinks FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null))?.drinks || 1;
-    return { ok: true, drinks };
+    return { ok: true, drinks, xp: PINT_XP, gold: PINT_GOLD };
+}
+
+// Buy a round for the house: a gold sink that spreads a little cheer. Every patron who's been around the Den
+// lately gets a small XP toast, you get a bigger one + a lifetime rounds count (for a future "Generous Soul"
+// badge). (Recipients = recently-present members; scopes to just-the-tavern once presence lands.)
+export async function buyRound(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, ROUND_COST]).catch(() => null);
+    if (!paid) return { ok: false, error: "insufficient_gold" };
+    await logCoin(buyerId, -ROUND_COST, "tavern_round", { balanceAfter: paid.gold }).catch(() => {});
+    const rows = await db.query(`SELECT buyer_id FROM mkt_town_presence WHERE updated_at > NOW() - INTERVAL '5 minutes' AND buyer_id <> $1 LIMIT 25`, [buyerId]).catch(() => []);
+    for (const r of rows) await awardXp(r.buyer_id, "tavern_cheers", { points: ROUND_GIFT_XP, gold: 0, dedupeKey: `cheers:${r.buyer_id}:${Date.now()}` }).catch(() => {});
+    await awardXp(buyerId, "tavern_host", { points: ROUND_HOST_XP, gold: 0 }).catch(() => {});
+    bumpTownQuest(buyerId, "patron", 1).catch(() => {});
+    const row = await db.queryOne(
+        `INSERT INTO mkt_tavern (buyer_id, rounds, updated_at) VALUES ($1, 1, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET rounds = COALESCE(mkt_tavern.rounds, 0) + 1, updated_at = NOW() RETURNING rounds`,
+        [buyerId]
+    ).catch(() => null);
+    return { ok: true, recipients: rows.length, cost: ROUND_COST, hostXp: ROUND_HOST_XP, giftXp: ROUND_GIFT_XP, rounds: row?.rounds || 1, gold: Number(paid.gold) };
 }

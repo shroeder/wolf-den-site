@@ -58,10 +58,17 @@ export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
     const askPint = useCallback(async () => {
         setFlash(null);
         const r = await act({ action: "pint" });
-        if (r?.ok) setLine("There you are — finest ale in the Den. *slides a frothing mug your way* 🍺");
+        if (r?.ok) setLine(`There you are — finest ale in the Den! *slides a frothing mug your way* 🍺\n\nThat'll warm you right up — +${r.xp} XP and +${r.gold} gold for the road.`);
         else if (r?.error === "already") setLine("Ha! You've had your fill today. Come back tomorrow, friend.");
         else setLine("*frowns* Tap's stuck. Try again in a moment.");
     }, [act]);
+    const buyRoundAct = useCallback(async () => {
+        setFlash(null);
+        const r = await act({ action: "round" });
+        if (r?.ok) setLine(`🍻 \"A ROUND FOR THE HOUSE!\" *cheers erupt across the tavern*\n\nYou stood ${r.recipients} ${r.recipients === 1 ? "patron" : "patrons"} a drink (+${r.giftXp} XP each) and earned a hero's welcome (+${r.hostXp} XP). That makes ${r.rounds} round${r.rounds === 1 ? "" : "s"} you've bought!`);
+        else if (r?.error === "insufficient_gold") setLine(`*eyes your purse* A round runs ${st?.round?.cost || 400} gold, friend — come back when you're flush.`);
+        else setLine("*shrugs* Can't pour that just now.");
+    }, [act, st?.round?.cost]);
 
     // ── Wolf's Gambit dice game ──
     const ante = useCallback(async (amount) => {
@@ -162,7 +169,8 @@ export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
                         {flash ? <div className="tv-flash">{flash}</div> : null}
                         <div className="tv-options">
                             <button type="button" onClick={askNews}>🗞️ What&apos;s the word tonight?</button>
-                            <button type="button" disabled={busy || !st?.dailyPint?.available} onClick={askPint}>{st?.dailyPint?.available ? "🍺 Pour me a pint" : "🍺 Already had my pint today"}</button>
+                            <button type="button" disabled={busy || !st?.dailyPint?.available} onClick={askPint}>{st?.dailyPint?.available ? `🍺 Pour me a pint (+${st?.dailyPint?.xp || 40} XP, +${st?.dailyPint?.gold || 15} 🪙)` : "🍺 Already had my pint today"}</button>
+                            <button type="button" disabled={busy || (st?.gold || 0) < (st?.round?.cost || 400)} onClick={buyRoundAct}>🍻 Buy a round for the house ({(st?.round?.cost || 400).toLocaleString()} 🪙)</button>
                             <button type="button" onClick={() => { setFlash(null); setView("dice"); }}>🎲 Fancy a game of dice?</button>
                             <button type="button" onClick={askLore}>🏰 Tell me about this place</button>
                         </div>
