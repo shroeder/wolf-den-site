@@ -472,20 +472,8 @@ export default function FarmClient({ initial, viewingAlias }) {
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
-    // Drag a plot to a new spot (own farm, in move mode). Optimistic so it doesn't snap back; server garden wins.
-    const movePlotTo = useCallback(async (slot, x, y) => {
-        let prev = null;
-        setGarden((g) => {
-            if (!g?.plots) return g;
-            const cur = g.plots.find((p) => p.slot === slot);
-            prev = cur ? { x: cur.x, y: cur.y } : null;
-            return { ...g, plots: g.plots.map((p) => (p.slot === slot ? { ...p, x, y } : p)) };
-        });
-        const r = await post({ action: "plot_move", slot, x, y });
-        if (r?.garden) setGarden(r.garden);
-        else if (prev) setGarden((g) => (g?.plots ? { ...g, plots: g.plots.map((p) => (p.slot === slot ? { ...p, x: prev.x, y: prev.y } : p)) } : g));
-        return r;
-    }, [post]);
+    // Plots are permanent fixtures now (no dragging) — they stay in their tidy arrangement and you invest in
+    // them in place. (The old plot_move action is retired on the client.)
 
     // Rate (like/love/admire) the farm you're visiting. Revising your rating is free; a brand-new rating spends
     // your one daily charge. Patches the summary in place with a juicy burst.
@@ -784,16 +772,30 @@ export default function FarmClient({ initial, viewingAlias }) {
                     id="farm"
                     emoji="🏡"
                     title="the Farm"
-                    tagline="Grow crops for gold, XP &amp; loot — and level up your pets."
+                    tagline="Your pet-XP engine — every harvest levels your companions and earns XP (loot &amp; gold along the way)."
                     steps={[
                         "Tap an empty plot to plant a seed — buy one right there if your bag's empty.",
                         "Crops grow over time. Spend fertilizer to speed one up.",
-                        "Tap a ripe crop to harvest it for gold, XP + a bonus loot roll.",
+                        "Tap a ripe crop to harvest it — it feeds your equipped pet XP + earns you XP, with a bonus loot roll.",
                         "Pet your companions (❤️) for pet XP, and grab the Wild Loot Pig when he shows up.",
                     ]}
                     accent="#4abd6a"
                 />
             ) : null}
+
+            {/* Farm identity strip — reframes what this place is FOR: leveling your pets. Computed from the pets
+                already roaming here (no extra query). */}
+            {farm.mine && pets.length ? (() => {
+                const totalLevels = pets.reduce((s, p) => s + (Number(p.level) || 1), 0);
+                const maxed = pets.filter((p) => p.maxed || (Number(p.level) || 0) >= 5).length;
+                return (
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 14px", padding: "9px 13px", margin: "2px 0 4px", borderRadius: 12, background: "rgba(140,110,220,0.1)", border: "1px solid rgba(160,130,230,0.3)", fontSize: 12.5, fontWeight: 700 }}>
+                        <span style={{ color: "#c9b4ff" }}>🐾 {pets.length} companion{pets.length === 1 ? "" : "s"} leveling here</span>
+                        <span style={{ color: "#8fe39a" }}>⬆️ {totalLevels} pet level{totalLevels === 1 ? "" : "s"} raised</span>
+                        {maxed ? <span style={{ color: "#ffd75e" }}>✨ {maxed} maxed</span> : null}
+                    </div>
+                );
+            })() : null}
 
             {/* Welcome-back recaps: who petted your pets + who rated your farm (own farm only). */}
             {farm.mine ? <PetVisitReport /> : null}
@@ -885,9 +887,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                             <ScenePlots
                                 garden={garden}
                                 busy={gardenBusy}
-                                editing={farm.mine && decoEditing}
+                                editing={false}
                                 fieldRef={fieldRef}
-                                onMovePlot={movePlotTo}
                                 onPlant={(slot) => setPlanting(slot)}
                                 onHarvest={harvestAt}
                                 onInspect={(slot) => setInspectSlot(slot)}
@@ -986,10 +987,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {fullscreen ? (
                     <div style={{ position: "absolute", left: 10, right: 10, bottom: 10, zIndex: 9998, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>{sceneControls}</div>
                 ) : null}
-                {/* Persistent lock/move toggle — top-right of the scene. Governs dragging BOTH plots and
-                    decorations on your own farm. Default is movable. */}
+                {/* Persistent lock/move toggle — top-right of the scene. Governs dragging DECORATIONS on your
+                    own farm (plots are permanent fixtures now and never move). Default is movable. */}
                 {farm.mine && (garden || (farm.decorations && (((farm.placements?.length || 0) > 0) || decorating))) ? (
-                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock farm layout" : "Unlock farm layout"} title={decoEditing ? "Layout unlocked — tap to LOCK plots & decorations" : "Layout locked — tap to UNLOCK and rearrange"}
+                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock decorations" : "Unlock decorations"} title={decoEditing ? "Decorations unlocked — tap to LOCK them in place" : "Decorations locked — tap to UNLOCK and rearrange"}
                         style={{ position: "absolute", top: 10, right: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 999, border: `1px solid ${decoEditing ? "rgba(143,199,255,0.6)" : "rgba(255,255,255,0.25)"}`, background: decoEditing ? "linear-gradient(180deg, rgba(30,52,74,0.96), rgba(18,32,46,0.96))" : "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: decoEditing ? "#bfe0ff" : "#d7d7db", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "🔓" : "🔒"}</span>{decoEditing ? "Unlocked" : "Locked"}
                     </button>
@@ -1852,7 +1853,7 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Plant a seed" style={{ width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
-                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>Rarer seeds take longer, sell for more, and roll better harvest loot. Here&apos;s what each one pays out:</div>
+                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>Rarer seeds take longer, feed your pet more XP, and roll better harvest loot. Here&apos;s what each one pays out:</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {bag.length ? bag.map((s) => (
                         <button key={s.id} type="button" disabled={Boolean(busy)} onClick={() => onPick(slot, s.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
@@ -1860,10 +1861,11 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                             <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ display: "block", fontSize: 13.5, fontWeight: 800 }}>{s.name} <span className="muted" style={{ fontWeight: 400 }}>×{s.count}</span></span>
                                 <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 8px", marginTop: 4, fontSize: 11.5 }}>
-                                    <span style={{ color: "#ffd75e", fontWeight: 700 }}>🪙 {s.sell.toLocaleString()} gold</span>
-                                    <span style={{ color: "#8fd8ff", fontWeight: 700 }}>✨ {s.xp} XP</span>
-                                    <span className="muted">⏳ {Math.round(s.growMin / 60)}h grow</span>
+                                    <span style={{ color: "#8fe39a", fontWeight: 700 }}>✨ {s.xp} XP</span>
+                                    <span style={{ color: "#c9b4ff", fontWeight: 700 }}>🐾 {s.xp} pet XP</span>
                                     {s.loot ? <span style={{ color: RARITY_RING[s.rarity] || "#cdd9c6", fontWeight: 700 }}>🎁 {s.loot}</span> : null}
+                                    <span className="muted">⏳ {Math.round(s.growMin / 60)}h</span>
+                                    <span className="muted">🪙 {s.sell.toLocaleString()} sold</span>
                                 </span>
                             </span>
                         </button>
@@ -1955,14 +1957,15 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                 <div style={{ padding: "6px 16px 4px" }}>
                     <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", color: "#9aa0a6", margin: "6px 2px 8px" }}>Expected harvest</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <ExpectStat icon="🪙" value={(p.sell || 0).toLocaleString()} label="gold" accent="#ffd75e" />
-                        <ExpectStat icon="✨" value={`+${(p.xp || 0).toLocaleString()}`} label="XP" accent="#8cd0ff" />
+                        <ExpectStat icon="✨" value={`+${(p.xp || 0).toLocaleString()}`} label="your XP" accent="#8fe39a" />
+                        <ExpectStat icon="🐾" value={`+${(p.xp || 0).toLocaleString()}`} label="pet XP" accent="#c9b4ff" />
                     </div>
                     {p.loot ? (
                         <div style={{ marginTop: 8, padding: "9px 12px", borderRadius: 11, background: `${ring}1f`, border: `1px solid ${ring}80`, display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700 }}>
                             <span style={{ fontSize: 16 }}>🎁</span><span>Chance at <strong style={{ color: ring }}>{p.loot}</strong> on harvest</span>
                         </div>
                     ) : null}
+                    <div className="muted" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center" }}>🪙 sells for {(p.sell || 0).toLocaleString()} gold</div>
                 </div>
                 <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
                     {ready ? (
