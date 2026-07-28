@@ -29,6 +29,23 @@ function urlBase64ToUint8Array(base64String) {
     return arr;
 }
 
+// Does an existing subscription's applicationServerKey match the CURRENT VAPID public key? After a key
+// rotation, old subscriptions keep working locally but the server can't push to them (403), so we must detect
+// the mismatch and re-subscribe. Returns true when it matches (or can't be determined — don't churn).
+function subMatchesCurrentKey(sub) {
+    try {
+        const appKey = sub?.options?.applicationServerKey;
+        if (!appKey) return true; // browser doesn't expose it — assume ok
+        const a = new Uint8Array(appKey);
+        const b = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+        return true;
+    } catch {
+        return true;
+    }
+}
+
 // Register the push service worker (idempotent — the browser dedupes by URL).
 export async function registerPushServiceWorker() {
     if (!isWebPushSupported()) return null;
@@ -56,6 +73,12 @@ export async function enableWebPush() {
     const reg = await navigator.serviceWorker.ready;
 
     let sub = await reg.pushManager.getSubscription();
+    // Heal a STALE subscription made with a rotated key — drop it so we re-subscribe with the current one.
+    if (sub && !subMatchesCurrentKey(sub)) {
+        await fetch("/api/marketplace/push/web/unsubscribe", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
+        await sub.unsubscribe().catch(() => {});
+        sub = null;
+    }
     if (!sub) {
         sub = await reg.pushManager
             .subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) })
