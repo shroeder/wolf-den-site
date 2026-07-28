@@ -30,7 +30,10 @@ export const PET_PASSIVE_BY_RARITY = { common: 1, rare: 2, epic: 4, legendary: 6
 export const FARM_PASSIVE_STATS = new Set(["seedLuck", "growSpeed", "petXp"]);
 // FORGE passive stats — same idea for The Forge: an owned forge pet improves your smithing odds (crafting.js),
 // NOT boss power. These keys aren't combat stats, so the pet combat aggregator ignores them.
-export const FORGE_PASSIVE_STATS = new Set(["efficient", "keen_eye", "masters_touch", "steady_hand"]);
+// The four real forge-odds keys, plus "forgemaster" — a UNIQUE legendary passive that boosts ALL of them at
+// once (expanded in crafting.js's petForgeBonus). Kept out of the real-keys set used by the odds math.
+export const FORGE_ODDS_KEYS = ["efficient", "keen_eye", "masters_touch", "steady_hand"];
+export const FORGE_PASSIVE_STATS = new Set([...FORGE_ODDS_KEYS, "forgemaster"]);
 export const PET_PASSIVE_STAT = {
     // Level
     bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
@@ -47,7 +50,7 @@ export const PET_PASSIVE_STAT = {
     flamingo: "xp_gain", toucan: "gold_find",
     // Forge (earned by using The Forge) — FORGE passives that improve your smithing odds (crafting.js), fitting
     // how each is earned: salvagers → part yield, enhancers → enhance odds.
-    ember_whelp: "efficient", cinder_hound: "steady_hand", anvil_golem: "keen_eye", molten_salamander: "masters_touch", forgeheart_wyrm: "masters_touch",
+    ember_whelp: "efficient", cinder_hound: "steady_hand", anvil_golem: "keen_eye", molten_salamander: "masters_touch", forgeheart_wyrm: "forgemaster",
     // Chest
     tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
     corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
@@ -86,6 +89,7 @@ export const PET_STAT_META = {
     keen_eye: { label: "Keen Eye", icon: "👁️", desc: "Better odds of a BONUS higher-tier part when you salvage." },
     masters_touch: { label: "Master's Touch", icon: "✨", desc: "Better odds an enhancement rolls DOUBLE the gains." },
     steady_hand: { label: "Steady Hand", icon: "🖐️", desc: "Better odds a slip won't break your combo while enhancing." },
+    forgemaster: { label: "Forgemaster", icon: "⚒️", desc: "Master of every craft — raises ALL four Forge odds at once (double parts, bonus parts, double gains & combo-saves)." },
 };
 
 const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal", celestial: "Celestial", primordial: "Primordial" };
@@ -152,7 +156,7 @@ export const COLLECTIBLES = [
     { id: "cinder_hound", name: "Cinder Hound", Icon: GiHound, color: "#e0632c", rarity: "rare", source: "achievement", activeStat: "steady_hand", achievement: "Enhance gear 25 times at the Forge", spritePrompt: "a fierce hound wreathed in cinders and smoke, glowing ember cracks along its body and molten paws, eyes like hot coals" },
     { id: "anvil_golem", name: "Anvil Golem", Icon: GiRockGolem, color: "#9aa0a6", rarity: "epic", source: "achievement", activeStat: "keen_eye", achievement: "Combine forge parts 100 times", spritePrompt: "a stout sturdy golem forged from a blacksmith's anvil and iron blocks, glowing molten seams between its plates, one arm ending in a great hammer" },
     { id: "molten_salamander", name: "Molten Salamander", Icon: GiSalamander, color: "#ff6a2c", rarity: "epic", source: "achievement", activeStat: "masters_touch", achievement: "Enhance a piece to +8 at the Forge", spritePrompt: "a sleek salamander with cracked obsidian skin glowing with rivers of lava, dripping molten magma and trailing fire as it moves" },
-    { id: "forgeheart_wyrm", name: "Forgeheart Wyrm", Icon: GiFireBreath, color: "#ffb020", rarity: "legendary", source: "achievement", activeStat: "masters_touch", achievement: "Enhance a piece to a Master rank (+15)", spritePrompt: "a majestic wyrm plated in rune-etched forged steel with a blazing molten forge-heart glowing through its chest, wings of hammered gold-orange metal, radiating heat" },
+    { id: "forgeheart_wyrm", name: "Forgeheart Wyrm", Icon: GiFireBreath, color: "#ffb020", rarity: "legendary", source: "achievement", activeStat: "forgemaster", achievement: "Enhance a piece to a Master rank (+15)", spritePrompt: "a majestic wyrm plated in rune-etched forged steel with a blazing molten forge-heart glowing through its chest, wings of hammered gold-orange metal, radiating heat" },
 
     // ── Rare-chest drops ───────────────────────────────────────────────────────────────────────────
     { id: "tropical_fish", name: "Reef Fish", Icon: GiTropicalFish, color: "#5ad0d0", rarity: "common", source: "chest", chestTier: "wooden", activeStat: "fortune", hint: "A flash of color", spritePrompt: "a bright tropical reef fish" },

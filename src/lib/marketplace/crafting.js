@@ -9,7 +9,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { grantEventBadge, getBadgeForge } from "@/lib/marketplace/badges.js";
 import { MAX_FORGE_LEVEL } from "@/lib/marketplace/forge-rank.js";
-import { collectibleById, petForgePassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
+import { collectibleById, petForgePassive, petPassiveLevelMult, FORGE_ODDS_KEYS } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
@@ -90,8 +90,14 @@ async function petForgeBonus(buyerId) {
     for (const row of ownedRows) {
         const fp = petForgePassive(collectibleById(row.ref));
         if (!fp) continue;
-        const lvl = petLevelForXp(xpMap[row.ref] || 0, collectibleById(row.ref)?.rarity);
-        out[fp.stat] = (out[fp.stat] || 0) + fp.value * petPassiveLevelMult(lvl);
+        const scaled = fp.value * petPassiveLevelMult(petLevelForXp(xpMap[row.ref] || 0, collectibleById(row.ref)?.rarity));
+        if (fp.stat === "forgemaster") {
+            // Forgeheart Wyrm's unique passive: a slice of its power boosts EVERY forge odd, not just one.
+            const each = scaled * 0.5;
+            for (const k of FORGE_ODDS_KEYS) out[k] = (out[k] || 0) + each;
+        } else {
+            out[fp.stat] = (out[fp.stat] || 0) + scaled;
+        }
     }
     return out;
 }
