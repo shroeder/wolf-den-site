@@ -6,6 +6,7 @@ import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
+import { getSetting } from "@/lib/settings.js";
 
 // ── TOWN EVENTS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Admin-triggered communal encounters that spawn in the plaza (a bandit raid, etc.). Everyone in town attacks a
@@ -79,11 +80,17 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent) };
 }
 
+// Whether the auto opening-events are live. Controlled by a DB setting (owner toggle in the Town Hall) rather
+// than a Vercel env var — kept between us, flippable without touching the dashboard.
+export async function townEventsLive() {
+    return String((await getSetting("town_events_live", "")) || "").trim() === "1";
+}
+
 // Cron tick: right after the shop physically OPENS (Thu–Sun), auto-spawn a town event so members get pinged
-// to come down while the Den is open — a foot-traffic driver. DORMANT until TOWN_EVENTS_LIVE is set, because
-// the Town is owner-gated during the build and we must not push the whole membership to a town they can't enter.
+// to come down while the Den is open — a foot-traffic driver. DORMANT until the owner flips town_events_live,
+// because the Town is owner-gated during the build and we must not push the membership to a town they can't enter.
 export async function runTownHoursTick() {
-    if (!String(process.env.TOWN_EVENTS_LIVE || "").trim()) return { skipped: "not_live" };
+    if (!(await townEventsLive())) return { skipped: "not_live" };
     const status = storeStatus();
     if (!status.open || status.minutesSinceOpen > 20) return { skipped: "not_just_opened", open: status.open };
     const [active, recent] = await Promise.all([

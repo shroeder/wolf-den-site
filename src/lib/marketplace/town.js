@@ -7,8 +7,11 @@ import { listFriends } from "@/lib/marketplace/friends.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
+import { townEventsLive } from "@/lib/marketplace/town-events.js";
+import { setSetting } from "@/lib/settings.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a fair gold SINK). Tunable prices.
 export const MERCHANT_WARES = [
@@ -132,14 +135,18 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, friends, upgrade, event, quests] = await Promise.all([
+    const [art, petSprites, friends, upgrade, event, quests, chestArt, eventsLive] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
         buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
         getTownUpgrade().catch(() => null),
         getActiveTownEvent(buyerId).catch(() => null),
         buyerId ? getTownQuests(buyerId).catch(() => []) : Promise.resolve([]),
+        getChestArt().catch(() => ({})),
+        townEventsLive().catch(() => false),
     ]);
+    // Merchant wares with their REAL chest art (falls back to the emoji client-side if an image is missing).
+    const merchantWares = MERCHANT_WARES.map((w) => ({ ...w, image: chestArt[w.tier] || null }));
     const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
     const [acts, presence, chats] = await Promise.all([
@@ -218,11 +225,19 @@ export async function getTownState(buyerId) {
         art,
         upgrade,
         event,
-        merchant: MERCHANT_WARES,
+        merchant: merchantWares,
         store: storeStatus(),
         quests,
+        eventsLive,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
+}
+
+// Owner toggle for the auto opening-events cron (DB setting — no Vercel env needed).
+export async function setTownEventsLive(buyerId, on) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    await setSetting("town_events_live", on ? "1" : "0").catch(() => {});
+    return { ok: true, eventsLive: Boolean(on) };
 }
 
 // Buy a loot chest from the Traveling Merchant (owner-gated during the build). Guarded gold spend → a chest.

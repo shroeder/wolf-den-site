@@ -27,6 +27,14 @@ const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i
 
 function Avatar({ a, isYou, onTap }) {
     const dur = clamp((a.moveDist || 0) * 0.05, 0.4, 2.6);
+    // The pet drifts around near you on its own little schedule, so it feels alive instead of glued to your side.
+    const [petWander, setPetWander] = useState({ x: 0, y: 0 });
+    useEffect(() => {
+        if (!a.pet) return undefined;
+        const tick = () => setPetWander({ x: (Math.random() - 0.5) * 26, y: (Math.random() - 0.5) * 10 });
+        const t = setInterval(tick, 1600 + Math.random() * 1400);
+        return () => clearInterval(t);
+    }, [a.pet]);
     return (
         <div
             className={`tw-av${isYou ? " is-you" : ""}${a.friend ? " is-friend" : ""}`}
@@ -46,8 +54,10 @@ function Avatar({ a, isYou, onTap }) {
             )}
             <div className={`tw-sprite${a.moving ? " is-walking" : ""}`}>
                 {a.pet ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="tw-pet" src={a.pet} alt="" draggable={false} style={{ transform: spriteTransform(a.petFlip, a.facing) }} />
+                    <span className="tw-pet-wrap" style={{ transform: `translate(${petWander.x}px, ${petWander.y}px)` }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="tw-pet" src={a.pet} alt="" draggable={false} style={{ transform: spriteTransform(a.petFlip, a.facing) }} />
+                    </span>
                 ) : null}
                 {a.sprite ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -83,6 +93,8 @@ export default function TownClient({ initial }) {
     const [questOpen, setQuestOpen] = useState(false);
     const [questBusy, setQuestBusy] = useState(false);
     const [questFlash, setQuestFlash] = useState(null);
+    const [smithOpen, setSmithOpen] = useState(false);
+    const [previewDecos, setPreviewDecos] = useState(() => new Set()); // owner: preview upgrade decorations before funding
     const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
     const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
     const evIdRef = useRef(null);
@@ -251,7 +263,7 @@ export default function TownClient({ initial }) {
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
     const buildings = state?.buildings || [];
-    const unlocked = useMemo(() => new Set(state?.upgrade?.unlocked || []), [state?.upgrade]);
+    const shownDecos = useMemo(() => new Set([...(state?.upgrade?.unlocked || []), ...previewDecos]), [state?.upgrade, previewDecos]);
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
     const crierLines = useMemo(() => {
@@ -283,6 +295,14 @@ export default function TownClient({ initial }) {
         else setQuestFlash("That bounty isn't ready yet.");
     }, [load]);
     const questsClaimable = useMemo(() => (state?.quests || []).filter((q) => q.done && !q.claimed).length, [state?.quests]);
+    // Owner: preview an upgrade decoration locally without funding it; toggle the auto opening-events cron.
+    const togglePreview = useCallback((key) => {
+        setPreviewDecos((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+    }, []);
+    const toggleEventsLive = useCallback(async () => {
+        await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "set_events_live", on: !state?.eventsLive }) }).catch(() => {});
+        load();
+    }, [state?.eventsLive, load]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
     if (state && state.owner === false) {
@@ -369,11 +389,13 @@ export default function TownClient({ initial }) {
                             </Link>
                         );
                     })}
-                    {/* Blacksmith NPC standing by the Forge */}
-                    {art.smith?.url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="tw-npc" src={art.smith.url} alt="" draggable={false} style={{ left: "45%", top: `${GROUND}%` }} />
-                    ) : null}
+                    {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
+                    <button type="button" className="tw-npc-btn" style={{ left: "45%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
+                        {art.smith?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={art.smith.url} alt="Blacksmith" draggable={false} />
+                        ) : <span className="tw-npc-emoji">⚒️</span>}
+                    </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
                     <button type="button" className="tw-npc-btn" style={{ left: "32%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
@@ -399,9 +421,9 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
                     {/* Collective-upgrade decorations that scroll with the street */}
-                    {unlocked.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
-                    {unlocked.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
-                    {unlocked.has("garden") ? ["30%", "64%", "84%"].map((lx, i) => <div key={i} className="tw-deco tw-deco-garden" style={{ left: lx, top: `${GROUND}%` }} aria-hidden="true">🌷</div>) : null}
+                    {shownDecos.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
+                    {shownDecos.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
+                    {shownDecos.has("garden") ? ["30%", "64%", "84%"].map((lx, i) => <div key={i} className="tw-deco tw-deco-garden" style={{ left: lx, top: `${GROUND}%` }} aria-hidden="true">🌷</div>) : null}
                     {/* Other players */}
                     {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} />)}
                     {/* You */}
@@ -437,8 +459,8 @@ export default function TownClient({ initial }) {
                 })() : null}
 
                 {/* Collective-upgrade overlays that span the plaza (don't scroll — they hang over the whole view) */}
-                {unlocked.has("lights") ? <div className="tw-lights" aria-hidden="true" /> : null}
-                {unlocked.has("banners") ? <div className="tw-banners" aria-hidden="true" /> : null}
+                {shownDecos.has("lights") ? <div className="tw-lights" aria-hidden="true" /> : null}
+                {shownDecos.has("banners") ? <div className="tw-banners" aria-hidden="true" /> : null}
 
                 {/* edge hints — tap to walk that way (or just drag the street to look around) */}
                 {cameraPx > 4 ? <button type="button" className="tw-edge tw-edge-l" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x - 22, 1, 99), me.y); }} aria-label="Walk left">‹</button> : null}
@@ -529,7 +551,10 @@ export default function TownClient({ initial }) {
                                 const afford = (you?.gold || 0) >= w.price;
                                 return (
                                     <button key={w.tier} type="button" className="tw-ware" disabled={!afford || merchantBusy} onClick={() => buyChest(w.tier)}>
-                                        <span className="tw-ware-emoji" aria-hidden="true">{w.emoji}</span>
+                                        {w.image ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img className="tw-ware-img" src={w.image} alt="" draggable={false} />
+                                        ) : <span className="tw-ware-emoji" aria-hidden="true">{w.emoji}</span>}
                                         <span className="tw-ware-label">{w.label}</span>
                                         <span className="tw-ware-price">🪙 {w.price.toLocaleString()}</span>
                                     </button>
@@ -598,6 +623,37 @@ export default function TownClient({ initial }) {
                                 </div>
                             );
                         })() : null}
+
+                        {state?.owner ? (
+                            <div className="tw-board-section">
+                                <div className="tw-board-title">🔧 Owner tools</div>
+                                <p className="muted" style={{ fontSize: "0.78rem", margin: "0 2px 6px" }}>Preview each upgrade before it&apos;s funded (local only — doesn&apos;t change the real total):</p>
+                                <div className="tw-owner-preview">
+                                    {(state?.upgrade?.tiers || []).map((t) => {
+                                        const on = previewDecos.has(t.key) || (state?.upgrade?.unlocked || []).includes(t.key);
+                                        return <button key={t.key} type="button" className={`tw-prev-chip${on ? " is-on" : ""}`} onClick={() => togglePreview(t.key)}>{on ? "👁️" : "🔒"} {t.name}</button>;
+                                    })}
+                                </div>
+                                <button type="button" className={`tw-live-toggle${state?.eventsLive ? " is-on" : ""}`} onClick={toggleEventsLive}>
+                                    {state?.eventsLive ? "🟢 Auto opening-events: LIVE" : "⚪ Auto opening-events: off"}
+                                    <span className="muted">tap to {state?.eventsLive ? "turn off" : "turn on"} — pushes members when the shop opens</span>
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Blacksmith dialogue */}
+            {smithOpen ? (
+                <div className="tw-roster" onClick={() => setSmithOpen(false)} role="presentation">
+                    <div className="tw-roster-panel tw-menu-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>⚒️ The Blacksmith</strong><button type="button" onClick={() => setSmithOpen(false)} aria-label="Close">✕</button></div>
+                        <p className="muted" style={{ margin: "-2px 2px 10px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;Bring me your old gear, wolf — I&apos;ll salvage it into parts, or we&apos;ll enhance what you&apos;ve got at the anvil.&rdquo;</p>
+                        <div className="tw-menu-actions">
+                            <Link href="/marketplace/blacksmith" className="tw-menu-btn">🔨 Visit the Forge →</Link>
+                            <Link href="/marketplace/inventory" className="tw-menu-btn">🛡️ Your gear</Link>
+                        </div>
                     </div>
                 </div>
             ) : null}
@@ -652,7 +708,8 @@ const TOWN_CSS = `
 .tw-sprite { position: relative; width: 60px; height: 60px; display: grid; place-items: center; }
 .tw-sprite img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
 .tw-sprite-fallback { font-size: 42px; }
-.tw-pet { position: absolute; bottom: -2px; left: -20px; width: 32px; height: 32px; object-fit: contain; z-index: -1; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
+.tw-pet-wrap { position: absolute; bottom: -2px; left: -30px; z-index: -1; transition: transform 1.6s ease-in-out; }
+.tw-pet { display: block; width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
 .tw-sprite.is-walking { animation: twBob .5s ease-in-out infinite; transform-origin: bottom center; }
 @keyframes twBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .tw-av.is-you .tw-sprite::after { content: ""; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); width: 42px; height: 9px; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,215,110,0.55), transparent 70%); }
@@ -721,6 +778,13 @@ const TOWN_CSS = `
 .tw-ware-emoji { font-size: 30px; line-height: 1; }
 .tw-ware-label { font-size: 0.74rem; font-weight: 800; text-align: center; }
 .tw-ware-price { font-size: 0.72rem; color: #ffd75e; font-weight: 800; }
+.tw-ware-img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.tw-owner-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tw-prev-chip { font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #cbb9e0; cursor: pointer; }
+.tw-prev-chip.is-on { color: #8fe39a; border-color: rgba(143,227,154,0.5); background: rgba(143,227,154,0.12); }
+.tw-live-toggle { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f2ead9; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
+.tw-live-toggle.is-on { border-color: rgba(143,227,154,0.5); background: rgba(143,227,154,0.1); }
+.tw-live-toggle .muted { font-size: 0.72rem; font-weight: 600; }
 .tw-npc-alert { position: absolute; top: 0; right: 6px; z-index: 2; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e0433f; color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 .tw-quests { display: flex; flex-direction: column; gap: 10px; }
 .tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
