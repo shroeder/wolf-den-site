@@ -203,6 +203,16 @@ export default function TownClient({ initial }) {
                             ))}
                         </div>
                     ) : null}
+                    {/* Foreground border wall — sits at the mid/street seam so the horizon line reads as a defined
+                        plaza edge (buildings & avatars draw in front of it). Ground-locked (moves with the street). */}
+                    {layered && art.fg?.url ? (
+                        <div className="tw-fg" aria-hidden="true">
+                            {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={k} src={art.fg.url} alt="" draggable={false} />
+                            ))}
+                        </div>
+                    ) : null}
                     {/* Buildings */}
                     {buildings.map((b) => {
                         const bart = art[b.id];
@@ -271,14 +281,21 @@ const TOWN_CSS = `
 .tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
-/* Midground rooftops — transparent above, silhouettes at the bottom; sits just above the street. */
-.tw-mid { position: absolute; top: 0; left: 0; height: 56%; display: flex; z-index: 0; pointer-events: none; }
+/* Midground rooftops — transparent above, silhouettes at the bottom; its base fades to haze so it doesn't cut
+   a hard horizontal line against the street. */
+.tw-mid { position: absolute; top: 0; left: 0; height: 56%; display: flex; z-index: 0; pointer-events: none;
+    -webkit-mask-image: linear-gradient(180deg, #000 76%, transparent 99%); mask-image: linear-gradient(180deg, #000 76%, transparent 99%); }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
+/* Foreground plaza border wall — ground-locked, sits over the mid/street seam. */
+.tw-fg { position: absolute; left: 0; bottom: 33%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
+.tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-fg img:nth-child(even) { transform: scaleX(-1); }
 .tw-cobble { position: absolute; left: 0; bottom: 0; height: 44%; display: flex; overflow: hidden; z-index: 1; box-shadow: inset 0 12px 26px rgba(0,0,0,0.35); }
 .tw-cobble img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-cobble img:nth-child(even) { transform: scaleX(-1); }
-.tw-cobble::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 30px; background: linear-gradient(180deg, rgba(30,20,45,0.5), transparent); pointer-events: none; }
+/* Softer, taller shadow where the street meets the buildings behind it — dissolves the seam. */
+.tw-cobble::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 68px; background: linear-gradient(180deg, rgba(26,17,40,0.9), rgba(26,17,40,0.28) 55%, transparent); pointer-events: none; }
 /* CSS fallback backdrop (before art is generated) */
 .tw-sky { position: absolute; inset: 0 0 34% 0; background: linear-gradient(180deg, #2a2140 0%, #3b2d55 42%, #6b4d7a 80%, #a56b6b 100%); }
 .tw-ground { position: absolute; inset: 66% 0 0 0; background: radial-gradient(120% 80% at 50% -10%, rgba(255,190,120,0.12), transparent 60%), repeating-linear-gradient(90deg, #55402c 0 38px, #5c4630 38px 76px), linear-gradient(180deg, #6a5138, #4a381f); box-shadow: inset 0 8px 24px rgba(0,0,0,0.35); }
