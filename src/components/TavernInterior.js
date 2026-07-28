@@ -22,11 +22,10 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const spriteFlip = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 
 const WORLD_W = 1240;   // width of the scrollable room (px)
-const FLOOR_Y = 90;     // % of scene height where characters stand (on the plank floor)
-// NPCs / spots placed along the room (x = % of the world width).
+const FLOOR_Y = 95;     // % of scene height where characters stand (on the plank floor)
+// NPC characters placed along the room (x = % of the world width).
 const NPCS = [
-    { key: "bar", art: "barkeep", emoji: "🧔", label: "Barkeep", x: 15 },
-    { key: "hearth", art: null, emoji: "🔥", label: "Hearth", x: 48 },
+    { key: "bar", art: "barkeep", emoji: "🧔", label: "Barkeep", x: 16 },
     { key: "dice", art: "gambler", emoji: "🎲", label: "Gambler", x: 84 },
 ];
 
@@ -214,15 +213,15 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                     ) : <div className="tv-scene-fallback">🍺 The Wolf&apos;s Rest</div>}
                     <div className="tv-fire" aria-hidden="true" />
                     <div className="tv-vignette" aria-hidden="true" />
-                    {/* NPCs / spots */}
-                    {NPCS.map((n) => {
+                    {/* NPC characters */}
+                    {NPCS.map((n, i) => {
                         const url = n.art ? npcArt?.[n.art] : null;
                         return (
                             <button key={n.key} type="button" className="tv-npc" style={{ left: `${n.x}%`, top: `${FLOOR_Y}%` }} onClick={(e) => { e.stopPropagation(); openStation(n.key); }}>
                                 <span className="tv-npc-label">{n.label}{n.key === "bar" && st?.dailyPint?.available ? " •" : ""}</span>
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="tv-npc-sprite" src={url} alt={n.label} draggable={false} />
+                                    <img className="tv-npc-sprite" src={url} alt={n.label} draggable={false} style={{ animationDelay: `${i * 0.85}s` }} />
                                 ) : <span className="tv-npc-emoji">{n.emoji}</span>}
                             </button>
                         );
@@ -261,16 +260,10 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                                         <span className="tv-menu-ic">🗞️</span>
                                         <span className="tv-menu-body"><b>Ask for gossip</b><small>The latest word around the Den</small></span>
                                     </button>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {station === "hearth" ? (
-                            <div className="tv-dialogue">
-                                <div className="tv-keeper"><span className="tv-keeper-ic" aria-hidden="true">🔥</span><div className="tv-speech">{line}</div></div>
-                                <div className="tv-menu">
-                                    <button type="button" className="tv-menu-item" onClick={askNews}><span className="tv-menu-ic">🗞️</span><span className="tv-menu-body"><b>Rumors by the fire</b><small>What&apos;s happening in the Den</small></span></button>
-                                    <button type="button" className="tv-menu-item" onClick={askLore}><span className="tv-menu-ic">🏰</span><span className="tv-menu-body"><b>Tell me about this place</b><small>Tavern lore</small></span></button>
+                                    <button type="button" className="tv-menu-item" onClick={askLore}>
+                                        <span className="tv-menu-ic">🏰</span>
+                                        <span className="tv-menu-body"><b>Tell me about this place</b><small>A bit of tavern lore</small></span>
+                                    </button>
                                 </div>
                             </div>
                         ) : null}
@@ -337,7 +330,7 @@ const TV_CSS = `
 /* NPCs */
 .tv-npc { position: absolute; transform: translate(-50%, -100%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; cursor: pointer; padding: 0; }
 .tv-npc-label { font-size: 11px; font-weight: 800; color: #ffe6b3; background: rgba(20,10,4,0.8); border: 1px solid rgba(255,215,110,0.45); border-radius: 999px; padding: 2px 10px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
-.tv-npc-sprite { width: 168px; height: 168px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)); }
+.tv-npc-sprite { width: 168px; height: 168px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)); transform-origin: 50% 100%; animation: tvBreathe 3s ease-in-out infinite; }
 .tv-npc-emoji { font-size: 66px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
 /* Avatars — sized to read as real inhabitants next to the room's furniture */
 .tv-av { position: absolute; transform: translate(-50%, -100%); z-index: 6; display: flex; flex-direction: column; align-items: center; transition: left .3s linear, top .3s linear; }
