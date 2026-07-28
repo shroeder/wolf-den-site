@@ -53,7 +53,7 @@ function Avatar({ a, isYou, onTap }) {
             ) : (
                 <div className="tw-bubble">{a.status || (isYou ? "🐺 you" : "🐺 around town")}</div>
             )}
-            <div className={`tw-sprite${a.moving ? " is-walking" : ""}`}>
+            <div className={`tw-sprite${a.moving ? " is-walking" : ""}`} style={{ animationDelay: `${((Math.round(a.x || 0) % 24) / 8).toFixed(2)}s` }}>
                 {a.pet ? (
                     <span className="tw-pet-wrap" style={{ transform: `translate(${petWander.x}px, ${petWander.y}px)` }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -169,7 +169,8 @@ export default function TownClient({ initial }) {
     const moveTimer = useRef(null);
     const chatClear = useRef(null);
     const lastTyping = useRef(0);
-    const drag = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0 });
+    const drag = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0, lastT: 0, vx: 0 });
+    const momentumRef = useRef(0);
 
     // Measure the viewport so the camera can keep the player centered.
     useEffect(() => {
@@ -179,6 +180,15 @@ export default function TownClient({ initial }) {
         const ro = new ResizeObserver(set); ro.observe(el);
         return () => ro.disconnect();
     }, []);
+
+    // Lock the page scroll while any Town overlay is open, so the background can't scroll underneath it.
+    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen;
+    useEffect(() => {
+        if (typeof document === "undefined" || !anyTownModal) return undefined;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [anyTownModal]);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/town", { cache: "no-store" }).catch(() => null);
@@ -248,22 +258,40 @@ export default function TownClient({ initial }) {
     const followCam = clamp((me.x / 100) * WORLD_W - viewportW / 2, 0, maxScroll);
     const cameraPx = clamp(followCam + panExtra, 0, maxScroll);
 
-    // Pointer: a DRAG pans the street (free look); a TAP walks you there.
+    // Pointer: a DRAG pans the street (free look, with flick momentum); a TAP walks you there.
     const onPointerDown = useCallback((e) => {
-        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX };
+        cancelAnimationFrame(momentumRef.current); // stop any glide
+        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0 };
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ok */ }
     }, []);
     const onPointerMove = useCallback((e) => {
         const d = drag.current; if (!d.down) return;
         const dx = e.clientX - d.lastX;
-        // Only treat as a horizontal pan once it's clearly horizontal — otherwise let the page scroll vertically.
-        if (!d.moved && Math.abs(e.clientX - d.startX) > 8 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY)) { d.moved = true; setDragging(true); }
-        if (d.moved) { d.lastX = e.clientX; setPanExtra((p) => clamp(followCam + p - dx, 0, maxScroll) - followCam); }
+        // Treat as a horizontal pan as soon as it's mostly-horizontal (low threshold = less friction to start).
+        if (!d.moved && Math.abs(e.clientX - d.startX) > 4 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) { d.moved = true; setDragging(true); }
+        if (d.moved) {
+            const t = e.timeStamp || 0;
+            const dt = Math.max(1, t - d.lastT);
+            d.vx = dx / dt; // px per ms — for the release flick
+            d.lastX = e.clientX; d.lastT = t;
+            setPanExtra((p) => clamp(followCam + p - dx, 0, maxScroll) - followCam);
+        }
     }, [followCam, maxScroll]);
     const onPointerUp = useCallback((e) => {
         const d = drag.current; d.down = false;
         setDragging(false);
-        if (d.moved) return; // was a pan, not a tap
+        if (d.moved) {
+            // Flick momentum: keep gliding, decaying, so swipes feel effortless.
+            let v = d.vx * 16; // ≈ px per frame
+            const glide = () => {
+                v *= 0.93;
+                if (Math.abs(v) < 0.5) return;
+                setPanExtra((p) => clamp(followCam + p - v, 0, maxScroll) - followCam);
+                momentumRef.current = requestAnimationFrame(glide);
+            };
+            if (Math.abs(v) > 1.2) momentumRef.current = requestAnimationFrame(glide);
+            return; // was a pan, not a tap
+        }
         if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return; // doors/avatars handle themselves
         const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
         const worldX = ((e.clientX - rect.left + cameraPx) / WORLD_W) * 100;
@@ -544,8 +572,6 @@ export default function TownClient({ initial }) {
                 {state?.event ? <RaidCombat ev={state.event} hp={evHp ?? state.event.hp} onAttack={attackEvent} defeated={Boolean(evFlash?.defeated)} /> : null}
 
                 {/* edge hints — tap to walk that way (or just drag the street to look around) */}
-                {cameraPx > 4 ? <button type="button" className="tw-edge tw-edge-l" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x - 22, 1, 99), me.y); }} aria-label="Walk left">‹</button> : null}
-                {cameraPx < maxScroll - 4 ? <button type="button" className="tw-edge tw-edge-r" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x + 22, 1, 99), me.y); }} aria-label="Walk right">›</button> : null}
             </div>
 
             <section className="card tw-chatbar">
@@ -780,11 +806,11 @@ const TOWN_CSS = `
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
 /* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon.
    Raised so more of the distant buildings clear the foreground wall (and the bright haze base tucks behind it). */
-.tw-depth { position: absolute; left: 0; bottom: 62%; height: 26%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+.tw-depth { position: absolute; left: 0; bottom: 67%; height: 26%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-depth img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-depth img:nth-child(even) { transform: scaleX(-1); }
 /* Midground skyline band — nearer rooftops on the horizon, faster parallax than the sky, behind the plaza. */
-.tw-mid { position: absolute; left: 0; bottom: 48%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+.tw-mid { position: absolute; left: 0; bottom: 44%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Plaza centerpiece — the wolf fountain landmark standing in the square. */
@@ -819,8 +845,12 @@ const TOWN_CSS = `
 .tw-building-label { position: absolute; bottom: -22px; font-size: 10.5px; font-weight: 800; white-space: nowrap; background: rgba(20,14,30,0.75); border-radius: 6px; padding: 1px 7px; }
 
 .tw-av { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-.tw-sprite { position: relative; width: 60px; height: 60px; display: grid; place-items: center; }
+.tw-sprite { position: relative; width: 60px; height: 60px; display: grid; place-items: center; transform-origin: 50% 100%; }
+/* Idle "alive" breathing squash — a subtle neck squish so characters feel alive without wandering. */
+.tw-sprite:not(.is-walking) { animation: twBreathe 2.8s ease-in-out infinite; }
+@keyframes twBreathe { 0%,100% { transform: scaleY(1) scaleX(1); } 48% { transform: scaleY(0.955) scaleX(1.035); } }
 .tw-sprite img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
+.tw-npc-btn img { animation: twBreathe 3.1s ease-in-out infinite; transform-origin: 50% 100%; }
 .tw-sprite-fallback { font-size: 42px; }
 .tw-pet-wrap { position: absolute; bottom: -2px; left: -30px; z-index: -1; transition: transform 1.6s ease-in-out; }
 .tw-pet { display: block; width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
@@ -851,11 +881,6 @@ const TOWN_CSS = `
 .tw-emote-row button { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); font-size: 19px; line-height: 1; cursor: pointer; }
 .tw-emote-row button:active { transform: translateY(1px); }
 
-.tw-edge { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 60px; display: grid; place-items: center; font-size: 30px;
-    color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.28); border: none; border-radius: 10px; cursor: pointer; z-index: 500; animation: twEdge 1.4s ease-in-out infinite; }
-.tw-edge:hover { color: #fff; background: rgba(0,0,0,0.45); }
-.tw-edge-l { left: 8px; } .tw-edge-r { right: 8px; }
-@keyframes twEdge { 0%,100% { opacity: .5; } 50% { opacity: .9; } }
 
 .tw-emote { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,215,110,0.5); background: linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96)); color: #ffe9b0; font-weight: 800; font-size: 13px; cursor: pointer; }
 .tw-emote:active { transform: translateY(1px); }

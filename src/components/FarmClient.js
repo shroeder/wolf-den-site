@@ -799,19 +799,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 />
             ) : null}
 
-            {/* Farm identity strip — reframes what this place is FOR: leveling your pets. Computed from the pets
-                already roaming here (no extra query). */}
-            {farm.mine && pets.length ? (() => {
-                const totalLevels = pets.reduce((s, p) => s + (Number(p.level) || 1), 0);
-                const maxed = pets.filter((p) => p.maxed || (Number(p.level) || 0) >= 5).length;
-                return (
-                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 14px", padding: "9px 13px", margin: "2px 0 4px", borderRadius: 12, background: "rgba(140,110,220,0.1)", border: "1px solid rgba(160,130,230,0.3)", fontSize: 12.5, fontWeight: 700 }}>
-                        <span style={{ color: "#c9b4ff" }}>🐾 {pets.length} companion{pets.length === 1 ? "" : "s"} leveling here</span>
-                        <span style={{ color: "#8fe39a" }}>⬆️ {totalLevels} pet level{totalLevels === 1 ? "" : "s"} raised</span>
-                        {maxed ? <span style={{ color: "#ffd75e" }}>✨ {maxed} maxed</span> : null}
-                    </div>
-                );
-            })() : null}
 
             {/* Welcome-back recaps: who petted your pets + who rated your farm (own farm only). */}
             {farm.mine ? <PetVisitReport /> : null}
