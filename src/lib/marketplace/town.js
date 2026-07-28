@@ -5,9 +5,15 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 
 // ── THE WOLF DEN TOWN ─────────────────────────────────────────────────────────────────────────────────────
 // A persistent social overworld: your hero sprite walks a plaza and you see other players (as their real hero
-// sprites) with a live status of what they're doing. Owner-gated during the build, but populated with REAL
-// recently-active members so it never feels empty — they render as ambient avatars (idle-wandering client-side)
-// until the town ships and they can walk it themselves. Positions of real movers live in mkt_town_presence.
+// sprites) with a live status of what they're doing. Owner-gated during the build. Shows ONLY members who are
+// online RIGHT NOW (active within ONLINE_WINDOW) — nobody offline appears, so the plaza reflects who's actually
+// around. Real movers walk at their live position; other online members render as ambient (idle-wandering)
+// avatars until the town ships. Positions of real movers live in mkt_town_presence.
+
+// "Online now" window: a member counts as present if they've been active this recently. There's no periodic
+// heartbeat yet, so this is driven by page views / tracked actions — keep it a few minutes so an online member
+// briefly between clicks doesn't flicker out. (Tighten + add a heartbeat ping for sub-minute precision.)
+const ONLINE_WINDOW = "3 minutes";
 
 // Buildings line the side-scrolling street at fixed x positions (0..100 % of the WIDE world); tapping one fast-
 // travels into that system (the menu still works for speed). Each optionally shows a generated sprite (mkt_town_art).
@@ -72,13 +78,13 @@ export async function getTownState(buyerId) {
         : null;
     const myPos = buyerId ? await db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : null;
 
-    // Recently-active members (last ~20 min), excluding me, capped.
+    // Members who are ONLINE NOW (active within ONLINE_WINDOW), excluding me, capped. Offline members never show.
     const recent = await db.query(
         `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, MAX(v.last_seen) AS seen
            FROM mkt_visitor v JOIN mkt_buyer b ON b.id = v.buyer_id
-          WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - INTERVAL '20 minutes'
+          WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - $2::interval
           GROUP BY b.id ORDER BY seen DESC LIMIT 40`,
-        [buyerId || "00000000-0000-0000-0000-000000000000"]
+        [buyerId || "00000000-0000-0000-0000-000000000000", ONLINE_WINDOW]
     ).catch(() => []);
 
     const ids = recent.map((r) => r.id);
