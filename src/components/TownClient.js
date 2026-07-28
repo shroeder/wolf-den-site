@@ -27,7 +27,13 @@ function Avatar({ a, isYou, onTap }) {
             style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: 300 + Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear` }}
             onClick={onTap ? (e) => { e.stopPropagation(); onTap(); } : undefined}
         >
-            <div className="tw-bubble">{a.status || (isYou ? "🐺 you" : "🐺 around town")}</div>
+            {a.chat ? (
+                <div className="tw-bubble tw-chat">{a.chat}</div>
+            ) : a.typing ? (
+                <div className="tw-bubble tw-typing-bubble" aria-label="typing"><span /><span /><span /></div>
+            ) : (
+                <div className="tw-bubble">{a.status || (isYou ? "🐺 you" : "🐺 around town")}</div>
+            )}
             <div className={`tw-sprite${a.moving ? " is-walking" : ""}`}>
                 {a.sprite ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -50,8 +56,12 @@ export default function TownClient({ initial }) {
     const [roster, setRoster] = useState(false);
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
     const [dragging, setDragging] = useState(false); // true mid-drag → camera follows the finger instantly (no ease)
+    const [chatText, setChatText] = useState("");    // town chat composer
+    const [myChat, setMyChat] = useState(null);      // my own speech bubble (optimistic, clears after a few s)
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
+    const chatClear = useRef(null);
+    const lastTyping = useRef(0);
     const drag = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0 });
 
     // Measure the viewport so the camera can keep the player centered.
@@ -147,6 +157,31 @@ export default function TownClient({ initial }) {
 
     const wave = useCallback(() => { setMe((m) => ({ ...m, wave: true })); setTimeout(() => setMe((m) => ({ ...m, wave: false })), 1600); }, []);
 
+    // Fire-and-forget town action (chat / typing).
+    const postAction = useCallback((payload) => {
+        fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
+    }, []);
+    // Pop my own speech bubble immediately (optimistic), auto-clearing so it matches the ~8s server window.
+    const showMyChat = useCallback((text) => {
+        setMyChat(text);
+        clearTimeout(chatClear.current);
+        chatClear.current = setTimeout(() => setMyChat(null), 7000);
+    }, []);
+    const sendChat = useCallback((e) => {
+        if (e) e.preventDefault();
+        const body = chatText.trim();
+        if (!body) return;
+        setChatText("");
+        showMyChat(body.slice(0, 200));
+        postAction({ action: "chat", body });
+    }, [chatText, showMyChat, postAction]);
+    const quickEmote = useCallback((emoji) => { showMyChat(emoji); postAction({ action: "chat", body: emoji }); }, [showMyChat, postAction]);
+    const onChatChange = useCallback((e) => {
+        setChatText(e.target.value);
+        const now = Date.now();
+        if (now - lastTyping.current > 2500) { lastTyping.current = now; postAction({ action: "typing" }); } // throttle typing pings
+    }, [postAction]);
+
     const you = state?.you;
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
@@ -226,7 +261,7 @@ export default function TownClient({ initial }) {
                     {/* Other players */}
                     {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => walkToWorld(p.x + (p.x > me.x ? -3 : 3), p.y)} />)}
                     {/* You */}
-                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you" }} isYou /> : null}
+                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat }} isYou /> : null}
                 </div>
 
                 {/* edge hints — tap to walk that way (or just drag the street to look around) */}
@@ -234,9 +269,17 @@ export default function TownClient({ initial }) {
                 {cameraPx < maxScroll - 4 ? <button type="button" className="tw-edge tw-edge-r" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x + 22, 1, 99), me.y); }} aria-label="Walk right">›</button> : null}
             </div>
 
-            <section className="card" style={{ padding: "10px 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <button type="button" className="tw-emote" onClick={wave}>👋 Wave</button>
-                <span className="muted" style={{ fontSize: "0.78rem" }}>Members render where they were last active; once the town ships they&apos;ll walk it live with you.</span>
+            <section className="card tw-chatbar">
+                <form onSubmit={sendChat} className="tw-chat-form">
+                    <input value={chatText} onChange={onChatChange} placeholder="Say something to the plaza…" maxLength={200} aria-label="Town chat message" />
+                    <button type="submit" className="tw-chat-send" disabled={!chatText.trim()} aria-label="Send">➤</button>
+                </form>
+                <div className="tw-emote-row">
+                    <button type="button" onClick={wave} title="Wave">👋</button>
+                    {["❤️", "😂", "🔥", "👍", "😮", "✨", "🐺"].map((em) => (
+                        <button type="button" key={em} onClick={() => quickEmote(em)} aria-label={`Send ${em}`}>{em}</button>
+                    ))}
+                </div>
             </section>
 
             {/* Roster overlay — see who's doing what without walking */}
@@ -315,6 +358,24 @@ const TOWN_CSS = `
 .tw-bubble { font-size: 10px; font-weight: 700; color: #eadfff; background: rgba(30,20,48,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 2px 8px; margin-bottom: 3px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 .tw-wave { position: absolute; top: -6px; right: -8px; font-size: 20px; animation: twWave .5s ease-in-out infinite; }
 @keyframes twWave { 0%,100% { transform: rotate(-16deg); } 50% { transform: rotate(16deg); } }
+
+/* Chat speech bubbles + typing dots above avatars, and the composer bar below the scene. */
+.tw-chat { background: #fff; color: #1a1206; font-size: 11px; font-weight: 700; white-space: normal; max-width: 180px; text-align: center; border: 1px solid rgba(0,0,0,0.12); box-shadow: 0 3px 10px rgba(0,0,0,0.45); }
+.tw-av.is-you .tw-chat { background: linear-gradient(180deg,#ffe488,#f3b23a); color: #2a1a06; }
+.tw-typing-bubble { display: inline-flex; gap: 3px; align-items: center; padding: 5px 9px; }
+.tw-typing-bubble span { width: 5px; height: 5px; border-radius: 50%; background: #cbb9e0; animation: twType 1.2s infinite; }
+.tw-typing-bubble span:nth-child(2) { animation-delay: .2s; }
+.tw-typing-bubble span:nth-child(3) { animation-delay: .4s; }
+@keyframes twType { 0%,60%,100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+.tw-chatbar { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+.tw-chat-form { display: flex; gap: 8px; }
+.tw-chat-form input { flex: 1 1 auto; min-width: 0; padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,215,110,0.35); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 14px; }
+.tw-chat-form input::placeholder { color: #9a8fb0; }
+.tw-chat-send { flex: 0 0 auto; width: 44px; border-radius: 999px; border: none; background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #1c130a; font-weight: 900; font-size: 15px; cursor: pointer; }
+.tw-chat-send:disabled { opacity: .5; cursor: default; }
+.tw-emote-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.tw-emote-row button { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); font-size: 19px; line-height: 1; cursor: pointer; }
+.tw-emote-row button:active { transform: translateY(1px); }
 
 .tw-edge { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 60px; display: grid; place-items: center; font-size: 30px;
     color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.28); border: none; border-radius: 10px; cursor: pointer; z-index: 500; animation: twEdge 1.4s ease-in-out infinite; }

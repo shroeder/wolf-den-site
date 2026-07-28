@@ -88,9 +88,10 @@ export async function getTownState(buyerId) {
     ).catch(() => []);
 
     const ids = recent.map((r) => r.id);
+    const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
     const art = await getTownArt();
-    // Latest activity per recent player (for the status bubble) + any who are actually walking the town now.
-    const [acts, movers] = await Promise.all([
+    // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
+    const [acts, presence, chats] = await Promise.all([
         ids.length
             ? db.query(
                 `SELECT DISTINCT ON (buyer_id) buyer_id, event, path FROM mkt_activity_event
@@ -100,15 +101,32 @@ export async function getTownState(buyerId) {
             ).catch(() => [])
             : Promise.resolve([]),
         ids.length
-            ? db.query(`SELECT buyer_id, x, y, facing FROM mkt_town_presence WHERE buyer_id = ANY($1) AND updated_at > NOW() - INTERVAL '30 seconds'`, [ids]).catch(() => [])
+            ? db.query(
+                `SELECT buyer_id, x, y, facing,
+                        (updated_at > NOW() - INTERVAL '30 seconds') AS walking,
+                        (typing_at  > NOW() - INTERVAL '6 seconds')  AS typing
+                   FROM mkt_town_presence
+                  WHERE buyer_id = ANY($1) AND (updated_at > NOW() - INTERVAL '30 seconds' OR typing_at > NOW() - INTERVAL '6 seconds')`,
+                [ids]
+            ).catch(() => [])
+            : Promise.resolve([]),
+        chatIds.length
+            ? db.query(
+                `SELECT DISTINCT ON (buyer_id) buyer_id, body FROM mkt_town_chat
+                  WHERE buyer_id = ANY($1) AND created_at > NOW() - INTERVAL '8 seconds'
+                  ORDER BY buyer_id, created_at DESC`,
+                [chatIds]
+            ).catch(() => [])
             : Promise.resolve([]),
     ]);
     const actBy = Object.fromEntries(acts.map((a) => [a.buyer_id, a]));
-    const moverBy = Object.fromEntries(movers.map((m) => [m.buyer_id, m]));
+    const moverBy = Object.fromEntries(presence.map((m) => [m.buyer_id, m]));
+    const chatBy = Object.fromEntries(chats.map((c) => [c.buyer_id, c.body]));
 
     const players = recent.map((r) => {
         const a = actBy[r.id];
         const mv = moverBy[r.id];
+        const walking = Boolean(mv?.walking);
         const slot = homeSlot(r.id);
         return {
             id: r.id,
@@ -117,10 +135,12 @@ export async function getTownState(buyerId) {
             sprite: r.avatar_sprite_url || null,
             flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
             status: statusFor(a?.event, a?.path),
-            walking: Boolean(mv),                       // true = actually in the town, use real x/y
-            x: mv ? mv.x : slot.x,
-            y: mv ? mv.y : slot.y,
-            facing: mv ? mv.facing : 1,
+            chat: chatBy[r.id] || null,                 // recent speech-bubble message (shows ~8s)
+            typing: Boolean(mv?.typing),
+            walking,                                    // true = actually in the town, use real x/y
+            x: walking ? mv.x : slot.x,
+            y: walking ? mv.y : slot.y,
+            facing: walking ? mv.facing : 1,
         };
     });
 
@@ -133,12 +153,36 @@ export async function getTownState(buyerId) {
             sprite: me?.avatar_sprite_url || null,
             flip: me?.avatar_sprite_url ? me.avatar_sprite_flip === true : false,
             x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
+            chat: (buyerId ? chatBy[buyerId] : null) || null,
         },
         players,
         buildings: TOWN_BUILDINGS,
         art,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
+}
+
+// Post a chat message that pops as a speech bubble over your avatar for everyone in the plaza (owner-gated
+// during the build). Trimmed + length-capped; empties are dropped.
+export async function sendTownChat(buyerId, body) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    if (!text) return { ok: false, error: "empty" };
+    await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
+    return { ok: true };
+}
+
+// Flag that you're typing (owner-gated). Upserts a presence row without marking you a "mover", so the "…"
+// bubble can show even before you've walked. Recent typing_at → the client renders typing dots.
+export async function setTownTyping(buyerId) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    await db.query(
+        `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, typing_at, updated_at)
+         VALUES ($1, 50, 80, 1, NOW(), NOW() - INTERVAL '1 hour')
+         ON CONFLICT (buyer_id) DO UPDATE SET typing_at = NOW()`,
+        [buyerId]
+    ).catch(() => {});
+    return { ok: true };
 }
 
 // Upsert the mover's position (owner-gated during the build). x/y clamped to the plaza; facing derives from dx.
