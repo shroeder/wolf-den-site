@@ -213,6 +213,9 @@ export async function salvageItem(buyerId, itemId) {
     if (equippedSet.has(itemId)) return { ok: false, error: "equipped" };
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
+    // Mark it SOLD (same as selling) so an auto-granted LEVEL item is never re-granted — otherwise you could
+    // salvage it, have syncLevelItems hand it back on the next gear load, and salvage it again for infinite parts.
+    await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, itemId]).catch(() => {});
     // Read the item's enhancement BEFORE dropping it — salvaging an upgraded item melts down and recovers part
     // of the parts you forged into it (~40%), on top of the base salvage.
     const enhRow = await db.queryOne(`SELECT level FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
