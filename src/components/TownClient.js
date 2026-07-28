@@ -378,7 +378,7 @@ export default function TownClient({ initial }) {
                 </div>
                 {state?.owner && !state?.event ? (
                     <div className="tw-owner-spawn">
-                        <span className="muted">Owner · spawn event:</span>
+                        <span className="muted">Owner · silent test (no push):</span>
                         <button type="button" onClick={() => spawnEvent("bandit_raid")}>🗡️ Bandits</button>
                         <button type="button" onClick={() => spawnEvent("goblin_swarm")}>👺 Goblins</button>
                         <button type="button" onClick={() => spawnEvent("treasure_golem")}>💎 Golem</button>

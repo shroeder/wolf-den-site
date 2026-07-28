@@ -56,22 +56,25 @@ export async function getActiveTownEvent(buyerId) {
     };
 }
 
-// Admin/owner: spawn an event (one active at a time) and alert everyone via web + app push.
-export async function spawnTownEvent(kind = "bandit_raid") {
+// Admin/owner: spawn an event (one active at a time). Alerts everyone via web + app push UNLESS `silent`
+// (a quiet test spawn — no notifications go out, and the resolution push is suppressed too).
+export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = {}) {
     const type = TOWN_EVENT_TYPES[kind];
     if (!type) return { ok: false, error: "unknown_kind" };
     const existing = await db.queryOne(`SELECT id FROM mkt_town_event WHERE status = 'active' LIMIT 1`).catch(() => null);
     if (existing) return { ok: false, error: "already_active" };
     const row = await db.queryOne(
-        `INSERT INTO mkt_town_event (kind, name, status, hp_max, hp, reward_gold, ends_at)
-         VALUES ($1, $2, 'active', $3, $3, $4, NOW() + ($5 || ' minutes')::interval) RETURNING id`,
-        [kind, type.name, type.hp, type.rewardGold, String(type.durationMin)]
+        `INSERT INTO mkt_town_event (kind, name, status, hp_max, hp, reward_gold, ends_at, meta)
+         VALUES ($1, $2, 'active', $3, $3, $4, NOW() + ($5 || ' minutes')::interval, $6) RETURNING id`,
+        [kind, type.name, type.hp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent) })]
     ).catch(() => null);
     if (!row) return { ok: false, error: "spawn_failed" };
-    // Rally the whole pack — browser push + phone-app push, both deep-linking to the Town.
-    broadcastWebPush({ title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch(() => {});
-    broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch(() => {});
-    return { ok: true, id: Number(row.id), name: type.name };
+    if (!silent) {
+        // Rally the whole pack — browser push + phone-app push, both deep-linking to the Town.
+        broadcastWebPush({ title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch(() => {});
+        broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch(() => {});
+    }
+    return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent) };
 }
 
 // Land a hit on the active event. Throttled per member; on the killing blow, resolves + pays out.
@@ -114,8 +117,10 @@ async function resolveTownEvent(eventId, outcome) {
         await logCoin(h.buyer_id, gold, "town_event", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
         await db.query(`UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3 WHERE event_id = $1 AND buyer_id = $2`, [eventId, h.buyer_id, gold]).catch(() => {});
     }
-    const msg = outcome === "defeated"
-        ? `The ${ev.name} was driven off! Gold paid to all ${hits.length} who fought.`
-        : `The ${ev.name} slipped away — but everyone who fought still earned a share.`;
-    broadcastWebPush({ title: `✅ ${ev.name} over`, body: msg, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+    if (!ev.meta?.silent) {
+        const msg = outcome === "defeated"
+            ? `The ${ev.name} was driven off! Gold paid to all ${hits.length} who fought.`
+            : `The ${ev.name} slipped away — but everyone who fought still earned a share.`;
+        broadcastWebPush({ title: `✅ ${ev.name} over`, body: msg, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+    }
 }

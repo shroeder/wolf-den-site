@@ -35,7 +35,7 @@ export async function POST(request) {
             else if (body?.action === "typing") res = await setTownTyping(buyer.id);
             else if (body?.action === "contribute") res = await contributeTownGold(buyer.id, body?.amount);
             else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId);
-            else if (body?.action === "spawn_event") res = isOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid") : { ok: false, error: "forbidden" };
+            else if (body?.action === "spawn_event") res = isOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid", { silent: true }) : { ok: false, error: "forbidden" }; // in-Town owner spawn = silent test (no push)
             else res = await moveTown(buyer.id, { x: body?.x, y: body?.y, facing: body?.facing });
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.error === "forbidden" ? 403 : 400 });
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });

@@ -32,7 +32,8 @@ export async function POST(request) {
         if (authError) return authError;
         try {
             const body = await request.json().catch(() => ({}));
-            const res = await spawnTownEvent(String(body?.kind || "bandit_raid"));
+            // Pass { silent: true } to spawn a quiet test that alerts nobody; default alerts everyone.
+            const res = await spawnTownEvent(String(body?.kind || "bandit_raid"), { silent: Boolean(body?.silent) });
             if (!res.ok) return noStore({ error: res.error }, { status: res.error === "already_active" ? 409 : 400 });
             return noStore(res);
         } catch (error) {
