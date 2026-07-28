@@ -4,7 +4,7 @@ import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { db } from "@/lib/db";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { VAPID_PUBLIC_KEY } from "@/lib/push/vapid.js";
-import { isWebPushEnabled, sendWebPush } from "@/lib/push/web-push.js";
+import { isWebPushEnabled, sendWebPush, sendWebPushDebug } from "@/lib/push/web-push.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -21,6 +21,13 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
+            // ?debug=<alias> → actually send to that member's subs and report the raw per-endpoint result.
+            const debugAlias = new URL(request.url).searchParams.get("debug");
+            if (debugAlias) {
+                const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE alias_normalized = $1 OR id::text = $1`, [String(debugAlias).toLowerCase()]).catch(() => null);
+                if (!row) return noStore({ error: "buyer_not_found", debugAlias });
+                return noStore({ configured: isWebPushEnabled(), buyer: row.id, ...(await sendWebPushDebug(row.id)) });
+            }
             const total = await db.queryOne(`SELECT COUNT(*)::int AS c FROM mkt_web_push`).catch(() => null);
             return noStore({ configured: isWebPushEnabled(), subscriptions: total?.c ?? 0, publicKeyTail: VAPID_PUBLIC_KEY.slice(-8) });
         } catch (error) {
