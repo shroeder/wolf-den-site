@@ -467,7 +467,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [gardenAct]);
     const harvestAt = useCallback(async (slot) => {
         const r = await gardenAct({ action: "harvest", slot }, `h-${slot}`);
-        if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed }); SFX.coin(); }
+        if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, doubled: r.doubled, xp: r.xp, petFed: r.petFed, newPet: r.newPet, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed }); SFX.coin(); }
     }, [gardenAct]);
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
@@ -2011,10 +2011,19 @@ function HarvestToast({ toast, onClose }) {
                     <>
                         <div style={{ fontSize: 46 }}>{toast.emoji}</div>
                         <div style={{ fontWeight: 800, fontSize: 17, marginTop: 6 }}>Harvested {toast.name}!</div>
-                        <div style={{ fontSize: 24, fontWeight: 900, color: "#ffd75e", marginTop: 6 }}>+{(toast.gold || 0).toLocaleString()} 🪙</div>
+                        {/* Lead with the real payoff: XP + pet progress. Farming is an XP / pet engine — gold is a garnish. */}
+                        {toast.xp ? <div style={{ fontSize: 24, fontWeight: 900, color: "#8fe39a", marginTop: 6 }}>✨ +{toast.xp} XP</div> : null}
+                        {toast.petFed ? (
+                            <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: toast.petFed.leveled ? "rgba(255,210,90,0.16)" : "rgba(180,150,255,0.12)", border: `1px solid ${toast.petFed.leveled ? "rgba(255,210,90,0.55)" : "rgba(180,150,255,0.4)"}`, fontWeight: 800, fontSize: 13 }}>
+                                {toast.petFed.leveled ? `⬆️ ${toast.petFed.emoji} ${toast.petFed.name} reached Lv ${toast.petFed.level}!` : `${toast.petFed.emoji} ${toast.petFed.name} +${toast.petFed.xp} pet XP`}
+                            </div>
+                        ) : null}
                         {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.12)", border: "1px solid rgba(140,200,255,0.45)", fontWeight: 800, fontSize: 13 }}>🎁 Harvest loot: {toast.bonus}</div> : null}
+                        {toast.newPet ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(255,210,90,0.16)", border: "1px solid rgba(255,210,90,0.55)", fontWeight: 800, fontSize: 13 }}>🎉 New farm pet unlocked: {toast.newPet.name}!</div> : null}
                         {toast.savedSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(120,220,120,0.12)", border: "1px solid rgba(120,220,120,0.45)", fontWeight: 700, fontSize: 13 }}>🌰 Seed saved! {toast.savedEmoji} back in your bag</div> : null}
                         {toast.foundSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(143,227,154,0.12)", border: "1px solid rgba(143,227,154,0.45)", fontWeight: 700, fontSize: 13 }}>🌱 Found a {toast.foundSeed.emoji} {toast.foundSeed.name} seed in the harvest!</div> : null}
+                        {/* Gold demoted to a quiet garnish line. */}
+                        <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{toast.doubled ? "×2 " : ""}+{(toast.gold || 0).toLocaleString()} 🪙 sold</div>
                     </>
                 )}
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>

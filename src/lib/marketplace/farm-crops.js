@@ -14,6 +14,7 @@ import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { SEED_PACK_IDS, seedPackById } from "@/lib/marketplace/seed-packs.js";
 import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -303,6 +304,14 @@ export async function harvestPlot(buyerId, slot) {
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
     if (xp > 0) await awardXp(buyerId, "harvest", { points: xp, gold: 0 }).catch(() => {});
+    // The farm IS a pet-XP engine: every harvest also feeds your equipped pet XP equal to the crop's value, so
+    // tending crops visibly levels your companion (rarer/slower crops feed it much more). Gated by real grow
+    // time, so it's steady progress, not a free maxing lever. Capped at the pet's max XP inside addEquippedPetXp.
+    let petFed = null;
+    if (xp > 0) {
+        const pr = await addEquippedPetXp(buyerId, xp).catch(() => null);
+        if (pr?.ok) { const pdef = collectibleById(pr.petId); petFed = { petId: pr.petId, name: pdef?.name || "your pet", emoji: pdef?.emoji || "🐾", xp, level: pr.level, leveled: pr.leveled }; }
+    }
     const buyer = await loadFarmBuyer(buyerId);
     const rarity = def?.rarity || "common";
     // Harvest Charm consumable: a banked charge adds a flat +20% loot-tier promote chance for THIS harvest, then
@@ -349,7 +358,7 @@ export async function harvestPlot(buyerId, slot) {
     const foundSeed = null;
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.
