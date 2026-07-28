@@ -386,6 +386,17 @@ export default function TownClient({ initial }) {
         if (r?.ok) { setMerchantFlash(`🎁 Bought a ${r.label}! Open it over in your Gear.`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
         else setMerchantFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : "Couldn't buy that.");
     }, [load]);
+    // High-roller table: gamble 1,000 gold on a random piece of gear (rarely up to Tier 4).
+    const gambleGear = useCallback(async () => {
+        setMerchantBusy(true);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "merchant_gamble" }) }).then((x) => x.json()).catch(() => null);
+        setMerchantBusy(false);
+        if (r?.ok) {
+            if (r.dupeAll) setMerchantFlash(`Ha! You already own every piece — here's ${r.refund} gold back.`);
+            else setMerchantFlash(`🎉 Tier ${r.item.tier} ${r.item.rarity} — you won the ${r.item.name}! Equip it in your Gear.`);
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load();
+        } else setMerchantFlash(r?.error === "insufficient_gold" ? "That table's 1,000 gold, friend." : "The dice wouldn't roll.");
+    }, [load]);
     // Claim a completed town bounty from the quest-giver.
     const claimQuest = useCallback(async (key) => {
         setQuestBusy(true);
@@ -668,7 +679,16 @@ export default function TownClient({ initial }) {
                                 );
                             })}
                         </div>
-                        <p className="muted" style={{ fontSize: "0.8rem", margin: "10px 2px 0" }}>🪙 You have {(you?.gold || 0).toLocaleString()} gold · chests open in your Gear.</p>
+                        {/* High-roller gear gamble */}
+                        <button type="button" className="tw-gamble" disabled={(you?.gold || 0) < 1000 || merchantBusy} onClick={gambleGear}>
+                            <span className="tw-gamble-ico" aria-hidden="true">🎲</span>
+                            <span className="tw-gamble-body">
+                                <span className="tw-gamble-title">Gamble for gear</span>
+                                <span className="tw-gamble-sub">A random piece — rarely up to Tier 4!</span>
+                            </span>
+                            <span className="tw-gamble-price">🪙 1,000</span>
+                        </button>
+                        <p className="muted" style={{ fontSize: "0.8rem", margin: "10px 2px 0" }}>🪙 You have {(you?.gold || 0).toLocaleString()} gold · chests & gear live in your Gear.</p>
                     </div>
                 </div>
             ) : null}
@@ -918,6 +938,13 @@ const TOWN_CSS = `
 .tw-ware-label { font-size: 0.74rem; font-weight: 800; text-align: center; }
 .tw-ware-price { font-size: 0.72rem; color: #ffd75e; font-weight: 800; }
 .tw-ware-img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.tw-gamble { display: flex; align-items: center; gap: 11px; width: 100%; margin-top: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(190,120,255,0.5); background: linear-gradient(180deg, rgba(120,70,190,0.22), rgba(70,40,120,0.22)); color: #f2ead9; cursor: pointer; text-align: left; }
+.tw-gamble:disabled { opacity: .5; cursor: default; }
+.tw-gamble-ico { font-size: 26px; flex: 0 0 auto; }
+.tw-gamble-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.tw-gamble-title { font-weight: 900; font-size: 0.92rem; color: #e9d5ff; }
+.tw-gamble-sub { font-size: 0.72rem; color: #c3aee0; }
+.tw-gamble-price { flex: 0 0 auto; font-size: 0.82rem; color: #ffd75e; font-weight: 900; white-space: nowrap; }
 .tw-live-toggle { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f2ead9; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tw-live-toggle.is-on { border-color: rgba(143,227,154,0.5); background: rgba(143,227,154,0.1); }
 .tw-live-toggle .muted { font-size: 0.72rem; font-weight: 600; }

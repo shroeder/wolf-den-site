@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buyMerchantChest, contributeTownProject, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
+import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
 import { attackTownEvent, spawnTownEvent } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -37,6 +37,7 @@ export async function POST(request) {
             else if (body?.action === "project_contribute") res = await contributeTownProject(buyer.id, body?.projectId, body?.amount);
             else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId, body?.move);
             else if (body?.action === "merchant_buy") res = await buyMerchantChest(buyer.id, body?.tier);
+            else if (body?.action === "merchant_gamble") res = await gambleMerchantGear(buyer.id);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);
             else if (body?.action === "spawn_event") res = isOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid", { silent: true }) : { ok: false, error: "forbidden" }; // in-Town owner spawn = silent test (no push)
             else if (body?.action === "set_events_live") res = await setTownEventsLive(buyer.id, Boolean(body?.on));

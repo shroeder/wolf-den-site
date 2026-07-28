@@ -12,6 +12,8 @@ import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
 import { getTownProjects, getTownBonuses, contributeToProject } from "@/lib/marketplace/town-projects.js";
+import { ITEMS } from "@/lib/marketplace/items.js";
+import { grantItem } from "@/lib/marketplace/inventory.js";
 import { setSetting } from "@/lib/settings.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK). Stock + prices improve as the
@@ -263,6 +265,34 @@ export async function buyMerchantChest(buyerId, tier) {
     await logCoin(buyerId, -ware.price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
     await addChests(buyerId, { [tier]: 1 }, { source: "merchant" }).catch(() => {});
     return { ok: true, gold: Number(paid.gold), tier, label: ware.label };
+}
+
+// The Traveling Merchant's high-roller table: gamble 1,000 gold on a random piece of gear. Mostly low tiers,
+// with a rare shot at a Tier-4 (legendary) drop. Owner-gated during the build.
+const GAMBLE_COST = 1000;
+const GAMBLE_WEIGHTS = { common: 50, rare: 30, epic: 15, legendary: 5 }; // legendary = the rare Tier-4 jackpot
+const RARITY_TIER = { common: 1, rare: 2, epic: 3, legendary: 4 };
+export async function gambleMerchantGear(buyerId) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, GAMBLE_COST]).catch(() => null);
+    if (!paid) return { ok: false, error: "insufficient_gold" };
+    await logCoin(buyerId, -GAMBLE_COST, "merchant_gamble", { balanceAfter: paid.gold }).catch(() => {});
+    const total = Object.values(GAMBLE_WEIGHTS).reduce((s, w) => s + w, 0);
+    let r = Math.random() * total; let rolled = "common";
+    for (const [rar, w] of Object.entries(GAMBLE_WEIGHTS)) { if ((r -= w) < 0) { rolled = rar; break; } }
+    const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((x) => x.item_id));
+    const gear = ITEMS.filter((i) => i.slot && !i.charged && RARITY_TIER[i.rarity]); // equippable, non-perk, tiers 1-4
+    let pool = gear.filter((i) => i.rarity === rolled && !owned.has(i.id));
+    if (!pool.length) pool = gear.filter((i) => !owned.has(i.id)); // owns every piece of that rarity → any un-owned
+    if (!pool.length) { // owns literally everything — hand some gold back
+        const back = 400;
+        const ref = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, back]).catch(() => null);
+        await logCoin(buyerId, back, "merchant_gamble_refund", { balanceAfter: ref?.gold }).catch(() => {});
+        return { ok: true, dupeAll: true, refund: back, gold: Number(ref?.gold ?? paid.gold) };
+    }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    await grantItem(buyerId, pick.id, "merchant_gamble").catch(() => {});
+    return { ok: true, item: { id: pick.id, name: pick.name, rarity: pick.rarity, tier: RARITY_TIER[pick.rarity], slot: pick.slot }, gold: Number(paid.gold) };
 }
 
 // Contribute gold to a Town Development project (owner-gated during the build). Also ticks the civic quest.
