@@ -252,6 +252,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
     const [petCele, setPetCele] = useState(null); // pet just leveled up (from feeding) → juicy celebration modal
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
+    const [encounter, setEncounter] = useState(null); // a creature raided a harvest → timing-meter fight
     const rainedRef = useRef(false);
 
     // Wild Loot Pig: once/day, at a random moment after you land on YOUR farm, a crowned pig may rampage
@@ -282,7 +283,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || upgradePlot != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || encounter || planting != null || upgradePlot != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -299,7 +300,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, upgradePlot, inspectSlot, inspectDeco, customOpen]);
+    }, [inspect, pigResult, harvestToast, encounter, planting, upgradePlot, inspectSlot, inspectDeco, customOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -468,10 +469,23 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [gardenAct]);
     const harvestAt = useCallback(async (slot) => {
         const r = await gardenAct({ action: "harvest", slot }, `h-${slot}`);
-        if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, doubled: r.doubled, xp: r.xp, petFed: r.petFed, newPet: r.newPet, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed }); SFX.coin(); }
+        if (r?.ok) {
+            SFX.coin();
+            const harvest = { name: r.name, emoji: r.emoji, gold: r.gold, doubled: r.doubled, xp: r.xp, petFed: r.petFed, newPet: r.newPet, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed };
+            // A creature raided this harvest → fight it (the reward toast comes after the fight). Otherwise the
+            // normal harvest reward toast.
+            if (r.encounter) setEncounter({ ...r.encounter, harvest });
+            else setHarvestToast(harvest);
+        }
     }, [gardenAct]);
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const upgradePlotAt = useCallback((slot, key) => gardenAct({ action: "plot_upgrade", slot, key }, `pu-${slot}-${key}`), [gardenAct]);
+    // Resolve a harvest encounter (server grants the pre-rolled loot scaled by perfect hits). Updates wallet.
+    const resolveEncounterAt = useCallback(async (perfectHits) => {
+        const r = await gardenAct({ action: "encounter_resolve", perfectHits }, "enc");
+        if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } if (r.goldAfter != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.goldAfter } } : f)); }
+        return r;
+    }, [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
     // Plots are permanent fixtures now (no dragging) — they stay in their tidy arrangement and you invest in
@@ -1132,6 +1146,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {harvestToast ? <HarvestToast toast={harvestToast} onClose={() => setHarvestToast(null)} /> : null}
+
+            {encounter ? <EncounterModal encounter={encounter} onResolve={resolveEncounterAt} onClose={() => setEncounter(null)} /> : null}
 
             {inspect ? (
                 <PetInspect
@@ -2075,6 +2091,106 @@ function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) 
                     })}
                 </div>
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Done</button>
+            </div>
+        </div>
+    );
+}
+
+// Harvest ENCOUNTER — a creature raided your harvest. Fight it with a timing meter: a marker sweeps a bar, tap
+// to strike; land in the GREEN for a perfect hit (more perfects = bigger reward). Down its HP to win bonus loot.
+function EncounterModal({ encounter, onResolve, onClose }) {
+    const [hp, setHp] = useState(encounter.hp || 2);
+    const [perfect, setPerfect] = useState(0);
+    const [phase, setPhase] = useState("fight"); // fight | resolving | reward
+    const [flash, setFlash] = useState(null); // { kind, text }
+    const [reward, setReward] = useState(null);
+    const [pos, setPos] = useState(0);
+    const posRef = useRef(0);
+    const dirRef = useRef(1);
+    const rafRef = useRef(0);
+    const lastRef = useRef(0);
+    const hpRef = useRef(hp);
+    const perfectRef = useRef(0);
+    hpRef.current = hp;
+
+    // The sweeping marker (rAF so hit-detection reads the true live position).
+    useEffect(() => {
+        if (phase !== "fight") return undefined;
+        const SPEED = 1.7; // full sweeps per second
+        const tick = (t) => {
+            if (!lastRef.current) lastRef.current = t;
+            const dt = Math.min(0.05, (t - lastRef.current) / 1000);
+            lastRef.current = t;
+            let p = posRef.current + dirRef.current * SPEED * dt;
+            if (p >= 1) { p = 1; dirRef.current = -1; } else if (p <= 0) { p = 0; dirRef.current = 1; }
+            posRef.current = p;
+            setPos(p);
+            rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafRef.current);
+    }, [phase]);
+
+    const strike = useCallback(async () => {
+        if (phase !== "fight") return;
+        const p = posRef.current;
+        const inGreen = p >= 0.44 && p <= 0.56;
+        const inYellow = p >= 0.28 && p <= 0.72;
+        if (!inYellow) { setFlash({ kind: "miss", text: "Miss!" }); setTimeout(() => setFlash(null), 320); return; }
+        if (inGreen) { perfectRef.current += 1; setPerfect(perfectRef.current); setFlash({ kind: "perfect", text: "PERFECT!" }); }
+        else setFlash({ kind: "hit", text: "Hit!" });
+        setTimeout(() => setFlash(null), 320);
+        const nextHp = hpRef.current - 1;
+        setHp(nextHp);
+        if (nextHp <= 0) {
+            setPhase("resolving");
+            const r = await onResolve(perfectRef.current);
+            setReward(r?.ok ? r : { error: true });
+            setPhase("reward");
+        }
+    }, [phase, onResolve]);
+
+    const green = "#43d98a";
+    return (
+        <div onClick={phase === "reward" ? onClose : undefined} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10002, background: "rgba(0,0,0,0.62)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Harvest encounter" style={{ width: "100%", maxWidth: 340, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #e0704a", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", padding: 20, textAlign: "center", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
+                {phase === "reward" ? (
+                    <>
+                        <div style={{ fontSize: 44 }}>🎉</div>
+                        <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>{reward?.error ? "Encounter over" : `${encounter.emoji} ${encounter.name} defeated!`}</div>
+                        {reward && !reward.error ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
+                                <div style={{ fontSize: 22, fontWeight: 900, color: "#ffd75e" }}>+{(reward.gold || 0).toLocaleString()} 🪙</div>
+                                {reward.chest ? <div style={{ padding: 8, borderRadius: 10, background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.5)", fontWeight: 800, fontSize: 13 }}>🧰 a {reward.chest.charAt(0).toUpperCase() + reward.chest.slice(1)} chest</div> : null}
+                                {reward.seedName ? <div style={{ padding: 8, borderRadius: 10, background: "rgba(143,227,154,0.12)", border: "1px solid rgba(143,227,154,0.45)", fontWeight: 700, fontSize: 13 }}>🌱 a {reward.seedName} seed</div> : null}
+                                {reward.perfectAll ? <div style={{ fontSize: 12, fontWeight: 800, color: green }}>✨ Flawless — chest guaranteed!</div> : null}
+                            </div>
+                        ) : <div className="muted" style={{ fontSize: 13, marginTop: 8 }}>The critter got away with the scraps.</div>}
+                        <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
+                    </>
+                ) : (
+                    <>
+                        <div className="muted" style={{ fontSize: 11.5 }}>You harvested {encounter.harvest?.emoji} {encounter.harvest?.name} — but…</div>
+                        <div style={{ fontSize: 50, marginTop: 6, animation: "farmBob 1.1s ease-in-out infinite" }}>{encounter.emoji}</div>
+                        <div style={{ fontWeight: 900, fontSize: 17, marginTop: 2 }}>A {encounter.name} raids your crop!</div>
+                        {/* HP pips */}
+                        <div style={{ display: "flex", justifyContent: "center", gap: 5, margin: "10px 0 4px" }}>
+                            {Array.from({ length: encounter.hp || 2 }).map((_, i) => (
+                                <span key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: i < hp ? "#e0704a" : "rgba(255,255,255,0.14)", boxShadow: i < hp ? "0 0 6px rgba(224,112,74,0.7)" : "none", transition: "background .2s" }} />
+                            ))}
+                        </div>
+                        {/* timing meter */}
+                        <div style={{ position: "relative", height: 22, borderRadius: 999, margin: "12px 0 4px", overflow: "hidden", background: "linear-gradient(90deg, rgba(224,80,63,0.35) 0 28%, rgba(240,200,80,0.4) 28% 44%, rgba(67,217,138,0.85) 44% 56%, rgba(240,200,80,0.4) 56% 72%, rgba(224,80,63,0.35) 72% 100%)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                            <span aria-hidden="true" style={{ position: "absolute", top: -2, bottom: -2, left: `${pos * 100}%`, width: 4, marginLeft: -2, background: "#fff", borderRadius: 2, boxShadow: "0 0 6px rgba(255,255,255,0.9)" }} />
+                        </div>
+                        <div style={{ height: 20, marginBottom: 6 }}>
+                            {flash ? <span style={{ fontWeight: 900, fontSize: 14, color: flash.kind === "perfect" ? green : flash.kind === "hit" ? "#ffe27a" : "#ff9a9a" }}>{flash.text}</span> : <span className="muted" style={{ fontSize: 11 }}>Tap Strike in the green for a perfect hit</span>}
+                        </div>
+                        <button type="button" onClick={strike} disabled={phase !== "fight"} style={{ width: "100%", padding: 13, fontWeight: 900, fontSize: 15, background: "linear-gradient(180deg,#f0865a,#d8543a)", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", boxShadow: "0 3px 0 #a53d28" }}>⚔️ Strike!</button>
+                        <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 8, padding: 8, fontWeight: 700, fontSize: 12, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer", opacity: 0.75 }}>Flee (forfeit the loot)</button>
+                        {perfect ? <div style={{ marginTop: 8, fontSize: 11, fontWeight: 800, color: green }}>✨ {perfect} perfect {perfect === 1 ? "strike" : "strikes"}</div> : null}
+                    </>
+                )}
             </div>
         </div>
     );

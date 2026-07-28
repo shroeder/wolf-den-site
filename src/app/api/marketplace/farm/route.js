@@ -8,6 +8,7 @@ import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, 
 import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, equipFarmBg, unequipFarmBg, deleteFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { upgradePlotTrack } from "@/lib/marketplace/farm-plot-upgrades.js";
+import { resolveEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { useConsumable as openConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -88,6 +89,7 @@ export async function POST(request) {
             else if (b?.action === "farm_upgrade") res = await buyUpgrade(buyer.id, String(b?.key || ""));
             else if (b?.action === "plot_move") res = await movePlot(buyer.id, Number(b?.slot), b?.x, b?.y);
             else if (b?.action === "plot_upgrade") { res = await upgradePlotTrack(buyer.id, Number(b?.slot), String(b?.key || "")); if (res?.ok) res = { ...res, garden: await getGarden(buyer.id) }; }
+            else if (b?.action === "encounter_resolve") { res = await resolveEncounter(buyer.id, { perfectHits: Number(b?.perfectHits) || 0 }); if (res?.ok) res = { ...res, garden: await getGarden(buyer.id) }; }
             else if (b?.action === "rain") res = await applyRainBoost(buyer.id);
             // ── Decorations ── (buy/place/move/remove on YOUR OWN farm)
             else if (b?.action === "deco_buy") res = await buyDecoration(buyer.id, String(b?.decoId || ""));

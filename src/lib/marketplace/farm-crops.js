@@ -16,6 +16,7 @@ import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.j
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
+import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -367,8 +368,11 @@ export async function harvestPlot(buyerId, slot) {
     // Saver upgrade still recovers the planted seed. Kept null so the client toast simply omits it.
     const foundSeed = null;
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
+    // A creature might RAID this harvest (chance raised by the plot's Warding Totem + rarer crops) — the client
+    // fights it with a timing meter, then calls encounter_resolve for bonus loot. Server parks the pending fight.
+    const encounter = await maybeStartEncounter(buyerId, { rarity, wardChance: pEff.raidChance, seedId: claimed.seed_id }).catch(() => null);
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, encounter, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.
