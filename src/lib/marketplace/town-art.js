@@ -19,6 +19,9 @@ const ART_PROMPTS = {
         `A fantasy town SKYLINE far-background at warm golden dusk — a soft glowing sky fading from warm amber near the horizon up to dusky purple, a LOW distant silhouette of generic medieval rooftops and chimneys with a couple of faint vague towers along the horizon, soft atmospheric haze. NO distinct landmark, NO foreground, NO people, NO street or ground — only sky and a faint distant town silhouette, an even repeating horizon meant to tile. ${STREET_STYLE}`,
     cobble:
         `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle — worn rounded grey-brown cobbles with mortar gaps, warm even dusk lighting, uniform across the WHOLE image with no focal point, NO objects, NO people, NO buildings, NO sky, NO horizon — just repeating cobblestones, designed to tile left-to-right. ${STREET_STYLE}`,
+    // Farm RAISED BED planter — real art to replace the flat CSS plot. Plants are drawn growing out of its soil.
+    farm_bed:
+        `A single empty RAISED GARDEN BED planter seen from a slight 3/4 top-down angle: a low rectangular frame of weathered wooden planks with rounded corner posts, brimming with dark rich freshly-tilled soil showing gentle furrow rows and a few small pebbles. NO plants, NO crops — just the empty soil bed, ready to plant. Painterly fantasy farm game-art, warm daylight, clean confident outlines and cel-shaded vibrant colors, a strong readable silhouette. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO grass, NO surrounding ground, NO scenery, NO drop shadow, NO glow behind it. Nothing but the raised bed. No text, no watermark, no border.`,
     // Custom dice sprite — a pair of tavern dice spilling from a leather cup (replaces the 🎲 emoji at the
     // merchant gamble + the tavern dice table).
     dice:
