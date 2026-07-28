@@ -5393,7 +5393,12 @@ body.tv-mode .shop-mobile-cart-fab {
     border-radius: 999px;
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
     white-space: nowrap;
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
 }
+.user-badge:hover { filter: brightness(1.08); }
 .user-badge-icon {
     font-size: 1.5em; /* scales with the pill; BadgeArt renders relative to this so the art reads big */
     line-height: 0;
@@ -6463,26 +6468,23 @@ body.tv-mode .shop-mobile-cart-fab {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    height: calc(100dvh - 96px);
-    min-height: 340px;
-    overflow: hidden;
 }
 .dm-screen > .card { margin: 0; }
 .dm-topbar { flex: 0 0 auto; }
 .dm-thread {
-    flex: 1 1 auto;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
     padding-bottom: 0.75rem;
 }
+/* The messages list is a bounded scroller (capped to the viewport) rather than the whole screen being
+   locked to 100dvh — that lock pushed the composer off-screen on pages with extra chrome and trapped the
+   scroll. Now the page scrolls normally and the composer always sits just below a self-contained list. */
 .dm-messages {
-    flex: 1 1 auto;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: 62dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 4px;
@@ -6578,7 +6580,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 .dm-row { display: flex; flex-direction: column; align-items: flex-start; max-width: 82%; margin-top: 8px; }
 .dm-row.grouped { margin-top: 2px; }
-.dm-row.mine { align-self: flex-end; align-items: flex-end; }
+/* Each row is wrapped in a plain <div>, so align-self can't right-align it — margin-left:auto pushes the
+   capped-width block to the right edge (was stranded at the 82% mark). */
+.dm-row.mine { align-items: flex-end; margin-left: auto; }
 .dm-bubble-wrap { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 100%; }
 .dm-row.mine .dm-bubble-wrap { align-items: flex-end; }
 
