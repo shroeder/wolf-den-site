@@ -15,6 +15,7 @@ import { SEED_PACK_IDS, seedPackById } from "@/lib/marketplace/seed-packs.js";
 import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
+import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -197,11 +198,12 @@ function defaultPlotPos(i, n) {
 // fertilizer stock, and how many crops are ready right now (for the alert badge).
 export async function getGarden(buyerId) {
     if (!buyerId) return null;
-    const [buyer, plots, seeds, packRows] = await Promise.all([
+    const [buyer, plots, seeds, packRows, plotUp] = await Promise.all([
         loadFarmBuyer(buyerId),
         db.query(`SELECT slot, seed_id, planted_at, ready_at, fertilized FROM mkt_farm_plot WHERE buyer_id = $1 ORDER BY slot`, [buyerId]).catch(() => []),
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0 AND consumable_id = ANY($2)`, [buyerId, SEED_PACK_IDS]).catch(() => []),
+        getPlotUpgrades(buyerId).catch(() => ({})),
     ]);
     const up = buyer?.farm_upgrades || {};
     const n = plotCount(up);
@@ -213,14 +215,16 @@ export async function getGarden(buyerId) {
     const posFor = (i) => { const c = posMap[i] || posMap[String(i)]; const d = defaultPlotPos(i, n); return { x: Number.isFinite(c?.x) ? c.x : d.x, y: Number.isFinite(c?.y) ? c.y : d.y }; };
     for (let i = 0; i < n; i += 1) {
         const pos = posFor(i);
+        const tracks = plotTracksFor(plotUp[i] || {}); // this plot's specialization tracks (levels + costs)
+        const specLevel = tracks.reduce((s, t) => s + t.level, 0); // total invested (for the plot badge)
         const p = byslot.get(i);
-        if (!p) { gardenPlots.push({ slot: i, empty: true, x: pos.x, y: pos.y }); continue; }
+        if (!p) { gardenPlots.push({ slot: i, empty: true, x: pos.x, y: pos.y, tracks, specLevel }); continue; }
         const def = seedById(p.seed_id);
         const readyMs = new Date(p.ready_at).getTime();
         const ready = readyMs <= now;
         if (ready) readyCount += 1;
         gardenPlots.push({
-            x: pos.x, y: pos.y,
+            x: pos.x, y: pos.y, tracks, specLevel,
             slot: i, empty: false, seedId: p.seed_id, name: def?.name || p.seed_id, emoji: def?.emoji || "🌱",
             sprout: def?.sprout || "🌱", sell: def?.sell || 0, xp: def?.xp || 0, loot: LOOT_LABEL[def?.rarity] || null, rarity: def?.rarity || "common",
             plantedAt: new Date(p.planted_at).toISOString(), readyAt: new Date(p.ready_at).toISOString(),
@@ -267,7 +271,10 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Forager's Kit full-set capstone: crops grow 15% faster (a flat multiplier on top of every other speedup).
     const equipped = await getEquippedIds(buyerId).catch(() => ({}));
     const capGrow = Math.max(0.5, 1 - setFarmGrowBonus(equipped));
-    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow);
+    // Per-plot Fertile Soil specialization cuts THIS plot's grow time on top of everything else.
+    const plotUp = await getPlotUpgrades(buyerId).catch(() => ({}));
+    const plotGrow = plotEffects(plotUp[slot] || {}).growMult;
+    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow);
     const row = await db.queryOne(
         `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at)
          VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval)
@@ -291,6 +298,8 @@ export async function harvestPlot(buyerId, slot) {
     const claimed = await db.queryOne(`DELETE FROM mkt_farm_plot WHERE buyer_id = $1 AND slot = $2 AND ready_at <= NOW() RETURNING seed_id`, [buyerId, slot]).catch(() => null);
     if (!claimed) return { ok: false, error: "not_ready" };
     const def = seedById(claimed.seed_id);
+    // This plot's own specialization (Rich Loam / Nurturing Bed / Greenhouse / Warding Totem).
+    const pEff = plotEffects((await getPlotUpgrades(buyerId).catch(() => ({})))[slot] || {});
     // Farm buffs (decorations + equipped gear farm affix + equipped pet): more harvest gold, better loot odds,
     // better seed-save luck.
     const buffs = await farmBonuses(buyerId).catch(() => null);
@@ -308,9 +317,10 @@ export async function harvestPlot(buyerId, slot) {
     // tending crops visibly levels your companion (rarer/slower crops feed it much more). Gated by real grow
     // time, so it's steady progress, not a free maxing lever. Capped at the pet's max XP inside addEquippedPetXp.
     let petFed = null;
-    if (xp > 0) {
-        const pr = await addEquippedPetXp(buyerId, xp).catch(() => null);
-        if (pr?.ok) { const pdef = collectibleById(pr.petId); petFed = { petId: pr.petId, name: pdef?.name || "your pet", emoji: pdef?.emoji || "🐾", xp, level: pr.level, leveled: pr.leveled }; }
+    const petXpGain = Math.round(xp * pEff.petXpMult); // Nurturing Bed feeds extra pet XP
+    if (petXpGain > 0) {
+        const pr = await addEquippedPetXp(buyerId, petXpGain).catch(() => null);
+        if (pr?.ok) { const pdef = collectibleById(pr.petId); petFed = { petId: pr.petId, name: pdef?.name || "your pet", emoji: pdef?.emoji || "🐾", xp: petXpGain, level: pr.level, leveled: pr.leveled }; }
     }
     const buyer = await loadFarmBuyer(buyerId);
     const rarity = def?.rarity || "common";
@@ -325,15 +335,15 @@ export async function harvestPlot(buyerId, slot) {
     // extra reward from the shared pool (chest / bonus seed / treat / spin / bonus gold). Harvest-luck sources
     // (Lucky Harvest deco/gear + an active Harvest Charm) raise both the odds a little AND the tier when it fires.
     let loot = { label: null, chest: null, tier: 0 };
-    const bonusChance = HARVEST_BONUS_CHANCE + (buffs?.harvestLuck || 0) / 400 + (charmActive ? 0.05 : 0);
+    const bonusChance = HARVEST_BONUS_CHANCE + (buffs?.harvestLuck || 0) / 400 + (charmActive ? 0.05 : 0) + pEff.lootPromote / 2;
     if (Math.random() < bonusChance) {
-        loot = await rollHarvestReward(buyerId, rarity, luckyHarvestLevel(buyer?.farm_upgrades || {}), charmActive ? 0.2 : 0);
+        loot = await rollHarvestReward(buyerId, rarity, luckyHarvestLevel(buyer?.farm_upgrades || {}), (charmActive ? 0.2 : 0) + pEff.lootPromote);
     }
     const bonus = loot.label;
     const chest = loot.chest;
     // Seed Saver upgrade (+ deco seed-luck) — chance to recover the seed you planted (rare crops stay sustainable).
     let savedSeed = false;
-    if (Math.random() < seedSaverChance(buyer?.farm_upgrades || {}) + (buffs?.seedLuck || 0) / 200) {
+    if (Math.random() < seedSaverChance(buyer?.farm_upgrades || {}) + (buffs?.seedLuck || 0) / 200 + pEff.seedSave) {
         await grantSeed(buyerId, claimed.seed_id).catch(() => {});
         savedSeed = true;
     }

@@ -247,6 +247,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [gardenBusy, setGardenBusy] = useState(null);
     const [bountyTick, setBountyTick] = useState(0); // bumps after a mission-progressing action → FeatureDailies re-fetches
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
+    const [upgradePlot, setUpgradePlot] = useState(null); // slot whose specialization tracks are open
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
     const [petCele, setPetCele] = useState(null); // pet just leveled up (from feeding) → juicy celebration modal
@@ -281,7 +282,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || planting != null || upgradePlot != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -298,7 +299,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, planting, inspectSlot, inspectDeco, customOpen]);
+    }, [inspect, pigResult, harvestToast, planting, upgradePlot, inspectSlot, inspectDeco, customOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -470,6 +471,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) { setHarvestToast({ name: r.name, emoji: r.emoji, gold: r.gold, doubled: r.doubled, xp: r.xp, petFed: r.petFed, newPet: r.newPet, chest: r.chest, bonus: r.bonus, savedSeed: r.savedSeed, savedEmoji: r.savedEmoji, foundSeed: r.foundSeed }); SFX.coin(); }
     }, [gardenAct]);
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
+    const upgradePlotAt = useCallback((slot, key) => gardenAct({ action: "plot_upgrade", slot, key }, `pu-${slot}-${key}`), [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
     // Plots are permanent fixtures now (no dragging) — they stay in their tidy arrangement and you invest in
@@ -1109,7 +1111,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {planting != null && garden ? (
-                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} gold={farm.wallet?.gold || 0} onPick={plantSeedAt} onOpenPack={openPack} onBuyPack={buySeedPack} onClose={() => setPlanting(null)} />
+                <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} gold={farm.wallet?.gold || 0} onPick={plantSeedAt} onOpenPack={openPack} onBuyPack={buySeedPack} onSpecialize={() => { setUpgradePlot(planting); setPlanting(null); }} onClose={() => setPlanting(null)} />
             ) : null}
 
             {inspectSlot != null && garden ? (
@@ -1120,8 +1122,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onFertilize={fertilizeAt}
                     onBuyFertilizer={buyFert}
                     onHarvest={harvestAt}
+                    onSpecialize={() => { setUpgradePlot(inspectSlot); setInspectSlot(null); }}
                     onClose={() => setInspectSlot(null)}
                 />
+            ) : null}
+
+            {upgradePlot != null && garden ? (
+                <PlotUpgradeModal garden={garden} slot={upgradePlot} busy={gardenBusy} gold={farm.wallet?.gold || 0} onUpgrade={upgradePlotAt} onClose={() => setUpgradePlot(null)} />
             ) : null}
 
             {harvestToast ? <HarvestToast toast={harvestToast} onClose={() => setHarvestToast(null)} /> : null}
@@ -1478,6 +1485,8 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
                 boxShadow: "inset 0 2px 2px rgba(255,225,180,0.22), inset 0 -4px 7px rgba(0,0,0,0.62), 0 2px 3px rgba(0,0,0,0.4)",
                 border: canPlant ? "1.5px dashed rgba(255,226,122,0.75)" : "1px solid rgba(20,12,4,0.6)",
                 borderTop: "2px solid rgba(120,86,48,0.75)" }} />
+            {/* specialization badge — this plot has been invested in */}
+            {p.specLevel ? <span aria-hidden="true" style={{ position: "absolute", top: 2, right: 6, fontSize: 9.5, fontWeight: 900, color: "#e8dcff", background: "rgba(120,90,200,0.85)", border: "1px solid rgba(200,180,255,0.6)", borderRadius: 999, padding: "0 5px", lineHeight: "15px", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>⚙️{p.specLevel}</span> : null}
             {/* status chip */}
             <span style={{ display: "block", textAlign: "center", marginTop: 2 }}>
                 {!empty ? (
@@ -1846,7 +1855,8 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
 }
 
 // Centered "pick a seed" modal, opened by tapping an empty plot out in the field.
-function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onBuyPack, onClose }) {
+function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onBuyPack, onSpecialize, onClose }) {
+    const plotSpec = (garden.plots || []).find((x) => x.slot === slot)?.specLevel || 0;
     const bag = garden.seedBag || [];
     const packs = garden.seedPacks || [];
     const [opened, setOpened] = useState(null);
@@ -1862,7 +1872,12 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Plant a seed" style={{ width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #ffd75e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
                 <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
-                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>Rarer seeds take longer, feed your pet more XP, and roll better harvest loot. Here&apos;s what each one pays out:</div>
+                <div className="muted" style={{ fontSize: 12, margin: "2px 0 10px" }}>Rarer seeds take longer, feed your pet more XP, and roll better harvest loot. Here&apos;s what each one pays out:</div>
+                {onSpecialize ? (
+                    <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", marginBottom: 12, borderRadius: 11, border: "1px solid rgba(180,150,255,0.45)", background: "rgba(150,120,230,0.12)", color: "#d9caff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", textAlign: "left" }}>
+                        <span style={{ fontSize: 16 }}>⚙️</span><span style={{ flex: 1 }}>Specialize this plot{plotSpec ? ` · Lv ${plotSpec}` : ""}</span><span aria-hidden="true">›</span>
+                    </button>
+                ) : null}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {bag.length ? bag.map((s) => (
                         <button key={s.id} type="button" disabled={Boolean(busy)} onClick={() => onPick(slot, s.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `1px solid ${(RARITY_RING[s.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
@@ -1936,7 +1951,7 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
 // Tap a growing crop → this modal tells you what it is, when it's ready, and exactly what to expect at harvest
 // (gold, XP, loot tier). From here you can spend fertilizer to speed it up, buy more fertilizer, or (once ripe)
 // harvest — but a plain tap never silently burns fertilizer anymore.
-function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, onHarvest, onClose }) {
+function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, onHarvest, onSpecialize, onClose }) {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
     const p = (garden.plots || []).find((x) => x.slot === slot);
@@ -1990,6 +2005,11 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                             ) : null}
                         </>
                     )}
+                    {onSpecialize ? (
+                        <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", fontWeight: 800, fontSize: 12.5, background: "rgba(150,120,230,0.12)", color: "#d9caff", border: "1px solid rgba(180,150,255,0.45)", borderRadius: 11, cursor: "pointer", textAlign: "left" }}>
+                            <span style={{ fontSize: 16 }}>⚙️</span><span style={{ flex: 1 }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true">›</span>
+                        </button>
+                    ) : null}
                     <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
                 </div>
             </div>
@@ -2004,6 +2024,58 @@ function ExpectStat({ icon, value, label, accent }) {
             <div style={{ fontSize: 18 }}>{icon}</div>
             <div style={{ fontWeight: 900, fontSize: 16, color: accent, marginTop: 2 }}>{value}</div>
             <div className="muted" style={{ fontSize: 11 }}>{label}</div>
+        </div>
+    );
+}
+
+// Per-plot specialization: invest gold into this plot's tracks to give it permanent passive attributes. You
+// decide how each plot specializes — the levels persist across harvests.
+function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) {
+    const plot = (garden.plots || []).find((x) => x.slot === slot);
+    const tracks = plot?.tracks || [];
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Specialize plot" style={{ width: "100%", maxWidth: 360, maxHeight: "88dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #b49aff", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>⚙️ Specialize plot {slot + 1}</div>
+                    <span className="muted" style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>🪙 {gold.toLocaleString()}</span>
+                </div>
+                <div className="muted" style={{ fontSize: 12, margin: "3px 0 12px" }}>Permanent passive attributes for this plot — you decide its role. Levels stay even after you harvest.</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {tracks.map((t) => {
+                        const afford = t.cost != null && gold >= t.cost;
+                        const bKey = `pu-${slot}-${t.key}`;
+                        return (
+                            <div key={t.key} style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <span style={{ fontSize: 20 }}>{t.emoji}</span>
+                                    <span style={{ fontWeight: 800, fontSize: 13.5, flex: 1, minWidth: 0 }}>{t.name}</span>
+                                    <span style={{ fontSize: 11, fontWeight: 900, color: t.maxed ? "#8fe39a" : "#c9b4ff" }}>{t.maxed ? "MAX" : `Lv ${t.level}`}</span>
+                                </div>
+                                <div className="muted" style={{ fontSize: 11.5, margin: "4px 2px 6px", lineHeight: 1.35 }}>{t.desc}</div>
+                                <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                                    {Array.from({ length: t.max }).map((_, i) => (
+                                        <span key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < t.level ? "#b49aff" : "rgba(255,255,255,0.12)" }} />
+                                    ))}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <span style={{ fontSize: 11.5, color: "#c7bcd8" }}>
+                                        {t.now ? `+${t.now}${t.unit}` : "—"}{t.next != null ? ` → +${t.next}${t.unit}` : ""}
+                                    </span>
+                                    {t.maxed ? (
+                                        <span style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 800, color: "#8fe39a" }}>Maxed</span>
+                                    ) : (
+                                        <button type="button" disabled={!afford || Boolean(busy)} onClick={() => onUpgrade(slot, t.key)} style={{ marginLeft: "auto", padding: "7px 12px", borderRadius: 9, border: "none", fontWeight: 800, fontSize: 12, cursor: afford && !busy ? "pointer" : "default", background: afford ? "linear-gradient(180deg,#c3a7ff,#9a78e0)" : "rgba(255,255,255,0.08)", color: afford ? "#1a1030" : "#9aa0a6", opacity: afford ? 1 : 0.6 }}>
+                                            {busy === bKey ? "…" : `🪙 ${t.cost.toLocaleString()}`}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Done</button>
+            </div>
         </div>
     );
 }
