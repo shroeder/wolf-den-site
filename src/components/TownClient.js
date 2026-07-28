@@ -22,6 +22,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const TILES = (n) => Array.from({ length: n }, (_, i) => i);
 // Which town-art sprite each raid kind uses (falls back to the event emoji until the art is generated).
 const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem" };
+const CAT_LABEL = { civic: "🏛️ Civic", building: "🏚️ Buildings", service: "🧭 Services", unlock: "🌟 New buildings" };
 // A message that's just emoji (a reaction/emote) pops as a floating emote instead of a text bubble.
 const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
 
@@ -159,7 +160,6 @@ export default function TownClient({ initial }) {
     const [questBusy, setQuestBusy] = useState(false);
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
-    const [previewDecos, setPreviewDecos] = useState(() => new Set()); // owner: preview upgrade decorations before funding
     const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
     const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
     const evIdRef = useRef(null);
@@ -296,10 +296,10 @@ export default function TownClient({ initial }) {
         const now = Date.now();
         if (now - lastTyping.current > 2500) { lastTyping.current = now; postAction({ action: "typing" }); } // throttle typing pings
     }, [postAction]);
-    // Contribute gold to the collective plaza fund, then refresh the coin HUD + town state.
-    const contribute = useCallback(async (amount) => {
-        setContribBusy(true);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "contribute", amount }) }).catch(() => null);
+    // Contribute gold to a Town Development project, then refresh the coin HUD + town state.
+    const contribute = useCallback(async (projectId, amount) => {
+        setContribBusy(projectId);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "project_contribute", projectId, amount }) }).then((x) => x.json()).catch(() => null);
         setContribBusy(false);
         if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
     }, [load]);
@@ -331,7 +331,8 @@ export default function TownClient({ initial }) {
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
     const buildings = state?.buildings || [];
-    const shownDecos = useMemo(() => new Set([...(state?.upgrade?.unlocked || []), ...previewDecos]), [state?.upgrade, previewDecos]);
+    const projects = state?.projects || [];
+    const townBonuses = state?.bonuses || {};
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
     const crierLines = useMemo(() => {
@@ -340,11 +341,12 @@ export default function TownClient({ initial }) {
         if (state?.store?.open) lines.push(`The Den is OPEN til ${state.store.closesLabel} — come on down!`);
         else if (state?.store?.nextOpenLabel) lines.push(`Shop's closed — opens ${state.store.nextOpenLabel}!`);
         lines.push(`${state?.onlineCount ?? 1} wolves about the Den tonight!`);
-        if (state?.upgrade?.next) lines.push(`Chip in to build the ${state.upgrade.next.name}!`);
+        const nextProj = (state?.projects || []).find((p) => !p.maxed);
+        if (nextProj) lines.push(`Chip in to grow the ${nextProj.name}!`);
         lines.push("The tavern's warm — pull up a stool!");
         lines.push("Hear ye! Fresh happenings on the board!");
         return lines;
-    }, [state?.event, state?.onlineCount, state?.upgrade]);
+    }, [state?.event, state?.onlineCount, state?.projects]);
     useEffect(() => { const t = setInterval(() => setCrierMsg((m) => m + 1), 4500); return () => clearInterval(t); }, []);
     // Buy a chest from the Traveling Merchant.
     const buyChest = useCallback(async (tier) => {
@@ -363,10 +365,7 @@ export default function TownClient({ initial }) {
         else setQuestFlash("That bounty isn't ready yet.");
     }, [load]);
     const questsClaimable = useMemo(() => (state?.quests || []).filter((q) => q.done && !q.claimed).length, [state?.quests]);
-    // Owner: preview an upgrade decoration locally without funding it; toggle the auto opening-events cron.
-    const togglePreview = useCallback((key) => {
-        setPreviewDecos((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-    }, []);
+    // Owner: toggle the auto opening-events cron.
     const toggleEventsLive = useCallback(async () => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "set_events_live", on: !state?.eventsLive }) }).catch(() => {});
         load();
@@ -488,10 +487,6 @@ export default function TownClient({ initial }) {
                             <img src={art.merchant.url} alt="Traveling Merchant" draggable={false} />
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
-                    {/* Collective-upgrade decorations that scroll with the street */}
-                    {shownDecos.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
-                    {shownDecos.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
-                    {shownDecos.has("garden") ? ["30%", "64%", "84%"].map((lx, i) => <div key={i} className="tw-deco tw-deco-garden" style={{ left: lx, top: `${GROUND}%` }} aria-hidden="true">🌷</div>) : null}
                     {/* Raid: roaming enemies in the plaza — they thin out as the raid HP drops; tap one to strike it */}
                     {state?.event ? (() => {
                         const ev = state.event;
@@ -515,10 +510,6 @@ export default function TownClient({ initial }) {
 
                 {/* Raid combat HUD — shared HP bar + timed-strike meter + abilities (enemies roam in-world above) */}
                 {state?.event ? <RaidCombat ev={state.event} hp={evHp ?? state.event.hp} onAttack={attackEvent} defeated={Boolean(evFlash?.defeated)} /> : null}
-
-                {/* Collective-upgrade overlays that span the plaza (don't scroll — they hang over the whole view) */}
-                {shownDecos.has("lights") ? <div className="tw-lights" aria-hidden="true" /> : null}
-                {shownDecos.has("banners") ? <div className="tw-banners" aria-hidden="true" /> : null}
 
                 {/* edge hints — tap to walk that way (or just drag the street to look around) */}
                 {cameraPx > 4 ? <button type="button" className="tw-edge tw-edge-l" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x - 22, 1, 99), me.y); }} aria-label="Walk left">‹</button> : null}
@@ -656,42 +647,56 @@ export default function TownClient({ initial }) {
                             <p className="muted" style={{ fontSize: "0.8rem", margin: "8px 2px 0" }}>🟢 {state?.onlineCount ?? 1} online in the Den right now.</p>
                         </div>
 
-                        {state?.upgrade ? (() => {
-                            const up = state.upgrade;
-                            const next = up.next;
-                            const pct = next ? Math.min(100, Math.round((up.total / next.at) * 100)) : 100;
-                            return (
-                                <div className="tw-board-section">
-                                    <div className="tw-board-title">🏗️ Fund the plaza</div>
-                                    <div className="tw-fund-bar"><span style={{ width: `${pct}%` }} /></div>
-                                    <p className="muted" style={{ fontSize: "0.82rem", margin: "6px 2px 2px" }}>
-                                        🪙 {up.total.toLocaleString()} pooled{next ? ` · next: ${next.name} at ${next.at.toLocaleString()}` : " · every upgrade unlocked!"}
-                                    </p>
-                                    {next ? <p style={{ fontSize: "0.8rem", margin: "0 2px 8px", color: "#cbb9e0" }}>{next.blurb}</p> : null}
-                                    <div className="tw-fund-btns">
-                                        {[100, 500, 2500].map((amt) => (
-                                            <button key={amt} type="button" disabled={contribBusy} onClick={() => contribute(amt)}>+{amt.toLocaleString()}</button>
-                                        ))}
+                        {projects.length ? (
+                            <div className="tw-board-section">
+                                <div className="tw-board-title">🏗️ Town Development</div>
+                                <p className="muted" style={{ fontSize: "0.8rem", margin: "0 2px 8px" }}>
+                                    Everyone pools gold into the town we all share. Every level is a perk the WHOLE Den keeps — forever.
+                                </p>
+                                {(townBonuses.xpPct || townBonuses.goldPct) ? (
+                                    <div className="tw-town-perks">
+                                        {townBonuses.xpPct ? <span>✨ +{townBonuses.xpPct}% XP</span> : null}
+                                        {townBonuses.goldPct ? <span>🪙 +{townBonuses.goldPct}% gold</span> : null}
+                                        <span className="muted">town-wide, right now</span>
                                     </div>
-                                    <div className="tw-fund-chips">
-                                        {up.tiers.map((t) => (
-                                            <span key={t.key} className={`tw-fund-chip${up.unlocked.includes(t.key) ? " is-on" : ""}`}>{up.unlocked.includes(t.key) ? "✅" : "🔒"} {t.name}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })() : null}
+                                ) : null}
+                                {["civic", "building", "service", "unlock"].map((cat) => {
+                                    const inCat = projects.filter((p) => p.category === cat);
+                                    if (!inCat.length) return null;
+                                    return (
+                                        <div key={cat} className="tw-proj-group">
+                                            <div className="tw-proj-cat">{CAT_LABEL[cat]}</div>
+                                            {inCat.map((p) => (
+                                                <div key={p.id} className={`tw-proj${p.maxed ? " is-maxed" : ""}`}>
+                                                    <div className="tw-proj-head">
+                                                        <span className="tw-proj-emoji" aria-hidden="true">{p.emoji}</span>
+                                                        <span className="tw-proj-name">{p.name}</span>
+                                                        <span className="tw-proj-lvl">{p.maxed ? "MAX" : `Lv ${p.level}`}</span>
+                                                    </div>
+                                                    <p className="tw-proj-desc">{p.desc}</p>
+                                                    {p.perkNow ? <p className="tw-proj-perk">Now: {p.perkNow}</p> : null}
+                                                    {p.maxed ? null : (
+                                                        <>
+                                                            <div className="tw-fund-bar"><span style={{ width: `${p.progressPct}%` }} /></div>
+                                                            <p className="tw-proj-cost">🪙 {p.goldIn.toLocaleString()} / {p.cost.toLocaleString()} → Lv {p.level + 1}{p.perkNext ? ` · ${p.perkNext}` : ""}</p>
+                                                            <div className="tw-fund-btns">
+                                                                {[100, 500, 2500].map((amt) => (
+                                                                    <button key={amt} type="button" disabled={contribBusy === p.id} onClick={() => contribute(p.id, amt)}>+{amt.toLocaleString()}</button>
+                                                                ))}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
 
                         {state?.owner ? (
                             <div className="tw-board-section">
                                 <div className="tw-board-title">🔧 Owner tools</div>
-                                <p className="muted" style={{ fontSize: "0.78rem", margin: "0 2px 6px" }}>Preview each upgrade before it&apos;s funded (local only — doesn&apos;t change the real total):</p>
-                                <div className="tw-owner-preview">
-                                    {(state?.upgrade?.tiers || []).map((t) => {
-                                        const on = previewDecos.has(t.key) || (state?.upgrade?.unlocked || []).includes(t.key);
-                                        return <button key={t.key} type="button" className={`tw-prev-chip${on ? " is-on" : ""}`} onClick={() => togglePreview(t.key)}>{on ? "👁️" : "🔒"} {t.name}</button>;
-                                    })}
-                                </div>
                                 <button type="button" className={`tw-live-toggle${state?.eventsLive ? " is-on" : ""}`} onClick={toggleEventsLive}>
                                     {state?.eventsLive ? "🟢 Auto opening-events: LIVE" : "⚪ Auto opening-events: off"}
                                     <span className="muted">tap to {state?.eventsLive ? "turn off" : "turn on"} — pushes members when the shop opens</span>
@@ -837,9 +842,6 @@ const TOWN_CSS = `
 .tw-ware-label { font-size: 0.74rem; font-weight: 800; text-align: center; }
 .tw-ware-price { font-size: 0.72rem; color: #ffd75e; font-weight: 800; }
 .tw-ware-img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
-.tw-owner-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.tw-prev-chip { font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #cbb9e0; cursor: pointer; }
-.tw-prev-chip.is-on { color: #8fe39a; border-color: rgba(143,227,154,0.5); background: rgba(143,227,154,0.12); }
 .tw-live-toggle { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f2ead9; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tw-live-toggle.is-on { border-color: rgba(143,227,154,0.5); background: rgba(143,227,154,0.1); }
 .tw-live-toggle .muted { font-size: 0.72rem; font-weight: 600; }
@@ -858,14 +860,6 @@ const TOWN_CSS = `
 .tw-quest-claim { flex: 0 0 auto; padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer; font-weight: 800; font-size: 0.82rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
 .tw-quest-claim:disabled { opacity: .5; cursor: default; }
 .tw-quest-tag.is-done { font-size: 20px; flex: 0 0 auto; }
-.tw-deco { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 96; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.5)); }
-.tw-deco-fountain { font-size: 54px; }
-.tw-deco-statue { font-size: 46px; }
-.tw-deco-garden { font-size: 24px; transform: translate(-50%, -30%); }
-.tw-lights { position: absolute; top: 6px; left: 0; right: 0; height: 16px; z-index: 40; pointer-events: none; background-image: radial-gradient(circle, #ffe488 2.5px, transparent 3px); background-size: 26px 16px; filter: drop-shadow(0 0 4px rgba(255,215,110,0.85)); opacity: .92; }
-.tw-banners { position: absolute; top: 24px; left: 0; right: 0; height: 15px; z-index: 40; pointer-events: none;
-    background: repeating-linear-gradient(90deg,#e0433f 0 18px,#47b866 18px 36px,#3a86ff 36px 54px,#ffd75e 54px 72px);
-    -webkit-mask: repeating-linear-gradient(90deg,#000 0 9px, transparent 12px 18px); mask: repeating-linear-gradient(90deg,#000 0 9px, transparent 12px 18px); opacity: .85; }
 
 /* Tap-a-player menu + Town Hall panel */
 .tw-menu-panel { max-width: 360px; }
@@ -884,9 +878,20 @@ const TOWN_CSS = `
 .tw-fund-btns { display: flex; gap: 8px; margin: 8px 0; }
 .tw-fund-btns button { flex: 1 1 auto; padding: 9px 4px; border-radius: 10px; border: none; background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #1c130a; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tw-fund-btns button:disabled { opacity: .5; cursor: default; }
-.tw-fund-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.tw-fund-chip { font-size: 0.72rem; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #9a8fb0; }
-.tw-fund-chip.is-on { color: #8fe39a; border-color: rgba(143,227,154,0.4); background: rgba(143,227,154,0.1); }
+.tw-town-perks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 0.8rem; font-weight: 800; color: #ffe488; }
+.tw-town-perks .muted { font-weight: 600; font-size: 0.72rem; }
+.tw-proj-group { margin-bottom: 14px; }
+.tw-proj-cat { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #8b7fb0; margin: 0 2px 6px; }
+.tw-proj { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; }
+.tw-proj.is-maxed { border-color: rgba(143,227,154,0.35); background: rgba(143,227,154,0.07); }
+.tw-proj-head { display: flex; align-items: center; gap: 8px; }
+.tw-proj-emoji { font-size: 20px; flex: 0 0 auto; }
+.tw-proj-name { font-weight: 800; font-size: 0.9rem; color: #f2ead9; flex: 1 1 auto; min-width: 0; }
+.tw-proj-lvl { flex: 0 0 auto; font-size: 0.72rem; font-weight: 900; color: #ffd75e; letter-spacing: 0.03em; }
+.tw-proj.is-maxed .tw-proj-lvl { color: #8fe39a; }
+.tw-proj-desc { font-size: 0.78rem; color: #c7bcd8; margin: 5px 2px 6px; line-height: 1.35; }
+.tw-proj-perk { font-size: 0.74rem; font-weight: 700; color: #8fe39a; margin: 0 2px 6px; }
+.tw-proj-cost { font-size: 0.72rem; color: #cbb9e0; margin: 6px 2px 0; }
 
 /* Live town event (raid) overlay */
 /* Raid: roaming enemies in the plaza (tap to strike) */

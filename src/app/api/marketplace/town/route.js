@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buyMerchantChest, contributeTownGold, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
+import { buyMerchantChest, contributeTownProject, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
 import { attackTownEvent, spawnTownEvent } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -34,7 +34,7 @@ export async function POST(request) {
             let res;
             if (body?.action === "chat") res = await sendTownChat(buyer.id, body?.body);
             else if (body?.action === "typing") res = await setTownTyping(buyer.id);
-            else if (body?.action === "contribute") res = await contributeTownGold(buyer.id, body?.amount);
+            else if (body?.action === "project_contribute") res = await contributeTownProject(buyer.id, body?.projectId, body?.amount);
             else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId, body?.move);
             else if (body?.action === "merchant_buy") res = await buyMerchantChest(buyer.id, body?.tier);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);

@@ -6,6 +6,7 @@ import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -108,11 +109,16 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     if (base <= 0) return null;
     // Happy Hour multiplies all XP (which cascades to the gold + the equipped pet's 25% share below).
     const mult = await activeXpMultiplier().catch(() => 1);
-    const pts = Math.round(base * mult);
+    // The shared Town's prosperity gives EVERY member a standing % boost to XP & gold earned (Town Development).
+    const town = await getTownBonuses(Date.now()).catch(() => ({ xpPct: 0, goldPct: 0 }));
+    const xpMult = 1 + (town.xpPct || 0) / 100;
+    const goldMult = 1 + (town.goldPct || 0) / 100;
+    const pts = Math.round(base * mult * xpMult);
     // Gold is UNLINKED from XP: by default it still tracks XP 1:1 (purchases, donations, boss, quests…), but a
     // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
-    // spendable currency for a payout we already paid the customer for.
-    const goldDelta = gold === undefined ? pts : Math.max(0, Math.round(Number(gold) * mult));
+    // spendable currency for a payout we already paid the customer for. Town gold-boost rides on top of gold only.
+    const goldBase = gold === undefined ? base * mult : Number(gold) * mult;
+    const goldDelta = Math.max(0, Math.round(goldBase * goldMult));
 
     // Per-action daily cap — enforced ATOMICALLY in the insert so rapid/concurrent awards can't slip past it
     // (a plain COUNT-then-insert is racy: burst clicks all read "under cap" before any row commits). When a

@@ -11,22 +11,32 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
+import { getTownProjects, getTownBonuses, contributeToProject } from "@/lib/marketplace/town-projects.js";
 import { setSetting } from "@/lib/settings.js";
 
-// The Traveling Merchant's wares — loot chests sold for gold (a fair gold SINK). Tunable prices.
-export const MERCHANT_WARES = [
-    { tier: "wooden", price: 500 },
-    { tier: "iron", price: 2000 },
-    { tier: "gold", price: 6000 },
-].map((w) => ({ ...w, label: CHEST_TIERS[w.tier]?.label || w.tier, emoji: CHEST_TIERS[w.tier]?.emoji || "📦" }));
+// The Traveling Merchant's wares — loot chests sold for gold (a gold SINK). Stock + prices improve as the
+// community levels up the Trading Post (Town Development merchantTier): rarer chests unlock, prices drop.
+const MERCHANT_STOCK = [
+    { tier: "wooden", price: 500, minTier: 0 },
+    { tier: "iron", price: 2000, minTier: 0 },
+    { tier: "gold", price: 6000, minTier: 0 },
+    { tier: "mythic", price: 16000, minTier: 3 },
+    { tier: "ascendant", price: 40000, minTier: 5 },
+];
+function merchantWaresForTier(tier = 0, chestArt = {}) {
+    const disc = Math.min(0.2, tier * 0.03); // up to 20% off as the Trading Post levels
+    return MERCHANT_STOCK.filter((w) => tier >= w.minTier).map((w) => ({
+        tier: w.tier, price: Math.round(w.price * (1 - disc)),
+        label: CHEST_TIERS[w.tier]?.label || w.tier, emoji: CHEST_TIERS[w.tier]?.emoji || "📦",
+        image: chestArt[w.tier] || null,
+    }));
+}
 
-// Collective plaza upgrades: the whole pack pools gold to unlock shared decorations that everyone sees.
-export const TOWN_UPGRADES = [
-    { key: "lights", name: "String Lights", at: 3000, blurb: "Warm lights strung across the plaza." },
-    { key: "banners", name: "Festival Banners", at: 12000, blurb: "Colorful banners fly over the street." },
-    { key: "fountain", name: "Grand Fountain", at: 30000, blurb: "A marble fountain bubbles in the square." },
-    { key: "statue", name: "Wolf Statue", at: 75000, blurb: "A towering statue of the Wolf watches over town." },
-    { key: "garden", name: "Plaza Garden", at: 150000, blurb: "Flowerbeds and hedges line the whole street." },
+// Buildings that only appear once the community funds their unlock project (Town Development). They get their
+// own art later; for now they render with the emoji-card fallback.
+const UNLOCKABLE_BUILDINGS = [
+    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 16 },
+    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 82 },
 ];
 
 // ── THE WOLF DEN TOWN ─────────────────────────────────────────────────────────────────────────────────────
@@ -135,18 +145,18 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, friends, upgrade, event, quests, chestArt, eventsLive] = await Promise.all([
+    const [art, petSprites, friends, projects, bonuses, event, quests, chestArt, eventsLive] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
         buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
-        getTownUpgrade().catch(() => null),
+        getTownProjects().catch(() => []),
+        getTownBonuses(Date.now()).catch(() => ({})),
         getActiveTownEvent(buyerId).catch(() => null),
         buyerId ? getTownQuests(buyerId).catch(() => []) : Promise.resolve([]),
         getChestArt().catch(() => ({})),
         townEventsLive().catch(() => false),
     ]);
-    // Merchant wares with their REAL chest art (falls back to the emoji client-side if an image is missing).
-    const merchantWares = MERCHANT_WARES.map((w) => ({ ...w, image: chestArt[w.tier] || null }));
+    const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt);
     const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
     const [acts, presence, chats] = await Promise.all([
@@ -221,9 +231,10 @@ export async function getTownState(buyerId) {
             gold: Number(me?.gold || 0),
         },
         players,
-        buildings: TOWN_BUILDINGS,
+        buildings: [...TOWN_BUILDINGS, ...UNLOCKABLE_BUILDINGS.filter((b) => (bonuses.unlocks || []).includes(b.id))],
         art,
-        upgrade,
+        projects,
+        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, depth: bonuses.depth || 0, tavernLevel: bonuses.tavernLevel || 0, raidTier: bonuses.raidTier || 0, unlocks: bonuses.unlocks || [] },
         event,
         merchant: merchantWares,
         store: storeStatus(),
@@ -240,10 +251,12 @@ export async function setTownEventsLive(buyerId, on) {
     return { ok: true, eventsLive: Boolean(on) };
 }
 
-// Buy a loot chest from the Traveling Merchant (owner-gated during the build). Guarded gold spend → a chest.
+// Buy a loot chest from the Traveling Merchant (owner-gated during the build). Price/stock follow the town's
+// Trading Post tier. Guarded gold spend → a chest.
 export async function buyMerchantChest(buyerId, tier) {
     if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
-    const ware = MERCHANT_WARES.find((w) => w.tier === tier);
+    const bonuses = await getTownBonuses().catch(() => ({}));
+    const ware = merchantWaresForTier(bonuses.merchantTier || 0).find((w) => w.tier === tier);
     if (!ware) return { ok: false, error: "not_for_sale" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, ware.price]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
@@ -252,27 +265,12 @@ export async function buyMerchantChest(buyerId, tier) {
     return { ok: true, gold: Number(paid.gold), tier, label: ware.label };
 }
 
-// The collective-upgrade state: pooled gold total, which decorations are unlocked, and the next goal.
-export async function getTownUpgrade() {
-    const row = await db.queryOne(`SELECT gold_total FROM mkt_town_upgrade WHERE id = 1`).catch(() => null);
-    const total = Number(row?.gold_total || 0);
-    const unlocked = TOWN_UPGRADES.filter((u) => total >= u.at).map((u) => u.key);
-    const next = TOWN_UPGRADES.find((u) => total < u.at) || null;
-    return { total, unlocked, next, tiers: TOWN_UPGRADES };
-}
-
-// Contribute gold to the plaza fund (owner-gated during the build). Deducts from the member (guarded so it
-// can't go negative), logs the coin sink, and bumps the shared total. Returns the member's new gold + total.
-export async function contributeTownGold(buyerId, amount) {
+// Contribute gold to a Town Development project (owner-gated during the build). Also ticks the civic quest.
+export async function contributeTownProject(buyerId, projectId, amount) {
     if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
-    const amt = Math.floor(Number(amount) || 0);
-    if (amt <= 0) return { ok: false, error: "bad_amount" };
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, amt]).catch(() => null);
-    if (!paid) return { ok: false, error: "insufficient_gold" };
-    await logCoin(buyerId, -amt, "town_fund", { balanceAfter: paid.gold }).catch(() => {});
-    const row = await db.queryOne(`UPDATE mkt_town_upgrade SET gold_total = gold_total + $1, updated_at = NOW() WHERE id = 1 RETURNING gold_total`, [amt]).catch(() => null);
-    bumpTownQuest(buyerId, "civic", 1).catch(() => {});
-    return { ok: true, gold: Number(paid.gold), total: Number(row?.gold_total || amt) };
+    const res = await contributeToProject(buyerId, projectId, amount);
+    if (res.ok) bumpTownQuest(buyerId, "civic", 1).catch(() => {});
+    return res;
 }
 
 // Post a chat message that pops as a speech bubble over your avatar for everyone in the plaza (owner-gated
