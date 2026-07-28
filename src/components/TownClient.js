@@ -661,7 +661,14 @@ export default function TownClient({ initial }) {
             {merchantOpen ? (
                 <div className="tw-roster" onClick={() => setMerchantOpen(false)} role="presentation">
                     <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
-                        <div className="tw-roster-head"><strong>🧳 Traveling Merchant</strong><button type="button" onClick={() => setMerchantOpen(false)} aria-label="Close">✕</button></div>
+                        <div className="tw-roster-head" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {art.merchant?.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={art.merchant.url} alt="" draggable={false} style={{ width: 34, height: 34, objectFit: "contain", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.5))" }} />
+                            ) : <span aria-hidden="true">🧳</span>}
+                            <strong style={{ flex: 1 }}>Traveling Merchant</strong>
+                            <button type="button" onClick={() => setMerchantOpen(false)} aria-label="Close">✕</button>
+                        </div>
                         <p className="muted" style={{ margin: "-2px 2px 8px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;Rare goods, fair prices! Fancy a chest, friend?&rdquo;</p>
                         {merchantFlash ? <div className="tw-merchant-flash">{merchantFlash}</div> : null}
                         <div className="tw-wares">
