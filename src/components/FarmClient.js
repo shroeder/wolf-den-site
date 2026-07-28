@@ -2048,42 +2048,61 @@ function ExpectStat({ icon, value, label, accent }) {
 
 // Per-plot specialization: invest gold into this plot's tracks to give it permanent passive attributes. You
 // decide how each plot specializes — the levels persist across harvests.
+const TRACK_ACCENT = { fertile: "#5fe39a", loam: "#ffd75e", nurture: "#c9b4ff", greenhouse: "#5fd6c8", ward: "#ff8f6a" };
+
 function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) {
     const plot = (garden.plots || []).find((x) => x.slot === slot);
     const tracks = plot?.tracks || [];
+    const total = tracks.reduce((s, t) => s + t.level, 0);
+    const maxTotal = tracks.reduce((s, t) => s + t.max, 0);
+    const [justUp, setJustUp] = useState(null);
+    const doUp = useCallback(async (key) => { const r = await onUpgrade(slot, key); if (r?.ok) { SFX?.coin?.(); setJustUp(key); setTimeout(() => setJustUp(null), 900); } }, [onUpgrade, slot]);
+    const lead = tracks.filter((t) => t.level > 0).sort((a, b) => b.level - a.level)[0]; // the plot's "role" = most-invested track
+    const roleName = lead ? `${lead.name} Bed` : "Unspecialized Bed";
     return (
-        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
-            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Specialize plot" style={{ width: "100%", maxWidth: 360, maxHeight: "88dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #b49aff", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ fontWeight: 800, fontSize: 16 }}>⚙️ Specialize plot {slot + 1}</div>
-                    <span className="muted" style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>🪙 {gold.toLocaleString()}</span>
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.62)", display: "grid", placeItems: "center", padding: 14 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Specialize plot" style={{ width: "100%", maxWidth: 384, maxHeight: "90dvh", overflowY: "auto", overflowX: "hidden", borderRadius: 18, background: "var(--card-bg,#17181c)", border: "2px solid #b49aff", boxShadow: "0 24px 64px rgba(0,0,0,0.6)", animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
+                {/* hero header */}
+                <div style={{ position: "relative", padding: "16px 18px 14px", background: "radial-gradient(130% 100% at 50% 0%, rgba(150,120,230,0.4), transparent 72%)" }}>
+                    <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7 }}>×</button>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#c9b4ff" }}>Plot {slot + 1} · Specialization</div>
+                    <div style={{ fontWeight: 900, fontSize: 21, marginTop: 2, color: lead ? (TRACK_ACCENT[lead.key] || "#e8dcff") : "#e8dcff" }}>{roleName}</div>
+                    <div className="muted" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.4 }}>Pour gold in to give this plot permanent powers — you decide its role. Levels stay through every harvest.</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11 }}>
+                        <span style={{ fontSize: 12, fontWeight: 900, color: "#e8dcff", background: "rgba(120,90,200,0.4)", border: "1px solid rgba(180,150,255,0.5)", borderRadius: 999, padding: "3px 11px" }}>⚙️ Power {total}/{maxTotal}</span>
+                        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#ffd75e" }}>🪙 {gold.toLocaleString()}</span>
+                    </div>
                 </div>
-                <div className="muted" style={{ fontSize: 12, margin: "3px 0 12px" }}>Permanent passive attributes for this plot — you decide its role. Levels stay even after you harvest.</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* tracks */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: "4px 14px 16px" }}>
                     {tracks.map((t) => {
+                        const accent = TRACK_ACCENT[t.key] || "#b49aff";
                         const afford = t.cost != null && gold >= t.cost;
                         const bKey = `pu-${slot}-${t.key}`;
+                        const flash = justUp === t.key;
                         return (
-                            <div key={t.key} style={{ padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontSize: 20 }}>{t.emoji}</span>
-                                    <span style={{ fontWeight: 800, fontSize: 13.5, flex: 1, minWidth: 0 }}>{t.name}</span>
-                                    <span style={{ fontSize: 11, fontWeight: 900, color: t.maxed ? "#8fe39a" : "#c9b4ff" }}>{t.maxed ? "MAX" : `Lv ${t.level}`}</span>
+                            <div key={t.key} style={{ padding: "11px 12px", borderRadius: 13, background: t.maxed ? `${accent}14` : "rgba(255,255,255,0.04)", border: `1px solid ${t.maxed ? `${accent}66` : "rgba(255,255,255,0.09)"}`, boxShadow: flash ? `0 0 0 2px ${accent}, 0 0 20px ${accent}99` : "none", transition: "box-shadow .3s ease" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <span style={{ width: 36, height: 36, flex: "0 0 auto", display: "grid", placeItems: "center", fontSize: 20, borderRadius: 10, background: `${accent}22`, border: `1px solid ${accent}55` }}>{t.emoji}</span>
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ display: "block", fontWeight: 800, fontSize: 13.5 }}>{t.name}</span>
+                                        <span className="muted" style={{ fontSize: 10.5, lineHeight: 1.3 }}>{t.desc}</span>
+                                    </span>
+                                    <span style={{ fontSize: 10.5, fontWeight: 900, color: t.maxed ? accent : "#cbb9e0", whiteSpace: "nowrap" }}>{t.maxed ? "MAX" : `Lv ${t.level}`}</span>
                                 </div>
-                                <div className="muted" style={{ fontSize: 11.5, margin: "4px 2px 6px", lineHeight: 1.35 }}>{t.desc}</div>
-                                <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                                <div style={{ display: "flex", gap: 4, margin: "9px 0 8px" }}>
                                     {Array.from({ length: t.max }).map((_, i) => (
-                                        <span key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < t.level ? "#b49aff" : "rgba(255,255,255,0.12)" }} />
+                                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: i < t.level ? accent : "rgba(255,255,255,0.12)", boxShadow: i < t.level ? `0 0 5px ${accent}77` : "none", transition: "background .35s ease, box-shadow .35s ease" }} />
                                     ))}
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontSize: 11.5, color: "#c7bcd8" }}>
+                                    <span style={{ fontSize: 11.5, fontWeight: 700, color: accent }}>
                                         {t.now ? `+${t.now}${t.unit}` : "—"}{t.next != null ? ` → +${t.next}${t.unit}` : ""}
                                     </span>
                                     {t.maxed ? (
-                                        <span style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 800, color: "#8fe39a" }}>Maxed</span>
+                                        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 900, color: accent }}>✓ MAXED</span>
                                     ) : (
-                                        <button type="button" disabled={!afford || Boolean(busy)} onClick={() => onUpgrade(slot, t.key)} style={{ marginLeft: "auto", padding: "7px 12px", borderRadius: 9, border: "none", fontWeight: 800, fontSize: 12, cursor: afford && !busy ? "pointer" : "default", background: afford ? "linear-gradient(180deg,#c3a7ff,#9a78e0)" : "rgba(255,255,255,0.08)", color: afford ? "#1a1030" : "#9aa0a6", opacity: afford ? 1 : 0.6 }}>
+                                        <button type="button" disabled={!afford || Boolean(busy)} onClick={() => doUp(t.key)} style={{ marginLeft: "auto", padding: "8px 14px", borderRadius: 10, border: "none", fontWeight: 900, fontSize: 12, cursor: afford && !busy ? "pointer" : "default", background: afford ? `linear-gradient(180deg, ${accent}, ${accent}bb)` : "rgba(255,255,255,0.08)", color: afford ? "#12100a" : "#9aa0a6", opacity: afford ? 1 : 0.55, boxShadow: afford ? `0 3px 0 ${accent}55` : "none" }}>
                                             {busy === bKey ? "…" : `🪙 ${t.cost.toLocaleString()}`}
                                         </button>
                                     )}
@@ -2092,7 +2111,7 @@ function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) 
                         );
                     })}
                 </div>
-                <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 14, padding: 10, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer" }}>Done</button>
+                <button type="button" onClick={onClose} style={{ width: "calc(100% - 28px)", margin: "0 14px 16px", padding: 11, fontWeight: 800, background: "rgba(255,255,255,0.08)", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 11, cursor: "pointer" }}>Done</button>
             </div>
         </div>
     );
