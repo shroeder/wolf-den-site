@@ -833,19 +833,19 @@ const TOWN_CSS = `
 .tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-bg img:nth-child(even) { transform: scaleX(-1); }
 /* Layered parallax: far sky (slow) behind the world + a tiling cobble ground band inside it. */
-/* Sky shifted well up so the distant-building silhouette baked into the sky rises clearly above the nearer
-   rooftops, into view behind the clouds. Bottom lands ~42% (still tucked behind the mid rooftops + wall). */
-.tw-far { position: absolute; top: -33%; left: 0; height: 82%; display: flex; z-index: 0; }
+/* Sky: atmospheric dusk backdrop at a normal scale (its distant silhouette is small + faint = FAR), sitting
+   behind the nearer layers. Not scaled up — that made its "far" buildings read bigger than the near ones. */
+.tw-far { position: absolute; top: 0; left: 0; height: 66%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
-/* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon.
-   Raised so more of the distant buildings clear the foreground wall (and the bright haze base tucks behind it). */
-.tw-depth { position: absolute; left: 0; bottom: 67%; height: 26%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+/* Depth layers ("Grow the Plaza") — far spires sitting BEHIND the mid rooftops, kept SMALLER than mid so they
+   read as farther (only the tips peek above the nearer roofline). */
+.tw-depth { position: absolute; left: 0; bottom: 56%; height: 24%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-depth img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-depth img:nth-child(even) { transform: scaleX(-1); }
-/* Midground skyline band — nearer rooftops on the horizon, faster parallax than the sky, behind the plaza.
-   Raised to meet the (now high) sky so the nearer rooftops close the gap over the bright horizon seam. */
-.tw-mid { position: absolute; left: 0; bottom: 46%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+/* Midground skyline band — the NEAREST backdrop, so it's the LARGEST (biggest buildings), sitting just above
+   the plaza wall. Faster parallax than the far layers. This is the warm rooftop layer. */
+.tw-mid { position: absolute; left: 0; bottom: 44%; height: 40%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Plaza centerpiece — the wolf fountain landmark standing in the square. */
