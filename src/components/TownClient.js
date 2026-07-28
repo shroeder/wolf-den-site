@@ -80,6 +80,9 @@ export default function TownClient({ initial }) {
     const [merchantBusy, setMerchantBusy] = useState(false);
     const [merchantFlash, setMerchantFlash] = useState(null);
     const [crierMsg, setCrierMsg] = useState(0);      // which rotating announcement the crier is shouting
+    const [questOpen, setQuestOpen] = useState(false);
+    const [questBusy, setQuestBusy] = useState(false);
+    const [questFlash, setQuestFlash] = useState(null);
     const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
     const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
     const evIdRef = useRef(null);
@@ -271,6 +274,15 @@ export default function TownClient({ initial }) {
         if (r?.ok) { setMerchantFlash(`🎁 Bought a ${r.label}! Open it over in your Gear.`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
         else setMerchantFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : "Couldn't buy that.");
     }, [load]);
+    // Claim a completed town bounty from the quest-giver.
+    const claimQuest = useCallback(async (key) => {
+        setQuestBusy(true);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "quest_claim", key }) }).then((x) => x.json()).catch(() => null);
+        setQuestBusy(false);
+        if (r?.ok) { setQuestFlash(`🪙 +${r.reward} gold — ${r.label} done!`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
+        else setQuestFlash("That bounty isn't ready yet.");
+    }, [load]);
+    const questsClaimable = useMemo(() => (state?.quests || []).filter((q) => q.done && !q.claimed).length, [state?.quests]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
     if (state && state.owner === false) {
@@ -370,6 +382,14 @@ export default function TownClient({ initial }) {
                             <img src={art.crier.url} alt="Town Crier" draggable={false} />
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
+                    {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
+                    <button type="button" className="tw-npc-btn" style={{ left: "51%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
+                        {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
+                        {art.questgiver?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={art.questgiver.url} alt="Quest Giver" draggable={false} />
+                        ) : <span className="tw-npc-emoji">📜</span>}
+                    </button>
                     {/* Traveling Merchant — tap to browse wares */}
                     <button type="button" className="tw-npc-btn" style={{ left: "66%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
@@ -462,6 +482,37 @@ export default function TownClient({ initial }) {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Quest-Giver — daily town bounties */}
+            {questOpen ? (
+                <div className="tw-roster" onClick={() => setQuestOpen(false)} role="presentation">
+                    <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>📜 Town Bounties</strong><button type="button" onClick={() => setQuestOpen(false)} aria-label="Close">✕</button></div>
+                        <p className="muted" style={{ margin: "-2px 2px 8px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;Do the town a service, wolf, and there's gold in it for you.&rdquo;</p>
+                        {questFlash ? <div className="tw-merchant-flash">{questFlash}</div> : null}
+                        <div className="tw-quests">
+                            {(state?.quests || []).map((q) => {
+                                const pct = Math.max(0, Math.min(100, Math.round((q.progress / q.target) * 100)));
+                                return (
+                                    <div key={q.key} className={`tw-quest${q.claimed ? " is-claimed" : ""}`}>
+                                        <span className="tw-quest-emoji" aria-hidden="true">{q.emoji}</span>
+                                        <div className="tw-quest-body">
+                                            <div className="tw-quest-top"><strong>{q.label}</strong><span className="tw-quest-reward">🪙 {q.gold}</span></div>
+                                            <div className="muted" style={{ fontSize: "0.76rem" }}>{q.desc}</div>
+                                            <div className="tw-quest-bar"><span style={{ width: `${pct}%` }} /></div>
+                                            <div className="tw-quest-prog muted">{q.progress}/{q.target}</div>
+                                        </div>
+                                        {q.claimed ? <span className="tw-quest-tag is-done">✅</span>
+                                            : q.done ? <button type="button" className="tw-quest-claim" disabled={questBusy} onClick={() => claimQuest(q.key)}>Claim</button>
+                                                : null}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="muted" style={{ fontSize: "0.76rem", margin: "10px 2px 0" }}>Bounties refresh daily. Progress ticks as you play in the plaza.</p>
                     </div>
                 </div>
             ) : null}
@@ -670,6 +721,21 @@ const TOWN_CSS = `
 .tw-ware-emoji { font-size: 30px; line-height: 1; }
 .tw-ware-label { font-size: 0.74rem; font-weight: 800; text-align: center; }
 .tw-ware-price { font-size: 0.72rem; color: #ffd75e; font-weight: 800; }
+.tw-npc-alert { position: absolute; top: 0; right: 6px; z-index: 2; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e0433f; color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+.tw-quests { display: flex; flex-direction: column; gap: 10px; }
+.tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+.tw-quest.is-claimed { opacity: 0.6; }
+.tw-quest-emoji { font-size: 26px; flex: 0 0 auto; }
+.tw-quest-body { flex: 1 1 auto; min-width: 0; }
+.tw-quest-top { display: flex; align-items: center; gap: 8px; }
+.tw-quest-top strong { font-size: 0.9rem; color: #f2ead9; }
+.tw-quest-reward { margin-left: auto; font-size: 0.78rem; font-weight: 800; color: #ffd75e; }
+.tw-quest-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; margin: 5px 0 2px; }
+.tw-quest-bar span { display: block; height: 100%; background: linear-gradient(90deg,#ffd75e,#f3b23a); border-radius: 999px; transition: width .3s ease; }
+.tw-quest-prog { font-size: 0.72rem; }
+.tw-quest-claim { flex: 0 0 auto; padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer; font-weight: 800; font-size: 0.82rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
+.tw-quest-claim:disabled { opacity: .5; cursor: default; }
+.tw-quest-tag.is-done { font-size: 20px; flex: 0 0 auto; }
 .tw-deco { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 96; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.5)); }
 .tw-deco-fountain { font-size: 54px; }
 .tw-deco-statue { font-size: 46px; }

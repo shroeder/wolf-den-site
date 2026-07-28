@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 
 // ── THE TAVERN ──────────────────────────────────────────────────────────────────────────────────────────────
 // A cozy, rowdy room you step INTO from the plaza. The barkeep runs three things: live RUMORS (in-character game
@@ -124,6 +125,7 @@ export async function claimDailyPint(buyerId) {
          ON CONFLICT (buyer_id) DO UPDATE SET last_drink_day = (NOW() AT TIME ZONE 'America/Chicago')::date, drinks = mkt_tavern.drinks + 1, updated_at = NOW()`,
         [buyerId]
     );
+    bumpTownQuest(buyerId, "patron", 1).catch(() => {});
     const drinks = (await db.queryOne(`SELECT drinks FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null))?.drinks || 1;
     return { ok: true, drinks };
 }

@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 
 // ── TOWN EVENTS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Admin-triggered communal encounters that spawn in the plaza (a bandit raid, etc.). Everyone in town attacks a
@@ -112,6 +113,7 @@ export async function attackTownEvent(buyerId, eventId) {
          ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()`,
         [eventId, buyerId, dmg]
     ).catch(() => {});
+    bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     const hp = updated?.hp ?? ev.hp;
     let defeated = false;
     if (hp <= 0) { await resolveTownEvent(eventId, "defeated").catch(() => {}); defeated = true; }

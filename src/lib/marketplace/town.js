@@ -8,6 +8,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a fair gold SINK). Tunable prices.
 export const MERCHANT_WARES = [
@@ -131,12 +132,13 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, friends, upgrade, event] = await Promise.all([
+    const [art, petSprites, friends, upgrade, event, quests] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
         buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
         getTownUpgrade().catch(() => null),
         getActiveTownEvent(buyerId).catch(() => null),
+        buyerId ? getTownQuests(buyerId).catch(() => []) : Promise.resolve([]),
     ]);
     const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
@@ -218,6 +220,7 @@ export async function getTownState(buyerId) {
         event,
         merchant: MERCHANT_WARES,
         store: storeStatus(),
+        quests,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
 }
@@ -253,6 +256,7 @@ export async function contributeTownGold(buyerId, amount) {
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -amt, "town_fund", { balanceAfter: paid.gold }).catch(() => {});
     const row = await db.queryOne(`UPDATE mkt_town_upgrade SET gold_total = gold_total + $1, updated_at = NOW() WHERE id = 1 RETURNING gold_total`, [amt]).catch(() => null);
+    bumpTownQuest(buyerId, "civic", 1).catch(() => {});
     return { ok: true, gold: Number(paid.gold), total: Number(row?.gold_total || amt) };
 }
 
@@ -263,6 +267,7 @@ export async function sendTownChat(buyerId, body) {
     const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return { ok: false, error: "empty" };
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
+    bumpTownQuest(buyerId, "social", 1).catch(() => {});
     return { ok: true };
 }
 
