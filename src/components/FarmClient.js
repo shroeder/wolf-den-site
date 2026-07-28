@@ -1460,6 +1460,11 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
     // swelling) AND scales up across the whole grow, so you can SEE it maturing over time.
     const plantScale = ready ? 1 : 0.26 + 0.74 * progress; // 26% → 100%
     const growEmoji = ready || progress >= 0.6 ? p.emoji : p.sprout; // the real crop shows in the back half, then ripens
+    // The bed visibly upgrades as you invest in the plot: dirt → wood frame → stone+glow → gilded.
+    const spec = p.specLevel || 0;
+    const specTier = spec >= 8 ? 3 : spec >= 4 ? 2 : spec >= 1 ? 1 : 0;
+    const frameBorder = specTier === 3 ? "2px solid #e0b84a" : specTier === 2 ? "2px solid #9aa4b2" : specTier === 1 ? "2px solid #8a6636" : "1px solid rgba(20,12,4,0.6)";
+    const frameGlow = specTier === 3 ? ", 0 0 11px rgba(224,184,74,0.6)" : specTier === 2 ? ", 0 0 7px rgba(160,180,220,0.45)" : "";
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
         : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — tap to get seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
@@ -1485,9 +1490,9 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
                 background: p.fertilized
                     ? "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 6px, rgba(0,0,0,0) 6px 12px), linear-gradient(180deg, #7a5430 0%, #3a2410 100%)"
                     : "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 6px, rgba(0,0,0,0) 6px 12px), linear-gradient(180deg, #6b4a26 0%, #33200d 100%)",
-                boxShadow: "inset 0 2px 2px rgba(255,225,180,0.22), inset 0 -4px 7px rgba(0,0,0,0.62), 0 2px 3px rgba(0,0,0,0.4)",
-                border: canPlant ? "1.5px dashed rgba(255,226,122,0.75)" : "1px solid rgba(20,12,4,0.6)",
-                borderTop: "2px solid rgba(120,86,48,0.75)" }} />
+                boxShadow: `inset 0 2px 2px rgba(255,225,180,0.22), inset 0 -4px 7px rgba(0,0,0,0.62), 0 2px 3px rgba(0,0,0,0.4)${frameGlow}`,
+                border: canPlant ? "1.5px dashed rgba(255,226,122,0.75)" : frameBorder,
+                borderTop: specTier ? frameBorder : "2px solid rgba(120,86,48,0.75)" }} />
             {/* specialization badge — this plot has been invested in */}
             {p.specLevel ? <span aria-hidden="true" style={{ position: "absolute", top: 2, right: 6, fontSize: 9.5, fontWeight: 900, color: "#e8dcff", background: "rgba(120,90,200,0.85)", border: "1px solid rgba(200,180,255,0.6)", borderRadius: 999, padding: "0 5px", lineHeight: "15px", boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>⚙️{p.specLevel}</span> : null}
             {/* status chip */}
@@ -1877,8 +1882,8 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                 <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
                 <div className="muted" style={{ fontSize: 12, margin: "2px 0 10px" }}>Rarer seeds take longer, feed your pet more XP, and roll better harvest loot. Here&apos;s what each one pays out:</div>
                 {onSpecialize ? (
-                    <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", marginBottom: 12, borderRadius: 11, border: "1px solid rgba(180,150,255,0.45)", background: "rgba(150,120,230,0.12)", color: "#d9caff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", textAlign: "left" }}>
-                        <span style={{ fontSize: 16 }}>⚙️</span><span style={{ flex: 1 }}>Specialize this plot{plotSpec ? ` · Lv ${plotSpec}` : ""}</span><span aria-hidden="true">›</span>
+                    <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", marginBottom: 12, borderRadius: 12, border: "none", background: "linear-gradient(180deg,#5fe39a,#2fae72)", color: "#06311f", fontWeight: 900, fontSize: 13.5, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #1c7a4f" }}>
+                        <span style={{ fontSize: 18 }}>🌿</span><span style={{ flex: 1 }}>Specialize this plot{plotSpec ? ` · Lv ${plotSpec}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
                     </button>
                 ) : null}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2009,8 +2014,8 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                         </>
                     )}
                     {onSpecialize ? (
-                        <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", fontWeight: 800, fontSize: 12.5, background: "rgba(150,120,230,0.12)", color: "#d9caff", border: "1px solid rgba(180,150,255,0.45)", borderRadius: 11, cursor: "pointer", textAlign: "left" }}>
-                            <span style={{ fontSize: 16 }}>⚙️</span><span style={{ flex: 1 }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true">›</span>
+                        <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", fontWeight: 900, fontSize: 13.5, background: "linear-gradient(180deg,#5fe39a,#2fae72)", color: "#06311f", border: "none", borderRadius: 12, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #1c7a4f" }}>
+                            <span style={{ fontSize: 18 }}>🌿</span><span style={{ flex: 1 }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
                         </button>
                     ) : null}
                     <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
