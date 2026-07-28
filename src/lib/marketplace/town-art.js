@@ -9,17 +9,17 @@ import { generateImage, generateWideSceneImage } from "@/lib/marketplace/openai-
 const STREET_STYLE =
     "painterly 2D side-scrolling video-game background, warm golden-hour dusk, cohesive fantasy action-RPG town, soft lantern glow, rich but not busy, no text, no watermark.";
 const BUILDING_STYLE =
-    "2D video-game building sprite, a single standalone front-facing building facade, painterly fantasy action-RPG style matching a warm-dusk cobblestone town, clean confident outlines, cohesive palette, sitting flat (no floating), transparent background, no ground plane, no sky, no people, no text, no logo, no watermark, no border.";
+    "a single isolated 2D game-art building, the WHOLE building centered and fully visible, painterly fantasy action-RPG style with clean confident outlines and cel-shaded vibrant colors, strong readable silhouette. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO background scenery, NO sky, NO ground, NO cobblestones, NO haze, fog, or ambient glow behind the building. Nothing but the building itself. No people, no text, no logo, no watermark, no border.";
 
 const ART_PROMPTS = {
     background:
         `A wide empty fantasy COBBLESTONE town street at warm golden dusk, worn cobblestones underfoot, a low stone curb, distant medieval town rooftops, chimneys and a couple of towers on the horizon, warm sky fading to dusky purple, a few hanging lanterns and string lights, cozy and inviting, NO people, NO large foreground buildings (leave the street open) — a clean side-scroller street the player walks along. ${STREET_STYLE}`,
-    tavern: `A cozy fantasy TAVERN building with timber framing, warm glowing windows, a hanging wooden sign shaped like a foaming beer mug, a small awning. ${BUILDING_STYLE}`,
-    boss: `An imposing stone BATTLE ARENA gatehouse — a coliseum-style entrance with crossed-swords banners, iron braziers with flame, heavy arched doors. ${BUILDING_STYLE}`,
-    forge: `A blacksmith's FORGE building — stone and timber smithy with a glowing orange furnace inside, an anvil out front, a chimney with a wisp of smoke, a hanging hammer-and-anvil sign. ${BUILDING_STYLE}`,
-    shop: `A GENERAL STORE / trading post — a wooden shopfront with a striped awning, barrels and crates of goods out front, a hanging sign with a coin/pouch. ${BUILDING_STYLE}`,
-    docks: `A wooden HARBOR DOCK building with a small moored sailing ship beside it, coiled ropes, barrels and crates, a lantern on a post, nautical fantasy. ${BUILDING_STYLE}`,
-    farm: `A rustic FARM gate and barn — a red-brown barn with a wooden fence, a wheat field and a few pumpkins behind the gate, a scarecrow. ${BUILDING_STYLE}`,
+    tavern: `A cozy fantasy TAVERN — a timber-framed inn with warm-lit windows, a hanging wooden sign shaped like a foaming beer mug, a small awning over the door. ${BUILDING_STYLE}`,
+    boss: `An imposing stone BATTLE ARENA gatehouse — a coliseum-style entrance with crossed-swords banners, two iron braziers with flame, heavy arched wooden doors. ${BUILDING_STYLE}`,
+    forge: `A blacksmith's FORGE — a stone-and-timber smithy with a glowing orange furnace opening, an anvil beside the door, a chimney with a small wisp of smoke, a hanging hammer-and-anvil sign. ${BUILDING_STYLE}`,
+    shop: `A GENERAL STORE trading post — a wooden shopfront with a striped awning, a couple of barrels and crates of goods by the door, a hanging sign with a coin pouch. ${BUILDING_STYLE}`,
+    docks: `A wooden HARBOR DOCKHOUSE with a small moored sailing ship beside it, coiled ropes, barrels and crates, a lantern on a post. ${BUILDING_STYLE}`,
+    farm: `A rustic FARM barn — a red-brown barn with a hayloft, a wooden fence gate, a couple of pumpkins and a wheat sheaf by the door, a little scarecrow. ${BUILDING_STYLE}`,
 };
 
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
