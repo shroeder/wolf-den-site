@@ -232,12 +232,11 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                     <TavAvatar a={{ x: pos.x, y: pos.y, facing: pos.facing, moving: pos.moving, sprite: me?.sprite, flip: me?.flip }} you />
                 </div>
                 {here > 1 ? <div className="tv-hint">{here} here now</div> : null}
-            </div>
 
-            {/* Station panel */}
-            {station ? (
-                <div className="tv-panel-wrap">
-                    <div className="tv-panel">
+                {/* Interaction overlay — happens INSIDE the scene pane for immersion */}
+                {station ? (
+                    <div className="tv-panel-wrap" onClick={() => { setStation(null); setFlash(null); }} role="presentation">
+                    <div className="tv-panel" onClick={(e) => e.stopPropagation()}>
                         <div className="tv-panel-head">
                             <strong>{station === "bar" ? "🍺 The Barkeep" : station === "dice" ? "🎲 The Gambler" : "🔥 The Hearth"}</strong>
                             <button type="button" onClick={() => { setStation(null); setFlash(null); }} aria-label="Close">✕</button>
@@ -308,7 +307,8 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                         ) : null}
                     </div>
                 </div>
-            ) : null}
+                ) : null}
+            </div>
 
             <style>{TV_CSS}</style>
         </div>
@@ -340,9 +340,10 @@ const TV_CSS = `
 .tv-av-sprite img { width: 132px; height: 132px; object-fit: contain; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.6)); }
 .tv-av-fallback { font-size: 94px; }
 .tv-av-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(30,18,50,0.85); border-radius: 999px; padding: 1px 8px; margin-bottom: 2px; white-space: nowrap; }
-/* Station panel */
-.tv-panel-wrap { margin-top: 12px; }
-.tv-panel { border-radius: 16px; background: var(--card-bg,#17181c); border: 1px solid rgba(255,215,110,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.4); padding: 14px; }
+/* Station panel — an overlay INSIDE the scene pane, for immersion */
+.tv-panel-wrap { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 14px; background: rgba(8,4,2,0.55); }
+.tv-panel { width: 100%; max-width: 330px; max-height: 90%; overflow-y: auto; overflow-x: hidden; border-radius: 16px; background: rgba(23,18,14,0.98); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 14px 40px rgba(0,0,0,0.6); padding: 14px; animation: tvPanelPop .28s cubic-bezier(.2,1.2,.3,1) both; }
+@keyframes tvPanelPop { 0% { transform: scale(.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .tv-panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .tv-panel-head strong { font-size: 1rem; color: #ffe0b0; flex: 1; }
 .tv-panel-head button { background: none; border: none; color: inherit; font-size: 18px; cursor: pointer; opacity: 0.7; }
