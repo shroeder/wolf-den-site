@@ -20,6 +20,8 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // (tiles are sized by height, so a small phone viewport → narrow tiles → need more of them). Over-tiling is free —
 // extras just overflow the world and are clipped by the scene.
 const TILES = (n) => Array.from({ length: n }, (_, i) => i);
+// Which town-art sprite each raid kind uses (falls back to the event emoji until the art is generated).
+const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem" };
 // A message that's just emoji (a reaction/emote) pops as a floating emote instead of a text bubble.
 const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
 
@@ -353,9 +355,9 @@ export default function TownClient({ initial }) {
                                 <div className="tw-event-hptext">{Math.max(0, hp).toLocaleString()} / {ev.hpMax.toLocaleString()} HP · {ev.fighterCount} fighting</div>
                             </div>
                             <button type="button" className={`tw-event-target${evFlash ? " is-hit" : ""}`} onClick={attackEvent} aria-label={`Attack the ${ev.name}`}>
-                                {art.bandit?.url ? (
+                                {art[EVENT_ART[ev.kind]]?.url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={art.bandit.url} alt={ev.name} draggable={false} />
+                                    <img src={art[EVENT_ART[ev.kind]].url} alt={ev.name} draggable={false} />
                                 ) : <span className="tw-event-emoji">{ev.emoji}</span>}
                                 {evFlash && !evFlash.defeated ? <span className="tw-event-hitfx">💥</span> : null}
                             </button>
