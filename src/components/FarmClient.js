@@ -1020,10 +1020,20 @@ export default function FarmClient({ initial, viewingAlias }) {
             {/* Wild Loot Pig announce banner — rendered at the ROOT (outside the pasture's overflow:hidden scene) as a
                 position:fixed, FLEX-centered overlay. Centering lives on the outer wrapper so the pill's own pigPop
                 scale animation can never knock it off-center or clip it (the old bug). */}
-            {pigToast ? (
+            {pig === "running" && view !== "outside" ? (
+                // Pig's loose but you're not looking at the pasture — a persistent, TAPPABLE banner that takes you there.
+                <div style={{ position: "fixed", top: 72, left: 0, right: 0, zIndex: 9998, display: "flex", justifyContent: "center", padding: "0 12px" }}>
+                    <button type="button" onClick={() => { setView("outside"); setPigToast(false); }}
+                        style={{ maxWidth: "min(94vw, 470px)", display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.2, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", cursor: "pointer", animation: "pigPop .4s ease both", WebkitTapHighlightColor: "transparent" }}>
+                        🐷👑 The Loot Pig&apos;s in the pasture!
+                        <span style={{ padding: "4px 12px", borderRadius: 999, background: "#ffd75e", color: "#2a2410", fontWeight: 900, fontSize: 13, whiteSpace: "nowrap" }}>Go catch it →</span>
+                    </button>
+                </div>
+            ) : pigToast ? (
+                // You're already on the pasture — tell you what to do.
                 <div style={{ position: "fixed", top: 72, left: 0, right: 0, zIndex: 9998, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
-                    <div style={{ maxWidth: "min(92vw, 440px)", textAlign: "center", padding: "9px 18px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.25, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", animation: "pigPop .4s ease both" }}>
-                        🐷👑 The Wild Loot Pig appeared!
+                    <div style={{ maxWidth: "min(92vw, 460px)", textAlign: "center", padding: "9px 18px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.25, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", animation: "pigPop .4s ease both" }}>
+                        🐷👑 The Loot Pig appeared — grab the coins he drops!
                     </div>
                 </div>
             ) : null}
@@ -1178,47 +1188,60 @@ export default function FarmClient({ initial, viewingAlias }) {
 // The Wild Loot Pig sprite (crown overlaid separately). Generated once via /api/admin/loot-pig-sprite.
 const PIG_SPRITE_URL = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm/1784834882238-913206.png";
 
-// The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping gold,
-// then wanders off an edge. Cosmetic only — the haul is claimed server-side in onFinish.
+// The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping
+// COINS you TAP to grab. A HUD tells you what to do; the guaranteed daily haul is claimed server-side in
+// onFinish when he wanders off. (Grabbing coins is the active bit — the reward is guaranteed either way.)
 function LootPig({ onFinish, crown }) {
     const cw = crown || { top: 9, side: 8, size: 22 };
     const [pos, setPos] = useState({ x: 4, y: 84, flip: false, dur: 1.6 });
     const [moving, setMoving] = useState(false); // true only while ambling between waypoints (gates the crown shake)
     const [coins, setCoins] = useState([]);
+    const [collected, setCollected] = useState(0);
     const coinId = useRef(0);
+    const timers = useRef([]);
     useEffect(() => {
         let alive = true;
-        const timers = [];
+        const t = timers.current;
         let step = 0;
-        const MAX_STEPS = 7; // meander waypoints before he leaves
-        const drop = (x, y) => { SFX.coin(); setCoins((c) => [...c, { id: ++coinId.current, x: x + rand(-3, 3), y: y + rand(-1, 5) }]); };
-        // Mark moving for the duration of a glide, then still while he pauses before the next amble.
-        const glide = (dur) => { setMoving(true); timers.push(setTimeout(() => { if (alive) setMoving(false); }, dur * 1000)); };
+        const MAX_STEPS = 8; // meander waypoints before he leaves
+        const drop = (x, y) => {
+            SFX.coin();
+            const id = ++coinId.current;
+            setCoins((c) => [...c, { id, x: x + rand(-4, 4), y: y + rand(-1, 6) }]);
+            t.push(setTimeout(() => { if (alive) setCoins((c) => c.filter((k) => k.id !== id)); }, 6500)); // coin lifespan → grab it before it's gone
+        };
+        const glide = (dur) => { setMoving(true); t.push(setTimeout(() => { if (alive) setMoving(false); }, dur * 1000)); };
         const move = () => {
             if (!alive) return;
             step += 1;
             if (step > MAX_STEPS) {
                 setPos((p) => { const exitX = Math.random() < 0.5 ? -12 : 112; return { x: exitX, y: 84, flip: exitX < p.x, dur: 2.4 }; });
                 glide(2.4);
-                timers.push(setTimeout(() => { if (alive) onFinish(); }, 2500));
+                t.push(setTimeout(() => { if (alive) onFinish(); }, 2500));
                 return;
             }
             const nx = rand(8, 90);
             const ny = 80 + rand(0, 10);
-            const dur = rand(1.5, 2.7);
+            const dur = rand(1.4, 2.4);
             setPos((p) => ({ x: nx, y: ny, flip: nx < p.x, dur }));
             glide(dur);
             drop(nx, ny);
-            timers.push(setTimeout(move, dur * 1000 + rand(350, 1000))); // amble, then pause, then wander again
+            t.push(setTimeout(move, dur * 1000 + rand(300, 800))); // amble, then pause, then wander again
         };
-        drop(4, 84);
-        timers.push(setTimeout(move, 1500));
-        return () => { alive = false; timers.forEach(clearTimeout); };
+        drop(6, 84);
+        t.push(setTimeout(move, 1400));
+        return () => { alive = false; t.forEach(clearTimeout); timers.current = []; };
     }, [onFinish]);
+    const collect = (id) => { setCoins((c) => c.filter((k) => k.id !== id)); setCollected((n) => n + 1); SFX.coin(); };
     return (
         <>
+            {/* what-to-do HUD */}
+            <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 120, pointerEvents: "none", padding: "6px 14px", borderRadius: 999, background: "rgba(20,16,6,0.92)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,0.5)" }}>
+                🐷 Grab the coins! <span style={{ color: "#fff" }}>· {collected} grabbed</span>
+            </div>
             {coins.map((c) => (
-                <span key={c.id} style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", fontSize: 18, zIndex: 50, pointerEvents: "none", animation: "coinPop .5s ease-out both" }}>🪙</span>
+                <button key={c.id} type="button" onClick={() => collect(c.id)} aria-label="Grab coin"
+                    style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", zIndex: 110, background: "none", border: "none", padding: 8, margin: -8, cursor: "pointer", fontSize: 26, lineHeight: 1, WebkitTapHighlightColor: "transparent", animation: "coinPop .4s ease-out both", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.55))" }}>🪙</button>
             ))}
             <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
                 <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
