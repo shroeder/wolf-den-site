@@ -19,6 +19,9 @@ const ART_PROMPTS = {
         `A fantasy town SKYLINE far-background at warm golden dusk — a soft glowing sky fading from warm amber near the horizon up to dusky purple, a LOW distant silhouette of generic medieval rooftops and chimneys with a couple of faint vague towers along the horizon, soft atmospheric haze. NO distinct landmark, NO foreground, NO people, NO street or ground — only sky and a faint distant town silhouette, an even repeating horizon meant to tile. ${STREET_STYLE}`,
     cobble:
         `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle — worn rounded grey-brown cobbles with mortar gaps, warm even dusk lighting, uniform across the WHOLE image with no focal point, NO objects, NO people, NO buildings, NO sky, NO horizon — just repeating cobblestones, designed to tile left-to-right. ${STREET_STYLE}`,
+    // Opaque INTERIOR scene for the enterable tavern — cozy + rowdy.
+    tavern_interior:
+        `The cozy, rowdy INTERIOR of a fantasy medieval TAVERN, wide interior view: warm golden lantern light and a big crackling stone FIREPLACE on one side casting an orange glow, heavy timber beams, a long wooden BAR with a friendly barkeep behind it pouring ale, round tables with mugs of foaming ale and a few cheerful cloaked patrons drinking and laughing, a bard's corner, barrels and hanging lanterns, hearty and inviting atmosphere. Painterly 2D video-game background, rich warm cozy mood, no text, no watermark, no UI, no border. A game scene the player steps INTO.`,
     mid:
         `A MIDGROUND row of nearer medieval fantasy town buildings and rooftops along the BOTTOM of the frame — timber-and-stone houses, steep tiled roofs, chimneys, a couple of taller buildings, warm dusk backlight with a few glowing windows, moderate detail (nearer than a distant skyline but still a backdrop). The TOP two-thirds of the image is FULLY TRANSPARENT sky (alpha) with nothing in it. Designed to tile left-to-right, no ground, no street, no people, no text. ${STREET_STYLE}`,
     fg:
@@ -47,7 +50,7 @@ export async function generateTownArt(key) {
     if (!prompt) throw new Error("Unknown town art key");
     let url;
     if (key === "background") url = await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 3 });
-    else if (key === "sky" || key === "cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town" }); // opaque scene layers
+    else if (key === "sky" || key === "cobble" || key === "tavern_interior") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town" }); // opaque scene layers
     else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true }); // transparent building sprite
     await db.query(
         `INSERT INTO mkt_town_art (art_key, url, updated_at) VALUES ($1, $2, NOW())

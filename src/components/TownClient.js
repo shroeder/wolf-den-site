@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import TavernInterior from "@/components/TavernInterior";
+
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
 // walk it too, as their own hero sprites, with a live status. Buildings line the street and fast-travel into
@@ -71,6 +73,7 @@ export default function TownClient({ initial }) {
     const [menuFor, setMenuFor] = useState(null);    // tapped another player → action sheet
     const [boardOpen, setBoardOpen] = useState(false); // Town Hall (events + plaza fund) panel
     const [contribBusy, setContribBusy] = useState(false);
+    const [inTavern, setInTavern] = useState(false);  // stepped inside the Tavern interior
     const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
     const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
     const evIdRef = useRef(null);
@@ -247,6 +250,15 @@ export default function TownClient({ initial }) {
         return <section className="card"><p className="muted" style={{ margin: 0 }}>🏘️ The Wolf Den Town is still being built — check back soon.</p></section>;
     }
 
+    // Stepped inside the Tavern — swap the plaza for the cozy interior.
+    if (inTavern) {
+        return (
+            <div className="stack reveal">
+                <TavernInterior bgUrl={art.tavern_interior?.url} onLeave={() => setInTavern(false)} />
+            </div>
+        );
+    }
+
     return (
         <div className="stack reveal">
             <section className="card" style={{ padding: "12px 14px" }}>
@@ -302,7 +314,7 @@ export default function TownClient({ initial }) {
                     {buildings.map((b) => {
                         const bart = art[b.id];
                         return (
-                            <Link key={b.id} href={b.href} className={`tw-building${bart ? " has-art" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND}%`, zIndex: 100 + Math.round(b.x) }} onClick={(e) => e.stopPropagation()}>
+                            <Link key={b.id} href={b.href} className={`tw-building${bart ? " has-art" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND}%`, zIndex: 100 + Math.round(b.x) }} onClick={b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()}>
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
