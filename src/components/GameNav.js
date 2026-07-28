@@ -49,6 +49,7 @@ const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplac
 export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
+    const [owner, setOwner] = useState(false); // owner-only preview features (e.g. the Town) — declared before `links` which reads it
     // Farm + Forge are live for everyone; the Town is an owner-only preview during its build.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         ...(owner ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : [])];
@@ -60,7 +61,6 @@ export default function GameNav() {
     const [cropsReady, setCropsReady] = useState(0);
     const [sailAttn, setSailAttn] = useState(false);
     const [signedIn, setSignedIn] = useState(false); // gates the one-time Forge announcement to real members
-    const [owner, setOwner] = useState(false); // owner-only preview features (e.g. the Town)
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
