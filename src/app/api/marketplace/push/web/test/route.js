@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { db } from "@/lib/db";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { VAPID_PUBLIC_KEY } from "@/lib/push/vapid.js";
-import { isWebPushEnabled, sendWebPush, sendWebPushDebug } from "@/lib/push/web-push.js";
+import { isWebPushEnabled, sendWebPush } from "@/lib/push/web-push.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -14,32 +11,8 @@ function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
 
-// Admin diagnostic: is browser push actually configured on the server (VAPID_PRIVATE_KEY present) and how
-// many subscriptions exist? Lets the owner confirm the plumbing without needing a member session.
-export async function GET(request) {
-    return withRequestLogging(request, "GET /api/marketplace/push/web/test", async ({ logger, internalError }) => {
-        const authError = await requireAdminAccess(request, "marketplace.manage", logger);
-        if (authError) return authError;
-        try {
-            // ?debug=<alias> → actually send to that member's subs and report the raw per-endpoint result.
-            const debugAlias = new URL(request.url).searchParams.get("debug");
-            if (debugAlias) {
-                const row = await db.queryOne(`SELECT id FROM mkt_buyer WHERE alias_normalized = $1 OR id::text = $1`, [String(debugAlias).toLowerCase()]).catch(() => null);
-                if (!row) return noStore({ error: "buyer_not_found", debugAlias });
-                return noStore({ configured: isWebPushEnabled(), buyer: row.id, ...(await sendWebPushDebug(row.id)) });
-            }
-            const total = await db.queryOne(`SELECT COUNT(*)::int AS c FROM mkt_web_push`).catch(() => null);
-            return noStore({ configured: isWebPushEnabled(), subscriptions: total?.c ?? 0, publicKeyTail: VAPID_PUBLIC_KEY.slice(-8) });
-        } catch (error) {
-            return internalError(error, { event: "marketplace.push.web.test.status.failure" });
-        }
-    });
-}
-
 // Fire a browser (Web Push) notification to the signed-in member's OWN subscribed browsers, so anyone can
-// verify push works end-to-end on their device. The response says exactly what happened — whether the
-// server has VAPID configured, whether this account has any subscriptions, and how many actually sent —
-// which turns "I'm not getting notifications" into a concrete answer.
+// verify push works end-to-end on their device (powers the "Send test" button in the notifications toggle).
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/push/web/test", async ({ internalError }) => {
         try {
