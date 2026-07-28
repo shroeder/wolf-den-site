@@ -674,6 +674,26 @@ export async function getMyBossSummary(buyerId) {
     return { bossName: boss.name, dmg, tickets, divisor };
 }
 
+// Just the number of manual strikes a member still has today (for the nav badge). 0 if no active boss.
+export async function getBossStrikesLeft(buyerId) {
+    if (!buyerId) return 0;
+    const boss = await getActiveBoss();
+    if (!boss || boss.defeated_at) return 0;
+    const used = await manualAttacksToday(buyerId, boss.id).catch(() => 0);
+    const [myStats, myIds, bonusStrikes, myPet] = await Promise.all([
+        getEquippedStats(buyerId).catch(() => ({})),
+        getEquippedIds(buyerId).catch(() => ({})),
+        memberBonusStrikes(buyerId).catch(() => 0),
+        getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
+    ]);
+    const dailyCap = dailyStrikeCap({
+        extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0) + petExtraStrikeToday(buyerId, myPet?.proc?.extraStrikeChance || 0),
+        equippedIds: myIds,
+        bonusStrikes,
+    });
+    return Math.max(0, dailyCap - used);
+}
+
 async function markDefeatIfDead(bossId, hp, defeatedBy = null) {
     if (hp > 0) return false;
     // Only the caller that flips defeated_at (wins the race) runs the finalize — draw + rewards + notify.

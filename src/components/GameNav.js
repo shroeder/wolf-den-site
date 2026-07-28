@@ -58,6 +58,7 @@ export default function GameNav() {
 
     const [chests, setChests] = useState(0);
     const [spins, setSpins] = useState(0);
+    const [bossStrikes, setBossStrikes] = useState(0);
     const [questsReady, setQuestsReady] = useState(0);
     const [cropsReady, setCropsReady] = useState(0);
     const [sailAttn, setSailAttn] = useState(false);
@@ -69,6 +70,7 @@ export default function GameNav() {
         const loadChests = () => {
             fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); }).catch(() => {});
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); setOwner(Boolean(d?.isOwner)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
+            fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
@@ -103,6 +105,7 @@ export default function GameNav() {
     const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
     const badgeInfo = (href) => {
         if (href === "/marketplace/inventory" && chests > 0) return { badge: chests, title: `${plural(chests, "chest")} to open` };
+        if (href === "/marketplace/boss" && bossStrikes > 0) return { badge: bossStrikes, title: `${plural(bossStrikes, "strike")} ready` };
         if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${plural(spins, "spin")} ready` };
         if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };
         // Feature pills also badge their claimable daily-quests (farm crops + quests together).
