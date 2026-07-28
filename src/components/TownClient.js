@@ -35,6 +35,10 @@ function Avatar({ a, isYou, onTap }) {
                 <div className="tw-bubble">{a.status || (isYou ? "🐺 you" : "🐺 around town")}</div>
             )}
             <div className={`tw-sprite${a.moving ? " is-walking" : ""}`}>
+                {a.pet ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="tw-pet" src={a.pet} alt="" draggable={false} style={{ transform: spriteTransform(a.petFlip, a.facing) }} />
+                ) : null}
                 {a.sprite ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={a.sprite} alt={a.name} draggable={false} style={{ transform: spriteTransform(a.flip, a.facing) }} />
@@ -261,7 +265,7 @@ export default function TownClient({ initial }) {
                     {/* Other players */}
                     {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => walkToWorld(p.x + (p.x > me.x ? -3 : 3), p.y)} />)}
                     {/* You */}
-                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat }} isYou /> : null}
+                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
                 </div>
 
                 {/* edge hints — tap to walk that way (or just drag the street to look around) */}
@@ -350,6 +354,7 @@ const TOWN_CSS = `
 .tw-sprite { position: relative; width: 60px; height: 60px; display: grid; place-items: center; }
 .tw-sprite img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
 .tw-sprite-fallback { font-size: 42px; }
+.tw-pet { position: absolute; bottom: -2px; left: -20px; width: 32px; height: 32px; object-fit: contain; z-index: -1; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
 .tw-sprite.is-walking { animation: twBob .5s ease-in-out infinite; transform-origin: bottom center; }
 @keyframes twBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .tw-av.is-you .tw-sprite::after { content: ""; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); width: 42px; height: 9px; border-radius: 50%; background: radial-gradient(ellipse, rgba(255,215,110,0.55), transparent 70%); }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 
 // ── THE WOLF DEN TOWN ─────────────────────────────────────────────────────────────────────────────────────
 // A persistent social overworld: your hero sprite walks a plaza and you see other players (as their real hero
@@ -71,16 +72,36 @@ function homeSlot(id) {
     return { x: 5 + hash01(id, 1) * 90, y: 74 + hash01(id, 2) * 10 };
 }
 
+// Which plaza building an activity gravitates toward, so members cluster where they're actually "doing it"
+// (boss fighters by the Arena, farmers by the Barn, …). Falls back to a spread home slot when unknown.
+const EVENT_BUILDING = {
+    harvest_crop: "farm", fertilize_crop: "farm", place_deco: "farm", pet_farm: "farm", pet_other: "farm", feed_other: "farm", loot_pig: "farm",
+    buy_consumable: "shop", use_consumable: "shop", buy_pet: "shop", trade: "tavern",
+};
+const PATH_BUILDING = [
+    ["/marketplace/blacksmith", "forge"], ["/marketplace/sailing", "docks"], ["/marketplace/boss", "boss"],
+    ["/marketplace/farm", "farm"], ["/marketplace/store", "shop"], ["/marketplace/friends", "tavern"],
+    ["/marketplace/trade", "tavern"],
+];
+function activitySlot(id, event, path) {
+    let bId = event && EVENT_BUILDING[event] ? EVENT_BUILDING[event] : null;
+    if (!bId && path) { const hit = PATH_BUILDING.find(([p]) => path.startsWith(p)); if (hit) bId = hit[1]; }
+    const b = bId ? TOWN_BUILDINGS.find((x) => x.id === bId) : null;
+    if (!b) return homeSlot(id); // unknown activity → mill along the street
+    const x = Math.max(3, Math.min(97, b.x + (hash01(id, 3) - 0.5) * 12)); // a few steps around the building
+    return { x, y: 76 + hash01(id, 4) * 10 };
+}
+
 export async function getTownState(buyerId) {
     const owner = isOwner(buyerId);
     const me = buyerId
-        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
+        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
         : null;
     const myPos = buyerId ? await db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : null;
 
     // Members who are ONLINE NOW (active within ONLINE_WINDOW), excluding me, capped. Offline members never show.
     const recent = await db.query(
-        `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, MAX(v.last_seen) AS seen
+        `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible, MAX(v.last_seen) AS seen
            FROM mkt_visitor v JOIN mkt_buyer b ON b.id = v.buyer_id
           WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - $2::interval
           GROUP BY b.id ORDER BY seen DESC LIMIT 40`,
@@ -89,7 +110,7 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const art = await getTownArt();
+    const [art, petSprites] = await Promise.all([getTownArt(), getPetSpriteData().catch(() => ({}))]);
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
     const [acts, presence, chats] = await Promise.all([
         ids.length
@@ -127,13 +148,16 @@ export async function getTownState(buyerId) {
         const a = actBy[r.id];
         const mv = moverBy[r.id];
         const walking = Boolean(mv?.walking);
-        const slot = homeSlot(r.id);
+        const slot = activitySlot(r.id, a?.event, a?.path);
+        const pet = petSprites[r.featured_collectible];
         return {
             id: r.id,
             name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"),
             alias: r.alias || null,
             sprite: r.avatar_sprite_url || null,
             flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
+            pet: pet?.url || null,
+            petFlip: pet ? pet.flip === true : false,
             status: statusFor(a?.event, a?.path),
             chat: chatBy[r.id] || null,                 // recent speech-bubble message (shows ~8s)
             typing: Boolean(mv?.typing),
@@ -154,6 +178,8 @@ export async function getTownState(buyerId) {
             flip: me?.avatar_sprite_url ? me.avatar_sprite_flip === true : false,
             x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
             chat: (buyerId ? chatBy[buyerId] : null) || null,
+            pet: petSprites[me?.featured_collectible]?.url || null,
+            petFlip: petSprites[me?.featured_collectible] ? petSprites[me.featured_collectible].flip === true : false,
         },
         players,
         buildings: TOWN_BUILDINGS,
