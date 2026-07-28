@@ -160,6 +160,7 @@ export default function TownClient({ initial }) {
     const [questBusy, setQuestBusy] = useState(false);
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
+    const [previewDepth, setPreviewDepth] = useState(null); // owner: locally preview a "Grow the Plaza" depth tier before it's funded
     const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
     const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
     const evIdRef = useRef(null);
@@ -333,6 +334,7 @@ export default function TownClient({ initial }) {
     const buildings = state?.buildings || [];
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
+    const effDepth = previewDepth ?? (townBonuses.depth || 0); // owner preview overrides the real funded depth
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
     const crierLines = useMemo(() => {
@@ -413,6 +415,20 @@ export default function TownClient({ initial }) {
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
+                {/* "Grow the Plaza" DEPTH layers — each funded level stacks one more band FURTHER back (spires →
+                    hills → distant castles). Farther layers scroll slower + sit hazier, so the town grows deeper
+                    as it's invested in. Painted high-N-first so the nearest funded layer sits on top. */}
+                {layered ? [6, 5, 4, 3, 2, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
+                    const factor = Math.max(0.3, 0.47 - (n - 1) * 0.03); // farther back → slower parallax
+                    return (
+                        <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                            {TILES(8).map((k) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={k} src={art[`depth${n}`].url} alt="" draggable={false} />
+                            ))}
+                        </div>
+                    );
+                }) : null}
                 {/* MIDGROUND skyline band (parallax between the far sky and the street) — a nearer row of town
                     rooftops that sits on the horizon. Transparent-topped PNG, buildings along its bottom edge.
                     This is what "Grow the Plaza" deepens over time (future depth tiers swap richer art in). */}
@@ -713,6 +729,14 @@ export default function TownClient({ initial }) {
                         {state?.owner ? (
                             <div className="tw-board-section">
                                 <div className="tw-board-title">🔧 Owner tools</div>
+                                <div className="tw-depth-preview">
+                                    <span>🌆 Preview plaza depth <b>{effDepth}</b>{previewDepth != null ? " (preview)" : ` (funded: ${townBonuses.depth || 0})`}</span>
+                                    <div className="tw-depth-steps">
+                                        <button type="button" onClick={() => setPreviewDepth(Math.max(0, effDepth - 1))} aria-label="Less depth">−</button>
+                                        <button type="button" onClick={() => setPreviewDepth(Math.min(6, effDepth + 1))} aria-label="More depth">+</button>
+                                        <button type="button" onClick={() => setPreviewDepth(null)}>live</button>
+                                    </div>
+                                </div>
                                 <button type="button" className={`tw-live-toggle${state?.eventsLive ? " is-on" : ""}`} onClick={toggleEventsLive}>
                                     {state?.eventsLive ? "🟢 Auto opening-events: LIVE" : "⚪ Auto opening-events: off"}
                                     <span className="muted">tap to {state?.eventsLive ? "turn off" : "turn on"} — pushes members when the shop opens</span>
@@ -754,6 +778,10 @@ const TOWN_CSS = `
 .tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
+/* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon. */
+.tw-depth { position: absolute; left: 0; bottom: 44%; height: 26%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+.tw-depth img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-depth img:nth-child(even) { transform: scaleX(-1); }
 /* Midground skyline band — nearer rooftops on the horizon, faster parallax than the sky, behind the plaza. */
 .tw-mid { position: absolute; left: 0; bottom: 40%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
@@ -867,6 +895,10 @@ const TOWN_CSS = `
 .tw-live-toggle { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f2ead9; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tw-live-toggle.is-on { border-color: rgba(143,227,154,0.5); background: rgba(143,227,154,0.1); }
 .tw-live-toggle .muted { font-size: 0.72rem; font-weight: 600; }
+.tw-depth-preview { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; margin-bottom: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); font-size: 0.8rem; font-weight: 700; color: #f2ead9; }
+.tw-depth-preview b { color: #ffd75e; }
+.tw-depth-steps { display: flex; gap: 6px; flex: 0 0 auto; }
+.tw-depth-steps button { min-width: 32px; padding: 5px 8px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #f2ead9; font-weight: 800; cursor: pointer; }
 .tw-npc-alert { position: absolute; top: 0; right: 6px; z-index: 2; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e0433f; color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 .tw-quests { display: flex; flex-direction: column; gap: 10px; }
 .tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
