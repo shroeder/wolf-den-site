@@ -8807,6 +8807,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .webpush-toggle-actions { display: flex; gap: 8px; flex: 0 0 auto; }
 .webpush-test-msg { flex-basis: 100%; font-size: 0.8rem; color: #cbb9e0; }
 
+/* "Customize your look" CTA on the (now settings-focused) Profile page → the Customize workshop. */
+.customize-cta { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; transition: border-color .12s ease, transform .12s ease; }
+.customize-cta:hover { border-color: rgba(255, 215, 110, 0.5); transform: translateY(-1px); }
+.customize-cta-icon { font-size: 26px; flex: 0 0 auto; }
+.customize-cta-body { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.customize-cta-title { font-weight: 800; color: #f4e4bc; font-size: 1rem; }
+.customize-cta-arrow { margin-left: auto; font-size: 20px; color: #ffd75e; flex: 0 0 auto; }
+
 @media (max-width: 520px) {
     .webpush-prompt { right: 10px; left: 10px; bottom: 10px; max-width: none; }
     .webpush-toggle { flex-direction: column; align-items: stretch; }

@@ -24,6 +24,7 @@ const renderBigIcon = (l) => (l.Icon ? <l.Icon aria-hidden="true" /> : l.sprite 
 const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
     { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
+    { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
     { href: "/marketplace/sailing", emoji: "⛵", label: "Sailing" },
     { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Spin" },
@@ -145,8 +146,8 @@ export default function GameNav() {
         ] },
         { title: "You", items: [
             { href: "/marketplace/play", emoji: "🎮", label: "Game Home", sub: "The hub" },
-            { href: "/marketplace/profile", emoji: "👤", label: "Profile", sub: "Your card" },
-            { href: "/marketplace/profile/avatar", emoji: "🧑‍🎨", label: "Avatar", sub: "Build your look" },
+            { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize", sub: "Avatar & card look" },
+            { href: "/marketplace/profile", emoji: "👤", label: "Profile", sub: "Settings & account" },
         ] },
     ];
 
