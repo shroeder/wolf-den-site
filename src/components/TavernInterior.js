@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+
+import SceneMusic from "@/components/SceneMusic";
 
 // The enterable Tavern — a SCROLLABLE, walkable room like the plaza. Your hero walks the floor (tap to move,
 // drag to look around), other members inside show up live, and you walk up to NPC characters — the BARKEEP and
@@ -20,6 +23,8 @@ const LORE = [
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const spriteFlip = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
+const isEmote = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
+const EMOTES = ["👋", "🍻", "😄", "🎵", "❤️", "🎲"];
 
 const WORLD_W = 1240;   // width of the scrollable room (px)
 const FLOOR_Y = 95;     // % of scene height where characters stand (on the plank floor)
@@ -42,11 +47,14 @@ function Die({ value, held = false, rolling = false, locked = false, small = fal
     );
 }
 
-// A member standing/walking in the room (positioned by world x %).
-function TavAvatar({ a, you = false }) {
+// A member standing/walking in the room (positioned by world x %). Shows their chat bubble / emote; tap another
+// member to open a quick action sheet.
+function TavAvatar({ a, you = false, onTap }) {
     const t = spriteFlip(a.flip, a.facing);
+    const emote = a.chat && isEmote(a.chat);
     return (
-        <div className={`tv-av${you ? " is-you" : ""}${a.moving ? " is-walking" : ""}`} style={{ left: `${a.x}%`, top: `${a.y || FLOOR_Y}%` }}>
+        <div className={`tv-av${you ? " is-you" : ""}${a.moving ? " is-walking" : ""}`} style={{ left: `${a.x}%`, top: `${a.y || FLOOR_Y}%` }} onClick={onTap ? (e) => { e.stopPropagation(); onTap(a); } : undefined}>
+            {a.chat ? (emote ? <span className="tv-emote" aria-hidden="true">{a.chat}</span> : <span className="tv-bubble">{a.chat}</span>) : null}
             <span className="tv-av-name">{you ? "🐺 you" : a.name}</span>
             <div className="tv-av-sprite">
                 {a.sprite ? (
@@ -62,6 +70,9 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
     const [st, setSt] = useState(null);
     const [viewportW, setViewportW] = useState(360);
     const [pos, setPos] = useState({ x: 50, y: FLOOR_Y, facing: 1, moving: false });
+    const [myChat, setMyChat] = useState(null);   // my optimistic speech bubble / emote
+    const [chatText, setChatText] = useState("");
+    const [menuFor, setMenuFor] = useState(null);  // tapped another member → action sheet
     const [panExtra, setPanExtra] = useState(0);
     const [dragging, setDragging] = useState(false);
     const [station, setStation] = useState(null); // open panel: "bar" | "dice" | "hearth"
@@ -105,6 +116,13 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
         await load();
         return r;
     }, [load]);
+
+    // Social: chat + quick emotes (shared chat store → everyone in the tavern sees your bubble/emote).
+    const chatClear = useRef(null);
+    const showMyChat = useCallback((text) => { setMyChat(text); clearTimeout(chatClear.current); chatClear.current = setTimeout(() => setMyChat(null), 7000); }, []);
+    const postChat = useCallback((body) => { fetch("/api/marketplace/tavern", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "chat", body }) }).catch(() => {}); }, []);
+    const sendChat = useCallback((e) => { if (e) e.preventDefault(); const body = chatText.trim(); if (!body) return; setChatText(""); showMyChat(body.slice(0, 200)); postChat(body); }, [chatText, showMyChat, postChat]);
+    const quickEmote = useCallback((emoji) => { showMyChat(emoji); postChat(emoji); }, [showMyChat, postChat]);
 
     // Camera: follow you + manual drag-pan, clamped to the room.
     const maxScroll = Math.max(0, WORLD_W - viewportW);
@@ -206,6 +224,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
         <div className="stack reveal">
             <div ref={sceneRef} className="tv-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <button type="button" className="tv-leave" onClick={onLeave}>← Leave</button>
+                <SceneMusic vibe="tavern" />
                 <div className="tv-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                     {bgUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -227,11 +246,30 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                         );
                     })}
                     {/* other members here now */}
-                    {others.map((o) => <TavAvatar key={o.id} a={o} />)}
+                    {others.map((o) => <TavAvatar key={o.id} a={o} onTap={(m) => setMenuFor(m)} />)}
                     {/* you */}
-                    <TavAvatar a={{ x: pos.x, y: pos.y, facing: pos.facing, moving: pos.moving, sprite: me?.sprite, flip: me?.flip }} you />
+                    <TavAvatar a={{ x: pos.x, y: pos.y, facing: pos.facing, moving: pos.moving, sprite: me?.sprite, flip: me?.flip, chat: myChat }} you />
                 </div>
                 {here > 1 ? <div className="tv-hint">{here} here now</div> : null}
+
+                {/* Quick emotes — float above your head + broadcast to the room */}
+                <div className="tv-emotebar" onClick={(e) => e.stopPropagation()}>
+                    {EMOTES.map((em) => <button key={em} type="button" onClick={() => quickEmote(em)}>{em}</button>)}
+                </div>
+
+                {/* Tap another member → quick actions */}
+                {menuFor ? (
+                    <div className="tv-panel-wrap" onClick={() => setMenuFor(null)} role="presentation">
+                        <div className="tv-panel" onClick={(e) => e.stopPropagation()}>
+                            <div className="tv-panel-head"><strong>{menuFor.name}</strong><button type="button" onClick={() => setMenuFor(null)} aria-label="Close">✕</button></div>
+                            <div className="tv-menu">
+                                <button type="button" className="tv-menu-item" onClick={() => { quickEmote("👋"); setMenuFor(null); }}><span className="tv-menu-ic">👋</span><span className="tv-menu-body"><b>Wave</b><small>Say hi to {menuFor.name}</small></span></button>
+                                {menuFor.alias ? <Link href={`/marketplace/u/${menuFor.alias}`} className="tv-menu-item"><span className="tv-menu-ic">👤</span><span className="tv-menu-body"><b>View profile</b><small>@{menuFor.alias}</small></span></Link> : null}
+                                {menuFor.alias ? <Link href={`/marketplace/trade/new?to=${encodeURIComponent(menuFor.alias)}`} className="tv-menu-item"><span className="tv-menu-ic">🤝</span><span className="tv-menu-body"><b>Trade</b><small>Start a trade</small></span></Link> : null}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
 
                 {/* Interaction overlay — happens INSIDE the scene pane for immersion */}
                 {station ? (
@@ -310,6 +348,12 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                 ) : null}
             </div>
 
+            {/* Chat to the tavern */}
+            <form className="tv-chatbar" onSubmit={sendChat}>
+                <input value={chatText} onChange={(e) => setChatText(e.target.value)} placeholder="Say something to the tavern…" maxLength={200} aria-label="Tavern chat" />
+                <button type="submit" aria-label="Send" disabled={!chatText.trim()}>➤</button>
+            </form>
+
             <style>{TV_CSS}</style>
         </div>
     );
@@ -340,6 +384,18 @@ const TV_CSS = `
 .tv-av-sprite img { width: 132px; height: 132px; object-fit: contain; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.6)); }
 .tv-av-fallback { font-size: 94px; }
 .tv-av-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(30,18,50,0.85); border-radius: 999px; padding: 1px 8px; margin-bottom: 2px; white-space: nowrap; }
+.tv-bubble { max-width: 150px; font-size: 11px; font-weight: 600; color: #2a1a06; background: #fbf2dc; border-radius: 12px; padding: 4px 9px; margin-bottom: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); white-space: normal; text-align: center; line-height: 1.25; }
+.tv-emote { font-size: 30px; margin-bottom: 2px; animation: tvEmote 1.4s ease-out; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+@keyframes tvEmote { 0% { transform: translateY(6px) scale(.5); opacity: 0; } 25% { transform: translateY(0) scale(1.15); opacity: 1; } 100% { transform: translateY(-8px) scale(1); opacity: 1; } }
+/* Quick-emote bar (bottom of the scene) */
+.tv-emotebar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 8; display: flex; gap: 4px; background: rgba(20,10,4,0.6); border: 1px solid rgba(255,215,110,0.28); border-radius: 999px; padding: 4px 6px; }
+.tv-emotebar button { width: 30px; height: 30px; border: none; background: rgba(255,255,255,0.06); border-radius: 999px; font-size: 17px; cursor: pointer; line-height: 1; }
+.tv-emotebar button:active { transform: scale(0.9); }
+/* Chat bar */
+.tv-chatbar { display: flex; gap: 8px; margin-top: 10px; }
+.tv-chatbar input { flex: 1 1 auto; min-width: 0; padding: 11px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); color: #f2ead9; font-size: 0.9rem; }
+.tv-chatbar button { flex: 0 0 auto; width: 44px; border-radius: 999px; border: none; background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #2a1a06; font-weight: 900; cursor: pointer; }
+.tv-chatbar button:disabled { opacity: .5; cursor: default; }
 /* Station panel — an overlay INSIDE the scene pane, for immersion */
 .tv-panel-wrap { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 14px; background: rgba(8,4,2,0.55); }
 .tv-panel { width: 100%; max-width: 330px; max-height: 90%; overflow-y: auto; overflow-x: hidden; border-radius: 16px; background: rgba(23,18,14,0.98); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 14px 40px rgba(0,0,0,0.6); padding: 14px; animation: tvPanelPop .28s cubic-bezier(.2,1.2,.3,1) both; }

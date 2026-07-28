@@ -20,7 +20,8 @@ export async function moveTavern(buyerId, { x, y, facing } = {}) {
     return { ok: true };
 }
 
-// Everyone ELSE currently inside the tavern (live), as avatar data for the walkable room.
+// Everyone ELSE currently inside the tavern (live), as avatar data for the walkable room — with their recent
+// chat bubble / emote (reuses the shared mkt_town_chat store) so social banter shows up in real time.
 async function tavernOccupants(selfId) {
     const rows = await db.query(
         `SELECT p.buyer_id, p.x, p.y, p.facing, b.display_name, b.alias, b.avatar_sprite_url, b.featured_collectible
@@ -29,11 +30,16 @@ async function tavernOccupants(selfId) {
         [selfId]
     ).catch(() => []);
     if (!rows.length) return [];
-    const petSprites = await getPetSpriteData().catch(() => ({}));
+    const ids = rows.map((r) => r.buyer_id);
+    const [petSprites, chats] = await Promise.all([
+        getPetSpriteData().catch(() => ({})),
+        db.query(`SELECT DISTINCT ON (buyer_id) buyer_id, body FROM mkt_town_chat WHERE buyer_id = ANY($1) AND created_at > NOW() - INTERVAL '8 seconds' ORDER BY buyer_id, created_at DESC`, [ids]).catch(() => []),
+    ]);
+    const chatBy = Object.fromEntries((chats || []).map((c) => [c.buyer_id, c.body]));
     return rows.map((r) => ({
         id: r.buyer_id, name: r.display_name || (r.alias ? `@${r.alias}` : "a wolf"), alias: r.alias || null,
         sprite: r.avatar_sprite_url || null, x: Number(r.x), y: Number(r.y), facing: Number(r.facing) === -1 ? -1 : 1,
-        pet: petSprites[r.featured_collectible] || null,
+        pet: petSprites[r.featured_collectible] || null, chat: chatBy[r.buyer_id] || null,
     }));
 }
 

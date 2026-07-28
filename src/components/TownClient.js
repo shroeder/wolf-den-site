@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import TavernInterior from "@/components/TavernInterior";
+import SceneMusic from "@/components/SceneMusic";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
@@ -447,6 +448,7 @@ export default function TownClient({ initial }) {
             </section>
 
             <div ref={sceneRef} className="tw-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
+                <SceneMusic vibe="town" />
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
