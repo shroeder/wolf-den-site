@@ -6,6 +6,14 @@ import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { listFriends } from "@/lib/marketplace/friends.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
+import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
+
+// The Traveling Merchant's wares — loot chests sold for gold (a fair gold SINK). Tunable prices.
+export const MERCHANT_WARES = [
+    { tier: "wooden", price: 500 },
+    { tier: "iron", price: 2000 },
+    { tier: "gold", price: 6000 },
+].map((w) => ({ ...w, label: CHEST_TIERS[w.tier]?.label || w.tier, emoji: CHEST_TIERS[w.tier]?.emoji || "📦" }));
 
 // Collective plaza upgrades: the whole pack pools gold to unlock shared decorations that everyone sees.
 export const TOWN_UPGRADES = [
@@ -107,7 +115,7 @@ function activitySlot(id, event, path) {
 export async function getTownState(buyerId) {
     const owner = isOwner(buyerId);
     const me = buyerId
-        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
+        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
         : null;
     const myPos = buyerId ? await db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : null;
 
@@ -200,14 +208,28 @@ export async function getTownState(buyerId) {
             chat: (buyerId ? chatBy[buyerId] : null) || null,
             pet: petSprites[me?.featured_collectible]?.url || null,
             petFlip: petSprites[me?.featured_collectible] ? petSprites[me.featured_collectible].flip === true : false,
+            gold: Number(me?.gold || 0),
         },
         players,
         buildings: TOWN_BUILDINGS,
         art,
         upgrade,
         event,
+        merchant: MERCHANT_WARES,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
+}
+
+// Buy a loot chest from the Traveling Merchant (owner-gated during the build). Guarded gold spend → a chest.
+export async function buyMerchantChest(buyerId, tier) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    const ware = MERCHANT_WARES.find((w) => w.tier === tier);
+    if (!ware) return { ok: false, error: "not_for_sale" };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, ware.price]).catch(() => null);
+    if (!paid) return { ok: false, error: "insufficient_gold" };
+    await logCoin(buyerId, -ware.price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
+    await addChests(buyerId, { [tier]: 1 }, { source: "merchant" }).catch(() => {});
+    return { ok: true, gold: Number(paid.gold), tier, label: ware.label };
 }
 
 // The collective-upgrade state: pooled gold total, which decorations are unlocked, and the next goal.

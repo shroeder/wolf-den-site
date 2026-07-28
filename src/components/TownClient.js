@@ -76,6 +76,10 @@ export default function TownClient({ initial }) {
     const [boardOpen, setBoardOpen] = useState(false); // Town Hall (events + plaza fund) panel
     const [contribBusy, setContribBusy] = useState(false);
     const [inTavern, setInTavern] = useState(false);  // stepped inside the Tavern interior
+    const [merchantOpen, setMerchantOpen] = useState(false);
+    const [merchantBusy, setMerchantBusy] = useState(false);
+    const [merchantFlash, setMerchantFlash] = useState(null);
+    const [crierMsg, setCrierMsg] = useState(0);      // which rotating announcement the crier is shouting
     const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
     const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
     const evIdRef = useRef(null);
@@ -246,6 +250,25 @@ export default function TownClient({ initial }) {
     const buildings = state?.buildings || [];
     const unlocked = useMemo(() => new Set(state?.upgrade?.unlocked || []), [state?.upgrade]);
     const otherList = useMemo(() => Object.values(others), [others]);
+    // The Town Crier's rotating live announcements (assembled from the current town state).
+    const crierLines = useMemo(() => {
+        const lines = [];
+        if (state?.event) lines.push(`${state.event.name} in the plaza — to arms!`);
+        lines.push(`${state?.onlineCount ?? 1} wolves about the Den tonight!`);
+        if (state?.upgrade?.next) lines.push(`Chip in to build the ${state.upgrade.next.name}!`);
+        lines.push("The tavern's warm — pull up a stool!");
+        lines.push("Hear ye! Fresh happenings on the board!");
+        return lines;
+    }, [state?.event, state?.onlineCount, state?.upgrade]);
+    useEffect(() => { const t = setInterval(() => setCrierMsg((m) => m + 1), 4500); return () => clearInterval(t); }, []);
+    // Buy a chest from the Traveling Merchant.
+    const buyChest = useCallback(async (tier) => {
+        setMerchantBusy(true);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "merchant_buy", tier }) }).then((x) => x.json()).catch(() => null);
+        setMerchantBusy(false);
+        if (r?.ok) { setMerchantFlash(`🎁 Bought a ${r.label}! Open it over in your Gear.`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
+        else setMerchantFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : "Couldn't buy that.");
+    }, [load]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
     if (state && state.owner === false) {
@@ -332,6 +355,22 @@ export default function TownClient({ initial }) {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img className="tw-npc" src={art.smith.url} alt="" draggable={false} style={{ left: "45%", top: `${GROUND}%` }} />
                     ) : null}
+                    {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
+                    <button type="button" className="tw-npc-btn" style={{ left: "32%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
+                        {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
+                        {art.crier?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={art.crier.url} alt="Town Crier" draggable={false} />
+                        ) : <span className="tw-npc-emoji">📣</span>}
+                    </button>
+                    {/* Traveling Merchant — tap to browse wares */}
+                    <button type="button" className="tw-npc-btn" style={{ left: "66%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
+                        <span className="tw-npc-bubble">🧳 Wares for sale!</span>
+                        {art.merchant?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={art.merchant.url} alt="Traveling Merchant" draggable={false} />
+                        ) : <span className="tw-npc-emoji">🧳</span>}
+                    </button>
                     {/* Collective-upgrade decorations that scroll with the street */}
                     {unlocked.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
                     {unlocked.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
@@ -416,6 +455,30 @@ export default function TownClient({ initial }) {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Traveling Merchant wares */}
+            {merchantOpen ? (
+                <div className="tw-roster" onClick={() => setMerchantOpen(false)} role="presentation">
+                    <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>🧳 Traveling Merchant</strong><button type="button" onClick={() => setMerchantOpen(false)} aria-label="Close">✕</button></div>
+                        <p className="muted" style={{ margin: "-2px 2px 8px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;Rare goods, fair prices! Fancy a chest, friend?&rdquo;</p>
+                        {merchantFlash ? <div className="tw-merchant-flash">{merchantFlash}</div> : null}
+                        <div className="tw-wares">
+                            {(state?.merchant || []).map((w) => {
+                                const afford = (you?.gold || 0) >= w.price;
+                                return (
+                                    <button key={w.tier} type="button" className="tw-ware" disabled={!afford || merchantBusy} onClick={() => buyChest(w.tier)}>
+                                        <span className="tw-ware-emoji" aria-hidden="true">{w.emoji}</span>
+                                        <span className="tw-ware-label">{w.label}</span>
+                                        <span className="tw-ware-price">🪙 {w.price.toLocaleString()}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="muted" style={{ fontSize: "0.8rem", margin: "10px 2px 0" }}>🪙 You have {(you?.gold || 0).toLocaleString()} gold · chests open in your Gear.</p>
                     </div>
                 </div>
             ) : null}
@@ -584,6 +647,20 @@ const TOWN_CSS = `
 
 /* Collective-upgrade decorations */
 .tw-npc { position: absolute; transform: translate(-50%, -100%); height: 92px; width: auto; z-index: 97; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
+/* Interactive plaza NPCs (crier / merchant) — a tappable button with a sprite + a speech bubble. */
+.tw-npc-btn { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 99; display: flex; flex-direction: column; align-items: center; }
+.tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
+.tw-npc-emoji { font-size: 50px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+.tw-npc-btn:hover img, .tw-npc-btn:hover .tw-npc-emoji { filter: drop-shadow(0 0 8px rgba(255,215,110,0.8)); }
+.tw-npc-bubble { max-width: 155px; font-size: 10px; font-weight: 800; line-height: 1.2; text-align: center; color: #241206; background: linear-gradient(180deg,#fff,#ffe9b0); border-radius: 9px; padding: 4px 9px; margin-bottom: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
+.tw-merchant-flash { text-align: center; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.35); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
+.tw-wares { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.tw-ware { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 6px; border-radius: 14px; border: 1px solid rgba(255,215,110,0.3); background: rgba(255,255,255,0.05); color: #f2ead9; cursor: pointer; }
+.tw-ware:hover:not(:disabled) { border-color: rgba(255,215,110,0.6); }
+.tw-ware:disabled { opacity: .45; cursor: default; }
+.tw-ware-emoji { font-size: 30px; line-height: 1; }
+.tw-ware-label { font-size: 0.74rem; font-weight: 800; text-align: center; }
+.tw-ware-price { font-size: 0.72rem; color: #ffd75e; font-weight: 800; }
 .tw-deco { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 96; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.5)); }
 .tw-deco-fountain { font-size: 54px; }
 .tw-deco-statue { font-size: 46px; }
