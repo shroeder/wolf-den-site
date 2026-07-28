@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // transitions (poll + tween — no canvas / websockets). Positions are % of the WIDE world; y is a ground band.
 
 const WORLD_W = 2200;   // px width of the whole street (x = 0..100 maps across this)
-const GROUND = 78;      // % from top where the street sits (building bases + avatar feet)
+const GROUND = 72;      // % from top where building BASES sit (avatars walk in front, lower/foreground)
 const spriteTransform = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -44,8 +44,10 @@ export default function TownClient({ initial }) {
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
     const [roster, setRoster] = useState(false);
+    const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
+    const drag = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0 });
 
     // Measure the viewport so the camera can keep the player centered.
     useEffect(() => {
@@ -96,9 +98,10 @@ export default function TownClient({ initial }) {
     }, []);
 
     const walkToWorld = useCallback((worldXPct, worldYPct) => {
+        setPanExtra(0); // walking re-centres the camera on you
         setMe((m) => {
             const x = clamp(worldXPct, 1, 99);
-            const y = clamp(worldYPct ?? m.y, 70, 88);
+            const y = clamp(worldYPct ?? m.y, 74, 90);
             const facing = x < m.x ? -1 : 1;
             const d = dist(m, { x, y });
             clearTimeout(moveTimer.current);
@@ -109,15 +112,31 @@ export default function TownClient({ initial }) {
         });
     }, []);
 
-    // Convert a screen tap → world %, accounting for the camera offset.
-    const cameraPx = clamp((me.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
-    const onSceneClick = useCallback((e) => {
-        if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return;
+    // Camera = follow you, plus any manual drag-to-pan, clamped to the world.
+    const maxScroll = Math.max(0, WORLD_W - viewportW);
+    const followCam = clamp((me.x / 100) * WORLD_W - viewportW / 2, 0, maxScroll);
+    const cameraPx = clamp(followCam + panExtra, 0, maxScroll);
+
+    // Pointer: a DRAG pans the street (free look); a TAP walks you there.
+    const onPointerDown = useCallback((e) => {
+        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ok */ }
+    }, []);
+    const onPointerMove = useCallback((e) => {
+        const d = drag.current; if (!d.down) return;
+        const dx = e.clientX - d.lastX;
+        if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > 7) d.moved = true;
+        if (d.moved) { d.lastX = e.clientX; setPanExtra((p) => clamp(followCam + p - dx, 0, maxScroll) - followCam); }
+    }, [followCam, maxScroll]);
+    const onPointerUp = useCallback((e) => {
+        const d = drag.current; d.down = false;
+        if (d.moved) return; // was a pan, not a tap
+        if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return; // doors/avatars handle themselves
         const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
         const worldX = ((e.clientX - rect.left + cameraPx) / WORLD_W) * 100;
         const worldY = ((e.clientY - rect.top) / rect.height) * 100;
         walkToWorld(worldX, worldY);
-    }, [cameraPx, walkToWorld]);
+    }, [cameraPx, followCam, maxScroll, walkToWorld]);
 
     const wave = useCallback(() => { setMe((m) => ({ ...m, wave: true })); setTimeout(() => setMe((m) => ({ ...m, wave: false })), 1600); }, []);
 
@@ -143,7 +162,7 @@ export default function TownClient({ initial }) {
                 <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the street to walk. Tap a building to head there. Real members who are online show up here.</p>
             </section>
 
-            <div ref={sceneRef} className="tw-scene" onClick={onSceneClick} role="presentation">
+            <div ref={sceneRef} className="tw-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; }} role="presentation">
                 {!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null}
                 {/* The wide world that scrolls under a fixed camera */}
                 <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: `transform ${camDur}s linear` }}>
@@ -177,9 +196,9 @@ export default function TownClient({ initial }) {
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you" }} isYou /> : null}
                 </div>
 
-                {/* edge hints */}
-                {cameraPx > 4 ? <div className="tw-edge tw-edge-l" aria-hidden="true">‹</div> : null}
-                {cameraPx < WORLD_W - viewportW - 4 ? <div className="tw-edge tw-edge-r" aria-hidden="true">›</div> : null}
+                {/* edge hints — tap to walk that way (or just drag the street to look around) */}
+                {cameraPx > 4 ? <button type="button" className="tw-edge tw-edge-l" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x - 22, 1, 99), me.y); }} aria-label="Walk left">‹</button> : null}
+                {cameraPx < maxScroll - 4 ? <button type="button" className="tw-edge tw-edge-r" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x + 22, 1, 99), me.y); }} aria-label="Walk right">›</button> : null}
             </div>
 
             <section className="card" style={{ padding: "10px 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -213,8 +232,9 @@ export default function TownClient({ initial }) {
 }
 
 const TOWN_CSS = `
-.tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: pointer;
+.tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: grab; touch-action: none;
     box-shadow: inset 0 -30px 60px rgba(0,0,0,0.28), 0 10px 30px rgba(0,0,0,0.35); user-select: none; -webkit-user-select: none; background: #1a1330; }
+.tw-scene:active { cursor: grabbing; }
 .tw-world { position: absolute; top: 0; left: 0; height: 100%; will-change: transform; }
 .tw-bg { position: absolute; inset: 0; display: flex; height: 100%; }
 .tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
@@ -229,6 +249,8 @@ const TOWN_CSS = `
 .tw-building { position: absolute; transform: translateX(-50%); bottom: auto; display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: #ffe9b0; transition: transform .12s ease; }
 .tw-building { transform: translate(-50%, -100%); }
 .tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
+/* contact shadow so the building reads as sitting ON the cobblestones */
+.tw-building::after { content: ""; position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); width: 72%; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 72%); z-index: -1; pointer-events: none; }
 .tw-building-art { display: block; height: 190px; width: auto; max-width: 260px; object-fit: contain; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.5)); }
 .tw-building-art[style*="scaleX"] { transform-origin: bottom center; }
 .tw-building-card { display: grid; place-items: center; width: 96px; height: 120px; border-radius: 12px; background: linear-gradient(180deg, rgba(40,28,58,0.94), rgba(26,18,40,0.96)); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 10px 22px rgba(0,0,0,0.5); }
@@ -248,9 +270,11 @@ const TOWN_CSS = `
 .tw-wave { position: absolute; top: -6px; right: -8px; font-size: 20px; animation: twWave .5s ease-in-out infinite; }
 @keyframes twWave { 0%,100% { transform: rotate(-16deg); } 50% { transform: rotate(16deg); } }
 
-.tw-edge { position: absolute; top: 50%; transform: translateY(-50%); font-size: 30px; color: rgba(255,255,255,0.5); pointer-events: none; animation: twEdge 1.4s ease-in-out infinite; }
+.tw-edge { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 60px; display: grid; place-items: center; font-size: 30px;
+    color: rgba(255,255,255,0.7); background: rgba(0,0,0,0.28); border: none; border-radius: 10px; cursor: pointer; z-index: 500; animation: twEdge 1.4s ease-in-out infinite; }
+.tw-edge:hover { color: #fff; background: rgba(0,0,0,0.45); }
 .tw-edge-l { left: 8px; } .tw-edge-r { right: 8px; }
-@keyframes twEdge { 0%,100% { opacity: .35; } 50% { opacity: .8; } }
+@keyframes twEdge { 0%,100% { opacity: .5; } 50% { opacity: .9; } }
 
 .tw-emote { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,215,110,0.5); background: linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96)); color: #ffe9b0; font-weight: 800; font-size: 13px; cursor: pointer; }
 .tw-emote:active { transform: translateY(1px); }
