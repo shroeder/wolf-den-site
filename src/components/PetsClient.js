@@ -53,7 +53,12 @@ function MenagerieGroup({ title, sub, tiles, accent = "#ffd75e" }) {
             <div className="petsum-ghead"><b>{title}</b><small>{sub}</small></div>
             {tiles.map((t) => (
                 <div key={t.key} className="petsum-row">
-                    <span className="petsum-ico" aria-hidden="true">{t.icon}</span>
+                    <span className="petsum-ico" aria-hidden="true">
+                        {t.sprite ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={t.sprite} alt="" draggable={false} style={{ width: 30, height: 30, objectFit: "contain" }} />
+                        ) : t.icon}
+                    </span>
                     <span className="petsum-val">{t.value}</span>
                     <span className="petsum-body"><b>{t.label}</b>{t.desc ? <small>{t.desc}</small> : null}</span>
                 </div>
@@ -412,14 +417,14 @@ export default function PetsClient() {
                         <div className="petsum-groups">
                             <MenagerieGroup
                                 title="Passive bonuses" sub={`stacked from all ${ownedCount} pets you own`} accent="#ffd75e"
-                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, icon: PET_STAT_META[stat]?.icon || "•", label: PET_STAT_META[stat]?.label || stat, value: `+${val}`, desc: PET_STAT_META[stat]?.desc }))}
+                                tiles={passiveEntries.map(([stat, val]) => ({ key: stat, icon: PET_STAT_META[stat]?.icon || "•", sprite: state.statSprites?.[stat], label: PET_STAT_META[stat]?.label || stat, value: `+${val}`, desc: PET_STAT_META[stat]?.desc }))}
                             />
                             <MenagerieGroup
                                 title="Earning" sub="your earner pets, auto-banked" accent="#8fe39a"
                                 tiles={[
-                                    state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", label: "XP per day", value: `+${(state.income.xpPerHour * 24).toLocaleString()}`, desc: "Passive XP, accrued around the clock and banked until you check in." } : null,
-                                    state.income?.goldPerHour > 0 ? { key: "gold", icon: "🪙", label: "Gold per day", value: `+${(state.income.goldPerHour * 24).toLocaleString()}`, desc: "Passive gold, accrued around the clock and banked until you check in." } : null,
-                                    state.income?.raffleTickets > 0 ? { key: "tix", icon: "🎟️", label: "Raffle tickets / day", value: `+${state.income.raffleTickets}`, desc: "Free weekly-boss raffle entries each day — real odds to win." } : null,
+                                    state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", sprite: state.statSprites?.xp, label: "XP per day", value: `+${(state.income.xpPerHour * 24).toLocaleString()}`, desc: "Passive XP, accrued around the clock and banked until you check in." } : null,
+                                    state.income?.goldPerHour > 0 ? { key: "gold", icon: "🪙", sprite: state.statSprites?.gold, label: "Gold per day", value: `+${(state.income.goldPerHour * 24).toLocaleString()}`, desc: "Passive gold, accrued around the clock and banked until you check in." } : null,
+                                    state.income?.raffleTickets > 0 ? { key: "tix", icon: "🎟️", sprite: state.statSprites?.tix, label: "Raffle tickets / day", value: `+${state.income.raffleTickets}`, desc: "Free weekly-boss raffle entries each day — real odds to win." } : null,
                                 ].filter(Boolean)}
                             />
                         </div>

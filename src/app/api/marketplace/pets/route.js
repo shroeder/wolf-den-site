@@ -3,10 +3,20 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare } from "@/lib/marketplace/pets.js";
 import { settlePetIncome, petIncomeRate } from "@/lib/marketplace/pet-income.js";
+import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Map the `stat_*` art keys (mkt_town_art) to the PET_STAT_META / earning stat keys the pets screen renders.
+const STAT_ART_MAP = { stat_xp: "xp_gain", stat_gold: "gold_find", stat_fortune: "fortune", stat_might: "might", stat_critchance: "crit_chance", stat_critpower: "crit_power", stat_ferocity: "ferocity", stat_seedluck: "seedLuck", stat_growspeed: "growSpeed", stat_petbond: "petXp", stat_tickets: "tix" };
+async function statSprites() {
+    const rows = await db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'stat_%'`).catch(() => []);
+    const map = {};
+    for (const r of rows) { const k = STAT_ART_MAP[r.art_key]; if (k && r.url) { map[k] = r.url; if (k === "xp_gain") map.xp = r.url; if (k === "gold_find") map.gold = r.url; } }
+    return map;
+}
 
 // GET — the member's pet state (owned ids, equipped, level, gold, passive total).
 export async function GET(request) {
@@ -24,7 +34,8 @@ export async function GET(request) {
             const incomeEarned = buyer?.id ? await settlePetIncome(buyer.id).catch(() => ({ xp: 0, gold: 0 })) : { xp: 0, gold: 0 };
             const state = await petsState(buyer?.id || null, { sync: true });
             const income = buyer?.id ? await petIncomeRate(buyer.id).catch(() => null) : null;
-            return NextResponse.json({ ...state, income, incomeEarned }, { headers: { "Cache-Control": "no-store" } });
+            const sprites = await statSprites().catch(() => ({}));
+            return NextResponse.json({ ...state, income, incomeEarned, statSprites: sprites }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.pets.state.failure" });
         }
