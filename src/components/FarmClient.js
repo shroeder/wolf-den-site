@@ -253,7 +253,15 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [petCele, setPetCele] = useState(null); // pet just leveled up (from feeding) → juicy celebration modal
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
     const [encounter, setEncounter] = useState(null); // a creature raided a harvest → timing-meter fight
+    const [recap, setRecap] = useState(null); // once-a-day "your pets earned X while you were away" recap
     const rainedRef = useRef(false);
+    // Once-a-day passive-income recap — "while you were away, your pets earned…" (own farm only).
+    const recapRef = useRef(false);
+    useEffect(() => {
+        if (!farm?.mine || recapRef.current) return;
+        recapRef.current = true;
+        fetch("/api/marketplace/pet-income/recap", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.show && (d.xp > 0 || d.gold > 0)) setRecap(d); }).catch(() => {});
+    }, [farm?.mine]);
 
     // Wild Loot Pig: once/day, at a random moment after you land on YOUR farm, a crowned pig may rampage
     // through dropping gold. The payout is server-guarded once/day; this just decides the dramatic entrance.
@@ -1135,6 +1143,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             {harvestToast ? <HarvestToast toast={harvestToast} onClose={() => setHarvestToast(null)} /> : null}
 
             {encounter ? <EncounterModal encounter={encounter} onResolve={resolveEncounterAt} onClose={() => setEncounter(null)} /> : null}
+
+            {recap ? <IncomeRecapModal recap={recap} onClose={() => setRecap(null)} /> : null}
 
             {inspect ? (
                 <PetInspect
@@ -2212,6 +2222,39 @@ function EncounterModal({ encounter, onResolve, onClose }) {
                         {perfect ? <div style={{ marginTop: 8, fontSize: 11, fontWeight: 800, color: green }}>✨ {perfect} perfect {perfect === 1 ? "strike" : "strikes"}</div> : null}
                     </>
                 )}
+            </div>
+        </div>
+    );
+}
+
+// Once-a-day "while you were away" recap of the passive income your pets banked.
+function IncomeRecapModal({ recap, onClose }) {
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10002, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Daily recap" style={{ width: "100%", maxWidth: 320, borderRadius: 18, overflow: "hidden", background: "var(--card-bg,#17181c)", border: "2px solid #8fe39a", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", animation: "pigPop .42s cubic-bezier(.2,1.2,.3,1) both" }}>
+                <div style={{ padding: "18px 18px 12px", textAlign: "center", background: "radial-gradient(130% 100% at 50% 0%, rgba(67,217,138,0.35), transparent 72%)" }}>
+                    <div style={{ fontSize: 42 }}>🐾💤</div>
+                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4 }}>Welcome back!</div>
+                    <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>While you were away, your menagerie was hard at work.</div>
+                </div>
+                <div style={{ padding: "6px 16px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {recap.xp > 0 ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(143,227,154,0.1)", border: "1px solid rgba(143,227,154,0.35)" }}>
+                            <span style={{ fontSize: 22 }}>✨</span><span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>Passive XP earned</span><span style={{ fontWeight: 900, color: "#8fe39a" }}>+{recap.xp.toLocaleString()}</span>
+                        </div>
+                    ) : null}
+                    {recap.gold > 0 ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.35)" }}>
+                            <span style={{ fontSize: 22 }}>🪙</span><span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>Passive gold earned</span><span style={{ fontWeight: 900, color: "#ffd75e" }}>+{recap.gold.toLocaleString()}</span>
+                        </div>
+                    ) : null}
+                    {recap.raffleTickets > 0 ? (
+                        <div className="muted" style={{ fontSize: 11.5, textAlign: "center", marginTop: 2 }}>🎟️ Your Fortune is also banking {recap.raffleTickets} boss-raffle ticket{recap.raffleTickets === 1 ? "" : "s"}/day.</div>
+                    ) : null}
+                </div>
+                <div style={{ padding: "6px 16px 16px" }}>
+                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#43d98a,#2fae72)", color: "#06311f", border: "none", borderRadius: 12, cursor: "pointer", boxShadow: "0 3px 0 #1c7a4f" }}>Collect &amp; carry on</button>
+                </div>
             </div>
         </div>
     );

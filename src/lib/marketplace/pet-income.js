@@ -66,5 +66,31 @@ export async function settlePetIncome(buyerId) {
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
         await logCoin(buyerId, gold, "pet_income", { balanceAfter: g?.gold }).catch(() => {});
     }
+    // Accumulate toward the daily recap ("here's what your pets earned").
+    if (xp > 0 || gold > 0) await db.query(`UPDATE mkt_buyer SET recap_xp = recap_xp + $2, recap_gold = recap_gold + $3 WHERE id = $1`, [buyerId, xp, gold]).catch(() => {});
     return { xp, gold };
+}
+
+// Once-a-day recap of what the menagerie banked. Settles first (so the tally is current), then — at most once
+// per store-local day — hands back the accumulated XP/gold and resets it. `raffleTickets` is the current daily
+// fortune rate (FYI). Returns { show:false } the rest of the day.
+export async function getIncomeRecap(buyerId) {
+    if (!buyerId) return { show: false };
+    await settlePetIncome(buyerId).catch(() => {});
+    const row = await db.queryOne(
+        `SELECT recap_xp AS xp, recap_gold AS gold FROM mkt_buyer
+          WHERE id = $1 AND (recap_shown_at IS NULL OR recap_shown_at < (NOW() AT TIME ZONE 'America/Chicago')::date)
+            AND (recap_xp > 0 OR recap_gold > 0)`,
+        [buyerId]
+    ).catch(() => null);
+    if (!row) return { show: false };
+    // Claim atomically (guarded on the same once-a-day condition) so it shows at most once.
+    const claim = await db.queryOne(
+        `UPDATE mkt_buyer SET recap_xp = 0, recap_gold = 0, recap_shown_at = NOW()
+          WHERE id = $1 AND (recap_shown_at IS NULL OR recap_shown_at < (NOW() AT TIME ZONE 'America/Chicago')::date) RETURNING id`,
+        [buyerId]
+    ).catch(() => null);
+    if (!claim) return { show: false };
+    const { raffleTickets } = await petIncomeRate(buyerId).catch(() => ({ raffleTickets: 0 }));
+    return { show: true, xp: Number(row.xp) || 0, gold: Number(row.gold) || 0, raffleTickets: raffleTickets || 0 };
 }
