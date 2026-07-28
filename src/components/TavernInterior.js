@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// The enterable Tavern: a cozy, rowdy interior you step into from the plaza. Fireplace glow + drifting ambient
-// emotes for life; the barkeep runs a little dialogue tree — rumors, the daily pint, and a press-your-luck dice
-// game. Owner-gated during the Town build.
-// Pip positions (in a 100×100 die viewBox) for values 1-6 — drawn as clean SVG dice.
+// The enterable Tavern — now a WALKABLE room. Your hero walks the floor (tap to move), other members who've
+// stepped inside show up live, and you walk up to STATIONS (the bar, the dice table, the hearth) to interact.
+// Owner-gated during the Town build.
 const PIP_LAYOUT = { 1: [[50, 50]], 2: [[30, 30], [70, 70]], 3: [[30, 30], [50, 50], [70, 70]], 4: [[30, 30], [70, 30], [30, 70], [70, 70]], 5: [[30, 30], [70, 30], [50, 50], [30, 70], [70, 70]], 6: [[30, 28], [70, 28], [30, 50], [70, 50], [30, 72], [70, 72]] };
 const AMBIENT = ["🍺", "🎵", "😄", "🔥", "🍻", "✨"];
 const GREET = [
@@ -21,23 +20,73 @@ const LORE = [
 ];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
+// Walk-up stations positioned over the painted room. y is where the LABEL sits; the walkable floor is below.
+const STATIONS = [
+    { key: "bar", emoji: "🍺", label: "The Bar", x: 22, y: 44 },
+    { key: "hearth", emoji: "🔥", label: "Hearth", x: 50, y: 40 },
+    { key: "dice", emoji: "🎲", label: "Dice Table", x: 78, y: 46 },
+];
+const FLOOR_MIN_Y = 60, FLOOR_MAX_Y = 90; // walkable band (% of scene height)
+const spriteFlip = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
+
+// A single clean SVG die (Wolf's Gambit).
+function Die({ value, held = false, rolling = false, locked = false, small = false, onClick }) {
+    const size = small ? 36 : 54;
+    return (
+        <button type="button" onClick={onClick} disabled={!onClick || locked} className={`tv-diebtn${held ? " is-held" : ""}${rolling ? " is-rolling" : ""}${!onClick ? " is-static" : ""}`} style={{ width: size, height: size }}>
+            <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+                <rect x="6" y="6" width="88" height="88" rx="18" fill="#f4ecd8" stroke="#3a2a12" strokeWidth="4" />
+                {(PIP_LAYOUT[value] || []).map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="8.5" fill="#2a1a08" />)}
+            </svg>
+            {held ? <span className="tv-held-tag">KEEP</span> : null}
+        </button>
+    );
+}
+
+// An avatar standing/walking in the room.
+function TavAvatar({ a, you = false }) {
+    const t = spriteFlip(a.flip, a.facing);
+    return (
+        <div className={`tv-av${you ? " is-you" : ""}${a.moving ? " is-walking" : ""}`} style={{ left: `${a.x}%`, top: `${a.y}%` }}>
+            <span className="tv-av-name">{you ? "🐺 you" : a.name}</span>
+            <div className="tv-av-sprite">
+                {a.sprite ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.sprite} alt="" draggable={false} style={{ transform: t }} />
+                ) : <span className="tv-av-fallback" style={{ transform: t }}>🐺</span>}
+            </div>
+            {you ? <span className="tv-av-you">You</span> : null}
+        </div>
+    );
+}
+
+export default function TavernInterior({ bgUrl, diceUrl, me, onLeave }) {
     const [st, setSt] = useState(null);
     const [busy, setBusy] = useState(false);
-    const [view, setView] = useState("bar");     // "bar" (dialogue) | "dice"
-    const [line, setLine] = useState(GREET[0]);   // what the barkeep is currently saying
-    const [g, setG] = useState(null);            // active Wolf's Gambit hand: { bet, dice[], hold[], rerolled, hand }
-    const [result, setResult] = useState(null);  // resolved hand vs the Gambler
-    const [rolling, setRolling] = useState(false); // dice tumble animation flag
+    const [station, setStation] = useState(null); // open panel: "bar" | "dice" | "hearth"
+    const [line, setLine] = useState(GREET[0]);
+    const [g, setG] = useState(null);            // active Wolf's Gambit hand
+    const [result, setResult] = useState(null);
+    const [rolling, setRolling] = useState(false);
     const [flash, setFlash] = useState(null);
+    const [pos, setPos] = useState({ x: 50, y: 82, facing: 1, moving: false });
     const greeted = useRef(false);
+    const sceneRef = useRef(null);
+    const moveTimer = useRef(null);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/tavern", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (d && d.owner !== false) setSt(d);
     }, []);
-    useEffect(() => { load(); if (!greeted.current) { greeted.current = true; setLine(pick(GREET)); } }, [load]);
+    useEffect(() => { load(); const t = setInterval(load, 2500); return () => clearInterval(t); }, [load]);
+    useEffect(() => { if (!greeted.current) { greeted.current = true; setLine(pick(GREET)); } }, []);
+
+    // Presence: tell the server where I am inside the tavern (fire-and-forget; throttled by the walk handler).
+    const postMove = useCallback((x, y, facing) => {
+        fetch("/api/marketplace/tavern", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "move", x, y, facing }) }).catch(() => {});
+    }, []);
+    useEffect(() => { postMove(50, 82, 1); }, [postMove]); // announce arrival
 
     const act = useCallback(async (payload) => {
         setBusy(true);
@@ -48,7 +97,21 @@ export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
         return r;
     }, [load]);
 
-    // ── Dialogue branches ──
+    // Walk to a tapped floor point (clamped to the floor band).
+    const walkTo = useCallback((x, y) => {
+        const cx = Math.max(6, Math.min(94, x));
+        const cy = Math.max(FLOOR_MIN_Y, Math.min(FLOOR_MAX_Y, y));
+        setPos((p) => ({ x: cx, y: cy, facing: cx < p.x ? -1 : 1, moving: true }));
+        clearTimeout(moveTimer.current);
+        moveTimer.current = setTimeout(() => { setPos((p) => ({ ...p, moving: false })); postMove(cx, cy, cx < pos.x ? -1 : 1); }, 320);
+    }, [postMove, pos.x]);
+    const onSceneClick = useCallback((e) => {
+        if (e.target.closest(".tv-station") || e.target.closest(".tv-leave")) return; // let those handle themselves
+        const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
+        walkTo(((e.clientX - rect.left) / rect.width) * 100, ((e.clientY - rect.top) / rect.height) * 100);
+    }, [walkTo]);
+
+    // ── Dialogue (bar + hearth) ──
     const askNews = useCallback(() => {
         const rumors = st?.rumors || [];
         setFlash(null);
@@ -70,7 +133,7 @@ export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
         else setLine("*shrugs* Can't pour that just now.");
     }, [act, st?.round?.cost]);
 
-    // ── Wolf's Gambit dice game ──
+    // ── Wolf's Gambit dice ──
     const ante = useCallback(async (amount) => {
         setResult(null); setFlash(null);
         const r = await act({ action: "gambit_start", bet: amount });
@@ -96,111 +159,115 @@ export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
         }
     }, [act]);
 
+    const others = st?.occupants || [];
+    const closeStation = () => { setStation(null); setFlash(null); };
+
     return (
-        <div className="tv">
-            <div className="tv-scene" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined}>
+        <div className="stack reveal">
+            <div ref={sceneRef} className="tv-scene" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined} onClick={onSceneClick} role="presentation">
                 {!bgUrl ? <div className="tv-scene-fallback">🍺 The Tavern</div> : null}
                 <div className="tv-fire" aria-hidden="true" />
                 <div className="tv-vignette" aria-hidden="true" />
-                {AMBIENT.map((em, i) => (
-                    <span key={i} className="tv-ambient" style={{ left: `${8 + i * 15}%`, animationDelay: `${i * 1.3}s` }} aria-hidden="true">{em}</span>
-                ))}
+                {AMBIENT.map((em, i) => <span key={i} className="tv-ambient" style={{ left: `${8 + i * 15}%`, animationDelay: `${i * 1.3}s` }} aria-hidden="true">{em}</span>)}
                 <button type="button" className="tv-leave" onClick={onLeave}>← Leave</button>
-                <div className="tv-title">🍺 The Tavern</div>
+
+                {/* Walk-up stations */}
+                {STATIONS.map((s) => (
+                    <button key={s.key} type="button" className="tv-station" style={{ left: `${s.x}%`, top: `${s.y}%` }} onClick={(e) => { e.stopPropagation(); setFlash(null); if (s.key === "dice") { setG(null); setResult(null); } setStation(s.key); }}>
+                        <span className="tv-station-emoji" aria-hidden="true">{s.emoji}</span>
+                        <span className="tv-station-label">{s.label}{s.key === "bar" && st?.dailyPint?.available ? " •" : ""}</span>
+                    </button>
+                ))}
+
+                {/* Other members currently in the tavern (live) */}
+                {others.map((o) => <TavAvatar key={o.id} a={o} />)}
+                {/* You */}
+                <TavAvatar a={{ x: pos.x, y: pos.y, facing: pos.facing, moving: pos.moving, sprite: me?.sprite, flip: me?.flip, name: "You" }} you />
+
+                <div className="tv-hint">Tap the floor to walk · tap a spot to interact{others.length ? ` · ${others.length + 1} here now` : ""}</div>
             </div>
 
-            <section className="card tv-panel">
-                {view === "dice" ? (
-                    <div className="tv-diceview">
-                        <button type="button" className="tv-back" onClick={() => { setView("bar"); setG(null); setResult(null); setFlash(null); }}>← Back to the bar</button>
-                        <div className="tv-gambit-head">
-                            {diceUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={diceUrl} alt="" className="tv-gambit-cup" draggable={false} />
-                            ) : null}
-                            <div className="tv-row-label"><strong>🎲 Wolf&apos;s Gambit</strong><span className="muted">Ante up, roll three, keep the good ones &amp; reroll once — beat the Gambler to <b>double</b> your bet (<b>triple</b> on three-of-a-kind!).</span></div>
+            {/* Station panel */}
+            {station ? (
+                <div className="tv-panel-wrap" onClick={closeStation} role="presentation">
+                    <div className="tv-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tv-panel-head">
+                            <strong>{station === "bar" ? "🍺 The Barkeep" : station === "dice" ? "🎲 Wolf's Gambit" : "🔥 The Hearth"}</strong>
+                            <button type="button" onClick={closeStation} aria-label="Close">✕</button>
                         </div>
-                        {flash ? <div className="tv-flash">{flash}</div> : null}
-                        {!g && !result ? (
-                            <div className="tv-bets">
-                                {[50, 200, 500].map((amt) => (
-                                    <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => ante(amt)}>Ante {amt}</button>
-                                ))}
-                                <span className="muted tv-gold">🪙 {(st?.gold || 0).toLocaleString()}</span>
-                            </div>
-                        ) : null}
-                        {g ? (
-                            <div className="tv-gambit">
-                                <div className="tv-hand-label">Your hand: <strong>{g.hand}</strong>{!g.rerolled ? <span className="muted"> · tap a die to KEEP it, then reroll</span> : <span className="muted"> · reroll used — lay it down!</span>}</div>
-                                <div className="tv-dice-row">
-                                    {g.dice.map((v, i) => <Die key={i} value={v} held={g.hold[i]} rolling={rolling && !g.hold[i]} locked={g.rerolled} onClick={() => toggleHold(i)} />)}
-                                </div>
-                                <div className="tv-play-btns">
-                                    {!g.rerolled ? <button type="button" className="tv-roll" disabled={busy} onClick={reroll}>🎲 Reroll the rest</button> : null}
-                                    <button type="button" className="tv-cash" disabled={busy} onClick={layDown}>🃏 Lay it down</button>
+
+                        {station === "bar" ? (
+                            <div className="tv-dialogue">
+                                <div className="tv-keeper"><span className="tv-keeper-ic" aria-hidden="true">🧔</span><div className="tv-speech">{line}</div></div>
+                                {flash ? <div className="tv-flash">{flash}</div> : null}
+                                <div className="tv-options">
+                                    <button type="button" disabled={busy || !st?.dailyPint?.available} onClick={askPint}>{st?.dailyPint?.available ? `🍺 Pour me a pint (+${st?.dailyPint?.xp || 40} XP, +${st?.dailyPint?.gold || 15} 🪙)` : "🍺 Already had my pint today"}</button>
+                                    <button type="button" disabled={busy || (st?.gold || 0) < (st?.round?.cost || 400)} onClick={buyRoundAct}>🍻 Buy a round for the house ({(st?.round?.cost || 400).toLocaleString()} 🪙)</button>
+                                    <button type="button" onClick={askNews}>🗞️ What&apos;s the word tonight?</button>
                                 </div>
                             </div>
                         ) : null}
-                        {result ? (
-                            <div className="tv-result">
-                                <div className="tv-vs">
-                                    <div className={`tv-vs-side${result.outcome === "win" ? " is-win" : ""}`}>
-                                        <div className="tv-vs-who">You</div>
-                                        <div className="tv-dice-row sm">{result.player.dice.map((v, i) => <Die key={i} value={v} small />)}</div>
-                                        <div className="tv-vs-hand">{result.player.hand}</div>
-                                    </div>
-                                    <div className="tv-vs-x">vs</div>
-                                    <div className={`tv-vs-side${result.outcome === "lose" ? " is-win" : ""}`}>
-                                        <div className="tv-vs-who">🧔 Gambler</div>
-                                        <div className="tv-dice-row sm">{result.gambler.dice.map((v, i) => <Die key={i} value={v} small />)}</div>
-                                        <div className="tv-vs-hand">{result.gambler.hand}</div>
-                                    </div>
+
+                        {station === "hearth" ? (
+                            <div className="tv-dialogue">
+                                <div className="tv-keeper"><span className="tv-keeper-ic" aria-hidden="true">🎵</span><div className="tv-speech">{line}</div></div>
+                                <div className="tv-options">
+                                    <button type="button" onClick={askNews}>🗞️ Any rumors by the fire?</button>
+                                    <button type="button" onClick={askLore}>🏰 Tell me about this place</button>
                                 </div>
-                                <button type="button" className="tv-roll" onClick={() => { setResult(null); setFlash(null); }}>Play again</button>
+                            </div>
+                        ) : null}
+
+                        {station === "dice" ? (
+                            <div className="tv-diceview">
+                                <div className="tv-gambit-head">
+                                    {diceUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={diceUrl} alt="" className="tv-gambit-cup" draggable={false} />
+                                    ) : null}
+                                    <span className="muted" style={{ fontSize: "0.82rem" }}>Ante up, roll three, keep the good ones &amp; reroll once — beat the Gambler to <b>double</b> your bet (<b>triple</b> on three-of-a-kind!).</span>
+                                </div>
+                                {flash ? <div className="tv-flash">{flash}</div> : null}
+                                {!g && !result ? (
+                                    <div className="tv-bets">
+                                        {[50, 200, 500].map((amt) => <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => ante(amt)}>Ante {amt}</button>)}
+                                        <span className="muted tv-gold">🪙 {(st?.gold || 0).toLocaleString()}</span>
+                                    </div>
+                                ) : null}
+                                {g ? (
+                                    <div className="tv-gambit">
+                                        <div className="tv-hand-label">Your hand: <strong>{g.hand}</strong>{!g.rerolled ? <span className="muted"> · tap a die to KEEP it, then reroll</span> : <span className="muted"> · reroll used — lay it down!</span>}</div>
+                                        <div className="tv-dice-row">{g.dice.map((v, i) => <Die key={i} value={v} held={g.hold[i]} rolling={rolling && !g.hold[i]} locked={g.rerolled} onClick={() => toggleHold(i)} />)}</div>
+                                        <div className="tv-play-btns">
+                                            {!g.rerolled ? <button type="button" className="tv-roll" disabled={busy} onClick={reroll}>🎲 Reroll the rest</button> : null}
+                                            <button type="button" className="tv-cash" disabled={busy} onClick={layDown}>🃏 Lay it down</button>
+                                        </div>
+                                    </div>
+                                ) : null}
+                                {result ? (
+                                    <div className="tv-result">
+                                        <div className="tv-vs">
+                                            <div className={`tv-vs-side${result.outcome === "win" ? " is-win" : ""}`}><div className="tv-vs-who">You</div><div className="tv-dice-row sm">{result.player.dice.map((v, i) => <Die key={i} value={v} small />)}</div><div className="tv-vs-hand">{result.player.hand}</div></div>
+                                            <div className="tv-vs-x">vs</div>
+                                            <div className={`tv-vs-side${result.outcome === "lose" ? " is-win" : ""}`}><div className="tv-vs-who">🧔 Gambler</div><div className="tv-dice-row sm">{result.gambler.dice.map((v, i) => <Die key={i} value={v} small />)}</div><div className="tv-vs-hand">{result.gambler.hand}</div></div>
+                                        </div>
+                                        <button type="button" className="tv-roll" onClick={() => { setResult(null); setFlash(null); }}>Play again</button>
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
                     </div>
-                ) : (
-                    <div className="tv-dialogue">
-                        <div className="tv-keeper">
-                            <span className="tv-keeper-ic" aria-hidden="true">🧔</span>
-                            <div className="tv-speech">{line}</div>
-                        </div>
-                        {flash ? <div className="tv-flash">{flash}</div> : null}
-                        <div className="tv-options">
-                            <button type="button" onClick={askNews}>🗞️ What&apos;s the word tonight?</button>
-                            <button type="button" disabled={busy || !st?.dailyPint?.available} onClick={askPint}>{st?.dailyPint?.available ? `🍺 Pour me a pint (+${st?.dailyPint?.xp || 40} XP, +${st?.dailyPint?.gold || 15} 🪙)` : "🍺 Already had my pint today"}</button>
-                            <button type="button" disabled={busy || (st?.gold || 0) < (st?.round?.cost || 400)} onClick={buyRoundAct}>🍻 Buy a round for the house ({(st?.round?.cost || 400).toLocaleString()} 🪙)</button>
-                            <button type="button" onClick={() => { setFlash(null); setView("dice"); }}>🎲 Fancy a game of dice?</button>
-                            <button type="button" onClick={askLore}>🏰 Tell me about this place</button>
-                        </div>
-                    </div>
-                )}
-            </section>
+                </div>
+            ) : null}
 
             <style>{TV_CSS}</style>
         </div>
     );
 }
 
-// A single clean SVG die. Tap to KEEP it (before your reroll); shows a tumble animation when rolling.
-function Die({ value, held = false, rolling = false, locked = false, small = false, onClick }) {
-    const size = small ? 36 : 54;
-    return (
-        <button type="button" onClick={onClick} disabled={!onClick || locked} className={`tv-diebtn${held ? " is-held" : ""}${rolling ? " is-rolling" : ""}${!onClick ? " is-static" : ""}`} style={{ width: size, height: size }}>
-            <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
-                <rect x="6" y="6" width="88" height="88" rx="18" fill="#f4ecd8" stroke="#3a2a12" strokeWidth="4" />
-                {(PIP_LAYOUT[value] || []).map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="8.5" fill="#2a1a08" />)}
-            </svg>
-            {held ? <span className="tv-held-tag">KEEP</span> : null}
-        </button>
-    );
-}
-
 const TV_CSS = `
-.tv { display: flex; flex-direction: column; gap: 12px; }
-.tv-scene { position: relative; width: 100%; height: min(52vh, 420px); border-radius: 18px; overflow: hidden;
-    background-size: cover; background-position: center; background-color: #241206;
+.tv-scene { position: relative; width: 100%; height: min(58vh, 460px); border-radius: 18px; overflow: hidden; cursor: pointer;
+    background-size: cover; background-position: center; background-color: #241206; user-select: none;
     box-shadow: inset 0 -40px 80px rgba(60,20,0,0.5), 0 10px 30px rgba(0,0,0,0.45); }
 .tv-scene-fallback { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.4rem; color: #ffcf8a; }
 .tv-fire { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 22% 92%, rgba(255,140,40,0.42), transparent 55%); mix-blend-mode: screen; animation: tvFlicker 2.6s ease-in-out infinite; }
@@ -208,9 +275,29 @@ const TV_CSS = `
 .tv-vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 30px rgba(20,8,0,0.6); }
 .tv-ambient { position: absolute; bottom: 12%; font-size: 20px; opacity: 0; pointer-events: none; animation: tvRise 5.5s ease-in infinite; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 @keyframes tvRise { 0% { opacity: 0; transform: translateY(0) scale(.7); } 15% { opacity: .9; } 80% { opacity: .6; } 100% { opacity: 0; transform: translateY(-160px) scale(1.1); } }
-.tv-leave { position: absolute; top: 10px; left: 10px; z-index: 3; padding: 7px 13px; border-radius: 999px; border: none; cursor: pointer; font-weight: 800; font-size: 13px; color: #2a1a06; background: linear-gradient(180deg,#ffd75e,#f3b23a); box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
-.tv-title { position: absolute; top: 12px; right: 14px; z-index: 3; font-weight: 900; color: #ffe0b0; text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
-.tv-panel { display: flex; flex-direction: column; gap: 12px; }
+.tv-leave { position: absolute; top: 10px; left: 10px; z-index: 6; padding: 7px 13px; border-radius: 999px; border: none; cursor: pointer; font-weight: 800; font-size: 13px; color: #2a1a06; background: linear-gradient(180deg,#ffd75e,#f3b23a); box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+.tv-hint { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 6; font-size: 11px; font-weight: 700; color: #ffe0b0; background: rgba(20,10,4,0.6); border: 1px solid rgba(255,215,110,0.25); border-radius: 999px; padding: 3px 12px; white-space: nowrap; pointer-events: none; }
+/* Stations */
+.tv-station { position: absolute; transform: translate(-50%, -100%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; padding: 4px; }
+.tv-station-emoji { font-size: 30px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); animation: tvBob 2.6s ease-in-out infinite; }
+.tv-station-label { font-size: 11px; font-weight: 800; color: #ffe6b3; background: rgba(20,10,4,0.78); border: 1px solid rgba(255,215,110,0.4); border-radius: 999px; padding: 2px 9px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+@keyframes tvBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+/* Avatars */
+.tv-av { position: absolute; transform: translate(-50%, -100%); z-index: 4; display: flex; flex-direction: column; align-items: center; transition: left .3s linear, top .3s linear; }
+.tv-av.is-you { z-index: 5; }
+.tv-av-sprite { width: 62px; height: 62px; display: grid; place-items: center; transform-origin: 50% 100%; }
+.tv-av:not(.is-walking) .tv-av-sprite { animation: tvBreathe 2.8s ease-in-out infinite; }
+@keyframes tvBreathe { 0%,100% { transform: scaleY(1) scaleX(1); } 48% { transform: scaleY(0.955) scaleX(1.035); } }
+.tv-av-sprite img { width: 62px; height: 62px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)); }
+.tv-av-fallback { font-size: 44px; }
+.tv-av-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(30,18,50,0.85); border-radius: 999px; padding: 1px 8px; margin-bottom: 2px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.tv-av-you { font-size: 10px; font-weight: 900; color: #2a1a06; background: #ffd75e; border-radius: 999px; padding: 0 8px; margin-top: 2px; }
+/* Station panel */
+.tv-panel-wrap { margin-top: 12px; }
+.tv-panel { border-radius: 16px; background: var(--card-bg,#17181c); border: 1px solid rgba(255,215,110,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.4); padding: 14px; }
+.tv-panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tv-panel-head strong { font-size: 1rem; color: #ffe0b0; flex: 1; }
+.tv-panel-head button { background: none; border: none; color: inherit; font-size: 18px; cursor: pointer; opacity: 0.7; }
 .tv-dialogue { display: flex; flex-direction: column; gap: 12px; }
 .tv-keeper { display: flex; gap: 12px; align-items: flex-start; }
 .tv-keeper-ic { font-size: 40px; flex: 0 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
@@ -220,16 +307,13 @@ const TV_CSS = `
 .tv-options button:hover:not(:disabled) { border-color: rgba(255,215,110,0.5); }
 .tv-options button:disabled { opacity: .5; cursor: default; }
 .tv-flash { text-align: center; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.35); border-radius: 10px; padding: 8px 12px; }
-.tv-back { align-self: flex-start; background: none; border: none; color: #ffd75e; font-weight: 800; font-size: 0.85rem; cursor: pointer; padding: 0; }
-.tv-row-label { display: flex; flex-direction: column; gap: 2px; }
-.tv-row-label .muted { font-size: 0.78rem; }
 .tv-diceview { display: flex; flex-direction: column; gap: 12px; }
+.tv-gambit-head { display: flex; align-items: center; gap: 12px; }
+.tv-gambit-cup { width: 52px; height: 52px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
 .tv-bets { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tv-bets button { padding: 9px 16px; border-radius: 10px; border: 1px solid rgba(255,215,110,0.4); background: rgba(255,215,110,0.12); color: #ffe0b0; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tv-bets button:disabled { opacity: .45; cursor: default; }
 .tv-gold { margin-left: auto; font-size: 0.85rem; }
-.tv-gambit-head { display: flex; align-items: center; gap: 12px; }
-.tv-gambit-cup { width: 52px; height: 52px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
 .tv-gambit { display: flex; flex-direction: column; gap: 12px; }
 .tv-hand-label { font-size: 0.92rem; color: #f2ead9; }
 .tv-hand-label strong { color: #ffe0b0; }
