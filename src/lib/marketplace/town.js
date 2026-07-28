@@ -7,6 +7,7 @@ import { listFriends } from "@/lib/marketplace/friends.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
+import { storeStatus } from "@/lib/marketplace/store-hours.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a fair gold SINK). Tunable prices.
 export const MERCHANT_WARES = [
@@ -216,6 +217,7 @@ export async function getTownState(buyerId) {
         upgrade,
         event,
         merchant: MERCHANT_WARES,
+        store: storeStatus(),
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
 }

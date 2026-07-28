@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
+import { storeStatus } from "@/lib/marketplace/store-hours.js";
 
 // ── TOWN EVENTS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Admin-triggered communal encounters that spawn in the plaza (a bandit raid, etc.). Everyone in town attacks a
@@ -75,6 +76,24 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
         broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch(() => {});
     }
     return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent) };
+}
+
+// Cron tick: right after the shop physically OPENS (Thu–Sun), auto-spawn a town event so members get pinged
+// to come down while the Den is open — a foot-traffic driver. DORMANT until TOWN_EVENTS_LIVE is set, because
+// the Town is owner-gated during the build and we must not push the whole membership to a town they can't enter.
+export async function runTownHoursTick() {
+    if (!String(process.env.TOWN_EVENTS_LIVE || "").trim()) return { skipped: "not_live" };
+    const status = storeStatus();
+    if (!status.open || status.minutesSinceOpen > 20) return { skipped: "not_just_opened", open: status.open };
+    const [active, recent] = await Promise.all([
+        db.queryOne(`SELECT id FROM mkt_town_event WHERE status = 'active' LIMIT 1`).catch(() => null),
+        db.queryOne(`SELECT id FROM mkt_town_event WHERE started_at > NOW() - INTERVAL '30 minutes' LIMIT 1`).catch(() => null),
+    ]);
+    if (active || recent) return { skipped: "event_recent" };
+    const kinds = Object.keys(TOWN_EVENT_TYPES);
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const res = await spawnTownEvent(kind);
+    return { spawned: res.ok ? kind : null, error: res.error || null };
 }
 
 // Land a hit on the active event. Throttled per member; on the killing blow, resolves + pays out.

@@ -36,6 +36,10 @@
     ],
     "crons": [
         {
+            "path": "/api/jobs/town-hours",
+            "schedule": "*/15 * * * *"
+        },
+        {
             "path": "/api/jobs/consignment-nightly-reports",
             "schedule": "30 7 * * *"
         },

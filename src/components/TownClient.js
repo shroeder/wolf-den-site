@@ -254,6 +254,8 @@ export default function TownClient({ initial }) {
     const crierLines = useMemo(() => {
         const lines = [];
         if (state?.event) lines.push(`${state.event.name} in the plaza — to arms!`);
+        if (state?.store?.open) lines.push(`The Den is OPEN til ${state.store.closesLabel} — come on down!`);
+        else if (state?.store?.nextOpenLabel) lines.push(`Shop's closed — opens ${state.store.nextOpenLabel}!`);
         lines.push(`${state?.onlineCount ?? 1} wolves about the Den tonight!`);
         if (state?.upgrade?.next) lines.push(`Chip in to build the ${state.upgrade.next.name}!`);
         lines.push("The tavern's warm — pull up a stool!");
@@ -290,6 +292,11 @@ export default function TownClient({ initial }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <h1 style={{ margin: 0, fontSize: "1.25rem" }}>🏘️ Wolf Den Town</h1>
                     <span className="tw-online">🟢 {state?.onlineCount ?? 1} around</span>
+                    {state?.store ? (
+                        <span className={`tw-openchip${state.store.open ? " is-open" : ""}`} title="The physical shop's hours">
+                            {state.store.open ? `🟢 Den open til ${state.store.closesLabel}` : `🔴 Closed · opens ${state.store.nextOpenLabel}`}
+                        </span>
+                    ) : null}
                     <button type="button" className="tw-roster-btn" onClick={() => setRoster(true)}>👥 Who&apos;s around</button>
                     <button type="button" className="tw-roster-btn" onClick={() => setBoardOpen(true)}>🏛️ Town Hall</button>
                     <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "#c58b3a", fontWeight: 800 }}>OWNER PREVIEW</span>
@@ -575,6 +582,8 @@ const TOWN_CSS = `
 .tw-ground { position: absolute; inset: 66% 0 0 0; background: radial-gradient(120% 80% at 50% -10%, rgba(255,190,120,0.12), transparent 60%), repeating-linear-gradient(90deg, #55402c 0 38px, #5c4630 38px 76px), linear-gradient(180deg, #6a5138, #4a381f); box-shadow: inset 0 8px 24px rgba(0,0,0,0.35); }
 
 .tw-online { font-size: 0.72rem; font-weight: 800; color: #8fe39a; background: rgba(143,227,154,0.12); border: 1px solid rgba(143,227,154,0.35); border-radius: 999px; padding: 2px 9px; }
+.tw-openchip { font-size: 0.7rem; font-weight: 800; border-radius: 999px; padding: 2px 9px; color: #e69a9a; background: rgba(224,67,63,0.1); border: 1px solid rgba(224,67,63,0.32); }
+.tw-openchip.is-open { color: #8fe39a; background: rgba(143,227,154,0.12); border-color: rgba(143,227,154,0.35); }
 .tw-roster-btn { font-size: 0.74rem; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.4); border-radius: 999px; padding: 3px 11px; cursor: pointer; }
 
 .tw-building { position: absolute; transform: translateX(-50%); bottom: auto; display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: #ffe9b0; transition: transform .12s ease; }
