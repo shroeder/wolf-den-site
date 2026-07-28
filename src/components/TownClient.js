@@ -279,19 +279,21 @@ export default function TownClient({ initial }) {
     }, [followCam, maxScroll]);
     const onPointerUp = useCallback((e) => {
         const d = drag.current; d.down = false;
-        setDragging(false);
         if (d.moved) {
-            // Flick momentum: keep gliding, decaying, so swipes feel effortless.
+            // Flick momentum: keep gliding (with the camera transition OFF the whole time, so it tracks the
+            // finger 1:1 like a native scroll instead of easing every frame) until it decays out.
             let v = d.vx * 16; // ≈ px per frame
             const glide = () => {
-                v *= 0.93;
-                if (Math.abs(v) < 0.5) return;
+                v *= 0.94;
+                if (Math.abs(v) < 0.4) { setDragging(false); return; }
                 setPanExtra((p) => clamp(followCam + p - v, 0, maxScroll) - followCam);
                 momentumRef.current = requestAnimationFrame(glide);
             };
-            if (Math.abs(v) > 1.2) momentumRef.current = requestAnimationFrame(glide);
+            if (Math.abs(v) > 0.8) { momentumRef.current = requestAnimationFrame(glide); } // keep dragging=true → no transition
+            else setDragging(false);
             return; // was a pan, not a tap
         }
+        setDragging(false);
         if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return; // doors/avatars handle themselves
         const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
         const worldX = ((e.clientX - rect.left + cameraPx) / WORLD_W) * 100;
@@ -828,7 +830,9 @@ const TOWN_CSS = `
 .tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-bg img:nth-child(even) { transform: scaleX(-1); }
 /* Layered parallax: far sky (slow) behind the world + a tiling cobble ground band inside it. */
-.tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
+/* Sky bottom stays anchored (~64%, tucked behind the wall so there's no gap) but it's scaled taller + shifted
+   up, so the distant-building silhouette baked into the sky rises up into view behind the clouds. */
+.tw-far { position: absolute; top: -18%; left: 0; height: 82%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
 /* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon.
