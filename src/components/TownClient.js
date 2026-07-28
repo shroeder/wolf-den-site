@@ -280,6 +280,11 @@ export default function TownClient({ initial }) {
                             </Link>
                         );
                     })}
+                    {/* Blacksmith NPC standing by the Forge */}
+                    {art.smith?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="tw-npc" src={art.smith.url} alt="" draggable={false} style={{ left: "45%", top: `${GROUND}%` }} />
+                    ) : null}
                     {/* Collective-upgrade decorations that scroll with the street */}
                     {unlocked.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
                     {unlocked.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
@@ -495,6 +500,7 @@ const TOWN_CSS = `
 .tw-av.is-friend .tw-sprite::before { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; margin: 0 auto; width: 46px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(120,200,255,0.8), 0 0 10px rgba(120,200,255,0.7); }
 
 /* Collective-upgrade decorations */
+.tw-npc { position: absolute; transform: translate(-50%, -100%); height: 92px; width: auto; z-index: 97; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 .tw-deco { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 96; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.5)); }
 .tw-deco-fountain { font-size: 54px; }
 .tw-deco-statue { font-size: 46px; }

@@ -32,6 +32,8 @@ const ART_PROMPTS = {
     shop: `A GENERAL STORE trading post — a wooden shopfront with a striped awning, a couple of barrels and crates of goods by the door, a hanging sign with a coin pouch. ${BUILDING_STYLE}`,
     docks: `A wooden HARBOR DOCKHOUSE with a small moored sailing ship beside it, coiled ropes, barrels and crates, a lantern on a post. ${BUILDING_STYLE}`,
     farm: `A rustic FARM barn — a red-brown barn with a hayloft, a wooden fence gate, a couple of pumpkins and a wheat sheaf by the door, a little scarecrow. ${BUILDING_STYLE}`,
+    // Town NPC — a character sprite (same isolated-cutout treatment as the buildings) who stands by the Forge.
+    smith: `A friendly burly BLACKSMITH — a bearded human smith in a leather apron and rolled sleeves, standing and resting a large hammer on one shoulder, full body, three-quarter view facing slightly forward, warm and welcoming. ${BUILDING_STYLE}`,
 };
 
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
