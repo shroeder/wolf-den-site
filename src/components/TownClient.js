@@ -778,12 +778,13 @@ const TOWN_CSS = `
 .tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
-/* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon. */
-.tw-depth { position: absolute; left: 0; bottom: 44%; height: 26%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+/* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon.
+   Raised so more of the distant buildings clear the foreground wall (and the bright haze base tucks behind it). */
+.tw-depth { position: absolute; left: 0; bottom: 56%; height: 26%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-depth img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-depth img:nth-child(even) { transform: scaleX(-1); }
 /* Midground skyline band — nearer rooftops on the horizon, faster parallax than the sky, behind the plaza. */
-.tw-mid { position: absolute; left: 0; bottom: 40%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+.tw-mid { position: absolute; left: 0; bottom: 52%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Plaza centerpiece — the wolf fountain landmark standing in the square. */
