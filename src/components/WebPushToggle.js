@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { disableWebPush, enableWebPush, hasLocalSubscription, isWebPushSupported, pushPermission } from "@/lib/web-push-client";
+import { disableWebPush, enableWebPush, hasLocalSubscription, isWebPushSupported, pushPermission, registerPushServiceWorker } from "@/lib/web-push-client";
 
 // An explicit on/off control for browser notifications, for the account hub. Reflects the real browser
 // permission + subscription state and lets a member turn it on or off on this device.
@@ -23,7 +23,12 @@ export default function WebPushToggle() {
                 if (alive) setState("blocked");
                 return;
             }
-            const on = await hasLocalSubscription();
+            // Register the SW so a subscription can be read, and never let the check hang the row invisible.
+            await registerPushServiceWorker().catch(() => {});
+            const on = await Promise.race([
+                hasLocalSubscription().catch(() => false),
+                new Promise((res) => setTimeout(() => res(false), 3000)),
+            ]);
             if (alive) setState(on ? "on" : "off");
         })();
         return () => {

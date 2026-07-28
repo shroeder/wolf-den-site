@@ -52,10 +52,12 @@ export async function registerPushServiceWorker() {
     return navigator.serviceWorker.register("/push-sw.js").catch(() => null);
 }
 
-// Is this browser currently subscribed (locally)? Doesn't hit the server.
+// Is this browser currently subscribed (locally)? Doesn't hit the server. Uses getRegistration() (resolves
+// immediately, undefined when there's no SW) rather than `.ready` (which HANGS forever when no service
+// worker is active — that hang left the settings toggle stuck invisible).
 export async function hasLocalSubscription() {
     if (!isWebPushSupported() || Notification.permission !== "granted") return false;
-    const reg = await navigator.serviceWorker.ready.catch(() => null);
+    const reg = await navigator.serviceWorker.getRegistration().catch(() => null);
     if (!reg) return false;
     const sub = await reg.pushManager.getSubscription().catch(() => null);
     return Boolean(sub);
