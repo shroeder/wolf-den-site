@@ -199,12 +199,13 @@ function defaultPlotPos(i, n) {
 // fertilizer stock, and how many crops are ready right now (for the alert badge).
 export async function getGarden(buyerId) {
     if (!buyerId) return null;
-    const [buyer, plots, seeds, packRows, plotUp] = await Promise.all([
+    const [buyer, plots, seeds, packRows, plotUp, bedRow] = await Promise.all([
         loadFarmBuyer(buyerId),
         db.query(`SELECT slot, seed_id, planted_at, ready_at, fertilized FROM mkt_farm_plot WHERE buyer_id = $1 ORDER BY slot`, [buyerId]).catch(() => []),
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0 AND consumable_id = ANY($2)`, [buyerId, SEED_PACK_IDS]).catch(() => []),
         getPlotUpgrades(buyerId).catch(() => ({})),
+        db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'farm_bed'`).catch(() => null),
     ]);
     const up = buyer?.farm_upgrades || {};
     const n = plotCount(up);
@@ -253,6 +254,7 @@ export async function getGarden(buyerId) {
         fertilizerPrice: FERTILIZER_PRICE,
         gold: buyer?.gold || 0,
         readyCount,
+        bedUrl: bedRow?.url || null,
     };
 }
 
