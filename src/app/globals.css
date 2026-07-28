@@ -8800,6 +8800,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .webpush-toggle strong { color: #f4e4bc; font-size: 0.92rem; }
 .webpush-toggle .secondary { font-size: 0.8rem; line-height: 1.35; }
 .webpush-toggle button { flex: 0 0 auto; padding: 7px 14px; font-size: 0.85rem; }
+.webpush-toggle-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+.webpush-test-msg { flex-basis: 100%; font-size: 0.8rem; color: #cbb9e0; }
 
 @media (max-width: 520px) {
     .webpush-prompt { right: 10px; left: 10px; bottom: 10px; max-width: none; }

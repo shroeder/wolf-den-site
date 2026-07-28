@@ -9,6 +9,7 @@ import { disableWebPush, enableWebPush, hasLocalSubscription, isWebPushSupported
 export default function WebPushToggle() {
     const [state, setState] = useState("loading"); // loading | unsupported | on | off | blocked
     const [busy, setBusy] = useState(false);
+    const [testMsg, setTestMsg] = useState("");
 
     useEffect(() => {
         let alive = true;
@@ -44,6 +45,21 @@ export default function WebPushToggle() {
         setState("off");
     }
 
+    async function sendTest() {
+        setBusy(true);
+        setTestMsg("Sending…");
+        // Make sure THIS browser's subscription is current on the server first (heals a rotated key), then fire.
+        await enableWebPush().catch(() => {});
+        const r = await fetch("/api/marketplace/push/web/test", { method: "POST" }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        setBusy(false);
+        if (!d) setTestMsg("Couldn't reach the server — try again.");
+        else if (d.reason === "not_configured") setTestMsg("Server push isn't switched on yet (VAPID key missing).");
+        else if (d.skipped === "no_subs") setTestMsg("This device isn't subscribed — toggle off then on.");
+        else if ((d.sent || 0) > 0) setTestMsg(`Sent ✓ — a notification should appear${d.pruned ? ` (cleaned ${d.pruned} dead)` : ""}.`);
+        else setTestMsg("Sent to 0 devices — the subscription may be stale; toggle off then on.");
+    }
+
     if (state === "loading") return null;
 
     return (
@@ -58,14 +74,20 @@ export default function WebPushToggle() {
                 </span>
             </div>
             {state === "on" ? (
-                <button type="button" className="btn-ghost" onClick={turnOff} disabled={busy}>
-                    {busy ? "…" : "Turn off"}
-                </button>
+                <div className="webpush-toggle-actions">
+                    <button type="button" className="btn-ghost" onClick={sendTest} disabled={busy}>
+                        {busy ? "…" : "Send test"}
+                    </button>
+                    <button type="button" className="btn-ghost" onClick={turnOff} disabled={busy}>
+                        Turn off
+                    </button>
+                </div>
             ) : state === "off" ? (
                 <button type="button" className="btn-gold" onClick={turnOn} disabled={busy}>
                     {busy ? "Enabling…" : "Turn on"}
                 </button>
             ) : null}
+            {testMsg ? <span className="webpush-test-msg secondary">{testMsg}</span> : null}
         </div>
     );
 }
