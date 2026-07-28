@@ -142,6 +142,7 @@ export default function TownClient({ initial }) {
 
     const you = state?.you;
     const art = state?.art || {};
+    const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
     const buildings = state?.buildings || [];
     const otherList = useMemo(() => Object.values(others), [others]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
@@ -163,11 +164,26 @@ export default function TownClient({ initial }) {
             </section>
 
             <div ref={sceneRef} className="tw-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; }} role="presentation">
-                {!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null}
+                {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
+                {layered ? (
+                    <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.35}px)`, transition: `transform ${camDur}s linear` }}>
+                        {[0, 1, 2, 3, 4].map((k) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={k} src={art.sky.url} alt="" draggable={false} />
+                        ))}
+                    </div>
+                ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
                 {/* The wide world that scrolls under a fixed camera */}
                 <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: `transform ${camDur}s linear` }}>
-                    {/* Background: mirror-tiled generated street, else the CSS sky/ground above shows through */}
-                    {art.background ? (
+                    {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
+                    {layered ? (
+                        <div className="tw-cobble" aria-hidden="true">
+                            {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={k} src={art.cobble.url} alt="" draggable={false} />
+                            ))}
+                        </div>
+                    ) : art.background ? (
                         <div className="tw-bg" aria-hidden="true">
                             {[0, 1, 2, 3].map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -239,6 +255,14 @@ const TOWN_CSS = `
 .tw-bg { position: absolute; inset: 0; display: flex; height: 100%; }
 .tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-bg img:nth-child(even) { transform: scaleX(-1); }
+/* Layered parallax: far sky (slow) behind the world + a tiling cobble ground band inside it. */
+.tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
+.tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-far img:nth-child(even) { transform: scaleX(-1); }
+.tw-cobble { position: absolute; left: 0; bottom: 0; height: 44%; display: flex; overflow: hidden; z-index: 1; box-shadow: inset 0 12px 26px rgba(0,0,0,0.35); }
+.tw-cobble img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-cobble img:nth-child(even) { transform: scaleX(-1); }
+.tw-cobble::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 30px; background: linear-gradient(180deg, rgba(30,20,45,0.5), transparent); pointer-events: none; }
 /* CSS fallback backdrop (before art is generated) */
 .tw-sky { position: absolute; inset: 0 0 34% 0; background: linear-gradient(180deg, #2a2140 0%, #3b2d55 42%, #6b4d7a 80%, #a56b6b 100%); }
 .tw-ground { position: absolute; inset: 66% 0 0 0; background: radial-gradient(120% 80% at 50% -10%, rgba(255,190,120,0.12), transparent 60%), repeating-linear-gradient(90deg, #55402c 0 38px, #5c4630 38px 76px), linear-gradient(180deg, #6a5138, #4a381f); box-shadow: inset 0 8px 24px rgba(0,0,0,0.35); }

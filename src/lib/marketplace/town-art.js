@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { generateImage, generateWideSceneImage } from "@/lib/marketplace/openai-image.js";
+import { generateImage, generateWideSceneImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
 
 // AI art for the side-scrolling Wolf Den Town: one WIDE panoramic street background (repeated/mirrored so it
 // scrolls forever) + transparent BUILDING sprites laid on top of it. Static/shared — generate once + store.
@@ -12,6 +12,14 @@ const BUILDING_STYLE =
     "a single isolated 2D game-art building, the WHOLE building centered and fully visible, painterly fantasy action-RPG style with clean confident outlines and cel-shaded vibrant colors, strong readable silhouette. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO background scenery, NO sky, NO ground, NO cobblestones, NO haze, fog, or ambient glow behind the building. Nothing but the building itself. No people, no text, no logo, no watermark, no border.";
 
 const ART_PROMPTS = {
+    // ── Layered/parallax approach (reliable): a GENERIC tiling far sky + a seamless cobble ground texture; all
+    // the uniqueness lives in the separate building sprites laid on top. Only these two are ever "tiled", and
+    // they're the two things that tile flawlessly (a generic sky mirrors invisibly; a texture repeats cleanly).
+    sky:
+        `A fantasy town SKYLINE far-background at warm golden dusk — a soft glowing sky fading from warm amber near the horizon up to dusky purple, a LOW distant silhouette of generic medieval rooftops and chimneys with a couple of faint vague towers along the horizon, soft atmospheric haze. NO distinct landmark, NO foreground, NO people, NO street or ground — only sky and a faint distant town silhouette, an even repeating horizon meant to tile. ${STREET_STYLE}`,
+    cobble:
+        `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle — worn rounded grey-brown cobbles with mortar gaps, warm even dusk lighting, uniform across the WHOLE image with no focal point, NO objects, NO people, NO buildings, NO sky, NO horizon — just repeating cobblestones, designed to tile left-to-right. ${STREET_STYLE}`,
+    // Legacy single wide background (kept only as a fallback if the layers aren't generated).
     background:
         `A wide empty fantasy COBBLESTONE town street at warm golden dusk, worn cobblestones underfoot, a low stone curb, distant medieval town rooftops, chimneys and a couple of towers on the horizon, warm sky fading to dusky purple, a few hanging lanterns and string lights, cozy and inviting, NO people, NO large foreground buildings (leave the street open) — a clean side-scroller street the player walks along. ${STREET_STYLE}`,
     tavern: `A cozy fantasy TAVERN — a timber-framed inn with warm-lit windows, a hanging wooden sign shaped like a foaming beer mug, a small awning over the door. ${BUILDING_STYLE}`,
@@ -28,9 +36,10 @@ export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
 export async function generateTownArt(key) {
     const prompt = ART_PROMPTS[key];
     if (!prompt) throw new Error("Unknown town art key");
-    const url = key === "background"
-        ? await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 3 })
-        : await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true });
+    let url;
+    if (key === "background") url = await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 3 });
+    else if (key === "sky" || key === "cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town" }); // opaque scene layers
+    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true }); // transparent building sprite
     await db.query(
         `INSERT INTO mkt_town_art (art_key, url, updated_at) VALUES ($1, $2, NOW())
          ON CONFLICT (art_key) DO UPDATE SET url = $2, updated_at = NOW()`,
