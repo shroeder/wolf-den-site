@@ -2051,7 +2051,7 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                                 {!p.fertilized && garden.fertilizer > 0 ? <span style={{ fontWeight: 700, opacity: 0.8 }}> ({garden.fertilizer} left)</span> : null}
                             </button>
                             {!p.fertilized && garden.fertilizer <= 0 ? (
-                                <button type="button" onClick={onBuyFertilizer} disabled={!canBuyFert || busy === "fbuy"} style={{ width: "100%", padding: 11, fontWeight: 900, background: canBuyFert ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.08)", color: canBuyFert ? "#3a2c08" : "inherit", border: "none", borderRadius: 11, cursor: canBuyFert && busy !== "fbuy" ? "pointer" : "default", boxShadow: canBuyFert ? "0 3px 0 #b57f22" : "none", opacity: canBuyFert && busy !== "fbuy" ? 1 : 0.55 }}>🪙 Buy fertilizer · {garden.fertilizerPrice}g</button>
+                                <button type="button" onClick={onBuyFertilizer} disabled={!canBuyFert || busy === "fbuy"} style={{ width: "100%", padding: 11, fontWeight: 800, background: canBuyFert ? "linear-gradient(180deg,#8cc7ff,#4a93e0)" : "rgba(255,255,255,0.08)", color: canBuyFert ? "#052540" : "inherit", border: "none", borderRadius: 11, cursor: canBuyFert && busy !== "fbuy" ? "pointer" : "default", boxShadow: canBuyFert ? "0 3px 0 #2f6bb0" : "none", opacity: canBuyFert && busy !== "fbuy" ? 1 : 0.55 }}>💧 Buy fertilizer <span style={{ opacity: 0.75, fontWeight: 700 }}>({garden.fertilizerPrice}g)</span></button>
                             ) : null}
                         </>
                     )}
