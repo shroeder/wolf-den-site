@@ -830,9 +830,9 @@ const TOWN_CSS = `
 .tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-bg img:nth-child(even) { transform: scaleX(-1); }
 /* Layered parallax: far sky (slow) behind the world + a tiling cobble ground band inside it. */
-/* Sky bottom stays anchored (~64%, tucked behind the wall so there's no gap) but it's scaled taller + shifted
-   up, so the distant-building silhouette baked into the sky rises up into view behind the clouds. */
-.tw-far { position: absolute; top: -18%; left: 0; height: 82%; display: flex; z-index: 0; }
+/* Sky shifted well up so the distant-building silhouette baked into the sky rises clearly above the nearer
+   rooftops, into view behind the clouds. Bottom lands ~42% (still tucked behind the mid rooftops + wall). */
+.tw-far { position: absolute; top: -40%; left: 0; height: 82%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
 /* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon.
