@@ -334,8 +334,8 @@ export async function moveTown(buyerId, { x, y, facing } = {}) {
     const cy = Math.max(70, Math.min(88, Number(y) || 80));
     const f = facing === -1 ? -1 : 1;
     await db.query(
-        `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, updated_at) VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (buyer_id) DO UPDATE SET x = $2, y = $3, facing = $4, updated_at = NOW()`,
+        `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, zone, updated_at) VALUES ($1, $2, $3, $4, 'plaza', NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET x = $2, y = $3, facing = $4, zone = 'plaza', updated_at = NOW()`,
         [buyerId, cx, cy, f]
     ).catch(() => {});
     return { ok: true };

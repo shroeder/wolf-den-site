@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buyRound, claimDailyPint, gambitReroll, gambitResolve, gambitStart, getTavernState } from "@/lib/marketplace/town-tavern.js";
+import { buyRound, claimDailyPint, gambitReroll, gambitResolve, gambitStart, getTavernState, moveTavern } from "@/lib/marketplace/town-tavern.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -39,6 +39,7 @@ export async function POST(request) {
             else if (body?.action === "gambit_resolve") res = await gambitResolve(buyer.id);
             else if (body?.action === "pint") res = await claimDailyPint(buyer.id);
             else if (body?.action === "round") res = await buyRound(buyer.id);
+            else if (body?.action === "move") res = await moveTavern(buyer.id, { x: body?.x, y: body?.y, facing: body?.facing });
             else return noStore({ error: "unknown_action" }, { status: 400 });
             if (!res?.ok) return noStore({ error: res?.error || "failed" }, { status: 400 });
             return noStore(res);

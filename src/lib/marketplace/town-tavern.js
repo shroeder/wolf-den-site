@@ -4,6 +4,38 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
+
+// Mark you as walking around INSIDE the tavern (presence zone = 'tavern') at x,y so other patrons see you live.
+export async function moveTavern(buyerId, { x, y, facing } = {}) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const cx = clampN(x, 4, 96), cy = clampN(y, 55, 90), f = facing === -1 ? -1 : 1;
+    await db.query(
+        `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, zone, updated_at) VALUES ($1, $2, $3, $4, 'tavern', NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET x = $2, y = $3, facing = $4, zone = 'tavern', updated_at = NOW()`,
+        [buyerId, cx, cy, f]
+    ).catch(() => {});
+    return { ok: true };
+}
+
+// Everyone ELSE currently inside the tavern (live), as avatar data for the walkable room.
+async function tavernOccupants(selfId) {
+    const rows = await db.query(
+        `SELECT p.buyer_id, p.x, p.y, p.facing, b.display_name, b.alias, b.avatar_sprite_url, b.featured_collectible
+           FROM mkt_town_presence p JOIN mkt_buyer b ON b.id = p.buyer_id
+          WHERE p.zone = 'tavern' AND p.updated_at > NOW() - INTERVAL '90 seconds' AND p.buyer_id <> $1`,
+        [selfId]
+    ).catch(() => []);
+    if (!rows.length) return [];
+    const petSprites = await getPetSpriteData().catch(() => ({}));
+    return rows.map((r) => ({
+        id: r.buyer_id, name: r.display_name || (r.alias ? `@${r.alias}` : "a wolf"), alias: r.alias || null,
+        sprite: r.avatar_sprite_url || null, x: Number(r.x), y: Number(r.y), facing: Number(r.facing) === -1 ? -1 : 1,
+        pet: petSprites[r.featured_collectible] || null,
+    }));
+}
 
 const PINT_XP = 40, PINT_GOLD = 15;   // the daily Hearty Pint reward
 const ROUND_COST = 400;               // "buy a round" gold sink
@@ -85,6 +117,7 @@ export async function getTavernState(buyerId) {
             : { active: false, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET },
         dailyPint: { available: !row?.drank_today, drinks: row?.drinks || 0, xp: PINT_XP, gold: PINT_GOLD },
         round: { cost: ROUND_COST, bought: row?.rounds || 0 },
+        occupants: await tavernOccupants(buyerId).catch(() => []),
         rumors,
     };
 }
