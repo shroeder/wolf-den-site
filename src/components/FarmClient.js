@@ -494,6 +494,11 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } if (r.goldAfter != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.goldAfter } } : f)); }
         return r;
     }, [gardenAct]);
+    // Owner-only debug: force a harvest encounter so the fight can be tested without waiting for a random roll.
+    const testEncounter = useCallback(async () => {
+        const r = await post({ action: "debug_encounter" });
+        if (r?.ok && r.encounter) setEncounter({ ...r.encounter, harvest: { name: "test crop", emoji: "🌱" } });
+    }, [post]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
     // Drag a plot to a new spot (own farm, in move mode) so you can arrange them without overlap. Optimistic.
@@ -700,6 +705,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </svg>
                 {fullscreen ? "Exit" : "Full screen"}
             </button>
+            {farm.ownerDebug ? (
+                <button type="button" onClick={testEncounter} title="Owner debug: force a harvest encounter" style={{ ...CTRL_PILL, border: "1px solid rgba(224,112,74,0.55)", background: "linear-gradient(180deg, rgba(58,26,16,0.96), rgba(38,18,12,0.96))", color: "#ffb59a" }}>
+                    <span style={{ fontSize: 15 }} aria-hidden="true">🐀</span>Test raid
+                </button>
+            ) : null}
         </>
     );
 

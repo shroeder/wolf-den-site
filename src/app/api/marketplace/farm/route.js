@@ -8,7 +8,8 @@ import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, 
 import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, equipFarmBg, unequipFarmBg, deleteFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { upgradePlotTrack } from "@/lib/marketplace/farm-plot-upgrades.js";
-import { resolveEncounter } from "@/lib/marketplace/farm-encounters.js";
+import { resolveEncounter, maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { useConsumable as openConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { SEED_PACK_IDS } from "@/lib/marketplace/seed-packs.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -38,7 +39,8 @@ export async function GET(request) {
             }
             const farm = await getFarm(ownerId, buyer.id);
             if (!farm) return NextResponse.json({ error: "no_farm" }, { status: 404 });
-            return NextResponse.json(farm, { headers: { "Cache-Control": "no-store" } });
+            // Expose an owner-debug flag on your OWN farm (powers the "test a harvest encounter" button).
+            return NextResponse.json({ ...farm, ownerDebug: !u && isOwner(buyer.id) }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.farm.get.failure" });
         }
@@ -90,6 +92,10 @@ export async function POST(request) {
             else if (b?.action === "plot_move") res = await movePlot(buyer.id, Number(b?.slot), b?.x, b?.y);
             else if (b?.action === "plot_upgrade") { res = await upgradePlotTrack(buyer.id, Number(b?.slot), String(b?.key || "")); if (res?.ok) res = { ...res, garden: await getGarden(buyer.id) }; }
             else if (b?.action === "encounter_resolve") { res = await resolveEncounter(buyer.id, { perfectHits: Number(b?.perfectHits) || 0 }); if (res?.ok) res = { ...res, garden: await getGarden(buyer.id) }; }
+            else if (b?.action === "debug_encounter") { // owner-only: force a harvest encounter to test the fight
+                if (!isOwner(buyer.id)) res = { ok: false, error: "forbidden" };
+                else { const enc = await maybeStartEncounter(buyer.id, { rarity: "rare", wardChance: 0, seedId: null, force: true }).catch(() => null); res = enc ? { ok: true, encounter: enc } : { ok: false, error: "spawn_failed" }; }
+            }
             else if (b?.action === "rain") res = await applyRainBoost(buyer.id);
             // ── Decorations ── (buy/place/move/remove on YOUR OWN farm)
             else if (b?.action === "deco_buy") res = await buyDecoration(buyer.id, String(b?.decoId || ""));

@@ -37,10 +37,10 @@ function weightedCreature() {
 // Roll whether a harvest is raided; if so, PARK the pending encounter (creature + pre-rolled reward) on the
 // member and return the public info the client needs to run the fight. `wardChance` is the plot's Warding Totem
 // bonus (a fraction). Returns null when no encounter fires.
-export async function maybeStartEncounter(buyerId, { rarity = "common", wardChance = 0, seedId = null } = {}) {
+export async function maybeStartEncounter(buyerId, { rarity = "common", wardChance = 0, seedId = null, force = false } = {}) {
     if (!buyerId) return null;
     const chance = Math.min(0.6, BASE_ENCOUNTER_CHANCE + (RARITY_BUMP[rarity] || 0) + (Number(wardChance) || 0));
-    if (Math.random() >= chance) return null;
+    if (!force && Math.random() >= chance) return null;
     const key = weightedCreature();
     const c = CREATURES[key];
     // Pre-roll the reward NOW so it can't be faked at resolve time.
