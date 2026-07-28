@@ -6,6 +6,7 @@ import HappyHourWatcher from "@/components/HappyHourWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
 import PetLevelUp from "@/components/PetLevelUp";
 import LocationPrompt from "@/components/LocationPrompt";
+import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 import RewardNudge from "@/components/RewardNudge";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -39,6 +40,9 @@ export default function PublicLayout({ children }) {
             <WebPushManager />
             {/* Logs a page_view for every visitor (incl. anonymous) — powers the admin traffic telemetry. */}
             <TrafficBeacon />
+            {/* Real-time "online now" heartbeat (members only) — keeps the Town's presence fresh from ANY page,
+                not just the game area, so a member active anywhere on the site shows up as online. */}
+            <PresenceHeartbeat />
             {/* Asks every visitor for location (once/session) to power "near you" features — not just the map. */}
             <LocationPrompt />
         </>

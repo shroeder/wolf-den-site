@@ -4,15 +4,13 @@
 
 import DailyCheckin from "@/components/DailyCheckin";
 import GameNav from "@/components/GameNav";
-import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 
 export default function MarketplaceLayout({ children }) {
     return (
         <div className="mkt-app">
             <DailyCheckin />
-            {/* Keeps "online now" fresh for the Town/presence — pings every ~40s while the tab is visible. */}
-            <PresenceHeartbeat />
-            {/* In-game menu bar — self-hides on non-game pages. */}
+            {/* In-game menu bar — self-hides on non-game pages. (Presence heartbeat lives in the site-wide
+                public layout so a member active ANYWHERE — shop, home, etc. — shows as online.) */}
             <GameNav />
             {children}
         </div>
