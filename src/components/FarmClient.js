@@ -496,8 +496,20 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
-    // Plots are permanent fixtures now (no dragging) — they stay in their tidy arrangement and you invest in
-    // them in place. (The old plot_move action is retired on the client.)
+    // Drag a plot to a new spot (own farm, in move mode) so you can arrange them without overlap. Optimistic.
+    const movePlotTo = useCallback(async (slot, x, y) => {
+        let prev = null;
+        setGarden((g) => {
+            if (!g?.plots) return g;
+            const cur = g.plots.find((p) => p.slot === slot);
+            prev = cur ? { x: cur.x, y: cur.y } : null;
+            return { ...g, plots: g.plots.map((p) => (p.slot === slot ? { ...p, x, y } : p)) };
+        });
+        const r = await post({ action: "plot_move", slot, x, y });
+        if (r?.garden) setGarden(r.garden);
+        else if (prev) setGarden((g) => (g?.plots ? { ...g, plots: g.plots.map((p) => (p.slot === slot ? { ...p, x: prev.x, y: prev.y } : p)) } : g));
+        return r;
+    }, [post]);
 
     // Rate (like/love/admire) the farm you're visiting. Revising your rating is free; a brand-new rating spends
     // your one daily charge. Patches the summary in place with a juicy burst.
@@ -898,8 +910,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             <ScenePlots
                                 garden={garden}
                                 busy={gardenBusy}
-                                editing={false}
+                                editing={farm.mine && decoEditing}
                                 fieldRef={fieldRef}
+                                onMovePlot={movePlotTo}
                                 onPlant={(slot) => setPlanting(slot)}
                                 onHarvest={harvestAt}
                                 onInspect={(slot) => setInspectSlot(slot)}
@@ -998,10 +1011,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {fullscreen ? (
                     <div style={{ position: "absolute", left: 10, right: 10, bottom: 10, zIndex: 9998, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>{sceneControls}</div>
                 ) : null}
-                {/* Persistent lock/move toggle — top-right of the scene. Governs dragging DECORATIONS on your
-                    own farm (plots are permanent fixtures now and never move). Default is movable. */}
+                {/* Persistent lock/move toggle — top-right of the scene. Governs dragging plots + decorations on
+                    your own farm, so you can arrange them without overlap. Default is movable. */}
                 {farm.mine && (garden || (farm.decorations && (((farm.placements?.length || 0) > 0) || decorating))) ? (
-                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock decorations" : "Unlock decorations"} title={decoEditing ? "Decorations unlocked — tap to LOCK them in place" : "Decorations locked — tap to UNLOCK and rearrange"}
+                    <button type="button" onClick={() => setDecoEditing((v) => !v)} aria-label={decoEditing ? "Lock farm layout" : "Unlock farm layout"} title={decoEditing ? "Layout unlocked — drag plots & decorations; tap to LOCK" : "Layout locked — tap to UNLOCK and rearrange plots & decorations"}
                         style={{ position: "absolute", top: 10, right: 10, zIndex: 9998, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 999, border: `1px solid ${decoEditing ? "rgba(143,199,255,0.6)" : "rgba(255,255,255,0.25)"}`, background: decoEditing ? "linear-gradient(180deg, rgba(30,52,74,0.96), rgba(18,32,46,0.96))" : "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: decoEditing ? "#bfe0ff" : "#d7d7db", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.5)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent" }}>
                         <span style={{ fontSize: 15 }} aria-hidden="true">{decoEditing ? "🔓" : "🔒"}</span>{decoEditing ? "Unlocked" : "Locked"}
                     </button>
@@ -1512,8 +1525,7 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, totalSeeds, editing = fals
                 )}
                 {/* canPlant hint ring on the art bed */}
                 {bedUrl && canPlant ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: "20%", transform: "translateX(-50%)", fontSize: 9, fontWeight: 800, color: "#2a1a06", background: "rgba(255,226,122,0.9)", borderRadius: 999, padding: "0 6px", zIndex: 3 }}>plant</span> : null}
-                {/* specialization badge — this plot has been invested in */}
-                {p.specLevel ? <span aria-hidden="true" style={{ position: "absolute", top: "24%", right: "8%", fontSize: 9.5, fontWeight: 900, color: "#e8dcff", background: "rgba(120,90,200,0.9)", border: "1px solid rgba(200,180,255,0.6)", borderRadius: 999, padding: "0 5px", lineHeight: "15px", zIndex: 3, boxShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>⚙️{p.specLevel}</span> : null}
+                {/* specialization tier shown by the bed's colored aura (bedGlow) — no badge clutter */}
             </div>
             {/* status chip */}
             <span style={{ display: "block", textAlign: "center", marginTop: 2 }}>
@@ -1902,8 +1914,8 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                 <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
                 <div className="muted" style={{ fontSize: 12, margin: "2px 0 10px" }}>Rarer seeds take longer, feed your pet more XP, and roll better harvest loot. Here&apos;s what each one pays out:</div>
                 {onSpecialize ? (
-                    <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", marginBottom: 12, borderRadius: 12, border: "none", background: "linear-gradient(180deg,#5fe39a,#2fae72)", color: "#06311f", fontWeight: 900, fontSize: 13.5, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #1c7a4f" }}>
-                        <span style={{ fontSize: 18 }}>🌿</span><span style={{ flex: 1 }}>Specialize this plot{plotSpec ? ` · Lv ${plotSpec}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
+                    <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", marginBottom: 12, borderRadius: 12, border: "none", background: "linear-gradient(180deg,#ffd75e,#e0a12f)", color: "#3a2705", fontWeight: 900, fontSize: 13.5, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #a8791f" }}>
+                        <span style={{ fontSize: 16 }}>★</span><span style={{ flex: 1 }}>Specialize this plot{plotSpec ? ` · Lv ${plotSpec}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
                     </button>
                 ) : null}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2034,8 +2046,8 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                         </>
                     )}
                     {onSpecialize ? (
-                        <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", fontWeight: 900, fontSize: 13.5, background: "linear-gradient(180deg,#5fe39a,#2fae72)", color: "#06311f", border: "none", borderRadius: 12, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #1c7a4f" }}>
-                            <span style={{ fontSize: 18 }}>🌿</span><span style={{ flex: 1 }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
+                        <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", fontWeight: 900, fontSize: 13.5, background: "linear-gradient(180deg,#ffd75e,#e0a12f)", color: "#3a2705", border: "none", borderRadius: 12, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #a8791f" }}>
+                            <span style={{ fontSize: 16 }}>★</span><span style={{ flex: 1 }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
                         </button>
                     ) : null}
                     <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
