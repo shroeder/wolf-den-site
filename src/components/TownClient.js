@@ -835,7 +835,7 @@ const TOWN_CSS = `
 /* Layered parallax: far sky (slow) behind the world + a tiling cobble ground band inside it. */
 /* Sky shifted well up so the distant-building silhouette baked into the sky rises clearly above the nearer
    rooftops, into view behind the clouds. Bottom lands ~42% (still tucked behind the mid rooftops + wall). */
-.tw-far { position: absolute; top: -40%; left: 0; height: 82%; display: flex; z-index: 0; }
+.tw-far { position: absolute; top: -33%; left: 0; height: 82%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
 /* Depth layers ("Grow the Plaza") — far tiling silhouette bands stacked behind the midground on the horizon.
@@ -845,7 +845,7 @@ const TOWN_CSS = `
 .tw-depth img:nth-child(even) { transform: scaleX(-1); }
 /* Midground skyline band — nearer rooftops on the horizon, faster parallax than the sky, behind the plaza.
    Raised to meet the (now high) sky so the nearer rooftops close the gap over the bright horizon seam. */
-.tw-mid { position: absolute; left: 0; bottom: 53%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+.tw-mid { position: absolute; left: 0; bottom: 46%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Plaza centerpiece — the wolf fountain landmark standing in the square. */
