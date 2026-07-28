@@ -423,7 +423,7 @@ export default function TownClient({ initial }) {
     if (inTavern) {
         return (
             <div className="stack reveal">
-                <TavernInterior bgUrl={art.tavern_interior?.url} onLeave={() => setInTavern(false)} />
+                <TavernInterior bgUrl={art.tavern_interior?.url} diceUrl={art.dice?.url} onLeave={() => setInTavern(false)} />
             </div>
         );
     }

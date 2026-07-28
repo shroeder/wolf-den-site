@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { cashOutDice, claimDailyPint, getTavernState, rollDice, startDice } from "@/lib/marketplace/town-tavern.js";
+import { claimDailyPint, gambitReroll, gambitResolve, gambitStart, getTavernState } from "@/lib/marketplace/town-tavern.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -34,9 +34,9 @@ export async function POST(request) {
             if (!isOwner(buyer.id)) return noStore({ error: "forbidden" }, { status: 403 });
             const body = await request.json().catch(() => ({}));
             let res;
-            if (body?.action === "dice_start") res = await startDice(buyer.id, body?.bet);
-            else if (body?.action === "dice_roll") res = await rollDice(buyer.id);
-            else if (body?.action === "dice_cash") res = await cashOutDice(buyer.id);
+            if (body?.action === "gambit_start") res = await gambitStart(buyer.id, body?.bet);
+            else if (body?.action === "gambit_reroll") res = await gambitReroll(buyer.id, body?.hold);
+            else if (body?.action === "gambit_resolve") res = await gambitResolve(buyer.id);
             else if (body?.action === "pint") res = await claimDailyPint(buyer.id);
             else return noStore({ error: "unknown_action" }, { status: 400 });
             if (!res?.ok) return noStore({ error: res?.error || "failed" }, { status: 400 });

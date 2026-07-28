@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // The enterable Tavern: a cozy, rowdy interior you step into from the plaza. Fireplace glow + drifting ambient
 // emotes for life; the barkeep runs a little dialogue tree — rumors, the daily pint, and a press-your-luck dice
 // game. Owner-gated during the Town build.
-const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+// Pip positions (in a 100×100 die viewBox) for values 1-6 — drawn as clean SVG dice.
+const PIP_LAYOUT = { 1: [[50, 50]], 2: [[30, 30], [70, 70]], 3: [[30, 30], [50, 50], [70, 70]], 4: [[30, 30], [70, 30], [30, 70], [70, 70]], 5: [[30, 30], [70, 30], [50, 50], [30, 70], [70, 70]], 6: [[30, 28], [70, 28], [30, 50], [70, 50], [30, 72], [70, 72]] };
 const AMBIENT = ["🍺", "🎵", "😄", "🔥", "🍻", "✨"];
 const GREET = [
     "Ahh, a familiar face! Pull up a stool — what'll it be?",
@@ -20,12 +21,14 @@ const LORE = [
 ];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-export default function TavernInterior({ bgUrl, onLeave }) {
+export default function TavernInterior({ bgUrl, diceUrl, onLeave }) {
     const [st, setSt] = useState(null);
     const [busy, setBusy] = useState(false);
     const [view, setView] = useState("bar");     // "bar" (dialogue) | "dice"
     const [line, setLine] = useState(GREET[0]);   // what the barkeep is currently saying
-    const [roll, setRoll] = useState(null);
+    const [g, setG] = useState(null);            // active Wolf's Gambit hand: { bet, dice[], hold[], rerolled, hand }
+    const [result, setResult] = useState(null);  // resolved hand vs the Gambler
+    const [rolling, setRolling] = useState(false); // dice tumble animation flag
     const [flash, setFlash] = useState(null);
     const greeted = useRef(false);
 
@@ -60,26 +63,31 @@ export default function TavernInterior({ bgUrl, onLeave }) {
         else setLine("*frowns* Tap's stuck. Try again in a moment.");
     }, [act]);
 
-    // ── Dice ──
-    const bet = useCallback(async (amount) => {
-        setRoll(null); setFlash(null);
-        const r = await act({ action: "dice_start", bet: amount });
-        if (!r?.ok && r?.error) setFlash(r.error === "insufficient_gold" ? "Not enough gold." : "Couldn't place that bet.");
+    // ── Wolf's Gambit dice game ──
+    const ante = useCallback(async (amount) => {
+        setResult(null); setFlash(null);
+        const r = await act({ action: "gambit_start", bet: amount });
+        if (r?.ok) { setRolling(true); setG({ bet: r.bet, dice: r.dice, hold: [false, false, false], rerolled: false, hand: r.hand }); setTimeout(() => setRolling(false), 650); }
+        else setFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : "Couldn't ante up.");
     }, [act]);
-    const doRoll = useCallback(async () => {
-        const r = await act({ action: "dice_roll" });
+    const toggleHold = useCallback((i) => { setG((cur) => (cur && !cur.rerolled ? { ...cur, hold: cur.hold.map((h, idx) => (idx === i ? !h : h)) } : cur)); }, []);
+    const reroll = useCallback(async () => {
+        if (!g || g.rerolled) return;
+        setRolling(true);
+        const r = await act({ action: "gambit_reroll", hold: g.hold });
+        setTimeout(() => setRolling(false), 650);
+        if (r?.ok) setG((cur) => (cur ? { ...cur, dice: r.dice, rerolled: true, hand: r.hand } : cur));
+    }, [act, g]);
+    const layDown = useCallback(async () => {
+        setRolling(true);
+        const r = await act({ action: "gambit_resolve" });
+        setTimeout(() => setRolling(false), 650);
         if (r?.ok) {
-            setRoll({ face: r.roll, bust: r.bust });
-            if (r.bust) setFlash("💥 Busted! The pot's gone.");
-            else if (r.forcedCashOut) setFlash(`🎉 Max streak — cashed out ${r.won?.toLocaleString()} gold!`);
+            setResult(r); setG(null);
+            setFlash(r.outcome === "win" ? (r.jackpot ? `🎉 JACKPOT — won ${r.payout.toLocaleString()} gold!` : `🎉 You win ${r.payout.toLocaleString()} gold!`)
+                : r.outcome === "push" ? "🤝 A push — your ante's returned." : "😤 The Gambler takes this one. Again?");
         }
     }, [act]);
-    const cash = useCallback(async () => {
-        const r = await act({ action: "dice_cash" });
-        if (r?.ok) { setRoll(null); setFlash(`💰 Cashed out ${r.won?.toLocaleString()} gold!`); }
-    }, [act]);
-
-    const dice = st?.dice;
 
     return (
         <div className="tv">
@@ -97,28 +105,53 @@ export default function TavernInterior({ bgUrl, onLeave }) {
             <section className="card tv-panel">
                 {view === "dice" ? (
                     <div className="tv-diceview">
-                        <button type="button" className="tv-back" onClick={() => { setView("bar"); setRoll(null); setFlash(null); }}>← Back to the bar</button>
-                        <div className="tv-row-label"><strong>🎲 Dice table</strong><span className="muted">Press your luck — roll to grow the pot, but a ⚀ busts you. Cash out anytime.</span></div>
+                        <button type="button" className="tv-back" onClick={() => { setView("bar"); setG(null); setResult(null); setFlash(null); }}>← Back to the bar</button>
+                        <div className="tv-gambit-head">
+                            {diceUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={diceUrl} alt="" className="tv-gambit-cup" draggable={false} />
+                            ) : null}
+                            <div className="tv-row-label"><strong>🎲 Wolf&apos;s Gambit</strong><span className="muted">Ante up, roll three, keep the good ones &amp; reroll once — beat the Gambler to <b>double</b> your bet (<b>triple</b> on three-of-a-kind!).</span></div>
+                        </div>
                         {flash ? <div className="tv-flash">{flash}</div> : null}
-                        {!dice?.active ? (
+                        {!g && !result ? (
                             <div className="tv-bets">
-                                {[10, 50, 200].map((amt) => (
-                                    <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => bet(amt)}>Bet {amt}</button>
+                                {[50, 200, 500].map((amt) => (
+                                    <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => ante(amt)}>Ante {amt}</button>
                                 ))}
                                 <span className="muted tv-gold">🪙 {(st?.gold || 0).toLocaleString()}</span>
                             </div>
-                        ) : (
-                            <div className="tv-play">
-                                <div className="tv-pot">
-                                    <span className={`tv-die${roll ? (roll.bust ? " is-bust" : " is-grow") : ""}`}>{roll?.face ? DIE_FACES[roll.face] : "🎲"}</span>
-                                    <span className="tv-pot-amt">Pot: <strong>{dice.pot.toLocaleString()}</strong> 🪙 <span className="muted">· {dice.rolls} rolls</span></span>
+                        ) : null}
+                        {g ? (
+                            <div className="tv-gambit">
+                                <div className="tv-hand-label">Your hand: <strong>{g.hand}</strong>{!g.rerolled ? <span className="muted"> · tap a die to KEEP it, then reroll</span> : <span className="muted"> · reroll used — lay it down!</span>}</div>
+                                <div className="tv-dice-row">
+                                    {g.dice.map((v, i) => <Die key={i} value={v} held={g.hold[i]} rolling={rolling && !g.hold[i]} locked={g.rerolled} onClick={() => toggleHold(i)} />)}
                                 </div>
                                 <div className="tv-play-btns">
-                                    <button type="button" className="tv-roll" disabled={busy} onClick={doRoll}>🎲 Roll</button>
-                                    <button type="button" className="tv-cash" disabled={busy} onClick={cash}>💰 Cash out {dice.pot.toLocaleString()}</button>
+                                    {!g.rerolled ? <button type="button" className="tv-roll" disabled={busy} onClick={reroll}>🎲 Reroll the rest</button> : null}
+                                    <button type="button" className="tv-cash" disabled={busy} onClick={layDown}>🃏 Lay it down</button>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
+                        {result ? (
+                            <div className="tv-result">
+                                <div className="tv-vs">
+                                    <div className={`tv-vs-side${result.outcome === "win" ? " is-win" : ""}`}>
+                                        <div className="tv-vs-who">You</div>
+                                        <div className="tv-dice-row sm">{result.player.dice.map((v, i) => <Die key={i} value={v} small />)}</div>
+                                        <div className="tv-vs-hand">{result.player.hand}</div>
+                                    </div>
+                                    <div className="tv-vs-x">vs</div>
+                                    <div className={`tv-vs-side${result.outcome === "lose" ? " is-win" : ""}`}>
+                                        <div className="tv-vs-who">🧔 Gambler</div>
+                                        <div className="tv-dice-row sm">{result.gambler.dice.map((v, i) => <Die key={i} value={v} small />)}</div>
+                                        <div className="tv-vs-hand">{result.gambler.hand}</div>
+                                    </div>
+                                </div>
+                                <button type="button" className="tv-roll" onClick={() => { setResult(null); setFlash(null); }}>Play again</button>
+                            </div>
+                        ) : null}
                     </div>
                 ) : (
                     <div className="tv-dialogue">
@@ -139,6 +172,20 @@ export default function TavernInterior({ bgUrl, onLeave }) {
 
             <style>{TV_CSS}</style>
         </div>
+    );
+}
+
+// A single clean SVG die. Tap to KEEP it (before your reroll); shows a tumble animation when rolling.
+function Die({ value, held = false, rolling = false, locked = false, small = false, onClick }) {
+    const size = small ? 36 : 54;
+    return (
+        <button type="button" onClick={onClick} disabled={!onClick || locked} className={`tv-diebtn${held ? " is-held" : ""}${rolling ? " is-rolling" : ""}${!onClick ? " is-static" : ""}`} style={{ width: size, height: size }}>
+            <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+                <rect x="6" y="6" width="88" height="88" rx="18" fill="#f4ecd8" stroke="#3a2a12" strokeWidth="4" />
+                {(PIP_LAYOUT[value] || []).map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="8.5" fill="#2a1a08" />)}
+            </svg>
+            {held ? <span className="tv-held-tag">KEEP</span> : null}
+        </button>
     );
 }
 
@@ -173,14 +220,28 @@ const TV_CSS = `
 .tv-bets button { padding: 9px 16px; border-radius: 10px; border: 1px solid rgba(255,215,110,0.4); background: rgba(255,215,110,0.12); color: #ffe0b0; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tv-bets button:disabled { opacity: .45; cursor: default; }
 .tv-gold { margin-left: auto; font-size: 0.85rem; }
-.tv-play { display: flex; flex-direction: column; gap: 10px; }
-.tv-pot { display: flex; align-items: center; gap: 12px; }
-.tv-die { font-size: 40px; line-height: 1; }
-.tv-die.is-grow { animation: tvPop .3s ease; color: #8fe39a; }
-.tv-die.is-bust { animation: tvShake .3s ease; color: #e0433f; }
-@keyframes tvPop { 0% { transform: scale(.5); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
-@keyframes tvShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px) rotate(-8deg); } 75% { transform: translateX(5px) rotate(8deg); } }
-.tv-pot-amt { font-size: 1rem; color: #f2ead9; }
+.tv-gambit-head { display: flex; align-items: center; gap: 12px; }
+.tv-gambit-cup { width: 52px; height: 52px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
+.tv-gambit { display: flex; flex-direction: column; gap: 12px; }
+.tv-hand-label { font-size: 0.92rem; color: #f2ead9; }
+.tv-hand-label strong { color: #ffe0b0; }
+.tv-dice-row { display: flex; gap: 12px; justify-content: center; padding: 6px 0; }
+.tv-dice-row.sm { gap: 7px; padding: 2px 0; }
+.tv-diebtn { position: relative; padding: 0; border: none; background: none; cursor: pointer; border-radius: 12px; transition: transform .12s ease; }
+.tv-diebtn.is-static { cursor: default; }
+.tv-diebtn:not(.is-static):active { transform: scale(0.92); }
+.tv-diebtn.is-held { transform: translateY(-4px); }
+.tv-diebtn.is-held svg rect { fill: #fff6df; stroke: #2fae72; }
+.tv-diebtn.is-rolling { animation: tvTumble .5s cubic-bezier(.3,1.4,.4,1) both; }
+@keyframes tvTumble { 0% { transform: translateY(-18px) rotate(-60deg) scale(.7); } 60% { transform: translateY(3px) rotate(12deg) scale(1.08); } 100% { transform: translateY(0) rotate(0) scale(1); } }
+.tv-held-tag { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 8.5px; font-weight: 900; letter-spacing: .04em; color: #06311f; background: #43d98a; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.tv-result { display: flex; flex-direction: column; gap: 12px; }
+.tv-vs { display: flex; align-items: stretch; gap: 8px; }
+.tv-vs-side { flex: 1 1 0; text-align: center; padding: 10px 6px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+.tv-vs-side.is-win { border-color: rgba(67,217,138,0.6); background: rgba(67,217,138,0.1); box-shadow: 0 0 14px rgba(67,217,138,0.25); }
+.tv-vs-who { font-size: 0.78rem; font-weight: 800; color: #cbb9e0; margin-bottom: 4px; }
+.tv-vs-hand { font-size: 0.78rem; font-weight: 800; color: #ffe0b0; margin-top: 4px; }
+.tv-vs-x { align-self: center; font-weight: 900; color: #9aa0a6; font-size: 0.8rem; }
 .tv-play-btns { display: flex; gap: 10px; }
 .tv-roll { flex: 1 1 auto; padding: 12px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; font-size: 15px; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 0 #b57f22; }
 .tv-roll:active { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }

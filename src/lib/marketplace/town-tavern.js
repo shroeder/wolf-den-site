@@ -9,11 +9,33 @@ import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 // news), a press-your-luck DICE game (gold gamble — opt-in, capped, server-authoritative), and a DAILY PINT
 // (once/day, cosmetic cheer). All gold moves go through the guarded spend/credit + coin ledger.
 
-const DICE_MIN_BET = 10;
-const DICE_MAX_BET = 1000;
-const DICE_MULT = 1.18;      // pot grows this much per surviving roll (~gentle house edge from busts)
-const DICE_BUST_MAX = 1;     // a die roll of 1 busts you
-const DICE_MAX_ROLLS = 8;    // auto-cash after this many survives
+// ── Wolf's Gambit: 3-dice poker vs the house Gambler. Ante → roll 3 → hold/reroll once → best hand wins. ──
+const GAMBIT_MIN_BET = 50;
+const GAMBIT_MAX_BET = 2000;
+const d6 = () => 1 + Math.floor(Math.random() * 6);
+const rollThree = () => [d6(), d6(), d6()];
+
+// Rank a 3-die hand → { rank, tie[], label }. rank: 4 three-of-a-kind > 3 straight > 2 pair > 1 high roll.
+function scoreHand(dice) {
+    const desc = [...dice].sort((a, b) => b - a);
+    const counts = {};
+    for (const d of dice) counts[d] = (counts[d] || 0) + 1;
+    const trip = Object.keys(counts).find((k) => counts[k] === 3);
+    if (trip) return { rank: 4, tie: [Number(trip)], label: `Three ${trip}s!` };
+    const uniq = new Set(dice);
+    if (uniq.size === 3 && Math.max(...dice) - Math.min(...dice) === 2) return { rank: 3, tie: [Math.max(...dice)], label: `Straight ${[...dice].sort((a, b) => a - b).join("-")}` };
+    const pair = Object.keys(counts).find((k) => counts[k] === 2);
+    if (pair) { const kicker = dice.find((d) => d !== Number(pair)); return { rank: 2, tie: [Number(pair), kicker], label: `Pair of ${pair}s` }; }
+    return { rank: 1, tie: desc, label: `High roll (${desc[0]})` };
+}
+function cmpHand(a, b) {
+    if (a.rank !== b.rank) return a.rank - b.rank;
+    for (let i = 0; i < 3; i += 1) { const d = (a.tie[i] || 0) - (b.tie[i] || 0); if (d) return d; }
+    return 0;
+}
+// The Gambler plays too: rolls 3, then rerolls anything ≤2 once (a simple greedy AI) — balances the reroll
+// the player gets, so the table isn't wildly player-favored.
+function gamblerRoll() { return rollThree().map((d) => (d <= 2 ? d6() : d)); }
 
 // Rotating tavern flavor + a couple of cheap live nuggets — the barkeep's gossip.
 const FLAVOR = [
@@ -42,76 +64,83 @@ export async function getTavernState(buyerId) {
     if (!buyerId) return null;
     const [row, gold, rumors] = await Promise.all([
         db.queryOne(
-            `SELECT dice_pot, dice_rolls, dice_active,
+            `SELECT dice_active, dice_state,
                     (last_drink_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS drank_today, drinks
                FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]
         ).catch(() => null),
         db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getRumors().catch(() => []),
     ]);
+    const st = row?.dice_active ? row.dice_state : null;
     return {
         gold: Number(gold?.gold || 0),
-        dice: { active: Boolean(row?.dice_active), pot: row?.dice_pot || 0, rolls: row?.dice_rolls || 0, minBet: DICE_MIN_BET, maxBet: DICE_MAX_BET, mult: DICE_MULT },
+        dice: st
+            ? { active: true, bet: st.bet, dice: st.dice, rerolled: Boolean(st.rerolled), hand: scoreHand(st.dice).label, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET }
+            : { active: false, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET },
         dailyPint: { available: !row?.drank_today, drinks: row?.drinks || 0 },
         rumors,
     };
 }
 
-// Place a bet: guarded gold spend, open a dice session with the bet as the starting pot.
-export async function startDice(buyerId, bet) {
+// Ante up: guarded gold spend, roll your opening 3 dice, open a hand. Returns your dice (reroll not yet used).
+export async function gambitStart(buyerId, bet) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const b = Math.floor(Number(bet) || 0);
-    if (b < DICE_MIN_BET || b > DICE_MAX_BET) return { ok: false, error: "bad_bet" };
+    if (b < GAMBIT_MIN_BET || b > GAMBIT_MAX_BET) return { ok: false, error: "bad_bet" };
     const cur = await db.queryOne(`SELECT dice_active FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null);
     if (cur?.dice_active) return { ok: false, error: "already_playing" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, b]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
-    await logCoin(buyerId, -b, "tavern_dice_bet", { balanceAfter: paid.gold }).catch(() => {});
+    await logCoin(buyerId, -b, "tavern_gambit_bet", { balanceAfter: paid.gold }).catch(() => {});
+    const dice = rollThree();
+    const state = { bet: b, dice, rerolled: false };
     await db.query(
-        `INSERT INTO mkt_tavern (buyer_id, dice_pot, dice_rolls, dice_active, updated_at) VALUES ($1, $2, 0, TRUE, NOW())
-         ON CONFLICT (buyer_id) DO UPDATE SET dice_pot = $2, dice_rolls = 0, dice_active = TRUE, updated_at = NOW()`,
-        [buyerId, b]
+        `INSERT INTO mkt_tavern (buyer_id, dice_active, dice_state, updated_at) VALUES ($1, TRUE, $2::jsonb, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET dice_active = TRUE, dice_state = $2::jsonb, updated_at = NOW()`,
+        [buyerId, JSON.stringify(state)]
     );
-    return { ok: true, pot: b, rolls: 0, gold: Number(paid.gold) };
+    return { ok: true, bet: b, dice, hand: scoreHand(dice).label, gold: Number(paid.gold) };
 }
 
-// Atomically claim + pay out the current pot (guards against double-cashout).
-async function payoutDice(buyerId) {
-    const claimed = await db.queryOne(`UPDATE mkt_tavern SET dice_active = FALSE, updated_at = NOW() WHERE buyer_id = $1 AND dice_active = TRUE RETURNING dice_pot`, [buyerId]).catch(() => null);
-    if (!claimed) return null;
-    const amount = claimed.dice_pot;
-    await db.query(`UPDATE mkt_tavern SET dice_pot = 0 WHERE buyer_id = $1`, [buyerId]).catch(() => {});
-    const paid = amount > 0 ? await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, amount]).catch(() => null) : null;
-    if (amount > 0) await logCoin(buyerId, amount, "tavern_dice_win", { balanceAfter: paid?.gold }).catch(() => {});
-    return { amount, gold: paid?.gold };
-}
-
-// Roll the die: 1 = bust (lose the pot); else the pot grows. Auto-cashes at DICE_MAX_ROLLS.
-export async function rollDice(buyerId) {
+// Use your ONE reroll: keep the dice flagged in `hold` (3 booleans), reroll the rest. Returns the new dice.
+export async function gambitReroll(buyerId, hold) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const s = await db.queryOne(`SELECT dice_pot, dice_rolls, dice_active FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null);
-    if (!s?.dice_active) return { ok: false, error: "no_game" };
-    const roll = 1 + Math.floor(Math.random() * 6);
-    if (roll <= DICE_BUST_MAX) {
-        await db.query(`UPDATE mkt_tavern SET dice_active = FALSE, dice_pot = 0, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]);
-        return { ok: true, roll, bust: true, pot: 0 };
-    }
-    const newPot = Math.round(s.dice_pot * DICE_MULT);
-    const rolls = s.dice_rolls + 1;
-    await db.query(`UPDATE mkt_tavern SET dice_pot = $2, dice_rolls = $3, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, newPot, rolls]);
-    if (rolls >= DICE_MAX_ROLLS) {
-        const c = await payoutDice(buyerId);
-        return { ok: true, roll, bust: false, pot: newPot, rolls, forcedCashOut: true, won: c?.amount || newPot, gold: c?.gold };
-    }
-    return { ok: true, roll, bust: false, pot: newPot, rolls };
+    const row = await db.queryOne(`SELECT dice_active, dice_state FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    const st = row?.dice_active ? row.dice_state : null;
+    if (!st) return { ok: false, error: "no_game" };
+    if (st.rerolled) return { ok: false, error: "already_rerolled" };
+    const keep = Array.isArray(hold) ? hold : [false, false, false];
+    const dice = st.dice.map((d, i) => (keep[i] ? d : d6()));
+    await db.query(`UPDATE mkt_tavern SET dice_state = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify({ ...st, dice, rerolled: true })]);
+    return { ok: true, dice, hand: scoreHand(dice).label };
 }
 
-// Walk away with the pot.
-export async function cashOutDice(buyerId) {
+// Lay it down: the Gambler rolls his hand, compare, pay out. Win = 2× bet (3× on three-of-a-kind), push = bet
+// back, lose = nothing. Atomic claim so a hand pays at most once.
+export async function gambitResolve(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const c = await payoutDice(buyerId);
-    if (!c) return { ok: false, error: "no_game" };
-    return { ok: true, won: c.amount, gold: c.gold };
+    // Claim the hand by flipping dice_active (RETURNING still hands back the state row we're resolving), then
+    // clear dice_state afterward.
+    const row = await db.queryOne(`UPDATE mkt_tavern SET dice_active = FALSE, updated_at = NOW() WHERE buyer_id = $1 AND dice_active = TRUE RETURNING dice_state`, [buyerId]).catch(() => null);
+    const st = row?.dice_state;
+    if (!st) return { ok: false, error: "no_game" };
+    await db.query(`UPDATE mkt_tavern SET dice_state = NULL WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    const bet = st.bet;
+    const playerDice = st.dice;
+    const gamblerDice = gamblerRoll();
+    const ph = scoreHand(playerDice), gh = scoreHand(gamblerDice);
+    const c = cmpHand(ph, gh);
+    const jackpot = c > 0 && ph.rank === 4;
+    const outcome = c > 0 ? "win" : c === 0 ? "push" : "lose";
+    const payout = outcome === "win" ? (jackpot ? bet * 3 : bet * 2) : outcome === "push" ? bet : 0;
+    let gold = null;
+    if (payout > 0) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, payout]).catch(() => null);
+        await logCoin(buyerId, payout, "tavern_gambit_win", { balanceAfter: paid?.gold, meta: { outcome, bet } }).catch(() => {});
+        gold = Number(paid?.gold ?? 0);
+    }
+    if (outcome === "win") bumpTownQuest(buyerId, "patron", 1).catch(() => {});
+    return { ok: true, outcome, bet, payout, jackpot, player: { dice: playerDice, hand: ph.label }, gambler: { dice: gamblerDice, hand: gh.label }, gold };
 }
 
 // The daily pint — once per store-local day. Cosmetic cheer (tracks a lifetime count for a future badge).
