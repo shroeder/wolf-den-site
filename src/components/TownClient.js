@@ -18,17 +18,23 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // (tiles are sized by height, so a small phone viewport → narrow tiles → need more of them). Over-tiling is free —
 // extras just overflow the world and are clipped by the scene.
 const TILES = (n) => Array.from({ length: n }, (_, i) => i);
+// A message that's just emoji (a reaction/emote) pops as a floating emote instead of a text bubble.
+const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
 
 function Avatar({ a, isYou, onTap }) {
     const dur = clamp((a.moveDist || 0) * 0.05, 0.4, 2.6);
     return (
         <div
-            className={`tw-av${isYou ? " is-you" : ""}`}
+            className={`tw-av${isYou ? " is-you" : ""}${a.friend ? " is-friend" : ""}`}
             style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: 300 + Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear` }}
             onClick={onTap ? (e) => { e.stopPropagation(); onTap(); } : undefined}
         >
             {a.chat ? (
-                <div className="tw-bubble tw-chat">{a.chat}</div>
+                isEmoteMsg(a.chat) ? (
+                    <div className="tw-emote-pop">{a.chat}</div>
+                ) : (
+                    <div className="tw-bubble tw-chat">{a.chat}</div>
+                )
             ) : a.typing ? (
                 <div className="tw-bubble tw-typing-bubble" aria-label="typing"><span /><span /><span /></div>
             ) : (
@@ -62,6 +68,9 @@ export default function TownClient({ initial }) {
     const [dragging, setDragging] = useState(false); // true mid-drag → camera follows the finger instantly (no ease)
     const [chatText, setChatText] = useState("");    // town chat composer
     const [myChat, setMyChat] = useState(null);      // my own speech bubble (optimistic, clears after a few s)
+    const [menuFor, setMenuFor] = useState(null);    // tapped another player → action sheet
+    const [boardOpen, setBoardOpen] = useState(false); // Town Hall (events + plaza fund) panel
+    const [contribBusy, setContribBusy] = useState(false);
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
     const chatClear = useRef(null);
@@ -185,11 +194,19 @@ export default function TownClient({ initial }) {
         const now = Date.now();
         if (now - lastTyping.current > 2500) { lastTyping.current = now; postAction({ action: "typing" }); } // throttle typing pings
     }, [postAction]);
+    // Contribute gold to the collective plaza fund, then refresh the coin HUD + town state.
+    const contribute = useCallback(async (amount) => {
+        setContribBusy(true);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "contribute", amount }) }).catch(() => null);
+        setContribBusy(false);
+        if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
+    }, [load]);
 
     const you = state?.you;
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
     const buildings = state?.buildings || [];
+    const unlocked = useMemo(() => new Set(state?.upgrade?.unlocked || []), [state?.upgrade]);
     const otherList = useMemo(() => Object.values(others), [others]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
@@ -204,6 +221,7 @@ export default function TownClient({ initial }) {
                     <h1 style={{ margin: 0, fontSize: "1.25rem" }}>🏘️ Wolf Den Town</h1>
                     <span className="tw-online">🟢 {state?.onlineCount ?? 1} around</span>
                     <button type="button" className="tw-roster-btn" onClick={() => setRoster(true)}>👥 Who&apos;s around</button>
+                    <button type="button" className="tw-roster-btn" onClick={() => setBoardOpen(true)}>🏛️ Town Hall</button>
                     <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "#c58b3a", fontWeight: 800 }}>OWNER PREVIEW</span>
                 </div>
                 <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the street to walk. Tap a building to head there. Real members who are online show up here.</p>
@@ -262,11 +280,19 @@ export default function TownClient({ initial }) {
                             </Link>
                         );
                     })}
+                    {/* Collective-upgrade decorations that scroll with the street */}
+                    {unlocked.has("statue") ? <div className="tw-deco tw-deco-statue" style={{ left: "16%", top: `${GROUND}%` }} aria-hidden="true">🐺</div> : null}
+                    {unlocked.has("fountain") ? <div className="tw-deco tw-deco-fountain" style={{ left: "48%", top: `${GROUND}%` }} aria-hidden="true">⛲</div> : null}
+                    {unlocked.has("garden") ? ["30%", "64%", "84%"].map((lx, i) => <div key={i} className="tw-deco tw-deco-garden" style={{ left: lx, top: `${GROUND}%` }} aria-hidden="true">🌷</div>) : null}
                     {/* Other players */}
-                    {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => walkToWorld(p.x + (p.x > me.x ? -3 : 3), p.y)} />)}
+                    {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} />)}
                     {/* You */}
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
                 </div>
+
+                {/* Collective-upgrade overlays that span the plaza (don't scroll — they hang over the whole view) */}
+                {unlocked.has("lights") ? <div className="tw-lights" aria-hidden="true" /> : null}
+                {unlocked.has("banners") ? <div className="tw-banners" aria-hidden="true" /> : null}
 
                 {/* edge hints — tap to walk that way (or just drag the street to look around) */}
                 {cameraPx > 4 ? <button type="button" className="tw-edge tw-edge-l" onClick={(e) => { e.stopPropagation(); walkToWorld(clamp(me.x - 22, 1, 99), me.y); }} aria-label="Walk left">‹</button> : null}
@@ -302,6 +328,67 @@ export default function TownClient({ initial }) {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Tap-a-player action sheet */}
+            {menuFor ? (
+                <div className="tw-roster" onClick={() => setMenuFor(null)} role="presentation">
+                    <div className="tw-roster-panel tw-menu-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>{menuFor.friend ? "⭐ " : ""}{menuFor.name}</strong><button type="button" onClick={() => setMenuFor(null)} aria-label="Close">✕</button></div>
+                        <div className="muted" style={{ fontSize: "0.82rem", margin: "-2px 2px 8px" }}>{menuFor.status}</div>
+                        <div className="tw-menu-actions">
+                            <button type="button" className="tw-menu-btn" onClick={() => { walkToWorld(menuFor.x + (menuFor.x > me.x ? -3 : 3), menuFor.y); setMenuFor(null); }}>🚶 Walk over</button>
+                            <button type="button" className="tw-menu-btn" onClick={() => { quickEmote("👋"); setMenuFor(null); }}>👋 Wave</button>
+                            {menuFor.alias ? <Link href={`/marketplace/u/${menuFor.alias}`} className="tw-menu-btn">👤 View profile</Link> : null}
+                            {menuFor.alias ? <Link href={`/marketplace/trade/new?to=${encodeURIComponent(menuFor.alias)}`} className="tw-menu-btn">🤝 Trade</Link> : null}
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Town Hall — what's happening + collective plaza fund */}
+            {boardOpen ? (
+                <div className="tw-roster" onClick={() => setBoardOpen(false)} role="presentation">
+                    <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>🏛️ Town Hall</strong><button type="button" onClick={() => setBoardOpen(false)} aria-label="Close">✕</button></div>
+
+                        <div className="tw-board-section">
+                            <div className="tw-board-title">📣 What&apos;s happening</div>
+                            <div className="tw-board-grid">
+                                {[["/marketplace/boss", "⚔️", "Boss Fight"], ["/marketplace/sailing", "⛵", "Sailing"], ["/marketplace/farm", "🌾", "Farm"], ["/marketplace/store", "🛒", "Store"], ["/marketplace/track", "🎁", "Rewards"], ["/marketplace/bounties", "🎯", "Bounties"]].map(([href, ic, label]) => (
+                                    <Link key={href} href={href} className="tw-board-tile"><span aria-hidden="true">{ic}</span>{label}</Link>
+                                ))}
+                            </div>
+                            <p className="muted" style={{ fontSize: "0.8rem", margin: "8px 2px 0" }}>🟢 {state?.onlineCount ?? 1} online in the Den right now.</p>
+                        </div>
+
+                        {state?.upgrade ? (() => {
+                            const up = state.upgrade;
+                            const next = up.next;
+                            const pct = next ? Math.min(100, Math.round((up.total / next.at) * 100)) : 100;
+                            return (
+                                <div className="tw-board-section">
+                                    <div className="tw-board-title">🏗️ Fund the plaza</div>
+                                    <div className="tw-fund-bar"><span style={{ width: `${pct}%` }} /></div>
+                                    <p className="muted" style={{ fontSize: "0.82rem", margin: "6px 2px 2px" }}>
+                                        🪙 {up.total.toLocaleString()} pooled{next ? ` · next: ${next.name} at ${next.at.toLocaleString()}` : " · every upgrade unlocked!"}
+                                    </p>
+                                    {next ? <p style={{ fontSize: "0.8rem", margin: "0 2px 8px", color: "#cbb9e0" }}>{next.blurb}</p> : null}
+                                    <div className="tw-fund-btns">
+                                        {[100, 500, 2500].map((amt) => (
+                                            <button key={amt} type="button" disabled={contribBusy} onClick={() => contribute(amt)}>+{amt.toLocaleString()}</button>
+                                        ))}
+                                    </div>
+                                    <div className="tw-fund-chips">
+                                        {up.tiers.map((t) => (
+                                            <span key={t.key} className={`tw-fund-chip${up.unlocked.includes(t.key) ? " is-on" : ""}`}>{up.unlocked.includes(t.key) ? "✅" : "🔒"} {t.name}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })() : null}
                     </div>
                 </div>
             ) : null}
@@ -401,4 +488,40 @@ const TOWN_CSS = `
 .tw-roster-name { font-weight: 800; font-size: 0.9rem; color: #f0ede6; min-width: 90px; }
 .tw-roster-status { font-size: 0.82rem; color: #cbb9e0; flex: 1; }
 .tw-roster-go { font-size: 0.76rem; font-weight: 800; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border: none; border-radius: 8px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+
+/* Emote pop (emoji-only chat) + friend highlight ring under the sprite */
+.tw-emote-pop { font-size: 30px; line-height: 1; margin-bottom: 2px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); animation: twEmote 2.4s ease-out infinite; transform-origin: bottom center; }
+@keyframes twEmote { 0% { transform: translateY(6px) scale(.4); opacity: 0; } 18% { transform: translateY(0) scale(1.15); opacity: 1; } 30% { transform: scale(1); } 85% { opacity: 1; } 100% { transform: translateY(-6px); opacity: .85; } }
+.tw-av.is-friend .tw-sprite::before { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; margin: 0 auto; width: 46px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(120,200,255,0.8), 0 0 10px rgba(120,200,255,0.7); }
+
+/* Collective-upgrade decorations */
+.tw-deco { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 96; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.5)); }
+.tw-deco-fountain { font-size: 54px; }
+.tw-deco-statue { font-size: 46px; }
+.tw-deco-garden { font-size: 24px; transform: translate(-50%, -30%); }
+.tw-lights { position: absolute; top: 6px; left: 0; right: 0; height: 16px; z-index: 40; pointer-events: none; background-image: radial-gradient(circle, #ffe488 2.5px, transparent 3px); background-size: 26px 16px; filter: drop-shadow(0 0 4px rgba(255,215,110,0.85)); opacity: .92; }
+.tw-banners { position: absolute; top: 24px; left: 0; right: 0; height: 15px; z-index: 40; pointer-events: none;
+    background: repeating-linear-gradient(90deg,#e0433f 0 18px,#47b866 18px 36px,#3a86ff 36px 54px,#ffd75e 54px 72px);
+    -webkit-mask: repeating-linear-gradient(90deg,#000 0 9px, transparent 12px 18px); mask: repeating-linear-gradient(90deg,#000 0 9px, transparent 12px 18px); opacity: .85; }
+
+/* Tap-a-player menu + Town Hall panel */
+.tw-menu-panel { max-width: 360px; }
+.tw-menu-actions { display: flex; flex-direction: column; gap: 8px; }
+.tw-menu-btn { display: block; text-align: left; text-decoration: none; padding: 11px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #f2ead9; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+.tw-menu-btn:hover { border-color: rgba(255,215,110,0.5); }
+.tw-board-section { margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px; }
+.tw-board-section:first-of-type { border-top: none; padding-top: 0; }
+.tw-board-title { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #9fb0c0; margin-bottom: 8px; }
+.tw-board-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tw-board-tile { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 4px; border-radius: 12px; text-decoration: none; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); color: #eef2f7; font-size: 0.75rem; font-weight: 700; }
+.tw-board-tile span { font-size: 22px; }
+.tw-board-tile:hover { border-color: rgba(255,215,110,0.5); }
+.tw-fund-bar { height: 12px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.tw-fund-bar span { display: block; height: 100%; background: linear-gradient(90deg,#ffd75e,#f3b23a); border-radius: 999px; transition: width .4s ease; }
+.tw-fund-btns { display: flex; gap: 8px; margin: 8px 0; }
+.tw-fund-btns button { flex: 1 1 auto; padding: 9px 4px; border-radius: 10px; border: none; background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #1c130a; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
+.tw-fund-btns button:disabled { opacity: .5; cursor: default; }
+.tw-fund-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tw-fund-chip { font-size: 0.72rem; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); color: #9a8fb0; }
+.tw-fund-chip.is-on { color: #8fe39a; border-color: rgba(143,227,154,0.4); background: rgba(143,227,154,0.1); }
 `;

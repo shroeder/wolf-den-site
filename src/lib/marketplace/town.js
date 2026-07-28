@@ -3,6 +3,17 @@ import "server-only";
 import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { listFriends } from "@/lib/marketplace/friends.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
+
+// Collective plaza upgrades: the whole pack pools gold to unlock shared decorations that everyone sees.
+export const TOWN_UPGRADES = [
+    { key: "lights", name: "String Lights", at: 3000, blurb: "Warm lights strung across the plaza." },
+    { key: "banners", name: "Festival Banners", at: 12000, blurb: "Colorful banners fly over the street." },
+    { key: "fountain", name: "Grand Fountain", at: 30000, blurb: "A marble fountain bubbles in the square." },
+    { key: "statue", name: "Wolf Statue", at: 75000, blurb: "A towering statue of the Wolf watches over town." },
+    { key: "garden", name: "Plaza Garden", at: 150000, blurb: "Flowerbeds and hedges line the whole street." },
+];
 
 // ── THE WOLF DEN TOWN ─────────────────────────────────────────────────────────────────────────────────────
 // A persistent social overworld: your hero sprite walks a plaza and you see other players (as their real hero
@@ -110,7 +121,13 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites] = await Promise.all([getTownArt(), getPetSpriteData().catch(() => ({}))]);
+    const [art, petSprites, friends, upgrade] = await Promise.all([
+        getTownArt(),
+        getPetSpriteData().catch(() => ({})),
+        buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
+        getTownUpgrade().catch(() => null),
+    ]);
+    const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
     const [acts, presence, chats] = await Promise.all([
         ids.length
@@ -158,6 +175,7 @@ export async function getTownState(buyerId) {
             flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
             pet: pet?.url || null,
             petFlip: pet ? pet.flip === true : false,
+            friend: friendSet.has(r.id),
             status: statusFor(a?.event, a?.path),
             chat: chatBy[r.id] || null,                 // recent speech-bubble message (shows ~8s)
             typing: Boolean(mv?.typing),
@@ -184,8 +202,31 @@ export async function getTownState(buyerId) {
         players,
         buildings: TOWN_BUILDINGS,
         art,
+        upgrade,
         onlineCount: players.length + (buyerId ? 1 : 0),
     };
+}
+
+// The collective-upgrade state: pooled gold total, which decorations are unlocked, and the next goal.
+export async function getTownUpgrade() {
+    const row = await db.queryOne(`SELECT gold_total FROM mkt_town_upgrade WHERE id = 1`).catch(() => null);
+    const total = Number(row?.gold_total || 0);
+    const unlocked = TOWN_UPGRADES.filter((u) => total >= u.at).map((u) => u.key);
+    const next = TOWN_UPGRADES.find((u) => total < u.at) || null;
+    return { total, unlocked, next, tiers: TOWN_UPGRADES };
+}
+
+// Contribute gold to the plaza fund (owner-gated during the build). Deducts from the member (guarded so it
+// can't go negative), logs the coin sink, and bumps the shared total. Returns the member's new gold + total.
+export async function contributeTownGold(buyerId, amount) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    const amt = Math.floor(Number(amount) || 0);
+    if (amt <= 0) return { ok: false, error: "bad_amount" };
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, amt]).catch(() => null);
+    if (!paid) return { ok: false, error: "insufficient_gold" };
+    await logCoin(buyerId, -amt, "town_fund", { balanceAfter: paid.gold }).catch(() => {});
+    const row = await db.queryOne(`UPDATE mkt_town_upgrade SET gold_total = gold_total + $1, updated_at = NOW() WHERE id = 1 RETURNING gold_total`, [amt]).catch(() => null);
+    return { ok: true, gold: Number(paid.gold), total: Number(row?.gold_total || amt) };
 }
 
 // Post a chat message that pops as a speech bubble over your avatar for everyone in the plaza (owner-gated
