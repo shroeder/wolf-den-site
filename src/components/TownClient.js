@@ -284,11 +284,11 @@ const TOWN_CSS = `
 /* Midground rooftops — transparent above, silhouettes at the bottom; its base fades to haze so it doesn't cut
    a hard horizontal line against the street. */
 .tw-mid { position: absolute; top: 0; left: 0; height: 56%; display: flex; z-index: 0; pointer-events: none;
-    -webkit-mask-image: linear-gradient(180deg, #000 76%, transparent 99%); mask-image: linear-gradient(180deg, #000 76%, transparent 99%); }
+    -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 96%); mask-image: linear-gradient(180deg, #000 70%, transparent 96%); }
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Foreground plaza border wall — ground-locked, sits over the mid/street seam. */
-.tw-fg { position: absolute; left: 0; bottom: 33%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
+.tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-fg img:nth-child(even) { transform: scaleX(-1); }
 .tw-cobble { position: absolute; left: 0; bottom: 0; height: 44%; display: flex; overflow: hidden; z-index: 1; box-shadow: inset 0 12px 26px rgba(0,0,0,0.35); }
