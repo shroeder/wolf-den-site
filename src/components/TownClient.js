@@ -413,6 +413,17 @@ export default function TownClient({ initial }) {
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
+                {/* MIDGROUND skyline band (parallax between the far sky and the street) — a nearer row of town
+                    rooftops that sits on the horizon. Transparent-topped PNG, buildings along its bottom edge.
+                    This is what "Grow the Plaza" deepens over time (future depth tiers swap richer art in). */}
+                {layered && art.mid?.url ? (
+                    <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                        {TILES(10).map((k) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={k} src={art.mid.url} alt="" draggable={false} />
+                        ))}
+                    </div>
+                ) : null}
                 {/* The wide world that scrolls under a fixed camera */}
                 <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
@@ -440,6 +451,11 @@ export default function TownClient({ initial }) {
                                 <img key={k} src={art.fg.url} alt="" draggable={false} />
                             ))}
                         </div>
+                    ) : null}
+                    {/* Plaza centerpiece — the arted wolf fountain landmark, ground-locked in the town square */}
+                    {art.centerpiece?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "50%", top: `${GROUND}%` }} />
                     ) : null}
                     {/* Buildings */}
                     {buildings.map((b) => {
@@ -738,6 +754,12 @@ const TOWN_CSS = `
 .tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
+/* Midground skyline band — nearer rooftops on the horizon, faster parallax than the sky, behind the plaza. */
+.tw-mid { position: absolute; left: 0; bottom: 40%; height: 34%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+.tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+.tw-mid img:nth-child(even) { transform: scaleX(-1); }
+/* Plaza centerpiece — the wolf fountain landmark standing in the square. */
+.tw-centerpiece { position: absolute; transform: translate(-50%, -100%); height: 24%; width: auto; z-index: 93; pointer-events: none; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Foreground plaza border wall — ground-locked, sits over the sky/street seam. */
 .tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
