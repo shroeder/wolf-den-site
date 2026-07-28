@@ -22,7 +22,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const spriteFlip = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 
 const WORLD_W = 1240;   // width of the scrollable room (px)
-const FLOOR_Y = 87;     // % of scene height where characters stand (on the plank floor)
+const FLOOR_Y = 90;     // % of scene height where characters stand (on the plank floor)
 // NPCs / spots placed along the room (x = % of the world width).
 const NPCS = [
     { key: "bar", art: "barkeep", emoji: "🧔", label: "Barkeep", x: 15 },
@@ -337,15 +337,15 @@ const TV_CSS = `
 /* NPCs */
 .tv-npc { position: absolute; transform: translate(-50%, -100%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; cursor: pointer; padding: 0; }
 .tv-npc-label { font-size: 11px; font-weight: 800; color: #ffe6b3; background: rgba(20,10,4,0.8); border: 1px solid rgba(255,215,110,0.45); border-radius: 999px; padding: 2px 10px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
-.tv-npc-sprite { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)); }
-.tv-npc-emoji { font-size: 60px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
+.tv-npc-sprite { width: 168px; height: 168px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)); }
+.tv-npc-emoji { font-size: 66px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
 /* Avatars — sized to read as real inhabitants next to the room's furniture */
 .tv-av { position: absolute; transform: translate(-50%, -100%); z-index: 6; display: flex; flex-direction: column; align-items: center; transition: left .3s linear, top .3s linear; }
-.tv-av-sprite { width: 118px; height: 118px; display: grid; place-items: center; transform-origin: 50% 100%; }
+.tv-av-sprite { width: 132px; height: 132px; display: grid; place-items: center; transform-origin: 50% 100%; }
 .tv-av:not(.is-walking) .tv-av-sprite { animation: tvBreathe 2.8s ease-in-out infinite; }
 @keyframes tvBreathe { 0%,100% { transform: scaleY(1) scaleX(1); } 48% { transform: scaleY(0.955) scaleX(1.035); } }
-.tv-av-sprite img { width: 118px; height: 118px; object-fit: contain; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.6)); }
-.tv-av-fallback { font-size: 84px; }
+.tv-av-sprite img { width: 132px; height: 132px; object-fit: contain; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.6)); }
+.tv-av-fallback { font-size: 94px; }
 .tv-av-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(30,18,50,0.85); border-radius: 999px; padding: 1px 8px; margin-bottom: 2px; white-space: nowrap; }
 /* Station panel */
 .tv-panel-wrap { margin-top: 12px; }
