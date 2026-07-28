@@ -14,6 +14,10 @@ const GROUND = 72;      // % from top where building BASES sit (avatars walk in 
 const spriteTransform = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// Mirror-tiled parallax rows: enough tiles to always span the full WORLD_W (2200px) even when the scene is short
+// (tiles are sized by height, so a small phone viewport → narrow tiles → need more of them). Over-tiling is free —
+// extras just overflow the world and are clipped by the scene.
+const TILES = (n) => Array.from({ length: n }, (_, i) => i);
 
 function Avatar({ a, isYou, onTap }) {
     const dur = clamp((a.moveDist || 0) * 0.05, 0.4, 2.6);
@@ -170,27 +174,18 @@ export default function TownClient({ initial }) {
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                        {[0, 1, 2, 3, 4].map((k) => (
+                        {TILES(8).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={k} src={art.sky.url} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
-                {/* Midground rooftops — nearer than the sky, in-between parallax speed, for depth. */}
-                {layered && art.mid?.url ? (
-                    <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.6}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                        {[0, 1, 2, 3, 4, 5].map((k) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={art.mid.url} alt="" draggable={false} />
-                        ))}
-                    </div>
-                ) : null}
                 {/* The wide world that scrolls under a fixed camera */}
                 <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
-                            {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => (
+                            {TILES(14).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art.cobble.url} alt="" draggable={false} />
                             ))}
@@ -207,7 +202,7 @@ export default function TownClient({ initial }) {
                         plaza edge (buildings & avatars draw in front of it). Ground-locked (moves with the street). */}
                     {layered && art.fg?.url ? (
                         <div className="tw-fg" aria-hidden="true">
-                            {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => (
+                            {TILES(18).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art.fg.url} alt="" draggable={false} />
                             ))}
@@ -281,13 +276,7 @@ const TOWN_CSS = `
 .tw-far { position: absolute; top: 0; left: 0; height: 64%; display: flex; z-index: 0; }
 .tw-far img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
-/* Midground rooftops — transparent above, silhouettes at the bottom; its base fades to haze so it doesn't cut
-   a hard horizontal line against the street. */
-.tw-mid { position: absolute; top: 0; left: 0; height: 56%; display: flex; z-index: 0; pointer-events: none;
-    -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 96%); mask-image: linear-gradient(180deg, #000 70%, transparent 96%); }
-.tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
-.tw-mid img:nth-child(even) { transform: scaleX(-1); }
-/* Foreground plaza border wall — ground-locked, sits over the mid/street seam. */
+/* Foreground plaza border wall — ground-locked, sits over the sky/street seam. */
 .tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-fg img:nth-child(even) { transform: scaleX(-1); }
