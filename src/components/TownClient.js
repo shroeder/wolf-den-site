@@ -690,7 +690,10 @@ export default function TownClient({ initial }) {
                         </div>
                         {/* High-roller gear gamble */}
                         <button type="button" className="tw-gamble" disabled={(you?.gold || 0) < 1000 || merchantBusy} onClick={gambleGear}>
-                            <span className="tw-gamble-ico" aria-hidden="true">🎲</span>
+                            {art.dice?.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="tw-gamble-ico" src={art.dice.url} alt="" draggable={false} style={{ width: 38, height: 38, objectFit: "contain" }} />
+                            ) : <span className="tw-gamble-ico" aria-hidden="true">🎲</span>}
                             <span className="tw-gamble-body">
                                 <span className="tw-gamble-title">Gamble for gear</span>
                                 <span className="tw-gamble-sub">A random piece — rarely up to Tier 4!</span>
