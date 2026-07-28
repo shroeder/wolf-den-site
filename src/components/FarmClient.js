@@ -1446,29 +1446,38 @@ function ScenePlot({ p, left, top, now, busy, totalSeeds, editing = false, dragg
         if (ready) onHarvest(p.slot);
         else onInspect(p.slot); // growing → open the inspect modal (don't silently fertilize)
     };
-    const plantScale = ready ? 1 : 0.4 + 0.6 * progress; // grows from a seedling as it matures
+    // Real growth: the plant swaps through stages (tiny sprout → bigger sprout → the actual crop appearing and
+    // swelling) AND scales up across the whole grow, so you can SEE it maturing over time.
+    const plantScale = ready ? 1 : 0.26 + 0.74 * progress; // 26% → 100%
+    const growEmoji = ready || progress >= 0.6 ? p.emoji : p.sprout; // the real crop shows in the back half, then ripens
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
         : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — tap to get seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
     return (
         <button type="button" onClick={onClick} title={title}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
-            style={{ position: "absolute", left: `${left}%`, top: `${top}%`, transform: "translate(-50%, -100%)", width: 56, background: "none", border: "none", padding: 0, cursor: editing ? "grab" : tappable ? "pointer" : "default", zIndex: dragging ? 9990 : Math.round(top), touchAction: editing ? "none" : "auto", transition: dragging ? "none" : "left .15s ease, top .15s ease", WebkitTapHighlightColor: "transparent", userSelect: "none", outline: "none" }}>
-            {/* the plant / sprout rising from the mound */}
-            <span style={{ display: "block", position: "relative", height: 44, width: "100%" }}>
-                {ready ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: 40, height: 40, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", animation: "farmReadyRing 1.6s ease-out infinite" }} /> : null}
+            style={{ position: "absolute", left: `${left}%`, top: `${top}%`, transform: "translate(-50%, -100%)", width: 78, background: "none", border: "none", padding: 0, cursor: editing ? "grab" : tappable ? "pointer" : "default", zIndex: dragging ? 9990 : Math.round(top), touchAction: editing ? "none" : "auto", transition: dragging ? "none" : "left .15s ease, top .15s ease", WebkitTapHighlightColor: "transparent", userSelect: "none", outline: "none" }}>
+            {/* the plant / sprout rising from the bed — grows taller & swaps stages over time */}
+            <span style={{ display: "block", position: "relative", height: 60, width: "100%" }}>
+                {ready ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", top: "54%", width: 52, height: 52, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", animation: "farmReadyRing 1.6s ease-out infinite" }} /> : null}
                 {!empty ? (
-                    <span style={{ position: "absolute", left: "50%", bottom: 1, transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1s linear" }}>
-                        <span style={{ display: "block", fontSize: 28, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 7px rgba(140,240,150,0.9))" : "drop-shadow(0 2px 2px rgba(0,0,0,0.45))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{ready ? p.emoji : p.sprout}</span>
+                    <span style={{ position: "absolute", left: "50%", bottom: 2, transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1.2s linear" }}>
+                        <span style={{ display: "block", fontSize: 38, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 2px 3px rgba(0,0,0,0.5))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{growEmoji}</span>
                     </span>
                 ) : (
-                    <span style={{ position: "absolute", left: "50%", bottom: 6, transform: "translateX(-50%)", fontSize: 19, color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
+                    <span style={{ position: "absolute", left: "50%", bottom: 8, transform: "translateX(-50%)", fontSize: 22, color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
                 )}
             </span>
-            {/* a soft ground shadow so the mound reads as sitting ON the grass */}
-            <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: -3, transform: "translateX(-50%)", width: 46, height: 10, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0) 72%)", zIndex: 0 }} />
-            {/* tilled soil mound on the grass */}
-            <span style={{ position: "relative", display: "block", width: 44, height: 13, margin: "0 auto", borderRadius: "50%", background: p.fertilized ? "radial-gradient(ellipse at 50% 22%, #7a5430, #3c2712)" : "radial-gradient(ellipse at 50% 22%, #64431f, #33200d)", boxShadow: "inset 0 1px 2px rgba(255,255,255,0.2), inset 0 -2px 5px rgba(0,0,0,0.6)", border: canPlant ? "1.5px dashed rgba(255,226,122,0.7)" : "1px solid rgba(0,0,0,0.4)" }} />
+            {/* a soft ground shadow so the bed reads as sitting ON the grass */}
+            <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: -4, transform: "translateX(-50%)", width: 72, height: 14, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 72%)", zIndex: 0 }} />
+            {/* a real raised, tilled garden BED with furrow rows (not a baby mound) */}
+            <span style={{ position: "relative", display: "block", width: 68, height: 26, margin: "0 auto", borderRadius: "7px / 9px",
+                background: p.fertilized
+                    ? "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 6px, rgba(0,0,0,0) 6px 12px), linear-gradient(180deg, #7a5430 0%, #3a2410 100%)"
+                    : "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 6px, rgba(0,0,0,0) 6px 12px), linear-gradient(180deg, #6b4a26 0%, #33200d 100%)",
+                boxShadow: "inset 0 2px 2px rgba(255,225,180,0.22), inset 0 -4px 7px rgba(0,0,0,0.62), 0 2px 3px rgba(0,0,0,0.4)",
+                border: canPlant ? "1.5px dashed rgba(255,226,122,0.75)" : "1px solid rgba(20,12,4,0.6)",
+                borderTop: "2px solid rgba(120,86,48,0.75)" }} />
             {/* status chip */}
             <span style={{ display: "block", textAlign: "center", marginTop: 2 }}>
                 {!empty ? (
