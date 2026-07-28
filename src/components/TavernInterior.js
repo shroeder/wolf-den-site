@@ -231,7 +231,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                     {/* you */}
                     <TavAvatar a={{ x: pos.x, y: pos.y, facing: pos.facing, moving: pos.moving, sprite: me?.sprite, flip: me?.flip }} you />
                 </div>
-                <div className="tv-hint">Tap the floor to walk · drag to look around · tap the barkeep or gambler{here > 1 ? ` · ${here} here now` : ""}</div>
+                {here > 1 ? <div className="tv-hint">{here} here now</div> : null}
             </div>
 
             {/* Station panel */}
