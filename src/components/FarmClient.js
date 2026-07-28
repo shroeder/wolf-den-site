@@ -1455,7 +1455,7 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
                 const live = drag && drag.slot === p.slot ? drag : p;
                 return (
                     <ScenePlot
-                        key={p.slot} p={p} left={live.x} top={live.y} now={now} busy={busy} bedUrl={garden.bedUrl}
+                        key={p.slot} p={p} left={live.x} top={live.y} now={now} busy={busy} bedUrl={garden.bedUrl} cropSprites={garden.cropSprites}
                         totalSeeds={totalSeeds} editing={editing} dragging={drag?.slot === p.slot} suppressClickRef={suppressClickRef}
                         onPointerDown={editing ? (e) => start(e, p) : undefined}
                         onPointerMove={editing ? move : undefined}
@@ -1469,7 +1469,7 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
     );
 }
 
-function ScenePlot({ p, left, top, now, busy, bedUrl, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
+function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
     const empty = p.empty;
     let progress = 1; let ready = false; let secsLeft = 0;
     if (!empty) {
@@ -1491,8 +1491,11 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, totalSeeds, editing = fals
     };
     // Real growth: the plant swaps through stages (tiny sprout → bigger sprout → the actual crop appearing and
     // swelling) AND scales up across the whole grow, so you can SEE it maturing over time.
-    const plantScale = ready ? 1 : 0.26 + 0.74 * progress; // 26% → 100%
-    const growEmoji = ready || progress >= 0.6 ? p.emoji : p.sprout; // the real crop shows in the back half, then ripens
+    const plantScale = ready ? 1 : 0.26 + 0.74 * progress; // 26% → 100% (smooth growth within a stage)
+    const growEmoji = ready || progress >= 0.6 ? p.emoji : p.sprout; // emoji fallback
+    // Real 3-stage growth sprites (sprout → growing → ripe) so the plant looks like it's growing out of the bed.
+    const stageKey = !p.empty ? ((ready || progress >= 0.72) ? `crop_${p.seedId}_ripe` : progress >= 0.33 ? `crop_${p.seedId}_grow` : "crop_sprout") : null;
+    const plantSprite = stageKey ? cropSprites?.[stageKey] : null;
     // The bed visibly upgrades as you invest in the plot: dirt → wood frame → stone+glow → gilded.
     const spec = p.specLevel || 0;
     const specTier = spec >= 8 ? 3 : spec >= 4 ? 2 : spec >= 1 ? 1 : 0;
@@ -1515,7 +1518,12 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, totalSeeds, editing = fals
                 {/* the crop — its BASE sits down in the soil (bottom ~46% up the bed), growing taller over time */}
                 {!empty ? (
                     <span style={{ position: "absolute", left: "50%", bottom: "46%", transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1.2s linear", zIndex: 2 }}>
-                        <span style={{ display: "block", fontSize: 42, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{growEmoji}</span>
+                        {plantSprite ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={plantSprite} alt="" draggable={false} style={{ display: "block", width: 50, height: "auto", transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }} />
+                        ) : (
+                            <span style={{ display: "block", fontSize: 42, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{growEmoji}</span>
+                        )}
                     </span>
                 ) : (
                     <span style={{ position: "absolute", left: "50%", bottom: "48%", transform: "translateX(-50%)", fontSize: 24, color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", zIndex: 2, animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>

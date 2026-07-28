@@ -91,6 +91,29 @@ const ART_PROMPTS = {
     questgiver: `A single 2D video-game CHARACTER sprite of a friendly QUEST-GIVER quartermaster: a grizzled seasoned HUMAN adventurer in a leather jerkin and short cloak, holding up a rolled bounty scroll in one hand and gesturing invitingly with the other, a satchel at the hip, full body head-to-boots, three-quarter view facing forward, warm and welcoming. This is a PERSON / character — NOT a building, NOT a notice board. Painterly fantasy action-RPG style with clean confident outlines and cel-shaded vibrant colors, strong readable silhouette. Isolated as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO background, NO scenery, NO ground, NO sky, NO glow. Nothing but the character. No text, no logo, no watermark, no border.`,
 };
 
+// ── Crop GROWTH sprites: each crop gets 3 stages (sprout → growing → ripe) so plots look like the plant is
+// actually growing OUT of the bed, not a pickable emoji. Stage 1 (sprout) is shared. Plants are rooted at the
+// bottom and grow upward; NO soil/pot/bed (they sit on the arted bed), NO white sticker rim.
+const _cropPlant = (stage, subject) =>
+    `A single ${stage}, a 2D farm-game PLANT sprite viewed FRONT-ON, rooted at the very BOTTOM edge and growing UPWARD (${subject}). Painterly cel-shaded style with soft dark ink linework (NOT a white outline), vivid natural colors, strong readable silhouette. The plant floats ALONE on a FULLY TRANSPARENT background (alpha) — absolutely NO soil, NO dirt, NO pot, NO planter, NO bed, NO ground, NO white sticker outline, NO die-cut border, NO halo, NO drop shadow, NO scenery. Nothing but the plant itself. No text, no watermark, no border.`;
+const CROP_RIPE = {
+    wheat: "tall golden WHEAT stalks topped with heavy ripe grain heads",
+    carrot: "bushy green CARROT tops with the bright orange carrot crown just showing at the base",
+    potato: "a leafy green POTATO plant dotted with small white flowers",
+    strawberry: "a low STRAWBERRY plant with green leaves and a few ripe red strawberries",
+    corn: "a tall CORN stalk with broad green leaves and one ripe golden-yellow corn cob",
+    grape: "a GRAPEVINE with green leaves and a full cluster of ripe purple grapes",
+    pumpkin: "a sprawling PUMPKIN vine with big leaves and a plump ripe orange pumpkin",
+    goldenapple: "a small leafy branch bearing a glowing GOLDEN APPLE among green leaves",
+    starfruit: "an exotic plant bearing a glowing yellow STAR-SHAPED starfruit with faint sparkles",
+};
+const _cropPrompts = { crop_sprout: _cropPlant("small green SEEDLING SPROUT — two tiny leaves on a short pale stem, freshly emerged", "just the little sprout") };
+for (const [id, ripe] of Object.entries(CROP_RIPE)) {
+    _cropPrompts[`crop_${id}_grow`] = _cropPlant(`young ${id} plant partway grown — a leafy green stem with several leaves and NO ripe fruit yet`, "a healthy leafy young plant, taller than a sprout");
+    _cropPrompts[`crop_${id}_ripe`] = _cropPlant(`mature ${id} plant heavy with its crop`, ripe);
+}
+Object.assign(ART_PROMPTS, _cropPrompts);
+
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
 
 // Generate (or regenerate) one town art asset and store its URL.

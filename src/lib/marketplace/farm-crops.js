@@ -199,14 +199,17 @@ function defaultPlotPos(i, n) {
 // fertilizer stock, and how many crops are ready right now (for the alert badge).
 export async function getGarden(buyerId) {
     if (!buyerId) return null;
-    const [buyer, plots, seeds, packRows, plotUp, bedRow] = await Promise.all([
+    const [buyer, plots, seeds, packRows, plotUp, bedRow, cropRows] = await Promise.all([
         loadFarmBuyer(buyerId),
         db.query(`SELECT slot, seed_id, planted_at, ready_at, fertilized FROM mkt_farm_plot WHERE buyer_id = $1 ORDER BY slot`, [buyerId]).catch(() => []),
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0 AND consumable_id = ANY($2)`, [buyerId, SEED_PACK_IDS]).catch(() => []),
         getPlotUpgrades(buyerId).catch(() => ({})),
         db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'farm_bed'`).catch(() => null),
+        db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'crop_%'`).catch(() => []),
     ]);
+    const cropSprites = {};
+    for (const r of (cropRows || [])) if (r.url) cropSprites[r.art_key] = r.url; // { crop_sprout, crop_<id>_grow, crop_<id>_ripe }
     const up = buyer?.farm_upgrades || {};
     const n = plotCount(up);
     const posMap = buyer?.farm_plot_pos || {};
@@ -255,6 +258,7 @@ export async function getGarden(buyerId) {
         gold: buyer?.gold || 0,
         readyCount,
         bedUrl: bedRow?.url || null,
+        cropSprites,
     };
 }
 
