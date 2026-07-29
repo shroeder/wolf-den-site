@@ -120,9 +120,11 @@ function Avatar({ a, isYou, onTap }) {
             )}
             <div className={`tw-sprite${a.moving ? " is-walking" : ""}`} style={{ animationDelay: `${((Math.round(a.x || 0) % 24) / 8).toFixed(2)}s` }}>
                 {a.pet ? (
-                    <span className="tw-pet-wrap" style={{ transform: `translate(${petWander.x}px, ${petWander.y}px)` }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="tw-pet" src={a.pet} alt="" draggable={false} style={{ transform: spriteTransform(a.petFlip, a.facing) }} />
+                    <span className="tw-pet-wrap" style={{ [a.facing === -1 ? "right" : "left"]: -52, [a.facing === -1 ? "left" : "right"]: "auto", transform: `translate(${petWander.x}px, ${petWander.y}px)` }}>
+                        <span className={`tw-pet-bob${a.moving ? " is-walking" : ""}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="tw-pet" src={a.pet} alt="" draggable={false} style={{ transform: spriteTransform(a.petFlip, a.facing) }} />
+                        </span>
                     </span>
                 ) : null}
                 {a.sprite ? (
@@ -191,6 +193,7 @@ export default function TownClient({ initial }) {
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
     const [previewDepth, setPreviewDepth] = useState(null); // owner: locally preview a "Grow the Plaza" depth tier before it's funded
+    const [previewUnlocks, setPreviewUnlocks] = useState({}); // owner: locally preview an unlockable building { [id]: true }
     const [raidEnemies, setRaidEnemies] = useState([]); // per-enemy {id,x,y,hp,hpMax,floats:[],dying}
     const [raidKills, setRaidKills] = useState(0);
     const [raidDamage, setRaidDamage] = useState(0);    // your total damage this raid (optimistic)
@@ -444,7 +447,10 @@ export default function TownClient({ initial }) {
     const you = state?.you;
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
-    const buildings = state?.buildings || [];
+    const baseBuildings = state?.buildings || [];
+    // Owner preview: drop any toggled-on unlockable building into the plaza locally (if not already unlocked).
+    const previewBuildings = (state?.unlockables || []).filter((u) => previewUnlocks[u.id] && !u.unlocked).map((u) => ({ id: u.id, emoji: u.emoji, label: u.label, href: u.href, x: u.x }));
+    const buildings = [...baseBuildings, ...previewBuildings];
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
     const effDepth = previewDepth ?? (townBonuses.depth || 0); // owner preview overrides the real funded depth
@@ -944,6 +950,27 @@ export default function TownClient({ initial }) {
                                     {state?.eventsLive ? "🟢 Auto opening-events: LIVE" : "⚪ Auto opening-events: off"}
                                     <span className="muted">tap to {state?.eventsLive ? "turn off" : "turn on"} — pushes members when the shop opens</span>
                                 </button>
+                                {(state?.unlockables || []).length ? (
+                                    <div className="tw-unlockables">
+                                        <div className="tw-unlockables-title">🔓 Unlockable buildings</div>
+                                        {state.unlockables.map((u) => (
+                                            <div key={u.id} className="tw-unlockable">
+                                                {u.art ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img className="tw-unlockable-art" src={u.art} alt="" draggable={false} />
+                                                ) : <span className="tw-unlockable-emoji">{u.emoji}</span>}
+                                                <div className="tw-unlockable-body">
+                                                    <div className="tw-unlockable-name">{u.label} {u.unlocked ? <span className="tw-unlockable-tag is-on">UNLOCKED</span> : <span className="tw-unlockable-tag">locked</span>}{u.art ? null : <span className="tw-unlockable-tag is-warn">no art</span>}</div>
+                                                    <div className="muted" style={{ fontSize: "0.72rem" }}>{u.req}</div>
+                                                </div>
+                                                {u.unlocked ? <span className="tw-unlockable-live">live</span> : (
+                                                    <button type="button" className={`tw-unlockable-btn${previewUnlocks[u.id] ? " is-on" : ""}`} onClick={() => setPreviewUnlocks((p) => ({ ...p, [u.id]: !p[u.id] }))}>{previewUnlocks[u.id] ? "👁 Hide" : "👁 Preview"}</button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <p className="muted" style={{ fontSize: "0.7rem", margin: "6px 2px 0" }}>Preview drops the building into the plaza locally (owner-only) so you can see it before it&apos;s funded.</p>
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
                     </div>
@@ -1073,7 +1100,10 @@ const TOWN_CSS = `
 .tw-sprite img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
 .tw-npc-btn img { animation: twBreathe 3.1s ease-in-out infinite; transform-origin: 50% 100%; }
 .tw-sprite-fallback { font-size: 42px; }
-.tw-pet-wrap { position: absolute; bottom: -2px; left: -30px; z-index: -1; transition: transform 1.6s ease-in-out; }
+.tw-pet-wrap { position: absolute; bottom: -2px; z-index: -1; transition: transform 1.6s ease-in-out; }
+.tw-pet-bob { display: block; }
+.tw-pet-bob.is-walking { animation: twPetTrot .42s ease-in-out infinite; }
+@keyframes twPetTrot { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .tw-pet { display: block; width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
 .tw-sprite.is-walking { animation: twBob .5s ease-in-out infinite; transform-origin: bottom center; }
 @keyframes twBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
@@ -1153,6 +1183,19 @@ const TOWN_CSS = `
 .tw-depth-preview b { color: #ffd75e; }
 .tw-depth-steps { display: flex; gap: 6px; flex: 0 0 auto; }
 .tw-depth-steps button { min-width: 32px; padding: 5px 8px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #f2ead9; font-weight: 800; cursor: pointer; }
+.tw-unlockables { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.12); }
+.tw-unlockables-title { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.03em; color: #cbb9e0; margin-bottom: 8px; }
+.tw-unlockable { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; }
+.tw-unlockable-art { width: 42px; height: 42px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.tw-unlockable-emoji { font-size: 30px; flex: 0 0 auto; width: 42px; text-align: center; }
+.tw-unlockable-body { flex: 1 1 auto; min-width: 0; }
+.tw-unlockable-name { font-weight: 800; font-size: 0.86rem; color: #f2ead9; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tw-unlockable-tag { font-size: 0.6rem; font-weight: 900; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,0.12); color: #cbb9e0; }
+.tw-unlockable-tag.is-on { background: rgba(143,227,154,0.18); color: #8fe39a; }
+.tw-unlockable-tag.is-warn { background: rgba(224,112,74,0.18); color: #ffb59a; }
+.tw-unlockable-btn { flex: 0 0 auto; padding: 7px 12px; border-radius: 10px; border: 1px solid rgba(255,215,110,0.4); background: rgba(255,215,110,0.12); color: #ffe0b0; font-weight: 800; font-size: 0.76rem; cursor: pointer; }
+.tw-unlockable-btn.is-on { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border-color: transparent; }
+.tw-unlockable-live { flex: 0 0 auto; font-size: 0.7rem; font-weight: 800; color: #8fe39a; }
 .tw-npc-alert { position: absolute; top: 0; right: 6px; z-index: 2; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e0433f; color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 /* Quest marker floating over the Quest-Giver's head — gold "!" = bounties available, green "?" = reward ready. */
 .tw-quest-marker { position: absolute; top: -22px; left: 50%; z-index: 3; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 16px; line-height: 1; color: #3a2a06; background: linear-gradient(180deg,#ffe27a,#f3b23a); border: 1.5px solid #fff3c4; box-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none; animation: twQuestBob 1.5s ease-in-out infinite; }

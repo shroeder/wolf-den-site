@@ -2,7 +2,9 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { listFriends } from "@/lib/marketplace/friends.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
@@ -58,9 +60,14 @@ async function merchantBoughtToday(buyerId) {
 // Buildings that only appear once the community funds their unlock project (Town Development). They get their
 // own art later; for now they render with the emoji-card fallback.
 const UNLOCKABLE_BUILDINGS = [
-    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 16 },
-    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 82 },
+    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 3 },
+    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 97 },
 ];
+// How each unlockable is earned (for the owner/admin panel).
+const UNLOCK_INFO = {
+    vault: { req: "Fund the Vault project (needs Town Prosperity Lv 5)" },
+    festival: { req: "Fund the Festival Stage project (needs Prosperity Lv 10 + Grow the Plaza Lv 3)" },
+};
 
 // ── THE WOLF DEN TOWN ─────────────────────────────────────────────────────────────────────────────────────
 // A persistent social overworld: your hero sprite walks a plaza and you see other players (as their real hero
@@ -151,16 +158,28 @@ function activitySlot(id, event, path) {
     return { x, y: 76 + hash01(id, 4) * 10 };
 }
 
+// The pet sprite at a member's ACTUAL level for their featured pet (evolved art at Lv2-5), so town pets reflect
+// their level like the boss scene does. Returns { url, flip } or null.
+function petSpriteForLevel(collId, petXp, petSprites, petSpriteLevels) {
+    if (!collId) return null;
+    const lvl = petLevelForXp(petXp || 0, collectibleById(collId)?.rarity) || 1;
+    return pickPetSpriteForLevel(petSprites[collId], petSpriteLevels[collId], lvl) || null;
+}
+
 export async function getTownState(buyerId) {
     const owner = isOwner(buyerId);
     const me = buyerId
-        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
+        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible,
+                (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = mkt_buyer.id::text AND pl.pet_id = mkt_buyer.featured_collectible) AS featured_pet_xp,
+                COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
         : null;
     const myPos = buyerId ? await db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : null;
 
     // Members who are ONLINE NOW (active within ONLINE_WINDOW), excluding me, capped. Offline members never show.
     const recent = await db.query(
-        `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible, MAX(v.last_seen) AS seen
+        `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
+                (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
+                MAX(v.last_seen) AS seen
            FROM mkt_visitor v JOIN mkt_buyer b ON b.id = v.buyer_id
           WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - $2::interval
           GROUP BY b.id ORDER BY seen DESC LIMIT 40`,
@@ -169,9 +188,10 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, friends, projects, bonuses, event, quests, chestArt, eventsLive] = await Promise.all([
+    const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
+        getPetSpriteLevelData().catch(() => ({})),
         buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
         getTownProjects().catch(() => []),
         getTownBonuses(Date.now()).catch(() => ({})),
@@ -221,7 +241,7 @@ export async function getTownState(buyerId) {
         const mv = moverBy[r.id];
         const walking = Boolean(mv?.walking);
         const slot = activitySlot(r.id, a?.event, a?.path);
-        const pet = petSprites[r.featured_collectible];
+        const pet = petSpriteForLevel(r.featured_collectible, r.featured_pet_xp, petSprites, petSpriteLevels);
         return {
             id: r.id,
             name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"),
@@ -251,12 +271,18 @@ export async function getTownState(buyerId) {
             flip: me?.avatar_sprite_url ? me.avatar_sprite_flip === true : false,
             x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
             chat: (buyerId ? chatBy[buyerId] : null) || null,
-            pet: petSprites[me?.featured_collectible]?.url || null,
-            petFlip: petSprites[me?.featured_collectible] ? petSprites[me.featured_collectible].flip === true : false,
+            pet: petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels)?.url || null,
+            petFlip: Boolean(petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels)?.flip),
             gold: Number(me?.gold || 0),
         },
         players,
         buildings: [...TOWN_BUILDINGS, ...UNLOCKABLE_BUILDINGS.filter((b) => (bonuses.unlocks || []).includes(b.id))],
+        // Every unlockable building + whether it's unlocked yet + how it's earned + its art — for the owner panel
+        // (and so an owner can PREVIEW it in the plaza before it's funded).
+        unlockables: owner ? UNLOCKABLE_BUILDINGS.map((b) => ({
+            id: b.id, label: b.label, emoji: b.emoji, href: b.href, x: b.x,
+            art: art[b.id]?.url || null, unlocked: (bonuses.unlocks || []).includes(b.id), req: UNLOCK_INFO[b.id]?.req || null,
+        })) : [],
         art,
         projects,
         bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, depth: bonuses.depth || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, unlocks: bonuses.unlocks || [] },
