@@ -17,6 +17,7 @@ const SOURCES = [
     { id: "achievement", label: "Achievements" },
     { id: "chest", label: "Chests" },
     { id: "boss", label: "Boss" },
+    { id: "raid", label: "Raid" },
     { id: "elite", label: "Elite" },
 ];
 
@@ -40,7 +41,7 @@ const STAT_EFFECT = {
 
 const SOURCE_LABEL = {
     level: "🎮 Leveling reward", shop: "🛒 Shop", achievement: "🏅 Achievement",
-    chest: "🎁 Chest drop", boss: "⚔️ Boss drop", elite: "🌟 Elite",
+    chest: "🎁 Chest drop", boss: "⚔️ Boss drop", raid: "🏘️ Raid-exclusive", elite: "🌟 Elite",
 };
 
 // A scannable, self-explaining group for the menagerie summary: a labeled header + one row per bonus, each

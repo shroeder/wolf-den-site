@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { isPrimaryOwner } from "@/lib/marketplace/owner.js";
 import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
 import { attackTownEvent, spawnTownEvent, duelRaidEnemy, bossRaidStrike, endTownEvent } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
@@ -16,7 +16,7 @@ export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/town", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
-            if (!buyer || !isOwner(buyer.id)) return NextResponse.json({ signedIn: Boolean(buyer), owner: false }, { headers: { "Cache-Control": "no-store" } });
+            if (!buyer) return NextResponse.json({ signedIn: false, owner: false }, { headers: { "Cache-Control": "no-store" } });
             return NextResponse.json(await getTownState(buyer.id), { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.town.state.failure" });
@@ -43,9 +43,11 @@ export async function POST(request) {
             else if (body?.action === "merchant_gamble") res = await gambleMerchantGear(buyer.id);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);
             else if (body?.action === "well_claim") res = await claimWishingWell(buyer.id);
-            else if (body?.action === "spawn_event") res = isOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid", { silent: true }) : { ok: false, error: "forbidden" }; // in-Town owner spawn = silent test (no push)
-            else if (body?.action === "end_event") res = isOwner(buyer.id) ? await endTownEvent() : { ok: false, error: "forbidden" }; // owner: force-end for testing
-            else if (body?.action === "set_events_live") res = await setTownEventsLive(buyer.id, Boolean(body?.on));
+            // Raid controls are PRIMARY-OWNER only (Luke) — a co-owner must not be able to fire a raid at the
+            // whole membership. The in-Town spawn is now a REAL surprise drop: full HP + push everyone.
+            else if (body?.action === "spawn_event") res = isPrimaryOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid") : { ok: false, error: "forbidden" };
+            else if (body?.action === "end_event") res = isPrimaryOwner(buyer.id) ? await endTownEvent() : { ok: false, error: "forbidden" };
+            else if (body?.action === "set_events_live") res = isPrimaryOwner(buyer.id) ? await setTownEventsLive(buyer.id, Boolean(body?.on)) : { ok: false, error: "forbidden" };
             else res = await moveTown(buyer.id, { x: body?.x, y: body?.y, facing: body?.facing });
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.error === "forbidden" ? 403 : 400 });
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });

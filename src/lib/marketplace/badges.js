@@ -350,6 +350,14 @@ const BADGE_BONUSES = {
     forge_first: G({ efficient: 1 }), forge_smith: G({ masters_touch: 1 }), forge_master: G({ masters_touch: 3 }),
     forge_plus10: G({ steady_hand: 3 }), forge_pixel: G({ steady_hand: 2 }), forge_emberheart: G({ keen_eye: 3 }),
     forge_artisan: G({ efficient: 2, keen_eye: 2 }), forge_grandmaster: G({ efficient: 4, keen_eye: 4, masters_touch: 4, steady_hand: 4 }),
+
+    // ── TOWN & RAIDS → combat power (raids), scaling with difficulty ──
+    town_raider: C(2), town_veteran: C(3), town_warlord: C(5, 0, 3),
+    town_brawler: C(2), town_berserker: C(4, 2), town_juggernaut: C(4, 0, 3),
+    golem_slayer: C(3), golem_bane: C(6, 0, 4), town_topdog: C(4, 3),
+    tavern_regular: C(1), dice_devil: C(0, 3), dice_king: C(0, 5),
+    town_patron: C(2), town_benefactor: C(5), well_wisher: C(1), fountain_faithful: C(3),
+    high_stakes: C(2), merchant_jackpot: C(0, 4), town_taskmaster: C(2),
 };
 
 // Sum one bonus DOMAIN across every badge a member holds. Cheap (one held-slugs read); safe on hot paths.

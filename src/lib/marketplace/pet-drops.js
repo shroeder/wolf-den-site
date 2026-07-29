@@ -50,3 +50,22 @@ export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     const pet = pool[Math.floor(Math.random() * pool.length)];
     return grantDrop(buyerId, pet, "boss", {});
 }
+
+// EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a prestige badge of the
+// pack's regulars. Deliberately very rare: best odds on a Golem BOSS kill, slimmer on an escaped boss or a
+// skirmish raid. The rarest (eternal Golem's Heart) can ONLY drop from an actual Golem kill.
+const RAID_PET_WEIGHT = { mythic: 60, ascendant: 22, eternal: 6 };
+export async function maybeGrantRaidPet(buyerId, { boss = false, killed = false } = {}) {
+    if (!buyerId) return null;
+    const chance = boss ? (killed ? 0.08 : 0.02) : 0.015;
+    if (Math.random() > chance) return null;
+    const owned = await ownedPetSet(buyerId);
+    let eligible = COLLECTIBLES.filter((p) => p.raidExclusive && !owned.has(p.id));
+    if (!(boss && killed)) eligible = eligible.filter((p) => p.rarity !== "eternal"); // Golem's Heart = kill trophy only
+    if (!eligible.length) return null;
+    const total = eligible.reduce((s, p) => s + (RAID_PET_WEIGHT[p.rarity] || 10), 0);
+    let r = Math.random() * total;
+    let pet = eligible[0];
+    for (const p of eligible) { if ((r -= (RAID_PET_WEIGHT[p.rarity] || 10)) < 0) { pet = p; break; } }
+    return grantDrop(buyerId, pet, "raid", { boss, killed });
+}

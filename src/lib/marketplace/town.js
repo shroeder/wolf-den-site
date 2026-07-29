@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -19,6 +19,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { describeItemElements } from "@/lib/marketplace/item-element.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
+import { checkTownContribBadges, checkMerchantBadges } from "@/lib/marketplace/town-badges.js";
 import { setSetting } from "@/lib/settings.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
@@ -263,6 +264,7 @@ export async function getTownState(buyerId) {
     return {
         signedIn: Boolean(buyerId),
         owner,
+        raidAdmin: isPrimaryOwner(buyerId), // ONLY Luke sees the raid trigger/end controls (surprise-drop lever)
         you: {
             id: buyerId,
             name: me?.display_name || (me?.alias ? `@${me.alias}` : "You"),
@@ -299,7 +301,7 @@ export async function setTownEventsLive(buyerId, on) {
 // Buy a loot chest from the Traveling Merchant (owner-gated during the build). Price/stock follow the town's
 // Trading Post tier. Guarded gold spend → a chest.
 export async function buyMerchantChest(buyerId, tier) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const [bonuses, boughtToday] = await Promise.all([getTownBonuses().catch(() => ({})), merchantBoughtToday(buyerId)]);
     const ware = merchantWaresForTier(bonuses.merchantTier || 0, {}, boughtToday).find((w) => w.tier === tier);
     if (!ware) return { ok: false, error: "not_for_sale" };
@@ -317,7 +319,7 @@ const GAMBLE_COST = 1000;
 const GAMBLE_WEIGHTS = { common: 50, rare: 30, epic: 15, legendary: 5 }; // legendary = the rare Tier-4 jackpot
 const RARITY_TIER = { common: 1, rare: 2, epic: 3, legendary: 4 };
 export async function gambleMerchantGear(buyerId) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, GAMBLE_COST]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -GAMBLE_COST, "merchant_gamble", { balanceAfter: paid.gold }).catch(() => {});
@@ -336,6 +338,7 @@ export async function gambleMerchantGear(buyerId) {
     }
     const pick = pool[Math.floor(Math.random() * pool.length)];
     await grantItem(buyerId, pick.id, "merchant_gamble").catch(() => {});
+    checkMerchantBadges(buyerId, { jackpot: pick.rarity === "legendary" }).catch(() => {}); // High Stakes + Merchant Jackpot
     const image = await itemSpriteFor(pick.id).catch(() => null);
     // Full detail so the reveal shows the real gear — stats, signature ability, element & spin-off affinities.
     return {
@@ -354,16 +357,16 @@ export async function gambleMerchantGear(buyerId) {
 
 // Contribute gold to a Town Development project (owner-gated during the build). Also ticks the civic quest.
 export async function contributeTownProject(buyerId, projectId, amount) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const res = await contributeToProject(buyerId, projectId, amount);
-    if (res.ok) bumpTownQuest(buyerId, "civic", 1).catch(() => {});
+    if (res.ok) { bumpTownQuest(buyerId, "civic", 1).catch(() => {}); checkTownContribBadges(buyerId).catch(() => {}); }
     return res;
 }
 
 // Post a chat message that pops as a speech bubble over your avatar for everyone in the plaza (owner-gated
 // during the build). Trimmed + length-capped; empties are dropped.
 export async function sendTownChat(buyerId, body) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return { ok: false, error: "empty" };
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
@@ -374,7 +377,7 @@ export async function sendTownChat(buyerId, body) {
 // Flag that you're typing (owner-gated). Upserts a presence row without marking you a "mover", so the "…"
 // bubble can show even before you've walked. Recent typing_at → the client renders typing dots.
 export async function setTownTyping(buyerId) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     await db.query(
         `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, typing_at, updated_at)
          VALUES ($1, 50, 80, 1, NOW(), NOW() - INTERVAL '1 hour')
@@ -386,7 +389,7 @@ export async function setTownTyping(buyerId) {
 
 // Upsert the mover's position (owner-gated during the build). x/y clamped to the plaza; facing derives from dx.
 export async function moveTown(buyerId, { x, y, facing } = {}) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const cx = Math.max(1, Math.min(99, Number(x) || 50));
     const cy = Math.max(70, Math.min(88, Number(y) || 80));
     const f = facing === -1 ? -1 : 1;

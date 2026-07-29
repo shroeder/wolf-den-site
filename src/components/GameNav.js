@@ -50,11 +50,11 @@ const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplac
 export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
-    const [owner, setOwner] = useState(false); // owner-only preview features (e.g. the Town) — declared before `links` which reads it
-    // Farm + Forge + Auction are live for everyone; the Town is an owner-only preview during its build.
+    const [signedIn, setSignedIn] = useState(false); // gates the Town link + the one-time Forge announcement — declared before `links`
+    // Farm + Forge + Auction + Town are all live for every signed-in member now.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
-        ...(owner ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : [])];
+        ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -64,14 +64,13 @@ export default function GameNav() {
     const [cropsReady, setCropsReady] = useState(0);
     const [petNudge, setPetNudge] = useState(0); // own pets you can still pet today (free daily reward)
     const [sailAttn, setSailAttn] = useState(false);
-    const [signedIn, setSignedIn] = useState(false); // gates the one-time Forge announcement to real members
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
         const loadChests = () => {
             fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); }).catch(() => {});
-            fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); setOwner(Boolean(d?.isOwner)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
+            fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); }).catch(() => {});
@@ -121,7 +120,7 @@ export default function GameNav() {
     // The full, categorized grid menu — organized so you can see everything at once.
     const SECTIONS = [
         { title: "Play", items: [
-            ...(owner ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town", sub: "Owner preview" }] : []),
+            ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town", sub: "Gather & raid" }] : []),
             { href: "/marketplace/boss", emoji: "⚔️", label: "Boss Fight", sub: "Join the raid" },
             { href: "/marketplace/sailing", emoji: "⛵", label: "Sailing", sub: "Voyage & dig" },
             { href: "/marketplace/farm", emoji: "🏡", label: "Farm", sub: "Grow & harvest" },

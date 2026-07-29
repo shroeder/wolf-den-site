@@ -204,6 +204,15 @@ export const COLLECTIBLES = [
 
     // ── Merchant (sailing-exclusive) — only ever gifted by the Gold Merchant island event ──────────────
     { id: "elephant_spear", name: "Merchant's Guard", Icon: GiElephant, color: "#c9a24a", rarity: "legendary", source: "merchant", eliteOnly: true, activeStat: "gold_find", hint: "Boosts your chance to find the Gold Merchant at sea (+1% → +5% by level)", spritePrompt: "a standing cartoon elephant warrior holding a spear" },
+
+    // ── Raid-exclusive — ULTRA-RARE pets dropped ONLY by completing a live Wolf Den Town raid ───────────
+    // No shop, chest, boss, spin, or item-unlock path — the sole source is coming down to the plaza and fighting
+    // (and felling) Town raids, so they're a true badge of the pack's fiercest defenders. Filtered by the
+    // `raidExclusive` flag in pet-drops.js maybeGrantRaidPet(); drop odds are tiny (best on a Golem boss kill).
+    { id: "warbanner_wolf", name: "Warbanner Wolf", Icon: GiWolfHead, color: "#e0433f", rarity: "mythic", source: "raid", raidExclusive: true, eliteOnly: true, activeStat: "might", hint: "Rallied from a Town raid — the pack's fiercest", spritePrompt: "a battle-scarred grey war-wolf draped in a tattered crimson war banner, snarling and armored for battle" },
+    { id: "bandit_shade", name: "Bandit King's Shade", Icon: GiSpectre, color: "#9b7fe0", rarity: "mythic", source: "raid", raidExclusive: true, eliteOnly: true, activeStat: "gold_find", hint: "The ghost of a raider felled in the plaza", spritePrompt: "a translucent purple ghostly bandit chief in a hooded cloak clutching a spectral coin purse, wisps of shadow trailing" },
+    { id: "goblin_warchief", name: "Goblin Warchief", Icon: GiMinotaur, color: "#6fae3a", rarity: "ascendant", source: "raid", raidExclusive: true, eliteOnly: true, activeStat: "ferocity", hint: "Only the fiercest raids yield this brute", spritePrompt: "a hulking green goblin warchief in crude spiked armor hoisting a jagged cleaver, roaring with tusks bared" },
+    { id: "golem_heart", name: "Golem's Heart", Icon: GiRockGolem, color: "#37f5c0", rarity: "eternal", source: "raid", raidExclusive: true, eliteOnly: true, activeStat: "crit_power", hint: "The living gem-core of a felled Treasure Golem — rarest of all", spritePrompt: "a small floating stone-and-crystal golem heart, a glowing teal gemstone core wrapped in rocky armored plates, radiating treasure light" },
 ];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));
@@ -284,6 +293,7 @@ export function petUnlockText(pet) {
         case "shop": return `Buy for ${petPrice(pet).toLocaleString()} gold`;
         case "chest": return `Found in ${CHEST_LABEL[pet.chestTier] || "rare"}+ chests`;
         case "boss": return "Rare boss-battle drop";
+        case "raid": return "Ultra-rare drop from completing a Town raid";
         case "farm": return pet.farmSource === "loot_pig" ? "Rare drop from the Wild Loot Pig" : "Earned at a farm harvest milestone";
         case "achievement": return pet.achievement || "Earn via an achievement";
         case "elite": return pet.unlockText || (pet.unlockRarity ? `Own any ${pet.unlockRarity}-tier item` : (pet.hint || "Special unlock"));

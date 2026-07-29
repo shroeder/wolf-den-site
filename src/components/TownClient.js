@@ -729,8 +729,8 @@ export default function TownClient({ initial }) {
     }, [state?.eventsLive, load]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
-    if (state && state.owner === false) {
-        return <section className="card"><p className="muted" style={{ margin: 0 }}>🏘️ The Wolf Den Town is still being built — check back soon.</p></section>;
+    if (state && state.signedIn === false) {
+        return <section className="card"><p className="muted" style={{ margin: 0 }}>🏘️ Sign in to enter the Wolf Den Town.</p></section>;
     }
 
     // Stepped inside the Tavern — swap the plaza for the cozy interior.
@@ -982,17 +982,17 @@ export default function TownClient({ initial }) {
                         <button type="button" key={em} onClick={() => quickEmote(em)} aria-label={`Send ${em}`}>{em}</button>
                     ))}
                 </div>
-                {state?.owner && !state?.event ? (
+                {state?.raidAdmin && !state?.event ? (
                     <div className="tw-owner-spawn">
-                        <span className="muted">Owner · silent test (no push):</span>
+                        <span className="muted">🔒 Surprise drop — pushes the whole pack:</span>
                         <button type="button" onClick={() => spawnEvent("bandit_raid")}>🗡️ Bandits</button>
                         <button type="button" onClick={() => spawnEvent("goblin_swarm")}>👺 Goblins</button>
                         <button type="button" onClick={() => spawnEvent("treasure_golem")}>💎 Golem (boss)</button>
                     </div>
                 ) : null}
-                {state?.owner && state?.event ? (
+                {state?.raidAdmin && state?.event ? (
                     <div className="tw-owner-spawn">
-                        <span className="muted">Owner · testing:</span>
+                        <span className="muted">🔒 Raid admin:</span>
                         <button type="button" onClick={endEvent} style={{ borderColor: "rgba(255,215,110,0.5)", background: "rgba(255,215,110,0.14)", color: "#ffe0a0" }}>⏹️ End raid now</button>
                     </div>
                 ) : null}
@@ -1204,7 +1204,7 @@ export default function TownClient({ initial }) {
                             </div>
                         ) : null}
 
-                        {state?.owner ? (
+                        {state?.raidAdmin ? (
                             <div className="tw-board-section">
                                 <div className="tw-board-title">🔧 Owner tools</div>
                                 <button type="button" className={`tw-live-toggle${state?.eventsLive ? " is-on" : ""}`} onClick={toggleEventsLive}>

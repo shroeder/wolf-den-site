@@ -14,6 +14,8 @@ import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { addChests } from "@/lib/marketplace/chests.js";
+import { checkTownRaidBadges } from "@/lib/marketplace/town-badges.js";
+import { maybeGrantRaidPet } from "@/lib/marketplace/pet-drops.js";
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
@@ -283,6 +285,8 @@ async function resolveTownEvent(eventId, outcome) {
     if (!ev) return; // someone else already closed it
     const hits = await db.query(`SELECT buyer_id, damage FROM mkt_town_event_hit WHERE event_id = $1`, [eventId]).catch(() => []);
     const n = hits.length;
+    // The single top damager (for the prestige "Top Dog" badge on a boss kill).
+    const topId = hits.length ? hits.reduce((a, b) => (Number(b.damage) > Number(a.damage) ? b : a)).buyer_id : null;
     // BOSS RAID: a fat COMPLETION reward to everyone who joined (full on a kill; a fraction if it escaped the timer).
     if (ev.meta?.boss) {
         const killed = outcome === "defeated";
@@ -298,11 +302,20 @@ async function resolveTownEvent(eventId, outcome) {
             // Completion chest — a Gold chest on a kill (a Wooden one if it escaped).
             await addChests(h.buyer_id, { [killed ? "gold" : "wooden"]: 1 }, { source: "boss_raid" }).catch(() => {});
             await db.query(`UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3 WHERE event_id = $1 AND buyer_id = $2`, [eventId, h.buyer_id, gold]).catch(() => {});
+            // Hard raid/boss badges + the very-rare raid-exclusive pet drop (best odds on a kill).
+            await checkTownRaidBadges(h.buyer_id, { topDamagerOnKill: killed && h.buyer_id === topId }).catch(() => {});
+            await maybeGrantRaidPet(h.buyer_id, { boss: true, killed }).catch(() => {});
         }
         if (!ev.meta?.silent) {
             broadcastWebPush({ title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
         }
         return;
+    }
+    // Skirmish raid over: per-duel rewards were already paid, but tally hard badges + a slim raid-pet chance for
+    // everyone who came down and fought.
+    for (const h of hits) {
+        await checkTownRaidBadges(h.buyer_id).catch(() => {});
+        await maybeGrantRaidPet(h.buyer_id, { boss: false, killed: false }).catch(() => {});
     }
     if (!ev.meta?.silent) {
         broadcastWebPush({ title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});

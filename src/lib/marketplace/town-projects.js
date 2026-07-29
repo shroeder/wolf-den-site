@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { checkWellBadges } from "@/lib/marketplace/town-badges.js";
 
 // ── TOWN DEVELOPMENT ────────────────────────────────────────────────────────────────────────────────────────
 // A shared, community-funded upgrade catalog. Everyone pools gold into PROJECTS; each level costs more, grants a
@@ -194,5 +195,6 @@ export async function claimWishingWell(buyerId) {
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "wishing_well", { balanceAfter: paid?.gold }).catch(() => {});
     if (xp > 0) await awardXp(buyerId, "wishing_well", { points: xp, gold: 0 }).catch(() => {});
+    checkWellBadges(buyerId).catch(() => {}); // Well Wisher / Fountain Faithful (daily claims)
     return { ok: true, gold, xp, goldAfter: paid?.gold ?? null };
 }

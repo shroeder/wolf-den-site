@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { checkTownQuestBadges } from "@/lib/marketplace/town-badges.js";
 
 // Daily TOWN quests handed out by the Quartermaster NPC — bounties that reward playing in the plaza itself
 // (fighting raids, being social, funding the town, visiting the tavern). Progress ticks from the town actions;
@@ -53,5 +54,6 @@ export async function claimTownQuest(buyerId, key) {
     if (!claimed) return { ok: false, error: "not_ready" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, q.gold]).catch(() => null);
     await logCoin(buyerId, q.gold, "town_quest", { balanceAfter: paid?.gold, meta: { key } }).catch(() => {});
+    checkTownQuestBadges(buyerId).catch(() => {}); // Taskmaster (lifetime claimed quests)
     return { ok: true, gold: Number(paid?.gold || 0), reward: q.gold, label: q.label };
 }

@@ -6,6 +6,7 @@ import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
+import { checkTavernBadges } from "@/lib/marketplace/town-badges.js";
 
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
 
@@ -185,7 +186,7 @@ export async function gambitResolve(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // Claim the hand by flipping dice_active (RETURNING still hands back the state row we're resolving), then
     // clear dice_state afterward.
-    const row = await db.queryOne(`UPDATE mkt_tavern SET dice_active = FALSE, updated_at = NOW() WHERE buyer_id = $1 AND dice_active = TRUE RETURNING dice_state`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`UPDATE mkt_tavern SET dice_active = FALSE, dice_rolls = COALESCE(dice_rolls, 0) + 1, updated_at = NOW() WHERE buyer_id = $1 AND dice_active = TRUE RETURNING dice_state`, [buyerId]).catch(() => null);
     const st = row?.dice_state;
     if (!st) return { ok: false, error: "no_game" };
     await db.query(`UPDATE mkt_tavern SET dice_state = NULL WHERE buyer_id = $1`, [buyerId]).catch(() => {});
@@ -209,6 +210,7 @@ export async function gambitResolve(buyerId) {
         gold = Number(paid?.gold ?? 0);
     }
     if (outcome === "win") bumpTownQuest(buyerId, "patron", 1).catch(() => {});
+    checkTavernBadges(buyerId).catch(() => {}); // Dice Devil / Dice King (hands played)
     return { ok: true, outcome, bet, payout, jackpot, player: { dice: playerDice, hand: ph.label }, gambler: { dice: gamblerDice, hand: gh.label }, gold };
 }
 
@@ -226,6 +228,7 @@ export async function claimDailyPint(buyerId) {
     await awardXp(buyerId, "tavern_pint", { points: PINT_XP, gold: PINT_GOLD, dedupeKey: `pint:${buyerId}:${Date.now()}` }).catch(() => {});
     bumpTownQuest(buyerId, "patron", 1).catch(() => {});
     const drinks = (await db.queryOne(`SELECT drinks FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null))?.drinks || 1;
+    checkTavernBadges(buyerId).catch(() => {}); // Tavern Regular (pints downed)
     return { ok: true, drinks, xp: PINT_XP, gold: PINT_GOLD };
 }
 
