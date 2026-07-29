@@ -145,24 +145,26 @@ function Avatar({ a, isYou, onTap, raiding }) {
 // Raid combat HUD: a shared HP bar (top) + a timed-strike meter and abilities (bottom). The marker sweeps; tap
 // Strike when it's in the gold zone for a PERFECT slash, or fire the Power Slash on cooldown.
 // Corner HUD for a live raid: time left, kills, and your damage. No timing meter — you just tap the foes.
-function RaidHUD({ ev, kills, myDamage }) {
+function RaidHUD({ ev, kills, onExpire }) {
     const [left, setLeft] = useState("");
+    const firedRef = useRef(false);
     useEffect(() => {
+        firedRef.current = false;
         if (!ev?.endsAt) { setLeft(""); return undefined; }
         const tick = () => {
             const ms = new Date(ev.endsAt).getTime() - Date.now();
-            if (ms <= 0) { setLeft("0:00"); return; }
+            if (ms <= 0) { setLeft("wrapping up…"); if (!firedRef.current) { firedRef.current = true; onExpire && onExpire(); } return; }
             const s = Math.floor(ms / 1000);
             setLeft(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
         };
         tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
-    }, [ev?.endsAt]);
+    }, [ev?.endsAt, onExpire]);
     return (
         <div className="tw-raid-hud">
-            <div className="tw-raid-hud-title">{ev.emoji} {ev.name}{ev.wave > 1 ? ` · wave ${ev.wave}` : ""}</div>
+            <div className="tw-raid-hud-title">{ev.emoji} {ev.name}{ev.boss ? "" : ev.wave > 1 ? ` · wave ${ev.wave}` : ""}</div>
             <div className="tw-raid-hud-stats">
                 {left ? <span title="Time left">⏱️ {left}</span> : null}
-                <span title="Foes you've bested">☠️ {kills}</span>
+                {ev.boss ? <span title="Boss HP">💥 {ev.hpPct ?? 100}%</span> : <span title="Foes you've bested">☠️ {kills}</span>}
             </div>
         </div>
     );
@@ -216,11 +218,10 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
                             {(r.loot || []).map((l, i) => <span key={i} className="tw-duel-chip loot">{l.emoji} {l.label}</span>)}
                             {!r.xp && !r.coin && !(r.loot || []).length ? <span className="muted">No spoils this time.</span> : null}
                         </div>
-                        {duel.firstDuel ? <div className="tw-duel-note">🧰 Welcome chest for joining the fight!</div> : null}
                         <button type="button" className="tw-levelup-btn" onClick={onClose}>{duel.win ? "Huzzah! 🐺" : "Again! ⚔️"}</button>
                     </div>
                 ) : (
-                    <button type="button" className="tw-duel-skip" onClick={() => setStep(events.length)}>Skip →</button>
+                    <div className="tw-duel-fighting">⚔️ Locked in battle…</div>
                 )}
             </div>
         </div>
@@ -334,6 +335,9 @@ export default function TownClient({ initial }) {
     const [bossOpen, setBossOpen] = useState(false);    // boss-raid battle modal open
     const [bossReward, setBossReward] = useState(null); // boss KILL completion reward { gold, xp, chest }
     const bossCdRef = useRef(false);
+    const [raidHaul, setRaidHaul] = useState({ xp: 0, gold: 0, chests: 0 }); // your running haul this skirmish raid
+    const wasRaidingRef = useRef(false);
+    const bossKillRef = useRef(false); // set when YOU land the killing blow, so the end-recap defers to bossReward
     const [raidCd, setRaidCd] = useState(false);        // duel cooldown
     const evIdRef = useRef(null);
     const raidWaveRef = useRef(1);
@@ -419,8 +423,11 @@ export default function TownClient({ initial }) {
             raidWaveRef.current = wave;
             const n = Math.min(ev.enemies || 6, 8);
             const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
+            // Spread across the street in per-enemy slots with a random offset inside each slot, so they never
+            // line up in the same predictable spots twice.
+            const slot = 92 / n;
             setRaidEnemies(Array.from({ length: n }).map((_, i) => ({
-                id: `${ev.id}-${wave}-${i}`, x: n > 1 ? Math.round(7 + (i * 86) / (n - 1)) : 50, y: GROUND + 13 - (i % 3) * 3, hp: hpMax, hpMax, floats: [], dying: false,
+                id: `${ev.id}-${wave}-${i}`, x: Math.round(4 + (i + 0.15 + Math.random() * 0.7) * slot), y: GROUND + 14 - Math.floor(Math.random() * 5) * 2, hp: hpMax, hpMax, floats: [], dying: false,
             })));
         }
     }, [state?.event]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -557,6 +564,7 @@ export default function TownClient({ initial }) {
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
         if (!r?.ok) return; // too_fast / no_event
         if (r.win && typeof r.wins === "number") setRaidKills(r.wins);
+        if (r.win && r.reward) setRaidHaul((h) => ({ xp: h.xp + (r.reward.xp || 0), gold: h.gold + (r.reward.coin || 0), chests: h.chests + ((r.reward.loot || []).length || 0) }));
         setDuel({ enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] } });
     }, [state?.event, duel]);
     const closeDuel = useCallback(() => {
@@ -574,7 +582,7 @@ export default function TownClient({ initial }) {
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "boss_strike", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
         if (r?.ok) {
             try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
-            if (r.killed) { setBossOpen(false); setBossReward(r.reward || { gold: 0, xp: 0 }); setTimeout(() => load(), 500); }
+            if (r.killed) { bossKillRef.current = true; setBossOpen(false); setBossReward(r.reward || { gold: 0, xp: 0 }); setTimeout(() => load(), 500); }
         }
         return r;
     }, [state?.event, load]);
@@ -586,6 +594,19 @@ export default function TownClient({ initial }) {
     }, [bossOpen, load]);
     // If the boss dies (event clears) while the modal's open, close it.
     useEffect(() => { if (bossOpen && (!state?.event || state.event.defeated || !state.event.boss)) setBossOpen(false); }, [bossOpen, state?.event]);
+    // RAID CONCLUSION — the dopamine moment. When a raid ENDS (event goes away), pop a recap so it never just
+    // hangs at 0:00. A boss YOU felled shows its own reward modal, so skip the recap then.
+    const wasBossRef = useRef(false);
+    useEffect(() => {
+        const active = Boolean(state?.event && !state.event.defeated);
+        if (!wasRaidingRef.current && active) { setRaidHaul({ xp: 0, gold: 0, chests: 0 }); setRaidKills(0); } // new raid → reset
+        if (active) wasBossRef.current = Boolean(state.event.boss);
+        if (wasRaidingRef.current && !active) {
+            if (!bossKillRef.current) setRaidRecap({ kills: raidKills, xp: raidHaul.xp, gold: raidHaul.gold, chests: raidHaul.chests, boss: wasBossRef.current });
+            bossKillRef.current = false;
+        }
+        wasRaidingRef.current = active;
+    }, [state?.event]); // eslint-disable-line react-hooks/exhaustive-deps
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
@@ -896,7 +917,7 @@ export default function TownClient({ initial }) {
                 ) : null}
 
                 {/* Raid HUD (corner) + weapon-skill callout */}
-                {state?.event && !state.event.defeated ? <RaidHUD ev={state.event} kills={raidKills} myDamage={raidDamage} /> : null}
+                {state?.event && !state.event.defeated ? <RaidHUD ev={state.event} kills={raidKills} onExpire={load} /> : null}
                 {raidProc ? (
                     <div className="tw-proc" style={{ "--pc": raidProc.color || "#ffb347" }} key={raidProc.key}>
                         <span className="tw-proc-emoji">{raidProc.emoji}</span> {raidProc.name}!
@@ -1189,13 +1210,23 @@ export default function TownClient({ initial }) {
                         ))}
                     </div>
                     <div className="tw-levelup-card" onClick={(e) => e.stopPropagation()} role="presentation">
-                        <div className="tw-levelup-badge">🏆 RAID CLEARED!</div>
-                        <div className="tw-reveal-rarity" style={{ color: "#ffd75e", marginTop: 4 }}>Your spoils</div>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", margin: "8px 0" }}>
-                            <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{raidRecap.gold.toLocaleString()} 🪙</span>
-                            <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{raidRecap.xp.toLocaleString()} ✨ XP</span>
-                        </div>
-                        <div className="muted" style={{ fontSize: "0.86rem" }}>☠️ {raidRecap.kills} felled · ⚔️ {raidRecap.damage.toLocaleString()} damage dealt</div>
+                        <div className="tw-levelup-badge">{raidRecap.boss ? "🏆 BOSS FELLED!" : "🏆 RAID REPELLED!"}</div>
+                        {raidRecap.boss ? (
+                            <>
+                                <div className="tw-reveal-rarity" style={{ color: "#ffd75e", marginTop: 4 }}>The pack brought it down!</div>
+                                <div className="muted" style={{ fontSize: "0.86rem", marginTop: 8 }}>Your completion reward has been added to your account. 🎉</div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="tw-reveal-rarity" style={{ color: "#ffd75e", marginTop: 4 }}>Your spoils</div>
+                                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", margin: "8px 0" }}>
+                                    {raidRecap.gold ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{raidRecap.gold.toLocaleString()} 🪙</span> : null}
+                                    {raidRecap.xp ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{raidRecap.xp.toLocaleString()} ✨ XP</span> : null}
+                                    {raidRecap.chests ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#e0c8ff", background: "rgba(150,90,255,0.2)" }}>🧰 {raidRecap.chests} chest{raidRecap.chests === 1 ? "" : "s"}</span> : null}
+                                </div>
+                                <div className="muted" style={{ fontSize: "0.86rem" }}>☠️ {raidRecap.kills} {raidRecap.kills === 1 ? "foe" : "foes"} bested</div>
+                            </>
+                        )}
                         <button type="button" className="tw-levelup-btn" onClick={() => setRaidRecap(null)}>Huzzah! 🐺</button>
                     </div>
                 </div>
@@ -1365,7 +1396,7 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-duel-chip.gold { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
 .tw-duel-chip.loot { color: #e0c8ff; background: rgba(150,90,255,0.18); border: 1px solid rgba(184,120,255,0.45); }
 .tw-duel-note { font-size: 0.76rem; font-weight: 800; color: #ffd9a0; }
-.tw-duel-skip { display: block; margin: 12px auto 0; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #cbb9a0; font-weight: 800; font-size: 0.8rem; cursor: pointer; }
+.tw-duel-fighting { margin: 12px auto 0; text-align: center; font-weight: 900; font-size: 0.82rem; color: #ffb08a; letter-spacing: 0.03em; animation: twOnlinePulse 1.1s ease-in-out infinite; }
 .tw-openchip { font-size: 0.7rem; font-weight: 800; border-radius: 999px; padding: 2px 9px; color: #e69a9a; background: rgba(224,67,63,0.1); border: 1px solid rgba(224,67,63,0.32); }
 .tw-openchip.is-open { color: #8fe39a; background: rgba(143,227,154,0.12); border-color: rgba(143,227,154,0.35); }
 .tw-roster-btn { font-size: 0.74rem; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.4); border-radius: 999px; padding: 3px 11px; cursor: pointer; }

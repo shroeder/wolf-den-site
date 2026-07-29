@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runTownHoursTick } from "@/lib/marketplace/town-events.js";
+import { runTownHoursTick, maybeSpawnRandomEvent } from "@/lib/marketplace/town-events.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -22,7 +22,10 @@ export async function GET(request) {
                 logger.warn("town_hours.unauthorized");
                 return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             }
-            return NextResponse.json({ success: true, ...(await runTownHoursTick()) });
+            // Store-open spawn first; if that didn't fire, roll the evening-weighted random spawn.
+            const hours = await runTownHoursTick();
+            const random = hours.spawned ? { skipped: "store_open_spawned" } : await maybeSpawnRandomEvent();
+            return NextResponse.json({ success: true, hours, random });
         } catch (error) {
             return internalError(error, { event: "town_hours.run.failure" });
         }

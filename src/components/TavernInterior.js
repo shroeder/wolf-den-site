@@ -290,8 +290,9 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                 </div>
                 {here > 1 ? <div className="tv-hint">{here} here now</div> : null}
 
-                {/* Barkeep order tray — an in-scene dialogue bar (NOT a modal). Appears when you step up to him. */}
-                {barkeep ? (
+                {/* Barkeep order tray — an in-scene dialogue bar (NOT a modal). Appears when you step up to him.
+                    Hidden while the drink-confirm modal is open so it can't overlap the confirm buttons. */}
+                {confirmDrink ? null : barkeep ? (
                     <div className="tv-keeper-tray" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="tv-order tv-order-pint" disabled={busy || !pintAvail} onClick={() => setConfirmDrink({ type: "pint" })} title={pintAvail ? "Daily Hearty Pint" : "Had yours today"}>
                             {iconArt?.pint ? (

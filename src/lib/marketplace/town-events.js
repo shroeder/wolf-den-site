@@ -54,7 +54,7 @@ const DUEL_THROTTLE_MS = 700;
 const DUEL_WIN_XP = 18;         // tuned DOWN — per-enemy spoils were too rich
 const DUEL_WIN_GOLD = 22;
 const DUEL_LOSS_GOLD = 8;       // consolation so a loss is never nothing
-const DUEL_LOOT_CHANCE = 0.10;  // chance a WIN also drops a low-tier chest
+const DUEL_LOOT_CHANCE = 0.03;  // chance a WIN also drops a low-tier chest — chests are meant to be RARE here
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 1000;
@@ -185,6 +185,34 @@ export async function runTownHoursTick() {
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     const res = await spawnTownEvent(kind);
     return { spawned: res.ok ? kind : null, error: res.error || null };
+}
+
+// Per-15-min spawn chance by CENTRAL hour — concentrated in the evening (~5–8pm CT) when the most members are
+// around, a light chance mid-day/evening, and nothing overnight. Tune freely.
+function spawnChanceForHour(h) {
+    if (h < 10) return 0;              // overnight / early morning — quiet
+    if (h >= 17 && h <= 20) return 0.16; // 5–8pm CT peak
+    if (h >= 12 && h <= 21) return 0.05; // afternoon / evening
+    return 0.02;                        // late morning / late night
+}
+
+// Cron tick (every ~15 min): a WEIGHTED-RANDOM chance to spawn a random town event, biased toward the evening
+// (Central). Gated behind town_events_live (the Town is owner-only during the build). At most one event at a
+// time, and none within 3 hours of the last, so they stay special.
+export async function maybeSpawnRandomEvent() {
+    if (!(await townEventsLive())) return { skipped: "not_live" };
+    const [active, recent] = await Promise.all([
+        db.queryOne(`SELECT id FROM mkt_town_event WHERE status = 'active' LIMIT 1`).catch(() => null),
+        db.queryOne(`SELECT id FROM mkt_town_event WHERE started_at > NOW() - INTERVAL '3 hours' LIMIT 1`).catch(() => null),
+    ]);
+    if (active || recent) return { skipped: "event_recent" };
+    const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/Chicago", hour: "2-digit", hour12: false })) % 24;
+    const chance = spawnChanceForHour(h);
+    if (!chance || Math.random() >= chance) return { skipped: "no_roll", hour: h, chance };
+    const kinds = Object.keys(TOWN_EVENT_TYPES);
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const res = await spawnTownEvent(kind);
+    return { spawned: res.ok ? kind : null, hour: h, chance, error: res.error || null };
 }
 
 // Land an attack on the raid. `move` is the timed-strike tier (weak/normal/good/perfect) or "power" (ability).
@@ -349,8 +377,7 @@ export async function duelRaidEnemy(buyerId, eventId) {
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
 
     const loot = [];
-    // First fight of the raid → a chest just for coming down to play (generous, guaranteed).
-    if (firstDuel) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_visit" }).catch(() => {}); loot.push({ tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
+    // (Chests are RARE from skirmish foes now — only the occasional lucky win-drop below, no guaranteed chest.)
 
     let xp = 0, coin = 0;
     let hp = ev.hp, wave = Number(ev.meta?.wave) || 1;
