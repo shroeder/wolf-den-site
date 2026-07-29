@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
+import CoinCta from "@/components/CoinCta";
 import { STAT_META, describeSea, describeFarm } from "@/lib/marketplace/items.js";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
@@ -30,6 +31,8 @@ const CAT_LABEL = { civic: "🏛️ Civic", building: "🏚️ Buildings", servi
 const PROJECT_ART = { prosperity: "prosperity", depth: "townscape", tavern: "tavern", market: "trading_post", garrison: "garrison", vault: "vault", festival: "festival" };
 // A message that's just emoji (a reaction/emote) pops as a floating emote instead of a text bubble.
 const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
+// Compact "time left" for the hangout buff pill (e.g. 5400 → "1h 30m", 240 → "4m").
+const fmtLeft = (secs) => { const s = Math.max(0, Math.round(secs || 0)); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${Math.max(1, m)}m`; };
 
 // Rarity colors/labels for the gear-gamble reveal (Tier 1-4 = common/rare/epic/legendary).
 const RARITY_META = {
@@ -135,7 +138,7 @@ function Avatar({ a, isYou, onTap, raiding }) {
     }, [a.pet]);
     return (
         <div
-            className={`tw-av${isYou ? " is-you" : ""}${a.friend ? " is-friend" : ""}`}
+            className={`tw-av${isYou ? " is-you" : ""}${a.friend ? " is-friend" : ""}${!isYou && a.inTown === false ? " is-around" : ""}`}
             // During a raid, avatars are click-through so the foes behind them are always tappable (your hero
             // stands in front and used to swallow the taps).
             style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: 300 + Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear`, pointerEvents: raiding ? "none" : undefined }}
@@ -374,6 +377,10 @@ export default function TownClient({ initial }) {
     const [bossOpen, setBossOpen] = useState(false);    // boss-raid battle modal open
     const [bossReward, setBossReward] = useState(null); // boss KILL completion reward { gold, xp, chest }
     const bossCdRef = useRef(false);
+    const [shinyReward, setShinyReward] = useState(null); // claimed the hidden glint → { deco } | "gone"
+    const shinyBusyRef = useRef(false);
+    const [buffCele, setBuffCele] = useState(null); // hangout buff just earned → celebration { pct }
+    const buffSeenRef = useRef(false);
     const [raidHaul, setRaidHaul] = useState({ xp: 0, gold: 0, chests: 0 }); // your running haul this skirmish raid
     const wasRaidingRef = useRef(false);
     const bossKillRef = useRef(false); // set when YOU land the killing blow, so the end-recap defers to bossReward
@@ -658,6 +665,27 @@ export default function TownClient({ initial }) {
         load();
     }, [load]);
 
+    // Tap the hidden shiny glint → race everyone to claim it. First tap wins a source-exclusive decoration.
+    const claimShiny = useCallback(async () => {
+        if (shinyBusyRef.current || !state?.shiny) return;
+        shinyBusyRef.current = true;
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "claim_shiny", shinyId: state.shiny.id }) }).then((x) => x.json()).catch(() => null);
+        shinyBusyRef.current = false;
+        if (r?.ok) { setShinyReward({ deco: r.deco }); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } }
+        else setShinyReward("gone");
+        load();
+    }, [state?.shiny, load]);
+
+    // Hangout buff earned → celebrate ONCE (justGranted fires for a single poll; guard against re-showing).
+    useEffect(() => {
+        if (state?.hangout?.justGranted && !buffSeenRef.current) {
+            buffSeenRef.current = true;
+            setBuffCele({ pct: state.hangout.pct || 5 });
+            setTimeout(() => setBuffCele(null), 6000);
+        }
+        if (!state?.hangout?.active) buffSeenRef.current = false; // reset so the NEXT earn can celebrate again
+    }, [state?.hangout?.justGranted, state?.hangout?.active, state?.hangout?.pct]);
+
     const you = state?.you;
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
@@ -744,26 +772,41 @@ export default function TownClient({ initial }) {
 
     return (
         <div className="stack reveal">
-            <section className="card" style={{ padding: "12px 14px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <h1 style={{ margin: 0, fontSize: "1.25rem" }}>🏘️ Wolf Den Town</h1>
-                    <span className="tw-online">🟢 {state?.onlineCount ?? 1} around</span>
+            <section className="tw-hdr">
+                <div className="tw-hdr-top">
+                    <h1 className="tw-hdr-title">🏘️ Wolf Den Town</h1>
                     {state?.store ? (
                         <span className={`tw-openchip${state.store.open ? " is-open" : ""}`} title="The physical shop's hours">
-                            {state.store.open ? `🟢 Den open til ${state.store.closesLabel}` : `🔴 Closed · opens ${state.store.nextOpenLabel}`}
+                            {state.store.open ? `Open til ${state.store.closesLabel}` : `Closed · opens ${state.store.nextOpenLabel}`}
                         </span>
                     ) : null}
-                    <button type="button" className="tw-roster-btn" onClick={() => setRoster(true)}>👥 Who&apos;s around</button>
-                    <button type="button" className="tw-roster-btn" onClick={() => setBoardOpen(true)}>🏛️ Town Hall</button>
-                    <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "#c58b3a", fontWeight: 800 }}>OWNER PREVIEW</span>
+                    {state?.hangout?.active ? (
+                        <span className="tw-buffpill" title="Earned by hanging out in the plaza">✨ +{state.hangout.pct}% XP & gold · {fmtLeft(state.hangout.secsLeft)}</span>
+                    ) : null}
                 </div>
-                <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the street to walk. Tap a building to head there. Real members who are online show up here.</p>
+                <div className="tw-hdr-row">
+                    <button type="button" className="tw-pop is-here" onClick={() => setRoster(true)} title="Members on this page right now">
+                        <span className="tw-pop-dot" /> <b>{state?.inTownCount ?? 1}</b> in town
+                    </button>
+                    <button type="button" className="tw-pop is-around" onClick={() => setRoster(true)} title="Members online elsewhere on the site">
+                        <span className="tw-pop-dot" /> <b>{state?.aroundCount ?? 0}</b> around
+                    </button>
+                    <button type="button" className="tw-hdr-btn" onClick={() => setRoster(true)}>👥 Who&apos;s here</button>
+                    <button type="button" className="tw-hdr-btn" onClick={() => setBoardOpen(true)}>🏛️ Town Hall</button>
+                </div>
+                <p className="tw-hdr-sub">Tap the street to walk · tap a building to enter. <b>In town</b> = here now; <b>around</b> = online elsewhere.</p>
             </section>
 
             <div ref={sceneRef} className="tw-scene" style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <SceneMusic vibe={raidActive ? "raid" : "town"} />
-                {/* Live online count — green bubble, top-left (hidden behind the raid HUD during a raid). */}
-                {!raidActive ? <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Who's around"><span className="tw-online-dot" />{state?.onlineCount ?? 1} online</button> : null}
+                {/* Live in-town count — green bubble, top-left (hidden behind the raid HUD during a raid). */}
+                {!raidActive ? <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Members here right now"><span className="tw-online-dot" />{state?.inTownCount ?? 1} in town</button> : null}
+                {/* The hidden shiny glint — barely visible, tucked up in the sky/rooftops. Tap to claim it. */}
+                {!raidActive && state?.shiny ? (
+                    <button type="button" className="tw-shiny" style={{ left: `${state.shiny.x}%`, top: `${state.shiny.y}%` }} onClick={claimShiny} aria-label="A faint glimmer…" title="…is something glinting up there?">
+                        <span className="tw-shiny-core" />
+                    </button>
+                ) : null}
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
@@ -884,7 +927,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "64%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: "64%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {art.questgiver?.url ? (
@@ -1156,7 +1199,7 @@ export default function TownClient({ initial }) {
 
                         {projects.length ? (
                             <div className="tw-board-section">
-                                <div className="tw-board-title">🏗️ Town Development</div>
+                                <div className="tw-board-title">🏗️ Town Development<span className="tw-board-gold">🪙 {(you?.gold || 0).toLocaleString()}</span></div>
                                 <p className="muted" style={{ fontSize: "0.8rem", margin: "0 2px 8px" }}>
                                     Everyone pools gold into the town we all share. Every level is a perk the WHOLE Den keeps — forever.
                                 </p>
@@ -1185,17 +1228,24 @@ export default function TownClient({ initial }) {
                                                     </div>
                                                     <p className="tw-proj-desc">{p.desc}</p>
                                                     {p.perkNow ? <p className="tw-proj-perk">Now: {p.perkNow}</p> : null}
-                                                    {p.maxed ? null : (
-                                                        <>
-                                                            <div className="tw-fund-bar"><span style={{ width: `${p.progressPct}%` }} /></div>
-                                                            <p className="tw-proj-cost">🪙 {p.goldIn.toLocaleString()} / {p.cost.toLocaleString()} → Lv {p.level + 1}{p.perkNext ? ` · ${p.perkNext}` : ""}</p>
-                                                            <div className="tw-fund-btns">
-                                                                {[100, 500, 2500].map((amt) => (
-                                                                    <button key={amt} type="button" disabled={contribBusy === p.id} onClick={() => contribute(p.id, amt)}>+{amt.toLocaleString()}</button>
-                                                                ))}
-                                                            </div>
-                                                        </>
-                                                    )}
+                                                    {p.maxed ? null : (() => {
+                                                        const myGold = you?.gold || 0;
+                                                        const amounts = [100, 500, 2500];
+                                                        const cheapest = amounts[0];
+                                                        const canFundAny = myGold >= cheapest;
+                                                        return (
+                                                            <>
+                                                                <div className="tw-fund-bar"><span style={{ width: `${p.progressPct}%` }} /></div>
+                                                                <p className="tw-proj-cost">🪙 {p.goldIn.toLocaleString()} / {p.cost.toLocaleString()} → Lv {p.level + 1}{p.perkNext ? ` · ${p.perkNext}` : ""}</p>
+                                                                <div className="tw-fund-btns">
+                                                                    {amounts.map((amt) => (
+                                                                        <button key={amt} type="button" disabled={contribBusy === p.id || myGold < amt} onClick={() => contribute(p.id, amt)}>+{amt.toLocaleString()}</button>
+                                                                    ))}
+                                                                </div>
+                                                                {!canFundAny ? <CoinCta price={cheapest} have={myGold} label="Buy gold" className="tw-fund-cta" /> : null}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             ))}
                                         </div>
@@ -1249,6 +1299,43 @@ export default function TownClient({ initial }) {
                             {bossReward.chest ? <span className="tw-duel-chip loot">🧰 {bossReward.chest[0].toUpperCase() + bossReward.chest.slice(1)} Chest</span> : null}
                         </div>
                         <button type="button" className="tw-levelup-btn" style={{ marginTop: 12 }} onClick={() => setBossReward(null)}>Huzzah! 🐺</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Claimed the hidden glint → the source-exclusive decoration reveal (or "someone beat you to it"). */}
+            {shinyReward ? (
+                <div className="tw-duel" role="presentation" onClick={() => setShinyReward(null)}>
+                    <div className="tw-duel-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: "center", position: "relative", overflow: "hidden" }}>
+                        {shinyReward === "gone" ? (
+                            <>
+                                <div style={{ fontSize: "2.4rem" }}>💨</div>
+                                <div className="tw-duel-verdict" style={{ fontSize: "1.15rem" }}>Just missed it!</div>
+                                <div className="muted" style={{ margin: "4px 0 10px" }}>Someone spotted that glimmer first. Keep your eyes peeled…</div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="tw-shiny-burst" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }} />)}</div>
+                                <div style={{ fontSize: "2.8rem", position: "relative", zIndex: 2 }}>{shinyReward.deco?.emoji || "✨"}</div>
+                                <div className="tw-duel-verdict win" style={{ fontSize: "1.25rem", position: "relative", zIndex: 2 }}>✨ You caught the glimmer!</div>
+                                <div style={{ fontWeight: 900, fontSize: "1.05rem", margin: "2px 0", position: "relative", zIndex: 2 }}>{shinyReward.deco?.name || "A rare decoration"}</div>
+                                <div className="muted" style={{ margin: "2px 0 10px", fontSize: "0.82rem", position: "relative", zIndex: 2 }}>A {shinyReward.deco?.rarity || "rare"} decoration only ever found this way — it&apos;s in your Farm decorations.</div>
+                            </>
+                        )}
+                        <button type="button" className="tw-levelup-btn" onClick={() => setShinyReward(null)}>{shinyReward === "gone" ? "Aw, next time" : "Sweet! ✨"}</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Hangout buff earned — the one-shot celebration (not advertised anywhere until this moment). */}
+            {buffCele ? (
+                <div className="tw-buffcele" role="status" onClick={() => setBuffCele(null)}>
+                    <div className="tw-buffcele-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-buffcele-spark" aria-hidden="true">✨</div>
+                        <div className="tw-buffcele-title">Hangout Bonus!</div>
+                        <div className="tw-buffcele-big">+{buffCele.pct}% XP &amp; Gold</div>
+                        <div className="tw-buffcele-sub">for the next 2 hours — thanks for hanging around the Den. 🐺</div>
+                        <button type="button" className="tw-levelup-btn" style={{ marginTop: 12 }} onClick={() => setBuffCele(null)}>Nice!</button>
                     </div>
                 </div>
             ) : null}
@@ -1366,6 +1453,41 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-wellfx-title { font-size: 1.15rem; font-weight: 900; color: #ffe0a0; }
 .tw-wellfx-rewards { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 2px 0 4px; }
 @keyframes twWellCoin { 0% { transform: translateY(-30px) rotate(-180deg); opacity: 0; } 60% { transform: translateY(4px) rotate(10deg); opacity: 1; } 100% { transform: translateY(0) rotate(0); } }
+/* ── Town header (modern) ── */
+.tw-hdr { padding: 12px 14px; border-radius: 18px; background: linear-gradient(160deg, rgba(38,28,54,0.96), rgba(20,15,30,0.96)); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 9px; }
+.tw-hdr-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tw-hdr-title { margin: 0; font-size: 1.22rem; font-weight: 900; letter-spacing: -0.01em; }
+.tw-buffpill { margin-left: auto; font-size: 0.72rem; font-weight: 900; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border-radius: 999px; padding: 4px 11px; box-shadow: 0 0 14px rgba(243,178,58,0.55); animation: twBuffGlow 2.2s ease-in-out infinite; white-space: nowrap; }
+@keyframes twBuffGlow { 0%,100% { box-shadow: 0 0 10px rgba(243,178,58,0.4); } 50% { box-shadow: 0 0 18px rgba(243,178,58,0.75); } }
+.tw-hdr-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tw-pop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 700; border-radius: 999px; padding: 6px 12px; cursor: pointer; border: 1px solid; }
+.tw-pop b { font-weight: 900; }
+.tw-pop-dot { width: 8px; height: 8px; border-radius: 50%; }
+.tw-pop.is-here { color: #d8ffe0; background: rgba(30,64,40,0.6); border-color: rgba(74,222,128,0.55); }
+.tw-pop.is-here .tw-pop-dot { background: #4ade80; box-shadow: 0 0 8px #4ade80; animation: twOnlinePulse 2s ease-in-out infinite; }
+.tw-pop.is-around { color: #b7c0cf; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.14); }
+.tw-pop.is-around .tw-pop-dot { background: #7c8698; }
+.tw-hdr-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 800; color: #e8e2f0; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.tw-hdr-btn:active { transform: translateY(1px); }
+.tw-hdr-sub { margin: 0; font-size: 0.76rem; color: #a99fc0; }
+.tw-hdr-sub b { color: #d7cdec; font-weight: 800; }
+/* "Around" (online elsewhere) avatars read as faint, desaturated ghosts vs the full-colour in-town crowd. */
+.tw-av.is-around { opacity: 0.42; filter: grayscale(0.55); }
+.tw-av.is-around .tw-bubble { display: none; }
+/* The hidden shiny glint — tiny + faint; a soft twinkle you'll only catch if you're looking. */
+.tw-shiny { position: absolute; z-index: 200; width: 22px; height: 22px; transform: translate(-50%, -50%); background: none; border: none; padding: 0; cursor: pointer; }
+.tw-shiny-core { position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle, #ffffff 0%, #fff6c8 40%, rgba(255,246,200,0) 72%); box-shadow: 0 0 6px 2px rgba(255,255,255,0.5); opacity: 0.5; animation: twShinyTwinkle 3.4s ease-in-out infinite; }
+@keyframes twShinyTwinkle { 0%,100% { opacity: 0.16; transform: scale(0.7) rotate(0deg); } 45% { opacity: 0.85; transform: scale(1.15) rotate(45deg); } 60% { opacity: 0.5; } }
+.tw-shiny-burst { position: absolute; inset: 0; pointer-events: none; }
+.tw-shiny-burst span { position: absolute; top: 50%; left: 50%; width: 7px; height: 7px; border-radius: 50%; background: #ffe488; box-shadow: 0 0 8px #ffe488; animation: twShinyBurst 0.9s ease-out forwards; animation-delay: calc(var(--i) * 0.02s); }
+@keyframes twShinyBurst { 0% { transform: translate(-50%,-50%) rotate(calc(var(--i) * 25deg)) translateX(0) scale(1); opacity: 1; } 100% { transform: translate(-50%,-50%) rotate(calc(var(--i) * 25deg)) translateX(120px) scale(0); opacity: 0; } }
+/* Hangout buff earned — the one-shot celebration overlay. */
+.tw-buffcele { position: fixed; inset: 0; z-index: 1250; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); padding: 20px; }
+.tw-buffcele-card { width: min(340px, 88vw); text-align: center; padding: 24px 20px; border-radius: 22px; background: linear-gradient(180deg, rgba(48,34,14,0.98), rgba(28,20,8,0.98)); border: 1px solid rgba(255,215,110,0.55); box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(243,178,58,0.3); animation: twUp 0.4s ease both; }
+.tw-buffcele-spark { font-size: 44px; animation: twBuffGlow 1.6s ease-in-out infinite; }
+.tw-buffcele-title { font-size: 0.9rem; font-weight: 800; color: #ffcf7a; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+.tw-buffcele-big { font-size: 1.7rem; font-weight: 900; color: #ffe488; text-shadow: 0 2px 10px rgba(243,178,58,0.5); margin: 2px 0; }
+.tw-buffcele-sub { font-size: 0.84rem; color: #e8d6b0; }
 /* Foreground plaza border wall — ground-locked, sits over the sky/street seam. */
 .tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
@@ -1615,6 +1737,8 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-fund-btns { display: flex; gap: 8px; margin: 8px 0; }
 .tw-fund-btns button { flex: 1 1 auto; padding: 9px 4px; border-radius: 10px; border: none; background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #1c130a; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
 .tw-fund-btns button:disabled { opacity: .5; cursor: default; }
+.tw-fund-cta { margin-top: 2px; }
+.tw-board-gold { float: right; color: #ffd75e; font-weight: 900; letter-spacing: 0; text-transform: none; }
 .tw-town-perks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 0.8rem; font-weight: 800; color: #ffe488; }
 .tw-town-perks .muted { font-weight: 600; font-size: 0.72rem; }
 .tw-proj-group { margin-bottom: 14px; }

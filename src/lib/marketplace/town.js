@@ -20,6 +20,7 @@ import { describeItemElements } from "@/lib/marketplace/item-element.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { checkTownContribBadges, checkMerchantBadges } from "@/lib/marketplace/town-badges.js";
+import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
 import { setSetting } from "@/lib/settings.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
@@ -161,8 +162,53 @@ function petSpriteForLevel(collId, petXp, petSprites, petSpriteLevels) {
     return pickPetSpriteForLevel(petSprites[collId], petSpriteLevels[collId], lvl) || null;
 }
 
+// Heartbeat: the caller is on the Town page RIGHT NOW. Bumps town_seen_at every poll; (re)starts town_since when
+// they've just arrived (no ping in >90s). Returns how long they've been continuously in town so getTownState can
+// grant the 3-minute hangout buff. The upsert seeds a default slot for someone who never walked, and never
+// clobbers the x/y of someone already in the plaza.
+async function markTownSeen(buyerId) {
+    if (!buyerId) return null;
+    const row = await db.queryOne(
+        `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, town_seen_at, town_since)
+         VALUES ($1, 50, 80, 1, NOW(), NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET
+            town_since = CASE WHEN mkt_town_presence.town_seen_at IS NULL OR mkt_town_presence.town_seen_at < NOW() - INTERVAL '90 seconds'
+                              THEN NOW() ELSE mkt_town_presence.town_since END,
+            town_seen_at = NOW()
+         RETURNING EXTRACT(EPOCH FROM (NOW() - town_since))::int AS in_town_secs`,
+        [buyerId]
+    ).catch(() => null);
+    return row ? { inTownSecs: Number(row.in_town_secs) || 0 } : null;
+}
+
+// The Town HANGOUT buff: hang in the plaza for 3 continuous minutes → a personal +5% XP & gold for 2 hours.
+// Not advertised anywhere until you actually earn it (then the client celebrates it). Re-earns after it lapses
+// if you're still around. Returns the buff state for the client (incl. justGranted, the one-shot celebrate flag).
+const HANGOUT_PCT = 5, HANGOUT_HOURS = 2, HANGOUT_EARN_SECS = 180;
+async function hangoutBuffState(buyerId, inTownSecs) {
+    if (!buyerId) return null;
+    const active = await db.queryOne(
+        `SELECT EXTRACT(EPOCH FROM (expires_at - NOW()))::int AS secs_left
+           FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'town_hangout' AND expires_at > NOW()
+          ORDER BY expires_at DESC LIMIT 1`, [buyerId]
+    ).catch(() => null);
+    if (active) return { active: true, pct: HANGOUT_PCT, secsLeft: Number(active.secs_left) || 0, justGranted: false, earnSecs: HANGOUT_EARN_SECS, inTownSecs };
+    if (inTownSecs >= HANGOUT_EARN_SECS) {
+        const ins = await db.queryOne(
+            `INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at)
+             VALUES ($1, 'town_hangout', $2, NOW() + ($3 || ' hours')::interval)
+             RETURNING EXTRACT(EPOCH FROM (expires_at - NOW()))::int AS secs_left`,
+            [buyerId, 1 + HANGOUT_PCT / 100, String(HANGOUT_HOURS)]
+        ).catch(() => null);
+        if (ins) return { active: true, pct: HANGOUT_PCT, secsLeft: Number(ins.secs_left) || HANGOUT_HOURS * 3600, justGranted: true, earnSecs: HANGOUT_EARN_SECS, inTownSecs };
+    }
+    return { active: false, pct: HANGOUT_PCT, secsLeft: 0, justGranted: false, earnSecs: HANGOUT_EARN_SECS, inTownSecs };
+}
+
 export async function getTownState(buyerId) {
     const owner = isOwner(buyerId);
+    const heartbeat = await markTownSeen(buyerId); // stamp presence + measure how long they've been here
+    const hangout = await hangoutBuffState(buyerId, heartbeat?.inTownSecs || 0);
     const me = buyerId
         ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible,
                 (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = mkt_buyer.id::text AND pl.pet_id = mkt_buyer.featured_collectible) AS featured_pet_xp,
@@ -217,9 +263,10 @@ export async function getTownState(buyerId) {
             ? db.query(
                 `SELECT buyer_id, x, y, facing,
                         (updated_at > NOW() - INTERVAL '30 seconds') AS walking,
-                        (typing_at  > NOW() - INTERVAL '6 seconds')  AS typing
+                        (typing_at  > NOW() - INTERVAL '6 seconds')  AS typing,
+                        (town_seen_at > NOW() - INTERVAL '45 seconds') AS in_town
                    FROM mkt_town_presence
-                  WHERE buyer_id = ANY($1) AND (updated_at > NOW() - INTERVAL '30 seconds' OR typing_at > NOW() - INTERVAL '6 seconds')`,
+                  WHERE buyer_id = ANY($1) AND (updated_at > NOW() - INTERVAL '30 seconds' OR typing_at > NOW() - INTERVAL '6 seconds' OR town_seen_at > NOW() - INTERVAL '45 seconds')`,
                 [ids]
             ).catch(() => [])
             : Promise.resolve([]),
@@ -254,12 +301,16 @@ export async function getTownState(buyerId) {
             status: statusFor(a?.event, a?.path),
             chat: chatBy[r.id] || null,                 // recent speech-bubble message (shows ~8s)
             typing: Boolean(mv?.typing),
-            walking,                                    // true = actually in the town, use real x/y
+            walking,                                    // true = actively moving in the plaza, use real x/y
+            inTown: Boolean(mv?.in_town),               // true = ON the Town page right now (vs just online elsewhere)
             x: walking ? mv.x : slot.x,
             y: walking ? mv.y : slot.y,
             facing: walking ? mv.facing : 1,
         };
     });
+    // Delineate who is ACTUALLY in the plaza (on this page) vs merely online elsewhere on the site.
+    const inTownCount = players.filter((p) => p.inTown).length + (buyerId ? 1 : 0); // you count as in-town
+    const aroundCount = players.filter((p) => !p.inTown).length;
 
     return {
         signedIn: Boolean(buyerId),
@@ -272,6 +323,7 @@ export async function getTownState(buyerId) {
             flip: me?.avatar_sprite_url ? me.avatar_sprite_flip === true : false,
             x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
             chat: (buyerId ? chatBy[buyerId] : null) || null,
+            inTown: true,
             pet: petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels)?.url || null,
             petFlip: Boolean(petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels)?.flip),
             gold: Number(me?.gold || 0),
@@ -288,6 +340,10 @@ export async function getTownState(buyerId) {
         quests,
         eventsLive,
         onlineCount: players.length + (buyerId ? 1 : 0),
+        inTownCount,
+        aroundCount,
+        hangout,
+        shiny: await getActiveShiny().catch(() => null),
     };
 }
 
@@ -310,6 +366,7 @@ export async function buyMerchantChest(buyerId, tier) {
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -ware.price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
     await addChests(buyerId, { [tier]: 1 }, { source: "merchant" }).catch(() => {});
+    bumpTownQuest(buyerId, "merchant", 1).catch(() => {}); // "Window Shopping" town quest
     return { ok: true, gold: Number(paid.gold), tier, label: ware.label, remaining: ware.remaining - 1 };
 }
 

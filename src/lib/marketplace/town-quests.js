@@ -5,24 +5,80 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { checkTownQuestBadges } from "@/lib/marketplace/town-badges.js";
 
 // Daily TOWN quests handed out by the Quartermaster NPC — bounties that reward playing in the plaza itself
-// (fighting raids, being social, funding the town, visiting the tavern). Progress ticks from the town actions;
-// claim the reward from the NPC. Modest gold rewards (admin-controlled economy — not a firehose).
-export const TOWN_QUESTS = [
-    { key: "rally", label: "Rally the Plaza", desc: "Land 15 hits on a town raid", target: 15, gold: 150, emoji: "⚔️" },
-    { key: "social", label: "Good Neighbor", desc: "Send 5 chats or emotes in town", target: 5, gold: 80, emoji: "💬" },
-    { key: "civic", label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 100, emoji: "🏗️" },
-    { key: "patron", label: "Tavern Patron", desc: "Grab your daily pint at the tavern", target: 1, gold: 60, emoji: "🍺" },
-];
-const QUEST_BY_KEY = Object.fromEntries(TOWN_QUESTS.map((q) => [q.key, q]));
+// (fighting raids, being social, funding the town, the tavern, the Well, the Merchant). Progress ticks from the
+// town actions; claim the reward from the NPC. Modest gold rewards (admin-controlled economy — not a firehose).
+//
+// The pool is grouped by ACTIVITY. Each activity's `key` is what the town actions bump (town-events raids →
+// 'rally', town chat → 'social', plaza fund → 'civic', tavern → 'patron', Wishing Well → 'well', Traveling
+// Merchant → 'merchant'). Keys are STABLE so progress rows always line up. Each activity has one or more
+// VARIANTS (different target/reward); a rotating handful of activities is FEATURED each day, one variant apiece,
+// chosen deterministically from the date so every member sees the same quests, stable for the whole day.
+const QUEST_POOL = {
+    rally: { emoji: "⚔️", variants: [
+        { label: "Rally the Plaza", desc: "Land 15 hits on a town raid", target: 15, gold: 150 },
+        { label: "Hold the Line", desc: "Land 30 hits on a town raid", target: 30, gold: 280 },
+    ] },
+    social: { emoji: "💬", variants: [
+        { label: "Good Neighbor", desc: "Send 5 chats or emotes in town", target: 5, gold: 80 },
+        { label: "Chatterbox", desc: "Send 12 chats or emotes in town", target: 12, gold: 150 },
+    ] },
+    civic: { emoji: "🏗️", variants: [
+        { label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 100 },
+        { label: "Town Benefactor", desc: "Chip in to the plaza fund 3 times", target: 3, gold: 240 },
+    ] },
+    patron: { emoji: "🍺", variants: [
+        { label: "Tavern Patron", desc: "Down your daily pint (or win a dice hand)", target: 1, gold: 60 },
+        { label: "Life of the Party", desc: "Enjoy the tavern 3 times today", target: 3, gold: 140 },
+    ] },
+    well: { emoji: "🪙", variants: [
+        { label: "Make a Wish", desc: "Toss a coin in the Wishing Well", target: 1, gold: 70 },
+    ] },
+    merchant: { emoji: "🧳", variants: [
+        { label: "Window Shopping", desc: "Buy a chest from the Traveling Merchant", target: 1, gold: 90 },
+    ] },
+};
+const ACTIVITY_KEYS = Object.keys(QUEST_POOL);
+const DAILY_COUNT = 4; // how many quests the Quartermaster features each day (of the pool above)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 
-// Advance a member's town-quest progress (capped at target). Best-effort; called from the town actions.
+// FNV-1a hash → a stable 32-bit number for a string. Used to seed the daily rotation deterministically.
+function hashStr(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+}
+// Today in America/Chicago as YYYY-MM-DD — matches the SQL `day` boundary used for progress rows.
+function chicagoDay() { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date()); }
+
+// The activities featured today + which variant of each, chosen deterministically from the date. Everyone sees
+// the same set, and it's stable for the whole Chicago day.
+function dailyQuests(day) {
+    const order = ACTIVITY_KEYS
+        .map((k) => ({ k, r: hashStr(day + ":" + k) }))
+        .sort((a, b) => a.r - b.r)
+        .map((x) => x.k);
+    const chosen = order.slice(0, Math.min(DAILY_COUNT, order.length));
+    return chosen.map((key) => {
+        const pool = QUEST_POOL[key];
+        const variant = pool.variants[hashStr(day + ":v:" + key) % pool.variants.length];
+        return { key, emoji: pool.emoji, ...variant };
+    });
+}
+function todayQuestByKey(day) {
+    const by = {};
+    for (const q of dailyQuests(day)) by[q.key] = q;
+    return by;
+}
+
+// Advance a member's town-quest progress (capped at today's target). No-op when the activity isn't one of
+// today's featured quests. Best-effort; called from the town actions.
 export async function bumpTownQuest(buyerId, key, n = 1) {
-    const q = QUEST_BY_KEY[key];
-    if (!buyerId || !q) return;
+    if (!buyerId) return;
+    const q = todayQuestByKey(chicagoDay())[key];
+    if (!q) return; // not featured today — nothing to tick
     await db.query(
-        `INSERT INTO mkt_town_quest (buyer_id, day, key, progress) VALUES ($1, ${DAY}, $2, LEAST($3, $4))
-         ON CONFLICT (buyer_id, day, key) DO UPDATE SET progress = LEAST(mkt_town_quest.progress + $3, $4)`,
+        `INSERT INTO mkt_town_quest (buyer_id, day, key, progress) VALUES ($1, ${DAY}, $2, LEAST($3::int, $4::int))
+         ON CONFLICT (buyer_id, day, key) DO UPDATE SET progress = LEAST(mkt_town_quest.progress + $3::int, $4::int)`,
         [buyerId, key, n, q.target]
     ).catch(() => {});
 }
@@ -30,9 +86,11 @@ export async function bumpTownQuest(buyerId, key, n = 1) {
 // Today's quests for a member with progress + claim state.
 export async function getTownQuests(buyerId) {
     if (!buyerId) return [];
+    const day = chicagoDay();
+    const todays = dailyQuests(day);
     const rows = await db.query(`SELECT key, progress, claimed FROM mkt_town_quest WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => []);
     const by = Object.fromEntries(rows.map((r) => [r.key, r]));
-    return TOWN_QUESTS.map((q) => {
+    return todays.map((q) => {
         const progress = Math.min(q.target, by[q.key]?.progress || 0);
         return { ...q, progress, claimed: Boolean(by[q.key]?.claimed), done: progress >= q.target };
     });
@@ -43,12 +101,13 @@ export async function townQuestsClaimable(buyerId) {
     return (await getTownQuests(buyerId)).filter((q) => q.done && !q.claimed).length;
 }
 
-// Claim a completed quest's gold. Atomic flip so it can't be double-claimed.
+// Claim a completed quest's gold. Atomic flip so it can't be double-claimed. Reward is TODAY's variant.
 export async function claimTownQuest(buyerId, key) {
-    const q = QUEST_BY_KEY[key];
-    if (!buyerId || !q) return { ok: false, error: "unknown" };
+    if (!buyerId) return { ok: false, error: "unknown" };
+    const q = todayQuestByKey(chicagoDay())[key];
+    if (!q) return { ok: false, error: "unknown" };
     const claimed = await db.queryOne(
-        `UPDATE mkt_town_quest SET claimed = TRUE WHERE buyer_id = $1 AND day = ${DAY} AND key = $2 AND progress >= $3 AND claimed = FALSE RETURNING key`,
+        `UPDATE mkt_town_quest SET claimed = TRUE WHERE buyer_id = $1 AND day = ${DAY} AND key = $2 AND progress >= $3::int AND claimed = FALSE RETURNING key`,
         [buyerId, key, q.target]
     ).catch(() => null);
     if (!claimed) return { ok: false, error: "not_ready" };

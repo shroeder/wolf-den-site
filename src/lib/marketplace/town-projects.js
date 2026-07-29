@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { checkWellBadges } from "@/lib/marketplace/town-badges.js";
+import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 
 // ── TOWN DEVELOPMENT ────────────────────────────────────────────────────────────────────────────────────────
 // A shared, community-funded upgrade catalog. Everyone pools gold into PROJECTS; each level costs more, grants a
@@ -196,5 +197,6 @@ export async function claimWishingWell(buyerId) {
     await logCoin(buyerId, gold, "wishing_well", { balanceAfter: paid?.gold }).catch(() => {});
     if (xp > 0) await awardXp(buyerId, "wishing_well", { points: xp, gold: 0 }).catch(() => {});
     checkWellBadges(buyerId).catch(() => {}); // Well Wisher / Fountain Faithful (daily claims)
+    bumpTownQuest(buyerId, "well", 1).catch(() => {}); // "Make a Wish" town quest
     return { ok: true, gold, xp, goldAfter: paid?.gold ?? null };
 }
