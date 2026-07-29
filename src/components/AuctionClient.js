@@ -1,0 +1,257 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import ItemArt from "@/components/ItemArt";
+import CoinCta from "@/components/CoinCta";
+
+const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
+const SLOTS = [["", "All slots"], ["main_hand", "Weapon"], ["off_hand", "Off-hand"], ["head", "Head"], ["chest", "Chest"], ["legs", "Legs"], ["feet", "Feet"], ["hands", "Hands"], ["ring", "Ring"], ["amulet", "Amulet"], ["cloak", "Cloak"]];
+const RARITIES = [["", "All rarities"], ["common", "Common"], ["rare", "Rare"], ["epic", "Epic"], ["legendary", "Legendary"], ["mythic", "Mythic"]];
+const SORTS = [["new", "Newest"], ["old", "Oldest"], ["price_asc", "Price ↑"], ["price_desc", "Price ↓"]];
+
+function timeLeft(iso) {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 0) return "ending";
+    const h = Math.floor(ms / 3600000);
+    if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+    if (h >= 1) return `${h}h ${Math.floor((ms % 3600000) / 60000)}m`;
+    return `${Math.max(1, Math.floor(ms / 60000))}m`;
+}
+function ago(iso) {
+    const ms = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+}
+
+export default function AuctionClient({ initial }) {
+    const [state, setState] = useState(initial || null);
+    const [tab, setTab] = useState("browse"); // browse | sell | mine
+    const [q, setQ] = useState("");
+    const [slot, setSlot] = useState("");
+    const [rarity, setRarity] = useState("");
+    const [sort, setSort] = useState("new");
+    const [listings, setListings] = useState(initial?.listings || []);
+    const [busy, setBusy] = useState(false);
+    const [flash, setFlash] = useState(null);
+    const [sellPick, setSellPick] = useState(null); // item being listed { itemId,... }
+    const [price, setPrice] = useState("");
+    const [days, setDays] = useState(3);
+
+    const gold = state?.gold || 0;
+    const feePct = state?.feePct || 0.05;
+    const durations = state?.durations || [1, 3, 5, 7];
+
+    const reloadState = useCallback(async () => {
+        const r = await fetch("/api/marketplace/auction", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+        if (r?.owner) { setState(r); setListings(r.listings || []); }
+    }, []);
+
+    // Live browse search/filter/sort → re-fetch just the listings.
+    useEffect(() => {
+        if (tab !== "browse") return undefined;
+        const t = setTimeout(async () => {
+            const params = new URLSearchParams({ q, slot, rarity, sort });
+            const r = await fetch(`/api/marketplace/auction?${params}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+            if (r?.owner) setListings(r.listings || []);
+        }, 220);
+        return () => clearTimeout(t);
+    }, [q, slot, rarity, sort, tab]);
+
+    const showFlash = useCallback((msg) => { setFlash(msg); setTimeout(() => setFlash((f) => (f === msg ? null : f)), 3200); }, []);
+
+    const buy = useCallback(async (id) => {
+        setBusy(true);
+        const r = await fetch("/api/marketplace/auction", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "buy", id }) }).then((x) => x.json()).catch(() => null);
+        setBusy(false);
+        if (r?.ok) { showFlash(`✅ Bought ${r.item?.name} for ${r.price.toLocaleString()} 🪙!`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
+        else showFlash(r?.error === "insufficient_gold" ? "Not enough coins." : r?.error === "already_owned" ? "You already own that piece." : r?.error === "own_listing" ? "That's your own listing." : "That listing's gone.");
+    }, [showFlash, reloadState]);
+
+    const doList = useCallback(async () => {
+        const p = Math.floor(Number(price) || 0);
+        if (!sellPick || p < 10) { showFlash("Set a price of at least 10 🪙."); return; }
+        setBusy(true);
+        const r = await fetch("/api/marketplace/auction", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "list", itemId: sellPick.itemId, price: p, days }) }).then((x) => x.json()).catch(() => null);
+        setBusy(false);
+        if (r?.ok) { showFlash(`📜 Listed ${sellPick.name} for ${p.toLocaleString()} 🪙 (fee ${r.fee.toLocaleString()} 🪙).`); setSellPick(null); setPrice(""); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
+        else showFlash(r?.error === "insufficient_gold" ? `You need ${Math.max(1, Math.ceil(p * feePct)).toLocaleString()} 🪙 for the listing fee.` : r?.error === "equipped" ? "Unequip it first." : "Couldn't list that.");
+    }, [price, sellPick, days, feePct, showFlash, reloadState]);
+
+    const cancel = useCallback(async (id) => {
+        setBusy(true);
+        const r = await fetch("/api/marketplace/auction", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "cancel", id }) }).then((x) => x.json()).catch(() => null);
+        setBusy(false);
+        if (r?.ok) { showFlash("↩ Listing cancelled — item returned."); reloadState(); }
+        else showFlash("Couldn't cancel that.");
+    }, [showFlash, reloadState]);
+
+    const fee = useMemo(() => Math.max(1, Math.ceil((Number(price) || 0) * feePct)), [price, feePct]);
+
+    if (state && state.owner === false) {
+        return <section className="card"><h1 style={{ marginTop: 0 }}>🏛️ Auction House</h1><p className="muted" style={{ margin: 0 }}>The Auction House is still being built — check back soon.</p></section>;
+    }
+
+    return (
+        <div className="stack reveal">
+            <section className="card ah-head">
+                <div className="ah-head-top">
+                    <h1>🏛️ Auction House</h1>
+                    <span className="ah-gold">🪙 {gold.toLocaleString()}</span>
+                </div>
+                <p className="muted ah-sub">List gear you&apos;re not using, or snag a deal from another wolf. Listing costs a {Math.round(feePct * 100)}% fee.</p>
+                <div className="ah-tabs">
+                    {[["browse", `🔎 Browse${listings.length ? ` · ${listings.length}` : ""}`], ["sell", "📤 Sell"], ["mine", `📜 My listings${state?.mine?.length ? ` · ${state.mine.length}` : ""}`]].map(([k, label]) => (
+                        <button key={k} type="button" className={`ah-tab${tab === k ? " is-on" : ""}`} onClick={() => setTab(k)}>{label}</button>
+                    ))}
+                </div>
+            </section>
+
+            {flash ? <div className="ah-flash">{flash}</div> : null}
+
+            {tab === "browse" ? (
+                <>
+                    <section className="card ah-filters">
+                        <input className="ah-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search item or seller…" aria-label="Search" />
+                        <div className="ah-selrow">
+                            <select value={slot} onChange={(e) => setSlot(e.target.value)} aria-label="Slot">{SLOTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                            <select value={rarity} onChange={(e) => setRarity(e.target.value)} aria-label="Rarity">{RARITIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                            <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">{SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                        </div>
+                    </section>
+                    {listings.length === 0 ? (
+                        <section className="card"><p className="muted" style={{ margin: 0 }}>No listings match — be the first to list something in the Sell tab!</p></section>
+                    ) : (
+                        <div className="ah-grid">
+                            {listings.map((l) => (
+                                <div key={l.id} className="ah-card" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }}>
+                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} /></div>
+                                    <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
+                                    {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
+                                    <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
+                                    {l.mine ? (
+                                        <button type="button" className="ah-buy is-mine" disabled onClick={() => {}}>Your listing</button>
+                                    ) : l.owned ? (
+                                        <button type="button" className="ah-buy" disabled>Owned</button>
+                                    ) : gold < l.price ? (
+                                        <CoinCta price={l.price} have={gold} label="coins" />
+                                    ) : (
+                                        <button type="button" className="ah-buy" disabled={busy} onClick={() => buy(l.id)}>🪙 {l.price.toLocaleString()}</button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            ) : null}
+
+            {tab === "sell" ? (
+                <section className="card">
+                    <h3 style={{ marginTop: 0 }}>📤 List an item</h3>
+                    {(state?.sellable || []).length === 0 ? (
+                        <p className="muted" style={{ margin: 0 }}>No unequipped gear to list right now. Unequip a piece (or win some) and it&apos;ll show up here.</p>
+                    ) : (
+                        <div className="ah-grid">
+                            {(state?.sellable || []).map((it) => (
+                                <button key={it.itemId} type="button" className={`ah-card ah-sellcard${sellPick?.itemId === it.itemId ? " is-picked" : ""}`} style={{ "--rc": RARITY_TXT[it.rarity] || "#9aa7b5" }} onClick={() => { setSellPick(it); setPrice(""); }}>
+                                    <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} /></div>
+                                    <div className="ah-card-name" style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</div>
+                                    {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {sellPick ? (
+                        <div className="ah-listform">
+                            <div className="ah-listform-title">List <b style={{ color: RARITY_TXT[sellPick.rarity] || "#fff" }}>{sellPick.name}</b></div>
+                            <label className="ah-field"><span>Price (🪙)</span><input type="number" min={10} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 2500" /></label>
+                            <div className="ah-field"><span>Duration</span>
+                                <div className="ah-days">{durations.map((d) => <button key={d} type="button" className={days === d ? "is-on" : ""} onClick={() => setDays(d)}>{d}d</button>)}</div>
+                            </div>
+                            <div className="ah-feeline muted">Listing fee ({Math.round(feePct * 100)}%): <b>🪙 {fee.toLocaleString()}</b>{Number(price) > 0 ? ` · you keep 🪙 ${Number(price).toLocaleString()} on a sale` : ""}</div>
+                            <div className="ah-listform-btns">
+                                <button type="button" className="ah-list-btn" disabled={busy || Number(price) < 10 || gold < fee} onClick={doList}>📜 List it{gold < fee ? " (need fee)" : ""}</button>
+                                <button type="button" className="ah-cancel-btn" onClick={() => setSellPick(null)}>Cancel</button>
+                            </div>
+                        </div>
+                    ) : null}
+                </section>
+            ) : null}
+
+            {tab === "mine" ? (
+                <section className="card">
+                    <h3 style={{ marginTop: 0 }}>📜 Your listings</h3>
+                    {(state?.mine || []).length === 0 ? (
+                        <p className="muted" style={{ margin: 0 }}>You haven&apos;t listed anything. Head to the Sell tab.</p>
+                    ) : (
+                        <div className="ah-mine">
+                            {(state?.mine || []).map((l) => (
+                                <div key={l.id} className="ah-minerow" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }}>
+                                    <div className="ah-minerow-art"><ItemArt id={l.itemId} icon={l.icon} /></div>
+                                    <div className="ah-minerow-body">
+                                        <div className="ah-minerow-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
+                                        <div className="muted" style={{ fontSize: "0.76rem" }}>
+                                            🪙 {l.price.toLocaleString()} · {l.status === "active" ? `⏳ ${timeLeft(l.expiresAt)} left` : l.status === "sold" ? "✅ sold" : l.status === "expired" ? "⌛ expired (returned)" : "↩ cancelled"}
+                                        </div>
+                                    </div>
+                                    {l.status === "active" ? <button type="button" className="ah-cancel-btn" disabled={busy} onClick={() => cancel(l.id)}>Cancel</button> : null}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            ) : null}
+
+            <style>{AH_CSS}</style>
+        </div>
+    );
+}
+
+const AH_CSS = `
+.ah-head-top { display: flex; align-items: center; gap: 10px; }
+.ah-head-top h1 { margin: 0; font-size: 1.3rem; flex: 1; }
+.ah-gold { font-weight: 900; color: #ffd75e; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); border-radius: 999px; padding: 3px 12px; }
+.ah-sub { margin: 6px 0 10px; font-size: 0.85rem; }
+.ah-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ah-tab { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #e8e2d6; font-weight: 800; font-size: 0.84rem; cursor: pointer; }
+.ah-tab.is-on { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border-color: transparent; }
+.ah-flash { text-align: center; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.4); border-radius: 12px; padding: 10px 14px; }
+.ah-filters { display: flex; flex-direction: column; gap: 8px; }
+.ah-search { width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 0.9rem; }
+.ah-selrow { display: flex; gap: 8px; }
+.ah-selrow select { flex: 1 1 0; min-width: 0; padding: 9px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(30,22,44,0.9); color: #f2ead9; font-size: 0.82rem; font-weight: 700; }
+.ah-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ah-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border-radius: 14px; text-align: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-top: 2px solid var(--rc,#9aa7b5); }
+.ah-sellcard { cursor: pointer; color: inherit; font: inherit; }
+.ah-sellcard.is-picked { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e, 0 8px 20px rgba(255,215,94,0.2); }
+.ah-card-art { width: 64px; height: 64px; display: grid; place-items: center; }
+.ah-card-art svg, .ah-card-art img { width: 58px; height: 58px; }
+.ah-card-name { font-weight: 800; font-size: 0.86rem; line-height: 1.2; }
+.ah-card-stats { font-size: 0.72rem; line-height: 1.25; }
+.ah-card-meta { font-size: 0.68rem; line-height: 1.3; }
+.ah-buy { margin-top: 4px; width: 100%; padding: 9px; border-radius: 10px; border: none; cursor: pointer; font-weight: 900; font-size: 0.86rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
+.ah-buy:disabled { opacity: .55; cursor: default; background: rgba(255,255,255,0.08); color: #cbb9e0; }
+.ah-buy.is-mine { background: rgba(120,200,255,0.12); color: #bfe3ff; }
+.ah-listform { margin-top: 14px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,215,110,0.35); display: flex; flex-direction: column; gap: 10px; }
+.ah-listform-title { font-weight: 800; font-size: 1rem; }
+.ah-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; font-weight: 700; color: #cbb9e0; }
+.ah-field input { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 1rem; font-weight: 800; }
+.ah-days { display: flex; gap: 6px; }
+.ah-days button { flex: 1 1 0; padding: 9px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #f2ead9; font-weight: 800; cursor: pointer; }
+.ah-days button.is-on { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border-color: transparent; }
+.ah-feeline { font-size: 0.8rem; }
+.ah-listform-btns { display: flex; gap: 8px; }
+.ah-list-btn { flex: 1 1 auto; padding: 12px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; font-size: 0.95rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22; }
+.ah-list-btn:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.ah-cancel-btn { flex: 0 0 auto; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #e8e2d6; font-weight: 800; cursor: pointer; }
+.ah-mine { display: flex; flex-direction: column; gap: 8px; }
+.ah-minerow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-left: 3px solid var(--rc,#9aa7b5); }
+.ah-minerow-art { width: 44px; height: 44px; display: grid; place-items: center; flex: 0 0 auto; }
+.ah-minerow-art svg, .ah-minerow-art img { width: 40px; height: 40px; }
+.ah-minerow-body { flex: 1 1 auto; min-width: 0; }
+.ah-minerow-name { font-weight: 800; font-size: 0.9rem; }
+`;

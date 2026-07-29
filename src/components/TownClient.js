@@ -655,6 +655,14 @@ export default function TownClient({ initial }) {
                             <img src={art.merchant.url} alt="Traveling Merchant" draggable={false} />
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
+                    {/* Auctioneer — links out to the Auction House */}
+                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: "72%", top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
+                        <span className="tw-npc-bubble">🔨 Auction House!</span>
+                        {art.auctioneer?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={art.auctioneer.url} alt="Auctioneer" draggable={false} />
+                        ) : <span className="tw-npc-emoji">🔨</span>}
+                    </Link>
                     {/* Raid: tap each foe directly — its own HP bar drains, damage numbers pop, it dies when emptied */}
                     {state?.event && !state.event.defeated ? (() => {
                         const ev = state.event;
