@@ -297,7 +297,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.pint} alt="" draggable={false} />
                             ) : <span className="tv-order-emoji">🍺</span>}
-                            <span className="tv-order-lbl">Hearty Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP` : "tomorrow"}</small></span>
+                            <span className="tv-order-lbl">Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP` : "tomorrow"}</small></span>
                         </button>
                         <button type="button" className="tv-order tv-order-round" disabled={busy || (st?.gold || 0) < roundCost} onClick={buyRoundAct} title="Buy a round for everyone here">
                             {iconArt?.round ? (
@@ -507,15 +507,15 @@ const TV_CSS = `
 .tv-foam { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border-radius: 50%; background: #ffe9b0; box-shadow: 0 0 6px rgba(255,233,176,0.9); transform: rotate(var(--a)) translateY(0); animation: tvFoam .9s ease-out forwards; }
 @keyframes tvFoam { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 0; } 20% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-52px) scale(.3); opacity: 0; } }
 /* In-scene order tray (replaces the emote bar while at the bar) */
-.tv-keeper-tray { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; gap: 6px; align-items: stretch; max-width: 96%; background: rgba(20,10,4,0.72); border: 1px solid rgba(255,215,110,0.4); border-radius: 14px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: tvBubblePop .26s cubic-bezier(.2,1.2,.3,1) both; }
-.tv-order { display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 11px; border: 1px solid rgba(255,215,110,0.35); background: linear-gradient(180deg, rgba(70,44,20,0.9), rgba(44,26,10,0.9)); color: #ffe9c4; cursor: pointer; font: inherit; }
+.tv-keeper-tray { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 12; box-sizing: border-box; width: calc(100% - 16px); max-width: 440px; display: flex; gap: 5px; align-items: stretch; background: rgba(20,10,4,0.72); border: 1px solid rgba(255,215,110,0.4); border-radius: 14px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: tvBubblePop .26s cubic-bezier(.2,1.2,.3,1) both; }
+.tv-order { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: 11px; border: 1px solid rgba(255,215,110,0.35); background: linear-gradient(180deg, rgba(70,44,20,0.9), rgba(44,26,10,0.9)); color: #ffe9c4; cursor: pointer; font: inherit; }
 .tv-order:hover:not(:disabled) { border-color: rgba(255,215,110,0.7); }
 .tv-order:active:not(:disabled) { transform: translateY(1px); }
 .tv-order:disabled { opacity: .45; cursor: default; }
-.tv-order img { width: 34px; height: 34px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
-.tv-order-emoji { font-size: 26px; }
-.tv-order-lbl { display: flex; flex-direction: column; line-height: 1.1; font-weight: 900; font-size: 13px; text-align: left; }
-.tv-order-lbl small { font-weight: 700; font-size: 10px; color: #c8a86a; }
-.tv-order-mini { padding: 7px 12px; font-size: 17px; font-weight: 900; }
+.tv-order img { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.tv-order-emoji { font-size: 24px; flex: 0 0 auto; }
+.tv-order-lbl { min-width: 0; display: flex; flex-direction: column; line-height: 1.1; font-weight: 900; font-size: 12.5px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-order-lbl small { font-weight: 700; font-size: 9.5px; color: #c8a86a; overflow: hidden; text-overflow: ellipsis; }
+.tv-order-mini { flex: 0 0 auto; padding: 7px 11px; font-size: 16px; font-weight: 900; justify-content: center; }
 .tv-order-round { border-color: rgba(255,180,90,0.5); }
 `;
