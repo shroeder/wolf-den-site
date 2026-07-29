@@ -30,6 +30,8 @@ const CREATURES = {
     scarecrow: { name: "Merry Scarecrow", emoji: "🎃", art: "enc_scarecrow", weight: 4, xp: 45, gold: 640, seedBand: ["rare", "epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 3, loot: { seed: 46, chest: 28, parts: 26 } },
 };
 const CREATURE_KEYS = Object.keys(CREATURES);
+// Public list (key + name + emoji) so the owner-debug UI can cycle through every critter to test each.
+export const ENCOUNTER_CREATURES = CREATURE_KEYS.map((k) => ({ key: k, name: CREATURES[k].name, emoji: CREATURES[k].emoji }));
 
 function weightedPick(weights) {
     const total = Object.values(weights).reduce((s, w) => s + w, 0);
@@ -51,11 +53,11 @@ async function critterSprite(art) {
 // Roll whether a harvest turns up a critter; if so PARK the pending encounter (critter + pre-rolled reward) on
 // the member and return the public info the client needs to show it. `wardChance` is the plot's Warding Totem
 // bonus (a fraction). Returns null when nothing shows up.
-export async function maybeStartEncounter(buyerId, { rarity = "common", wardChance = 0, seedId = null, force = false } = {}) {
+export async function maybeStartEncounter(buyerId, { rarity = "common", wardChance = 0, seedId = null, force = false, creature = null } = {}) {
     if (!buyerId) return null;
     const chance = Math.min(0.6, BASE_ENCOUNTER_CHANCE + (RARITY_BUMP[rarity] || 0) + (Number(wardChance) || 0));
     if (!force && Math.random() >= chance) return null;
-    const key = weightedCreature();
+    const key = (creature && CREATURES[creature]) ? creature : weightedCreature(); // owner debug can force a specific critter
     const c = CREATURES[key];
     // Pre-roll the bonus loot NOW (one bucket) so it can't be faked at resolve.
     const bucket = weightedPick(c.loot);

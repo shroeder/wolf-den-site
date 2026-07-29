@@ -95,7 +95,7 @@ export async function POST(request) {
             else if (b?.action === "encounter_resolve") { res = await resolveEncounter(buyer.id, { perfectHits: Number(b?.perfectHits) || 0 }); if (res?.ok) res = { ...res, garden: await getGarden(buyer.id) }; }
             else if (b?.action === "debug_encounter") { // owner-only: force a harvest encounter to test the fight
                 if (!isOwner(buyer.id)) res = { ok: false, error: "forbidden" };
-                else { const enc = await maybeStartEncounter(buyer.id, { rarity: "rare", wardChance: 0, seedId: null, force: true }).catch(() => null); res = enc ? { ok: true, encounter: enc } : { ok: false, error: "spawn_failed" }; }
+                else { const enc = await maybeStartEncounter(buyer.id, { rarity: "rare", wardChance: 0, seedId: null, force: true, creature: b?.creature || null }).catch(() => null); res = enc ? { ok: true, encounter: enc } : { ok: false, error: "spawn_failed" }; }
             }
             else if (b?.action === "rain") res = await applyRainBoost(buyer.id);
             // ── Decorations ── (buy/place/move/remove on YOUR OWN farm)
