@@ -61,6 +61,7 @@ export default function GameNav() {
     const [bossStrikes, setBossStrikes] = useState(0);
     const [questsReady, setQuestsReady] = useState(0);
     const [cropsReady, setCropsReady] = useState(0);
+    const [petNudge, setPetNudge] = useState(0); // own pets you can still pet today (free daily reward)
     const [sailAttn, setSailAttn] = useState(false);
     const [signedIn, setSignedIn] = useState(false); // gates the one-time Forge announcement to real members
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
@@ -83,7 +84,7 @@ export default function GameNav() {
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
-        const load = () => fetch("/api/marketplace/farm", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setCropsReady(d?.garden?.readyCount || 0); }).catch(() => {});
+        const load = () => fetch("/api/marketplace/farm", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setCropsReady(d?.garden?.readyCount || 0); setPetNudge(d?.petNudge || 0); }).catch(() => {});
         load();
         const onRefresh = () => load();
         window.addEventListener("wolfden-hud-refresh", onRefresh);
@@ -109,7 +110,7 @@ export default function GameNav() {
         if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${plural(spins, "spin")} ready` };
         if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };
         // Feature pills also badge their claimable daily-quests (farm crops + quests together).
-        if (href === "/marketplace/farm") { const n = cropsReady + (featureClaims.farm || 0); if (n > 0) return { badge: n, title: [cropsReady ? `${plural(cropsReady, "crop")} ready` : null, featureClaims.farm ? `${plural(featureClaims.farm, "quest")} to claim` : null].filter(Boolean).join(" · ") }; }
+        if (href === "/marketplace/farm") { const n = cropsReady + petNudge + (featureClaims.farm || 0); if (n > 0) return { badge: n, title: [cropsReady ? `${plural(cropsReady, "crop")} ready` : null, petNudge ? `${plural(petNudge, "pet")} to pet` : null, featureClaims.farm ? `${plural(featureClaims.farm, "quest")} to claim` : null].filter(Boolean).join(" · ") }; }
         if (href === "/marketplace/sailing" && (featureClaims.sailing || 0) > 0) return { badge: featureClaims.sailing, title: `${plural(featureClaims.sailing, "quest")} to claim` };
         if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };
         return { badge: null, title: null };

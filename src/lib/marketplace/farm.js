@@ -263,6 +263,9 @@ export async function getFarm(ownerId, viewerId) {
         customBgDraft: mine ? (owner.farm_bg_draft_url || null) : null, // your pending, not-yet-accepted preview
         spriteBrightness: Number(owner.sprite_brightness ?? 1), // global brightness multiplier for this farm's sprites
         canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
+        // How many of your own pets you can actually pet RIGHT NOW (charges left ∩ un-petted pets) — nudges the
+        // nav badge + an in-farm hint so a free daily reward never sits unclaimed.
+        petNudge: mine ? Math.min((extras.petting?.left) || 0, pets.filter((p) => !p.petted).length) : 0,
         canFeed: Boolean(viewerId), // feed with your own treats
         petXp: PET_PET_XP,
         petGold: mine ? PET_PET_GOLD : PET_OTHER_GOLD,

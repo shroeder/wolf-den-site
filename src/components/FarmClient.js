@@ -706,8 +706,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {fullscreen ? "Exit" : "Full screen"}
             </button>
             {farm.ownerDebug ? (
-                <button type="button" onClick={testEncounter} title="Owner debug: force a harvest encounter" style={{ ...CTRL_PILL, border: "1px solid rgba(224,112,74,0.55)", background: "linear-gradient(180deg, rgba(58,26,16,0.96), rgba(38,18,12,0.96))", color: "#ffb59a" }}>
-                    <span style={{ fontSize: 15 }} aria-hidden="true">🐀</span>Test raid
+                <button type="button" onClick={testEncounter} title="Owner debug: force a harvest critter encounter (random critter)" style={{ ...CTRL_PILL, border: "1px solid rgba(224,112,74,0.55)", background: "linear-gradient(180deg, rgba(58,26,16,0.96), rgba(38,18,12,0.96))", color: "#ffb59a" }}>
+                    <span style={{ fontSize: 15 }} aria-hidden="true">🎁</span>Test critter
                 </button>
             ) : null}
         </>
@@ -773,6 +773,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .fm-btn-close:hover { background: rgba(255,255,255,0.09); }
                 .fm-sheen::after { content: ""; position: absolute; top: 0; left: -70%; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); transform: skewX(-18deg); animation: fmSheen 3.6s ease-in-out infinite; pointer-events: none; }
                 @keyframes fmSheen { 0%, 100% { left: -70%; } 55% { left: 150%; } }
+                .farm-petnudge { margin: 6px 0 0; padding: 8px 14px; border-radius: 999px; text-align: center; font-size: 0.82rem; font-weight: 800; color: #ffe9c4; background: linear-gradient(180deg, rgba(80,52,24,0.9), rgba(52,32,14,0.9)); border: 1px solid rgba(255,190,120,0.5); box-shadow: 0 2px 10px rgba(0,0,0,0.4); animation: petNudgePulse 2s ease-in-out infinite; }
+                .farm-petnudge b { color: #ffd75e; }
+                @keyframes petNudgePulse { 0%,100% { box-shadow: 0 2px 10px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,190,120,0.0); } 50% { box-shadow: 0 2px 10px rgba(0,0,0,0.4), 0 0 14px 2px rgba(255,190,120,0.4); } }
                 @keyframes rateBurstAnim { 0% { transform: translate(-50%,-50%) scale(.4); opacity: 0; } 25% { opacity: 1; } 55% { transform: translate(-50%,-60%) scale(1.7); opacity: 1; } 100% { transform: translate(-50%,-140%) scale(1.9); opacity: 0; } }
                 @keyframes ratePulse { 0%,100% { transform: scale(1); } 45% { transform: scale(1.18); } }
                 @keyframes rateStars { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px) scale(1.1); } }
@@ -874,27 +877,34 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]]
                     .filter(([v]) => farm.mine || v !== "garden") // the Garden is yours alone — hide it on other members' farms
                     .map(([v, ico, label]) => {
-                    // Garden tab badge = crops READY TO HARVEST only (quests are claimed above the scene, not in the garden).
+                    // Garden tab badge = crops READY TO HARVEST. Pet-view tabs badge = pets you can still pet today.
                     const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
+                    const petAttn = v !== "garden" && farm.mine && (farm.petNudge || 0) > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted).length : 0;
+                    const badge = attn || petAttn;
                     return (
-                        <button key={v} type="button" className={`${view === v ? "on" : ""}${attn ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
+                        <button key={v} type="button" className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
                             <span aria-hidden="true">{ico}</span>{label}
-                            {attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span> : null}
+                            {attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span>
+                                : petAttn ? <span className="farm-tab-badge" title={`${petAttn} pet${petAttn === 1 ? "" : "s"} to pet — a free daily reward`}>🐾</span> : null}
                         </button>
                     );
                 })}
             </div>
 
+            {farm.mine && (farm.petNudge || 0) > 0 && view !== "garden" ? (
+                <div className="farm-petnudge">🐾 <b>{farm.petNudge}</b> free {farm.petNudge === 1 ? "petting" : "pettings"} left today — tap your pets for XP &amp; gold!</div>
+            ) : null}
+
             {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,
                 so you can scroll sideways to see the WHOLE painting (it's wider than the viewport). */}
             <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
-                <div ref={scrollRef} className="farm-scroll" onPointerDown={fullscreen ? undefined : onScrollPointerDown} onPointerMove={fullscreen ? undefined : onScrollPointerMove} onPointerUp={fullscreen ? undefined : onScrollPointerUp} onPointerLeave={fullscreen ? undefined : onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: fullscreen ? "hidden" : "auto", overflowY: "hidden", cursor: fullscreen ? "default" : "grab" }}>
+                <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
-                            // Fullscreen: fill the viewport as a single cover (NO horizontal scroll). Windowed: the
-                            // field is as wide as the image so you can scroll sideways to see the whole painting.
-                            position: "relative", width: fullscreen ? "100%" : "max-content", minWidth: "100%", height: sceneHeight,
+                            // The field is as wide as the painting so you can scroll/pan sideways to see all of it —
+                            // in both windowed AND fullscreen (fullscreen just makes the scene taller).
+                            position: "relative", width: "max-content", minWidth: "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
