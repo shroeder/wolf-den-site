@@ -606,7 +606,7 @@ export default function TownClient({ initial }) {
                     {/* Plaza centerpiece — the arted wolf fountain landmark, ground-locked in the town square */}
                     {art.centerpiece?.url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "50%", top: `${GROUND}%` }} />
+                        <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "30%", top: `${GROUND}%` }} />
                     ) : null}
                     {/* Buildings */}
                     {buildings.map((b) => {
@@ -624,14 +624,14 @@ export default function TownClient({ initial }) {
                         );
                     })}
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "38%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
+                    <button type="button" className="tw-npc-btn" style={{ left: "42%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
                         ) : <span className="tw-npc-emoji">⚒️</span>}
                     </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "19%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
+                    <button type="button" className="tw-npc-btn" style={{ left: "14%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -639,7 +639,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "63%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: "84%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {art.questgiver?.url ? (
@@ -648,7 +648,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📜</span>}
                     </button>
                     {/* Traveling Merchant — tap to browse wares */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "84%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
+                    <button type="button" className="tw-npc-btn" style={{ left: "70%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
                         {art.merchant?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -656,7 +656,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
                     {/* Auctioneer — links out to the Auction House */}
-                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: "72%", top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
+                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: "56%", top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
                         <span className="tw-npc-bubble">🔨 Auction House!</span>
                         {art.auctioneer?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -1035,7 +1035,7 @@ const TOWN_CSS = `
 .tw-mid img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Plaza centerpiece — the wolf fountain landmark standing in the square. */
-.tw-centerpiece { position: absolute; transform: translate(-50%, -100%); height: 24%; width: auto; z-index: 93; pointer-events: none; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
+.tw-centerpiece { position: absolute; transform: translate(-50%, -100%); height: 24%; width: auto; z-index: 200; pointer-events: none; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
 /* Foreground plaza border wall — ground-locked, sits over the sky/street seam. */
 .tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
@@ -1125,7 +1125,7 @@ const TOWN_CSS = `
 /* Collective-upgrade decorations */
 .tw-npc { position: absolute; transform: translate(-50%, -100%); height: 92px; width: auto; z-index: 97; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 /* Interactive plaza NPCs (crier / merchant) — a tappable button with a sprite + a speech bubble. */
-.tw-npc-btn { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 99; display: flex; flex-direction: column; align-items: center; }
+.tw-npc-btn { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 250; display: flex; flex-direction: column; align-items: center; }
 .tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 .tw-npc-emoji { font-size: 50px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
 .tw-npc-btn:hover img, .tw-npc-btn:hover .tw-npc-emoji { filter: drop-shadow(0 0 8px rgba(255,215,110,0.8)); }

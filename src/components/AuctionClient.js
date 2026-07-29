@@ -9,6 +9,7 @@ const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legend
 const SLOTS = [["", "All slots"], ["main_hand", "Weapon"], ["off_hand", "Off-hand"], ["head", "Head"], ["chest", "Chest"], ["legs", "Legs"], ["feet", "Feet"], ["hands", "Hands"], ["ring", "Ring"], ["amulet", "Amulet"], ["cloak", "Cloak"]];
 const RARITIES = [["", "All rarities"], ["common", "Common"], ["rare", "Rare"], ["epic", "Epic"], ["legendary", "Legendary"], ["mythic", "Mythic"]];
 const SORTS = [["new", "Newest"], ["old", "Oldest"], ["price_asc", "Price ↑"], ["price_desc", "Price ↓"]];
+const TABS = [{ k: "browse", ic: "🔍", label: "Browse" }, { k: "sell", ic: "🏷️", label: "Sell" }, { k: "mine", ic: "📜", label: "Listings" }];
 
 function timeLeft(iso) {
     const ms = new Date(iso).getTime() - Date.now();
@@ -98,18 +99,31 @@ export default function AuctionClient({ initial }) {
 
     return (
         <div className="stack reveal">
-            <section className="card ah-head">
-                <div className="ah-head-top">
-                    <h1>🏛️ Auction House</h1>
-                    <span className="ah-gold">🪙 {gold.toLocaleString()}</span>
+            <section className="ah-hero">
+                <div className="ah-hero-shine" aria-hidden="true" />
+                {state?.auctioneer ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="ah-hero-mascot" src={state.auctioneer} alt="" draggable={false} />
+                ) : <span className="ah-hero-mascot ah-hero-mascot-emoji" aria-hidden="true">🧑‍⚖️</span>}
+                <div className="ah-hero-body">
+                    <h1 className="ah-hero-title">Auction House</h1>
+                    <p className="ah-hero-sub">Sell what you don&apos;t use · snag a deal · {Math.round(feePct * 100)}% to list</p>
                 </div>
-                <p className="muted ah-sub">List gear you&apos;re not using, or snag a deal from another wolf. Listing costs a {Math.round(feePct * 100)}% fee.</p>
-                <div className="ah-tabs">
-                    {[["browse", `🔎 Browse${listings.length ? ` · ${listings.length}` : ""}`], ["sell", "📤 Sell"], ["mine", `📜 My listings${state?.mine?.length ? ` · ${state.mine.length}` : ""}`]].map(([k, label]) => (
-                        <button key={k} type="button" className={`ah-tab${tab === k ? " is-on" : ""}`} onClick={() => setTab(k)}>{label}</button>
-                    ))}
-                </div>
+                <span className="ah-hero-gold">🪙 {gold.toLocaleString()}</span>
             </section>
+
+            <div className="ah-tabs" role="tablist" style={{ "--i": TABS.findIndex((t) => t.k === tab) }}>
+                <span className="ah-tabs-glide" aria-hidden="true" />
+                {TABS.map((t) => {
+                    const n = t.k === "browse" ? listings.length : t.k === "mine" ? (state?.mine?.length || 0) : (state?.sellable?.length || 0);
+                    return (
+                        <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={`ah-tab${tab === t.k ? " is-on" : ""}`} onClick={() => setTab(t.k)}>
+                            <span className="ah-tab-ic" aria-hidden="true">{t.ic}</span>
+                            <span className="ah-tab-lbl">{t.label}{n ? <span className="ah-tab-n">{n}</span> : null}</span>
+                        </button>
+                    );
+                })}
+            </div>
 
             {flash ? <div className="ah-flash">{flash}</div> : null}
 
@@ -214,20 +228,36 @@ export default function AuctionClient({ initial }) {
 }
 
 const AH_CSS = `
-.ah-head-top { display: flex; align-items: center; gap: 10px; }
-.ah-head-top h1 { margin: 0; font-size: 1.3rem; flex: 1; }
-.ah-gold { font-weight: 900; color: #ffd75e; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); border-radius: 999px; padding: 3px 12px; }
-.ah-sub { margin: 6px 0 10px; font-size: 0.85rem; }
-.ah-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.ah-tab { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #e8e2d6; font-weight: 800; font-size: 0.84rem; cursor: pointer; }
-.ah-tab.is-on { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border-color: transparent; }
+/* Hero banner with the Auctioneer mascot */
+.ah-hero { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 20px;
+    background: linear-gradient(135deg, #2a1c0a 0%, #4a2f10 45%, #6b4416 100%); border: 1px solid rgba(255,215,110,0.5); box-shadow: 0 10px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12); }
+.ah-hero-shine { position: absolute; top: -60%; width: 55%; height: 220%; transform: rotate(18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,0.13), transparent); animation: ahShine 4.8s ease-in-out infinite; pointer-events: none; }
+@keyframes ahShine { 0% { left: -45%; } 55%,100% { left: 135%; } }
+.ah-hero-mascot { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); animation: ahBob 3s ease-in-out infinite; }
+.ah-hero-mascot-emoji { font-size: 54px; }
+@keyframes ahBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1.5deg); } }
+.ah-hero-body { flex: 1 1 auto; min-width: 0; }
+.ah-hero-title { margin: 0; font-size: 1.5rem; font-weight: 900; color: #fff5db; text-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+.ah-hero-sub { margin: 2px 0 0; font-size: 0.76rem; font-weight: 600; color: #f0d6a0; }
+.ah-hero-gold { flex: 0 0 auto; align-self: flex-start; font-weight: 900; font-size: 0.9rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border: 1px solid #fff3c4; border-radius: 999px; padding: 5px 12px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); white-space: nowrap; }
+/* Segmented tab bar with a sliding highlight */
+.ah-tabs { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 5px; border-radius: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+.ah-tabs-glide { position: absolute; top: 5px; bottom: 5px; left: 5px; width: calc((100% - 10px) / 3); border-radius: 12px; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 12px rgba(243,178,58,0.45); transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .32s cubic-bezier(.2,1.1,.3,1); }
+.ah-tab { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 6px; border: none; background: none; cursor: pointer; font: inherit; font-weight: 800; font-size: 0.9rem; color: #cbb9e0; transition: color .2s; }
+.ah-tab.is-on { color: #2a1a06; }
+.ah-tab-ic { font-size: 1.05rem; }
+.ah-tab-lbl { display: inline-flex; align-items: center; gap: 5px; }
+.ah-tab-n { font-size: 0.66rem; font-weight: 900; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; }
+.ah-tab.is-on .ah-tab-n { background: rgba(42,26,6,0.22); color: #2a1a06; }
+.ah-tab:not(.is-on) .ah-tab-n { background: rgba(255,255,255,0.14); color: #e8e2d6; }
 .ah-flash { text-align: center; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.4); border-radius: 12px; padding: 10px 14px; }
 .ah-filters { display: flex; flex-direction: column; gap: 8px; }
 .ah-search { width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 0.9rem; }
 .ah-selrow { display: flex; gap: 8px; }
 .ah-selrow select { flex: 1 1 0; min-width: 0; padding: 9px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(30,22,44,0.9); color: #f2ead9; font-size: 0.82rem; font-weight: 700; }
 .ah-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.ah-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border-radius: 14px; text-align: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-top: 2px solid var(--rc,#9aa7b5); }
+.ah-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border-radius: 14px; text-align: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-top: 3px solid var(--rc,#9aa7b5); transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.ah-card:hover { transform: translateY(-3px); border-color: var(--rc,#9aa7b5); box-shadow: 0 12px 26px -10px var(--rc,#000); }
 .ah-sellcard { cursor: pointer; color: inherit; font: inherit; }
 .ah-sellcard.is-picked { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e, 0 8px 20px rgba(255,215,94,0.2); }
 .ah-card-art { position: relative; width: 64px; height: 64px; display: grid; place-items: center; }
@@ -237,8 +267,9 @@ const AH_CSS = `
 .ah-card-stats { font-size: 0.72rem; line-height: 1.25; }
 .ah-card-forge { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
 .ah-card-meta { font-size: 0.68rem; line-height: 1.3; }
-.ah-buy { margin-top: 4px; width: 100%; padding: 9px; border-radius: 10px; border: none; cursor: pointer; font-weight: 900; font-size: 0.86rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
-.ah-buy:disabled { opacity: .55; cursor: default; background: rgba(255,255,255,0.08); color: #cbb9e0; }
+.ah-buy { margin-top: 4px; width: 100%; padding: 9px; border-radius: 10px; border: none; cursor: pointer; font-weight: 900; font-size: 0.86rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 0 #b57f22; transition: transform .1s ease, box-shadow .1s ease; }
+.ah-buy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }
+.ah-buy:disabled { opacity: .55; cursor: default; background: rgba(255,255,255,0.08); color: #cbb9e0; box-shadow: none; }
 .ah-buy.is-mine { background: rgba(120,200,255,0.12); color: #bfe3ff; }
 .ah-listform { margin-top: 14px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,215,110,0.35); display: flex; flex-direction: column; gap: 10px; }
 .ah-listform-title { font-weight: 800; font-size: 1rem; }

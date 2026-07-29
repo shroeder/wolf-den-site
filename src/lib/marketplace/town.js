@@ -76,12 +76,13 @@ const ONLINE_WINDOW = "90 seconds";
 // Buildings line the side-scrolling street at fixed x positions (0..100 % of the WIDE world); tapping one fast-
 // travels into that system (the menu still works for speed). Each optionally shows a generated sprite (mkt_town_art).
 export const TOWN_BUILDINGS = [
-    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 8 },
-    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 24 },
-    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 40 },
-    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 56 },
-    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 74 },
-    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 90 },
+    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 7 },
+    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 21 },
+    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 35 },
+    { id: "auction", emoji: "🏛️", label: "Auction House", href: "/marketplace/auction", x: 49 },
+    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 63 },
+    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 77 },
+    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 91 },
 ];
 
 // Shared generated art (background + building sprites), keyed. Empty until generated via the admin tool.

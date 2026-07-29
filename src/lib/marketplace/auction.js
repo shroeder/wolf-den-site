@@ -123,13 +123,14 @@ export async function getMyListings(buyerId) {
 // Full state for the Auction House screen (owner-gated during the build).
 export async function getAuctionState(buyerId) {
     if (!isOwner(buyerId)) return { owner: false };
-    const [listings, sellable, mine, goldRow] = await Promise.all([
+    const [listings, sellable, mine, goldRow, artRow] = await Promise.all([
         getAuctionListings(buyerId, {}).catch(() => []),
         getSellableItems(buyerId).catch(() => []),
         getMyListings(buyerId).catch(() => []),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'auctioneer'`).catch(() => null),
     ]);
-    return { owner: true, listings, sellable, mine, gold: Number(goldRow?.gold || 0), feePct: LIST_FEE_PCT, durations: DURATIONS };
+    return { owner: true, listings, sellable, mine, gold: Number(goldRow?.gold || 0), feePct: LIST_FEE_PCT, durations: DURATIONS, auctioneer: artRow?.url || null };
 }
 
 // List an owned, unequipped item at `price` gold for `days` days. Charges the 5% fee up front; removes the item.
