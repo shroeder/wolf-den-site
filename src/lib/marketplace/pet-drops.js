@@ -51,21 +51,20 @@ export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     return grantDrop(buyerId, pet, "boss", {});
 }
 
-// EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a prestige badge of the
-// pack's regulars. Deliberately very rare: best odds on a Golem BOSS kill, slimmer on an escaped boss or a
-// skirmish raid. The rarest (eternal Golem's Heart) can ONLY drop from an actual Golem kill.
-const RAID_PET_WEIGHT = { mythic: 60, ascendant: 22, eternal: 6 };
+// EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a genuine prestige trophy.
+// Each pet has its own ABSOLUTE per-raid-completion drop chance (`raidChance`), tuned to be exceedingly rare:
+// the easiest (mythic) ~0.025%, the rarest (eternal Golem's Heart) ~0.0005%. The Golem's Heart can ONLY drop
+// from an actual Golem boss KILL. We roll each un-owned pet independently, rarest first, and grant the first hit.
 export async function maybeGrantRaidPet(buyerId, { boss = false, killed = false } = {}) {
     if (!buyerId) return null;
-    const chance = boss ? (killed ? 0.08 : 0.02) : 0.015;
-    if (Math.random() > chance) return null;
     const owned = await ownedPetSet(buyerId);
-    let eligible = COLLECTIBLES.filter((p) => p.raidExclusive && !owned.has(p.id));
+    let eligible = COLLECTIBLES.filter((p) => p.raidExclusive && p.raidChance > 0 && !owned.has(p.id));
     if (!(boss && killed)) eligible = eligible.filter((p) => p.rarity !== "eternal"); // Golem's Heart = kill trophy only
     if (!eligible.length) return null;
-    const total = eligible.reduce((s, p) => s + (RAID_PET_WEIGHT[p.rarity] || 10), 0);
-    let r = Math.random() * total;
-    let pet = eligible[0];
-    for (const p of eligible) { if ((r -= (RAID_PET_WEIGHT[p.rarity] || 10)) < 0) { pet = p; break; } }
-    return grantDrop(buyerId, pet, "raid", { boss, killed });
+    // Rarest first, so on a (near-impossible) double hit the scarcer pet wins.
+    eligible.sort((a, b) => a.raidChance - b.raidChance);
+    for (const p of eligible) {
+        if (Math.random() < p.raidChance) return grantDrop(buyerId, p, "raid", { boss, killed });
+    }
+    return null;
 }
