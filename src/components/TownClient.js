@@ -516,7 +516,7 @@ export default function TownClient({ initial }) {
     if (inTavern) {
         return (
             <div className="stack reveal">
-                <TavernInterior bgUrl={art.tavern_interior?.url} diceUrl={art.dice?.url} npcArt={{ barkeep: art.barkeep?.url, gambler: art.gambler?.url }} me={you ? { sprite: you.sprite, flip: you.flip } : null} onLeave={() => setInTavern(false)} />
+                <TavernInterior bgUrl={art.tavern_interior?.url} diceUrl={art.dice?.url} npcArt={{ barkeep: art.barkeep?.url, gambler: art.gambler?.url }} iconArt={{ pint: art.tavern_pint?.url, round: art.tavern_round?.url }} me={you ? { sprite: you.sprite, flip: you.flip } : null} onLeave={() => setInTavern(false)} />
             </div>
         );
     }

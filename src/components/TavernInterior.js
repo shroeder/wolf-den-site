@@ -66,7 +66,7 @@ function TavAvatar({ a, you = false, onTap }) {
     );
 }
 
-export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) {
+export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, onLeave }) {
     const [st, setSt] = useState(null);
     const [viewportW, setViewportW] = useState(360);
     const [pos, setPos] = useState({ x: 50, y: FLOOR_Y, facing: 1, moving: false });
@@ -75,13 +75,15 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
     const [menuFor, setMenuFor] = useState(null);  // tapped another member → action sheet
     const [panExtra, setPanExtra] = useState(0);
     const [dragging, setDragging] = useState(false);
-    const [station, setStation] = useState(null); // open panel: "bar" | "dice" | "hearth"
+    const [station, setStation] = useState(null); // open panel: "dice" (the gambler minigame)
+    const [barkeep, setBarkeep] = useState(null); // in-scene barkeep chat { line } — NO modal
+    const [drinkFx, setDrinkFx] = useState(null); // big drink/round celebration { type, xp, gold, key }
     const [busy, setBusy] = useState(false);
-    const [line, setLine] = useState(GREET[0]);
     const [g, setG] = useState(null);
     const [result, setResult] = useState(null);
     const [rolling, setRolling] = useState(false);
     const [flash, setFlash] = useState(null);
+    const drinkFxClear = useRef(null);
     const sceneRef = useRef(null);
     const drag = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0, lastT: 0, vx: 0 });
     const momentumRef = useRef(0);
@@ -102,7 +104,6 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
         if (d && d.owner !== false) setSt(d);
     }, []);
     useEffect(() => { load(); const t = setInterval(load, 2500); return () => clearInterval(t); }, [load]);
-    useEffect(() => { if (!greeted.current) { greeted.current = true; setLine(pick(GREET)); } }, []);
 
     const postMove = useCallback((x, y, facing) => {
         fetch("/api/marketplace/tavern", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "move", x, y, facing }) }).catch(() => {});
@@ -173,27 +174,33 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
         walkToWorld(worldX);
     }, [cameraPx, followCam, maxScroll, walkToWorld]);
 
-    // ── Dialogue (barkeep + hearth) ──
-    const askNews = useCallback(() => {
-        const rumors = st?.rumors || [];
-        setFlash(null);
-        setLine(rumors.length ? `*leans in* Word around the Den?\n\n${rumors.join("\n")}` : "*shrugs* Quiet night so far, friend.");
-    }, [st?.rumors]);
-    const askLore = useCallback(() => { setFlash(null); setLine(pick(LORE)); }, []);
+    // ── The Barkeep — talked to IN the scene (bubble over his head), not a modal ──
+    const barSay = useCallback((line) => setBarkeep({ line }), []);
+    const triggerDrinkFx = useCallback((fx) => {
+        const key = Date.now();
+        setDrinkFx({ ...fx, key });
+        clearTimeout(drinkFxClear.current);
+        drinkFxClear.current = setTimeout(() => setDrinkFx((f) => (f && f.key === key ? null : f)), 1900);
+    }, []);
+    const engageBarkeep = useCallback(() => {
+        barSay(pick(GREET));
+        // Slide the camera over to the barkeep so you're "at the bar".
+        const target = clampN((NPCS[0].x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
+        setPanExtra(target - clampN((pos.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW)));
+    }, [barSay, viewportW, pos.x]);
+    const askNews = useCallback(() => { const rumors = st?.rumors || []; barSay(rumors.length ? `*leans in* ${rumors[Math.floor(Math.random() * rumors.length)]}` : "*shrugs* Quiet night so far, friend."); }, [st?.rumors, barSay]);
     const askPint = useCallback(async () => {
-        setFlash(null);
         const r = await act({ action: "pint" });
-        if (r?.ok) setLine(`There you are — finest ale in the Den! 🍺 *slides a frothing mug your way*\n\nThat perks you right up: +${r.xp} XP and +${r.gold} gold.`);
-        else if (r?.error === "already") setLine("Ha! You've had your daily pint. Come back tomorrow, friend.");
-        else setLine("*frowns* Tap's stuck. Try again in a moment.");
-    }, [act]);
+        if (r?.ok) { barSay(`Finest ale in the Den! 🍺 +${r.xp} XP, +${r.gold} gold. Drink up!`); triggerDrinkFx({ type: "pint", xp: r.xp, gold: r.gold }); }
+        else if (r?.error === "already") barSay("Ha! You've had your daily pint — back tomorrow, friend.");
+        else barSay("*frowns* Tap's stuck. Try again in a moment.");
+    }, [act, barSay, triggerDrinkFx]);
     const buyRoundAct = useCallback(async () => {
-        setFlash(null);
         const r = await act({ action: "round" });
-        if (r?.ok) setLine(`🍻 \"A ROUND FOR THE HOUSE!\" *cheers erupt*\n\nYou treated ${r.recipients} ${r.recipients === 1 ? "patron" : "patrons"} (+${r.giftXp} XP each) and earned a hero's welcome (+${r.hostXp} XP). ${r.rounds} rounds bought!`);
-        else if (r?.error === "insufficient_gold") setLine(`*eyes your purse* A round's ${st?.round?.cost || 400} gold, friend — come back when you're flush.`);
-        else setLine("*shrugs* Can't pour that just now.");
-    }, [act, st?.round?.cost]);
+        if (r?.ok) { barSay(`🍻 A ROUND FOR THE HOUSE! You treated ${r.recipients} ${r.recipients === 1 ? "wolf" : "wolves"} — a hero's welcome (+${r.hostXp} XP)!`); triggerDrinkFx({ type: "round", recipients: r.recipients, hostXp: r.hostXp }); }
+        else if (r?.error === "insufficient_gold") barSay(`*eyes your purse* A round's ${st?.round?.cost || 400} gold, friend — come back flush.`);
+        else barSay("*shrugs* Can't pour that just now.");
+    }, [act, barSay, triggerDrinkFx, st?.round?.cost]);
 
     // ── Wolf's Gambit dice ──
     const ante = useCallback(async (amount) => {
@@ -221,10 +228,12 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
         }
     }, [act]);
 
-    const openStation = useCallback((key) => { setFlash(null); if (key === "dice") { setG(null); setResult(null); } if (key === "bar" || key === "hearth") setLine(pick(key === "bar" ? GREET : LORE)); setStation(key); }, []);
+    const openStation = useCallback((key) => { setFlash(null); if (key === "dice") { setG(null); setResult(null); } setStation(key); }, []);
     const others = st?.occupants || [];
     const here = others.length + 1;
-    overlayRef.current = Boolean(station || menuFor); // keep the pointer-guard in sync each render
+    overlayRef.current = Boolean(station || menuFor); // keep the pointer-guard in sync (barkeep is in-scene, not blocking)
+    const roundCost = st?.round?.cost || 400;
+    const pintAvail = Boolean(st?.dailyPint?.available);
     const dicePlaysLeft = st?.dice?.playsLeft ?? st?.dice?.dailyCap ?? 5;
     const diceCap = st?.dice?.dailyCap ?? 5;
 
@@ -243,12 +252,32 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                     {/* NPC characters */}
                     {NPCS.map((n, i) => {
                         const url = n.art ? npcArt?.[n.art] : null;
+                        const isBar = n.key === "bar";
                         return (
-                            <button key={n.key} type="button" className="tv-npc" style={{ left: `${n.x}%`, top: `${FLOOR_Y}%` }} onClick={(e) => { e.stopPropagation(); openStation(n.key); }}>
-                                <span className="tv-npc-label">{n.label}{n.key === "bar" && st?.dailyPint?.available ? " •" : ""}</span>
+                            <button key={n.key} type="button" className="tv-npc" style={{ left: `${n.x}%`, top: `${FLOOR_Y}%` }} onClick={(e) => { e.stopPropagation(); if (isBar) engageBarkeep(); else openStation(n.key); }}>
+                                {/* Barkeep talks IN the scene — a speech bubble over his head, plus a big drink/round splash */}
+                                {isBar && barkeep ? <span className="tv-keeper-bubble">{barkeep.line}</span> : null}
+                                {isBar && drinkFx ? (
+                                    <span className="tv-drinkfx" key={drinkFx.key} aria-hidden="true">
+                                        {drinkFx.type === "round" ? (
+                                            iconArt?.round ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={iconArt.round} alt="" className="tv-drinkfx-mug" draggable={false} />
+                                            ) : <span className="tv-drinkfx-emoji">🍻</span>
+                                        ) : (
+                                            iconArt?.pint ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={iconArt.pint} alt="" className="tv-drinkfx-mug" draggable={false} />
+                                            ) : <span className="tv-drinkfx-emoji">🍺</span>
+                                        )}
+                                        <span className="tv-drinkfx-reward">{drinkFx.type === "round" ? `🍻 +${drinkFx.hostXp} XP` : `+${drinkFx.xp} XP · +${drinkFx.gold}🪙`}</span>
+                                        {[...Array(8)].map((_, k) => <span key={k} className="tv-foam" style={{ "--a": `${k * 45}deg` }} />)}
+                                    </span>
+                                ) : null}
+                                <span className="tv-npc-label">{n.label}{isBar && pintAvail ? " •" : ""}</span>
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="tv-npc-sprite" src={url} alt={n.label} draggable={false} style={{ animationDelay: `${i * 0.85}s` }} />
+                                    <img className={`tv-npc-sprite${isBar && drinkFx ? " is-cheering" : ""}`} src={url} alt={n.label} draggable={false} style={{ animationDelay: `${i * 0.85}s` }} />
                                 ) : <span className="tv-npc-emoji">{n.emoji}</span>}
                             </button>
                         );
@@ -260,10 +289,32 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                 </div>
                 {here > 1 ? <div className="tv-hint">{here} here now</div> : null}
 
-                {/* Quick emotes — float above your head + broadcast to the room */}
-                <div className="tv-emotebar" onClick={(e) => e.stopPropagation()}>
-                    {EMOTES.map((em) => <button key={em} type="button" onClick={() => quickEmote(em)}>{em}</button>)}
-                </div>
+                {/* Barkeep order tray — an in-scene dialogue bar (NOT a modal). Appears when you step up to him. */}
+                {barkeep ? (
+                    <div className="tv-keeper-tray" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="tv-order tv-order-pint" disabled={busy || !pintAvail} onClick={askPint} title={pintAvail ? "Daily Hearty Pint" : "Had yours today"}>
+                            {iconArt?.pint ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={iconArt.pint} alt="" draggable={false} />
+                            ) : <span className="tv-order-emoji">🍺</span>}
+                            <span className="tv-order-lbl">Hearty Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP` : "tomorrow"}</small></span>
+                        </button>
+                        <button type="button" className="tv-order tv-order-round" disabled={busy || (st?.gold || 0) < roundCost} onClick={buyRoundAct} title="Buy a round for everyone here">
+                            {iconArt?.round ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={iconArt.round} alt="" draggable={false} />
+                            ) : <span className="tv-order-emoji">🍻</span>}
+                            <span className="tv-order-lbl">Round · {roundCost.toLocaleString()}🪙<small>+XP for all</small></span>
+                        </button>
+                        <button type="button" className="tv-order tv-order-mini" onClick={askNews} title="Ask for gossip">🗞️</button>
+                        <button type="button" className="tv-order tv-order-mini" onClick={() => setBarkeep(null)} aria-label="Step away">✕</button>
+                    </div>
+                ) : (
+                    /* Quick emotes — float above your head + broadcast to the room */
+                    <div className="tv-emotebar" onClick={(e) => e.stopPropagation()}>
+                        {EMOTES.map((em) => <button key={em} type="button" onClick={() => quickEmote(em)}>{em}</button>)}
+                    </div>
+                )}
 
                 {/* Tap another member → quick actions */}
                 {menuFor ? (
@@ -284,34 +335,9 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                     <div className="tv-panel-wrap" onClick={() => { setStation(null); setFlash(null); }} role="presentation">
                     <div className="tv-panel" onClick={(e) => e.stopPropagation()}>
                         <div className="tv-panel-head">
-                            <strong>{station === "bar" ? "🍺 The Barkeep" : station === "dice" ? "🎲 The Gambler" : "🔥 The Hearth"}</strong>
+                            <strong>🎲 The Gambler</strong>
                             <button type="button" onClick={() => { setStation(null); setFlash(null); }} aria-label="Close">✕</button>
                         </div>
-
-                        {station === "bar" ? (
-                            <div className="tv-dialogue">
-                                <div className="tv-keeper"><span className="tv-keeper-ic" aria-hidden="true">🧔</span><div className="tv-speech">{line}</div></div>
-                                {flash ? <div className="tv-flash">{flash}</div> : null}
-                                <div className="tv-menu">
-                                    <button type="button" className="tv-menu-item" disabled={busy || !st?.dailyPint?.available} onClick={askPint}>
-                                        <span className="tv-menu-ic">🍺</span>
-                                        <span className="tv-menu-body"><b>Hearty Pint</b><small>{st?.dailyPint?.available ? `Once a day — +${st?.dailyPint?.xp || 40} XP & +${st?.dailyPint?.gold || 15} gold` : "You've had yours today — back tomorrow"}</small></span>
-                                    </button>
-                                    <button type="button" className="tv-menu-item" disabled={busy || (st?.gold || 0) < (st?.round?.cost || 400)} onClick={buyRoundAct}>
-                                        <span className="tv-menu-ic">🍻</span>
-                                        <span className="tv-menu-body"><b>Round for the House · {(st?.round?.cost || 400).toLocaleString()}🪙</b><small>Everyone here gets +XP, you earn a hero&apos;s welcome + rep</small></span>
-                                    </button>
-                                    <button type="button" className="tv-menu-item" onClick={askNews}>
-                                        <span className="tv-menu-ic">🗞️</span>
-                                        <span className="tv-menu-body"><b>Ask for gossip</b><small>The latest word around the Den</small></span>
-                                    </button>
-                                    <button type="button" className="tv-menu-item" onClick={askLore}>
-                                        <span className="tv-menu-ic">🏰</span>
-                                        <span className="tv-menu-body"><b>Tell me about this place</b><small>A bit of tavern lore</small></span>
-                                    </button>
-                                </div>
-                            </div>
-                        ) : null}
 
                         {station === "dice" ? (
                             <div className="tv-diceview">
@@ -464,4 +490,32 @@ const TV_CSS = `
 .tv-roll:active { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }
 .tv-cash { flex: 1 1 auto; padding: 12px; border-radius: 12px; border: 1px solid rgba(143,227,154,0.5); cursor: pointer; font-weight: 800; font-size: 14px; color: #b8f0c2; background: rgba(143,227,154,0.12); }
 .tv-roll:disabled, .tv-cash:disabled { opacity: .5; cursor: default; }
+
+/* ── Barkeep talked to IN the scene (no modal) ── */
+.tv-keeper-bubble { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 6px; width: max-content; max-width: 210px; font-size: 12px; font-weight: 700; line-height: 1.3; color: #241206; background: linear-gradient(180deg,#fff,#ffe9b0); border-radius: 12px; padding: 7px 11px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); text-align: center; z-index: 20; animation: tvBubblePop .28s cubic-bezier(.2,1.3,.3,1) both; }
+.tv-keeper-bubble::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 7px solid transparent; border-top-color: #ffe9b0; }
+@keyframes tvBubblePop { 0% { transform: translateX(-50%) scale(.6); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+.tv-npc-sprite.is-cheering { animation: tvCheer .5s ease-in-out 2 !important; }
+@keyframes tvCheer { 0%,100% { transform: translateY(0) rotate(0); } 30% { transform: translateY(-10px) rotate(-4deg); } 60% { transform: translateY(-4px) rotate(4deg); } }
+/* Big drink / round splash over the barkeep */
+.tv-drinkfx { position: absolute; bottom: 60%; left: 50%; transform: translateX(-50%); z-index: 25; pointer-events: none; display: grid; place-items: center; }
+.tv-drinkfx-mug { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6)); animation: tvMugPop 1.9s ease-out forwards; }
+.tv-drinkfx-emoji { font-size: 72px; animation: tvMugPop 1.9s ease-out forwards; }
+@keyframes tvMugPop { 0% { transform: scale(0) rotate(-20deg); opacity: 0; } 15% { transform: scale(1.25) rotate(6deg); opacity: 1; } 40% { transform: scale(1) rotate(0); } 80% { opacity: 1; transform: translateY(-6px) scale(1); } 100% { opacity: 0; transform: translateY(-26px) scale(.9); } }
+.tv-drinkfx-reward { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-weight: 900; font-size: 15px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.85); animation: tvRewardFloat 1.9s ease-out forwards; }
+@keyframes tvRewardFloat { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.6); } 25% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -34px) scale(1); } }
+.tv-foam { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border-radius: 50%; background: #ffe9b0; box-shadow: 0 0 6px rgba(255,233,176,0.9); transform: rotate(var(--a)) translateY(0); animation: tvFoam .9s ease-out forwards; }
+@keyframes tvFoam { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 0; } 20% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-52px) scale(.3); opacity: 0; } }
+/* In-scene order tray (replaces the emote bar while at the bar) */
+.tv-keeper-tray { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; gap: 6px; align-items: stretch; max-width: 96%; background: rgba(20,10,4,0.72); border: 1px solid rgba(255,215,110,0.4); border-radius: 14px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: tvBubblePop .26s cubic-bezier(.2,1.2,.3,1) both; }
+.tv-order { display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 11px; border: 1px solid rgba(255,215,110,0.35); background: linear-gradient(180deg, rgba(70,44,20,0.9), rgba(44,26,10,0.9)); color: #ffe9c4; cursor: pointer; font: inherit; }
+.tv-order:hover:not(:disabled) { border-color: rgba(255,215,110,0.7); }
+.tv-order:active:not(:disabled) { transform: translateY(1px); }
+.tv-order:disabled { opacity: .45; cursor: default; }
+.tv-order img { width: 34px; height: 34px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.tv-order-emoji { font-size: 26px; }
+.tv-order-lbl { display: flex; flex-direction: column; line-height: 1.1; font-weight: 900; font-size: 13px; text-align: left; }
+.tv-order-lbl small { font-weight: 700; font-size: 10px; color: #c8a86a; }
+.tv-order-mini { padding: 7px 12px; font-size: 17px; font-weight: 900; }
+.tv-order-round { border-color: rgba(255,180,90,0.5); }
 `;
