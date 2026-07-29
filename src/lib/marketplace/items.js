@@ -26,6 +26,11 @@ export const EQUIP_SLOTS = [
     { slot: "ring2", label: "Ring", accepts: "ring" },
 ];
 
+// Ascendant tier and above are BOUND to their owner — they can't be traded or auctioned (the top-tier chase
+// gear stays personally earned, never bought or laundered through the market).
+export const TRADE_LOCKED_RARITIES = new Set(["ascendant", "eternal", "celestial", "primordial"]);
+export const isTradeLocked = (rarity) => TRADE_LOCKED_RARITIES.has(rarity);
+
 // Stat keys → how they read + how they apply in combat. Percent stats are additive % bonuses.
 // Each stat carries a plain-English `desc` (what it does for a player, no jargon) + an icon, so the gear
 // screen can teach what every stat means instead of just showing a number.

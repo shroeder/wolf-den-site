@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats, STAT_META, EQUIP_SLOTS } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -123,7 +123,7 @@ export async function getSellableItems(buyerId) {
     ]);
     const equippedSet = new Set(Object.values(equipped || {}));
     const listedSet = new Set(listed.map((r) => r.item_id));
-    const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id));
+    const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id) && !isTradeLocked(itemById(id).rarity));
     const enh = await enhanceDetailsFor(buyerId, sellableIds).catch(() => ({}));
     return sellableIds
         .map((id) => {
@@ -201,6 +201,7 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const it = itemById(itemId);
     if (!it) return { ok: false, error: "unknown_item" };
+    if (isTradeLocked(it.rarity)) return { ok: false, error: "item_bound" }; // Ascendant+ is bound — can't be auctioned
     const p = Math.floor(Number(price) || 0);
     if (p < MIN_PRICE || p > MAX_PRICE) return { ok: false, error: "bad_price" };
     const d = DURATIONS.includes(Number(days)) ? Number(days) : 3;

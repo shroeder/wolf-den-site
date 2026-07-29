@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, isTradeLocked } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -112,6 +112,7 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
     for (const r of rows) {
         const it = itemById(r.item_id);
         if (!it) continue;
+        if (isTradeLocked(it.rarity)) continue; // Ascendant+ is bound — never browsable for trade
         if (rarity && it.rarity !== rarity) continue;
         if (query && !it.name.toLowerCase().includes(query) && !(r.alias || "").toLowerCase().includes(query)) continue;
         const det = enhMap.get(`${r.buyer_id}|${r.item_id}`);
@@ -224,6 +225,9 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
         const eqId = oItems.find((id) => equipped.has(id));
         if (eqId) return { ok: false, error: "item_equipped", itemName: itemById(eqId)?.name || eqId };
     }
+    // Ascendant+ gear is bound — it can't be traded either way.
+    const lockedId = [...oItems, ...rItems].find((id) => isTradeLocked(itemById(id)?.rarity));
+    if (lockedId) return { ok: false, error: "item_bound", itemName: itemById(lockedId)?.name || lockedId };
 
     // Pets: offered must be MY earned+tradeable pets the recipient doesn't already own; requested must be
     // THEIR earned+tradeable pets I don't already own.
