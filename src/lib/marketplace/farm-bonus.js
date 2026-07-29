@@ -8,6 +8,7 @@ import { sumItemFarm } from "@/lib/marketplace/items.js";
 import { setFarmBonus } from "@/lib/marketplace/sets.js";
 import { collectibleById, petFarmPassive } from "@/lib/marketplace/collectibles.js";
 import { getBadgeFarm } from "@/lib/marketplace/badges.js";
+import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 
 // ── UNIFIED FARM BONUS AGGREGATOR ─────────────────────────────────────────────────────────────────────────
 // The single source the farm reads for passive bonuses. Returns the SAME { growSpeed, seedLuck, harvestLuck,
@@ -21,18 +22,20 @@ import { getBadgeFarm } from "@/lib/marketplace/badges.js";
 export async function farmBonuses(buyerId) {
     const out = emptyFarmBuffs();
     if (!buyerId) return out;
-    const [deco, bySlot, buyer, badgeFarm] = await Promise.all([
+    const [deco, bySlot, buyer, badgeFarm, utilTotals] = await Promise.all([
         placedDecoBuffs(buyerId).catch(() => emptyFarmBuffs()),
         getEquippedIds(buyerId).catch(() => ({})),
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getBadgeFarm(buyerId).catch(() => ({})), // (d) earned FARMING/pet badges add farm bonuses too
+        getEquippedUtilTotals(buyerId).catch(() => ({ farm: {} })), // (e) rare Forge "attunement" farm affixes on equipped gear
     ]);
     const equippedList = Object.values(bySlot || {});
     const gearFarm = sumItemFarm(equippedList);
     // (b2) FARM set-bonus tiers (Harvester / Forager) — small farm affinity on top of the pieces' own affixes.
     const setFarm = setFarmBonus(equippedList);
-    // (a) decorations + (b) equipped gear farm affixes + (b2) farm set bonuses + (d) farm/pet badges
-    for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0) + (setFarm[k] || 0) + (badgeFarm[k] || 0);
+    const utilFarm = utilTotals.farm || {};
+    // (a) decorations + (b) equipped gear farm affixes + (b2) farm set bonuses + (d) farm/pet badges + (e) forge attunements
+    for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0) + (setFarm[k] || 0) + (badgeFarm[k] || 0) + (utilFarm[k] || 0);
     // (c) equipped pet farm passive (pastoral pets only) — value by rarity
     const pet = buyer?.featured_collectible ? collectibleById(buyer.featured_collectible) : null;
     const petFarm = petFarmPassive(pet);

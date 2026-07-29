@@ -105,7 +105,7 @@ export default function BlacksmithClient({ initial }) {
     const applyEnhance = useCallback(async (item, result) => {
         const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
         setEnhancing(null);
-        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, allMaxed: r.allMaxed, scenario: r.scenario, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo, hits: result.hits, score: result.score, maxScore: result.maxScore }); }
+        if (r?.ok) { (r.attune ? SFX.pixel : r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, attune: r.attune, util: r.util, allMaxed: r.allMaxed, scenario: r.scenario, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo, hits: result.hits, score: result.score, maxScore: result.maxScore }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
@@ -310,6 +310,7 @@ export default function BlacksmithClient({ initial }) {
                                 {it.level > 0 ? <span className="forge-card-rankline"><ForgeRank level={it.level} size={22} /></span> : null}
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
                                 {it.bonus ? <span className="forge-card-bonus">⚒ {it.bonus}</span> : null}
+                                {it.util ? <span className="forge-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</span> : null}
                                 {it.maxed ? <span className="forge-card-cost forge-card-max">✦ PEAK — maxed</span> : (
                                     <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
                                         {parts[it.cost.tier - 1]?.sprite
@@ -564,6 +565,16 @@ function EnhanceResultModal({ res, onClose }) {
                             <div className="forge-er-note">{res.allMaxed ? "✦ Stats maxed — further forging earns prestige only" : addedCount ? "Your score was high enough to forge a whole new stat onto the item!" : "Higher scores forge more stats — a perfect run can add brand-new ones"}</div>
                         </div>
                     ) : null}
+                    {/* RARE ATTUNEMENT — a bonus utility affix rolled onto the piece (or leveled up). The showpiece moment. */}
+                    {res.attune ? (
+                        <div className="forge-er-attune">
+                            <div className="forge-er-attune-badge">🔮 {res.attune.isNew ? "ATTUNED!" : `ATTUNEMENT UP — Lv ${res.attune.level}`}</div>
+                            <div className="forge-er-attune-stat">{res.attune.icon} +{res.attune.value}{res.attune.unit} {res.attune.label}</div>
+                            <div className="forge-er-attune-blurb">{res.attune.isNew ? "This piece now carries a bonus stat" : "Leveled its bonus stat"} — {res.attune.blurb}</div>
+                        </div>
+                    ) : res.util ? (
+                        <div className="forge-er-hasattune">🔮 Attuned: {res.util.icon} +{res.util.value}{res.util.unit} {res.util.label} (Lv {res.util.level})</div>
+                    ) : null}
                     <div className="forge-sv-xp">+{res.xp} XP</div>
                     <button type="button" className="forge-strike big" onClick={onClose}>Forged!</button>
                 </div>
@@ -799,6 +810,7 @@ const FORGE_CSS = `
 .forge-card-stats { font-size: 11px; color: #bda88c; line-height: 1.25; }
 /* What the FORGE added — a green pill that clearly stacks ON TOP of the base stats above. */
 .forge-card-bonus { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #a6f0b4; font-weight: 900; line-height: 1.2; background: rgba(80,210,120,0.14); border: 1px solid rgba(143,227,154,0.45); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.forge-card-attune { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #e0c8ff; font-weight: 900; line-height: 1.2; background: rgba(150,90,255,0.16); border: 1px solid rgba(184,120,255,0.5); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .forge-card-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #b9a892; margin-top: 3px; }
 .forge-card.is-maxed { border-color: rgba(255,215,94,0.6); box-shadow: 0 0 0 1px rgba(255,215,94,0.3), 0 0 16px rgba(255,215,94,0.18); }
 .forge-card-max { color: #ffd75e; font-weight: 900; }
@@ -908,6 +920,12 @@ const FORGE_CSS = `
 .forge-er-stat-calc .eq { color: #7c6f5f; }
 .forge-er-stat-calc .total { color: #fff6e2; font-weight: 900; font-size: 15px; }
 .forge-er-note { margin-top: 8px; font-size: 10.5px; color: #b9a892; text-align: center; font-weight: 600; }
+.forge-er-attune { margin-top: 12px; padding: 12px 14px; border-radius: 14px; text-align: center; background: radial-gradient(120% 120% at 50% 0%, rgba(150,90,255,0.28), rgba(60,30,110,0.22)); border: 1px solid rgba(184,120,255,0.55); box-shadow: 0 0 22px rgba(150,90,255,0.35); animation: forgeAttunePop .5s ease both; }
+.forge-er-attune-badge { font-size: 12px; font-weight: 900; letter-spacing: 0.06em; color: #e6ccff; }
+.forge-er-attune-stat { margin-top: 4px; font-size: 17px; font-weight: 900; color: #fff; text-shadow: 0 0 12px rgba(184,120,255,0.8); }
+.forge-er-attune-blurb { margin-top: 3px; font-size: 10.5px; font-weight: 700; color: #cbb9e0; }
+.forge-er-hasattune { margin-top: 10px; font-size: 11px; font-weight: 800; color: #cbb9e0; }
+@keyframes forgeAttunePop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.06); } 100% { transform: scale(1); opacity: 1; } }
 .forge-er-newtag { margin-left: 6px; font-size: 9px; font-weight: 900; letter-spacing: 0.04em; color: #0e2c14; background: #8fe39a; border-radius: 5px; padding: 1px 5px; vertical-align: middle; }
 @keyframes forgeRaySpin { to { transform: rotate(360deg); } }
 @keyframes forgeGlowPulse { 0%,100% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 1; } }

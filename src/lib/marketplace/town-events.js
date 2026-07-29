@@ -9,6 +9,7 @@ import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
 import { getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
+import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
@@ -41,10 +42,11 @@ const RAID_PARTICIPATION_XP = 20; // XP each fighter earns when the raid resolve
 // Per-tap damage from the player's real equipped stats (+ pet), with a crit roll and a chance at a weapon-skill
 // proc. Server-authoritative so a cheating client can't inflate it. Returns { damage, crit, proc }.
 async function computeRaidHit(buyerId) {
-    const [stats, pet, ids] = await Promise.all([
+    const [stats, pet, ids, util] = await Promise.all([
         getEquippedStats(buyerId).catch(() => ({})),
         getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
         getEquippedIds(buyerId).catch(() => ({})),
+        getEquippedUtilTotals(buyerId).catch(() => ({ raidDmg: 0 })),
     ]);
     const ps = pet?.stats || {};
     const might = (stats.might || 0) + (ps.might || 0);
@@ -59,6 +61,8 @@ async function computeRaidHit(buyerId) {
     // Weapon skill proc (big bonus + a snazzy callout)
     const proc = rollWeaponSkill(ids?.main_hand || null);
     if (proc) dmg *= proc.mult;
+    // Raid Fury forge attunement — flat % boost to every raid strike.
+    if (util.raidDmg > 0) dmg *= 1 + util.raidDmg / 100;
     return { damage: Math.max(1, Math.round(dmg)), crit, proc };
 }
 // An event runs at least this long (waves refill until then) so it's a real gathering, not an instant kill.

@@ -11,6 +11,7 @@ import { grantEventBadge, getBadgeForge } from "@/lib/marketplace/badges.js";
 import { MAX_FORGE_LEVEL } from "@/lib/marketplace/forge-rank.js";
 import { collectibleById, petForgePassive, petPassiveLevelMult, FORGE_ODDS_KEYS } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { rollUtil, parseUtil, describeUtil, getEquippedUtilTotals, UTIL_BASE_CHANCE } from "@/lib/marketplace/item-affix.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -51,14 +52,15 @@ const GRADE_RANK = { good: 1, great: 2, perfect: 3, pixel: 4 };
 // item was never enhanced. Deletes the old owner's row and upserts the new owner's.
 export async function transferItemEnhancement(fromId, toId, itemId) {
     if (!fromId || !toId || !itemId || fromId === toId) return;
-    const row = await db.queryOne(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2 RETURNING level, stat_bonus, best_grade`, [fromId, itemId]).catch(() => null);
+    const row = await db.queryOne(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2 RETURNING level, stat_bonus, best_grade, util`, [fromId, itemId]).catch(() => null);
     if (!row) return;
     const statBonus = typeof row.stat_bonus === "string" ? row.stat_bonus : JSON.stringify(row.stat_bonus || {});
+    const util = row.util == null ? null : (typeof row.util === "string" ? row.util : JSON.stringify(row.util));
     await db.query(
-        `INSERT INTO mkt_item_enhance (buyer_id, item_id, level, stat_bonus, best_grade, updated_at)
-         VALUES ($1, $2, $3, $4::jsonb, $5, NOW())
-         ON CONFLICT (buyer_id, item_id) DO UPDATE SET level = EXCLUDED.level, stat_bonus = EXCLUDED.stat_bonus, best_grade = EXCLUDED.best_grade, updated_at = NOW()`,
-        [toId, itemId, row.level, statBonus, row.best_grade]
+        `INSERT INTO mkt_item_enhance (buyer_id, item_id, level, stat_bonus, best_grade, util, updated_at)
+         VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb, NOW())
+         ON CONFLICT (buyer_id, item_id) DO UPDATE SET level = EXCLUDED.level, stat_bonus = EXCLUDED.stat_bonus, best_grade = EXCLUDED.best_grade, util = EXCLUDED.util, updated_at = NOW()`,
+        [toId, itemId, row.level, statBonus, row.best_grade, util]
     ).catch(() => {});
 }
 
@@ -73,9 +75,9 @@ export async function enhanceLevelsFor(buyerId, itemIds = []) {
 // forge bonus and the effective (base + forge) totals.
 export async function enhanceDetailsFor(buyerId, itemIds = []) {
     if (!buyerId || !itemIds.length) return {};
-    const rows = await db.query(`SELECT item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, itemIds]).catch(() => []);
+    const rows = await db.query(`SELECT item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, itemIds]).catch(() => []);
     const out = {};
-    for (const r of rows) out[r.item_id] = { level: Number(r.level) || 0, bonus: (typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {})) };
+    for (const r of rows) out[r.item_id] = { level: Number(r.level) || 0, bonus: (typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {})), util: describeUtil(r.util) };
     return out;
 }
 
@@ -97,10 +99,11 @@ export const FORGE_UPGRADES = {
     masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 400, unit: "%" },
     steady_hand: { name: "Steady Hand", desc: "Chance a slip won't break your combo when you enhance.", max: 5, per: 0.05, base: 350, unit: "%" },
     transmute: { name: "Transmuter's Boon", desc: "Chance a combine yields TWO parts instead of one (+1% per level).", max: 5, per: 0.01, base: 300, unit: "%" },
+    attune: { name: "Attunement", desc: "Chance an enhancement ATTUNES the piece — rolling a rare bonus stat for a spin-off feature (farm, pet XP, raids, sailing or the forge). +2.5% per level.", max: 5, per: 0.025, base: 500, unit: "%" },
 };
 // Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
-const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️", transmute: "⚗️" };
-const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo-save chance", transmute: "Double-combine chance" };
+const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️", transmute: "⚗️", attune: "🔮" };
+const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo-save chance", transmute: "Double-combine chance", attune: "Attune chance" };
 // Gold cost of the NEXT level: affordable base, doubling each level — mirrors the sailing/dig upgrade curves.
 const upgCost = (u, level) => Math.round(u.base * Math.pow(2, level));
 async function upgradeLevels(buyerId) {
@@ -294,9 +297,11 @@ export async function combineParts(buyerId, tier) {
     if (!buyerId || !(t >= 1 && t < MAX_TIER)) return { ok: false, error: "bad_tier" };
     const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, t, COMBINE_COST]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough", ...(await getForgeState(buyerId)) };
-    // Transmuter's Boon: 1% per level chance the combine yields TWO of the next tier instead of one.
+    // Transmuter's Boon: 1% per level chance the combine yields TWO of the next tier — plus any Forge Yield
+    // attunement on your equipped gear stacks on top.
     const upg = await upgradeLevels(buyerId).catch(() => ({}));
-    const made = 1 + (Math.random() < chance(upg, "transmute", null) ? 1 : 0);
+    const util = await getEquippedUtilTotals(buyerId).catch(() => ({ forgeYield: 0 }));
+    const made = 1 + (Math.random() < chance(upg, "transmute", null) + (util.forgeYield || 0) / 100 ? 1 : 0);
     await addParts(buyerId, t + 1, made);
     await awardXp(buyerId, "craft_combine", { points: 8, gold: 0 }).catch(() => {});
     await logCraft(buyerId, "combine", { tier: t, meta: { to: t + 1, made } });
@@ -311,7 +316,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const item = itemById(itemId);
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
     if (!new Set(Object.values(await getEquippedIds(buyerId))).has(itemId)) return { ok: false, error: "not_equipped" };
-    const cur = await db.queryOne(`SELECT level, stat_bonus, best_grade FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    const cur = await db.queryOne(`SELECT level, stat_bonus, best_grade, util FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     const level = cur?.level || 0;
     if (level >= MAX_FORGE_LEVEL) return { ok: false, error: "maxed", ...(await getForgeState(buyerId)) }; // peak enchantment reached
     const { tier, qty } = enhanceCost(item, level);
@@ -350,11 +355,16 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const forgedKeys = Object.keys(nextBonus).filter((k) => (nextBonus[k] || 0) > 0);
     const allMaxed = forgedKeys.length >= Math.min(4, existing.length + newPool.length) && forgedKeys.every((k) => (nextBonus[k] || 0) >= capOf(k));
     const bestGrade = (GRADE_RANK[grade] || 0) > (GRADE_RANK[cur?.best_grade] || 0) ? grade : cur?.best_grade || grade;
+    // RARE ATTUNEMENT ROLL — a lucky enhance can add (or level up) a bonus utility affix that helps a spin-off
+    // feature. Base chance + a bonus for a flawless strike + the Attunement forge upgrade. One affix per item.
+    const utilChance = UTIL_BASE_CHANCE + (grade === "pixel" ? 0.06 : grade === "perfect" ? 0.03 : 0) + chance(upg, "attune", bf);
+    const { next: nextUtil, result: utilRoll } = rollUtil(parseUtil(cur?.util), utilChance);
+    const utilJson = nextUtil ? JSON.stringify(nextUtil) : null;
     await db
         .query(
-            `INSERT INTO mkt_item_enhance (buyer_id, item_id, level, stat_bonus, best_grade, updated_at) VALUES ($1,$2,$3,$4::jsonb,$5,NOW())
-             ON CONFLICT (buyer_id, item_id) DO UPDATE SET level = $3, stat_bonus = $4::jsonb, best_grade = $5, updated_at = NOW()`,
-            [buyerId, itemId, level + 1, JSON.stringify(nextBonus), bestGrade]
+            `INSERT INTO mkt_item_enhance (buyer_id, item_id, level, stat_bonus, best_grade, util, updated_at) VALUES ($1,$2,$3,$4::jsonb,$5,$6::jsonb,NOW())
+             ON CONFLICT (buyer_id, item_id) DO UPDATE SET level = $3, stat_bonus = $4::jsonb, best_grade = $5, util = $6::jsonb, updated_at = NOW()`,
+            [buyerId, itemId, level + 1, JSON.stringify(nextBonus), bestGrade, utilJson]
         )
         .catch(() => {});
     await db.query(`UPDATE mkt_buyer SET equipment_updated_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {}); // nudge the hero-sprite redraw
@@ -374,7 +384,9 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // stats this forge just ADDED (base 0), flagged isNew so the reveal can call them out.
     const statKeys = Array.from(new Set([...existing, ...forgedKeys]));
     const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k) }));
-    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, allMaxed, scenario, doubled, xp, grade, ...(await getForgeState(buyerId)) };
+    // The attunement outcome for the reveal: what (if anything) got rolled, plus the item's resulting affix.
+    const attune = utilRoll ? { ...describeUtil(nextUtil), isNew: Boolean(utilRoll.isNew), upgraded: Boolean(utilRoll.upgraded) } : null;
+    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, attune, util: describeUtil(nextUtil), allMaxed, scenario, doubled, xp, grade, ...(await getForgeState(buyerId)) };
 }
 
 // ── Full forge state for the UI ──
@@ -384,7 +396,7 @@ export async function getForgeState(buyerId) {
         getEquippedIds(buyerId),
         partCounts(buyerId),
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT item_id, level, stat_bonus, best_grade FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT item_id, level, stat_bonus, best_grade, util FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         itemSpriteMap().catch(() => ({})),
         upgradeLevels(buyerId),
         getForgeBonus(buyerId).catch(() => ({})), // earned forge badges + owned forge pets boost displayed + real odds
@@ -395,7 +407,7 @@ export async function getForgeState(buyerId) {
     const dailies = DAILIES.map((q) => { const prog = Number(dRow?.[q.field] || 0); return { key: q.key, label: q.label, need: q.need, progress: Math.min(prog, q.need), done: prog >= q.need, claimed: claimedSet.has(q.key), rewardLabel: q.rewardLabel }; });
     const equippedIds = new Set(Object.values(bySlot));
     const enhById = new Map();
-    for (const r of enhRows) enhById.set(r.item_id, { level: r.level, bonus: parseBonus(r.stat_bonus), bestGrade: r.best_grade });
+    for (const r of enhRows) enhById.set(r.item_id, { level: r.level, bonus: parseBonus(r.stat_bonus), bestGrade: r.best_grade, util: r.util });
     const dress = (id) => {
         const it = itemById(id);
         if (!it) return null;
@@ -404,6 +416,7 @@ export async function getForgeState(buyerId) {
             id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon, flavor: it.flavor || null, sprite: spriteMap[id] || null,
             stats: describeStats(it.stats), salvageTier: rarityTier(it.rarity),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
+            util: describeUtil(enh?.util),
         };
     };
     const salvage = (ownedRows || []).map((r) => r.item_id).filter((id) => !equippedIds.has(id)).map(dress).filter(Boolean)

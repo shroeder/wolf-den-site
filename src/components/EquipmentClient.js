@@ -466,6 +466,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
                                 {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
+                                {i.util ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#e0c8ff" }}>🔮 +{i.util.value}{i.util.unit} {i.util.label}{i.util.level > 1 ? ` Lv${i.util.level}` : ""}</span> : null}
                             </button>
                         ))}
                     </div>

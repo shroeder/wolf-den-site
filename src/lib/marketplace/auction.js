@@ -8,6 +8,7 @@ import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
+import { describeUtil } from "@/lib/marketplace/item-affix.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
 function mergeStats(base = {}, bonus = {}) {
@@ -88,6 +89,7 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
         name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null,
         stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, // effective (base + forge) totals
         forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, // the forge bonus alone
+        util: det?.util || null, // rare Forge attunement (spin-off bonus stat) that rides with the item
         sprite: sprites[row.item_id] || null,
         enhanceLevel: det?.level || 0,
         price: Number(row.price),
@@ -124,7 +126,7 @@ export async function getSellableItems(buyerId) {
         .map((id) => {
             const it = itemById(id);
             const bonus = enh[id]?.bonus || null;
-            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, enhanceLevel: enh[id]?.level || 0 };
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, util: enh[id]?.util || null, enhanceLevel: enh[id]?.level || 0 };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -143,8 +145,8 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     // Enhancement per (seller, item) so a listed enhanced piece shows "⚒️ +N" + its exact forge stats.
     const sellerIds = [...new Set(rows.map((r) => r.seller_id))];
     const itemIds = [...new Set(rows.map((r) => r.item_id))];
-    const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
-    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})) }]));
+    const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
+    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})), util: describeUtil(e.util) }]));
     let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap)).filter(Boolean);
     const needle = String(q || "").trim().toLowerCase();
     if (needle) out = out.filter((l) => l.name.toLowerCase().includes(needle) || l.sellerName.toLowerCase().includes(needle));

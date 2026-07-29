@@ -13,6 +13,7 @@ import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge, getBadgeSea } from "@/lib/marketplace/badges.js";
+import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -215,6 +216,9 @@ async function equippedSeaAffinity(buyerId) {
     // Earned SAILING/raiding/digging BADGES add sea affinity too (their thematic bonus).
     const badgeSea = await getBadgeSea(buyerId).catch(() => ({}));
     for (const k in sea) sea[k] += badgeSea[k] || 0;
+    // Rare Forge "attunement" sea affixes (Dredge / Trove / Tailwind) on equipped gear add points too.
+    const utilSea = (await getEquippedUtilTotals(buyerId).catch(() => ({ sea: {} }))).sea || {};
+    for (const k in sea) sea[k] += utilSea[k] || 0;
     return sea;
 }
 // Sea-affinity POINTS → real effects. Plain tunable numbers (no env). Stackers are CAPPED so the rare gear that

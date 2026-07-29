@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
@@ -102,8 +103,8 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
     // the item's real (base + forge) stats, not just the base.
     const bIds = [...new Set(rows.map((r) => r.buyer_id))];
     const iIds = [...new Set(rows.map((r) => r.item_id))];
-    const enhRows = bIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [bIds, iIds]).catch(() => []) : [];
-    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})) }]));
+    const enhRows = bIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [bIds, iIds]).catch(() => []) : [];
+    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})), util: describeUtil(e.util) }]));
     const query = String(q || "").trim().toLowerCase();
     const out = [];
     for (const r of rows) {
@@ -117,6 +118,7 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
             itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot,
             stats: describeStats(mergeStats(it.stats || {}, bonus || {})),
             forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,
+            util: det?.util || null,
             enhanceLevel: det?.level || 0,
             icon: it.icon, sprite: spriteMap[r.item_id] || null,
             ownerName: r.display_name || `@${r.alias}`, ownerAlias: r.alias,

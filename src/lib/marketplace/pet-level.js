@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 
 // Pet leveling (equipped pet only). Re-tuned 2026-07-21:
 //  - The equipped pet earns PET_XP_SHARE of every XP the member gains, plus PET_TRICKLE_PER_DAY over time.
@@ -81,11 +82,14 @@ export function levelsFromXpMap(xpMap = {}) {
 // Add a FLAT amount of XP to the member's equipped pet (capped). Returns { ok, petId, xp, level, leveled }
 // or { ok: false }. Used by pet-feed consumables (full amount) and, via creditEquippedPetXp, the XP share.
 export async function addEquippedPetXp(buyerId, amount) {
-    const add = Math.round(Number(amount) || 0);
+    let add = Math.round(Number(amount) || 0);
     if (!buyerId || add <= 0) return { ok: false };
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const petId = buyer?.featured_collectible;
     if (!petId) return { ok: false, error: "no_pet_equipped" };
+    // Pet Bond forge attunement on equipped gear boosts ALL pet XP gains.
+    const petBond = (await getEquippedUtilTotals(buyerId).catch(() => ({ petXp: 0 }))).petXp || 0;
+    if (petBond > 0) add = Math.round(add * (1 + petBond / 100));
     const rarity = rarityOf(petId);
     const maxXp = petMaxXp(rarity);
     const before = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);

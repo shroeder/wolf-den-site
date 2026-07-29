@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
+import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
@@ -243,17 +244,18 @@ export async function getInventory(buyerId) {
         db.query(`SELECT item_id, acquired_via, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getEquippedIds(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        db.query(`SELECT item_id, level FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT item_id, level, util FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
     const ownedIds = new Set(ownedRows.map((r) => r.item_id));
     const equippedIds = new Set(Object.values(bySlot));
-    const enhById = new Map((enhRows || []).map((r) => [r.item_id, r.level]));
+    const enhById = new Map((enhRows || []).map((r) => [r.item_id, { level: r.level, util: r.util }]));
     const items = ownedRows
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
             const set = setForItem(def.id);
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), enhanceLevel: enhById.get(def.id) || 0, charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
+            const enh = enhById.get(def.id);
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), enhanceLevel: enh?.level || 0, util: describeUtil(enh?.util), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
