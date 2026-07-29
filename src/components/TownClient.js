@@ -24,8 +24,9 @@ const TILES = (n) => Array.from({ length: n }, (_, i) => i);
 // Which town-art sprite each raid kind uses (falls back to the event emoji until the art is generated).
 const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem" };
 const CAT_LABEL = { civic: "🏛️ Civic", building: "🏚️ Buildings", service: "🧭 Services", unlock: "🌟 New buildings" };
-// Town Development projects that have a real sprite for their card icon (replaces the emoji when the art exists).
-const PROJECT_ART = { market: "trading_post" };
+// Town Development projects → their card sprite (replaces the emoji when the art exists). tavern reuses the
+// plaza tavern building sprite; vault/festival reuse the same art that becomes their unlocked plaza building.
+const PROJECT_ART = { prosperity: "prosperity", depth: "townscape", tavern: "tavern", market: "trading_post", garrison: "garrison", vault: "vault", festival: "festival" };
 // A message that's just emoji (a reaction/emote) pops as a floating emote instead of a text bubble.
 const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
 
