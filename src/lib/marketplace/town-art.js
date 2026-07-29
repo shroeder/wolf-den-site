@@ -8,6 +8,12 @@ import { generateImage, generateWideSceneImage, generateSceneImage } from "@/lib
 
 const STREET_STYLE =
     "painterly 2D side-scrolling video-game background, warm golden-hour dusk, cohesive fantasy action-RPG town, soft lantern glow, rich but not busy, no text, no watermark.";
+// Shared framing for the raised-bed sprites so every tier keeps the SAME wide/low/shallow front-on shape (plants
+// are anchored to it, so the silhouette must stay consistent) — only the material changes per tier.
+const BED_BASE =
+    "A single empty RAISED GARDEN BED planter drawn nearly FRONT-ON at a SHALLOW downward tilt — a flat 2D side-scroller farm-game view, NOT a steep isometric angle: you mainly see the low front rail with rounded corner posts and, just above it, the dark rich tilled SOIL surface (gentle furrow rows) tilted enough to plant in. A WIDE, LOW, SHALLOW bed, the same size and shape as a basic wooden planter. NO plants, NO crops, NO sprouts — just empty soil ready to plant.";
+const BED_TAIL =
+    "Painterly fantasy farm game-art, clean confident outlines and cel-shaded vibrant colors, a strong readable silhouette. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO grass, NO surrounding ground, NO scenery, NO drop shadow behind it. Nothing but the raised bed. No text, no watermark, no border.";
 const CRITTER_STYLE =
     "a single cute mascot CHARACTER sprite, full body, three-quarter view facing forward, painterly fantasy cel-shaded style with soft dark ink linework (NOT a white outline), warm vibrant colors, a strong readable silhouette, centered. Floats ALONE on a FULLY TRANSPARENT background (alpha) — absolutely NO white sticker outline, NO die-cut border, NO rim, NO halo, NO glow ring, NO drop shadow, NO ground, NO scenery, NO tile. Nothing but the critter. No text, no watermark, no border.";
 const BUILDING_STYLE =
@@ -25,6 +31,13 @@ const ART_PROMPTS = {
     // view, NOT steep isometric) so it sits naturally in the side-on garden scene. Plants grow out of its soil.
     farm_bed:
         `A single empty RAISED GARDEN BED planter drawn nearly FRONT-ON at a SHALLOW downward tilt — a flat 2D side-scroller farm-game view, NOT a steep isometric angle: you mainly see the low wooden-plank front rail with rounded corner posts, and just above it the dark rich tilled soil surface (gentle furrow rows, a few pebbles) tilted enough to plant in. A wide, low, shallow bed. NO plants, NO crops — empty soil ready to plant. Painterly fantasy farm game-art, warm daylight, clean confident outlines and cel-shaded vibrant colors, a strong readable silhouette. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO grass, NO surrounding ground, NO scenery, NO drop shadow, NO glow behind it. Nothing but the raised bed. No text, no watermark, no border.`,
+    // Upgraded bed sprites — the plot's specialization tier (every 5 levels). SAME wide/low/shallow front-on
+    // shape + empty tilled soil as farm_bed (so plants still align); only the MATERIAL ranks up.
+    farm_bed_t1: `${BED_BASE} The planter is a STURDY REINFORCED WOODEN bed — dark iron corner brackets, bolts and an iron band around the front rail, a slightly richer stained wood. ${BED_TAIL}`,
+    farm_bed_t2: `${BED_BASE} The planter is built of carved GREY STONE blocks with mortared seams and solid stone corner posts (a masonry raised bed), the wood trim replaced by cool stone. ${BED_TAIL}`,
+    farm_bed_t3: `${BED_BASE} The planter is an ORNATE GILDED bed — polished dark wood with lustrous GOLD trim and filigree inlay along the front rail and small gold corner finials, luxurious and prized. ${BED_TAIL}`,
+    farm_bed_t4: `${BED_BASE} The planter is an ENCHANTED CRYSTAL-AND-WOOD bed — pale wood set with glowing cyan crystal corner shards and faint softly-glowing magic runes etched along the front rail, the soil faintly luminous. ${BED_TAIL}`,
+    farm_bed_t5: `${BED_BASE} The planter is a magnificent PRISMATIC CRYSTAL bed — iridescent violet-and-rainbow crystal edges and corner spires with a gentle inner glow and a few tiny floating sparkles, the richest enchanted planter. ${BED_TAIL}`,
     // Pet passive-bonus STAT ICONS — small emblem sprites in the game's painterly cel-shaded style (style proof:
     // xp, gold, fortune; the rest follow once approved). CRITICAL: no white sticker rim / die-cut border / halo.
     stat_xp:

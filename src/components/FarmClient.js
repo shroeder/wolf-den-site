@@ -1513,7 +1513,7 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
                 const live = drag && drag.slot === p.slot ? drag : p;
                 return (
                     <ScenePlot
-                        key={p.slot} p={p} left={live.x} top={live.y} now={now} busy={busy} bedUrl={garden.bedUrl} cropSprites={garden.cropSprites}
+                        key={p.slot} p={p} left={live.x} top={live.y} now={now} busy={busy} bedUrl={garden.bedUrl} bedTiers={garden.bedTiers} cropSprites={garden.cropSprites}
                         totalSeeds={totalSeeds} editing={editing} dragging={drag?.slot === p.slot} suppressClickRef={suppressClickRef}
                         onPointerDown={editing ? (e) => start(e, p) : undefined}
                         onPointerMove={editing ? move : undefined}
@@ -1527,7 +1527,7 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
     );
 }
 
-function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
+function ScenePlot({ p, left, top, now, busy, bedUrl, bedTiers, cropSprites, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
     const empty = p.empty;
     let progress = 1; let ready = false; let secsLeft = 0;
     if (!empty) {
@@ -1556,18 +1556,20 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, e
     const plantSprite = stageKey ? cropSprites?.[stageKey] : null;
     // The bed visibly upgrades as you invest in the plot: dirt → wood frame → stone+glow → gilded.
     const spec = p.specLevel || 0;
-    // The plot visibly RANKS UP every 5 specialization levels: bronze → silver → gold → radiant → prismatic.
+    // The plot visibly RANKS UP every 5 specialization levels — a DISTINCT bed SPRITE per tier (t1..t5), with a
+    // faint matching aura so the upgrade reads at a glance. Falls back to the base bed until a tier's art exists.
     const specTier = Math.min(5, Math.floor(spec / 5));
     const TIER_COL = ["", "#c0864a", "#c3cdd8", "#ffd75e", "#7fe0ff", "#c99bff"][specTier];
     const TIER_GLOW = ["", "rgba(192,134,74,0.85)", "rgba(195,205,216,0.85)", "rgba(255,215,94,0.95)", "rgba(127,224,255,0.95)", "rgba(201,155,255,0.95)"][specTier];
+    const tierBed = (specTier && bedTiers?.[specTier]) || bedUrl; // upgraded bed art when available
     const frameBorder = specTier ? `2px solid ${TIER_COL}` : "1px solid rgba(20,12,4,0.6)";
     const frameGlow = specTier ? `, 0 0 ${5 + specTier * 2}px ${TIER_GLOW}` : "";
-    // Specialization glow for the ART bed — a colored aura that intensifies each 5-level tier.
-    const bedGlow = specTier ? ` drop-shadow(0 0 ${3 + specTier * 1.6}px ${TIER_GLOW})` : "";
+    // A soft aura on the ART bed that intensifies each tier (the distinct sprite carries the main upgrade look).
+    const bedGlow = specTier ? ` drop-shadow(0 0 ${3 + specTier * 1.4}px ${TIER_GLOW})` : "";
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
         : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — tap to get seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
-    const W = bedUrl ? 112 : 78; // the art bed has ~18% transparent padding, so render it a bit larger
+    const W = tierBed ? 112 : 78; // the art bed has ~18% transparent padding, so render it a bit larger
     return (
         <button type="button" onClick={onClick} title={title}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
@@ -1590,9 +1592,9 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, e
                     <span style={{ position: "absolute", left: "50%", bottom: "48%", transform: "translateX(-50%)", fontSize: 24, color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", zIndex: 2, animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
                 )}
                 {/* the raised bed — real AI art if we have it, else the CSS fallback */}
-                {bedUrl ? (
+                {tierBed ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={bedUrl} alt="" draggable={false} style={{ display: "block", width: W, height: "auto", filter: `drop-shadow(0 4px 5px rgba(0,0,0,0.45))${bedGlow}`, opacity: canPlant ? 1 : 1 }} />
+                    <img src={tierBed} alt="" draggable={false} style={{ display: "block", width: W, height: "auto", filter: `drop-shadow(0 4px 5px rgba(0,0,0,0.45))${bedGlow}`, opacity: canPlant ? 1 : 1 }} />
                 ) : (
                     <span style={{ position: "relative", display: "block", width: 68, height: 26, margin: "0 auto", borderRadius: "7px / 9px",
                         background: p.fertilized
@@ -1603,11 +1605,8 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, e
                         borderTop: specTier ? frameBorder : "2px solid rgba(120,86,48,0.75)" }} />
                 )}
                 {/* canPlant hint ring on the art bed */}
-                {bedUrl && canPlant ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: "20%", transform: "translateX(-50%)", fontSize: 9, fontWeight: 800, color: "#2a1a06", background: "rgba(255,226,122,0.9)", borderRadius: 999, padding: "0 6px", zIndex: 3 }}>plant</span> : null}
-                {/* Specialization RANK emblem — a tier badge that upgrades every 5 levels (bronze→prismatic). */}
-                {specTier > 0 ? (
-                    <span aria-hidden="true" title={`Plot rank ${specTier} · Lv ${spec}`} style={{ position: "absolute", top: "6%", right: "4%", zIndex: 4, display: "inline-flex", alignItems: "center", gap: 1, padding: "1px 5px", borderRadius: 999, fontSize: 8.5, fontWeight: 900, color: "#2a1a06", background: TIER_COL, border: "1px solid rgba(255,255,255,0.7)", boxShadow: `0 1px 3px rgba(0,0,0,0.5), 0 0 8px ${TIER_GLOW}` }}>★{specTier}</span>
-                ) : null}
+                {tierBed && canPlant ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: "20%", transform: "translateX(-50%)", fontSize: 9, fontWeight: 800, color: "#2a1a06", background: "rgba(255,226,122,0.9)", borderRadius: 999, padding: "0 6px", zIndex: 3 }}>plant</span> : null}
+                {/* The plot's upgrade is carried by its distinct tier SPRITE (tierBed) — no badge clutter. */}
             </div>
             {/* status chip */}
             <span style={{ display: "block", textAlign: "center", marginTop: 2 }}>
