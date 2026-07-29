@@ -6,6 +6,10 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
+// Grant an event badge WITHOUT a static import of badges.js (that would create a cycle:
+// item-element → badges → xp → pet-level → item-element). Dynamic import, best-effort.
+const grantBadge = (buyerId, slug) => import("@/lib/marketplace/badges.js").then((m) => m.grantEventBadge(buyerId, slug)).catch(() => {});
+
 // ── ELEMENTAL REFORGE ("Attune") ──────────────────────────────────────────────────────────────────────────
 // The Forge can change a piece's elemental affinity for gold. A small chance it instead KEEPS the current
 // element and ADDS the one you picked → a rare DUAL-affinity piece that matches TWO of the rotating boss
@@ -112,6 +116,7 @@ export async function reforgeItemElement(buyerId, itemId, target, replaceKey = n
         [buyerId, itemId, JSON.stringify(elements)]
     ).catch(() => {});
     await trackActivity(buyerId, "reforge_element", { itemId, target, dual, elements }).catch(() => {});
+    if (elements.length >= 2) grantBadge(buyerId, "forge_dual_affinity");
     return { ok: true, elements, dual, from: cur, cost, gold: Number(paid.gold) };
 }
 
@@ -136,5 +141,7 @@ export async function enchantItemElement(buyerId, itemId, element) {
         [buyerId, itemId, JSON.stringify(elements)]
     ).catch(() => {});
     await trackActivity(buyerId, "enchant_element", { itemId, element, elements }).catch(() => {});
+    grantBadge(buyerId, "forge_enchanter");
+    if (elements.length >= 2) grantBadge(buyerId, "forge_dual_affinity");
     return { ok: true, elements, added: element, scrollsLeft: Number(sc.count) };
 }

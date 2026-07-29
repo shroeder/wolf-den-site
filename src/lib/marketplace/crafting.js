@@ -396,6 +396,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k) }));
     // The attunement outcome for the reveal: what (if anything) got rolled, plus the item's resulting affix.
     const attune = utilRoll ? { ...describeUtil(nextUtil), isNew: Boolean(utilRoll.isNew), upgraded: Boolean(utilRoll.upgraded) } : null;
+    if (attune) grantEventBadge(buyerId, "forge_attuned").catch(() => {});
     return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, attune, util: describeUtil(nextUtil), allMaxed, scenario, doubled, usedScroll, xp, grade, ...(await getForgeState(buyerId)) };
 }
 
