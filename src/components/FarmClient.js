@@ -902,7 +902,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         <button key={v} type="button" className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
                             <span aria-hidden="true">{ico}</span>{label}
                             {attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span>
-                                : petAttn ? <span className="farm-tab-badge" title={`${petAttn} pet${petAttn === 1 ? "" : "s"} to pet — a free daily reward`}>🐾</span> : null}
+                                : petAttn ? <span className="farm-tab-badge" title={`${petAttn} pet${petAttn === 1 ? "" : "s"} to pet — a free daily reward`}>{petAttn}</span> : null}
                         </button>
                     );
                 })}
