@@ -200,8 +200,6 @@ const FARM_BG = {
 const pickFarmBg = (tod, condition) =>
     (condition === "storm" && FARM_BG.storm) || (condition === "snow" && FARM_BG.snow) || FARM_BG[tod] || FARM_BG.day || null;
 // Fixed straight-on backdrops for Inside (barn) and Garden — single images, shown as a cover (no wide scroll).
-// Owner-debug critter cycle (keys MUST match CREATURES in farm-encounters.js) so you can test each one.
-const TEST_CRITTERS = [{ key: "rat", label: "Field Mouse" }, { key: "crow", label: "Crop Crow" }, { key: "raccoon", label: "Raccoon" }, { key: "boar", label: "Truffle Boar" }, { key: "scarecrow", label: "Scarecrow" }, { key: "fox", label: "Sly Fox" }, { key: "owl", label: "Wise Owl" }, { key: "stag", label: "Golden Stag" }, { key: "dragon", label: "Dragonling" }, { key: "unicorn", label: "Unicorn" }];
 const VIEW_BG = {
     inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-flat-1785108049136.png",
     garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-flat-1785108098669.png",
@@ -513,17 +511,6 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } if (r.goldAfter != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.goldAfter } } : f)); }
         return r;
     }, [gardenAct]);
-    // Owner-only debug: force a critter encounter. Cycles through EVERY critter (rat→crow→raccoon→boar→scarecrow)
-    // so you can test each one, instead of a random roll (which rarely lands the rare ones).
-    const critterIdx = useRef(0);
-    const [nextCritter, setNextCritter] = useState(0);
-    const testEncounter = useCallback(async () => {
-        const which = TEST_CRITTERS[critterIdx.current % TEST_CRITTERS.length];
-        critterIdx.current += 1;
-        setNextCritter(critterIdx.current % TEST_CRITTERS.length);
-        const r = await post({ action: "debug_encounter", creature: which.key });
-        if (r?.ok && r.encounter) setEncounter({ ...r.encounter, harvest: { name: "test crop", emoji: "🌱" } });
-    }, [post]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);
     // Drag a plot to a new spot (own farm, in move mode) so you can arrange them without overlap. Optimistic.
@@ -730,11 +717,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </svg>
                 {fullscreen ? "Exit" : "Full screen"}
             </button>
-            {farm.ownerDebug ? (
-                <button type="button" onClick={testEncounter} title="Owner debug: force this critter (cycles through all 5 so you can test each)" style={{ ...CTRL_PILL, border: "1px solid rgba(224,112,74,0.55)", background: "linear-gradient(180deg, rgba(58,26,16,0.96), rgba(38,18,12,0.96))", color: "#ffb59a" }}>
-                    <span style={{ fontSize: 15 }} aria-hidden="true">🎁</span>Test: {TEST_CRITTERS[nextCritter].label}
-                </button>
-            ) : null}
         </>
     );
 
