@@ -384,6 +384,18 @@ export default function FarmClient({ initial, viewingAlias }) {
         return json;
     }, []);
 
+    // Live farm presence: keep-alive ping so the owner sees visitors (and a visitor sees themself here), refreshed
+    // every 15s. Uses the friend's @handle when visiting so the ping lands on THEIR farm.
+    useEffect(() => {
+        let alive = true;
+        const ping = async () => {
+            const r = await post({ action: "farm_ping", owner: farm.mine ? undefined : farm.owner?.alias }).catch(() => null);
+            if (alive && r?.ok && Array.isArray(r.visitors)) setFarm((f) => ({ ...f, visitors: r.visitors }));
+        };
+        const t = setInterval(ping, 15000);
+        return () => { alive = false; clearInterval(t); };
+    }, [post, farm.mine, farm.owner?.alias]);
+
     const petIt = useCallback(async (pet) => {
         if (!farm.canPet || pet.petted || busy) return;
         const i = pets.findIndex((p) => p.id === pet.id);
@@ -776,6 +788,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-petnudge { margin: 6px 0 0; padding: 8px 14px; border-radius: 999px; text-align: center; font-size: 0.82rem; font-weight: 800; color: #ffe9c4; background: linear-gradient(180deg, rgba(80,52,24,0.9), rgba(52,32,14,0.9)); border: 1px solid rgba(255,190,120,0.5); box-shadow: 0 2px 10px rgba(0,0,0,0.4); animation: petNudgePulse 2s ease-in-out infinite; }
                 .farm-petnudge b { color: #ffd75e; }
                 @keyframes petNudgePulse { 0%,100% { box-shadow: 0 2px 10px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,190,120,0.0); } 50% { box-shadow: 0 2px 10px rgba(0,0,0,0.4), 0 0 14px 2px rgba(255,190,120,0.4); } }
+                .farm-visitor { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; z-index: 6; pointer-events: none; animation: farmBob 2.8s ease-in-out infinite; }
+                .farm-visitor img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
+                .farm-visitor-fallback { font-size: 44px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
+                .farm-visitor-name { font-size: 10px; font-weight: 800; color: #f2ead9; background: rgba(20,14,30,0.72); border-radius: 999px; padding: 1px 8px; margin-bottom: 2px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+                .farm-visitor.is-you .farm-visitor-name { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
                 @keyframes rateBurstAnim { 0% { transform: translate(-50%,-50%) scale(.4); opacity: 0; } 25% { opacity: 1; } 55% { transform: translate(-50%,-60%) scale(1.7); opacity: 1; } 100% { transform: translate(-50%,-140%) scale(1.9); opacity: 0; } }
                 @keyframes ratePulse { 0%,100% { transform: scale(1); } 45% { transform: scale(1.18); } }
                 @keyframes rateStars { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px) scale(1.1); } }
@@ -943,6 +960,19 @@ export default function FarmClient({ initial, viewingAlias }) {
                             to THIS layer only, so the illustrated backdrop keeps its own night/dusk mood while the
                             flat-lit sprites stop glowing like noon. */}
                         <div style={{ position: "absolute", inset: 0, filter: objFilter }}>
+                        {/* Live VISITORS — real wolves currently viewing this farm. On your OWN farm you're the farmer
+                            (don't also show yourself as a guest); when VISITING you appear so you see yourself here. */}
+                        {(view === "outside" || view === "inside") ? (
+                            (farm.visitors || []).filter((v) => (farm.mine ? !v.isYou : true)).map((vis, i) => (
+                                <div key={vis.id} className={`farm-visitor${vis.isYou ? " is-you" : ""}`} style={{ left: `${10 + (i * 71) % 78}%`, top: `${70 + (i % 3) * 6 - groundShift}%`, animationDelay: `${(i % 4) * 0.4}s` }}>
+                                    <span className="farm-visitor-name">{vis.isYou ? "🐺 you" : vis.name}</span>
+                                    {vis.sprite ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={vis.sprite} alt="" draggable={false} style={{ transform: vis.flip ? "scaleX(-1)" : "none" }} />
+                                    ) : <span className="farm-visitor-fallback" aria-hidden="true">🐺</span>}
+                                </div>
+                            ))
+                        ) : null}
                         {/* Crops live ONLY in the Garden view — a dedicated planting/harvesting space. */}
                         {view === "garden" && farm.mine && garden ? (
                             <ScenePlots
@@ -1526,11 +1556,14 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, e
     const plantSprite = stageKey ? cropSprites?.[stageKey] : null;
     // The bed visibly upgrades as you invest in the plot: dirt → wood frame → stone+glow → gilded.
     const spec = p.specLevel || 0;
-    const specTier = spec >= 8 ? 3 : spec >= 4 ? 2 : spec >= 1 ? 1 : 0;
-    const frameBorder = specTier === 3 ? "2px solid #e0b84a" : specTier === 2 ? "2px solid #9aa4b2" : specTier === 1 ? "2px solid #8a6636" : "1px solid rgba(20,12,4,0.6)";
-    const frameGlow = specTier === 3 ? ", 0 0 11px rgba(224,184,74,0.6)" : specTier === 2 ? ", 0 0 7px rgba(160,180,220,0.45)" : "";
-    // Specialization glow for the ART bed (a colored aura by tier: wood → stone → gilded).
-    const bedGlow = specTier === 3 ? " drop-shadow(0 0 6px rgba(224,184,74,0.95))" : specTier === 2 ? " drop-shadow(0 0 5px rgba(160,180,220,0.8))" : specTier === 1 ? " drop-shadow(0 0 4px rgba(190,150,90,0.7))" : "";
+    // The plot visibly RANKS UP every 5 specialization levels: bronze → silver → gold → radiant → prismatic.
+    const specTier = Math.min(5, Math.floor(spec / 5));
+    const TIER_COL = ["", "#c0864a", "#c3cdd8", "#ffd75e", "#7fe0ff", "#c99bff"][specTier];
+    const TIER_GLOW = ["", "rgba(192,134,74,0.85)", "rgba(195,205,216,0.85)", "rgba(255,215,94,0.95)", "rgba(127,224,255,0.95)", "rgba(201,155,255,0.95)"][specTier];
+    const frameBorder = specTier ? `2px solid ${TIER_COL}` : "1px solid rgba(20,12,4,0.6)";
+    const frameGlow = specTier ? `, 0 0 ${5 + specTier * 2}px ${TIER_GLOW}` : "";
+    // Specialization glow for the ART bed — a colored aura that intensifies each 5-level tier.
+    const bedGlow = specTier ? ` drop-shadow(0 0 ${3 + specTier * 1.6}px ${TIER_GLOW})` : "";
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
         : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — tap to get seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
@@ -1571,7 +1604,10 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, cropSprites, totalSeeds, e
                 )}
                 {/* canPlant hint ring on the art bed */}
                 {bedUrl && canPlant ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: "20%", transform: "translateX(-50%)", fontSize: 9, fontWeight: 800, color: "#2a1a06", background: "rgba(255,226,122,0.9)", borderRadius: 999, padding: "0 6px", zIndex: 3 }}>plant</span> : null}
-                {/* specialization tier shown by the bed's colored aura (bedGlow) — no badge clutter */}
+                {/* Specialization RANK emblem — a tier badge that upgrades every 5 levels (bronze→prismatic). */}
+                {specTier > 0 ? (
+                    <span aria-hidden="true" title={`Plot rank ${specTier} · Lv ${spec}`} style={{ position: "absolute", top: "6%", right: "4%", zIndex: 4, display: "inline-flex", alignItems: "center", gap: 1, padding: "1px 5px", borderRadius: 999, fontSize: 8.5, fontWeight: 900, color: "#2a1a06", background: TIER_COL, border: "1px solid rgba(255,255,255,0.7)", boxShadow: `0 1px 3px rgba(0,0,0,0.5), 0 0 8px ${TIER_GLOW}` }}>★{specTier}</span>
+                ) : null}
             </div>
             {/* status chip */}
             <span style={{ display: "block", textAlign: "center", marginTop: 2 }}>

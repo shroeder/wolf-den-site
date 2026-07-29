@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resolveFarmOwner, farmDirectory } from "@/lib/marketplace/farm.js";
+import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resolveFarmOwner, farmDirectory, farmVisitors } from "@/lib/marketplace/farm.js";
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState, setSpriteBrightness } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
@@ -61,7 +61,8 @@ export async function POST(request) {
                 ownerId = o && String(o.id) !== String(buyer.id) ? o.id : null;
             }
             let res = null;
-            if (b?.action === "pet") res = await petPet(buyer.id, String(b?.petId || ""), ownerId);
+            if (b?.action === "farm_ping") res = { ok: true, visitors: await farmVisitors(ownerId || buyer.id, buyer.id).catch(() => []) }; // keep-alive presence poll → live visitors
+            else if (b?.action === "pet") res = await petPet(buyer.id, String(b?.petId || ""), ownerId);
             else if (b?.action === "rate") res = ownerId ? await rateFarm(buyer.id, ownerId, Number(b?.tier)) : { ok: false, error: "cant_rate_own" };
             else if (b?.action === "use_item") res = await feedPetItem(buyer.id, String(b?.petId || ""), String(b?.consumableId || ""), ownerId);
             else if (b?.action === "buy_treat") res = await buyTreat(buyer.id, String(b?.consumableId || ""));

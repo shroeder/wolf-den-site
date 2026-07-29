@@ -209,6 +209,30 @@ export async function claimPig(buyerId) {
 }
 
 // A member's farm state. viewerId === ownerId ⟺ it's your farm (petting enabled + per-pet "petted today" flags).
+// Stamp the viewer as present on THIS farm and return everyone currently viewing it (active in the last 60s).
+// So the owner sees visitors at their farm, and a visitor sees themself standing on the farm they're viewing.
+export async function farmVisitors(farmOwnerId, viewerId) {
+    if (!viewerId || !farmOwnerId) return [];
+    await db.query(
+        `INSERT INTO mkt_farm_presence (viewer_id, farm_owner_id, last_seen) VALUES ($1, $2, NOW())
+         ON CONFLICT (viewer_id) DO UPDATE SET farm_owner_id = $2, last_seen = NOW()`,
+        [viewerId, farmOwnerId]
+    ).catch(() => {});
+    const rows = await db.query(
+        `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.equipped_border, b.featured_collectible
+           FROM mkt_farm_presence p JOIN mkt_buyer b ON b.id = p.viewer_id
+          WHERE p.farm_owner_id = $1 AND p.last_seen > NOW() - INTERVAL '60 seconds'
+          ORDER BY (p.viewer_id = $2) DESC, p.last_seen DESC LIMIT 12`,
+        [farmOwnerId, viewerId]
+    ).catch(() => []);
+    return rows.map((r) => ({
+        id: r.id, name: r.display_name || (r.alias ? `@${r.alias}` : "a wolf"), alias: r.alias || null,
+        sprite: r.avatar_sprite_url || null, flip: r.avatar_sprite_flip === true,
+        border: r.equipped_border && r.equipped_border !== "none" ? r.equipped_border : null,
+        isYou: String(r.id) === String(viewerId),
+    }));
+}
+
 export async function getFarm(ownerId, viewerId) {
     if (!ownerId) return null;
     const [owner, state, sprites, levelSprites, pettedRows] = await Promise.all([
@@ -262,6 +286,7 @@ export async function getFarm(ownerId, viewerId) {
         customBg: owner.farm_bg_active_url || null, // the equipped library background (shown to everyone), or none → default scenes
         customBgDraft: mine ? (owner.farm_bg_draft_url || null) : null, // your pending, not-yet-accepted preview
         spriteBrightness: Number(owner.sprite_brightness ?? 1), // global brightness multiplier for this farm's sprites
+        visitors: await farmVisitors(ownerId, viewerId).catch(() => []), // live wolves viewing this farm (incl. you when visiting)
         canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
         // How many of your own pets you can actually pet RIGHT NOW (charges left ∩ un-petted pets) — nudges the
         // nav badge + an in-farm hint so a free daily reward never sits unclaimed.
