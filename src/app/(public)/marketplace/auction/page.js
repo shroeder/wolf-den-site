@@ -1,7 +1,6 @@
 import AuctionClient from "@/components/AuctionClient";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getAuctionState } from "@/lib/marketplace/auction.js";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +19,6 @@ export default async function AuctionPage() {
                     <p className="muted">Sign in to browse the Auction House.</p>
                     <MarketplaceProfileClient />
                 </section>
-            </div>
-        );
-    }
-    if (!isOwner(buyer.id)) {
-        return (
-            <div className="stack reveal">
-                <section className="card"><h1 style={{ marginTop: 0 }}>🏛️ Auction House</h1><p className="muted" style={{ margin: 0 }}>The Auction House is still being built — check back soon.</p></section>
             </div>
         );
     }

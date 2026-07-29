@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { getAuctionState, getAuctionListings, listAuctionItem, buyAuctionListing, cancelAuctionListing } from "@/lib/marketplace/auction.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -18,7 +17,7 @@ export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/auction", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
-            if (!buyer || !isOwner(buyer.id)) return noStore({ owner: false });
+            if (!buyer) return noStore({ owner: false });
             const { searchParams } = new URL(request.url);
             if (searchParams.has("q") || searchParams.has("slot") || searchParams.has("rarity") || searchParams.has("sort")) {
                 const listings = await getAuctionListings(buyer.id, {
@@ -40,7 +39,6 @@ export async function POST(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return noStore({ error: "not_signed_in" }, { status: 401 });
-            if (!isOwner(buyer.id)) return noStore({ error: "forbidden" }, { status: 403 });
             const body = await request.json().catch(() => ({}));
             let res;
             if (body?.action === "list") res = await listAuctionItem(buyer.id, body?.itemId, body?.price, body?.days);

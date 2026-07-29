@@ -1,7 +1,6 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { itemById, describeStats, STAT_META, EQUIP_SLOTS } from "@/lib/marketplace/items.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
@@ -183,7 +182,7 @@ export async function getMyListings(buyerId) {
 
 // Full state for the Auction House screen (owner-gated during the build).
 export async function getAuctionState(buyerId) {
-    if (!isOwner(buyerId)) return { owner: false };
+    if (!buyerId) return { owner: false };
     const [listings, sellable, mine, goldRow, artRow] = await Promise.all([
         getAuctionListings(buyerId, {}).catch(() => []),
         getSellableItems(buyerId).catch(() => []),
@@ -196,7 +195,7 @@ export async function getAuctionState(buyerId) {
 
 // List an owned, unequipped item at `price` gold for `days` days. Charges the 5% fee up front; removes the item.
 export async function listAuctionItem(buyerId, itemId, price, days) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const it = itemById(itemId);
     if (!it) return { ok: false, error: "unknown_item" };
     const p = Math.floor(Number(price) || 0);
@@ -225,7 +224,7 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
 
 // Buy an active listing. Buyer pays the price → seller receives it; the item is granted to the buyer.
 export async function buyAuctionListing(buyerId, listingId) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const lst = await db.queryOne(`SELECT id, seller_id, item_id, price FROM mkt_auction WHERE id = $1 AND status = 'active' AND expires_at > NOW()`, [listingId]).catch(() => null);
     if (!lst) return { ok: false, error: "gone" };
     if (lst.seller_id === buyerId) return { ok: false, error: "own_listing" };
@@ -255,7 +254,7 @@ export async function buyAuctionListing(buyerId, listingId) {
 
 // Cancel your own active listing → the item comes back to you (no fee refund).
 export async function cancelAuctionListing(buyerId, listingId) {
-    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await db.queryOne(`UPDATE mkt_auction SET status = 'cancelled' WHERE id = $1 AND seller_id = $2 AND status = 'active' RETURNING item_id`, [listingId, buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "gone" };
     await grantItem(buyerId, row.item_id, "auction_return").catch(() => {});

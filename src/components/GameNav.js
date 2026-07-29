@@ -51,9 +51,10 @@ export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [owner, setOwner] = useState(false); // owner-only preview features (e.g. the Town) — declared before `links` which reads it
-    // Farm + Forge are live for everyone; the Town is an owner-only preview during its build.
+    // Farm + Forge + Auction are live for everyone; the Town is an owner-only preview during its build.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
-        ...(owner ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }, { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" }] : [])];
+        { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
+        ...(owner ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -138,7 +139,7 @@ export default function GameNav() {
             { href: "/marketplace/store", emoji: "🛒", label: "Store", sub: "Buy supplies" },
             { href: "/marketplace/creations", emoji: "🎨", label: "Creations", sub: "Custom AI art" },
             { href: "/marketplace/trade", emoji: "🤝", label: "Trades", sub: "Swap gear & gold" },
-            ...(owner ? [{ href: "/marketplace/auction", emoji: "🏛️", label: "Auction House", sub: "List & buy gear" }] : []),
+            { href: "/marketplace/auction", emoji: "🏛️", label: "Auction House", sub: "List & buy gear" },
             { href: "/marketplace/credit", emoji: "💳", label: "Store Credit", sub: "Credit + coins" },
         ] },
         { title: "Progress & Social", items: [
