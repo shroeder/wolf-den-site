@@ -227,6 +227,62 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
     );
 }
 
+// BOSS RAID battle — the whole pack strikes ONE shared boss. Big boss + shared HP bar (live from the server),
+// the roster of everyone fighting, and a STRIKE button. No per-hit reward; killing it ends the raid (completion
+// reward handled by the parent). Damage floats pop on each hit; the bar reflects everyone's damage via polling.
+function BossRaidModal({ ev, bossArt, you, others, onStrike, onClose }) {
+    const [floats, setFloats] = useState([]); // { id, dmg, crit }
+    const [cd, setCd] = useState(false);
+    const [localPct, setLocalPct] = useState(ev.hpPct ?? 100);
+    const fidRef = useRef(0);
+    // Keep the bar in sync with the server (others' hits) but let a local strike drop it instantly.
+    useEffect(() => { setLocalPct((p) => Math.min(p, ev.hpPct ?? 100)); }, [ev.hpPct]);
+    const strike = useCallback(async () => {
+        if (cd) return;
+        setCd(true); setTimeout(() => setCd(false), 1000);
+        const r = await onStrike();
+        if (r?.ok) {
+            const id = (fidRef.current += 1);
+            setFloats((f) => [...f, { id, dmg: r.damage, crit: r.crit }]);
+            setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 800);
+            if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
+        }
+    }, [cd, onStrike]);
+    // The fighters currently in the plaza (you + others), a compact roster so you see who you're raiding with.
+    const roster = [{ id: "you", name: "You", sprite: you?.sprite, flip: you?.flip, isYou: true }, ...others.slice(0, 11).map((o) => ({ id: o.id, name: o.name, sprite: o.sprite, flip: o.flip }))];
+    return (
+        <div className="tw-boss-modal" role="dialog" aria-label="Boss raid">
+            <div className="tw-boss-panel" onClick={(e) => e.stopPropagation()}>
+                <div className="tw-boss-top">
+                    <div className="tw-boss-title">{ev.emoji} {ev.name}</div>
+                    <button type="button" className="tw-boss-leave" onClick={onClose} aria-label="Leave">✕</button>
+                </div>
+                <div className="tw-boss-stage" onClick={strike} role="button" aria-label="Strike the boss">
+                    {bossArt ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className={`tw-boss-big${cd ? " is-cd" : ""}`} src={bossArt} alt={ev.name} draggable={false} />
+                    ) : <span className="tw-boss-bigemoji">{ev.emoji}</span>}
+                    {floats.map((f) => <span key={f.id} className={`tw-boss-dmg${f.crit ? " is-crit" : ""}`} style={{ left: `${35 + (f.id * 17) % 30}%` }}>{f.crit ? "✦" : ""}{f.dmg}</span>)}
+                </div>
+                <div className="tw-boss-hpwrap">
+                    <div className="tw-boss-hpline">HP <b>{Math.max(0, Math.round(localPct))}%</b> · you dealt {Number(ev.myDamage || 0).toLocaleString()}</div>
+                    <div className="tw-boss-hpouter"><span style={{ width: `${Math.max(0, localPct)}%` }} /></div>
+                </div>
+                <div className="tw-boss-roster">
+                    {roster.map((r) => (
+                        <span key={r.id} className={`tw-boss-fighter${r.isYou ? " is-you" : ""}`} title={r.name}>
+                            {r.sprite ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={r.sprite} alt="" style={{ transform: r.flip ? "scaleX(-1)" : "none" }} /> : <span>🐺</span>}
+                        </span>
+                    ))}
+                    <span className="tw-boss-count">{roster.length} fighting</span>
+                </div>
+                <button type="button" className={`tw-boss-strike${cd ? " is-cd" : ""}`} onClick={strike} disabled={cd}>{cd ? "…" : "⚔️ STRIKE!"}</button>
+                <div className="tw-boss-hint">Tap the boss or STRIKE — the whole pack shares its HP. Bring it down together!</div>
+            </div>
+        </div>
+    );
+}
+
 export default function TownClient({ initial }) {
     const [state, setState] = useState(initial || null);
     const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
@@ -275,6 +331,9 @@ export default function TownClient({ initial }) {
     const [raidProc, setRaidProc] = useState(null);     // weapon-skill callout {name,emoji,color,key}
     const [raidRecap, setRaidRecap] = useState(null);   // end-of-raid recap {gold,xp,kills,damage}
     const [duel, setDuel] = useState(null);             // active duel exchange { enemyId, foeArt, foeEmoji, name, win, events, reward }
+    const [bossOpen, setBossOpen] = useState(false);    // boss-raid battle modal open
+    const [bossReward, setBossReward] = useState(null); // boss KILL completion reward { gold, xp, chest }
+    const bossCdRef = useRef(false);
     const [raidCd, setRaidCd] = useState(false);        // duel cooldown
     const evIdRef = useRef(null);
     const raidWaveRef = useRef(1);
@@ -353,7 +412,7 @@ export default function TownClient({ initial }) {
     // or a NEW wave; clear when the raid ends. Kept client-side — the server tracks the shared wave HP for the win.
     useEffect(() => {
         const ev = state?.event;
-        if (!ev || ev.defeated) { evIdRef.current = ev?.id ?? null; raidWaveRef.current = ev?.wave ?? 1; if (!ev) { setRaidEnemies([]); } return; }
+        if (!ev || ev.defeated || ev.boss) { evIdRef.current = ev?.id ?? null; raidWaveRef.current = ev?.wave ?? 1; if (!ev || ev.boss) { setRaidEnemies([]); } return; } // boss raids have no roaming duel foes
         const wave = ev.wave || 1;
         if (evIdRef.current !== ev.id) { evIdRef.current = ev.id; setRaidKills(0); setRaidDamage(ev.myDamage || 0); }
         if (evIdRef.current !== ev.id || raidWaveRef.current !== wave || (raidEnemies.length === 0 && ev.hp > 0)) {
@@ -508,6 +567,25 @@ export default function TownClient({ initial }) {
         }
         setTimeout(() => load(), 350);
     }, [duel, load]);
+    // BOSS RAID: strike the shared boss. Returns the server result so the modal can float damage + drain the bar.
+    const bossStrike = useCallback(async () => {
+        const ev = state?.event; if (!ev || bossCdRef.current) return null;
+        bossCdRef.current = true; setTimeout(() => { bossCdRef.current = false; }, 1000);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "boss_strike", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        if (r?.ok) {
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
+            if (r.killed) { setBossOpen(false); setBossReward(r.reward || { gold: 0, xp: 0 }); setTimeout(() => load(), 500); }
+        }
+        return r;
+    }, [state?.event, load]);
+    // While the boss modal is open, poll a little faster so the shared HP bar reflects everyone's hits live.
+    useEffect(() => {
+        if (!bossOpen) return undefined;
+        const t = setInterval(() => load(), 2000);
+        return () => clearInterval(t);
+    }, [bossOpen, load]);
+    // If the boss dies (event clears) while the modal's open, close it.
+    useEffect(() => { if (bossOpen && (!state?.event || state.event.defeated || !state.event.boss)) setBossOpen(false); }, [bossOpen, state?.event]);
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
@@ -766,8 +844,23 @@ export default function TownClient({ initial }) {
                     </Link>
                       </>
                     ) : null}
-                    {/* Raid: tap each foe directly — its own HP bar drains, damage numbers pop, it dies when emptied */}
-                    {state?.event && !state.event.defeated ? (() => {
+                    {/* BOSS RAID: one huge shared boss — tap to join the pack battle (shared HP bar). */}
+                    {state?.event && !state.event.defeated && state.event.boss ? (() => {
+                        const ev = state.event;
+                        const url = art[EVENT_ART[ev.kind]]?.url;
+                        return (
+                            <button type="button" className="tw-boss" style={{ left: "50%", top: `${GROUND + 9}%`, zIndex: 260 }} onClick={(e) => { e.stopPropagation(); setBossOpen(true); }} aria-label={`Join the boss fight — ${ev.name}`}>
+                                <span className="tw-boss-hpbar"><span style={{ width: `${ev.hpPct ?? 100}%` }} /></span>
+                                {url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="tw-boss-art" src={url} alt={ev.name} draggable={false} />
+                                ) : <span className="tw-boss-emoji">{ev.emoji}</span>}
+                                <span className="tw-boss-join">⚔️ Join the fight!</span>
+                            </button>
+                        );
+                    })() : null}
+                    {/* Skirmish raid: tap each foe directly → a 1v1 duel. */}
+                    {state?.event && !state.event.defeated && !state.event.boss ? (() => {
                         const ev = state.event;
                         const url = art[EVENT_ART[ev.kind]]?.url;
                         return raidEnemies.map((en, i) => (
@@ -1072,6 +1165,22 @@ export default function TownClient({ initial }) {
             {/* Raid victory recap */}
             {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
 
+            {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} others={otherList} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}
+            {bossReward ? (
+                <div className="tw-duel" role="presentation" onClick={() => setBossReward(null)}>
+                    <div className="tw-duel-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: "center" }}>
+                        <div className="tw-duel-verdict win" style={{ fontSize: "1.5rem" }}>🏆 BOSS FELLED!</div>
+                        <div className="muted" style={{ margin: "4px 0 10px" }}>The pack brought it down together.</div>
+                        <div className="tw-duel-rewards" style={{ justifyContent: "center" }}>
+                            {bossReward.xp ? <span className="tw-duel-chip xp">+{bossReward.xp} XP</span> : null}
+                            {bossReward.gold ? <span className="tw-duel-chip gold">+{bossReward.gold} 🪙</span> : null}
+                            {bossReward.chest ? <span className="tw-duel-chip loot">🧰 {bossReward.chest[0].toUpperCase() + bossReward.chest.slice(1)} Chest</span> : null}
+                        </div>
+                        <button type="button" className="tw-levelup-btn" style={{ marginTop: 12 }} onClick={() => setBossReward(null)}>Huzzah! 🐺</button>
+                    </div>
+                </div>
+            ) : null}
+
             {raidRecap ? (
                 <div className="tw-levelup" onClick={() => setRaidRecap(null)} role="presentation">
                     <div className="tw-levelup-confetti" aria-hidden="true">
@@ -1195,6 +1304,40 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 @keyframes twOnlinePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 /* Enemy "fight me" crossed-swords hint */
 .tw-enemy-crossed { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 15px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); pointer-events: none; opacity: 0.9; }
+/* ── BOSS RAID — a huge shared boss in the plaza ── */
+.tw-boss { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; animation: twBossLoom 3s ease-in-out infinite; }
+.tw-boss-art { height: 300px; width: auto; max-width: 92vw; filter: drop-shadow(0 12px 18px rgba(0,0,0,0.6)); }
+.tw-boss-bigemoji { font-size: 180px; }
+.tw-boss-hpbar { width: 220px; max-width: 60vw; height: 12px; border-radius: 999px; background: rgba(0,0,0,0.6); border: 1px solid rgba(0,0,0,0.5); overflow: hidden; margin-bottom: 6px; }
+.tw-boss-hpbar span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); transition: width .4s ease; }
+.tw-boss-join { margin-top: 6px; font-size: 0.78rem; font-weight: 900; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); padding: 4px 14px; border-radius: 999px; box-shadow: 0 3px 10px rgba(0,0,0,0.45); animation: twWellBob 1.4s ease-in-out infinite; }
+@keyframes twBossLoom { 0%,100% { transform: translate(-50%, -100%) scale(1); } 50% { transform: translate(-50%, -100%) scale(1.03); } }
+/* Boss battle modal */
+.tw-boss-modal { position: fixed; inset: 0; z-index: 640; display: grid; place-items: center; padding: 14px; background: radial-gradient(120% 120% at 50% 25%, rgba(60,16,10,0.82), rgba(4,2,1,0.94)); animation: twRevealIn .2s ease both; }
+.tw-boss-panel { width: min(440px, 96vw); border-radius: 20px; padding: 14px; background: linear-gradient(180deg, rgba(28,16,12,0.99), rgba(14,8,6,0.99)); border: 1px solid rgba(224,120,74,0.55); box-shadow: 0 22px 60px rgba(0,0,0,0.72); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tw-boss-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.tw-boss-title { font-size: 1.05rem; font-weight: 900; color: #ffcaba; }
+.tw-boss-leave { background: rgba(255,255,255,0.08); border: none; color: #e8d6c0; width: 30px; height: 30px; border-radius: 999px; font-size: 15px; cursor: pointer; }
+.tw-boss-stage { position: relative; width: 100%; display: grid; place-items: center; padding: 6px 0 2px; cursor: pointer; }
+.tw-boss-big { height: 230px; width: auto; max-width: 100%; filter: drop-shadow(0 10px 16px rgba(0,0,0,0.6)); transition: transform .1s; }
+.tw-boss-big.is-cd { filter: drop-shadow(0 10px 16px rgba(0,0,0,0.6)) brightness(1.25) saturate(1.2); }
+.tw-boss-big:active { transform: scale(0.97); }
+.tw-boss-bigemoji { font-size: 150px; }
+.tw-boss-dmg { position: absolute; top: 20%; font-weight: 900; font-size: 22px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.85); pointer-events: none; animation: twDmg .8s ease-out forwards; }
+.tw-boss-dmg.is-crit { font-size: 30px; color: #ffe27a; }
+.tw-boss-hpwrap { width: 100%; }
+.tw-boss-hpline { font-size: 0.74rem; font-weight: 800; color: #ffd0c8; margin-bottom: 3px; }
+.tw-boss-hpline b { color: #fff; }
+.tw-boss-hpouter { width: 100%; height: 16px; border-radius: 999px; background: rgba(0,0,0,0.55); border: 1px solid rgba(0,0,0,0.5); overflow: hidden; }
+.tw-boss-hpouter span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); transition: width .35s ease; }
+.tw-boss-roster { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; width: 100%; }
+.tw-boss-fighter { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); display: grid; place-items: center; font-size: 15px; }
+.tw-boss-fighter.is-you { border-color: #ffd75e; box-shadow: 0 0 8px rgba(255,215,94,0.5); }
+.tw-boss-fighter img { width: 100%; height: 100%; object-fit: contain; }
+.tw-boss-count { font-size: 0.68rem; font-weight: 800; color: #cbb9a0; margin-left: 4px; }
+.tw-boss-strike { width: 100%; padding: 14px; border-radius: 14px; border: none; background: linear-gradient(180deg,#ff8a4c,#e0431a); color: #fff; font-weight: 900; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 16px rgba(224,67,26,0.5); text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+.tw-boss-strike.is-cd { opacity: 0.6; cursor: default; }
+.tw-boss-hint { font-size: 0.68rem; color: #cbb9a0; text-align: center; }
 /* ── DUEL modal ── */
 .tw-duel { position: fixed; inset: 0; z-index: 640; display: grid; place-items: center; padding: 18px; background: radial-gradient(120% 120% at 50% 30%, rgba(40,12,8,0.72), rgba(4,2,1,0.9)); animation: twRevealIn .2s ease both; }
 .tw-duel-card { width: min(400px, 94vw); border-radius: 20px; padding: 18px; background: linear-gradient(180deg, rgba(30,18,14,0.99), rgba(16,10,8,0.99)); border: 1px solid rgba(224,120,74,0.5); box-shadow: 0 20px 55px rgba(0,0,0,0.7); }

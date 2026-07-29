@@ -36,9 +36,11 @@ export const TOWN_EVENT_TYPES = {
         name: "Goblin Swarm", emoji: "👺", hp: 2000, enemies: 8, rewardGold: 1800, durationMin: 12, duelPower: 13,
         pushTitle: "👺 A goblin swarm hit the Town!", pushBody: "Pile into the plaza and drive them out — loot for everyone who fights!",
     },
+    // The golem is a BOSS RAID (not a skirmish): ONE huge shared boss everyone strikes together, its HP bar drains
+    // for the whole pack, and killing it ENDS the raid. No per-hit rewards — only a rich completion reward.
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", hp: 1800, enemies: 2, rewardGold: 4000, durationMin: 12, duelPower: 40,
-        pushTitle: "💎 A Treasure Golem lumbered into Town!", pushBody: "Crack it open together — it's stuffed with gold. First to the plaza wins big!",
+        name: "Treasure Golem", emoji: "💎", boss: true, hp: 260000, testHp: 6000, rewardGold: 4000, durationMin: 20,
+        pushTitle: "💎 A Treasure Golem BOSS lumbered into Town!", pushBody: "It's massive — the whole pack has to bring it down together. Rush the plaza!",
     },
 };
 
@@ -46,13 +48,19 @@ const HIT_THROTTLE_MS = 1000;  // 1-second cooldown between taps
 const FLAT_MIN_GOLD = 25;      // everyone who lands a hit gets at least this
 const RAID_MAX_GOLD = 500;     // per-fighter gold CAP (a raid is a nice bonus, not a jackpot)
 const RAID_PARTICIPATION_XP = 250; // XP each fighter earns when the raid resolves (the raid's main draw is XP now)
-// ── DUELS ── clicking a foe starts a back-and-forth exchange (like ship battles). Win → a small reward + a low
-// loot chance; your FIRST fight of a raid always drops a chest (thanks for coming down); a loss still pays a little.
+// ── DUELS (skirmish raids) ── clicking a foe starts a back-and-forth exchange. Win → a small reward + a low loot
+// chance; your FIRST fight of a raid always drops a chest (thanks for coming down); a loss still pays a little.
 const DUEL_THROTTLE_MS = 700;
-const DUEL_WIN_XP = 35;
-const DUEL_WIN_GOLD = 55;
-const DUEL_LOSS_GOLD = 12;      // consolation so a loss is never nothing
-const DUEL_LOOT_CHANCE = 0.18;  // chance a WIN also drops a low-tier chest
+const DUEL_WIN_XP = 18;         // tuned DOWN — per-enemy spoils were too rich
+const DUEL_WIN_GOLD = 22;
+const DUEL_LOSS_GOLD = 8;       // consolation so a loss is never nothing
+const DUEL_LOOT_CHANCE = 0.10;  // chance a WIN also drops a low-tier chest
+// ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
+// only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
+const BOSS_STRIKE_THROTTLE_MS = 1000;
+const BOSS_COMPLETE_GOLD = 900;   // to every fighter on a kill
+const BOSS_COMPLETE_XP = 800;
+const BOSS_ESCAPE_MULT = 0.4;     // if the boss survives the timer, fighters get this fraction of the reward
 // Per-tap damage from the player's real equipped stats (+ pet), with a crit roll and a chance at a weapon-skill
 // proc. Server-authoritative so a cheating client can't inflate it. Returns { damage, crit, proc }.
 async function computeRaidHit(buyerId) {
@@ -106,8 +114,10 @@ export async function getActiveTownEvent(buyerId) {
     await resolveExpiredEvents();
     let ev = await db.queryOne(`SELECT * FROM mkt_town_event WHERE status = 'active' ORDER BY started_at DESC LIMIT 1`).catch(() => null);
     if (!ev) return null;
-    // A wave sitting at 0 (cleared) → reinforcements arrive; the raid runs until its timer, never ends on a clear.
+    const isBoss = Boolean(ev.meta?.boss);
     if (ev.hp <= 0) {
+        if (isBoss) { await resolveTownEvent(ev.id, "defeated").catch(() => {}); return null; } // boss down → raid over
+        // Skirmish: a cleared wave refills; the raid runs until its timer, never ends on a clear.
         const w = await refillWave(ev);
         ev = { ...ev, hp: w.hp, meta: { ...ev.meta, wave: w.wave } };
     }
@@ -119,9 +129,10 @@ export async function getActiveTownEvent(buyerId) {
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_event_hit WHERE event_id = $1`, [ev.id]).catch(() => ({ n: 0 })),
     ]);
     return {
-        id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️",
+        id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️", boss: isBoss,
         hp: ev.hp, hpMax: ev.hp_max, endsAt: ev.ends_at, startedAt: ev.started_at, rewardGold: ev.reward_gold,
         enemies, enemiesLeft: ev.hp <= 0 ? 0 : Math.max(1, Math.ceil((ev.hp / ev.hp_max) * enemies)),
+        hpPct: ev.hp_max ? Math.max(0, Math.round((ev.hp / ev.hp_max) * 100)) : 0,
         wave: Number(ev.meta?.wave) || 1, minMs: Number(ev.meta?.minMs) || MIN_ACTIVE_MS,
         myDamage: mine?.damage || 0, myHits: mine?.hits || 0,
         fighterCount: count?.n || 0,
@@ -136,10 +147,12 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     if (!type) return { ok: false, error: "unknown_kind" };
     const existing = await db.queryOne(`SELECT id FROM mkt_town_event WHERE status = 'active' LIMIT 1`).catch(() => null);
     if (existing) return { ok: false, error: "already_active" };
+    // Boss raids get a huge shared HP pool (a much smaller one for silent owner-tests so they're soloable).
+    const spawnHp = type.boss ? (silent ? (type.testHp || type.hp) : type.hp) : type.hp;
     const row = await db.queryOne(
         `INSERT INTO mkt_town_event (kind, name, status, hp_max, hp, reward_gold, ends_at, meta)
          VALUES ($1, $2, 'active', $3, $3, $4, NOW() + ($5 || ' minutes')::interval, $6) RETURNING id`,
-        [kind, type.name, type.hp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent), enemies: type.enemies || 6, minMs: silent ? MIN_ACTIVE_SILENT_MS : MIN_ACTIVE_MS, wave: 1 })]
+        [kind, type.name, spawnHp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent), boss: Boolean(type.boss), enemies: type.enemies || 6, minMs: silent ? MIN_ACTIVE_SILENT_MS : MIN_ACTIVE_MS, wave: 1 })]
     ).catch(() => null);
     if (!row) return { ok: false, error: "spawn_failed" };
     if (!silent) {
@@ -220,10 +233,61 @@ async function resolveTownEvent(eventId, outcome) {
         [eventId, outcome === "defeated" ? "defeated" : "expired"]
     ).catch(() => null);
     if (!ev) return; // someone else already closed it
-    const n = (await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_event_hit WHERE event_id = $1`, [eventId]).catch(() => null))?.n || 0;
+    const hits = await db.query(`SELECT buyer_id, damage FROM mkt_town_event_hit WHERE event_id = $1`, [eventId]).catch(() => []);
+    const n = hits.length;
+    // BOSS RAID: a fat COMPLETION reward to everyone who joined (full on a kill; a fraction if it escaped the timer).
+    if (ev.meta?.boss) {
+        const killed = outcome === "defeated";
+        const mult = killed ? 1 : BOSS_ESCAPE_MULT;
+        const gold = Math.round(BOSS_COMPLETE_GOLD * mult);
+        const xp = Math.round(BOSS_COMPLETE_XP * mult);
+        for (const h of hits) {
+            if (gold > 0) {
+                const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);
+                await logCoin(h.buyer_id, gold, "boss_raid", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
+            }
+            if (xp > 0) await awardXp(h.buyer_id, "boss_raid", { points: xp, gold: 0, dedupeKey: `boss_raid:${eventId}:${h.buyer_id}` }).catch(() => {});
+            // Completion chest — a Gold chest on a kill (a Wooden one if it escaped).
+            await addChests(h.buyer_id, { [killed ? "gold" : "wooden"]: 1 }, { source: "boss_raid" }).catch(() => {});
+            await db.query(`UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3 WHERE event_id = $1 AND buyer_id = $2`, [eventId, h.buyer_id, gold]).catch(() => {});
+        }
+        if (!ev.meta?.silent) {
+            broadcastWebPush({ title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+        }
+        return;
+    }
     if (!ev.meta?.silent) {
         broadcastWebPush({ title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
     }
+}
+
+// Strike the BOSS RAID (the golem): everyone hits ONE shared HP pool. No per-hit reward — killing it ends the raid
+// and pays the completion reward (resolveTownEvent). Returns the boss's new HP + your running damage.
+export async function bossRaidStrike(buyerId, eventId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const ev = await db.queryOne(`SELECT id, hp, hp_max, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
+    if (!ev || !ev.meta?.boss) return { ok: false, error: "no_boss" };
+    const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
+    if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < BOSS_STRIKE_THROTTLE_MS) return { ok: false, error: "too_fast", hp: ev.hp };
+    const hit = await computeRaidHit(buyerId);
+    const dmg = hit.damage;
+    const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
+    const mine = await db.queryOne(
+        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()
+         RETURNING damage, hits`,
+        [eventId, buyerId, dmg]
+    ).catch(() => null);
+    bumpTownQuest(buyerId, "rally", 1).catch(() => {});
+    const hp = updated?.hp ?? ev.hp;
+    let killed = false;
+    if (hp <= 0) { await resolveTownEvent(eventId, "defeated").catch(() => {}); killed = true; }
+    return {
+        ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
+        hp, hpMax: ev.hp_max, hpPct: ev.hp_max ? Math.max(0, Math.round((hp / ev.hp_max) * 100)) : 0,
+        myDamage: Number(mine?.damage || dmg), killed,
+        reward: killed ? { gold: BOSS_COMPLETE_GOLD, xp: BOSS_COMPLETE_XP, chest: "gold" } : null,
+    };
 }
 
 // A back-and-forth exchange (like the ship battles): both open at 100 HP and trade blows scaled by their power,

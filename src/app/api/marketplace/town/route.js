@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
-import { attackTownEvent, spawnTownEvent, duelRaidEnemy } from "@/lib/marketplace/town-events.js";
+import { attackTownEvent, spawnTownEvent, duelRaidEnemy, bossRaidStrike } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { claimWishingWell } from "@/lib/marketplace/town-projects.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -38,6 +38,7 @@ export async function POST(request) {
             else if (body?.action === "project_contribute") res = await contributeTownProject(buyer.id, body?.projectId, body?.amount);
             else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId, body?.move);
             else if (body?.action === "duel") res = await duelRaidEnemy(buyer.id, body?.eventId);
+            else if (body?.action === "boss_strike") res = await bossRaidStrike(buyer.id, body?.eventId);
             else if (body?.action === "merchant_buy") res = await buyMerchantChest(buyer.id, body?.tier);
             else if (body?.action === "merchant_gamble") res = await gambleMerchantGear(buyer.id);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);
