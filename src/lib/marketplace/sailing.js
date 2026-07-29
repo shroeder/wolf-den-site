@@ -7,7 +7,7 @@ import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
-import { itemById, ITEMS, STAT_META, sumItemSea } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -1203,8 +1203,10 @@ export async function doRaid(buyerId, targetId = null) {
         goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus) * (raidExtras.doubleGold ? 2 : 1)); // Bounty + Dread Corsair double
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
         if (Math.random() < Math.min(0.05, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 5%)
-            const it = await db.queryOne(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 ORDER BY random() LIMIT 1`, [target.id]).catch(() => null);
-            const item = it?.item_id ? itemById(it.item_id) : null;
+            // Copy one of THEIR items — but never a BOUND piece (ascendant+ can't be copied/traded).
+            const rows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [target.id]).catch(() => []);
+            const pool = rows.map((r) => itemById(r.item_id)).filter((d) => d && !isTradeLocked(d.rarity));
+            const item = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
             if (item) {
                 const g = await grantItem(buyerId, item.id, "raid").catch(() => null);
                 itemWon = { id: item.id, name: item.name, rarity: item.rarity, image: await itemSpriteFor(item.id).catch(() => null), isNew: !!g?.granted };

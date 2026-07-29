@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
@@ -240,6 +241,11 @@ export default function AuctionClient({ initial }) {
                                         <div className="muted" style={{ fontSize: "0.76rem" }}>
                                             🪙 {l.price.toLocaleString()} · {l.status === "active" ? `⏳ ${timeLeft(l.expiresAt)} left` : l.status === "sold" ? "✅ sold" : l.status === "expired" ? "⌛ expired (returned)" : "↩ cancelled"}
                                         </div>
+                                        {l.status === "sold" && l.buyerName ? (
+                                            <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "#8fe39a", marginTop: 2 }}>
+                                                🤝 Bought by {l.buyerAlias ? <Link href={`/marketplace/u/${l.buyerAlias}`} style={{ color: "#8fe39a" }}>{l.buyerName}</Link> : l.buyerName}{l.soldAt ? ` · ${ago(l.soldAt)}` : ""}
+                                            </div>
+                                        ) : null}
                                     </div>
                                     {l.status === "active" ? <button type="button" className="ah-cancel-btn" disabled={busy} onClick={() => cancel(l.id)}>Cancel</button> : null}
                                 </div>

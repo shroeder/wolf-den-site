@@ -10,6 +10,7 @@ import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { transferItemElement } from "@/lib/marketplace/item-element.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
@@ -174,13 +175,20 @@ export async function getMyListings(buyerId) {
     if (!buyerId) return [];
     await expireAuctions();
     const rows = await db.query(
-        `SELECT a.id, a.seller_id, a.item_id, a.price, a.status, a.listed_at, a.expires_at, a.sold_at, b.display_name, b.alias
-           FROM mkt_auction a JOIN mkt_buyer b ON b.id = a.seller_id
+        `SELECT a.id, a.seller_id, a.item_id, a.price, a.status, a.listed_at, a.expires_at, a.sold_at,
+                buyer.display_name AS buyer_name, buyer.alias AS buyer_alias
+           FROM mkt_auction a
+           LEFT JOIN mkt_buyer buyer ON buyer.id = a.buyer_id
           WHERE a.seller_id = $1 AND (a.status = 'active' OR a.status IN ('sold','expired','cancelled') AND a.listed_at > NOW() - INTERVAL '7 days')
           ORDER BY (a.status = 'active') DESC, a.listed_at DESC LIMIT 100`, [buyerId]
     ).catch(() => []);
     const sprites = await itemSpriteMap().catch(() => ({}));
-    return rows.map((r) => { const it = itemById(r.item_id); return it ? { id: Number(r.id), itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[r.item_id] || null, price: Number(r.price), status: r.status, listedAt: r.listed_at, expiresAt: r.expires_at } : null; }).filter(Boolean);
+    return rows.map((r) => {
+        const it = itemById(r.item_id);
+        if (!it) return null;
+        const buyerName = r.status === "sold" ? (r.buyer_name || (r.buyer_alias ? `@${r.buyer_alias}` : "a wolf")) : null;
+        return { id: Number(r.id), itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[r.item_id] || null, price: Number(r.price), status: r.status, listedAt: r.listed_at, expiresAt: r.expires_at, soldAt: r.sold_at, buyerName, buyerAlias: r.status === "sold" ? r.buyer_alias : null };
+    }).filter(Boolean);
 }
 
 // Full state for the Auction House screen (owner-gated during the build).
@@ -256,6 +264,18 @@ export async function buyAuctionListing(buyerId, listingId) {
     // Sale done → check both sides for newly-earned Auction badges.
     syncEarnedBadges(buyerId).catch(() => {});
     syncEarnedBadges(claim.seller_id).catch(() => {});
+    // Notify the SELLER their item sold (web push).
+    (async () => {
+        const b = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        const who = b?.display_name || (b?.alias ? `@${b.alias}` : "a wolf");
+        await sendWebPush(claim.seller_id, {
+            title: "💰 Your item sold!",
+            body: `${it?.name || "Your listing"} sold to ${who} for ${price.toLocaleString()} gold.`,
+            url: "/marketplace/auction",
+            tag: `auction-sold-${claim.id}`,
+            data: { type: "auction_sold" },
+        }).catch(() => {});
+    })().catch(() => {});
     return { ok: true, item: { id: claim.item_id, name: it?.name, rarity: it?.rarity }, price, gold: Number(paid.gold) };
 }
 
