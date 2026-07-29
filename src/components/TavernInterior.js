@@ -483,7 +483,7 @@ const TV_CSS = `
 .tv-chatbar button { flex: 0 0 auto; width: 44px; border-radius: 999px; border: none; background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #2a1a06; font-weight: 900; cursor: pointer; }
 .tv-chatbar button:disabled { opacity: .5; cursor: default; }
 /* Station panel — an overlay INSIDE the scene pane, for immersion */
-.tv-panel-wrap { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 14px; background: rgba(8,4,2,0.55); }
+.tv-panel-wrap { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 14px; background: rgba(8,4,2,0.55); } /* above the barkeep order tray (z-12) so the confirm modal isn't covered */
 .tv-panel { width: 100%; max-width: 330px; max-height: 90%; overflow-y: auto; overflow-x: hidden; border-radius: 16px; background: rgba(23,18,14,0.98); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 14px 40px rgba(0,0,0,0.6); padding: 14px; animation: tvPanelPop .28s cubic-bezier(.2,1.2,.3,1) both; }
 @keyframes tvPanelPop { 0% { transform: scale(.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 /* Drink confirm — juicy prompt before ordering */
