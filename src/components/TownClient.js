@@ -601,7 +601,7 @@ export default function TownClient({ initial }) {
                     {buildings.map((b) => {
                         const bart = art[b.id];
                         return (
-                            <Link key={b.id} href={b.href} className={`tw-building${bart ? " has-art" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND}%`, zIndex: 100 + Math.round(b.x) }} onClick={b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()}>
+                            <Link key={b.id} href={b.href} className={`tw-building${bart ? " has-art" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()}>
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
@@ -629,6 +629,7 @@ export default function TownClient({ initial }) {
                     </button>
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
                     <button type="button" className="tw-npc-btn" style={{ left: "51%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
+                        <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {art.questgiver?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -989,7 +990,7 @@ const TOWN_CSS = `
 .tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
 /* contact shadow so the building reads as sitting ON the cobblestones */
 .tw-building::after { content: ""; position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); width: 72%; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 72%); z-index: -1; pointer-events: none; }
-.tw-building-art { display: block; height: 190px; width: auto; max-width: 260px; object-fit: contain; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.5)); }
+.tw-building-art { display: block; height: 176px; width: auto; max-width: 244px; object-fit: contain; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.5)); }
 .tw-building-art[style*="scaleX"] { transform-origin: bottom center; }
 .tw-building-card { display: grid; place-items: center; width: 96px; height: 120px; border-radius: 12px; background: linear-gradient(180deg, rgba(40,28,58,0.94), rgba(26,18,40,0.96)); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 10px 22px rgba(0,0,0,0.5); }
 .tw-building-emoji { font-size: 46px; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
@@ -1084,6 +1085,10 @@ const TOWN_CSS = `
 .tw-depth-steps { display: flex; gap: 6px; flex: 0 0 auto; }
 .tw-depth-steps button { min-width: 32px; padding: 5px 8px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #f2ead9; font-weight: 800; cursor: pointer; }
 .tw-npc-alert { position: absolute; top: 0; right: 6px; z-index: 2; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e0433f; color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+/* Quest marker floating over the Quest-Giver's head — gold "!" = bounties available, green "?" = reward ready. */
+.tw-quest-marker { position: absolute; top: -22px; left: 50%; z-index: 3; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 16px; line-height: 1; color: #3a2a06; background: linear-gradient(180deg,#ffe27a,#f3b23a); border: 1.5px solid #fff3c4; box-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none; animation: twQuestBob 1.5s ease-in-out infinite; }
+.tw-quest-marker.is-ready { color: #06311f; background: linear-gradient(180deg,#8fe39a,#3ec06a); border-color: #d6ffe0; }
+@keyframes twQuestBob { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -6px); } }
 .tw-quests { display: flex; flex-direction: column; gap: 10px; }
 .tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 .tw-quest.is-claimed { opacity: 0.6; }
