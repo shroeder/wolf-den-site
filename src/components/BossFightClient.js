@@ -297,6 +297,7 @@ export default function BossFightClient() {
                             <div className="boss2-you">
                                 <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
                                 <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>
+                                {you.fortuneTickets > 0 ? <span className="boss2-fortune" title="Bonus raffle tickets from your fortune (pets/gear) — banked each day the boss is alive, on top of your damage tickets">🍀 +{you.fortuneTickets} from fortune</span> : null}
                                 {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
                             </div>
                             {you.autoPerHour ? (
@@ -398,7 +399,7 @@ export default function BossFightClient() {
                             );
                         })}
                     </div>
-                    <p className="muted boss2-note">Damage converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️.</p>
+                    <p className="muted boss2-note">Damage converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️. 🍀 Fortune (pets/gear) banks bonus tickets each day too.</p>
                 </div>
             ) : (
                 <p className="muted boss2-note">Be the first to strike — the pack is warming up.</p>

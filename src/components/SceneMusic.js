@@ -2,21 +2,34 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Gentle procedural ambient MUSIC for the walkable scenes (Town + Tavern). No audio files — a warm chord pad
-// (Web Audio) that slowly cycles a cozy folk progression, with an occasional soft pluck. Autoplay is blocked
+// Procedural ambient MUSIC for the walkable scenes (Town + Tavern). No audio files — a proper little looping
+// tune built live with Web Audio: a plucked-lute arpeggio + a walking bass on the downbeats + (in town) a
+// gentle lead melody, over a cozy 4-bar folk progression, warmed with a feedback delay. Autoplay is blocked
 // until a user gesture, so it kicks in on the first tap; a mute toggle persists the player's choice.
-const CHORDS = [
-    [110.0, 261.63, 329.63, 440.0], // Am
-    [87.31, 220.0, 261.63, 349.23], // F
-    [130.81, 261.63, 329.63, 392.0], // C
-    [98.0, 246.94, 293.66, 392.0],  // G
-];
 const KEY = "wolfden-scene-music-muted";
+const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+// Each bar = one chord (arp tones low→high + a bass root). Two moods: town is brighter/livelier with a lead
+// melody; the tavern is slower, warmer and mellower with no lead.
+const CHORD = {
+    C: { arp: [60, 64, 67, 72], bass: 48 },
+    G: { arp: [55, 59, 62, 67], bass: 43 },
+    Am: { arp: [57, 60, 64, 69], bass: 45 },
+    F: { arp: [53, 57, 60, 65], bass: 41 },
+};
+const ARP_PATTERN = [0, 1, 2, 3, 2, 3, 1, 2]; // which chord tone plays on each of the 8 eighth-notes in a bar
+// Town lead melody over the 4-bar loop (step 0..31 = eighth-notes). Sparse + singable; null = rest.
+const TOWN_LEAD = { 0: 64, 3: 67, 8: 71, 11: 67, 16: 69, 19: 72, 24: 72, 27: 69 };
+
+const VIBES = {
+    town: { bpm: 104, lpf: 1600, prog: ["C", "G", "Am", "F"], lead: TOWN_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.15, arpRelease: 0.55, master: 0.42 },
+    tavern: { bpm: 76, lpf: 950, prog: ["Am", "F", "C", "G"], lead: null, arpType: "triangle", arpGain: 0.05, bassType: "sine", bassGain: 0.17, arpRelease: 0.95, master: 0.4 },
+};
 
 export default function SceneMusic({ vibe = "town" }) {
     const [muted, setMuted] = useState(true);
     const started = useRef(false);
-    const audio = useRef(null); // { ctx, master, voices, chordTimer, pluckTimer }
+    const audio = useRef(null);
 
     // read saved preference (default: ON)
     useEffect(() => {
@@ -25,7 +38,7 @@ export default function SceneMusic({ vibe = "town" }) {
 
     const stop = useCallback(() => {
         const a = audio.current; if (!a) return;
-        clearInterval(a.chordTimer); clearTimeout(a.pluckTimer);
+        clearInterval(a.schedTimer);
         try { a.master.gain.setTargetAtTime(0, a.ctx.currentTime, 0.4); } catch { /* ok */ }
         setTimeout(() => { try { a.ctx.close(); } catch { /* ok */ } }, 900);
         audio.current = null; started.current = false;
@@ -36,49 +49,66 @@ export default function SceneMusic({ vibe = "town" }) {
         let ctx;
         try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
         started.current = true;
+        const cfg = VIBES[vibe] || VIBES.town;
+
         const master = ctx.createGain(); master.gain.value = 0;
-        const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = vibe === "tavern" ? 820 : 1100;
-        lp.connect(master); master.connect(ctx.destination);
-        // 4 sustained voices (bass + 3 chord tones)
-        const voices = CHORDS[0].map((f, i) => {
-            const o = ctx.createOscillator(); o.type = i === 0 ? "sine" : "triangle"; o.frequency.value = f;
-            const g = ctx.createGain(); g.gain.value = i === 0 ? 0.16 : 0.09;
-            o.connect(g); g.connect(lp); o.start();
-            return { o, g };
-        });
-        // slow breathing swell on the master
-        const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05;
-        const lfoG = ctx.createGain(); lfoG.gain.value = 0.4; lfo.connect(lfoG); lfoG.connect(master.gain); lfo.start();
-        master.gain.setTargetAtTime(0.5, ctx.currentTime, 1.2); // fade in
-        // cycle chords
-        let ci = 0;
-        const chordTimer = setInterval(() => {
-            ci = (ci + 1) % CHORDS.length;
-            const now = ctx.currentTime;
-            CHORDS[ci].forEach((f, i) => { try { voices[i].o.frequency.setTargetAtTime(f, now, 0.35); } catch { /* ok */ } });
-        }, 6000);
-        // occasional soft pluck from the current chord (a little life)
-        const pluck = () => {
-            const a = audio.current; if (!a) return;
-            const chord = CHORDS[ci];
-            const f = chord[1 + Math.floor(Math.random() * 3)] * 2;
-            const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = f;
-            const g = ctx.createGain(); g.gain.value = 0; o.connect(g); g.connect(lp); o.start();
-            const t = ctx.currentTime;
-            g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.06, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
-            o.stop(t + 1.7);
-            a.pluckTimer = setTimeout(pluck, 3500 + Math.random() * 5000);
+        master.connect(ctx.destination);
+        const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = cfg.lpf; lp.Q.value = 0.6;
+        lp.connect(master);
+        // A soft feedback delay for space/warmth (a fake reverb tail).
+        const delay = ctx.createDelay(1.0); delay.delayTime.value = (60 / cfg.bpm) * 0.75;
+        const fb = ctx.createGain(); fb.gain.value = 0.26;
+        const wet = ctx.createGain(); wet.gain.value = 0.34;
+        lp.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
+        master.gain.setTargetAtTime(cfg.master, ctx.currentTime, 1.4); // fade in
+
+        // A single plucked note with a quick attack + exponential decay (lute-ish).
+        const pluck = (midi, t, dur, gainVal, type, detune = 0) => {
+            const f = midiToFreq(midi);
+            const o = ctx.createOscillator(); o.type = type; o.frequency.value = f;
+            const g = ctx.createGain(); g.gain.value = 0;
+            o.connect(g); g.connect(lp);
+            let o2 = null;
+            if (detune) { o2 = ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = f; o2.detune.value = detune; o2.connect(g); }
+            o.start(t); if (o2) o2.start(t);
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(gainVal, t + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.stop(t + dur + 0.06); if (o2) o2.stop(t + dur + 0.06);
         };
-        const pluckTimer = setTimeout(pluck, 2500);
-        audio.current = { ctx, master, voices, lp, chordTimer, pluckTimer };
+
+        const step8 = 30 / cfg.bpm; // seconds per eighth-note
+        let step = 0;
+        let nextTime = ctx.currentTime + 0.12;
+        const scheduleStep = (s, t) => {
+            const bar = Math.floor(s / 8) % 4;
+            const inBar = s % 8;
+            const chord = CHORD[cfg.prog[bar]];
+            // Arpeggio (every eighth-note)
+            pluck(chord.arp[ARP_PATTERN[inBar] % chord.arp.length], t, cfg.arpRelease, cfg.arpGain, cfg.arpType);
+            // Bass on beats 1 and 3
+            if (inBar === 0 || inBar === 4) pluck(chord.bass, t, step8 * 3.6, cfg.bassGain, cfg.bassType);
+            // Lead melody (town), longer + slightly detuned for a singing tone
+            if (cfg.lead && cfg.lead[s] != null) pluck(cfg.lead[s], t, step8 * 3.2, 0.075, "triangle", 7);
+        };
+        const tick = () => {
+            const a = audio.current; if (!a) return;
+            while (nextTime < ctx.currentTime + 0.14) {
+                scheduleStep(step, nextTime);
+                nextTime += step8;
+                step = (step + 1) % 32;
+            }
+        };
+        tick();
+        const schedTimer = setInterval(tick, 25);
+        audio.current = { ctx, master, lp, delay, schedTimer };
     }, [vibe]);
 
     // Kick off on the first user gesture (autoplay policy) if not muted.
     useEffect(() => {
         if (muted) { stop(); return undefined; }
         const go = () => { start(); window.removeEventListener("pointerdown", go); };
-        // try immediately (in case audio is already unlocked), else wait for a tap
-        start();
+        start(); // try immediately (in case audio is already unlocked)
         window.addEventListener("pointerdown", go, { once: true });
         return () => window.removeEventListener("pointerdown", go);
     }, [muted, start, stop]);
@@ -90,7 +120,7 @@ export default function SceneMusic({ vibe = "town" }) {
     }, []);
 
     return (
-        <button type="button" onClick={toggle} aria-label={muted ? "Play music" : "Mute music"} title={muted ? "Play tavern music" : "Mute music"}
+        <button type="button" onClick={toggle} aria-label={muted ? "Play music" : "Mute music"} title={muted ? `Play ${vibe} music` : "Mute music"}
             style={{ position: "absolute", top: 10, right: 10, zIndex: 9, width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(20,10,4,0.72)", color: "#ffe0b0", fontSize: 15, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
             {muted ? "🔇" : "🎵"}
         </button>

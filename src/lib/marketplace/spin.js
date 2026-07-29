@@ -65,7 +65,7 @@ const WHEELS = [
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
             { label: "50 gold", sprite: "coins-small", weight: 16, kind: "gold", amount: 50 },
-            { label: "150 XP", sprite: "xp-orb", weight: 12, kind: "xp", amount: 150 },
+            { label: "60 XP", sprite: "xp-orb", weight: 12, kind: "xp", amount: 60 },
             { label: "100 gold", sprite: "coins-small", weight: 15, kind: "gold", amount: 100 },
             { label: "Pet Treat", sprite: "pet-treat", weight: 10, kind: "consumable", consumable: "treat_bone", n: 1 },
             { label: "Farm Seed", sprite: "seed-pouch", weight: 9, kind: "seed" },
@@ -74,7 +74,7 @@ const WHEELS = [
             { label: "3 Dig Fragments", sprite: "dig-shard", weight: 8, kind: "fragment", n: 3 },
             { label: "MINI WHEEL", sprite: "mini-wheel", weight: 5, tier: "bonus", kind: "mini_wheel" },
             { label: "350 gold", sprite: "coins-big", weight: 8, kind: "gold", amount: 350 },
-            { label: "400 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 400 },
+            { label: "150 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 150 },
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
             { label: "BONUS SPIN", sprite: "bonus-spin", weight: 7, tier: "bonus", kind: "respin" },
             { label: "Wooden Chest", sprite: "chest-wood", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
@@ -91,7 +91,7 @@ const WHEELS = [
 // The MINI WHEEL bonus round — a small secondary wheel of solid prizes.
 const MINI_WHEEL_PRIZES = [
     { label: "300 gold", sprite: "coins-small", weight: 20, kind: "gold", amount: 300 },
-    { label: "400 XP", sprite: "xp-orb", weight: 14, kind: "xp", amount: 400 },
+    { label: "150 XP", sprite: "xp-orb", weight: 14, kind: "xp", amount: 150 },
     { label: "Hearty Snack", sprite: "pet-treat", weight: 12, kind: "consumable", consumable: "treat_snack", n: 1 },
     { label: "5 Dig Fragments", sprite: "dig-shard", weight: 12, kind: "fragment", n: 5 },
     { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },

@@ -9548,6 +9548,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .badge-tile-bar span { display: block; height: 100%; background: linear-gradient(90deg, #d4af37, #ffd75e); border-radius: 4px; }
 .boss2-you { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: 0.9rem; }
 .boss2-tix { font-weight: 800; color: #ffd75e; }
+.boss2-fortune { font-weight: 800; font-size: 0.78rem; color: #8fe39a; background: rgba(143,227,154,0.12); border: 1px solid rgba(143,227,154,0.3); border-radius: 999px; padding: 2px 9px; }
 
 /* ---- active heroes (compact identity strip: mini avatar + badge + name) ---- */
 .hero-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }

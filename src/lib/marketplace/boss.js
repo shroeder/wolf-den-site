@@ -350,9 +350,10 @@ export async function getBossState(buyerId = null) {
     ]);
     // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
     // Base (Lv1) art + evolved (Lv2–5) art; each fighter shows the sprite for THEIR pet's level.
-    const [petSprites, petSpriteLevels] = await Promise.all([
+    const [petSprites, petSpriteLevels, packPetBonuses] = await Promise.all([
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
+        getPackPetBonuses().catch(() => new Map()), // whole-pack fortune, so every roster card's ticket TOTAL is the same for all viewers
     ]);
 
     // Each contributor's most prestigious badge (lowest sort_order), in one query — so the roster cards
@@ -451,6 +452,11 @@ export async function getBossState(buyerId = null) {
     const rosterDmgRank = new Map(contributors.filter((c) => (c.dmg || 0) > 0).slice(0, 3).map((c, i) => [c.id, i + 1]));
     const roster = contributors.map((c) => {
         const rcos = sanitizeCosmetics(c.avatar_cosmetics);
+        // Tickets = damage-earned + this member's fortune bonus (computed from the SHARED pack-fortune, so the
+        // total is identical on everyone's screen AND matches the actual raffle draw). fortuneTickets is broken
+        // out so the UI can show "+N from fortune".
+        const dmgTickets = Math.floor(c.dmg / divisor);
+        const fortTickets = fortuneTickets(packPetBonuses.get(c.id)?.stats?.fortune || 0, boss);
         return {
             id: c.id,
             dmgRank: rosterDmgRank.get(c.id) || null,
@@ -469,7 +475,9 @@ export async function getBossState(buyerId = null) {
             aura: rcos && typeof rcos === "object" && rcos.aura && rcos.aura !== "none" ? rcos.aura : null,
             dmg: c.dmg,
             hits: c.hits,
-            tickets: Math.floor(c.dmg / divisor),
+            dmgTickets,
+            fortuneTickets: fortTickets,
+            tickets: dmgTickets + fortTickets,
             you: buyerId && c.id === buyerId,
         };
     });
@@ -509,13 +517,11 @@ export async function getBossState(buyerId = null) {
         const myLevel = mine?.level || lvl(goldRow?.xp || 0);
         const myAutoPerHour = Math.round(autoPerHour(myLevel, autoStats(myStats, myPet?.stats || {})) * em.mult);
         const cheerStatus = await getCheerStatus(buyerId).catch(() => ({ left: 0, perDay: CHEERS_PER_DAY }));
-        // Fortune (raffle luck) from pets/gear banks bonus tickets PER DAY the boss is alive (see fortuneTickets).
-        const myFortuneTickets = fortuneTickets(myPet?.stats?.fortune || 0, boss);
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) + myFortuneTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
-        // NOTE: do NOT fold your fortune tickets into your roster card — that made the shared leaderboard show
-        // different totals to every viewer (each person saw only THEIR OWN card boosted). The roster now shows
-        // the same damage-based tickets to everyone; your fortune bonus lives in `you.tickets`/`you.fortuneTickets`
-        // (your personal headline) and still counts in the actual raffle draw.
+        // Your headline ticket count MIRRORS your roster card exactly (damage-tickets + fortune bonus), so the
+        // number you see for yourself is the same number everyone else sees for you — no more mismatches.
+        const myDmgTickets = mine?.dmgTickets ?? Math.floor(dmg / divisor);
+        const myFortuneTickets = mine?.fortuneTickets ?? fortuneTickets(myPet?.stats?.fortune || 0, boss);
+        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: myDmgTickets + myFortuneTickets, dmgTickets: myDmgTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.

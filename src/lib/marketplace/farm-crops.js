@@ -105,6 +105,7 @@ export function upgradeEffect(key, level) {
     const max = FARM_UPGRADES[key]?.max || 0;
     return { label: labels[key] || FARM_UPGRADES[key]?.name || key, now: at(Math.min(max, level)), next: at(Math.min(max, level + 1)) };
 }
+const HARVEST_PLAYER_XP_MULT = 0.4; // player banks 40% of a crop's XP (the full value still feeds your pet)
 const FERTILIZER_PRICE = 350; // gold per fertilizer
 const FERTILIZER_CUT = 0.4; // fertilizer removes 40% of the REMAINING grow time
 const RAIN_CUT = 0.3; // logging in during rain removes 30% of remaining time (once per plot per 6h)
@@ -319,7 +320,10 @@ export async function harvestPlot(buyerId, slot) {
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
-    if (xp > 0) await awardXp(buyerId, "harvest", { points: xp, gold: 0 }).catch(() => {});
+    // Harvest is a huge XP minter, so the PLAYER only banks a fraction of the crop's XP (tuned down). The full
+    // crop XP still feeds the PET below — the farm stays a pet-XP engine, it just doesn't flood player levels.
+    const harvestPlayerXp = Math.round(xp * HARVEST_PLAYER_XP_MULT);
+    if (harvestPlayerXp > 0) await awardXp(buyerId, "harvest", { points: harvestPlayerXp, gold: 0 }).catch(() => {});
     // The farm IS a pet-XP engine: every harvest also feeds your equipped pet XP equal to the crop's value, so
     // tending crops visibly levels your companion (rarer/slower crops feed it much more). Gated by real grow
     // time, so it's steady progress, not a free maxing lever. Capped at the pet's max XP inside addEquippedPetXp.
