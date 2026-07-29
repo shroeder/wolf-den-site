@@ -76,9 +76,10 @@ export async function transferItemElement(fromId, toId, itemId) {
     ).catch(() => {});
 }
 
-// Reforge an OWNED item's elemental affinity to `target`. Charges gold; small chance to instead go DUAL
-// (keep the current element + add the target). Can't reforge to an element it already has.
-export async function reforgeItemElement(buyerId, itemId, target) {
+// Reforge an OWNED item's elemental affinity to `target`. Charges gold; a single-element piece has a small
+// chance to instead go DUAL (keep the current element + add the target). For a DUAL item you pass `replaceKey`
+// to choose WHICH of its two elements to swap out (the other is kept). Can't reforge to an element it has.
+export async function reforgeItemElement(buyerId, itemId, target, replaceKey = null) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const item = itemById(itemId);
     if (!item) return { ok: false, error: "bad_item" };
@@ -91,9 +92,18 @@ export async function reforgeItemElement(buyerId, itemId, target) {
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold", cost };
     await logCoin(buyerId, -cost, "reforge_element", { balanceAfter: paid.gold, meta: { itemId, target } }).catch(() => {});
-    // Dual proc — only possible when there's exactly one element to keep (a neutral or already-dual item can't).
-    const dual = cur.length === 1 && Math.random() < DUAL_ELEMENT_CHANCE;
-    const elements = dual ? [cur[0], target] : [target];
+    let dual = false;
+    let elements;
+    if (cur.length >= 2) {
+        // Dual item: swap out the chosen element (default the first), keep the other.
+        const drop = cur.includes(replaceKey) ? replaceKey : cur[0];
+        const keep = cur.find((e) => e !== drop);
+        elements = [keep, target];
+    } else {
+        // Single/neutral: small chance to keep the current one AND add the target (go dual).
+        dual = cur.length === 1 && Math.random() < DUAL_ELEMENT_CHANCE;
+        elements = dual ? [cur[0], target] : [target];
+    }
     await db.query(
         `INSERT INTO mkt_item_element (buyer_id, item_id, elements, updated_at) VALUES ($1, $2, $3::jsonb, NOW())
          ON CONFLICT (buyer_id, item_id) DO UPDATE SET elements = $3::jsonb, updated_at = NOW()`,

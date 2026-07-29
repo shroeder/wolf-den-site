@@ -20,7 +20,7 @@ export const CHEST_TIERS = {
     gold: { label: "Gold Chest", emoji: "💰", color: "#ffd75e", weights: { rare: 40, epic: 42, legendary: 16, mythic: 2 } },
     // Top tiers span 5 rarities each, with the curve ANCHORED to the low end — most drops are the ordinary
     // gear in range and the top rarities are a rare thrill. Higher chests just nudge more weight upward.
-    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { rare: 10, epic: 42, legendary: 34, mythic: 13, ascendant: 1 } },
+    mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { rare: 10, epic: 42, legendary: 34, mythic: 14 } },
     ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { epic: 34, legendary: 36, mythic: 22, ascendant: 7, eternal: 1 } },
     eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { epic: 30, legendary: 34, mythic: 24, ascendant: 9, eternal: 3 } },
     // The two rarest chests — a slightly richer tail (still bottom-anchored) + the best relic shot.
@@ -127,9 +127,9 @@ export async function syncLevelChests(buyerId) {
     for (let L = row.chest_level + 1; L <= level; L++) {
         const t = tierForLevel(L);
         tally[t] = (tally[t] || 0) + 1;
-        // Milestone: a BONUS Mythic chest every 10th level. This is the main way to earn a Mythic chest
-        // (level-ups otherwise cap at Gold), so mythic gear stays a rare chase — ~1 per 10 levels.
-        if (L % 10 === 0) tally.mythic = (tally.mythic || 0) + 1;
+        // Milestone: a BONUS Mythic chest every 15th level. This is the main way to earn a Mythic chest
+        // (level-ups otherwise cap at Gold), so mythic gear stays a rare chase — ~1 per 15 levels.
+        if (L % 15 === 0) tally.mythic = (tally.mythic || 0) + 1;
         // Elite lottery (L20+): a tiny shot at an Ascendant→Primordial chest, exponentially rarer per tier.
         if (L >= 20) {
             for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < e.chance) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }

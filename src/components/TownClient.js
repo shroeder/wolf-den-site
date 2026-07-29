@@ -632,7 +632,8 @@ export default function TownClient({ initial }) {
                 {/* "Grow the Plaza" DEPTH layers — each funded level stacks one more band FURTHER back (spires →
                     hills → distant castles). Farther layers scroll slower + sit hazier, so the town grows deeper
                     as it's invested in. Painted high-N-first so the nearest funded layer sits on top. */}
-                {layered ? [6, 5, 4, 3, 2, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
+                {/* depth2 (the pale hills/mountains band) is intentionally skipped — it read as a washed-out white layer. */}
+                {layered ? [6, 5, 4, 3, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
                     const factor = Math.max(0.3, 0.47 - (n - 1) * 0.03); // farther back → slower parallax
                     return (
                         <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>

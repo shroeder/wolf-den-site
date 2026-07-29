@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
@@ -120,6 +121,7 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
             stats: describeStats(mergeStats(it.stats || {}, bonus || {})),
             forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,
             util: det?.util || null,
+            signature: signatureFor(r.item_id),
             enhanceLevel: det?.level || 0,
             icon: it.icon, sprite: spriteMap[r.item_id] || null,
             ownerName: r.display_name || `@${r.alias}`, ownerAlias: r.alias,

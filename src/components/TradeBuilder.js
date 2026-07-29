@@ -30,6 +30,7 @@ function ItemToggle({ item, on, onClick, blocked = false }) {
             ) : <span style={{ fontSize: "0.62rem", opacity: 0.55, margin: "1px 0 2px" }}>cosmetic</span>}
             {item.enhanceLevel > 0 ? <span style={{ fontSize: "0.6rem", color: "#8fe39a", fontWeight: 800 }}>⚒️ +{item.enhanceLevel} forged</span> : null}
             {item.util ? <span style={{ fontSize: "0.6rem", color: "#e0c8ff", fontWeight: 800 }}>🔮 +{item.util.value}{item.util.unit} {item.util.label}{item.util.level > 1 ? ` Lv${item.util.level}` : ""}</span> : null}
+            {item.signature ? <span style={{ fontSize: "0.58rem", color: "#ffd75e", fontWeight: 800, lineHeight: 1.25 }}>★ {item.signature.label}</span> : null}
             {(item.charged || item.sea) ? (
                 <span style={{ fontSize: "0.6rem", color: "#ffd75e", fontWeight: 700 }}>{item.charged ? "🔋 perk" : ""}{item.charged && item.sea ? " · " : ""}{item.sea ? "🌊 sea" : ""}</span>
             ) : null}

@@ -170,6 +170,7 @@ export default function AuctionClient({ initial }) {
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
                                     {l.forgeStats ? <div className="ah-card-forge">⚒️ +{l.enhanceLevel} · {l.forgeStats}</div> : null}
                                     {l.util ? <div className="ah-card-attune">🔮 +{l.util.value}{l.util.unit} {l.util.label}{l.util.level > 1 ? ` Lv${l.util.level}` : ""} <span className="ah-attune-blurb">· {l.util.blurb}</span></div> : null}
+                                    {l.signature ? <div className="ah-card-sig">★ {l.signature.label} — {l.signature.desc}</div> : null}
                                     {l.compare && !l.mine ? <CompareBlock c={l.compare} /> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
                                     {l.mine ? (
@@ -202,6 +203,7 @@ export default function AuctionClient({ initial }) {
                                     {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
                                     {it.forgeStats ? <div className="ah-card-forge">⚒️ +{it.enhanceLevel} · {it.forgeStats}</div> : null}
                                     {it.util ? <div className="ah-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</div> : null}
+                                    {it.signature ? <div className="ah-card-sig">★ {it.signature.label}</div> : null}
                                 </button>
                             ))}
                         </div>
@@ -293,6 +295,7 @@ const AH_CSS = `
 .ah-card-forge { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
 .ah-card-attune { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #e0c8ff; }
 .ah-attune-blurb { font-weight: 600; color: #b7a9cf; }
+.ah-card-sig { font-size: 0.7rem; line-height: 1.3; font-weight: 700; color: #ffd75e; }
 .ah-cmp { margin-top: 4px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); }
 .ah-cmp-head { font-size: 0.66rem; font-weight: 700; color: #b9c2cf; margin-bottom: 4px; }
 .ah-cmp-head b { color: #e7edf4; font-weight: 800; }

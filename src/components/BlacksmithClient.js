@@ -121,8 +121,8 @@ export default function BlacksmithClient({ initial }) {
     }, [post]);
 
     // Elemental reforge — change a piece's affinity for gold; a rare dual-affinity proc keeps the old + adds new.
-    const doReforge = useCallback(async (item, element) => {
-        const r = await post({ action: "reforge_element", itemId: item.id, element }, `rf-${item.id}`);
+    const doReforge = useCallback(async (item, element, replace) => {
+        const r = await post({ action: "reforge_element", itemId: item.id, element, replace: replace || undefined }, `rf-${item.id}`);
         if (r?.ok) { (r.dual ? SFX.pixel : SFX.great)(); setReforgeFor(null); setReforgeFx({ item, elements: r.elements, dual: r.dual, from: r.from }); }
         else setToast({ kind: "err", text: r?.error === "insufficient_gold" ? `Need ${(r.cost || 0).toLocaleString()} 🪙 to reforge that.` : r?.error === "already_has" ? "It already carries that element." : "Couldn't reforge that." });
     }, [post]);
@@ -415,7 +415,7 @@ export default function BlacksmithClient({ initial }) {
 
             {enhanceResult ? <EnhanceResultModal res={enhanceResult} onClose={() => setEnhanceResult(null)} /> : null}
 
-            {reforgeFor ? <ReforgePicker item={reforgeFor} elements={reforge.elements} dualChance={reforge.dualChance} gold={forge.gold || 0} busy={busy} onPick={(el) => doReforge(reforgeFor, el)} onClose={() => setReforgeFor(null)} /> : null}
+            {reforgeFor ? <ReforgePicker item={reforgeFor} elements={reforge.elements} dualChance={reforge.dualChance} gold={forge.gold || 0} busy={busy} onPick={(el, replace) => doReforge(reforgeFor, el, replace)} onClose={() => setReforgeFor(null)} /> : null}
             {reforgeFx ? <ReforgeReveal fx={reforgeFx} onClose={() => setReforgeFx(null)} /> : null}
 
             {toast ? (
@@ -430,6 +430,10 @@ export default function BlacksmithClient({ initial }) {
 // ── Elemental reforge: pick a target element → confirm the cost ──────────────────────────────────────────────
 function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose }) {
     const [pick, setPick] = useState(null);
+    const isDual = (item.elements || []).length >= 2;
+    // For a dual item you choose WHICH of its two elements to swap out (default the first).
+    const [replaceKey, setReplaceKey] = useState(isDual ? item.elements[0].key : null);
+    const kept = isDual ? item.elements.find((e) => e.key !== replaceKey) : null;
     const has = new Set((item.elements || []).map((e) => e.key));
     const canAfford = gold >= item.cost;
     return (
@@ -444,22 +448,39 @@ function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose
                         </div>
                     </div>
                 </div>
-                <div className="forge-reforge-sub">Pick a new affinity — {dualChance}% chance to keep the current one too (dual!).</div>
+                {isDual ? (
+                    <>
+                        <div className="forge-reforge-sub">This piece is <b>dual-affinity</b> — pick which element to REPLACE (the other is kept):</div>
+                        <div className="forge-elem-grid two">
+                            {item.elements.map((e) => (
+                                <button key={e.key} type="button" className={`forge-elem-btn${replaceKey === e.key ? " on" : ""}`} style={{ "--ec": e.color }} onClick={() => { setReplaceKey(e.key); if (pick === e.key) setPick(null); }}>
+                                    <span className="forge-elem-emoji">{e.emoji}</span>
+                                    <span>{e.label}</span>
+                                    {replaceKey === e.key ? <span className="forge-elem-has" style={{ color: "#ff9a8f" }}>swap out</span> : <span className="forge-elem-has">keep</span>}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="forge-reforge-sub">Change it to:</div>
+                    </>
+                ) : (
+                    <div className="forge-reforge-sub">Pick a new affinity — {dualChance}% chance to keep the current one too (dual!).</div>
+                )}
                 <div className="forge-elem-grid">
                     {elements.map((e) => {
-                        const owned = has.has(e.key);
+                        // For a dual reforge, only the element you're KEEPING is off-limits (you can pick the one you're swapping out's slot).
+                        const owned = isDual ? kept?.key === e.key : has.has(e.key);
                         return (
                             <button key={e.key} type="button" className={`forge-elem-btn${pick === e.key ? " on" : ""}${owned ? " is-owned" : ""}`} style={{ "--ec": e.color }} disabled={owned} onClick={() => setPick(e.key)}>
                                 <span className="forge-elem-emoji">{e.emoji}</span>
                                 <span>{e.label}</span>
-                                {owned ? <span className="forge-elem-has">✓ has</span> : null}
+                                {owned ? <span className="forge-elem-has">✓ kept</span> : null}
                             </button>
                         );
                     })}
                 </div>
                 <div className="forge-reforge-actions">
                     <button type="button" className="forge-reforge-cancel" onClick={onClose}>Cancel</button>
-                    <button type="button" className="forge-reforge-go" disabled={!pick || busy || !canAfford} onClick={() => pick && onPick(pick)}>
+                    <button type="button" className="forge-reforge-go" disabled={!pick || busy || !canAfford} onClick={() => pick && onPick(pick, isDual ? replaceKey : null)}>
                         {canAfford ? `Reforge · 🪙 ${item.cost.toLocaleString()}` : `Need 🪙 ${item.cost.toLocaleString()}`}
                     </button>
                 </div>

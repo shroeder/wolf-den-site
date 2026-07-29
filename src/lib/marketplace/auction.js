@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { itemById, describeStats, STAT_META, EQUIP_SLOTS } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
@@ -91,6 +92,7 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
         stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, // effective (base + forge) totals
         forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, // the forge bonus alone
         util: det?.util || null, // rare Forge attunement (spin-off bonus stat) that rides with the item
+        signature: signatureFor(row.item_id), // ★ signature ability (the item's special power)
         sprite: sprites[row.item_id] || null,
         enhanceLevel: det?.level || 0,
         price: Number(row.price),
@@ -127,7 +129,7 @@ export async function getSellableItems(buyerId) {
         .map((id) => {
             const it = itemById(id);
             const bonus = enh[id]?.bonus || null;
-            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, util: enh[id]?.util || null, enhanceLevel: enh[id]?.level || 0 };
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
