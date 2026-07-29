@@ -174,6 +174,20 @@ export default function TownClient({ initial }) {
     const [viewportW, setViewportW] = useState(360);
     const [roster, setRoster] = useState(false);
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
+    // Remember where you were standing + looking, so hitting Back from a building drops you right where you left
+    // off (not reset to spawn). Restored post-mount from sessionStorage; re-saved on every hero/camera change.
+    useEffect(() => {
+        try {
+            const v = JSON.parse(sessionStorage.getItem("wolfden-town-view") || "null");
+            if (v && Date.now() - (v.t || 0) < 1_800_000) { // within 30 min
+                setMe((m) => ({ ...m, x: v.x ?? m.x, y: v.y ?? m.y, facing: v.facing ?? m.facing }));
+                setPanExtra(v.pan || 0);
+            }
+        } catch { /* ok */ }
+    }, []);
+    useEffect(() => {
+        try { sessionStorage.setItem("wolfden-town-view", JSON.stringify({ x: me.x, y: me.y, facing: me.facing, pan: panExtra, t: Date.now() })); } catch { /* ok */ }
+    }, [me.x, me.y, me.facing, panExtra]);
     const [dragging, setDragging] = useState(false); // true mid-drag → camera follows the finger instantly (no ease)
     const [chatText, setChatText] = useState("");    // town chat composer
     const [myChat, setMyChat] = useState(null);      // my own speech bubble (optimistic, clears after a few s)
@@ -286,7 +300,7 @@ export default function TownClient({ initial }) {
             const n = Math.min(ev.enemies || 6, 8);
             const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
             setRaidEnemies(Array.from({ length: n }).map((_, i) => ({
-                id: `${ev.id}-${wave}-${i}`, x: 8 + (i * 79) % 84, y: GROUND + 8 - (i % 2) * 4, hp: hpMax, hpMax, floats: [], dying: false,
+                id: `${ev.id}-${wave}-${i}`, x: n > 1 ? Math.round(7 + (i * 86) / (n - 1)) : 50, y: GROUND + 13 - (i % 3) * 3, hp: hpMax, hpMax, floats: [], dying: false,
             })));
         }
     }, [state?.event]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -449,7 +463,7 @@ export default function TownClient({ initial }) {
                 if (alive.length >= 1) return prev.filter((en) => !(en.dying && en.floats.length === 0));
                 const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
                 const nid = `${ev.id}-${raidWaveRef.current}-r${floatId.current}`;
-                return [...prev.filter((en) => !(en.dying && en.floats.length === 0)), { id: nid, x: 8 + (floatId.current * 37) % 84, y: GROUND + 8 - (floatId.current % 2) * 4, hp: hpMax, hpMax, floats: [], dying: false }];
+                return [...prev.filter((en) => !(en.dying && en.floats.length === 0)), { id: nid, x: 10 + (floatId.current * 41) % 80, y: GROUND + 13 - (floatId.current % 3) * 3, hp: hpMax, hpMax, floats: [], dying: false }];
             }), 420);
         }
     }, [state?.event, load, raidKills, raidDamage]);
@@ -467,6 +481,7 @@ export default function TownClient({ initial }) {
     const townBonuses = state?.bonuses || {};
     const well = state?.well || null; // Wishing Well daily-claim state { gold, xp, claimedToday } | null until funded
     const canWish = Boolean(well && !well.claimedToday);
+    const raidActive = Boolean(state?.event && !state.event.defeated); // during a raid: hide NPCs + lock the buildings
     const effDepth = 6; // every parallax skyline band is on by default now (no funding gate)
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
@@ -644,21 +659,24 @@ export default function TownClient({ initial }) {
                             <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "20%", top: `${GROUND}%` }} />
                         )
                     ) : null}
-                    {/* Buildings */}
+                    {/* Buildings — locked (no entry) while a raid is on: defend the plaza first! */}
                     {buildings.map((b) => {
                         const bart = art[b.id];
                         return (
-                            <Link key={b.id} href={b.href} className={`tw-building${bart ? " has-art" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()}>
+                            <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${raidActive ? " is-locked" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
                                 ) : (
                                     <span className="tw-building-card"><span className="tw-building-emoji">{b.emoji}</span></span>
                                 )}
-                                <span className="tw-building-label">{b.emoji} {b.label}</span>
+                                <span className="tw-building-label">{raidActive ? "🔒" : b.emoji} {b.label}</span>
                             </Link>
                         );
                     })}
+                    {/* Plaza NPCs — they duck for cover during a raid (hidden while foes are about). */}
+                    {!raidActive ? (
+                      <>
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
                     <button type="button" className="tw-npc-btn" style={{ left: "31%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
@@ -699,6 +717,8 @@ export default function TownClient({ initial }) {
                             <img src={art.auctioneer.url} alt="Auctioneer" draggable={false} />
                         ) : <span className="tw-npc-emoji">🔨</span>}
                     </Link>
+                      </>
+                    ) : null}
                     {/* Raid: tap each foe directly — its own HP bar drains, damage numbers pop, it dies when emptied */}
                     {state?.event && !state.event.defeated ? (() => {
                         const ev = state.event;
@@ -707,14 +727,16 @@ export default function TownClient({ initial }) {
                             <button
                                 key={en.id} type="button"
                                 className={`tw-enemy${en.dying ? " is-dying" : ""}${raidCd ? " is-cd" : ""}`}
-                                style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 98 + Math.round(en.y) }}
+                                // Each foe roams on its OWN clock (per-enemy delay/duration/sway) so they move independently,
+                                // sit low in the foreground, and draw above the buildings (z well over the ~192 building band).
+                                style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 240 + Math.round(en.y), animationDelay: `${((i * 0.83) % 2.6).toFixed(2)}s`, animationDuration: `${(3 + (i % 4) * 0.7).toFixed(2)}s`, "--sway": `${9 + (i % 3) * 6}px` }}
                                 onClick={(e) => { e.stopPropagation(); if (!en.dying) tapEnemy(en.id); }}
                                 aria-label={`Attack the ${ev.name}`}
                             >
                                 <span className="tw-enemy-hp"><span style={{ width: `${Math.max(0, Math.round((en.hp / en.hpMax) * 100))}%` }} /></span>
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={url} alt="" draggable={false} style={{ transform: i % 2 ? "scaleX(-1)" : "none" }} />
+                                    <img src={url} alt="" draggable={false} style={{ transform: en.x > 50 ? "scaleX(-1)" : "none" }} />
                                 ) : <span className="tw-enemy-emoji">{ev.emoji}</span>}
                                 {en.floats.map((f) => (
                                     <span key={f.id} className={`tw-dmg${f.crit ? " is-crit" : ""}${f.proc ? " is-proc" : ""}`}>{f.crit ? "✦" : ""}{f.dmg}</span>
@@ -1070,7 +1092,9 @@ const TOWN_CSS = `
 .tw-far img:nth-child(even) { transform: scaleX(-1); }
 /* Depth layers ("Grow the Plaza") — far spires sitting BEHIND the mid rooftops, kept SMALLER than mid so they
    read as farther (only the tips peek above the nearer roofline). */
-.tw-depth { position: absolute; left: 0; bottom: 56%; height: 24%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
+/* Base lowered (56%→47%) + height grown to keep the spire TIPS at the same height while the band extends DOWN
+   behind the mid rooftops — closes the blue sky sliver that showed between the skyline and the roofline. */
+.tw-depth { position: absolute; left: 0; bottom: 47%; height: 33%; display: flex; align-items: flex-end; z-index: 0; pointer-events: none; }
 .tw-depth img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-depth img:nth-child(even) { transform: scaleX(-1); }
 /* Midground skyline band — the NEAREST backdrop, so it's the LARGEST (biggest buildings), sitting just above
@@ -1117,6 +1141,8 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 
 .tw-building { position: absolute; transform: translateX(-50%); bottom: auto; display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: #ffe9b0; transition: transform .12s ease; }
 .tw-building { transform: translate(-50%, -100%); }
+.tw-building.is-locked { cursor: not-allowed; }
+.tw-building.is-locked .tw-building-art, .tw-building.is-locked .tw-building-card { filter: brightness(0.62) saturate(0.7); }
 .tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
 /* contact shadow so the building reads as sitting ON the cobblestones */
 .tw-building::after { content: ""; position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); width: 72%; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 72%); z-index: -1; pointer-events: none; }
@@ -1286,12 +1312,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-enemy { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; animation: twEnemyRoam 3.4s ease-in-out infinite; }
 .tw-enemy img { height: 76px; width: auto; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); transition: filter .08s; }
 .tw-enemy-emoji { font-size: 48px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
-.tw-enemy:active img, .tw-enemy:active .tw-enemy-emoji { filter: drop-shadow(0 0 10px rgba(255,120,80,0.95)) brightness(1.4); transform: scale(.94); }
+.tw-enemy:active img, .tw-enemy:active .tw-enemy-emoji { filter: drop-shadow(0 0 10px rgba(255,120,80,0.95)) brightness(1.4); }
 .tw-enemy.is-cd { cursor: default; }
 .tw-enemy.is-cd img { filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)) grayscale(0.35) brightness(0.8); }
 .tw-enemy.is-dying { animation: twEnemyDie .45s ease-out forwards; pointer-events: none; }
 @keyframes twEnemyDie { 0% { transform: translate(-50%,-100%) scale(1) rotate(0); opacity: 1; } 100% { transform: translate(-50%,-70%) scale(.3) rotate(28deg); opacity: 0; } }
-@keyframes twEnemyRoam { 0%,100% { transform: translate(-50%, -100%); } 25% { transform: translate(calc(-50% - 11px), -103%); } 50% { transform: translate(-50%, -100%); } 75% { transform: translate(calc(-50% + 11px), -103%); } }
+/* Roam: a flat side-to-side drift only — NO vertical bob, NO squish/scale. Each foe's own delay/duration/--sway
+   (set inline per enemy) makes them wander independently rather than in lockstep. */
+@keyframes twEnemyRoam { 0%,100% { transform: translate(calc(-50% - var(--sway, 10px)), -100%); } 50% { transform: translate(calc(-50% + var(--sway, 10px)), -100%); } }
 .tw-enemy-hp { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 52px; height: 6px; border-radius: 999px; background: rgba(0,0,0,0.55); border: 1px solid rgba(0,0,0,0.4); overflow: hidden; }
 .tw-enemy-hp span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); transition: width .12s ease; }
 .tw-dmg { position: absolute; top: -6px; left: 50%; font-weight: 900; font-size: 16px; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.8); pointer-events: none; animation: twDmg .75s ease-out forwards; white-space: nowrap; }

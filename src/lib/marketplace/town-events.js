@@ -21,24 +21,28 @@ import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 
 // hp = one WAVE's health; `enemies` roam the plaza and thin out as the wave's hp drops. When a wave is cleared
 // before the minimum, reinforcements arrive (hp refills) — so the fight lasts long enough for people to show up.
+// hp = one WAVE's health, split across `enemies` — tuned so each foe soaks a few hits (not a one-shot) for a
+// real brawl. Rewards are CAPPED per fighter (see RAID_MAX_GOLD / RAID_PARTICIPATION_XP), so bigger pools just
+// mean more fighters can share, never a jackpot for one person.
 export const TOWN_EVENT_TYPES = {
     bandit_raid: {
-        name: "Bandit Raid", emoji: "🗡️", hp: 700, enemies: 8, rewardGold: 2500, durationMin: 14,
+        name: "Bandit Raid", emoji: "🗡️", hp: 2400, enemies: 6, rewardGold: 2500, durationMin: 14,
         pushTitle: "🗡️ Bandits are raiding the Wolf Den!", pushBody: "They're in the plaza — rush the Town and fight them off for gold!",
     },
     goblin_swarm: {
-        name: "Goblin Swarm", emoji: "👺", hp: 600, enemies: 12, rewardGold: 1800, durationMin: 12,
+        name: "Goblin Swarm", emoji: "👺", hp: 2000, enemies: 8, rewardGold: 1800, durationMin: 12,
         pushTitle: "👺 A goblin swarm hit the Town!", pushBody: "Pile into the plaza and drive them out — loot for everyone who fights!",
     },
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", hp: 1100, enemies: 3, rewardGold: 4000, durationMin: 12,
+        name: "Treasure Golem", emoji: "💎", hp: 1800, enemies: 2, rewardGold: 4000, durationMin: 12,
         pushTitle: "💎 A Treasure Golem lumbered into Town!", pushBody: "Crack it open together — it's stuffed with gold. First to the plaza wins big!",
     },
 };
 
 const HIT_THROTTLE_MS = 1000;  // 1-second cooldown between taps
 const FLAT_MIN_GOLD = 25;      // everyone who lands a hit gets at least this
-const RAID_PARTICIPATION_XP = 20; // XP each fighter earns when the raid resolves
+const RAID_MAX_GOLD = 500;     // per-fighter gold CAP (a raid is a nice bonus, not a jackpot)
+const RAID_PARTICIPATION_XP = 250; // XP each fighter earns when the raid resolves (the raid's main draw is XP now)
 // Per-tap damage from the player's real equipped stats (+ pet), with a crit roll and a chance at a weapon-skill
 // proc. Server-authoritative so a cheating client can't inflate it. Returns { damage, crit, proc }.
 async function computeRaidHit(buyerId) {
@@ -226,7 +230,7 @@ async function resolveTownEvent(eventId, outcome) {
     const basePool = outcome === "defeated" ? ev.reward_gold : Math.round(ev.reward_gold * Math.min(1, (ev.hp_max - ev.hp) / ev.hp_max));
     const pool = raidGoldPct ? Math.round(basePool * (1 + raidGoldPct / 100)) : basePool;
     for (const h of hits) {
-        const gold = FLAT_MIN_GOLD + Math.round(pool * (h.damage / totalDmg));
+        const gold = Math.min(RAID_MAX_GOLD, FLAT_MIN_GOLD + Math.round(pool * (h.damage / totalDmg)));
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);
         await logCoin(h.buyer_id, gold, "town_event", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
         await awardXp(h.buyer_id, "town_event", { points: RAID_PARTICIPATION_XP, gold: 0, dedupeKey: `town_event:${eventId}:${h.buyer_id}` }).catch(() => {});

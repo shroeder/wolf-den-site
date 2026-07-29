@@ -78,6 +78,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
     const [station, setStation] = useState(null); // open panel: "dice" (the gambler minigame)
     const [barkeep, setBarkeep] = useState(null); // in-scene barkeep chat { line } — NO modal
     const [drinkFx, setDrinkFx] = useState(null); // big drink/round celebration { type, xp, gold, key }
+    const [confirmDrink, setConfirmDrink] = useState(null); // { type: "pint" | "round" } → confirm modal before ordering
     const [busy, setBusy] = useState(false);
     const [g, setG] = useState(null);
     const [result, setResult] = useState(null);
@@ -292,14 +293,14 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                 {/* Barkeep order tray — an in-scene dialogue bar (NOT a modal). Appears when you step up to him. */}
                 {barkeep ? (
                     <div className="tv-keeper-tray" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="tv-order tv-order-pint" disabled={busy || !pintAvail} onClick={askPint} title={pintAvail ? "Daily Hearty Pint" : "Had yours today"}>
+                        <button type="button" className="tv-order tv-order-pint" disabled={busy || !pintAvail} onClick={() => setConfirmDrink({ type: "pint" })} title={pintAvail ? "Daily Hearty Pint" : "Had yours today"}>
                             {iconArt?.pint ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.pint} alt="" draggable={false} />
                             ) : <span className="tv-order-emoji">🍺</span>}
                             <span className="tv-order-lbl">Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP · +${st?.dailyPint?.gold || 15}🪙` : "back tomorrow"}</small></span>
                         </button>
-                        <button type="button" className="tv-order tv-order-round" disabled={busy || (st?.gold || 0) < roundCost} onClick={buyRoundAct} title="Buy a round for everyone here">
+                        <button type="button" className="tv-order tv-order-round" disabled={busy || (st?.gold || 0) < roundCost} onClick={() => setConfirmDrink({ type: "round" })} title="Buy a round for everyone here">
                             {iconArt?.round ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.round} alt="" draggable={false} />
@@ -315,6 +316,50 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                         {EMOTES.map((em) => <button key={em} type="button" onClick={() => quickEmote(em)}>{em}</button>)}
                     </div>
                 )}
+
+                {/* Drink confirm — a juicy "here's what happens" prompt before you commit gold / your daily pint. */}
+                {confirmDrink ? (() => {
+                    const isRound = confirmDrink.type === "round";
+                    const pintXp = st?.dailyPint?.xp || 40, pintGold = st?.dailyPint?.gold || 15;
+                    const hostXp = st?.round?.hostXp || 60, guestXp = st?.round?.guestXp || 15;
+                    const doIt = async () => { setConfirmDrink(null); if (isRound) await buyRoundAct(); else await askPint(); };
+                    return (
+                        <div className="tv-panel-wrap" onClick={() => setConfirmDrink(null)} role="presentation">
+                            <div className={`tv-drinkconfirm ${isRound ? "is-round" : "is-pint"}`} onClick={(e) => e.stopPropagation()}>
+                                <div className="tv-dc-icon" aria-hidden="true">
+                                    {isRound
+                                        ? (iconArt?.round ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={iconArt.round} alt="" draggable={false} /> : <span>🍻</span>)
+                                        : (iconArt?.pint ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={iconArt.pint} alt="" draggable={false} /> : <span>🍺</span>)}
+                                </div>
+                                <div className="tv-dc-title">{isRound ? "A Round for the House?" : "Hearty Pint?"}</div>
+                                <div className="tv-dc-desc">
+                                    {isRound
+                                        ? <>Treat every wolf in the tavern to a drink — a hero&apos;s welcome. Everyone here toasts you.</>
+                                        : <>The barkeep pours you the finest ale in the Den. Your one free pint for today.</>}
+                                </div>
+                                <div className="tv-dc-rewards">
+                                    {isRound ? (
+                                        <>
+                                            <span className="tv-dc-cost">−{roundCost.toLocaleString()} 🪙</span>
+                                            <span className="tv-dc-gain">+{hostXp} XP for you</span>
+                                            <span className="tv-dc-gain sub">everyone here +{guestXp} XP</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="tv-dc-gain">+{pintXp} XP</span>
+                                            <span className="tv-dc-gain">+{pintGold} 🪙</span>
+                                            <span className="tv-dc-gain sub">free · once a day</span>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="tv-dc-actions">
+                                    <button type="button" className="tv-dc-cancel" onClick={() => setConfirmDrink(null)}>Not now</button>
+                                    <button type="button" className="tv-dc-go" disabled={busy} onClick={doIt}>{isRound ? `Buy the round! 🍻` : `Drink up! 🍺`}</button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })() : null}
 
                 {/* Tap another member → quick actions */}
                 {menuFor ? (
@@ -441,6 +486,23 @@ const TV_CSS = `
 .tv-panel-wrap { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 14px; background: rgba(8,4,2,0.55); }
 .tv-panel { width: 100%; max-width: 330px; max-height: 90%; overflow-y: auto; overflow-x: hidden; border-radius: 16px; background: rgba(23,18,14,0.98); border: 1px solid rgba(255,215,110,0.4); box-shadow: 0 14px 40px rgba(0,0,0,0.6); padding: 14px; animation: tvPanelPop .28s cubic-bezier(.2,1.2,.3,1) both; }
 @keyframes tvPanelPop { 0% { transform: scale(.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+/* Drink confirm — juicy prompt before ordering */
+.tv-drinkconfirm { width: 100%; max-width: 320px; border-radius: 20px; padding: 20px 18px 16px; text-align: center; background: radial-gradient(130% 120% at 50% 0%, rgba(80,52,22,0.98), rgba(26,18,12,0.99)); border: 1px solid rgba(255,196,110,0.55); box-shadow: 0 18px 50px rgba(0,0,0,0.65); animation: tvPanelPop .28s cubic-bezier(.2,1.2,.3,1) both; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.tv-drinkconfirm.is-round { border-color: rgba(255,170,80,0.7); box-shadow: 0 18px 50px rgba(0,0,0,0.65), 0 0 30px rgba(255,150,60,0.28); }
+.tv-dc-icon { width: 84px; height: 84px; display: grid; place-items: center; animation: tvDcBob 1.8s ease-in-out infinite; }
+.tv-dc-icon img { width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55)); }
+.tv-dc-icon span { font-size: 60px; }
+@keyframes tvDcBob { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-5px) rotate(2deg); } }
+.tv-dc-title { font-size: 1.2rem; font-weight: 900; color: #ffe0a0; }
+.tv-dc-desc { font-size: 0.84rem; line-height: 1.35; color: #e4d3bd; max-width: 260px; }
+.tv-dc-rewards { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 4px 0 2px; }
+.tv-dc-gain { font-size: 0.82rem; font-weight: 900; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); padding: 5px 12px; border-radius: 999px; }
+.tv-dc-gain.sub { color: #ffe0b0; background: rgba(255,255,255,0.08); }
+.tv-dc-cost { font-size: 0.82rem; font-weight: 900; color: #ffd0c8; background: rgba(224,74,74,0.2); border: 1px solid rgba(224,74,74,0.4); padding: 5px 12px; border-radius: 999px; }
+.tv-dc-actions { display: flex; gap: 8px; width: 100%; margin-top: 8px; }
+.tv-dc-cancel { flex: 0 0 auto; padding: 11px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #d8cdbc; font-weight: 800; font-size: 0.9rem; cursor: pointer; }
+.tv-dc-go { flex: 1 1 auto; padding: 11px 16px; border-radius: 12px; border: none; background: linear-gradient(180deg,#ffe488,#f0a83a); color: #2a1a06; font-weight: 900; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 14px rgba(240,168,58,0.45); }
+.tv-dc-go:disabled { opacity: 0.6; cursor: default; }
 .tv-panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .tv-panel-head strong { font-size: 1rem; color: #ffe0b0; flex: 1; }
 .tv-panel-head button { background: none; border: none; color: inherit; font-size: 18px; cursor: pointer; opacity: 0.7; }
