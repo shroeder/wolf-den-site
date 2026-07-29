@@ -216,6 +216,8 @@ export default function TownClient({ initial }) {
     const [menuFor, setMenuFor] = useState(null);    // tapped another player → action sheet
     const [boardOpen, setBoardOpen] = useState(false); // Town Hall (events + plaza fund) panel
     const [contribBusy, setContribBusy] = useState(false);
+    const [levelUp, setLevelUp] = useState(null); // town-project level-up celebration { name, level, perk }
+    const levelUpClear = useRef(null);
     const [inTavern, setInTavern] = useState(false);  // stepped inside the Tavern interior
     const [merchantOpen, setMerchantOpen] = useState(false);
     const [merchantBusy, setMerchantBusy] = useState(false);
@@ -402,11 +404,20 @@ export default function TownClient({ initial }) {
     }, [postAction]);
     // Contribute gold to a Town Development project, then refresh the coin HUD + town state.
     const contribute = useCallback(async (projectId, amount) => {
+        const proj = (state?.projects || []).find((p) => p.id === projectId); // capture name + the perk it's leveling INTO
         setContribBusy(projectId);
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "project_contribute", projectId, amount }) }).then((x) => x.json()).catch(() => null);
         setContribBusy(false);
-        if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
-    }, [load]);
+        if (r?.ok) {
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
+            if (r.leveledTo) { // it crossed a level — celebrate the shared upgrade so it doesn't happen silently
+                setLevelUp({ name: proj?.name || "The town", level: r.leveledTo, perk: proj?.perkNext || null });
+                clearTimeout(levelUpClear.current);
+                levelUpClear.current = setTimeout(() => setLevelUp(null), 6000);
+            }
+            load();
+        }
+    }, [load, state?.projects]);
     // Attack the active raid with a `move` (weak/normal/good/perfect timing tier, or "power" ability). Optimistic
     // HP by an estimate; the server is authoritative (and handles wave refills + the win).
     const EST = { weak: 5, normal: 11, good: 18, perfect: 30, power: 48 };
@@ -614,14 +625,14 @@ export default function TownClient({ initial }) {
                         );
                     })}
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "45%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
+                    <button type="button" className="tw-npc-btn" style={{ left: "38%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
                         ) : <span className="tw-npc-emoji">⚒️</span>}
                     </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "32%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
+                    <button type="button" className="tw-npc-btn" style={{ left: "19%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -629,7 +640,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "51%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: "63%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {art.questgiver?.url ? (
@@ -638,7 +649,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📜</span>}
                     </button>
                     {/* Traveling Merchant — tap to browse wares */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "66%", top: `${GROUND}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
+                    <button type="button" className="tw-npc-btn" style={{ left: "84%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
                         {art.merchant?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -937,6 +948,23 @@ export default function TownClient({ initial }) {
             {/* High-roller gear reveal — suspense roll → rarity burst */}
             {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
+            {/* Town Development level-up celebration — the "something changed!" moment */}
+            {levelUp ? (
+                <div className="tw-levelup" onClick={() => setLevelUp(null)} role="presentation">
+                    <div className="tw-levelup-confetti" aria-hidden="true">
+                        {Array.from({ length: 24 }).map((_, i) => (
+                            <span key={i} style={{ left: `${(i * 4.3) % 100}%`, "--h": `${(i * 47) % 360}`, animationDelay: `${(i % 6) * 0.12}s`, animationDuration: `${1.6 + (i % 5) * 0.18}s` }} />
+                        ))}
+                    </div>
+                    <div className="tw-levelup-card" onClick={(e) => e.stopPropagation()} role="presentation">
+                        <div className="tw-levelup-badge">🏗️ TOWN UPGRADED!</div>
+                        <div className="tw-levelup-name">{levelUp.name} <span>Lv {levelUp.level}</span></div>
+                        {levelUp.perk ? <div className="tw-levelup-perk">✨ {levelUp.perk}<span className="muted"> — now active for the whole Den, forever</span></div> : null}
+                        <button type="button" className="tw-levelup-btn" onClick={() => setLevelUp(null)}>Huzzah! 🐺</button>
+                    </div>
+                </div>
+            ) : null}
+
             <style>{TOWN_CSS}</style>
         </div>
     );
@@ -1224,4 +1252,20 @@ const TOWN_CSS = `
 .tw-reveal-slot { position: relative; z-index: 2; font-size: .8rem; color: #c7bcd8; text-transform: capitalize; }
 .tw-reveal-btn { position: relative; z-index: 2; margin-top: 12px; padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: .95rem; color: #1c130a; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 5px 0 #b57f22; }
 .tw-reveal-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #b57f22; }
+
+/* ── Town Development level-up celebration ── */
+.tw-levelup { position: fixed; inset: 0; z-index: 620; display: grid; place-items: center; padding: 20px; cursor: pointer; overflow: hidden; background: radial-gradient(120% 120% at 50% 40%, rgba(24,16,44,0.55), rgba(4,2,10,0.8)); animation: twRevealIn .2s ease both; }
+.tw-levelup-confetti { position: absolute; inset: 0; pointer-events: none; }
+.tw-levelup-confetti span { position: absolute; top: -14px; width: 9px; height: 14px; border-radius: 2px; background: hsl(var(--h,45), 90%, 58%); opacity: 0; animation: twConfetti linear infinite; }
+@keyframes twConfetti { 0% { transform: translateY(-10px) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(88vh) rotate(540deg); opacity: .9; } }
+.tw-levelup-card { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(340px, 88vw); padding: 24px 22px 20px; border-radius: 20px; cursor: default; text-align: center;
+    background: linear-gradient(180deg, rgba(38,28,60,0.98), rgba(18,12,30,0.99)); border: 1.5px solid rgba(255,215,110,0.7); box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.6), 0 0 60px -10px rgba(255,215,110,0.7);
+    animation: twCardPop .5s cubic-bezier(.2,1.3,.4,1) both; }
+.tw-levelup-badge { font-weight: 900; font-size: .82rem; letter-spacing: .1em; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); border-radius: 999px; padding: 5px 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.tw-levelup-name { font-weight: 900; font-size: 1.28rem; color: #fff; text-wrap: balance; }
+.tw-levelup-name span { color: #ffd75e; }
+.tw-levelup-perk { font-size: .9rem; font-weight: 800; color: #8fe39a; line-height: 1.35; }
+.tw-levelup-perk .muted { display: block; font-weight: 600; font-size: .76rem; color: #b7ad9a; margin-top: 2px; }
+.tw-levelup-btn { margin-top: 10px; padding: 11px 28px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: .95rem; color: #1c130a; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 5px 0 #b57f22; }
+.tw-levelup-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #b57f22; }
 `;
