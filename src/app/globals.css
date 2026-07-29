@@ -10913,6 +10913,18 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .merchant-item-emoji { font-size: 1.5rem; flex: none; }
 .merchant-item-body { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .merchant-off { font-size: 0.66rem; font-weight: 800; color: #0f2a12; background: #7cffb2; border-radius: 999px; padding: 1px 6px; vertical-align: middle; }
+/* Buy-coins CTA on the Gold Merchant — bright, on-theme, links to the store-credit top-up. */
+.merchant-buycoins { display: flex; align-items: center; gap: 11px; margin: 0 0 12px; padding: 11px 13px; text-decoration: none; border-radius: 14px;
+    color: #2a1a04; background: linear-gradient(180deg, #ffe488, #f2b63a); border: 1px solid rgba(255,240,190,0.8);
+    box-shadow: 0 6px 18px -4px rgba(242,182,58,0.55), inset 0 1px 0 rgba(255,255,255,0.5); animation: merchantCoinPulse 2.4s ease-in-out infinite; }
+.merchant-buycoins:active { transform: translateY(1px); }
+.merchant-buycoins-ico { font-size: 1.6rem; flex: none; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
+.merchant-buycoins-body { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.merchant-buycoins-body strong { font-size: 0.98rem; font-weight: 900; }
+.merchant-buycoins-body span { font-size: 0.74rem; font-weight: 600; color: #5a3d10; }
+.merchant-buycoins-go { flex: none; font-weight: 900; font-size: 0.82rem; background: rgba(42,26,4,0.14); border-radius: 999px; padding: 6px 12px; }
+@keyframes merchantCoinPulse { 0%,100% { box-shadow: 0 6px 18px -4px rgba(242,182,58,0.5), inset 0 1px 0 rgba(255,255,255,0.5); } 50% { box-shadow: 0 6px 26px -2px rgba(255,220,120,0.85), inset 0 1px 0 rgba(255,255,255,0.5); } }
+.merchant-item .coin-cta { flex: none; }
 /* Post-game recap modal (over the merchant overlay). Pops in and locks its Continue button for ~0.75s. */
 .mg-recap-scrim { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; padding: 20px;
     background: rgba(4,4,8,0.74); animation: fbCineIn 0.25s ease both; }

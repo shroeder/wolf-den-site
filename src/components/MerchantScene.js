@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+import CoinCta from "@/components/CoinCta";
 
 // The Gold Merchant island event — shown when you LAND (before the dig) if he rolled in. A coin-catch arcade
 // minigame (move to catch falling gold, dodge the bricks, 3 lives, ~20s), his discounted exclusive shop, a
@@ -257,17 +260,34 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                         ) : null}
 
                         <h4 style={{ margin: "14px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own 🪙 {gold.toLocaleString()}</span></h4>
+                        {/* Buy coins right from the merchant — he trades in gold, after all. The merchant WAITS on your
+                            beach until you dig, so nipping off to top up your coins never loses him. */}
+                        <Link href="/marketplace/credit" className="merchant-buycoins">
+                            <span className="merchant-buycoins-ico" aria-hidden="true">💰</span>
+                            <span className="merchant-buycoins-body">
+                                <strong>Buy more coins</strong>
+                                <span>Top up your gold — the merchant waits right here.</span>
+                            </span>
+                            <span className="merchant-buycoins-go">Get coins →</span>
+                        </Link>
                         <div className="merchant-shop">
-                            {(merchant.shop || []).map((it) => (
-                                <div key={it.id} className="merchant-item">
-                                    <span className="merchant-item-emoji">{it.emoji}</span>
-                                    <div className="merchant-item-body">
-                                        <strong>{it.name} <span className="merchant-off">-{it.off}%</span></strong>
-                                        <span className="muted" style={{ fontSize: "0.76rem" }}>{it.desc}</span>
+                            {(merchant.shop || []).map((it) => {
+                                const afford = gold >= it.price;
+                                return (
+                                    <div key={it.id} className="merchant-item">
+                                        <span className="merchant-item-emoji">{it.emoji}</span>
+                                        <div className="merchant-item-body">
+                                            <strong>{it.name} <span className="merchant-off">-{it.off}%</span></strong>
+                                            <span className="muted" style={{ fontSize: "0.76rem" }}>{it.desc}</span>
+                                        </div>
+                                        {afford ? (
+                                            <button type="button" className="btn btn-small" disabled={busy} onClick={() => onBuy(it.id)}>🪙 {it.price.toLocaleString()}</button>
+                                        ) : (
+                                            <CoinCta price={it.price} have={gold} label="coins" />
+                                        )}
                                     </div>
-                                    <button type="button" className="btn btn-small" disabled={busy || gold < it.price} onClick={() => onBuy(it.id)}>🪙 {it.price.toLocaleString()}</button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <button type="button" className="sail-cta sail-cta-dig" disabled={busy} onClick={onLeave} style={{ marginTop: 16 }}>
