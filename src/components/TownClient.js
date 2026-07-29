@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
+import { STAT_META, describeSea, describeFarm } from "@/lib/marketplace/items.js";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
@@ -37,6 +38,36 @@ const RARITY_META = {
     epic: { label: "Epic", color: "#b878ff", glow: "rgba(184,120,255,0.85)", stars: 3 },
     legendary: { label: "Legendary", color: "#ffcf3a", glow: "rgba(255,207,58,0.92)", stars: 4 },
 };
+
+// The item's real stat block for a reveal — combat stats as chips, its signature ability, elemental affinity,
+// and any spin-off (sea/farm) affinities. So the win shows exactly what you got, not just a name.
+function RevealStats({ item }) {
+    if (!item) return null;
+    const stats = Object.entries(item.stats || {}).filter(([k]) => STAT_META[k]);
+    const els = item.elements || [];
+    const sea = item.sea ? describeSea(item.sea) : "";
+    const farm = item.farm ? describeFarm(item.farm) : "";
+    return (
+        <div className="tw-reveal-stats">
+            {stats.length ? (
+                <div className="tw-reveal-chips">
+                    {stats.map(([k, v]) => (
+                        <span key={k} className="tw-reveal-chip" title={STAT_META[k].desc || ""}>{STAT_META[k].icon} +{v}{STAT_META[k].suffix || ""} {STAT_META[k].label}</span>
+                    ))}
+                </div>
+            ) : null}
+            {els.length ? (
+                <div className="tw-reveal-els">
+                    {els.map((e) => <span key={e.key} className="tw-reveal-el" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>)}
+                </div>
+            ) : null}
+            {item.signature ? <div className="tw-reveal-sig">★ {item.signature.label} — {item.signature.desc}</div> : null}
+            {sea ? <div className="tw-reveal-aff">⚓ {sea}</div> : null}
+            {farm ? <div className="tw-reveal-aff">🌱 {farm}</div> : null}
+            {item.chargeReward ? <div className="tw-reveal-sig" style={{ color: "#ffd75e" }}>🎁 Real-world reward: {item.chargeReward}</div> : null}
+        </div>
+    );
+}
 
 // Full-screen gear-gamble reveal: a suspenseful dice tumble, then a rarity-colored burst that pops the won
 // item in with light, sparks (epic+) and its tier/rarity. This is the dopamine moment.
@@ -83,7 +114,8 @@ function GambleReveal({ reveal, diceUrl, onClose }) {
                         ) : <span className="tw-reveal-item tw-reveal-item-emoji" aria-hidden="true">🛡️</span>}
                     </div>
                     <div className="tw-reveal-name">{item?.name}</div>
-                    <div className="tw-reveal-slot">Tier {item?.tier} · {item?.slot}</div>
+                    <div className="tw-reveal-slot">Tier {item?.tier} · {String(item?.slot || "").replace(/_/g, " ")}{item?.reqLevel ? ` · needs Lv ${item.reqLevel}` : ""}</div>
+                    <RevealStats item={item} />
                     <button type="button" className="tw-reveal-btn" onClick={onClose}>Collect it →</button>
                 </div>
             )}
@@ -1686,6 +1718,13 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 @keyframes twItemFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 .tw-reveal-name { position: relative; z-index: 2; font-weight: 900; font-size: 1.12rem; color: #fff; text-wrap: balance; }
 .tw-reveal-slot { position: relative; z-index: 2; font-size: .8rem; color: #c7bcd8; text-transform: capitalize; }
+.tw-reveal-stats { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 10px; width: 100%; max-width: 320px; }
+.tw-reveal-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.tw-reveal-chip { font-size: .72rem; font-weight: 800; color: #f2ead9; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 3px 9px; }
+.tw-reveal-els { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.tw-reveal-el { font-size: .68rem; font-weight: 900; border: 1px solid; border-radius: 999px; padding: 2px 8px; background: rgba(0,0,0,0.25); }
+.tw-reveal-sig { font-size: .72rem; font-weight: 800; color: #e0c8ff; text-align: center; line-height: 1.3; text-wrap: balance; }
+.tw-reveal-aff { font-size: .7rem; font-weight: 700; color: #bfe6c9; text-align: center; }
 .tw-reveal-btn { position: relative; z-index: 2; margin-top: 12px; padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: .95rem; color: #1c130a; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 5px 0 #b57f22; }
 .tw-reveal-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #b57f22; }
 

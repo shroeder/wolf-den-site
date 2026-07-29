@@ -15,6 +15,8 @@ import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
 import { getTownProjects, getTownBonuses, contributeToProject, wellClaimedToday } from "@/lib/marketplace/town-projects.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
+import { signatureFor } from "@/lib/marketplace/signatures.js";
+import { describeItemElements } from "@/lib/marketplace/item-element.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { setSetting } from "@/lib/settings.js";
@@ -335,7 +337,19 @@ export async function gambleMerchantGear(buyerId) {
     const pick = pool[Math.floor(Math.random() * pool.length)];
     await grantItem(buyerId, pick.id, "merchant_gamble").catch(() => {});
     const image = await itemSpriteFor(pick.id).catch(() => null);
-    return { ok: true, item: { id: pick.id, name: pick.name, rarity: pick.rarity, tier: RARITY_TIER[pick.rarity], slot: pick.slot, image }, gold: Number(paid.gold) };
+    // Full detail so the reveal shows the real gear — stats, signature ability, element & spin-off affinities.
+    return {
+        ok: true,
+        item: {
+            id: pick.id, name: pick.name, rarity: pick.rarity, tier: RARITY_TIER[pick.rarity], slot: pick.slot, image,
+            stats: pick.stats || {}, reqLevel: pick.reqLevel || 0,
+            signature: signatureFor(pick.id) || null,
+            elements: describeItemElements(pick.id) || [],
+            sea: pick.sea || null, farm: pick.farm || null,
+            chargeReward: pick.chargeRewardLabel || null,
+        },
+        gold: Number(paid.gold),
+    };
 }
 
 // Contribute gold to a Town Development project (owner-gated during the build). Also ticks the civic quest.
