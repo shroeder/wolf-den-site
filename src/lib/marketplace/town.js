@@ -13,7 +13,7 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
-import { getTownProjects, getTownBonuses, contributeToProject } from "@/lib/marketplace/town-projects.js";
+import { getTownProjects, getTownBonuses, contributeToProject, wellClaimedToday } from "@/lib/marketplace/town-projects.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -194,6 +194,11 @@ export async function getTownState(buyerId) {
     ]);
     const boughtToday = await merchantBoughtToday(buyerId);
     const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt, boughtToday);
+    // Wishing Well: only surfaced once the town has funded it (wellGold > 0). Tells the client the daily payout
+    // and whether THIS member has already tossed their coin today (so the fountain shows a claim prompt or not).
+    const well = (bonuses.wellGold || 0) > 0
+        ? { gold: bonuses.wellGold, xp: bonuses.wellXp || 0, claimedToday: buyerId ? await wellClaimedToday(buyerId) : true }
+        : null;
     const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
     const [acts, presence, chats] = await Promise.all([
@@ -271,7 +276,8 @@ export async function getTownState(buyerId) {
         buildings: TOWN_BUILDINGS, // all nine are standing fixtures now (no funded unlocks)
         art,
         projects,
-        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0 },
+        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, farmGrowPct: bonuses.farmGrowPct || 0, farmYieldPct: bonuses.farmYieldPct || 0 },
+        well,
         event,
         merchant: merchantWares,
         store: storeStatus(),

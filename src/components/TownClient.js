@@ -182,6 +182,9 @@ export default function TownClient({ initial }) {
     const [contribBusy, setContribBusy] = useState(false);
     const [levelUp, setLevelUp] = useState(null); // town-project level-up celebration { name, level, perk }
     const levelUpClear = useRef(null);
+    const [wellFx, setWellFx] = useState(null); // Wishing Well "wish granted" popup { gold, xp }
+    const [wishBusy, setWishBusy] = useState(false);
+    const wellClear = useRef(null);
     const [inTavern, setInTavern] = useState(false);  // stepped inside the Tavern interior
     const [merchantOpen, setMerchantOpen] = useState(false);
     const [merchantBusy, setMerchantBusy] = useState(false);
@@ -395,6 +398,20 @@ export default function TownClient({ initial }) {
             load();
         }
     }, [load, state?.projects]);
+    // Wishing Well: toss a coin (once/day) at the plaza fountain to claim the town's daily blessing of gold.
+    const claimWell = useCallback(async () => {
+        if (wishBusy) return;
+        setWishBusy(true);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "well_claim" }) }).then((x) => x.json()).catch(() => null);
+        setWishBusy(false);
+        if (r?.ok) {
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
+            setWellFx({ gold: r.gold, xp: r.xp });
+            clearTimeout(wellClear.current);
+            wellClear.current = setTimeout(() => setWellFx(null), 4500);
+            load();
+        }
+    }, [wishBusy, load]);
     // Tap a raid enemy: 1s cooldown, server computes your real (stat-based) damage + crit + weapon-skill proc.
     // Apply it to THAT enemy's HP bar with a floating number; kill it when its bar empties; recap on the win.
     const tapEnemy = useCallback(async (enemyId) => {
@@ -448,6 +465,8 @@ export default function TownClient({ initial }) {
     const buildings = state?.buildings || [];
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
+    const well = state?.well || null; // Wishing Well daily-claim state { gold, xp, claimedToday } | null until funded
+    const canWish = Boolean(well && !well.claimedToday);
     const effDepth = 6; // every parallax skyline band is on by default now (no funding gate)
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
@@ -604,10 +623,26 @@ export default function TownClient({ initial }) {
                             ))}
                         </div>
                     ) : null}
-                    {/* Plaza centerpiece — the arted wolf fountain landmark, ground-locked in the town square */}
+                    {/* Plaza centerpiece — the wolf fountain, which doubles as the Wishing Well once the town funds
+                        it. Tap to claim the daily blessing; a coin badge + shimmer invites the wish when it's ready. */}
                     {art.centerpiece?.url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "20%", top: `${GROUND}%` }} />
+                        well ? (
+                            <button
+                                type="button"
+                                className={`tw-centerpiece tw-well${canWish ? " can-wish" : " is-spent"}`}
+                                style={{ left: "20%", top: `${GROUND}%` }}
+                                onClick={(e) => { e.stopPropagation(); if (canWish) claimWell(); }}
+                                disabled={!canWish || wishBusy}
+                                aria-label={canWish ? `Make a wish — claim ${well.gold} gold` : "Wishing Well — already wished today"}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={art.centerpiece.url} alt="" draggable={false} />
+                                {canWish ? <span className="tw-well-badge">🪙 Make a wish!</span> : <span className="tw-well-badge is-spent">✓ Wished today</span>}
+                            </button>
+                        ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "20%", top: `${GROUND}%` }} />
+                        )
                     ) : null}
                     {/* Buildings */}
                     {buildings.map((b) => {
@@ -981,6 +1016,22 @@ export default function TownClient({ initial }) {
                 </div>
             ) : null}
 
+            {/* Wishing Well — "wish granted" popup after tossing a coin */}
+            {wellFx ? (
+                <div className="tw-wellfx" onClick={() => setWellFx(null)} role="presentation">
+                    <div className="tw-wellfx-card" onClick={(e) => e.stopPropagation()} role="presentation">
+                        <div className="tw-wellfx-coin" aria-hidden="true">🪙</div>
+                        <div className="tw-wellfx-title">Your wish is granted!</div>
+                        <div className="tw-wellfx-rewards">
+                            <span style={{ padding: "6px 14px", borderRadius: 999, fontWeight: 900, fontSize: 16, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{Number(wellFx.gold || 0).toLocaleString()} 🪙</span>
+                            {wellFx.xp ? <span style={{ padding: "6px 14px", borderRadius: 999, fontWeight: 900, fontSize: 16, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{Number(wellFx.xp).toLocaleString()} ✨ XP</span> : null}
+                        </div>
+                        <div className="muted" style={{ fontSize: "0.8rem" }}>Come back tomorrow for another wish.</div>
+                        <button type="button" className="tw-levelup-btn" onClick={() => setWellFx(null)}>Huzzah! 🐺</button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* Town Development level-up celebration — the "something changed!" moment */}
             {levelUp ? (
                 <div className="tw-levelup" onClick={() => setLevelUp(null)} role="presentation">
@@ -1029,6 +1080,23 @@ const TOWN_CSS = `
 .tw-mid img:nth-child(even) { transform: scaleX(-1); }
 /* Plaza centerpiece — the wolf fountain landmark standing in the square. */
 .tw-centerpiece { position: absolute; transform: translate(-50%, -100%); height: 24%; width: auto; z-index: 200; pointer-events: none; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
+/* Wishing Well — the fountain becomes tappable once the town funds it. */
+button.tw-centerpiece.tw-well { pointer-events: auto; border: 0; background: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+button.tw-centerpiece.tw-well img { height: 100%; width: auto; }
+button.tw-centerpiece.tw-well.is-spent { cursor: default; }
+button.tw-centerpiece.tw-well.can-wish { animation: twWellPulse 2.2s ease-in-out infinite; }
+button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(255,215,110,0.8)) drop-shadow(0 8px 12px rgba(0,0,0,0.45)); }
+.tw-well-badge { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 999px; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 8px rgba(0,0,0,0.4); animation: twWellBob 1.6s ease-in-out infinite; }
+.tw-well-badge.is-spent { color: #cbb9e0; background: rgba(20,14,34,0.9); box-shadow: none; animation: none; }
+@keyframes twWellPulse { 0%,100% { transform: translate(-50%, -100%) scale(1); } 50% { transform: translate(-50%, -100%) scale(1.035); } }
+@keyframes twWellBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+/* Wishing Well "wish granted" popup */
+.tw-wellfx { position: fixed; inset: 0; z-index: 620; display: grid; place-items: center; padding: 20px; cursor: pointer; background: radial-gradient(120% 120% at 50% 40%, rgba(44,34,10,0.5), rgba(4,2,10,0.8)); animation: twRevealIn .2s ease both; }
+.tw-wellfx-card { display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(320px, 88vw); padding: 22px; border-radius: 20px; cursor: default; text-align: center; background: linear-gradient(180deg, rgba(38,28,52,0.98), rgba(22,16,34,0.98)); border: 1px solid rgba(255,215,110,0.35); box-shadow: 0 24px 60px rgba(0,0,0,0.6); }
+.tw-wellfx-coin { font-size: 52px; animation: twWellCoin 1s ease both; }
+.tw-wellfx-title { font-size: 1.15rem; font-weight: 900; color: #ffe0a0; }
+.tw-wellfx-rewards { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 2px 0 4px; }
+@keyframes twWellCoin { 0% { transform: translateY(-30px) rotate(-180deg); opacity: 0; } 60% { transform: translateY(4px) rotate(10deg); opacity: 1; } 100% { transform: translateY(0) rotate(0); } }
 /* Foreground plaza border wall — ground-locked, sits over the sky/street seam. */
 .tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }

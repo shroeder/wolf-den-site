@@ -17,6 +17,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
+import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -286,7 +287,10 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Per-plot Fertile Soil specialization cuts THIS plot's grow time on top of everything else.
     const plotUp = await getPlotUpgrades(buyerId).catch(() => ({}));
     const plotGrow = plotEffects(plotUp[slot] || {}).growMult;
-    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow);
+    // Town Greenhouse (community project) speeds growth for EVERY member's farm, on top of all personal buffs.
+    const townB = await getTownBonuses(Date.now()).catch(() => ({}));
+    const townGrow = Math.max(0.4, 1 - (townB?.farmGrowPct || 0) / 100);
+    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow * townGrow);
     const row = await db.queryOne(
         `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at)
          VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval)
@@ -316,7 +320,9 @@ export async function harvestPlot(buyerId, slot) {
     // better seed-save luck.
     const buffs = await farmBonuses(buyerId).catch(() => null);
     const xp = def?.xp || 0;
-    let gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100));
+    // Town Greenhouse (community project) fattens the harvest for EVERY member, on top of personal gold-harvest buffs.
+    const townB = await getTownBonuses(Date.now()).catch(() => ({}));
+    let gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100) * (1 + (townB?.farmYieldPct || 0) / 100));
     // Harvester's Garb full-set capstone: a chance the whole harvest yields DOUBLE gold.
     const equipped = await getEquippedIds(buyerId).catch(() => ({}));
     let doubled = false;
