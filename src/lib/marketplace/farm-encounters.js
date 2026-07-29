@@ -56,6 +56,24 @@ async function critterSprite(art) {
     return row?.url || null;
 }
 
+// Actually grant a critter's reward (XP + gold + the one bonus). Returns the new gold balance.
+async function grantEncounterReward(buyerId, key, xp, gold, loot) {
+    const g = Math.max(0, Number(gold) || 0);
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null);
+    await logCoin(buyerId, g, "farm_encounter", { balanceAfter: paid?.gold, meta: { creature: key } }).catch(() => {});
+    if ((Number(xp) || 0) > 0) await awardXp(buyerId, "farm_encounter", { points: Math.max(0, Number(xp) || 0), gold: 0 }).catch(() => {});
+    if (loot?.type === "seed" && loot.seed) await grantSeed(buyerId, loot.seed).catch(() => {});
+    else if (loot?.type === "chest" && loot.chestTier) await addChests(buyerId, { [loot.chestTier]: 1 }, { source: "farm_encounter" }).catch(() => {});
+    else if (loot?.type === "parts" && loot.partsTier) {
+        await db.query(
+            `INSERT INTO mkt_salvage_part (buyer_id, tier, count) VALUES ($1, $2, $3)
+             ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_salvage_part.count + $3`,
+            [buyerId, loot.partsTier, loot.partsN || 1]
+        ).catch(() => {});
+    }
+    return { goldAfter: paid?.gold ?? null };
+}
+
 // Roll whether a harvest turns up a critter; if so PARK the pending encounter (critter + pre-rolled reward) on
 // the member and return the public info the client needs to show it. `wardChance` is the plot's Warding Totem
 // bonus (a fraction). Returns null when nothing shows up.
@@ -80,15 +98,17 @@ export async function maybeStartEncounter(buyerId, { rarity = "common", wardChan
         const pt = PART_TIERS.find((p) => p.tier === c.partsTier) || PART_TIERS[0];
         loot = { type: "parts", partsTier: c.partsTier, partsN: n, label: `${n}× ${pt.name}`, emoji: "⚙️", sprite: pt.sprite || null };
     }
-    const pending = { key, xp: c.xp, gold: c.gold, loot };
-    await db.query(`UPDATE mkt_buyer SET farm_encounter = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify(pending)]).catch(() => {});
-    // Public info — includes the reward PREVIEW so the recap always shows what you got, even if the claim call
-    // races (it's pure upside + pre-rolled, so there's nothing to hide). resolveEncounter does the actual grant.
-    return { key, name: c.name, emoji: c.emoji, sprite: await critterSprite(c.art), crop: seedId ? (SEEDS[seedId]?.name || null) : null, reward: { xp: c.xp, gold: c.gold, loot } };
+    // GRANT the reward NOW (pure upside, pre-rolled) so it can NEVER be lost to a claim-call race — the modal is
+    // purely the reveal. Park it flagged `granted` so resolve only clears it (no double-grant), and expose the
+    // reward preview so the recap always shows exactly what landed.
+    const grant = await grantEncounterReward(buyerId, key, c.xp, c.gold, loot);
+    await db.query(`UPDATE mkt_buyer SET farm_encounter = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ key, xp: c.xp, gold: c.gold, loot, granted: true })]).catch(() => {});
+    return { key, name: c.name, emoji: c.emoji, sprite: await critterSprite(c.art), crop: seedId ? (SEEDS[seedId]?.name || null) : null, reward: { xp: c.xp, gold: c.gold, loot, goldAfter: grant.goldAfter } };
 }
 
-// Claim the parked critter's gift. Pure upside — always XP + gold + the pre-rolled bonus loot. Atomic claim so
-// it pays out at most once. (No timing / perfect-hits: the tapping is just for juice.)
+// Dismiss the critter (the reward was already granted at spawn). Atomically clears the parked encounter and
+// returns what was in it so the recap can echo it. Legacy pendings (parked before grant-at-spawn) are granted
+// here as a fallback, so nothing is ever lost either way.
 export async function resolveEncounter(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await db.queryOne(
@@ -96,22 +116,18 @@ export async function resolveEncounter(buyerId) {
         [buyerId]
     ).catch(() => null);
     const pend = row?.farm_encounter;
-    if (!pend) return { ok: false, error: "no_encounter" };
-    const c = CREATURES[pend.key] || CREATURES.rat;
-    const gold = Math.max(0, Number(pend.gold) || 0);
-    const xp = Math.max(0, Number(pend.xp) || 0);
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
-    await logCoin(buyerId, gold, "farm_encounter", { balanceAfter: paid?.gold, meta: { creature: pend.key } }).catch(() => {});
-    if (xp > 0) await awardXp(buyerId, "farm_encounter", { points: xp, gold: 0 }).catch(() => {});
-    const loot = pend.loot || null;
-    if (loot?.type === "seed" && loot.seed) await grantSeed(buyerId, loot.seed).catch(() => {});
-    else if (loot?.type === "chest" && loot.chestTier) await addChests(buyerId, { [loot.chestTier]: 1 }, { source: "farm_encounter" }).catch(() => {});
-    else if (loot?.type === "parts" && loot.partsTier) {
-        await db.query(
-            `INSERT INTO mkt_salvage_part (buyer_id, tier, count) VALUES ($1, $2, $3)
-             ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_salvage_part.count + $3`,
-            [buyerId, loot.partsTier, loot.partsN || 1]
-        ).catch(() => {});
+    if (!pend) {
+        // Already dismissed — the reward was granted at spawn, so this is fine. Hand back the current balance.
+        const g = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        return { ok: true, alreadyClaimed: true, goldAfter: g?.gold ?? null };
     }
-    return { ok: true, creature: c.name, emoji: c.emoji, xp, gold, loot, goldAfter: paid?.gold ?? null };
+    const c = CREATURES[pend.key] || CREATURES.rat;
+    let goldAfter = null;
+    if (!pend.granted) { // legacy pending → grant it now (one-time, transition safety)
+        goldAfter = (await grantEncounterReward(buyerId, pend.key, pend.xp, pend.gold, pend.loot)).goldAfter;
+    } else {
+        const g = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        goldAfter = g?.gold ?? null;
+    }
+    return { ok: true, creature: c.name, emoji: c.emoji, xp: pend.xp, gold: pend.gold, loot: pend.loot || null, goldAfter };
 }
