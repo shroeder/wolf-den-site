@@ -8,6 +8,7 @@ import { levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { transferItemEnhancement } from "@/lib/marketplace/crafting.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
 
@@ -170,6 +171,7 @@ async function moveItem(fromId, toId, itemId) {
         `INSERT INTO mkt_user_item (buyer_id, item_id, acquired_via, charges_left) VALUES ($1, $2, 'trade', $3) ON CONFLICT (buyer_id, item_id) DO NOTHING`,
         [toId, itemId, row.charges_left]
     ).catch(() => {});
+    await transferItemEnhancement(fromId, toId, itemId); // the Forge enhancement rides with the item
     return true;
 }
 

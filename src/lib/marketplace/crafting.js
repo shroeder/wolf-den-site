@@ -46,6 +46,29 @@ const rarityTier = (r) => SALVAGE[r]?.tier || 1;
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const GRADE_RANK = { good: 1, great: 2, perfect: 3, pixel: 4 };
 
+// Move an item's Forge ENHANCEMENT (level + stat bonus + best grade) to a new owner when the item changes
+// hands via trade or the auction house — so an enhanced piece stays enhanced for whoever holds it. No-op if the
+// item was never enhanced. Deletes the old owner's row and upserts the new owner's.
+export async function transferItemEnhancement(fromId, toId, itemId) {
+    if (!fromId || !toId || !itemId || fromId === toId) return;
+    const row = await db.queryOne(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2 RETURNING level, stat_bonus, best_grade`, [fromId, itemId]).catch(() => null);
+    if (!row) return;
+    const statBonus = typeof row.stat_bonus === "string" ? row.stat_bonus : JSON.stringify(row.stat_bonus || {});
+    await db.query(
+        `INSERT INTO mkt_item_enhance (buyer_id, item_id, level, stat_bonus, best_grade, updated_at)
+         VALUES ($1, $2, $3, $4::jsonb, $5, NOW())
+         ON CONFLICT (buyer_id, item_id) DO UPDATE SET level = EXCLUDED.level, stat_bonus = EXCLUDED.stat_bonus, best_grade = EXCLUDED.best_grade, updated_at = NOW()`,
+        [toId, itemId, row.level, statBonus, row.best_grade]
+    ).catch(() => {});
+}
+
+// A member's enhancement levels keyed by item_id (for showing "⚒️ +N" on tradeable/listed gear).
+export async function enhanceLevelsFor(buyerId, itemIds = []) {
+    if (!buyerId || !itemIds.length) return {};
+    const rows = await db.query(`SELECT item_id, level FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, itemIds]).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.item_id, Number(r.level) || 0]));
+}
+
 // Blacksmith's Regalia — the "salvaging set". Pieces drop rarely from salvaging; wearing 3/5 boosts salvage
 // output (a crafting-only bonus, kept out of combat).
 const REGALIA_IDS = ["regalia_visor", "regalia_plate", "regalia_girdle", "regalia_boots", "regalia_cloak"];

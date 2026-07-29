@@ -6,6 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { transferItemEnhancement, enhanceLevelsFor } from "@/lib/marketplace/crafting.js";
 
 // ── THE AUCTION HOUSE ───────────────────────────────────────────────────────────────────────────────────────
 // Members list unused gear at a gold price; anyone can browse + buy. Owner-gated during the Town build. A 5%
@@ -18,7 +19,7 @@ const MAX_PRICE = 10_000_000;
 export const listingFee = (price) => Math.max(1, Math.ceil((Number(price) || 0) * LIST_FEE_PCT));
 
 // A public shape for one listing (item meta merged in). `me`/`owned` are viewer-relative.
-function shapeListing(row, sprites, viewerId, ownedSet) {
+function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
     const it = itemById(row.item_id);
     if (!it) return null;
     return {
@@ -27,6 +28,7 @@ function shapeListing(row, sprites, viewerId, ownedSet) {
         name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null,
         stats: describeStats ? describeStats(it.stats || {}) : null,
         sprite: sprites[row.item_id] || null,
+        enhanceLevel: (enhMap && enhMap.get(`${row.seller_id}|${row.item_id}`)) || 0,
         price: Number(row.price),
         sellerId: row.seller_id,
         sellerName: row.display_name || (row.alias ? `@${row.alias}` : "A wolf"),
@@ -55,10 +57,10 @@ export async function getSellableItems(buyerId) {
     ]);
     const equippedSet = new Set(Object.values(equipped || {}));
     const listedSet = new Set(listed.map((r) => r.item_id));
-    return owned
-        .map((r) => r.item_id)
-        .filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id))
-        .map((id) => { const it = itemById(id); return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats ? describeStats(it.stats || {}) : null }; })
+    const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id));
+    const enh = await enhanceLevelsFor(buyerId, sellableIds).catch(() => ({}));
+    return sellableIds
+        .map((id) => { const it = itemById(id); return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats ? describeStats(it.stats || {}) : null, enhanceLevel: enh[id] || 0 }; })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -73,7 +75,12 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     ).catch(() => []);
     const sprites = await itemSpriteMap().catch(() => ({}));
     const ownedSet = new Set(buyerId ? (await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id) : []);
-    let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet)).filter(Boolean);
+    // Enhancement level per (seller, item) so a listed enhanced piece shows "⚒️ +N".
+    const sellerIds = [...new Set(rows.map((r) => r.seller_id))];
+    const itemIds = [...new Set(rows.map((r) => r.item_id))];
+    const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
+    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, Number(e.level) || 0]));
+    let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap)).filter(Boolean);
     const needle = String(q || "").trim().toLowerCase();
     if (needle) out = out.filter((l) => l.name.toLowerCase().includes(needle) || l.sellerName.toLowerCase().includes(needle));
     if (slot) out = out.filter((l) => l.slot === slot);
@@ -161,6 +168,7 @@ export async function buyAuctionListing(buyerId, listingId) {
     const sellerPaid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [claim.seller_id, price]).catch(() => null);
     await logCoin(claim.seller_id, price, "auction_sale", { balanceAfter: sellerPaid?.gold, meta: { itemId: claim.item_id } }).catch(() => {});
     await grantItem(buyerId, claim.item_id, "auction").catch(() => {});
+    await transferItemEnhancement(claim.seller_id, buyerId, claim.item_id); // any Forge enhancement rides with it
     const it = itemById(claim.item_id);
     return { ok: true, item: { id: claim.item_id, name: it?.name, rarity: it?.rarity }, price, gold: Number(paid.gold) };
 }

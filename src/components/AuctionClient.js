@@ -129,7 +129,7 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-grid">
                             {listings.map((l) => (
                                 <div key={l.id} className="ah-card" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }}>
-                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} /></div>
+                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
@@ -158,7 +158,7 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-grid">
                             {(state?.sellable || []).map((it) => (
                                 <button key={it.itemId} type="button" className={`ah-card ah-sellcard${sellPick?.itemId === it.itemId ? " is-picked" : ""}`} style={{ "--rc": RARITY_TXT[it.rarity] || "#9aa7b5" }} onClick={() => { setSellPick(it); setPrice(""); }}>
-                                    <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} /></div>
+                                    <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} />{it.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{it.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</div>
                                     {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
                                 </button>
@@ -228,8 +228,9 @@ const AH_CSS = `
 .ah-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border-radius: 14px; text-align: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-top: 2px solid var(--rc,#9aa7b5); }
 .ah-sellcard { cursor: pointer; color: inherit; font: inherit; }
 .ah-sellcard.is-picked { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e, 0 8px 20px rgba(255,215,94,0.2); }
-.ah-card-art { width: 64px; height: 64px; display: grid; place-items: center; }
+.ah-card-art { position: relative; width: 64px; height: 64px; display: grid; place-items: center; }
 .ah-card-art svg, .ah-card-art img { width: 58px; height: 58px; }
+.ah-enh { position: absolute; bottom: -4px; right: -6px; font-size: 0.6rem; font-weight: 900; color: #2a1a06; background: linear-gradient(180deg,#ffe27a,#f3b23a); border: 1px solid #fff3c4; border-radius: 999px; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); white-space: nowrap; }
 .ah-card-name { font-weight: 800; font-size: 0.86rem; line-height: 1.2; }
 .ah-card-stats { font-size: 0.72rem; line-height: 1.25; }
 .ah-card-meta { font-size: 0.68rem; line-height: 1.3; }
