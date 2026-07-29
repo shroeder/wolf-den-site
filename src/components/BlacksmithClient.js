@@ -936,11 +936,11 @@ const FORGE_CSS = `
 .forge-part-hint { font-size: 9px; color: #b9a892; text-align: center; line-height: 1.2; }
 /* Segmented control (one grouped pill, not three clashing blocks) — stacked icon over label so all
    three segments always share the width equally and never clip on narrow phones. */
-.forge-tabs { display: flex; gap: 5px; margin-bottom: 14px; padding: 5px; border-radius: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
-.forge-tabs button { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 10px; cursor: pointer; border: none; background: transparent; color: #c8b49b; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+.forge-tabs { display: flex; gap: 3px; margin-bottom: 14px; padding: 4px; border-radius: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4); }
+.forge-tabs button { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px; border-radius: 10px; cursor: pointer; border: none; background: transparent; color: #c8b49b; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
 .forge-tabs button svg { width: 20px; height: 20px; flex: none; opacity: 0.9; }
-.forge-tab-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
-.forge-tab-ct { font-style: normal; font-size: 10px; font-weight: 900; padding: 0 6px; border-radius: 999px; background: rgba(0,0,0,0.25); color: #e8d6c0; }
+.forge-tab-lbl { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.forge-tab-ct { font-style: normal; font-size: 9px; font-weight: 900; padding: 0 4px; border-radius: 999px; background: rgba(0,0,0,0.25); color: #e8d6c0; }
 @media (hover: hover) { .forge-tabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #f2e0c8; } }
 .forge-tabs button.on { background: linear-gradient(180deg, #ff9a3c, #e0631a); color: #2a1000; box-shadow: 0 2px 8px rgba(255,120,20,0.4), inset 0 1px 0 rgba(255,255,255,0.35); }
 .forge-tabs button.on svg { opacity: 1; }

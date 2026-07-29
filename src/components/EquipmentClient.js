@@ -559,6 +559,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
+                        {/* Plain-English: what each of this item's stats actually DOES. */}
+                        {Object.keys(detailItem.stats || {}).filter((k) => STAT_META[k]).length ? (
+                            <div style={{ margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
+                                {Object.keys(detailItem.stats).filter((k) => STAT_META[k]).map((k) => (
+                                    <div key={k} style={{ fontSize: "0.78rem", lineHeight: 1.4, color: "#c2c9d2" }}>
+                                        <b style={{ color: "#f2ead9" }}>{STAT_META[k].icon} +{detailItem.stats[k]}{STAT_META[k].suffix || ""} {STAT_META[k].label}</b> — {STAT_META[k].desc}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
                         {/* Compare against whatever's equipped in this slot so you can tell if it's an upgrade. */}
                         {(() => {
                             const eqId = equipped[detailItem.slot];
