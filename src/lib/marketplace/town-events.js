@@ -13,6 +13,9 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
+import { addChests } from "@/lib/marketplace/chests.js";
+
+const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
 // ── TOWN EVENTS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Admin-triggered communal encounters that spawn in the plaza (a bandit raid, etc.). Everyone in town attacks a
@@ -26,15 +29,15 @@ import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 // mean more fighters can share, never a jackpot for one person.
 export const TOWN_EVENT_TYPES = {
     bandit_raid: {
-        name: "Bandit Raid", emoji: "🗡️", hp: 2400, enemies: 6, rewardGold: 2500, durationMin: 14,
+        name: "Bandit Raid", emoji: "🗡️", hp: 2400, enemies: 6, rewardGold: 2500, durationMin: 14, duelPower: 16,
         pushTitle: "🗡️ Bandits are raiding the Wolf Den!", pushBody: "They're in the plaza — rush the Town and fight them off for gold!",
     },
     goblin_swarm: {
-        name: "Goblin Swarm", emoji: "👺", hp: 2000, enemies: 8, rewardGold: 1800, durationMin: 12,
+        name: "Goblin Swarm", emoji: "👺", hp: 2000, enemies: 8, rewardGold: 1800, durationMin: 12, duelPower: 13,
         pushTitle: "👺 A goblin swarm hit the Town!", pushBody: "Pile into the plaza and drive them out — loot for everyone who fights!",
     },
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", hp: 1800, enemies: 2, rewardGold: 4000, durationMin: 12,
+        name: "Treasure Golem", emoji: "💎", hp: 1800, enemies: 2, rewardGold: 4000, durationMin: 12, duelPower: 40,
         pushTitle: "💎 A Treasure Golem lumbered into Town!", pushBody: "Crack it open together — it's stuffed with gold. First to the plaza wins big!",
     },
 };
@@ -43,6 +46,13 @@ const HIT_THROTTLE_MS = 1000;  // 1-second cooldown between taps
 const FLAT_MIN_GOLD = 25;      // everyone who lands a hit gets at least this
 const RAID_MAX_GOLD = 500;     // per-fighter gold CAP (a raid is a nice bonus, not a jackpot)
 const RAID_PARTICIPATION_XP = 250; // XP each fighter earns when the raid resolves (the raid's main draw is XP now)
+// ── DUELS ── clicking a foe starts a back-and-forth exchange (like ship battles). Win → a small reward + a low
+// loot chance; your FIRST fight of a raid always drops a chest (thanks for coming down); a loss still pays a little.
+const DUEL_THROTTLE_MS = 700;
+const DUEL_WIN_XP = 35;
+const DUEL_WIN_GOLD = 55;
+const DUEL_LOSS_GOLD = 12;      // consolation so a loss is never nothing
+const DUEL_LOOT_CHANCE = 0.18;  // chance a WIN also drops a low-tier chest
 // Per-tap damage from the player's real equipped stats (+ pet), with a crit roll and a chance at a weapon-skill
 // proc. Server-authoritative so a cheating client can't inflate it. Returns { damage, crit, proc }.
 async function computeRaidHit(buyerId) {
@@ -79,22 +89,16 @@ async function resolveExpiredEvents() {
     for (const r of rows) await resolveTownEvent(r.id, "expired").catch(() => {});
 }
 
-// When a wave is cleared (hp<=0): if the minimum active time has passed, the raid is WON (resolve + pay).
-// Otherwise reinforcements arrive — refill the wave's hp + bump the wave counter. Returns {resolved, hp, wave}.
-async function waveOrResolve(ev) {
-    const startedMs = new Date(ev.started_at).getTime();
-    const minMs = Number(ev.meta?.minMs) || MIN_ACTIVE_MS;
-    if (Date.now() - startedMs >= minMs) {
-        await resolveTownEvent(ev.id, "defeated").catch(() => {});
-        return { resolved: true, hp: 0, wave: Number(ev.meta?.wave) || 1 };
-    }
+// A raid runs for its FULL duration — clearing a wave NEVER ends it; reinforcements always arrive (refill hp +
+// bump the wave counter) until the timer (`ends_at`) expires. Returns { hp, wave }.
+async function refillWave(ev) {
     const wave = (Number(ev.meta?.wave) || 1) + 1;
     const row = await db.queryOne(
         `UPDATE mkt_town_event SET hp = hp_max, meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{wave}', to_jsonb($2::int))
           WHERE id = $1 AND status = 'active' RETURNING hp`,
         [ev.id, wave]
     ).catch(() => null);
-    return { resolved: false, hp: row?.hp ?? ev.hp_max, wave };
+    return { hp: row?.hp ?? ev.hp_max, wave };
 }
 
 // The current active event (+ your damage + the top fighters), or null. Shape is town-state friendly.
@@ -102,10 +106,9 @@ export async function getActiveTownEvent(buyerId) {
     await resolveExpiredEvents();
     let ev = await db.queryOne(`SELECT * FROM mkt_town_event WHERE status = 'active' ORDER BY started_at DESC LIMIT 1`).catch(() => null);
     if (!ev) return null;
-    // A wave sitting at 0 (cleared, no one mid-fight) → resolve if past the minimum, else send in reinforcements.
+    // A wave sitting at 0 (cleared) → reinforcements arrive; the raid runs until its timer, never ends on a clear.
     if (ev.hp <= 0) {
-        const w = await waveOrResolve(ev);
-        if (w.resolved) return null;
+        const w = await refillWave(ev);
         ev = { ...ev, hp: w.hp, meta: { ...ev.meta, wave: w.wave } };
     }
     const type = TOWN_EVENT_TYPES[ev.kind] || {};
@@ -192,20 +195,14 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
     ).catch(() => null);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     let hp = updated?.hp ?? ev.hp;
-    let defeated = false;
+    const defeated = false; // raids run their full duration now — a cleared wave just refills
     let wave = Number(ev.meta?.wave) || 1;
     if (hp <= 0) {
-        const w = await waveOrResolve(ev); // pays out + awards XP on defeat (resolveTownEvent)
-        defeated = w.resolved;
-        hp = w.resolved ? 0 : w.hp;
+        const w = await refillWave(ev);
+        hp = w.hp;
         wave = w.wave;
     }
-    // On defeat, hand back this fighter's recap (their paid gold + participation XP + total damage).
-    let reward = null;
-    if (defeated) {
-        const row = await db.queryOne(`SELECT reward_gold, damage FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
-        reward = { gold: Number(row?.reward_gold || 0), xp: RAID_PARTICIPATION_XP, damage: Number(row?.damage ?? mine?.damage ?? 0) };
-    }
+    const reward = null;
     return {
         ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
         hp, defeated, wave, reward,
@@ -214,32 +211,103 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
     };
 }
 
-// Pay out an event once (atomic status flip guards against double-pay). Gold to every fighter, scaled by their
-// damage share (+ a flat participation floor). On a timeout the pool is prorated to the damage dealt.
+// End a raid when its timer expires. Rewards are handed out PER DUEL as they're fought (see duelRaidEnemy), so
+// this just closes the event out and rallies a "raid's over" note. Atomic status flip guards against double-close.
 async function resolveTownEvent(eventId, outcome) {
     const ev = await db.queryOne(
         `UPDATE mkt_town_event SET status = $2, defeated_at = CASE WHEN $2 = 'defeated' THEN NOW() ELSE defeated_at END
           WHERE id = $1 AND status = 'active' RETURNING *`,
         [eventId, outcome === "defeated" ? "defeated" : "expired"]
     ).catch(() => null);
-    if (!ev) return; // someone else already resolved it
-    const hits = await db.query(`SELECT buyer_id, damage FROM mkt_town_event_hit WHERE event_id = $1 AND damage > 0`, [eventId]).catch(() => []);
-    const totalDmg = hits.reduce((s, h) => s + h.damage, 0) || 1;
-    // The Garrison town-upgrade richens every raid's gold pool (+10% per level).
-    const raidGoldPct = (await getTownBonuses(Date.now()).catch(() => ({}))).raidGoldPct || 0;
-    const basePool = outcome === "defeated" ? ev.reward_gold : Math.round(ev.reward_gold * Math.min(1, (ev.hp_max - ev.hp) / ev.hp_max));
-    const pool = raidGoldPct ? Math.round(basePool * (1 + raidGoldPct / 100)) : basePool;
-    for (const h of hits) {
-        const gold = Math.min(RAID_MAX_GOLD, FLAT_MIN_GOLD + Math.round(pool * (h.damage / totalDmg)));
-        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);
-        await logCoin(h.buyer_id, gold, "town_event", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
-        await awardXp(h.buyer_id, "town_event", { points: RAID_PARTICIPATION_XP, gold: 0, dedupeKey: `town_event:${eventId}:${h.buyer_id}` }).catch(() => {});
-        await db.query(`UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3 WHERE event_id = $1 AND buyer_id = $2`, [eventId, h.buyer_id, gold]).catch(() => {});
-    }
+    if (!ev) return; // someone else already closed it
+    const n = (await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_event_hit WHERE event_id = $1`, [eventId]).catch(() => null))?.n || 0;
     if (!ev.meta?.silent) {
-        const msg = outcome === "defeated"
-            ? `The ${ev.name} was driven off! Gold paid to all ${hits.length} who fought.`
-            : `The ${ev.name} slipped away — but everyone who fought still earned a share.`;
-        broadcastWebPush({ title: `✅ ${ev.name} over`, body: msg, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+        broadcastWebPush({ title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
     }
+}
+
+// A back-and-forth exchange (like the ship battles): both open at 100 HP and trade blows scaled by their power,
+// with crits + randomness so it's never a lock. Returns the full turn-by-turn script for the client to animate.
+function simulateDuel({ myPower, foePower, myCrit = 0, myCritPow = 30 }) {
+    let me = 100, foe = 100;
+    const events = [];
+    const swing = (power, crit, critPow) => {
+        let dmg = (8 + randInt(0, 7)) * (1 + Math.max(0, power) * 0.012);
+        const isCrit = Math.random() < Math.min(0.55, Math.max(0, crit) / 100);
+        if (isCrit) dmg *= 1.5 + Math.max(0, critPow) / 100;
+        return { dmg: Math.max(1, Math.round(dmg)), crit: isCrit };
+    };
+    for (let round = 0; round < 30 && me > 0 && foe > 0; round += 1) {
+        const a = swing(myPower, myCrit, myCritPow);
+        foe = Math.max(0, foe - a.dmg);
+        events.push({ side: "me", dmg: a.dmg, crit: a.crit, me, foe });
+        if (foe <= 0) break;
+        const b = swing(foePower, 8, 30);
+        me = Math.max(0, me - b.dmg);
+        events.push({ side: "foe", dmg: b.dmg, crit: b.crit, me, foe });
+    }
+    return { win: foe <= 0 ? me > 0 : me >= foe, events, myHp: me, foeHp: foe };
+}
+
+// Fight ONE foe: a duel exchange. Win → small XP + coin + a low loot chance; a loss pays a little consolation.
+// Your FIRST duel of a raid always drops a low-tier chest (thanks for coming down to play). Wins drain the wave
+// (which just refills — the raid runs its full timer).
+export async function duelRaidEnemy(buyerId, eventId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const ev = await db.queryOne(`SELECT id, hp, hp_max, meta, kind, name FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
+    if (!ev) return { ok: false, error: "no_event" };
+    const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
+    if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < DUEL_THROTTLE_MS) return { ok: false, error: "too_fast" };
+    const firstDuel = !prior;
+    // Your combat power for the exchange (gear + pet offense + Raid Fury attunement).
+    const [stats, pet, util] = await Promise.all([
+        getEquippedStats(buyerId).catch(() => ({})),
+        getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
+        getEquippedUtilTotals(buyerId).catch(() => ({ raidDmg: 0 })),
+    ]);
+    const ps = pet?.stats || {};
+    const might = (stats.might || 0) + (ps.might || 0);
+    const ferocity = (stats.ferocity || 0) + (ps.ferocity || 0);
+    const critC = Math.min(60, (stats.crit_chance || 0) + (ps.crit_chance || 0));
+    const critP = (stats.crit_power || 0) + (ps.crit_power || 0) || 30;
+    let myPower = 6 + might * 0.9 + ferocity * 0.6;
+    myPower *= 1 + (util.raidDmg || 0) / 100;
+    const type = TOWN_EVENT_TYPES[ev.kind] || {};
+    const sim = simulateDuel({ myPower, foePower: type.duelPower || 16, myCrit: critC, myCritPow: critP });
+    // Record participation (damage this exchange = foe HP removed; hits = duels won — powers the leaderboard).
+    const dealt = Math.round(100 - sim.foeHp);
+    const mine = await db.queryOne(
+        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + $4, last_hit_at = NOW()
+         RETURNING damage, hits`,
+        [eventId, buyerId, dealt, sim.win ? 1 : 0]
+    ).catch(() => null);
+    bumpTownQuest(buyerId, "rally", 1).catch(() => {});
+
+    const loot = [];
+    // First fight of the raid → a chest just for coming down to play (generous, guaranteed).
+    if (firstDuel) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_visit" }).catch(() => {}); loot.push({ tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
+
+    let xp = 0, coin = 0;
+    let hp = ev.hp, wave = Number(ev.meta?.wave) || 1;
+    if (sim.win) {
+        xp = DUEL_WIN_XP + randInt(0, 20);
+        coin = DUEL_WIN_GOLD + randInt(0, 30);
+        // Low loot chance on a win.
+        if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
+        // Drain the wave; a cleared wave just refills (raid runs its full timer).
+        const perEnemy = Math.max(1, Math.round((ev.hp_max || 600) / (type.enemies || 6)));
+        const upd = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, perEnemy]).catch(() => null);
+        hp = upd?.hp ?? ev.hp;
+        if (hp <= 0) { const w = await refillWave(ev); hp = w.hp; wave = w.wave; }
+    } else {
+        coin = DUEL_LOSS_GOLD; // never nothing
+    }
+    if (coin > 0) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, coin]).catch(() => null);
+        await logCoin(buyerId, coin, "town_duel", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
+    }
+    if (xp > 0) await awardXp(buyerId, "town_duel", { points: xp, gold: 0 }).catch(() => {});
+
+    return { ok: true, win: sim.win, events: sim.events, reward: { xp, coin, loot }, firstDuel, hp, wave, wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️" };
 }

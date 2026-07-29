@@ -91,7 +91,7 @@ function GambleReveal({ reveal, diceUrl, onClose }) {
     );
 }
 
-function Avatar({ a, isYou, onTap }) {
+function Avatar({ a, isYou, onTap, raiding }) {
     const dur = clamp((a.moveDist || 0) * 0.05, 0.4, 2.6);
     // The pet drifts around near you on its own little schedule, so it feels alive instead of glued to your side.
     const [petWander, setPetWander] = useState({ x: 0, y: 0 });
@@ -104,8 +104,10 @@ function Avatar({ a, isYou, onTap }) {
     return (
         <div
             className={`tw-av${isYou ? " is-you" : ""}${a.friend ? " is-friend" : ""}`}
-            style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: 300 + Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear` }}
-            onClick={onTap ? (e) => { e.stopPropagation(); onTap(); } : undefined}
+            // During a raid, avatars are click-through so the foes behind them are always tappable (your hero
+            // stands in front and used to swallow the taps).
+            style={{ left: `${a.x}%`, top: `${a.y}%`, zIndex: 300 + Math.round(a.y) + (isYou ? 100 : 0), transition: `left ${dur}s linear, top ${dur}s linear`, pointerEvents: raiding ? "none" : undefined }}
+            onClick={onTap && !raiding ? (e) => { e.stopPropagation(); onTap(); } : undefined}
         >
             {a.chat ? (
                 isEmoteMsg(a.chat) ? (
@@ -160,8 +162,66 @@ function RaidHUD({ ev, kills, myDamage }) {
             <div className="tw-raid-hud-title">{ev.emoji} {ev.name}{ev.wave > 1 ? ` · wave ${ev.wave}` : ""}</div>
             <div className="tw-raid-hud-stats">
                 {left ? <span title="Time left">⏱️ {left}</span> : null}
-                <span title="Foes you've felled">☠️ {kills}</span>
-                <span title="Your total damage">⚔️ {myDamage.toLocaleString()}</span>
+                <span title="Foes you've bested">☠️ {kills}</span>
+            </div>
+        </div>
+    );
+}
+
+// A duel: animate the back-and-forth exchange (two HP bars, damage ticks), then the win/lose + reward.
+function DuelModal({ duel, youSprite, youFlip, onClose }) {
+    const events = duel.events || [];
+    const [step, setStep] = useState(0);      // how many events have played
+    const [pop, setPop] = useState(null);     // { side, dmg, crit, k }
+    const done = step >= events.length;
+    // HP after the last-played event (start both at 100).
+    const last = step > 0 ? events[step - 1] : null;
+    const meHp = last ? last.me : 100;
+    const foeHp = last ? last.foe : 100;
+    useEffect(() => {
+        if (done) return undefined;
+        const ev = events[step];
+        const t = setTimeout(() => {
+            setPop({ side: ev.side, dmg: ev.dmg, crit: ev.crit, k: step });
+            setStep((s) => s + 1);
+        }, step === 0 ? 350 : 620);
+        return () => clearTimeout(t);
+    }, [step, done, events]);
+    const r = duel.reward || { xp: 0, coin: 0, loot: [] };
+    return (
+        <div className="tw-duel" role="dialog" aria-label="Duel">
+            <div className="tw-duel-card" onClick={(e) => e.stopPropagation()}>
+                <div className="tw-duel-title">⚔️ {duel.name}</div>
+                <div className="tw-duel-arena">
+                    <div className={`tw-duel-side${pop?.side === "foe" && !done ? " is-hit" : ""}`}>
+                        {youSprite ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={youSprite} alt="You" style={{ transform: youFlip ? "scaleX(-1)" : "none" }} /> : <span className="tw-duel-emoji">🐺</span>}
+                        <div className="tw-duel-name">You</div>
+                        <div className="tw-duel-hp"><span style={{ width: `${meHp}%` }} /></div>
+                        {pop?.side === "foe" ? <span key={pop.k} className={`tw-duel-dmg${pop.crit ? " is-crit" : ""}`}>-{pop.dmg}</span> : null}
+                    </div>
+                    <div className="tw-duel-vs">VS</div>
+                    <div className={`tw-duel-side foe${pop?.side === "me" && !done ? " is-hit" : ""}`}>
+                        {duel.foeArt ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={duel.foeArt} alt="Foe" /> : <span className="tw-duel-emoji">{duel.foeEmoji}</span>}
+                        <div className="tw-duel-name">{duel.foeEmoji} Foe</div>
+                        <div className="tw-duel-hp foe"><span style={{ width: `${foeHp}%` }} /></div>
+                        {pop?.side === "me" ? <span key={pop.k} className={`tw-duel-dmg${pop.crit ? " is-crit" : ""}`}>-{pop.dmg}</span> : null}
+                    </div>
+                </div>
+                {done ? (
+                    <div className="tw-duel-result">
+                        <div className={`tw-duel-verdict ${duel.win ? "win" : "lose"}`}>{duel.win ? "🏆 Victory!" : "💥 Driven back!"}</div>
+                        <div className="tw-duel-rewards">
+                            {r.xp ? <span className="tw-duel-chip xp">+{r.xp} XP</span> : null}
+                            {r.coin ? <span className="tw-duel-chip gold">+{r.coin} 🪙</span> : null}
+                            {(r.loot || []).map((l, i) => <span key={i} className="tw-duel-chip loot">{l.emoji} {l.label}</span>)}
+                            {!r.xp && !r.coin && !(r.loot || []).length ? <span className="muted">No spoils this time.</span> : null}
+                        </div>
+                        {duel.firstDuel ? <div className="tw-duel-note">🧰 Welcome chest for joining the fight!</div> : null}
+                        <button type="button" className="tw-levelup-btn" onClick={onClose}>{duel.win ? "Huzzah! 🐺" : "Again! ⚔️"}</button>
+                    </div>
+                ) : (
+                    <button type="button" className="tw-duel-skip" onClick={() => setStep(events.length)}>Skip →</button>
+                )}
             </div>
         </div>
     );
@@ -214,7 +274,8 @@ export default function TownClient({ initial }) {
     const [raidDamage, setRaidDamage] = useState(0);    // your total damage this raid (optimistic)
     const [raidProc, setRaidProc] = useState(null);     // weapon-skill callout {name,emoji,color,key}
     const [raidRecap, setRaidRecap] = useState(null);   // end-of-raid recap {gold,xp,kills,damage}
-    const [raidCd, setRaidCd] = useState(false);        // 1s tap cooldown
+    const [duel, setDuel] = useState(null);             // active duel exchange { enemyId, foeArt, foeEmoji, name, win, events, reward }
+    const [raidCd, setRaidCd] = useState(false);        // duel cooldown
     const evIdRef = useRef(null);
     const raidWaveRef = useRef(1);
     const raidCdRef = useRef(false);
@@ -428,45 +489,25 @@ export default function TownClient({ initial }) {
     }, [wishBusy, load]);
     // Tap a raid enemy: 1s cooldown, server computes your real (stat-based) damage + crit + weapon-skill proc.
     // Apply it to THAT enemy's HP bar with a floating number; kill it when its bar empties; recap on the win.
-    const tapEnemy = useCallback(async (enemyId) => {
-        const ev = state?.event; if (!ev || raidCdRef.current) return;
+    // Click a foe → a back-and-forth DUEL (like the ship battles). The server resolves the exchange; we open the
+    // duel modal to animate it, then reward. On a win the foe falls + the field resyncs (fresh foes keep coming).
+    const startDuel = useCallback(async (enemyId, foeArt) => {
+        const ev = state?.event; if (!ev || raidCdRef.current || duel) return;
         raidCdRef.current = true; setRaidCd(true);
-        setTimeout(() => { raidCdRef.current = false; setRaidCd(false); }, 1000);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attack", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
-        if (!r?.ok) return; // too_fast / no_event — cooldown already prevents spam
-        const fid = (floatId.current += 1);
-        setRaidDamage((d) => d + r.damage);
-        // Weapon-skill proc → a snazzy callout
-        if (r.proc) { const key = fid; setRaidProc({ ...r.proc, key }); setTimeout(() => setRaidProc((p) => (p && p.key === key ? null : p)), 1500); }
-        // Apply damage to the tapped enemy + float the number
-        setRaidEnemies((prev) => prev.map((en) => {
-            if (en.id !== enemyId) return en;
-            const hp = en.hp - r.damage;
-            const floats = [...en.floats, { id: fid, dmg: r.damage, crit: r.crit, proc: Boolean(r.proc) }];
-            if (hp <= 0 && !en.dying) { setRaidKills((k) => k + 1); return { ...en, hp: 0, dying: true, floats }; }
-            return { ...en, hp: Math.max(0, hp), floats };
-        }));
-        setTimeout(() => setRaidEnemies((prev) => prev.map((en) => (en.id === enemyId ? { ...en, floats: en.floats.filter((f) => f.id !== fid) } : en))), 750);
-        if (r.defeated) {
-            // Force-clear the field, show the recap, then reload (server rotates the event).
-            setTimeout(() => setRaidEnemies((prev) => prev.map((en) => ({ ...en, dying: true }))), 60);
-            setRaidRecap({ gold: r.reward?.gold || 0, xp: r.reward?.xp || 0, kills: raidKills + 1, damage: r.reward?.damage || raidDamage + r.damage });
+        setTimeout(() => { raidCdRef.current = false; setRaidCd(false); }, 700);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        if (!r?.ok) return; // too_fast / no_event
+        if (r.win && typeof r.wins === "number") setRaidKills(r.wins);
+        setDuel({ enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] } });
+    }, [state?.event, duel]);
+    const closeDuel = useCallback(() => {
+        const d = duel; setDuel(null);
+        if (d?.win) {
+            setRaidEnemies((prev) => prev.map((en) => (en.id === d.enemyId ? { ...en, dying: true } : en)));
             try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
-            setTimeout(() => load(), 900);
-        } else if (r.clearedWave) {
-            // Reinforcements — respawn a fresh wave of enemies next poll (raidWaveRef guards it); nudge a reload.
-            raidWaveRef.current = -1; setTimeout(() => load(), 300);
-        } else {
-            // If the tapped enemy is dying and the wave still has HP, drop in a replacement so there's always a foe.
-            setTimeout(() => setRaidEnemies((prev) => {
-                const alive = prev.filter((en) => !en.dying);
-                if (alive.length >= 1) return prev.filter((en) => !(en.dying && en.floats.length === 0));
-                const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
-                const nid = `${ev.id}-${raidWaveRef.current}-r${floatId.current}`;
-                return [...prev.filter((en) => !(en.dying && en.floats.length === 0)), { id: nid, x: 10 + (floatId.current * 41) % 80, y: GROUND + 13 - (floatId.current % 3) * 3, hp: hpMax, hpMax, floats: [], dying: false }];
-            }), 420);
         }
-    }, [state?.event, load, raidKills, raidDamage]);
+        setTimeout(() => load(), 350);
+    }, [duel, load]);
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
@@ -577,6 +618,8 @@ export default function TownClient({ initial }) {
 
             <div ref={sceneRef} className="tw-scene" style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <SceneMusic vibe="town" />
+                {/* Live online count — green bubble, top-left (hidden behind the raid HUD during a raid). */}
+                {!raidActive ? <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Who's around"><span className="tw-online-dot" />{state?.onlineCount ?? 1} online</button> : null}
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
@@ -733,24 +776,21 @@ export default function TownClient({ initial }) {
                                 // Each foe roams on its OWN clock (per-enemy delay/duration/sway) so they move independently,
                                 // sit low in the foreground, and draw above the buildings (z well over the ~192 building band).
                                 style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 240 + Math.round(en.y), animationDelay: `${((i * 0.83) % 2.6).toFixed(2)}s`, animationDuration: `${(3 + (i % 4) * 0.7).toFixed(2)}s`, "--sway": `${9 + (i % 3) * 6}px` }}
-                                onClick={(e) => { e.stopPropagation(); if (!en.dying) tapEnemy(en.id); }}
-                                aria-label={`Attack the ${ev.name}`}
+                                onClick={(e) => { e.stopPropagation(); if (!en.dying) startDuel(en.id, url); }}
+                                aria-label={`Fight the ${ev.name}`}
                             >
-                                <span className="tw-enemy-hp"><span style={{ width: `${Math.max(0, Math.round((en.hp / en.hpMax) * 100))}%` }} /></span>
+                                <span className="tw-enemy-crossed" aria-hidden="true">⚔️</span>
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={url} alt="" draggable={false} style={{ transform: en.x > 50 ? "scaleX(-1)" : "none" }} />
                                 ) : <span className="tw-enemy-emoji">{ev.emoji}</span>}
-                                {en.floats.map((f) => (
-                                    <span key={f.id} className={`tw-dmg${f.crit ? " is-crit" : ""}${f.proc ? " is-proc" : ""}`}>{f.crit ? "✦" : ""}{f.dmg}</span>
-                                ))}
                             </button>
                         ));
                     })() : null}
                     {/* Other players */}
-                    {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} />)}
+                    {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} raiding={raidActive} />)}
                     {/* You */}
-                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
+                    {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou raiding={raidActive} /> : null}
                 </div>
 
                 {/* Market Day — the shop is physically OPEN: a festive ribbon + a live +XP nudge to match the crier's hype */}
@@ -1029,6 +1069,8 @@ export default function TownClient({ initial }) {
             {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
             {/* Raid victory recap */}
+            {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
+
             {raidRecap ? (
                 <div className="tw-levelup" onClick={() => setRaidRecap(null)} role="presentation">
                     <div className="tw-levelup-confetti" aria-hidden="true">
@@ -1146,6 +1188,40 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-ground { position: absolute; inset: 66% 0 0 0; background: radial-gradient(120% 80% at 50% -10%, rgba(255,190,120,0.12), transparent 60%), repeating-linear-gradient(90deg, #55402c 0 38px, #5c4630 38px 76px), linear-gradient(180deg, #6a5138, #4a381f); box-shadow: inset 0 8px 24px rgba(0,0,0,0.35); }
 
 .tw-online { font-size: 0.72rem; font-weight: 800; color: #8fe39a; background: rgba(143,227,154,0.12); border: 1px solid rgba(143,227,154,0.35); border-radius: 999px; padding: 2px 9px; }
+/* Live online count — green bubble, top-left of the scene */
+.tw-online-badge { position: absolute; top: 8px; left: 8px; z-index: 470; display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 900; color: #d8ffe0; background: rgba(16,32,20,0.82); border: 1px solid rgba(143,227,154,0.5); border-radius: 999px; padding: 4px 10px; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.4); }
+.tw-online-badge .tw-online-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px #4ade80; animation: twOnlinePulse 2s ease-in-out infinite; }
+@keyframes twOnlinePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+/* Enemy "fight me" crossed-swords hint */
+.tw-enemy-crossed { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 15px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); pointer-events: none; opacity: 0.9; }
+/* ── DUEL modal ── */
+.tw-duel { position: fixed; inset: 0; z-index: 640; display: grid; place-items: center; padding: 18px; background: radial-gradient(120% 120% at 50% 30%, rgba(40,12,8,0.72), rgba(4,2,1,0.9)); animation: twRevealIn .2s ease both; }
+.tw-duel-card { width: min(400px, 94vw); border-radius: 20px; padding: 18px; background: linear-gradient(180deg, rgba(30,18,14,0.99), rgba(16,10,8,0.99)); border: 1px solid rgba(224,120,74,0.5); box-shadow: 0 20px 55px rgba(0,0,0,0.7); }
+.tw-duel-title { text-align: center; font-size: 1.05rem; font-weight: 900; color: #ffcaba; margin-bottom: 12px; }
+.tw-duel-arena { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.tw-duel-side { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.tw-duel-side img { width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); }
+.tw-duel-emoji { font-size: 56px; }
+.tw-duel-side.is-hit { animation: twDuelShake .3s ease; }
+@keyframes twDuelShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.tw-duel-name { font-size: 0.72rem; font-weight: 800; color: #e8d6c0; }
+.tw-duel-hp { width: 92%; height: 8px; border-radius: 999px; background: rgba(0,0,0,0.5); overflow: hidden; }
+.tw-duel-hp span { display: block; height: 100%; background: linear-gradient(90deg,#4ade80,#22c55e); transition: width .35s ease; }
+.tw-duel-hp.foe span { background: linear-gradient(90deg,#e0433f,#ff7a3c); }
+.tw-duel-vs { font-size: 0.9rem; font-weight: 900; color: #ffb08a; }
+.tw-duel-dmg { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); font-weight: 900; font-size: 18px; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.8); pointer-events: none; animation: twDmg .6s ease-out forwards; }
+.tw-duel-dmg.is-crit { font-size: 24px; color: #ffe27a; }
+.tw-duel-result { text-align: center; margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.tw-duel-verdict { font-size: 1.3rem; font-weight: 900; }
+.tw-duel-verdict.win { color: #8fe39a; text-shadow: 0 0 14px rgba(62,192,106,0.6); }
+.tw-duel-verdict.lose { color: #ff9a8f; }
+.tw-duel-rewards { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+.tw-duel-chip { font-size: 0.86rem; font-weight: 900; padding: 5px 12px; border-radius: 999px; }
+.tw-duel-chip.xp { color: #0a2e1c; background: linear-gradient(180deg,#8fe39a,#3ec06a); }
+.tw-duel-chip.gold { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
+.tw-duel-chip.loot { color: #e0c8ff; background: rgba(150,90,255,0.18); border: 1px solid rgba(184,120,255,0.45); }
+.tw-duel-note { font-size: 0.76rem; font-weight: 800; color: #ffd9a0; }
+.tw-duel-skip { display: block; margin: 12px auto 0; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: #cbb9a0; font-weight: 800; font-size: 0.8rem; cursor: pointer; }
 .tw-openchip { font-size: 0.7rem; font-weight: 800; border-radius: 999px; padding: 2px 9px; color: #e69a9a; background: rgba(224,67,63,0.1); border: 1px solid rgba(224,67,63,0.32); }
 .tw-openchip.is-open { color: #8fe39a; background: rgba(143,227,154,0.12); border-color: rgba(143,227,154,0.35); }
 .tw-roster-btn { font-size: 0.74rem; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.4); border-radius: 999px; padding: 3px 11px; cursor: pointer; }
