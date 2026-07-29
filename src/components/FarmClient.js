@@ -488,9 +488,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [gardenAct]);
     const fertilizeAt = useCallback((slot) => gardenAct({ action: "fertilizer_use", slot }, `f-${slot}`), [gardenAct]);
     const upgradePlotAt = useCallback((slot, key) => gardenAct({ action: "plot_upgrade", slot, key }, `pu-${slot}-${key}`), [gardenAct]);
-    // Resolve a harvest encounter (server grants the pre-rolled loot scaled by perfect hits). Updates wallet.
-    const resolveEncounterAt = useCallback(async (perfectHits) => {
-        const r = await gardenAct({ action: "encounter_resolve", perfectHits }, "enc");
+    // Claim a harvest critter's gift (pure upside — server grants the pre-rolled XP + gold + loot). Updates wallet.
+    const resolveEncounterAt = useCallback(async () => {
+        const r = await gardenAct({ action: "encounter_resolve" }, "enc");
         if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } if (r.goldAfter != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.goldAfter } } : f)); }
         return r;
     }, [gardenAct]);
@@ -755,6 +755,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes crownJiggle { 0%,100% { transform: translateX(-50%) rotate(-11deg); } 50% { transform: translateX(-50%) rotate(11deg); } }
                 @keyframes coinPop { 0% { opacity: 0; transform: translate(-50%, -22px) scale(.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(360deg); } }
                 @keyframes pigPop { 0% { opacity: 0; transform: scale(.82); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+                @keyframes encShake { 0%,100% { transform: rotate(0) scale(1); } 20% { transform: rotate(-9deg) scale(1.08); } 45% { transform: rotate(8deg) scale(1.06); } 70% { transform: rotate(-5deg) scale(1.03); } }
+                @keyframes encSpark { 0% { opacity: 0; transform: translateY(6px) scale(.4); } 25% { opacity: 1; transform: translateY(-6px) scale(1.2); } 100% { opacity: 0; transform: translateY(-30px) scale(.7); } }
+                @keyframes farmConfetti { 0% { transform: translateY(-10px) rotate(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(88vh) rotate(560deg); opacity: .9; } }
                 @keyframes rateBurstAnim { 0% { transform: translate(-50%,-50%) scale(.4); opacity: 0; } 25% { opacity: 1; } 55% { transform: translate(-50%,-60%) scale(1.7); opacity: 1; } 100% { transform: translate(-50%,-140%) scale(1.9); opacity: 0; } }
                 @keyframes ratePulse { 0%,100% { transform: scale(1); } 45% { transform: scale(1.18); } }
                 @keyframes rateStars { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px) scale(1.1); } }
@@ -2159,97 +2162,94 @@ function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) 
 
 // Harvest ENCOUNTER — a creature raided your harvest. Fight it with a timing meter: a marker sweeps a bar, tap
 // to strike; land in the GREEN for a perfect hit (more perfects = bigger reward). Down its HP to win bonus loot.
+// A friendly critter turns up at harvest with a GIFT — pure upside, no fight, no flee. You tap it a few times
+// to shake the loot loose (juice only), then a confetti recap shows exactly what you got (XP + gold + a bonus).
+const SHAKES_TO_POP = 3;
 function EncounterModal({ encounter, onResolve, onClose }) {
-    const [hp, setHp] = useState(encounter.hp || 2);
-    const [perfect, setPerfect] = useState(0);
-    const [phase, setPhase] = useState("fight"); // fight | resolving | reward
-    const [flash, setFlash] = useState(null); // { kind, text }
+    const [phase, setPhase] = useState("catch"); // catch | resolving | reward
+    const [taps, setTaps] = useState(0);
+    const [pops, setPops] = useState([]);        // floating sparkle bursts on each tap
     const [reward, setReward] = useState(null);
-    const [pos, setPos] = useState(0);
-    const posRef = useRef(0);
-    const dirRef = useRef(1);
-    const rafRef = useRef(0);
-    const lastRef = useRef(0);
-    const hpRef = useRef(hp);
-    const perfectRef = useRef(0);
-    hpRef.current = hp;
+    const busyRef = useRef(false);
+    const popId = useRef(0);
 
-    // The sweeping marker (rAF so hit-detection reads the true live position).
-    useEffect(() => {
-        if (phase !== "fight") return undefined;
-        const SPEED = 1.7; // full sweeps per second
-        const tick = (t) => {
-            if (!lastRef.current) lastRef.current = t;
-            const dt = Math.min(0.05, (t - lastRef.current) / 1000);
-            lastRef.current = t;
-            let p = posRef.current + dirRef.current * SPEED * dt;
-            if (p >= 1) { p = 1; dirRef.current = -1; } else if (p <= 0) { p = 0; dirRef.current = 1; }
-            posRef.current = p;
-            setPos(p);
-            rafRef.current = requestAnimationFrame(tick);
-        };
-        rafRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(rafRef.current);
-    }, [phase]);
+    const finish = useCallback(async () => {
+        if (busyRef.current) return;
+        busyRef.current = true;
+        setPhase("resolving");
+        const r = await onResolve();
+        setReward(r?.ok ? r : { error: true });
+        setPhase("reward");
+    }, [onResolve]);
 
-    const strike = useCallback(async () => {
-        if (phase !== "fight") return;
-        const p = posRef.current;
-        const inGreen = p >= 0.44 && p <= 0.56;
-        const inYellow = p >= 0.28 && p <= 0.72;
-        if (!inYellow) { setFlash({ kind: "miss", text: "Miss!" }); setTimeout(() => setFlash(null), 320); return; }
-        if (inGreen) { perfectRef.current += 1; setPerfect(perfectRef.current); setFlash({ kind: "perfect", text: "PERFECT!" }); }
-        else setFlash({ kind: "hit", text: "Hit!" });
-        setTimeout(() => setFlash(null), 320);
-        const nextHp = hpRef.current - 1;
-        setHp(nextHp);
-        if (nextHp <= 0) {
-            setPhase("resolving");
-            const r = await onResolve(perfectRef.current);
-            setReward(r?.ok ? r : { error: true });
-            setPhase("reward");
-        }
-    }, [phase, onResolve]);
+    const shake = useCallback(() => {
+        if (phase !== "catch") return;
+        const n = taps + 1;
+        setTaps(n);
+        const id = (popId.current += 1);
+        setPops((p) => [...p, { id, x: 30 + Math.random() * 40, e: ["✨", "💫", "⭐", "🌟"][id % 4] }]);
+        setTimeout(() => setPops((p) => p.filter((x) => x.id !== id)), 650);
+        try { navigator?.vibrate?.(18); } catch { /* ok */ }
+        if (n >= SHAKES_TO_POP) finish();
+    }, [phase, taps, finish]);
 
-    const green = "#43d98a";
+    const gold = "#ffd75e";
+    const spriteEl = encounter.sprite ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={encounter.sprite} alt={encounter.name} draggable={false} style={{ width: 128, height: 128, objectFit: "contain", filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.5))" }} />
+    ) : <span style={{ fontSize: 74, lineHeight: 1 }}>{encounter.emoji}</span>;
+
     return (
-        <div onClick={phase === "reward" ? onClose : undefined} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10002, background: "rgba(0,0,0,0.62)", display: "grid", placeItems: "center", padding: 16 }}>
-            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Harvest encounter" style={{ width: "100%", maxWidth: 340, borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #e0704a", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", padding: 20, textAlign: "center", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
+        <div onClick={phase === "reward" ? onClose : undefined} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10002, background: "radial-gradient(120% 120% at 50% 40%, rgba(30,40,20,0.66), rgba(4,6,2,0.86))", display: "grid", placeItems: "center", padding: 16, overflow: "hidden" }}>
+            {phase === "reward" && !reward?.error ? (
+                <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+                    {Array.from({ length: 22 }).map((_, i) => (
+                        <span key={i} style={{ position: "absolute", top: -14, left: `${(i * 4.6) % 100}%`, width: 9, height: 14, borderRadius: 2, background: `hsl(${(i * 53) % 360},85%,58%)`, animation: `farmConfetti ${1.5 + (i % 5) * 0.2}s linear ${(i % 6) * 0.12}s infinite` }} />
+                    ))}
+                </div>
+            ) : null}
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Harvest critter" style={{ position: "relative", width: "100%", maxWidth: 340, borderRadius: 18, background: "linear-gradient(180deg, rgba(30,34,24,0.98), rgba(16,18,12,0.99))", border: "2px solid #7cc36a", boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 50px -12px rgba(124,195,106,0.6)", padding: 22, textAlign: "center", animation: "pigPop .45s cubic-bezier(.2,1.3,.4,1) both" }}>
                 {phase === "reward" ? (
                     <>
-                        <div style={{ fontSize: 44 }}>🎉</div>
-                        <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>{reward?.error ? "Encounter over" : `${encounter.emoji} ${encounter.name} defeated!`}</div>
+                        <div style={{ fontWeight: 900, fontSize: 13, letterSpacing: "0.08em", color: "#8fe39a" }}>🎁 CRITTER GIFT!</div>
+                        <div style={{ margin: "6px 0 2px", animation: "farmBob 1.4s ease-in-out infinite" }}>{spriteEl}</div>
                         {reward && !reward.error ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
-                                <div style={{ fontSize: 22, fontWeight: 900, color: "#ffd75e" }}>+{(reward.gold || 0).toLocaleString()} 🪙</div>
-                                {reward.chest ? <div style={{ padding: 8, borderRadius: 10, background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.5)", fontWeight: 800, fontSize: 13 }}>🧰 a {reward.chest.charAt(0).toUpperCase() + reward.chest.slice(1)} chest</div> : null}
-                                {reward.seedName ? <div style={{ padding: 8, borderRadius: 10, background: "rgba(143,227,154,0.12)", border: "1px solid rgba(143,227,154,0.45)", fontWeight: 700, fontSize: 13 }}>🌱 a {reward.seedName} seed</div> : null}
-                                {reward.perfectAll ? <div style={{ fontSize: 12, fontWeight: 800, color: green }}>✨ Flawless — chest guaranteed!</div> : null}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                                    <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{(reward.gold || 0).toLocaleString()} 🪙</span>
+                                    <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{(reward.xp || 0).toLocaleString()} ✨ XP</span>
+                                </div>
+                                {reward.loot ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,215,110,0.4)" }}>
+                                        {reward.loot.sprite ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={reward.loot.sprite} alt="" draggable={false} style={{ width: 34, height: 34, objectFit: "contain" }} />
+                                        ) : <span style={{ fontSize: 26 }}>{reward.loot.emoji}</span>}
+                                        <span style={{ fontWeight: 800, fontSize: 13.5, textAlign: "left", flex: 1 }}>You also got <b style={{ color: gold }}>{reward.loot.label}</b>!</span>
+                                    </div>
+                                ) : null}
                             </div>
-                        ) : <div className="muted" style={{ fontSize: 13, marginTop: 8 }}>The critter got away with the scraps.</div>}
-                        <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
+                        ) : <div className="muted" style={{ fontSize: 13, marginTop: 8 }}>The critter already scurried off.</div>}
+                        <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 12, fontWeight: 900, fontSize: 15, background: "linear-gradient(180deg,#8fe39a,#2fae72)", color: "#06311f", border: "none", borderRadius: 12, cursor: "pointer", boxShadow: "0 4px 0 #1f7d4f" }}>Collect! 🐺</button>
                     </>
                 ) : (
                     <>
-                        <div className="muted" style={{ fontSize: 11.5 }}>You harvested {encounter.harvest?.emoji} {encounter.harvest?.name} — but…</div>
-                        <div style={{ fontSize: 50, marginTop: 6, animation: "farmBob 1.1s ease-in-out infinite" }}>{encounter.emoji}</div>
-                        <div style={{ fontWeight: 900, fontSize: 17, marginTop: 2 }}>A {encounter.name} raids your crop!</div>
-                        {/* HP pips */}
-                        <div style={{ display: "flex", justifyContent: "center", gap: 5, margin: "10px 0 4px" }}>
-                            {Array.from({ length: encounter.hp || 2 }).map((_, i) => (
-                                <span key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: i < hp ? "#e0704a" : "rgba(255,255,255,0.14)", boxShadow: i < hp ? "0 0 6px rgba(224,112,74,0.7)" : "none", transition: "background .2s" }} />
+                        <div className="muted" style={{ fontSize: 11.5 }}>You harvested {encounter.harvest?.emoji} {encounter.harvest?.name} — and…</div>
+                        <button type="button" onClick={shake} aria-label={`Shake the ${encounter.name}`} disabled={phase !== "catch"} style={{ position: "relative", display: "block", margin: "8px auto 2px", padding: 0, border: "none", background: "none", cursor: "pointer" }}>
+                            <span key={taps} style={{ display: "inline-block", animation: "encShake .28s ease" }}>{spriteEl}</span>
+                            {pops.map((p) => (
+                                <span key={p.id} aria-hidden="true" style={{ position: "absolute", left: `${p.x}%`, top: "10%", fontSize: 24, pointerEvents: "none", animation: "encSpark .65s ease-out forwards" }}>{p.e}</span>
+                            ))}
+                        </button>
+                        <div style={{ fontWeight: 900, fontSize: 17, marginTop: 2 }}>A {encounter.name} brought you a gift!</div>
+                        <div className="muted" style={{ fontSize: 12, margin: "4px 0 12px" }}>Tap it to shake the loot loose!</div>
+                        {/* shake progress */}
+                        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 12 }}>
+                            {Array.from({ length: SHAKES_TO_POP }).map((_, i) => (
+                                <span key={i} style={{ width: 20, height: 10, borderRadius: 999, background: i < taps ? "linear-gradient(90deg,#ffd75e,#f3b23a)" : "rgba(255,255,255,0.14)", transition: "background .2s" }} />
                             ))}
                         </div>
-                        {/* timing meter */}
-                        <div style={{ position: "relative", height: 22, borderRadius: 999, margin: "12px 0 4px", overflow: "hidden", background: "linear-gradient(90deg, rgba(224,80,63,0.35) 0 28%, rgba(240,200,80,0.4) 28% 44%, rgba(67,217,138,0.85) 44% 56%, rgba(240,200,80,0.4) 56% 72%, rgba(224,80,63,0.35) 72% 100%)", border: "1px solid rgba(255,255,255,0.15)" }}>
-                            <span aria-hidden="true" style={{ position: "absolute", top: -2, bottom: -2, left: `${pos * 100}%`, width: 4, marginLeft: -2, background: "#fff", borderRadius: 2, boxShadow: "0 0 6px rgba(255,255,255,0.9)" }} />
-                        </div>
-                        <div style={{ height: 20, marginBottom: 6 }}>
-                            {flash ? <span style={{ fontWeight: 900, fontSize: 14, color: flash.kind === "perfect" ? green : flash.kind === "hit" ? "#ffe27a" : "#ff9a9a" }}>{flash.text}</span> : <span className="muted" style={{ fontSize: 11 }}>Tap Strike in the green for a perfect hit</span>}
-                        </div>
-                        <button type="button" onClick={strike} disabled={phase !== "fight"} style={{ width: "100%", padding: 13, fontWeight: 900, fontSize: 15, background: "linear-gradient(180deg,#f0865a,#d8543a)", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", boxShadow: "0 3px 0 #a53d28" }}>⚔️ Strike!</button>
-                        <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 8, padding: 8, fontWeight: 700, fontSize: 12, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, cursor: "pointer", opacity: 0.75 }}>Flee (forfeit the loot)</button>
-                        {perfect ? <div style={{ marginTop: 8, fontSize: 11, fontWeight: 800, color: green }}>✨ {perfect} perfect {perfect === 1 ? "strike" : "strikes"}</div> : null}
+                        <button type="button" onClick={shake} disabled={phase !== "catch"} style={{ width: "100%", padding: 14, fontWeight: 900, fontSize: 16, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#2a1a06", border: "none", borderRadius: 12, cursor: "pointer", boxShadow: "0 4px 0 #b57f22" }}>🫳 Shake it out!</button>
                     </>
                 )}
             </div>

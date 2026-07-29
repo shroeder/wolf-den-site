@@ -8,6 +8,8 @@ import { generateImage, generateWideSceneImage, generateSceneImage } from "@/lib
 
 const STREET_STYLE =
     "painterly 2D side-scrolling video-game background, warm golden-hour dusk, cohesive fantasy action-RPG town, soft lantern glow, rich but not busy, no text, no watermark.";
+const CRITTER_STYLE =
+    "a single cute mascot CHARACTER sprite, full body, three-quarter view facing forward, painterly fantasy cel-shaded style with soft dark ink linework (NOT a white outline), warm vibrant colors, a strong readable silhouette, centered. Floats ALONE on a FULLY TRANSPARENT background (alpha) — absolutely NO white sticker outline, NO die-cut border, NO rim, NO halo, NO glow ring, NO drop shadow, NO ground, NO scenery, NO tile. Nothing but the critter. No text, no watermark, no border.";
 const BUILDING_STYLE =
     "a single isolated 2D game-art building, the WHOLE building centered and fully visible, painterly fantasy action-RPG style with clean confident outlines and cel-shaded vibrant colors, strong readable silhouette. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO background scenery, NO sky, NO ground, NO cobblestones, NO haze, fog, or ambient glow behind the building. Nothing but the building itself. No people, no text, no logo, no watermark, no border.";
 
@@ -90,6 +92,13 @@ const ART_PROMPTS = {
     garrison: `A fortified stone GARRISON gatehouse — battlemented walls with a watchtower, a crossed-swords banner, an iron portcullis, a couple of spears and a shield racked by the heavy door. ${BUILDING_STYLE}`,
     vault: `A sturdy stone treasury VAULT building — a strong bank with a heavy round iron vault door, stacks of gold coins and a small treasure chest by the entrance, a coin crest on the pediment, iron-barred windows. ${BUILDING_STYLE}`,
     festival: `A colorful FESTIVAL STAGE — a raised wooden performance stage with hanging paper lanterns and rows of triangular pennant-flag bunting in bright colors, and a plain decorative curved wooden top beam (NO sign, NO banner with writing). CRITICAL: absolutely NO letters, NO words, NO text, NO writing anywhere on it. Festive and grand. ${BUILDING_STYLE}`,
+    // Farm-encounter CRITTERS — cute, FRIENDLY gift-bringing garden critters (the encounter is pure upside, so
+    // they read as adorable and welcoming, NOT menacing). Small mascot sprites, transparent, no white rim.
+    enc_rat: `A single adorable friendly cartoon FIELD MOUSE mascot, sitting up on its hind legs holding a tiny golden seed in its little paws with a cheerful smile, big sparkly eyes, round and cute. ${CRITTER_STYLE}`,
+    enc_crow: `A single plump friendly cartoon CROW mascot (glossy blue-black feathers), standing cheerfully with a small green sprout held in its beak, big friendly eyes, round and cute (NOT scary). ${CRITTER_STYLE}`,
+    enc_raccoon: `A single adorable friendly cartoon RACCOON mascot with its classic mask and ringed tail, sitting up holding a little treasure chest or shiny coin with a mischievous happy grin, big sparkly eyes, round and cute. ${CRITTER_STYLE}`,
+    enc_boar: `A single jolly friendly cartoon little TRUFFLE PIGLET / baby boar mascot, chubby and pink-brown with tiny tusks, holding a leafy truffle with a happy grin, big cute eyes, round and adorable (NOT menacing). ${CRITTER_STYLE}`,
+    enc_scarecrow: `A single cheerful friendly cartoon SCARECROW mascot — a smiling straw scarecrow in a patched hat and shirt, arms open in a welcoming wave, hugging a small orange pumpkin, warm and jolly (NOT creepy). ${CRITTER_STYLE}`,
     // Town NPC — a CHARACTER sprite (person, not a building) who stands by the Forge. Uses a character-style
     // prompt (the building style biased the model into drawing a smithy).
     smith: `A single 2D video-game CHARACTER sprite of a friendly burly BLACKSMITH: a bearded HUMAN MAN, full body head-to-boots, standing, wearing a leather apron and rolled sleeves, resting a large smithing hammer on one shoulder, three-quarter view facing slightly forward, warm and welcoming. This is a PERSON / character — NOT a building, NOT a house. Painterly fantasy action-RPG style with clean confident outlines and cel-shaded vibrant colors, strong readable silhouette. Isolated as a clean cutout on a FULLY TRANSPARENT background (alpha channel) — absolutely NO background, NO scenery, NO building, NO forge, NO ground, NO sky, NO glow. Nothing but the character. No text, no logo, no watermark, no border.`,

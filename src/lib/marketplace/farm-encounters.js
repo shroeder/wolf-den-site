@@ -2,65 +2,85 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { addChests } from "@/lib/marketplace/chests.js";
+import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
+import { PART_TIERS } from "@/lib/marketplace/crafting.js";
 
-// ── HARVEST ENCOUNTERS ────────────────────────────────────────────────────────────────────────────────────
-// A chance a garden creature RAIDS your harvest. You fight it with a timing meter (client) — landing perfect
-// strikes downs it faster and pays more. Server-authoritative: the encounter + its pre-rolled reward are parked
-// on mkt_buyer.farm_encounter at harvest time; resolve reads+clears it atomically and grants the loot scaled by
-// how many perfect hits the player landed (bounded, so a faked win only ever earns the pre-rolled max).
+// ── HARVEST CRITTER ENCOUNTERS ────────────────────────────────────────────────────────────────────────────
+// A chance a friendly garden critter scurries over at harvest with a GIFT. Encounters are PURE UPSIDE — they
+// never punish, there's no fight and no flee. You just shake the loot out of the critter: always XP + gold, plus
+// one bonus reward (usually a seed, with a fair shot at a low-tier chest or some low-to-mid salvage parts). The
+// reward is pre-rolled server-side at harvest time and parked on mkt_buyer.farm_encounter so it can't be faked;
+// resolve reads+clears it atomically and grants exactly what was rolled.
 
-// Base chance a harvest is raided (before the plot's Warding Totem + a small rarer-crop bump). Kept modest so
-// an encounter feels like an event, not every harvest.
+// Base chance a harvest turns up a critter (before the plot's Warding Totem + a small rarer-crop bump). Modest
+// so it feels like a treat, not every harvest.
 const BASE_ENCOUNTER_CHANCE = 0.1;
 const RARITY_BUMP = { common: 0, rare: 0.03, epic: 0.06, legendary: 0.1, mythic: 0.14 };
 
-// Creatures — weighted spawn, HP = strikes to down it, and the reward tier if you win. Rarer beasts hit harder
-// and pay much more (gold + a chest chance/tier + maybe a seed band).
+// Critters — weighted spawn. Rarer critters bring more XP + gold and better loot. `art` is the mkt_town_art key
+// for its sprite. Loot is rolled from three buckets (seed / chest / parts) weighted by `loot`; the tiers/bands
+// below scale the payout by critter.
 const CREATURES = {
-    rat: { name: "Field Rat", emoji: "🐀", hp: 2, weight: 40, gold: 90, chestChance: 0.12, chestTier: "wooden" },
-    crow: { name: "Crop Crow", emoji: "🐦", hp: 3, weight: 28, gold: 150, chestChance: 0.2, chestTier: "wooden" },
-    raccoon: { name: "Masked Raccoon", emoji: "🦝", hp: 3, weight: 18, gold: 210, chestChance: 0.28, chestTier: "iron", seedBand: ["common", "rare"] },
-    boar: { name: "Wild Boar", emoji: "🐗", hp: 4, weight: 10, gold: 340, chestChance: 0.45, chestTier: "iron", seedBand: ["rare", "epic"] },
-    scarecrow: { name: "Wicked Scarecrow", emoji: "🧟", hp: 5, weight: 4, gold: 640, chestChance: 1, chestTier: "gold", seedBand: ["rare", "epic"] },
+    rat: { name: "Field Mouse", emoji: "🐭", art: "enc_rat", weight: 40, xp: 8, gold: 90, seedBand: ["common"], chestTier: "wooden", partsTier: 1, partsMin: 1, partsMax: 2, loot: { seed: 60, chest: 20, parts: 20 } },
+    crow: { name: "Crop Crow", emoji: "🐦", art: "enc_crow", weight: 28, xp: 12, gold: 150, seedBand: ["common"], chestTier: "wooden", partsTier: 1, partsMin: 1, partsMax: 2, loot: { seed: 58, chest: 22, parts: 20 } },
+    raccoon: { name: "Masked Raccoon", emoji: "🦝", art: "enc_raccoon", weight: 18, xp: 18, gold: 210, seedBand: ["common", "rare"], chestTier: "iron", partsTier: 2, partsMin: 1, partsMax: 3, loot: { seed: 54, chest: 24, parts: 22 } },
+    boar: { name: "Truffle Boar", emoji: "🐗", art: "enc_boar", weight: 10, xp: 26, gold: 340, seedBand: ["rare", "epic"], chestTier: "iron", partsTier: 2, partsMin: 2, partsMax: 3, loot: { seed: 50, chest: 26, parts: 24 } },
+    scarecrow: { name: "Merry Scarecrow", emoji: "🎃", art: "enc_scarecrow", weight: 4, xp: 45, gold: 640, seedBand: ["rare", "epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 3, loot: { seed: 46, chest: 28, parts: 26 } },
 };
 const CREATURE_KEYS = Object.keys(CREATURES);
 
-function weightedCreature() {
-    const total = CREATURE_KEYS.reduce((s, k) => s + CREATURES[k].weight, 0);
+function weightedPick(weights) {
+    const total = Object.values(weights).reduce((s, w) => s + w, 0);
     let r = Math.random() * total;
-    for (const k of CREATURE_KEYS) { if ((r -= CREATURES[k].weight) < 0) return k; }
-    return "rat";
+    for (const [k, w] of Object.entries(weights)) { if ((r -= w) < 0) return k; }
+    return Object.keys(weights)[0];
+}
+function weightedCreature() {
+    return weightedPick(Object.fromEntries(CREATURE_KEYS.map((k) => [k, CREATURES[k].weight])));
 }
 
-// Roll whether a harvest is raided; if so, PARK the pending encounter (creature + pre-rolled reward) on the
-// member and return the public info the client needs to run the fight. `wardChance` is the plot's Warding Totem
-// bonus (a fraction). Returns null when no encounter fires.
+// One critter's sprite URL from mkt_town_art (best-effort → emoji fallback client-side).
+async function critterSprite(art) {
+    if (!art) return null;
+    const row = await db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = $1`, [art]).catch(() => null);
+    return row?.url || null;
+}
+
+// Roll whether a harvest turns up a critter; if so PARK the pending encounter (critter + pre-rolled reward) on
+// the member and return the public info the client needs to show it. `wardChance` is the plot's Warding Totem
+// bonus (a fraction). Returns null when nothing shows up.
 export async function maybeStartEncounter(buyerId, { rarity = "common", wardChance = 0, seedId = null, force = false } = {}) {
     if (!buyerId) return null;
     const chance = Math.min(0.6, BASE_ENCOUNTER_CHANCE + (RARITY_BUMP[rarity] || 0) + (Number(wardChance) || 0));
     if (!force && Math.random() >= chance) return null;
     const key = weightedCreature();
     const c = CREATURES[key];
-    // Pre-roll the reward NOW so it can't be faked at resolve time.
-    const chest = Math.random() < c.chestChance ? c.chestTier : null;
-    let seed = null;
-    if (c.seedBand) {
+    // Pre-roll the bonus loot NOW (one bucket) so it can't be faked at resolve.
+    const bucket = weightedPick(c.loot);
+    let loot = null;
+    if (bucket === "seed") {
         const band = c.seedBand[Math.floor(Math.random() * c.seedBand.length)];
         const pool = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === band);
-        seed = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+        const sid = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "wheat";
+        loot = { type: "seed", seed: sid, label: `a ${SEEDS[sid]?.name || "mystery"} seed`, emoji: "🌱" };
+    } else if (bucket === "chest") {
+        loot = { type: "chest", chestTier: c.chestTier, label: `a ${CHEST_TIERS[c.chestTier]?.label || c.chestTier} chest`, emoji: CHEST_TIERS[c.chestTier]?.emoji || "🧰" };
+    } else {
+        const n = c.partsMin + Math.floor(Math.random() * (c.partsMax - c.partsMin + 1));
+        const pt = PART_TIERS.find((p) => p.tier === c.partsTier) || PART_TIERS[0];
+        loot = { type: "parts", partsTier: c.partsTier, partsN: n, label: `${n}× ${pt.name}`, emoji: "⚙️", sprite: pt.sprite || null };
     }
-    const pending = { key, gold: c.gold, chest, seed };
-    // Park it (overwrites any stale unresolved one — one encounter at a time).
+    const pending = { key, xp: c.xp, gold: c.gold, loot };
     await db.query(`UPDATE mkt_buyer SET farm_encounter = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify(pending)]).catch(() => {});
-    // Public fight info (NOT the exact reward — that stays server-side).
-    return { key, name: c.name, emoji: c.emoji, hp: c.hp, crop: seedId ? (SEEDS[seedId]?.name || null) : null };
+    // Public info (NOT the exact reward — that stays server-side until you claim).
+    return { key, name: c.name, emoji: c.emoji, sprite: await critterSprite(c.art), crop: seedId ? (SEEDS[seedId]?.name || null) : null };
 }
 
-// Resolve the parked encounter. `perfectHits` (client-reported, bounded) scales the gold reward; landing all
-// perfect also guarantees the chest. Atomic claim so an encounter pays out at most once.
-export async function resolveEncounter(buyerId, { perfectHits = 0 } = {}) {
+// Claim the parked critter's gift. Pure upside — always XP + gold + the pre-rolled bonus loot. Atomic claim so
+// it pays out at most once. (No timing / perfect-hits: the tapping is just for juice.)
+export async function resolveEncounter(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await db.queryOne(
         `UPDATE mkt_buyer SET farm_encounter = NULL WHERE id = $1 AND farm_encounter IS NOT NULL RETURNING farm_encounter`,
@@ -69,17 +89,20 @@ export async function resolveEncounter(buyerId, { perfectHits = 0 } = {}) {
     const pend = row?.farm_encounter;
     if (!pend) return { ok: false, error: "no_encounter" };
     const c = CREATURES[pend.key] || CREATURES.rat;
-    const hits = Math.max(0, Math.min(c.hp, Number(perfectHits) || 0)); // bounded to the creature's HP
-    const perfectAll = hits >= c.hp;
-    // Gold: base pre-rolled + up to +50% for perfect timing.
-    const goldMult = 1 + 0.1 * hits; // capped by hits<=hp, and hp<=5 → max +50%
-    const gold = Math.round((pend.gold || 0) * Math.min(1.5, goldMult));
+    const gold = Math.max(0, Number(pend.gold) || 0);
+    const xp = Math.max(0, Number(pend.xp) || 0);
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "farm_encounter", { balanceAfter: paid?.gold, meta: { creature: pend.key } }).catch(() => {});
-    // Chest: the pre-rolled one, OR a guaranteed wooden if you went flawless and none rolled.
-    const chestTier = pend.chest || (perfectAll ? "wooden" : null);
-    if (chestTier) await addChests(buyerId, { [chestTier]: 1 }, { source: "farm_encounter" }).catch(() => {});
-    let seedName = null;
-    if (pend.seed) { await grantSeed(buyerId, pend.seed).catch(() => {}); seedName = SEEDS[pend.seed]?.name || null; }
-    return { ok: true, creature: c.name, emoji: c.emoji, gold, chest: chestTier, seed: pend.seed, seedName, perfectAll, goldAfter: paid?.gold ?? null };
+    if (xp > 0) await awardXp(buyerId, "farm_encounter", { points: xp, gold: 0 }).catch(() => {});
+    const loot = pend.loot || null;
+    if (loot?.type === "seed" && loot.seed) await grantSeed(buyerId, loot.seed).catch(() => {});
+    else if (loot?.type === "chest" && loot.chestTier) await addChests(buyerId, { [loot.chestTier]: 1 }, { source: "farm_encounter" }).catch(() => {});
+    else if (loot?.type === "parts" && loot.partsTier) {
+        await db.query(
+            `INSERT INTO mkt_salvage_part (buyer_id, tier, count) VALUES ($1, $2, $3)
+             ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_salvage_part.count + $3`,
+            [buyerId, loot.partsTier, loot.partsN || 1]
+        ).catch(() => {});
+    }
+    return { ok: true, creature: c.name, emoji: c.emoji, xp, gold, loot, goldAfter: paid?.gold ?? null };
 }
