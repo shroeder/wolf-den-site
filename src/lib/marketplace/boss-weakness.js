@@ -49,12 +49,18 @@ export function pickWeakness(rand = Math.random) {
 export const pickElement = pickWeakness;
 
 // How many equipped pieces match the boss's weak element, and the resulting damage multiplier (≥1).
-// Accepts the {slot → id} object OR an array of ids.
-export function elementMult(equippedIds, bossElement) {
+// Accepts the {slot → id} object OR an array of ids. `overrides` (optional) is { itemId: [elements] } from the
+// Forge's elemental reforge — a piece matches if ANY of its effective elements is the boss's weakness.
+export function elementMult(equippedIds, bossElement, overrides = null) {
     if (!bossElement || !ELEMENTS[bossElement]) return { mult: 1, matches: 0, bonusPct: 0 };
     const ids = Array.isArray(equippedIds) ? equippedIds : Object.values(equippedIds || {});
     let matches = 0;
-    for (const id of ids) if (id && itemElement(id) === bossElement) matches += 1;
+    for (const id of ids) {
+        if (!id) continue;
+        const over = overrides && overrides[id];
+        const els = over && over.length ? over : (itemElement(id) ? [itemElement(id)] : []);
+        if (els.includes(bossElement)) matches += 1;
+    }
     const bonus = Math.min(ELEMENT_CAP, ELEMENT_PER_PIECE * matches);
     return { mult: 1 + bonus, matches, bonusPct: Math.round(bonus * 100) };
 }

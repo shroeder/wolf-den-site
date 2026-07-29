@@ -10,6 +10,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { transferItemEnhancement } from "@/lib/marketplace/crafting.js";
+import { transferItemElement } from "@/lib/marketplace/item-element.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
 
@@ -192,6 +193,7 @@ async function moveItem(fromId, toId, itemId) {
         [toId, itemId, row.charges_left]
     ).catch(() => {});
     await transferItemEnhancement(fromId, toId, itemId); // the Forge enhancement rides with the item
+    await transferItemElement(fromId, toId, itemId); // ...and any elemental reforge
     return true;
 }
 

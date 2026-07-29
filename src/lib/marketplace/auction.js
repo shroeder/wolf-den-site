@@ -9,6 +9,7 @@ import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
+import { transferItemElement } from "@/lib/marketplace/item-element.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
 function mergeStats(base = {}, bonus = {}) {
@@ -244,6 +245,7 @@ export async function buyAuctionListing(buyerId, listingId) {
     await logCoin(claim.seller_id, price, "auction_sale", { balanceAfter: sellerPaid?.gold, meta: { itemId: claim.item_id } }).catch(() => {});
     await grantItem(buyerId, claim.item_id, "auction").catch(() => {});
     await transferItemEnhancement(claim.seller_id, buyerId, claim.item_id); // any Forge enhancement rides with it
+    await transferItemElement(claim.seller_id, buyerId, claim.item_id); // ...and any elemental reforge
     const it = itemById(claim.item_id);
     // A LEVEL item the seller sold must not be auto-re-granted back to them (syncLevelItems) — mark it sold for
     // the seller, mirroring salvage. (Harmless for other sources; they're never auto-granted anyway.)

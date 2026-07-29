@@ -14,12 +14,14 @@ import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
-// An item's elemental affinity chip — matters against a boss weak to that element (bonus damage).
-function ElBadge({ id }) {
-    const e = itemElement(id);
-    if (!e) return null;
-    const el = ELEMENTS[e];
-    return <span className="equip-el" title={`${el.label} affinity — bonus damage vs a boss weak to ${el.label}`} style={{ color: el.color }}>{el.emoji} {el.label}</span>;
+// An item's elemental affinity chip(s) — matters against a boss weak to that element (bonus damage). Prefers the
+// effective (reforged) elements passed from the server; falls back to the item's deterministic base element.
+function ElBadge({ id, elements }) {
+    const els = Array.isArray(elements) && elements.length
+        ? elements
+        : (itemElement(id) ? [{ key: itemElement(id), ...ELEMENTS[itemElement(id)] }] : []);
+    if (!els.length) return null;
+    return <>{els.map((el) => <span key={el.key} className="equip-el" title={`${el.label} affinity — bonus damage vs a boss weak to ${el.label}`} style={{ color: el.color }}>{el.emoji} {el.label}</span>)}</>;
 }
 
 // The Diablo-style equipment screen: a paper-doll of 9 slots around the hero portrait, a live stat total,
@@ -420,7 +422,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.sea ? <span className="equip-card-sea">{describeSea(i.sea)}</span> : null}
-                                <ElBadge id={i.id} />
+                                <ElBadge id={i.id} elements={i.elements} />
                             </button>
                         ))}
                         {!(data.items || []).some((i) => itemFitsSlot(i, slot)) ? <p className="muted" style={{ margin: 0 }}>No gear for this slot yet.</p> : null}
@@ -553,7 +555,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detailItem.name}</div>
                                 <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detailItem.rarity} · {detailItem.slot.replace("_", " ")}{detailItem.equipped ? " · Equipped ✓" : ""}</div>
-                                <div style={{ marginTop: 2 }}><ElBadge id={detailItem.id} /></div>
+                                <div style={{ marginTop: 2 }}><ElBadge id={detailItem.id} elements={detailItem.elements} /></div>
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>

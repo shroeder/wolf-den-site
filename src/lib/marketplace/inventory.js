@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, itemById, itemFitsSlot, sumItemStats } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
+import { getElementOverrides, describeItemElements } from "@/lib/marketplace/item-element.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
@@ -247,6 +248,7 @@ export async function getInventory(buyerId) {
         db.query(`SELECT item_id, level, util FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
     ]);
+    const elemOver = await getElementOverrides(buyerId).catch(() => ({})); // reforged elemental affinities
     // Items you have up for auction are "in escrow" — don't show them in the bag (an auto-re-granted level item
     // could otherwise reappear here while it's still listed).
     const listedSet = new Set(listedRows.map((r) => r.item_id));
@@ -260,7 +262,7 @@ export async function getInventory(buyerId) {
             if (!def) return null;
             const set = setForItem(def.id);
             const enh = enhById.get(def.id);
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), enhanceLevel: enh?.level || 0, util: describeUtil(enh?.util), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), enhanceLevel: enh?.level || 0, util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));

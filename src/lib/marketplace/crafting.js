@@ -12,6 +12,8 @@ import { MAX_FORGE_LEVEL } from "@/lib/marketplace/forge-rank.js";
 import { collectibleById, petForgePassive, petPassiveLevelMult, FORGE_ODDS_KEYS } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { rollUtil, parseUtil, describeUtil, getEquippedUtilTotals, UTIL_BASE_CHANCE } from "@/lib/marketplace/item-affix.js";
+import { getElementOverrides, describeItemElements, reforgeCost, DUAL_ELEMENT_CHANCE } from "@/lib/marketplace/item-element.js";
+import { ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -450,5 +452,13 @@ export async function getForgeState(buyerId) {
             : { label: UPG_EFF_LABEL[key], now: level ? saves(level) : "—", next: saves(level + 1) };
         return { key, name: u.name, emoji: UPG_EMOJI[key], desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? pct(level) : `${level}`, eff };
     });
-    return { parts: partList, salvage, enhance, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    // ── Attune (elemental reforge) — every OWNED piece + its current element(s) + the gold cost to reforge it. ──
+    const elemOver = await getElementOverrides(buyerId).catch(() => ({}));
+    const reforgeItems = (ownedRows || []).map((r) => r.item_id).map((id) => {
+        const it = itemById(id);
+        if (!it) return null;
+        return { id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon, sprite: spriteMap[id] || null, elements: describeItemElements(id, elemOver[id]), cost: reforgeCost(it.rarity), equipped: equippedIds.has(id) };
+    }).filter(Boolean).sort((a, b) => rarityTier(b.rarity) - rarityTier(a.rarity) || a.name.localeCompare(b.name));
+    const reforge = { items: reforgeItems, elements: Object.values(ELEMENTS).map((e) => ({ key: e.key, label: e.label, emoji: e.emoji, color: e.color })), dualChance: Math.round(DUAL_ELEMENT_CHANCE * 100) };
+    return { parts: partList, salvage, enhance, reforge, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }

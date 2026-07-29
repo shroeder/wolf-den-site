@@ -9,6 +9,7 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { petLevelForXp, addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
+import { getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -512,7 +513,8 @@ export async function getBossState(buyerId = null) {
         const dmg = mine?.dmg || 0;
         const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         // How much of this week's element the viewer is packing (drives the "your N 🔥 pieces: +X%" tip).
-        const em = elementMult(myIds, boss.weakness);
+        const myElemOver = await getElementOverrides(buyerId).catch(() => ({}));
+        const em = elementMult(myIds, boss.weakness, myElemOver);
         // The viewer's real passive auto-damage/hour (gear + pet + element) — so gear changes visibly move it.
         const myLevel = mine?.level || lvl(goldRow?.xp || 0);
         const myAutoPerHour = Math.round(autoPerHour(myLevel, autoStats(myStats, myPet?.stats || {})) * em.mult);
@@ -964,7 +966,8 @@ export async function attackBoss(buyerId) {
     const buffMult = (await activeDamageMult().catch(() => 1)) * (await memberDamageMult(buyerId).catch(() => 1)) * warAura;
     const divisor = boss.ticket_divisor || 100;
     // This week's boss is weak to an ELEMENT — matching gear deals bonus damage; the Attuned signature amplifies it.
-    const elem = elementMult(equippedIds, boss.weakness);
+    const elemOver = await getElementOverrides(buyerId).catch(() => ({}));
+    const elem = elementMult(equippedIds, boss.weakness, elemOver);
     const sig = signatureHit(equippedIds, {
         hitIndex: used, crit: swing.crit,
         bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1, bossMaxHp: boss.max_hp || 0,
@@ -1165,17 +1168,18 @@ export async function runBossAutoTick() {
 
     const members = await db.query(`SELECT id, xp FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []);
     // Gear + equipped-pet stats both boost each member's passive auto-damage.
-    const [statsByMember, idsByMember, petByMember] = await Promise.all([
+    const [statsByMember, idsByMember, petByMember, elemOverByMember] = await Promise.all([
         getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map()),
         getEquippedIdsForMembers(members.map((m) => m.id)).catch(() => new Map()),
         getPackPetBonuses().catch(() => new Map()),
+        getElementOverridesForMembers(members.map((m) => m.id)).catch(() => new Map()),
     ]);
     const buffMult = await activeDamageMult().catch(() => 1);
     const rows = members
         .map((m) => {
             // Elemental affinity now boosts PASSIVE auto-damage too (not just manual): matching-element gear
-            // deals bonus damage vs a boss weak to that element.
-            const elem = elementMult(idsByMember.get(m.id) || [], boss.weakness).mult;
+            // deals bonus damage vs a boss weak to that element (respecting Forge reforges).
+            const elem = elementMult(idsByMember.get(m.id) || [], boss.weakness, elemOverByMember.get(m.id)).mult;
             const stats = autoStats(statsByMember.get(m.id) || {}, petByMember.get(m.id)?.stats || {});
             return { id: m.id, damage: Math.round(autoPerHour(lvl(m.xp), stats) * hours * buffMult * elem) };
         })

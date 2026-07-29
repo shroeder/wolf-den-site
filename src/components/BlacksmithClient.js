@@ -20,6 +20,15 @@ const FOUNDER = {
 
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const rc = (r) => RARITY_COLOR[r] || "#9aa0a6";
+// Element display (mirrors boss-weakness.js ELEMENTS) for the reforge reveal.
+const ELEMENT_META = {
+    fire: { emoji: "🔥", label: "Fire", color: "#ff6b3c" },
+    water: { emoji: "💧", label: "Water", color: "#4aa3ff" },
+    earth: { emoji: "🌿", label: "Earth", color: "#6ad07a" },
+    storm: { emoji: "⚡", label: "Storm", color: "#ffd75e" },
+    light: { emoji: "☀️", label: "Light", color: "#fff0a8" },
+    shadow: { emoji: "🌑", label: "Shadow", color: "#b061ff" },
+};
 
 // ── tiny WebAudio SFX (no assets): a forge clang that rings brighter the better the strike ──
 let _ac = null;
@@ -65,6 +74,8 @@ export default function BlacksmithClient({ initial }) {
     const [enhanceResult, setEnhanceResult] = useState(null); // the juiced post-enhance reveal
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
     const [toast, setToast] = useState(null);
+    const [reforgeFor, setReforgeFor] = useState(null); // the item whose element you're reforging (opens the picker)
+    const [reforgeFx, setReforgeFx] = useState(null);   // the post-reforge reveal { item, elements, dual }
     const [showFounder, setShowFounder] = useState(false); // the Alstier1 credit medallion
 
     const post = useCallback(async (body, key) => {
@@ -109,6 +120,13 @@ export default function BlacksmithClient({ initial }) {
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
     }, [post]);
 
+    // Elemental reforge — change a piece's affinity for gold; a rare dual-affinity proc keeps the old + adds new.
+    const doReforge = useCallback(async (item, element) => {
+        const r = await post({ action: "reforge_element", itemId: item.id, element }, `rf-${item.id}`);
+        if (r?.ok) { (r.dual ? SFX.pixel : SFX.great)(); setReforgeFor(null); setReforgeFx({ item, elements: r.elements, dual: r.dual, from: r.from }); }
+        else setToast({ kind: "err", text: r?.error === "insufficient_gold" ? `Need ${(r.cost || 0).toLocaleString()} 🪙 to reforge that.` : r?.error === "already_has" ? "It already carries that element." : "Couldn't reforge that." });
+    }, [post]);
+
     useEffect(() => { const t = toast && toast.kind !== "enhance" ? setTimeout(() => setToast(null), 2600) : null; return () => t && clearTimeout(t); }, [toast]);
 
     // When the server couldn't resolve the session (e.g. a bearer-token app session on a full-page nav), fetch
@@ -134,6 +152,7 @@ export default function BlacksmithClient({ initial }) {
     const parts = forge.parts || [];
     const salvage = forge.salvage || [];
     const enhance = forge.enhance || [];
+    const reforge = forge.reforge || { items: [], elements: [], dualChance: 12 };
     const bg = forge.hearthBg && !forge.hearthBg.startsWith("__") ? forge.hearthBg : null;
 
     // Live status line for the hero scene (mirrors the farm/sailing HUD strips).
@@ -290,6 +309,10 @@ export default function BlacksmithClient({ initial }) {
                         <GiCrackedShield aria-hidden="true" />
                         <span className="forge-tab-lbl">Salvage<em className="forge-tab-ct">{salvage.length}</em></span>
                     </button>
+                    <button type="button" className={tab === "attune" ? "on" : ""} onClick={() => setTab("attune")}>
+                        <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>💠</span>
+                        <span className="forge-tab-lbl">Attune</span>
+                    </button>
                     <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}>
                         <GiUpgrade aria-hidden="true" />
                         <span className="forge-tab-lbl">Perks</span>
@@ -339,6 +362,22 @@ export default function BlacksmithClient({ initial }) {
                             </button>
                         )) : <div className="forge-empty">Nothing spare to salvage — every item you own is equipped.</div>}
                     </div>
+                ) : tab === "attune" ? (
+                    <>
+                        <p className="forge-panel-sub">Reforge a piece&apos;s <b>elemental affinity</b> to match the boss&apos;s weekly weakness. Small chance ({reforge.dualChance}%) it keeps the old element AND adds the new one — a rare <b>dual-affinity</b> piece that matches two elements.</p>
+                        <div className="forge-grid">
+                            {reforge.items.length ? reforge.items.map((it) => (
+                                <button key={it.id} type="button" className="forge-card is-attune" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setReforgeFor(it); }}>
+                                    <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
+                                    <span className="forge-card-name">{it.name}</span>
+                                    <span className="forge-card-elems">
+                                        {it.elements.length ? it.elements.map((e) => <span key={e.key} className="forge-elem-chip" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>) : <span className="forge-elem-chip is-neutral">◇ Neutral</span>}
+                                    </span>
+                                    <span className="forge-card-cost">🪙 {it.cost.toLocaleString()} to reforge</span>
+                                </button>
+                            )) : <div className="forge-empty">No gear to attune yet — win or buy some pieces first.</div>}
+                        </div>
+                    </>
                 ) : (
                     <>
                         <div className="sail-upgrades is-forge">
@@ -376,11 +415,76 @@ export default function BlacksmithClient({ initial }) {
 
             {enhanceResult ? <EnhanceResultModal res={enhanceResult} onClose={() => setEnhanceResult(null)} /> : null}
 
+            {reforgeFor ? <ReforgePicker item={reforgeFor} elements={reforge.elements} dualChance={reforge.dualChance} gold={forge.gold || 0} busy={busy} onPick={(el) => doReforge(reforgeFor, el)} onClose={() => setReforgeFor(null)} /> : null}
+            {reforgeFx ? <ReforgeReveal fx={reforgeFx} onClose={() => setReforgeFx(null)} /> : null}
+
             {toast ? (
                 <div className={`forge-toast${toast.kind === "err" ? " is-err" : ""}`} role="status">
                     <span>{toast.text}</span>
                 </div>
             ) : null}
+        </div>
+    );
+}
+
+// ── Elemental reforge: pick a target element → confirm the cost ──────────────────────────────────────────────
+function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose }) {
+    const [pick, setPick] = useState(null);
+    const has = new Set((item.elements || []).map((e) => e.key));
+    const canAfford = gold >= item.cost;
+    return (
+        <div className="forge-mg-scrim" role="dialog" aria-label="Reforge element" onClick={onClose}>
+            <div className="forge-reforge" onClick={(e) => e.stopPropagation()}>
+                <div className="forge-reforge-head">
+                    <ItemArt id={item.id} icon={item.icon} className="forge-reforge-art" alt={item.name} />
+                    <div>
+                        <div className="forge-reforge-name">{item.name}</div>
+                        <div className="forge-reforge-cur">
+                            Now: {item.elements.length ? item.elements.map((e) => <span key={e.key} className="forge-elem-chip" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>) : <span className="forge-elem-chip is-neutral">◇ Neutral</span>}
+                        </div>
+                    </div>
+                </div>
+                <div className="forge-reforge-sub">Pick a new affinity — {dualChance}% chance to keep the current one too (dual!).</div>
+                <div className="forge-elem-grid">
+                    {elements.map((e) => {
+                        const owned = has.has(e.key);
+                        return (
+                            <button key={e.key} type="button" className={`forge-elem-btn${pick === e.key ? " on" : ""}${owned ? " is-owned" : ""}`} style={{ "--ec": e.color }} disabled={owned} onClick={() => setPick(e.key)}>
+                                <span className="forge-elem-emoji">{e.emoji}</span>
+                                <span>{e.label}</span>
+                                {owned ? <span className="forge-elem-has">✓ has</span> : null}
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="forge-reforge-actions">
+                    <button type="button" className="forge-reforge-cancel" onClick={onClose}>Cancel</button>
+                    <button type="button" className="forge-reforge-go" disabled={!pick || busy || !canAfford} onClick={() => pick && onPick(pick)}>
+                        {canAfford ? `Reforge · 🪙 ${item.cost.toLocaleString()}` : `Need 🪙 ${item.cost.toLocaleString()}`}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Reforge reveal: the element burst (double burst on a dual proc) ─────────────────────────────────────────
+function ReforgeReveal({ fx, onClose }) {
+    return (
+        <div className="forge-mg-scrim" role="dialog" aria-label="Reforged" onClick={onClose}>
+            <div className={`forge-reforge-fx${fx.dual ? " is-dual" : ""}`} onClick={(e) => e.stopPropagation()}>
+                {fx.dual ? <div className="forge-reforge-badge">✨ DUAL AFFINITY! ✨</div> : null}
+                <ItemArt id={fx.item.id} icon={fx.item.icon} className="forge-reforge-fxart" alt={fx.item.name} />
+                <div className="forge-reforge-fxname">{fx.item.name}</div>
+                <div className="forge-reforge-fxels">
+                    {(fx.elements || []).map((k) => {
+                        const e = ELEMENT_META[k] || { emoji: "◇", label: k, color: "#ccc" };
+                        return <span key={k} className="forge-elem-chip big" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>;
+                    })}
+                </div>
+                <div className="forge-reforge-fxsub">{fx.dual ? "It now matches BOTH elements — twice the weeks it shines." : "Affinity reforged."}</div>
+                <button type="button" className="forge-strike big" onClick={onClose}>Done</button>
+            </div>
         </div>
     );
 }
@@ -820,6 +924,34 @@ const FORGE_CSS = `
 .forge-card-rankline { display: block; margin: 1px 0 1px; line-height: 1; }
 .forge-working { font-size: 10px; color: #ffb877; }
 .forge-empty { grid-column: 1/-1; text-align: center; color: #c8b79f; font-size: 13px; padding: 22px; }
+/* Attune (elemental reforge) */
+.forge-card-elems { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 2px 0; }
+.forge-elem-chip { font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; background: rgba(0,0,0,0.25); white-space: nowrap; }
+.forge-elem-chip.is-neutral { color: #9aa0a6; }
+.forge-elem-chip.big { font-size: 14px; padding: 4px 12px; }
+.forge-reforge { width: min(380px, 94vw); border-radius: 18px; padding: 18px; background: linear-gradient(180deg, rgba(34,22,14,0.99), rgba(18,11,7,0.99)); border: 1px solid rgba(255,196,110,0.4); box-shadow: 0 18px 50px rgba(0,0,0,0.65); }
+.forge-reforge-head { display: flex; gap: 12px; align-items: center; }
+.forge-reforge-art { width: 56px; height: 56px; }
+.forge-reforge-name { font-size: 15px; font-weight: 900; color: #ffe0a0; }
+.forge-reforge-cur { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; font-size: 11px; color: #c8b79f; }
+.forge-reforge-sub { margin: 12px 0 8px; font-size: 12px; color: #cbb99a; }
+.forge-elem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.forge-elem-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px; border-radius: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #e8d6c0; font-size: 11.5px; font-weight: 800; position: relative; }
+.forge-elem-btn .forge-elem-emoji { font-size: 22px; }
+.forge-elem-btn.on { border-color: var(--ec); box-shadow: 0 0 0 1px var(--ec), 0 0 16px color-mix(in srgb, var(--ec) 55%, transparent); background: color-mix(in srgb, var(--ec) 16%, transparent); }
+.forge-elem-btn.is-owned { opacity: 0.45; cursor: default; }
+.forge-elem-has { font-size: 8.5px; font-weight: 900; color: #8fe3a1; }
+.forge-reforge-actions { display: flex; gap: 8px; margin-top: 14px; }
+.forge-reforge-cancel { flex: 0 0 auto; padding: 11px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #d8cbb8; font-weight: 800; font-size: 13px; cursor: pointer; }
+.forge-reforge-go { flex: 1 1 auto; padding: 11px 16px; border-radius: 12px; border: none; background: linear-gradient(180deg,#ffe488,#f0a83a); color: #2a1000; font-weight: 900; font-size: 13.5px; cursor: pointer; box-shadow: 0 3px 12px rgba(240,168,58,0.45); }
+.forge-reforge-go:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
+.forge-reforge-fx { width: min(340px, 92vw); text-align: center; border-radius: 20px; padding: 22px; background: radial-gradient(120% 100% at 50% 0%, rgba(70,40,16,0.98), rgba(16,10,6,0.99)); border: 1px solid rgba(255,196,110,0.5); box-shadow: 0 18px 50px rgba(0,0,0,0.65); display: flex; flex-direction: column; align-items: center; gap: 8px; animation: forgeAttunePop .45s ease both; }
+.forge-reforge-fx.is-dual { border-color: rgba(184,120,255,0.7); box-shadow: 0 18px 50px rgba(0,0,0,0.65), 0 0 40px rgba(150,90,255,0.4); }
+.forge-reforge-badge { font-size: 14px; font-weight: 900; letter-spacing: 0.05em; color: #e6ccff; text-shadow: 0 0 12px rgba(184,120,255,0.8); }
+.forge-reforge-fxart { width: 92px; height: 92px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55)); }
+.forge-reforge-fxname { font-size: 16px; font-weight: 900; color: #fff; }
+.forge-reforge-fxels { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.forge-reforge-fxsub { font-size: 12px; color: #cbb99a; }
 .forge-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10062; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
     background: linear-gradient(180deg, rgba(40,22,10,0.98), rgba(22,12,6,0.98)); border: 1px solid #ff9a3c; border-radius: 14px; padding: 12px 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); color: #ffe0b0; max-width: 92vw; animation: forgePop .35s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-toast.is-err { border-color: #e05b6a; color: #ffc9ce; }
