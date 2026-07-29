@@ -6,7 +6,14 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
-import { transferItemEnhancement, enhanceLevelsFor } from "@/lib/marketplace/crafting.js";
+import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
+
+// Merge base item stats with a forge stat-bonus into effective totals.
+function mergeStats(base = {}, bonus = {}) {
+    const m = { ...(base || {}) };
+    for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0);
+    return m;
+}
 
 // ── THE AUCTION HOUSE ───────────────────────────────────────────────────────────────────────────────────────
 // Members list unused gear at a gold price; anyone can browse + buy. Owner-gated during the Town build. A 5%
@@ -22,13 +29,16 @@ export const listingFee = (price) => Math.max(1, Math.ceil((Number(price) || 0) 
 function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
     const it = itemById(row.item_id);
     if (!it) return null;
+    const det = enhMap && enhMap.get(`${row.seller_id}|${row.item_id}`);
+    const bonus = det?.bonus || null;
     return {
         id: Number(row.id),
         itemId: row.item_id,
         name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null,
-        stats: describeStats ? describeStats(it.stats || {}) : null,
+        stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, // effective (base + forge) totals
+        forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, // the forge bonus alone
         sprite: sprites[row.item_id] || null,
-        enhanceLevel: (enhMap && enhMap.get(`${row.seller_id}|${row.item_id}`)) || 0,
+        enhanceLevel: det?.level || 0,
         price: Number(row.price),
         sellerId: row.seller_id,
         sellerName: row.display_name || (row.alias ? `@${row.alias}` : "A wolf"),
@@ -58,9 +68,13 @@ export async function getSellableItems(buyerId) {
     const equippedSet = new Set(Object.values(equipped || {}));
     const listedSet = new Set(listed.map((r) => r.item_id));
     const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id));
-    const enh = await enhanceLevelsFor(buyerId, sellableIds).catch(() => ({}));
+    const enh = await enhanceDetailsFor(buyerId, sellableIds).catch(() => ({}));
     return sellableIds
-        .map((id) => { const it = itemById(id); return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats ? describeStats(it.stats || {}) : null, enhanceLevel: enh[id] || 0 }; })
+        .map((id) => {
+            const it = itemById(id);
+            const bonus = enh[id]?.bonus || null;
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, enhanceLevel: enh[id]?.level || 0 };
+        })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -75,11 +89,11 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     ).catch(() => []);
     const sprites = await itemSpriteMap().catch(() => ({}));
     const ownedSet = new Set(buyerId ? (await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id) : []);
-    // Enhancement level per (seller, item) so a listed enhanced piece shows "⚒️ +N".
+    // Enhancement per (seller, item) so a listed enhanced piece shows "⚒️ +N" + its exact forge stats.
     const sellerIds = [...new Set(rows.map((r) => r.seller_id))];
     const itemIds = [...new Set(rows.map((r) => r.item_id))];
-    const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
-    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, Number(e.level) || 0]));
+    const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
+    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})) }]));
     let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap)).filter(Boolean);
     const needle = String(q || "").trim().toLowerCase();
     if (needle) out = out.filter((l) => l.name.toLowerCase().includes(needle) || l.sellerName.toLowerCase().includes(needle));

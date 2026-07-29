@@ -132,6 +132,7 @@ export default function AuctionClient({ initial }) {
                                     <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
+                                    {l.forgeStats ? <div className="ah-card-forge">⚒️ +{l.enhanceLevel} · {l.forgeStats}</div> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
                                     {l.mine ? (
                                         <button type="button" className="ah-buy is-mine" disabled onClick={() => {}}>Your listing</button>
@@ -161,6 +162,7 @@ export default function AuctionClient({ initial }) {
                                     <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} />{it.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{it.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</div>
                                     {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
+                                    {it.forgeStats ? <div className="ah-card-forge">⚒️ +{it.enhanceLevel} · {it.forgeStats}</div> : null}
                                 </button>
                             ))}
                         </div>
@@ -233,6 +235,7 @@ const AH_CSS = `
 .ah-enh { position: absolute; bottom: -4px; right: -6px; font-size: 0.6rem; font-weight: 900; color: #2a1a06; background: linear-gradient(180deg,#ffe27a,#f3b23a); border: 1px solid #fff3c4; border-radius: 999px; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); white-space: nowrap; }
 .ah-card-name { font-weight: 800; font-size: 0.86rem; line-height: 1.2; }
 .ah-card-stats { font-size: 0.72rem; line-height: 1.25; }
+.ah-card-forge { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
 .ah-card-meta { font-size: 0.68rem; line-height: 1.3; }
 .ah-buy { margin-top: 4px; width: 100%; padding: 9px; border-radius: 10px; border: none; cursor: pointer; font-weight: 900; font-size: 0.86rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
 .ah-buy:disabled { opacity: .55; cursor: default; background: rgba(255,255,255,0.08); color: #cbb9e0; }

@@ -69,6 +69,16 @@ export async function enhanceLevelsFor(buyerId, itemIds = []) {
     return Object.fromEntries(rows.map((r) => [r.item_id, Number(r.level) || 0]));
 }
 
+// Full enhancement details keyed by item_id: { level, bonus: {stat→+amount} } — so a card can show the exact
+// forge bonus and the effective (base + forge) totals.
+export async function enhanceDetailsFor(buyerId, itemIds = []) {
+    if (!buyerId || !itemIds.length) return {};
+    const rows = await db.query(`SELECT item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, itemIds]).catch(() => []);
+    const out = {};
+    for (const r of rows) out[r.item_id] = { level: Number(r.level) || 0, bonus: (typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {})) };
+    return out;
+}
+
 // Blacksmith's Regalia — the "salvaging set". Pieces drop rarely from salvaging; wearing 3/5 boosts salvage
 // output (a crafting-only bonus, kept out of combat).
 const REGALIA_IDS = ["regalia_visor", "regalia_plate", "regalia_girdle", "regalia_boots", "regalia_cloak"];
