@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 // Hoisted, always-available messaging. A floating launcher on every /marketplace page opens a dock
@@ -146,6 +147,7 @@ function DockRowBody({ it }) {
 }
 
 export default function MarketplaceMessagingDock() {
+    const pathname = usePathname();
     const [authed, setAuthed] = useState(false);
     const [unread, setUnread] = useState(0);
     const [open, setOpen] = useState(false);
@@ -188,6 +190,9 @@ export default function MarketplaceMessagingDock() {
     }, [open, thread]);
 
     if (!authed) return null;
+    // Hide the floating launcher on the dedicated messaging pages (DM thread / inbox) — it's redundant there and
+    // was overlapping the message composer's Send button.
+    if (pathname && (pathname.startsWith("/marketplace/dm") || pathname.startsWith("/marketplace/inbox"))) return null;
 
     return (
         <>

@@ -37,7 +37,26 @@ export default function MarketplaceDmClient({ threadId }) {
     const [sending, setSending] = useState(false);
     const [pickerFor, setPickerFor] = useState(null);
     const endRef = useRef(null);
+    const messagesRef = useRef(null);
     const lastTypingRef = useRef(0);
+
+    // Size the message list to fill exactly from its top down to the composer, so ONLY the list scrolls (no
+    // nested page-vs-list double scroll). Recomputes on resize + when the on-screen keyboard opens (visualViewport).
+    useEffect(() => {
+        const fit = () => {
+            const el = messagesRef.current;
+            if (!el) return;
+            const top = el.getBoundingClientRect().top;
+            const vh = window.visualViewport?.height || window.innerHeight;
+            const composer = el.parentElement?.querySelector(".dm-composer")?.offsetHeight || 58;
+            el.style.height = `${Math.max(160, Math.round(vh - top - composer - 14))}px`;
+        };
+        fit();
+        const t = setTimeout(fit, 120); // after fonts/layout settle
+        window.addEventListener("resize", fit);
+        window.visualViewport?.addEventListener("resize", fit);
+        return () => { clearTimeout(t); window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
+    }, [thread?.counterpart?.displayLabel]);
 
     const load = useCallback(async () => {
         const r = await fetch(`/api/marketplace/dm/${threadId}`, { cache: "no-store" }).catch(() => null);
@@ -56,7 +75,11 @@ export default function MarketplaceDmClient({ threadId }) {
     const prevMsgCount = useRef(0);
     useEffect(() => {
         const count = thread?.messages?.length || 0;
-        if (count > prevMsgCount.current) endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        // Scroll the LIST (not the page) to the bottom on a new message or when the thread first loads.
+        if (count > prevMsgCount.current) {
+            const el = messagesRef.current;
+            if (el) el.scrollTo({ top: el.scrollHeight, behavior: prevMsgCount.current === 0 ? "auto" : "smooth" });
+        }
         prevMsgCount.current = count;
     }, [thread?.messages?.length]);
 
@@ -123,7 +146,7 @@ export default function MarketplaceDmClient({ threadId }) {
             </section>
 
             <section className="card dm-thread">
-                <div className="dm-messages" onClick={() => setPickerFor(null)}>
+                <div className="dm-messages" ref={messagesRef} onClick={() => setPickerFor(null)}>
                     {messages.map((m, i) => {
                         const prev = messages[i - 1];
                         const showDay = !prev || !sameDay(prev.createdAt, m.createdAt);

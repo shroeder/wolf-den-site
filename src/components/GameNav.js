@@ -45,7 +45,7 @@ const LINKS = [
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
 // Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them.
-const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/town", "/marketplace/auction"];
+const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction"];
 
 export default function GameNav() {
     const pathname = usePathname() || "";

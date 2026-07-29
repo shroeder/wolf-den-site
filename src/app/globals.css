@@ -6484,7 +6484,9 @@ body.tv-mode .shop-mobile-cart-fab {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 62dvh;
+    /* height is set in JS (MarketplaceDmClient) to fill exactly down to the composer — this is the ONLY scroller,
+       so there's no page-vs-list double scroll. Fallback cap for the brief moment before JS measures. */
+    max-height: 70dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 4px;
