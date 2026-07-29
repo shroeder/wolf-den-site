@@ -114,7 +114,7 @@ export default function BlacksmithClient({ initial }) {
 
     // Called by the mini-game with the player's execution → server rolls the stat bump → juiced result modal.
     const applyEnhance = useCallback(async (item, result) => {
-        const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo }, `en-${item.id}`);
+        const r = await post({ action: "enhance", itemId: item.id, quality: result.quality, grade: result.grade, combo: result.combo, useScroll: Boolean(item.useScroll) }, `en-${item.id}`);
         setEnhancing(null);
         if (r?.ok) { (r.attune ? SFX.pixel : r.doubled ? SFX.pixel : SFX.win)(); setEnhanceResult({ id: item.id, icon: item.icon, name: item.name, rarity: item.rarity, level: r.level, gained: r.gained, statLines: r.statLines, attune: r.attune, util: r.util, allMaxed: r.allMaxed, scenario: r.scenario, grade: r.grade, xp: r.xp, doubled: r.doubled, quality: result.quality, combo: result.combo, hits: result.hits, score: result.score, maxScore: result.maxScore }); }
         else setToast({ kind: "err", text: enhanceErr(r?.error, r?.need) });
@@ -125,6 +125,12 @@ export default function BlacksmithClient({ initial }) {
         const r = await post({ action: "reforge_element", itemId: item.id, element, replace: replace || undefined }, `rf-${item.id}`);
         if (r?.ok) { (r.dual ? SFX.pixel : SFX.great)(); setReforgeFor(null); setReforgeFx({ item, elements: r.elements, dual: r.dual, from: r.from }); }
         else setToast({ kind: "err", text: r?.error === "insufficient_gold" ? `Need ${(r.cost || 0).toLocaleString()} 🪙 to reforge that.` : r?.error === "already_has" ? "It already carries that element." : "Couldn't reforge that." });
+    }, [post]);
+    // Enchantment Scroll: permanently ADD an affinity (keeps the others — can exceed two).
+    const doEnchant = useCallback(async (item, element) => {
+        const r = await post({ action: "enchant_element", itemId: item.id, element }, `ec-${item.id}`);
+        if (r?.ok) { SFX.pixel(); setReforgeFor(null); setReforgeFx({ item, elements: r.elements, enchant: true, added: r.added }); }
+        else setToast({ kind: "err", text: r?.error === "no_scroll" ? "You have no Enchantment Scrolls." : r?.error === "already_has" ? "It already carries that element." : r?.error === "max_elements" ? "That piece can't hold any more affinities." : "Couldn't enchant that." });
     }, [post]);
 
     useEffect(() => { const t = toast && toast.kind !== "enhance" ? setTimeout(() => setToast(null), 2600) : null; return () => t && clearTimeout(t); }, [toast]);
@@ -153,6 +159,8 @@ export default function BlacksmithClient({ initial }) {
     const salvage = forge.salvage || [];
     const enhance = forge.enhance || [];
     const reforge = forge.reforge || { items: [], elements: [], dualChance: 12 };
+    const powerScrolls = forge.powerScrolls || 0;
+    const enchantScrolls = forge.enchantScrolls || 0;
     const bg = forge.hearthBg && !forge.hearthBg.startsWith("__") ? forge.hearthBg : null;
 
     // Live status line for the hero scene (mirrors the farm/sailing HUD strips).
@@ -160,6 +168,8 @@ export default function BlacksmithClient({ initial }) {
     const bestLvl = enhance.reduce((m, it) => Math.max(m, it.level || 0), 0);
     const statusBits = [`${totalParts} part${totalParts === 1 ? "" : "s"} ready`];
     if (bestLvl > 0) statusBits.push(`best forge +${bestLvl}`);
+    if (powerScrolls > 0) statusBits.push(`📜 ${powerScrolls} Power Scroll${powerScrolls === 1 ? "" : "s"}`);
+    if (enchantScrolls > 0) statusBits.push(`🪄 ${enchantScrolls} Enchant Scroll${enchantScrolls === 1 ? "" : "s"}`);
     if (forge.regalia?.equipped) statusBits.push(`${forge.regalia.equipped}/${forge.regalia.total} regalia worn`);
 
     return (
@@ -322,11 +332,12 @@ export default function BlacksmithClient({ initial }) {
                 {tab === "enhance" ? (
                     <div className="forge-grid">
                         {enhance.length ? enhance.map((it) => (
-                            <button key={it.id} type="button" className={`forge-card is-enhance${it.maxed ? " is-maxed" : it.affordable ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
+                            <button key={it.id} type="button" className={`forge-card is-enhance${it.maxed ? " is-maxed" : (it.affordable || powerScrolls > 0) ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
                                 onClick={() => {
                                     if (it.maxed) { setToast({ kind: "err", text: `${it.name} is at PEAK enchantment — it can't be forged any higher.` }); return; }
-                                    if (!it.affordable) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage or combine more first.` }); return; }
-                                    ac(); setEnhancing(it);
+                                    const scroll = !it.affordable && powerScrolls > 0; // pay with a Power Scroll if you're short on parts
+                                    if (!it.affordable && !scroll) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage, combine, or use a 📜 Power Scroll.` }); return; }
+                                    ac(); setEnhancing({ ...it, useScroll: scroll });
                                 }}>
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
                                 <span className="forge-card-name">{it.name}</span>
@@ -334,6 +345,7 @@ export default function BlacksmithClient({ initial }) {
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
                                 {it.bonus ? <span className="forge-card-bonus">⚒ {it.bonus}</span> : null}
                                 {it.util ? <span className="forge-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</span> : null}
+                                {!it.affordable && powerScrolls > 0 ? <span className="forge-card-scroll">📜 Use Power Scroll</span> : null}
                                 {it.maxed ? <span className="forge-card-cost forge-card-max">✦ PEAK — maxed</span> : (
                                     <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
                                         {parts[it.cost.tier - 1]?.sprite
@@ -415,7 +427,7 @@ export default function BlacksmithClient({ initial }) {
 
             {enhanceResult ? <EnhanceResultModal res={enhanceResult} onClose={() => setEnhanceResult(null)} /> : null}
 
-            {reforgeFor ? <ReforgePicker item={reforgeFor} elements={reforge.elements} dualChance={reforge.dualChance} gold={forge.gold || 0} busy={busy} onPick={(el, replace) => doReforge(reforgeFor, el, replace)} onClose={() => setReforgeFor(null)} /> : null}
+            {reforgeFor ? <ReforgePicker item={reforgeFor} elements={reforge.elements} dualChance={reforge.dualChance} gold={forge.gold || 0} enchantScrolls={enchantScrolls} busy={busy} onPick={(el, replace) => doReforge(reforgeFor, el, replace)} onEnchant={(el) => doEnchant(reforgeFor, el)} onClose={() => setReforgeFor(null)} /> : null}
             {reforgeFx ? <ReforgeReveal fx={reforgeFx} onClose={() => setReforgeFx(null)} /> : null}
 
             {toast ? (
@@ -427,14 +439,14 @@ export default function BlacksmithClient({ initial }) {
     );
 }
 
-// ── Elemental reforge: pick a target element → confirm the cost ──────────────────────────────────────────────
-function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose }) {
+// ── Elemental reforge (gold) OR enchant (scroll, ADDS an affinity, can exceed two) ──────────────────────────
+function ReforgePicker({ item, elements, dualChance, gold, enchantScrolls = 0, busy, onPick, onEnchant, onClose }) {
     const [pick, setPick] = useState(null);
+    const [mode, setMode] = useState("reforge"); // "reforge" (gold, replaces) | "enchant" (scroll, adds)
     const isDual = (item.elements || []).length >= 2;
-    // For a dual item you choose WHICH of its two elements to swap out (default the first).
     const [replaceKey, setReplaceKey] = useState(isDual ? item.elements[0].key : null);
-    const kept = isDual ? item.elements.find((e) => e.key !== replaceKey) : null;
     const has = new Set((item.elements || []).map((e) => e.key));
+    const isEnchant = mode === "enchant";
     const canAfford = gold >= item.cost;
     return (
         <div className="forge-mg-scrim" role="dialog" aria-label="Reforge element" onClick={onClose}>
@@ -448,7 +460,15 @@ function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose
                         </div>
                     </div>
                 </div>
-                {isDual ? (
+                {enchantScrolls > 0 ? (
+                    <div className="forge-mode-toggle">
+                        <button type="button" className={!isEnchant ? "on" : ""} onClick={() => { setMode("reforge"); setPick(null); }}>Reforge · 🪙</button>
+                        <button type="button" className={isEnchant ? "on" : ""} onClick={() => { setMode("enchant"); setPick(null); }}>🪄 Enchant · scroll ({enchantScrolls})</button>
+                    </div>
+                ) : null}
+                {isEnchant ? (
+                    <div className="forge-reforge-sub">Permanently <b>ADD</b> an affinity (keeps the others — a piece can go past two). Uses one 🪄 Enchantment Scroll.</div>
+                ) : isDual ? (
                     <>
                         <div className="forge-reforge-sub">This piece is <b>dual-affinity</b> — pick which element to REPLACE (the other is kept):</div>
                         <div className="forge-elem-grid two">
@@ -467,22 +487,27 @@ function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose
                 )}
                 <div className="forge-elem-grid">
                     {elements.map((e) => {
-                        // For a dual reforge, only the element you're KEEPING is off-limits (you can pick the one you're swapping out's slot).
-                        const owned = isDual ? kept?.key === e.key : has.has(e.key);
+                        // Enchant: elements it ALREADY has are off-limits. Reforge multi-affinity: every KEPT element
+                        // (all current ones except the one you're swapping out) is off-limits.
+                        const owned = isEnchant ? has.has(e.key) : isDual ? (has.has(e.key) && e.key !== replaceKey) : has.has(e.key);
                         return (
                             <button key={e.key} type="button" className={`forge-elem-btn${pick === e.key ? " on" : ""}${owned ? " is-owned" : ""}`} style={{ "--ec": e.color }} disabled={owned} onClick={() => setPick(e.key)}>
                                 <span className="forge-elem-emoji">{e.emoji}</span>
                                 <span>{e.label}</span>
-                                {owned ? <span className="forge-elem-has">✓ kept</span> : null}
+                                {owned ? <span className="forge-elem-has">✓ {isEnchant ? "has" : "kept"}</span> : null}
                             </button>
                         );
                     })}
                 </div>
                 <div className="forge-reforge-actions">
                     <button type="button" className="forge-reforge-cancel" onClick={onClose}>Cancel</button>
-                    <button type="button" className="forge-reforge-go" disabled={!pick || busy || !canAfford} onClick={() => pick && onPick(pick, isDual ? replaceKey : null)}>
-                        {canAfford ? `Reforge · 🪙 ${item.cost.toLocaleString()}` : `Need 🪙 ${item.cost.toLocaleString()}`}
-                    </button>
+                    {isEnchant ? (
+                        <button type="button" className="forge-reforge-go" disabled={!pick || busy} onClick={() => pick && onEnchant(pick)}>🪄 Enchant · adds affinity</button>
+                    ) : (
+                        <button type="button" className="forge-reforge-go" disabled={!pick || busy || !canAfford} onClick={() => pick && onPick(pick, isDual ? replaceKey : null)}>
+                            {canAfford ? `Reforge · 🪙 ${item.cost.toLocaleString()}` : `Need 🪙 ${item.cost.toLocaleString()}`}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -493,8 +518,8 @@ function ReforgePicker({ item, elements, dualChance, gold, busy, onPick, onClose
 function ReforgeReveal({ fx, onClose }) {
     return (
         <div className="forge-mg-scrim" role="dialog" aria-label="Reforged" onClick={onClose}>
-            <div className={`forge-reforge-fx${fx.dual ? " is-dual" : ""}`} onClick={(e) => e.stopPropagation()}>
-                {fx.dual ? <div className="forge-reforge-badge">✨ DUAL AFFINITY! ✨</div> : null}
+            <div className={`forge-reforge-fx${fx.dual || fx.enchant ? " is-dual" : ""}`} onClick={(e) => e.stopPropagation()}>
+                {fx.enchant ? <div className="forge-reforge-badge">🪄 ENCHANTED! 🪄</div> : fx.dual ? <div className="forge-reforge-badge">✨ DUAL AFFINITY! ✨</div> : null}
                 <ItemArt id={fx.item.id} icon={fx.item.icon} className="forge-reforge-fxart" alt={fx.item.name} />
                 <div className="forge-reforge-fxname">{fx.item.name}</div>
                 <div className="forge-reforge-fxels">
@@ -503,7 +528,7 @@ function ReforgeReveal({ fx, onClose }) {
                         return <span key={k} className="forge-elem-chip big" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>;
                     })}
                 </div>
-                <div className="forge-reforge-fxsub">{fx.dual ? "It now matches BOTH elements — twice the weeks it shines." : "Affinity reforged."}</div>
+                <div className="forge-reforge-fxsub">{fx.enchant ? `A new affinity bound in — it now matches ${(fx.elements || []).length} elements.` : fx.dual ? "It now matches BOTH elements — twice the weeks it shines." : "Affinity reforged."}</div>
                 <button type="button" className="forge-strike big" onClick={onClose}>Done</button>
             </div>
         </div>
@@ -956,6 +981,10 @@ const FORGE_CSS = `
 .forge-reforge-name { font-size: 15px; font-weight: 900; color: #ffe0a0; }
 .forge-reforge-cur { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; font-size: 11px; color: #c8b79f; }
 .forge-reforge-sub { margin: 12px 0 8px; font-size: 12px; color: #cbb99a; }
+.forge-mode-toggle { display: flex; gap: 6px; margin: 10px 0 4px; }
+.forge-mode-toggle button { flex: 1; padding: 8px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #cbb9a0; font-weight: 800; font-size: 11.5px; cursor: pointer; }
+.forge-mode-toggle button.on { border-color: rgba(184,120,255,0.6); background: rgba(150,90,255,0.16); color: #e6ccff; }
+.forge-card-scroll { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 900; color: #e6ccff; background: rgba(150,90,255,0.16); border: 1px solid rgba(184,120,255,0.45); border-radius: 999px; padding: 2px 7px; margin-top: 3px; }
 .forge-elem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .forge-elem-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px; border-radius: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #e8d6c0; font-size: 11.5px; font-weight: 800; position: relative; }
 .forge-elem-btn .forge-elem-emoji { font-size: 22px; }

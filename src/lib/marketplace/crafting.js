@@ -314,7 +314,7 @@ export async function combineParts(buyerId, tier) {
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
-export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0 } = {}) {
+export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
     const item = itemById(itemId);
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
     if (!new Set(Object.values(await getEquippedIds(buyerId))).has(itemId)) return { ok: false, error: "not_equipped" };
@@ -322,8 +322,16 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const level = cur?.level || 0;
     if (level >= MAX_FORGE_LEVEL) return { ok: false, error: "maxed", ...(await getForgeState(buyerId)) }; // peak enchantment reached
     const { tier, qty } = enhanceCost(item, level);
-    const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough", need: { tier, qty }, ...(await getForgeState(buyerId)) };
+    // A POWER SCROLL is a free enhance — consume one instead of salvaged parts.
+    let usedScroll = false;
+    if (useScroll) {
+        const sc = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = 'forge_power_scroll' AND count > 0 RETURNING count`, [buyerId]).catch(() => null);
+        if (!sc) return { ok: false, error: "no_scroll", ...(await getForgeState(buyerId)) };
+        usedScroll = true;
+    } else {
+        const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
+        if (!paid) return { ok: false, error: "not_enough", need: { tier, qty }, ...(await getForgeState(buyerId)) };
+    }
     const q = Math.max(0, Math.min(1, Number(quality) || 0));
     // SKILL TIERS — the mini-game score decides how many stat points you forge AND how they SPREAD. Higher tiers
     // add BREADTH (more stats); a flawless run can add brand-new stats to the item (up to four total):
@@ -388,7 +396,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k) }));
     // The attunement outcome for the reveal: what (if anything) got rolled, plus the item's resulting affix.
     const attune = utilRoll ? { ...describeUtil(nextUtil), isNew: Boolean(utilRoll.isNew), upgraded: Boolean(utilRoll.upgraded) } : null;
-    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, attune, util: describeUtil(nextUtil), allMaxed, scenario, doubled, xp, grade, ...(await getForgeState(buyerId)) };
+    return { ok: true, itemId, level: level + 1, gained: describeStats(gained), statLines, attune, util: describeUtil(nextUtil), allMaxed, scenario, doubled, usedScroll, xp, grade, ...(await getForgeState(buyerId)) };
 }
 
 // ── Full forge state for the UI ──
@@ -459,6 +467,9 @@ export async function getForgeState(buyerId) {
         if (!it) return null;
         return { id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon, sprite: spriteMap[id] || null, elements: describeItemElements(id, elemOver[id]), cost: reforgeCost(it.rarity), equipped: equippedIds.has(id) };
     }).filter(Boolean).sort((a, b) => rarityTier(b.rarity) - rarityTier(a.rarity) || a.name.localeCompare(b.name));
-    const reforge = { items: reforgeItems, elements: Object.values(ELEMENTS).map((e) => ({ key: e.key, label: e.label, emoji: e.emoji, color: e.color })), dualChance: Math.round(DUAL_ELEMENT_CHANCE * 100) };
-    return { parts: partList, salvage, enhance, reforge, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    // Forge scrolls held (Power = free enhance, Enchant = add an affinity).
+    const scrollRows = await db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND consumable_id IN ('forge_power_scroll','forge_enchant_scroll') AND count > 0`, [buyerId]).catch(() => []);
+    const scrollCount = (cid) => Number(scrollRows.find((r) => r.consumable_id === cid)?.count || 0);
+    const reforge = { items: reforgeItems, elements: Object.values(ELEMENTS).map((e) => ({ key: e.key, label: e.label, emoji: e.emoji, color: e.color })), dualChance: Math.round(DUAL_ELEMENT_CHANCE * 100), enchantScrolls: scrollCount("forge_enchant_scroll") };
+    return { parts: partList, salvage, enhance, reforge, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, powerScrolls: scrollCount("forge_power_scroll"), enchantScrolls: scrollCount("forge_enchant_scroll"), combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
 }

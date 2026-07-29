@@ -41,6 +41,8 @@ const ELITE_TIERS = new Set(["ascendant", "eternal", "celestial", "primordial"])
 
 // Chance a high-tier chest yields a CONSUMABLE instead of gear (+ which pool). The ultra relics
 // (Elixir of Renewal / Sands of Time) only appear from Eternal chests and up.
+// Forge-scroll drop chance by chest tier (a Power Scroll usually, rarely an Enchantment Scroll — see openChest).
+const SCROLL_CHEST_CHANCE = { gold: 0.04, mythic: 0.08, ascendant: 0.12, eternal: 0.16, celestial: 0.20, primordial: 0.26 };
 const CHEST_CONSUMABLES = {
     wooden: { chance: 0.06, pool: ["treat_bone", "treat_wild"] },
     iron: { chance: 0.08, pool: ["treat_wild", "treat_bone", "treat_snack", "farm_fertilizer_haul"] },
@@ -168,6 +170,16 @@ export async function openChest(buyerId, tier) {
     // A chance at a companion PET from this chest tier — the standout reveal.
     const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);
     if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop };
+
+    // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
+    // (permanently add an elemental affinity) instead.
+    const sChance = SCROLL_CHEST_CHANCE[tier] || 0;
+    if (sChance && Math.random() < sChance) {
+        const cid = Math.random() < 0.12 ? "forge_enchant_scroll" : "forge_power_scroll";
+        await grantConsumable(buyerId, cid);
+        const c = CONSUMABLES[cid];
+        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+    }
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
     const cc = CHEST_CONSUMABLES[tier];

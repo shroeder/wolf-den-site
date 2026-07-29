@@ -45,6 +45,10 @@ export const CONSUMABLES = {
     // ULTRA relics — no gold price (drop only from the highest chests). Applied to a charged item you pick.
     elixir_renewal: { name: "Elixir of Renewal", emoji: "⚗️", kind: "relic", price: null, target: "recharge", desc: "Fully RECHARGE all charges on one of your charged items.", effect: { type: "recharge" } },
     sands_of_time: { name: "Sands of Time", emoji: "⏳", kind: "relic", price: null, target: "cooldown", desc: "Instantly RESET the cooldown on a charged item that still has a charge left.", effect: { type: "reset_cooldown" } },
+    // FORGE SCROLLS — used AT the Forge (not the generic use screen). The Power Scroll is a free enhancement (no
+    // salvaged parts). The rarer Enchantment Scroll permanently adds an elemental affinity you pick (can exceed two).
+    forge_power_scroll: { name: "Power Scroll", emoji: "📜", kind: "scroll", price: null, target: "forge", desc: "A free enhancement at the Forge — enhance a piece WITHOUT spending salvaged parts.", effect: { type: "forge_enhance" } },
+    forge_enchant_scroll: { name: "Enchantment Scroll", emoji: "🪄", kind: "scroll", price: null, target: "forge", desc: "Permanently add an elemental affinity of your choice to a piece of gear (can extend it past two).", effect: { type: "forge_enchant" } },
     // PET TREATS — feed your EQUIPPED pet to level it up. Six buyable tiers + four drop-only.
     treat_bone: { name: "Pet Treat", emoji: "🦴", kind: "treat", desc: "Feed your equipped pet +25 pet XP.", price: 400, effect: { type: "pet_xp", amount: 25 } },
     treat_snack: { name: "Hearty Snack", emoji: "🍖", kind: "treat", desc: "Feed your equipped pet +75 pet XP.", price: 1000, effect: { type: "pet_xp", amount: 75 } },
@@ -200,6 +204,9 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
     const c = CONSUMABLES[id];
     if (!buyerId || !c) return { ok: false, error: "unknown" };
     const e = c.effect;
+
+    // Forge scrolls are consumed at the Forge (they need the enhance flow / an item+element picker), not here.
+    if (e.type === "forge_enhance" || e.type === "forge_enchant") return { ok: false, error: "use_at_forge" };
 
     if (e.type === "recharge" || e.type === "reset_cooldown") {
         const def = itemById(targetItemId);

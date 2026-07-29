@@ -16,18 +16,21 @@ export const DUAL_ELEMENT_CHANCE = 0.12; // small chance a reforge yields dual a
 const REFORGE_GOLD = { common: 400, rare: 900, epic: 1800, legendary: 3500, mythic: 6000, ascendant: 9000, eternal: 12000 };
 export const reforgeCost = (rarity) => REFORGE_GOLD[rarity] || 1500;
 
+// A reforge yields at most 2 (dual); the Enchantment Scroll can push an item past that, so the STORAGE cap is
+// higher (6 = all elements). Dedupe.
+const ELEMENT_STORE_CAP = 6;
 export function parseElements(v) {
     if (!v) return null;
     let a = v;
     if (typeof v === "string") { try { a = JSON.parse(v); } catch { return null; } }
     if (!Array.isArray(a)) return null;
-    const out = a.filter((e) => ELEMENTS[e]);
-    return out.slice(0, 2);
+    const out = [...new Set(a.filter((e) => ELEMENTS[e]))];
+    return out.slice(0, ELEMENT_STORE_CAP);
 }
 
 // The item's EFFECTIVE elements: the override array if present, else its deterministic base ([] when neutral).
 export function effectiveElements(itemId, overrideArr) {
-    if (overrideArr && overrideArr.length) return overrideArr.slice(0, 2);
+    if (overrideArr && overrideArr.length) return overrideArr.slice(0, ELEMENT_STORE_CAP);
     const base = itemElement(itemId);
     return base ? [base] : [];
 }
@@ -95,10 +98,9 @@ export async function reforgeItemElement(buyerId, itemId, target, replaceKey = n
     let dual = false;
     let elements;
     if (cur.length >= 2) {
-        // Dual item: swap out the chosen element (default the first), keep the other.
+        // Multi-affinity item: swap out the chosen element (default the first), KEEP all the others.
         const drop = cur.includes(replaceKey) ? replaceKey : cur[0];
-        const keep = cur.find((e) => e !== drop);
-        elements = [keep, target];
+        elements = [...cur.filter((e) => e !== drop), target];
     } else {
         // Single/neutral: small chance to keep the current one AND add the target (go dual).
         dual = cur.length === 1 && Math.random() < DUAL_ELEMENT_CHANCE;
@@ -111,4 +113,28 @@ export async function reforgeItemElement(buyerId, itemId, target, replaceKey = n
     ).catch(() => {});
     await trackActivity(buyerId, "reforge_element", { itemId, target, dual, elements }).catch(() => {});
     return { ok: true, elements, dual, from: cur, cost, gold: Number(paid.gold) };
+}
+
+// ENCHANTMENT SCROLL — permanently ADD an element to an item (keeps all its current ones, so it can go past two).
+// Consumes one forge_enchant_scroll. Can't add one it already has, or exceed the storage cap.
+export async function enchantItemElement(buyerId, itemId, element) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const item = itemById(itemId);
+    if (!item) return { ok: false, error: "bad_item" };
+    if (!ELEMENTS[element]) return { ok: false, error: "bad_element" };
+    const owns = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    if (!owns) return { ok: false, error: "not_owned" };
+    const cur = (await getElementOverrides(buyerId, [itemId]))[itemId] || (itemElement(itemId) ? [itemElement(itemId)] : []);
+    if (cur.includes(element)) return { ok: false, error: "already_has", elements: cur };
+    if (cur.length >= ELEMENT_STORE_CAP) return { ok: false, error: "max_elements", elements: cur };
+    const sc = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = 'forge_enchant_scroll' AND count > 0 RETURNING count`, [buyerId]).catch(() => null);
+    if (!sc) return { ok: false, error: "no_scroll" };
+    const elements = [...cur, element];
+    await db.query(
+        `INSERT INTO mkt_item_element (buyer_id, item_id, elements, updated_at) VALUES ($1, $2, $3::jsonb, NOW())
+         ON CONFLICT (buyer_id, item_id) DO UPDATE SET elements = $3::jsonb, updated_at = NOW()`,
+        [buyerId, itemId, JSON.stringify(elements)]
+    ).catch(() => {});
+    await trackActivity(buyerId, "enchant_element", { itemId, element, elements }).catch(() => {});
+    return { ok: true, elements, added: element, scrollsLeft: Number(sc.count) };
 }
