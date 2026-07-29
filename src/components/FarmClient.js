@@ -209,6 +209,10 @@ export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
     const [farm, setFarm] = useState(initial);
     const pets = useMemo(() => farm.pets || [], [farm.pets]);
+    // Live pet-charge nudge — recomputed from the budget left ∩ pets not yet petted, so the banner + tab badges
+    // clear the instant you pet (the server's petNudge is only the starting value at load).
+    const petsUnpetted = useMemo(() => pets.filter((p) => !p.petted).length, [pets]);
+    const liveNudge = farm.mine ? Math.max(0, Math.min(farm.petting?.left ?? farm.petNudge ?? 0, petsUnpetted)) : 0;
     // Pets roam the FULL width of the backdrop now that the garden is its own view (no crops to avoid) — evenly
     // spread from the left edge to the right so they're never bunched or missing from the left side.
     const petMinX = FARM_PAD; // left edge of the pets' roaming band
@@ -408,6 +412,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)), wallet: f.wallet ? { ...f.wallet, gold: f.wallet.gold + (r.goldGained || 0) } : f.wallet }));
             setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
             if (i >= 0) addFloater(i, `+${r.xpGained} XP · +${r.goldGained}g`, "#ffe27a");
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } // update the nav farm badge
         } else if (r?.error === "already_petted") {
             setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, petted: true } : p)) }));
             setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, petted: true } : cur));
@@ -896,7 +901,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     .map(([v, ico, label]) => {
                     // Garden tab badge = crops READY TO HARVEST. Pet-view tabs badge = pets you can still pet today.
                     const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
-                    const petAttn = v !== "garden" && farm.mine && (farm.petNudge || 0) > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted).length : 0;
+                    const petAttn = v !== "garden" && farm.mine && liveNudge > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted).length : 0;
                     const badge = attn || petAttn;
                     return (
                         <button key={v} type="button" className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
@@ -908,8 +913,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 })}
             </div>
 
-            {farm.mine && (farm.petNudge || 0) > 0 && view !== "garden" ? (
-                <div className="farm-petnudge">🐾 <b>{farm.petNudge}</b> free {farm.petNudge === 1 ? "petting" : "pettings"} left today — tap your pets for XP &amp; gold!</div>
+            {farm.mine && liveNudge > 0 && view !== "garden" ? (
+                <div className="farm-petnudge">🐾 <b>{liveNudge}</b> free {liveNudge === 1 ? "petting" : "pettings"} left today — tap your pets for XP &amp; gold!</div>
             ) : null}
 
             {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,
