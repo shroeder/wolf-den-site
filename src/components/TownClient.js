@@ -482,6 +482,7 @@ export default function TownClient({ initial }) {
     const well = state?.well || null; // Wishing Well daily-claim state { gold, xp, claimedToday } | null until funded
     const canWish = Boolean(well && !well.claimedToday);
     const raidActive = Boolean(state?.event && !state.event.defeated); // during a raid: hide NPCs + lock the buildings
+    const marketDay = Boolean(state?.store?.open) && !raidActive; // physical shop open → the plaza celebrates "Market Day"
     const effDepth = 6; // every parallax skyline band is on by default now (no funding gate)
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
@@ -662,8 +663,10 @@ export default function TownClient({ initial }) {
                     {/* Buildings — locked (no entry) while a raid is on: defend the plaza first! */}
                     {buildings.map((b) => {
                         const bart = art[b.id];
+                        const shopOpen = marketDay && b.id === "shop"; // the real store's building lights up when the shop is open
                         return (
-                            <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${raidActive ? " is-locked" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
+                            <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${raidActive ? " is-locked" : ""}${shopOpen ? " is-openshop" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
+                                {shopOpen ? <span className="tw-openflag">OPEN</span> : null}
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
@@ -749,6 +752,14 @@ export default function TownClient({ initial }) {
                     {/* You */}
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
                 </div>
+
+                {/* Market Day — the shop is physically OPEN: a festive ribbon + a live +XP nudge to match the crier's hype */}
+                {marketDay ? (
+                    <div className="tw-marketday" aria-hidden="true">
+                        <span className="tw-marketday-glow" />
+                        🎉 Market Day — the Den&apos;s OPEN til {state.store.closesLabel}! <b>+10% XP</b>
+                    </div>
+                ) : null}
 
                 {/* Raid HUD (corner) + weapon-skill callout */}
                 {state?.event && !state.event.defeated ? <RaidHUD ev={state.event} kills={raidKills} myDamage={raidDamage} /> : null}
@@ -1143,6 +1154,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-building { transform: translate(-50%, -100%); }
 .tw-building.is-locked { cursor: not-allowed; }
 .tw-building.is-locked .tw-building-art, .tw-building.is-locked .tw-building-card { filter: brightness(0.62) saturate(0.7); }
+/* Market Day — the General Store glows warm + flies an OPEN flag while the physical shop is open. */
+.tw-building.is-openshop .tw-building-art, .tw-building.is-openshop .tw-building-card { filter: drop-shadow(0 0 14px rgba(255,201,92,0.85)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); animation: twShopGlow 2.4s ease-in-out infinite; }
+@keyframes twShopGlow { 0%,100% { filter: drop-shadow(0 0 10px rgba(255,201,92,0.6)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); } 50% { filter: drop-shadow(0 0 20px rgba(255,220,120,0.95)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); } }
+.tw-openflag { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 2; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.08em; color: #2a1a06; background: linear-gradient(180deg,#8fe39a,#3ec06a); padding: 2px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); animation: twWellBob 1.5s ease-in-out infinite; }
+.tw-marketday { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 480; pointer-events: none; max-width: calc(100% - 96px); text-align: center; font-size: 0.74rem; font-weight: 800; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); padding: 5px 14px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,0.4); overflow: hidden; }
+.tw-marketday b { color: #7a3b00; }
+.tw-marketday-glow { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.65) 50%, transparent 80%); transform: translateX(-100%); animation: twSheen 3.2s ease-in-out infinite; }
+@keyframes twSheen { 0% { transform: translateX(-100%); } 60%,100% { transform: translateX(100%); } }
 .tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
 /* contact shadow so the building reads as sitting ON the cobblestones */
 .tw-building::after { content: ""; position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); width: 72%; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 72%); z-index: -1; pointer-events: none; }

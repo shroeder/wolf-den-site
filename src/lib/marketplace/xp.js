@@ -7,9 +7,11 @@ import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
+import { storeStatus } from "@/lib/marketplace/store-hours.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
+export const MARKET_DAY_XP_BONUS = 0.10; // +10% XP for everyone while the physical store is open ("Market Day")
 
 // Point values per action. Tune freely — they're only read here.
 // Anti-farm: dollars spent are uncapped (real money), everything else is capped via dedupe keys
@@ -113,7 +115,10 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     const town = await getTownBonuses(Date.now()).catch(() => ({ xpPct: 0, goldPct: 0 }));
     const xpMult = 1 + (town.xpPct || 0) / 100;
     const goldMult = 1 + (town.goldPct || 0) / 100;
-    const pts = Math.round(base * mult * xpMult);
+    // MARKET DAY — while the PHYSICAL Wolf Den store is open, every member earns bonus XP. Ties the game to real
+    // store hours (and quietly rewards playing when you could pop in). Pure function of the clock — no DB cost.
+    const marketMult = 1 + (storeStatus().open ? MARKET_DAY_XP_BONUS : 0);
+    const pts = Math.round(base * mult * xpMult * marketMult);
     // Gold is UNLINKED from XP: by default it still tracks XP 1:1 (purchases, donations, boss, quests…), but a
     // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
     // spendable currency for a payout we already paid the customer for. Town gold-boost rides on top of gold only.
