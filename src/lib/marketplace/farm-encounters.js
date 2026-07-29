@@ -74,8 +74,9 @@ export async function maybeStartEncounter(buyerId, { rarity = "common", wardChan
     }
     const pending = { key, xp: c.xp, gold: c.gold, loot };
     await db.query(`UPDATE mkt_buyer SET farm_encounter = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify(pending)]).catch(() => {});
-    // Public info (NOT the exact reward — that stays server-side until you claim).
-    return { key, name: c.name, emoji: c.emoji, sprite: await critterSprite(c.art), crop: seedId ? (SEEDS[seedId]?.name || null) : null };
+    // Public info — includes the reward PREVIEW so the recap always shows what you got, even if the claim call
+    // races (it's pure upside + pre-rolled, so there's nothing to hide). resolveEncounter does the actual grant.
+    return { key, name: c.name, emoji: c.emoji, sprite: await critterSprite(c.art), crop: seedId ? (SEEDS[seedId]?.name || null) : null, reward: { xp: c.xp, gold: c.gold, loot } };
 }
 
 // Claim the parked critter's gift. Pure upside — always XP + gold + the pre-rolled bonus loot. Atomic claim so

@@ -758,6 +758,21 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes encShake { 0%,100% { transform: rotate(0) scale(1); } 20% { transform: rotate(-9deg) scale(1.08); } 45% { transform: rotate(8deg) scale(1.06); } 70% { transform: rotate(-5deg) scale(1.03); } }
                 @keyframes encSpark { 0% { opacity: 0; transform: translateY(6px) scale(.4); } 25% { opacity: 1; transform: translateY(-6px) scale(1.2); } 100% { opacity: 0; transform: translateY(-30px) scale(.7); } }
                 @keyframes farmConfetti { 0% { transform: translateY(-10px) rotate(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translateY(88vh) rotate(560deg); opacity: .9; } }
+                /* Juiced plot-detail buttons — pressable depth, hover lift, a sheen sweep on the primary actions. */
+                .fm-btn { position: relative; overflow: hidden; width: 100%; border: none; border-radius: 12px; font-weight: 900; font-size: 14.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 13px; transition: transform .09s ease, box-shadow .09s ease, filter .12s ease; }
+                .fm-btn:hover:not(:disabled) { filter: brightness(1.05); }
+                .fm-btn:active:not(:disabled) { transform: translateY(2px); }
+                .fm-btn:disabled { opacity: .5; cursor: default; box-shadow: none !important; filter: grayscale(.3); }
+                .fm-btn-harvest { color: #06311f; background: linear-gradient(180deg,#5ff0a2,#2fae72); box-shadow: 0 4px 0 #1c7a4f; }
+                .fm-btn-harvest:active:not(:disabled) { box-shadow: 0 2px 0 #1c7a4f; }
+                .fm-btn-fert { color: #052540; background: linear-gradient(180deg,#8cc7ff,#4a93e0); box-shadow: 0 4px 0 #2f6bb0; }
+                .fm-btn-fert:active:not(:disabled) { box-shadow: 0 2px 0 #2f6bb0; }
+                .fm-btn-spec { color: #3a2705; background: linear-gradient(180deg,#ffe27a,#e0a12f); box-shadow: 0 4px 0 #a8791f; }
+                .fm-btn-spec:active:not(:disabled) { box-shadow: 0 2px 0 #a8791f; }
+                .fm-btn-close { color: inherit; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.16); padding: 11px; font-size: 13px; }
+                .fm-btn-close:hover { background: rgba(255,255,255,0.09); }
+                .fm-sheen::after { content: ""; position: absolute; top: 0; left: -70%; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); transform: skewX(-18deg); animation: fmSheen 3.6s ease-in-out infinite; pointer-events: none; }
+                @keyframes fmSheen { 0%, 100% { left: -70%; } 55% { left: 150%; } }
                 @keyframes rateBurstAnim { 0% { transform: translate(-50%,-50%) scale(.4); opacity: 0; } 25% { opacity: 1; } 55% { transform: translate(-50%,-60%) scale(1.7); opacity: 1; } 100% { transform: translate(-50%,-140%) scale(1.9); opacity: 0; } }
                 @keyframes ratePulse { 0%,100% { transform: scale(1); } 45% { transform: scale(1.18); } }
                 @keyframes rateStars { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px) scale(1.1); } }
@@ -2032,7 +2047,13 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
         <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`${p.name} crop`} style={{ width: "100%", maxWidth: 320, borderRadius: 16, background: "var(--card-bg,#17181c)", border: `2px solid ${ring}`, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
                 <div style={{ padding: "18px 18px 12px", textAlign: "center", background: `radial-gradient(120% 90% at 50% 0%, ${ring}33, transparent 70%)` }}>
-                    <div style={{ fontSize: 46, lineHeight: 1 }}>{ready ? p.emoji : p.sprout}</div>
+                    {(() => {
+                        const url = garden.cropSprites?.[ready ? `crop_${p.seedId}_ripe` : `crop_${p.seedId}_grow`] || garden.cropSprites?.crop_sprout;
+                        return url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={url} alt="" draggable={false} style={{ width: 78, height: 78, objectFit: "contain", filter: "drop-shadow(0 4px 7px rgba(0,0,0,0.45))", animation: "farmBob 2.4s ease-in-out infinite" }} />
+                        ) : <div style={{ fontSize: 46, lineHeight: 1 }}>{ready ? p.emoji : p.sprout}</div>;
+                    })()}
                     <div style={{ fontWeight: 900, fontSize: 18, marginTop: 6 }}>{p.name}</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize", marginTop: 2 }}>{p.rarity}{p.fertilized ? " · 💧 fertilized" : ""}</div>
                     <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
@@ -2052,26 +2073,26 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                     ) : null}
                     <div className="muted" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center" }}>🪙 sells for {(p.sell || 0).toLocaleString()} gold</div>
                 </div>
-                <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 9 }}>
                     {ready ? (
-                        <button type="button" onClick={() => { onHarvest(slot); onClose(); }} disabled={hBusy} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#43d98a,#2fae72)", color: "#06311f", border: "none", borderRadius: 11, cursor: hBusy ? "default" : "pointer", boxShadow: "0 3px 0 #1c7a4f", opacity: hBusy ? 0.6 : 1 }}>🧺 Harvest now</button>
+                        <button type="button" className="fm-btn fm-btn-harvest fm-sheen" onClick={() => { onHarvest(slot); onClose(); }} disabled={hBusy}>🧺 Harvest now</button>
                     ) : (
                         <>
-                            <button type="button" onClick={() => onFertilize(slot)} disabled={!canFertilize || fBusy} title={p.fertilized ? "Already fertilized" : garden.fertilizer <= 0 ? "No fertilizer in stock" : ""} style={{ width: "100%", padding: 12, fontWeight: 900, background: canFertilize ? "linear-gradient(180deg,#8cc7ff,#4a93e0)" : "rgba(255,255,255,0.08)", color: canFertilize ? "#052540" : "inherit", border: "none", borderRadius: 11, cursor: canFertilize && !fBusy ? "pointer" : "default", boxShadow: canFertilize ? "0 3px 0 #2f6bb0" : "none", opacity: canFertilize && !fBusy ? 1 : 0.55 }}>
+                            <button type="button" className="fm-btn fm-btn-fert" onClick={() => onFertilize(slot)} disabled={!canFertilize || fBusy} title={p.fertilized ? "Already fertilized" : garden.fertilizer <= 0 ? "No fertilizer in stock" : ""}>
                                 💧 {p.fertilized ? "Already fertilized" : "Fertilize · speed up growth"}
-                                {!p.fertilized && garden.fertilizer > 0 ? <span style={{ fontWeight: 700, opacity: 0.8 }}> ({garden.fertilizer} left)</span> : null}
+                                {!p.fertilized && garden.fertilizer > 0 ? <span style={{ fontWeight: 700, opacity: 0.82 }}>({garden.fertilizer} left)</span> : null}
                             </button>
                             {!p.fertilized && garden.fertilizer <= 0 ? (
-                                <button type="button" onClick={onBuyFertilizer} disabled={!canBuyFert || busy === "fbuy"} style={{ width: "100%", padding: 11, fontWeight: 800, background: canBuyFert ? "linear-gradient(180deg,#8cc7ff,#4a93e0)" : "rgba(255,255,255,0.08)", color: canBuyFert ? "#052540" : "inherit", border: "none", borderRadius: 11, cursor: canBuyFert && busy !== "fbuy" ? "pointer" : "default", boxShadow: canBuyFert ? "0 3px 0 #2f6bb0" : "none", opacity: canBuyFert && busy !== "fbuy" ? 1 : 0.55 }}>💧 Buy fertilizer <span style={{ opacity: 0.75, fontWeight: 700 }}>({garden.fertilizerPrice}g)</span></button>
+                                <button type="button" className="fm-btn fm-btn-fert" onClick={onBuyFertilizer} disabled={!canBuyFert || busy === "fbuy"}>💧 Buy fertilizer <span style={{ opacity: 0.78, fontWeight: 700 }}>({garden.fertilizerPrice}g)</span></button>
                             ) : null}
                         </>
                     )}
                     {onSpecialize ? (
-                        <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", fontWeight: 900, fontSize: 13.5, background: "linear-gradient(180deg,#ffd75e,#e0a12f)", color: "#3a2705", border: "none", borderRadius: 12, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #a8791f" }}>
-                            <span style={{ fontSize: 16 }}>★</span><span style={{ flex: 1 }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
+                        <button type="button" className="fm-btn fm-btn-spec fm-sheen" onClick={onSpecialize} style={{ justifyContent: "flex-start", gap: 9 }}>
+                            <span style={{ fontSize: 16 }}>★</span><span style={{ flex: 1, textAlign: "left" }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
                         </button>
                     ) : null}
-                    <button type="button" onClick={onClose} style={{ width: "100%", padding: 10, fontWeight: 800, background: "transparent", color: "inherit", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 11, cursor: "pointer" }}>Close</button>
+                    <button type="button" className="fm-btn fm-btn-close" onClick={onClose}>Close</button>
                 </div>
             </div>
         </div>
@@ -2178,9 +2199,11 @@ function EncounterModal({ encounter, onResolve, onClose }) {
         busyRef.current = true;
         setPhase("resolving");
         const r = await onResolve();
-        setReward(r?.ok ? r : { error: true });
+        // The reward is pre-known at spawn (encounter.reward) — so even if the claim call races, we always show
+        // exactly what you got. Prefer the live grant result, fall back to the preview.
+        setReward((r?.ok ? r : null) || (encounter.reward ? { ...encounter.reward, ok: true } : { error: true }));
         setPhase("reward");
-    }, [onResolve]);
+    }, [onResolve, encounter.reward]);
 
     const shake = useCallback(() => {
         if (phase !== "catch") return;
