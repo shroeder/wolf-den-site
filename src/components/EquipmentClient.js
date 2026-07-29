@@ -252,8 +252,14 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             closeDetail();
             await load();
             const g = d.gained;
-            setSalvaged(g ? `Salvaged into ${g.n} tier-${g.tier} part${g.n === 1 ? "" : "s"}${d.doubled ? " (doubled!)" : ""}` : "Salvaged into parts");
-            setTimeout(() => setSalvaged(null), 3000);
+            // Surface EVERY proc — same rewards as the Forge, just under-reported here before (looked like "less").
+            const bits = [g ? `🔩 ${g.n} tier-${g.tier} part${g.n === 1 ? "" : "s"}${d.doubled ? " ✦ DOUBLED!" : ""}` : "Salvaged into parts"];
+            if (d.enhanceBonus > 0) bits.push(`+${d.enhanceBonus} recovered from forging`);
+            if (d.bonusTier) bits.push(`👁️ +1 tier-${d.bonusTier} (Keen Eye!)`);
+            if (d.regaliaDrop) bits.push(`✨ RARE: ${d.regaliaDrop}!`);
+            if (d.xp) bits.push(`+${d.xp} XP`);
+            setSalvaged(bits.join(" · "));
+            setTimeout(() => setSalvaged(null), d.regaliaDrop ? 5000 : 3500);
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
         } finally { setBusy(false); }
     }
@@ -654,7 +660,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
 
             {err ? <p style={{ color: "#ff6b6b" }}>{err}</p> : null}
             {salvaged ? createPortal((
-                <div style={{ position: "fixed", left: "50%", bottom: 84, transform: "translateX(-50%)", zIndex: 10070, padding: "10px 16px", borderRadius: 12, background: "linear-gradient(180deg,#2a180c,#160c06)", border: "1px solid rgba(255,154,60,0.5)", color: "#ffcf9a", fontWeight: 800, fontSize: 13, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>🔨 {salvaged}</div>
+                <div style={{ position: "fixed", left: "50%", bottom: 84, transform: "translateX(-50%)", zIndex: 10070, padding: "10px 16px", borderRadius: 12, background: "linear-gradient(180deg,#2a180c,#160c06)", border: "1px solid rgba(255,154,60,0.5)", color: "#ffcf9a", fontWeight: 800, fontSize: 13, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", maxWidth: "min(92vw, 440px)", textAlign: "center", lineHeight: 1.4 }}>🔨 {salvaged}</div>
             ), document.body) : null}
         </div>
     );
