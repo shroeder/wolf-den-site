@@ -612,6 +612,12 @@ export default function TownClient({ initial }) {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
         load();
     }, [load]);
+    // Owner test control: force-end the active raid (so you can spawn a fresh one without waiting the timer out).
+    const endEvent = useCallback(async () => {
+        setBossOpen(false);
+        await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "end_event" }) }).catch(() => {});
+        load();
+    }, [load]);
 
     const you = state?.you;
     const art = state?.art || {};
@@ -716,7 +722,7 @@ export default function TownClient({ initial }) {
             </section>
 
             <div ref={sceneRef} className="tw-scene" style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
-                <SceneMusic vibe="town" />
+                <SceneMusic vibe={raidActive ? "raid" : "town"} />
                 {/* Live online count — green bubble, top-left (hidden behind the raid HUD during a raid). */}
                 {!raidActive ? <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Who's around"><span className="tw-online-dot" />{state?.onlineCount ?? 1} online</button> : null}
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
@@ -942,7 +948,13 @@ export default function TownClient({ initial }) {
                         <span className="muted">Owner · silent test (no push):</span>
                         <button type="button" onClick={() => spawnEvent("bandit_raid")}>🗡️ Bandits</button>
                         <button type="button" onClick={() => spawnEvent("goblin_swarm")}>👺 Goblins</button>
-                        <button type="button" onClick={() => spawnEvent("treasure_golem")}>💎 Golem</button>
+                        <button type="button" onClick={() => spawnEvent("treasure_golem")}>💎 Golem (boss)</button>
+                    </div>
+                ) : null}
+                {state?.owner && state?.event ? (
+                    <div className="tw-owner-spawn">
+                        <span className="muted">Owner · testing:</span>
+                        <button type="button" onClick={endEvent} style={{ borderColor: "rgba(255,215,110,0.5)", background: "rgba(255,215,110,0.14)", color: "#ffe0a0" }}>⏹️ End raid now</button>
                     </div>
                 ) : null}
             </section>

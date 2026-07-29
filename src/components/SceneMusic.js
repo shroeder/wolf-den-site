@@ -16,14 +16,21 @@ const CHORD = {
     G: { arp: [55, 59, 62, 67], bass: 43 },
     Am: { arp: [57, 60, 64, 69], bass: 45 },
     F: { arp: [53, 57, 60, 65], bass: 41 },
+    Em: { arp: [64, 67, 71, 76], bass: 40 },
+    Dm: { arp: [62, 65, 69, 74], bass: 38 },
+    E: { arp: [64, 68, 71, 76], bass: 40 },
 };
 const ARP_PATTERN = [0, 1, 2, 3, 2, 3, 1, 2]; // which chord tone plays on each of the 8 eighth-notes in a bar
 // Town lead melody over the 4-bar loop (step 0..31 = eighth-notes). Sparse + singable; null = rest.
 const TOWN_LEAD = { 0: 64, 3: 67, 8: 71, 11: 67, 16: 69, 19: 72, 24: 72, 27: 69 };
+// Raid lead — urgent, driving, higher register.
+const RAID_LEAD = { 0: 76, 2: 74, 4: 72, 6: 74, 8: 76, 12: 79, 16: 72, 18: 71, 20: 72, 24: 76, 26: 77, 28: 79 };
 
 const VIBES = {
     town: { bpm: 104, lpf: 1600, prog: ["C", "G", "Am", "F"], lead: TOWN_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.15, arpRelease: 0.55, master: 0.42 },
     tavern: { bpm: 76, lpf: 950, prog: ["Am", "F", "C", "G"], lead: null, arpType: "triangle", arpGain: 0.05, bassType: "sine", bassGain: 0.17, arpRelease: 0.95, master: 0.4 },
+    // Raid — a fast, tense minor loop with a driving bass + urgent lead; kicks in while a town event is active.
+    raid: { bpm: 144, lpf: 2500, prog: ["Am", "Em", "Dm", "E"], lead: RAID_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.22, arpRelease: 0.28, master: 0.46 },
 };
 
 export default function SceneMusic({ vibe = "town" }) {
@@ -114,6 +121,15 @@ export default function SceneMusic({ vibe = "town" }) {
     }, [muted, start, stop]);
 
     useEffect(() => () => stop(), [stop]); // cleanup on unmount
+
+    // When the vibe changes (e.g. town → raid), swap the loop so the new mood takes over immediately.
+    const prevVibe = useRef(vibe);
+    useEffect(() => {
+        if (prevVibe.current !== vibe) {
+            prevVibe.current = vibe;
+            if (!muted && audio.current) { stop(); start(); }
+        }
+    }, [vibe, muted, start, stop]);
 
     const toggle = useCallback(() => {
         setMuted((m) => { const nm = !m; try { localStorage.setItem(KEY, nm ? "1" : "0"); } catch { /* ok */ } return nm; });

@@ -163,6 +163,13 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent) };
 }
 
+// Owner/admin: force-end the active event (for testing) — closes it out so a new one can be spawned. No reward
+// payout; the client's raid-conclusion recap still fires so the wrap-up flow can be tested too.
+export async function endTownEvent() {
+    const rows = await db.query(`UPDATE mkt_town_event SET status = 'expired', defeated_at = NOW() WHERE status = 'active' RETURNING id`).catch(() => []);
+    return { ok: true, ended: rows.length };
+}
+
 // Whether the auto opening-events are live. Controlled by a DB setting (owner toggle in the Town Hall) rather
 // than a Vercel env var — kept between us, flippable without touching the dashboard.
 export async function townEventsLive() {
