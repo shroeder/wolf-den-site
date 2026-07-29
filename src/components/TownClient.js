@@ -26,6 +26,17 @@ const TILES = (n) => Array.from({ length: n }, (_, i) => i);
 // Which town-art sprite each raid kind uses (falls back to the event emoji until the art is generated).
 const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem" };
 const CAT_LABEL = { civic: "🏛️ Civic", building: "🏚️ Buildings", service: "🧭 Services", unlock: "🌟 New buildings" };
+// Pretty relative timestamp for the plaza chat log ("just now", "5m", "3h", then a date).
+const relTime = (iso) => {
+    const t = new Date(iso).getTime();
+    if (!t) return "";
+    const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    if (s < 45) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h`;
+    if (s < 604800) return `${Math.floor(s / 86400)}d`;
+    return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
 // Town Development projects → their card sprite (replaces the emoji when the art exists). tavern reuses the
 // plaza tavern building sprite; vault/festival reuse the same art that becomes their unlocked plaza building.
 const PROJECT_ART = { prosperity: "prosperity", depth: "townscape", tavern: "tavern", market: "trading_post", garrison: "garrison", vault: "vault", festival: "festival" };
@@ -1015,6 +1026,24 @@ export default function TownClient({ initial }) {
             </div>
 
             <section className="card tw-chatbar">
+                {(state?.chatLog || []).length ? (
+                    <div className="tw-chatlog" aria-label="Plaza chat log">
+                        {(state.chatLog).slice().reverse().map((m) => (
+                            <div key={m.id} className={`tw-clog-row${m.mine ? " mine" : ""}`}>
+                                <span className="tw-clog-hero" aria-hidden="true">
+                                    {m.sprite ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={m.sprite} alt="" style={{ transform: m.flip ? "scaleX(-1)" : "none" }} />
+                                    ) : <span className="tw-clog-fallback">{(m.name || "?").slice(0, 1).toUpperCase()}</span>}
+                                </span>
+                                <span className="tw-clog-main">
+                                    <span className="tw-clog-top"><span className="tw-clog-name">{m.name}</span><span className="tw-clog-time">{relTime(m.at)}</span></span>
+                                    <span className="tw-clog-body">{m.body}</span>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
                 <form onSubmit={sendChat} className="tw-chat-form">
                     <input value={chatText} onChange={onChatChange} placeholder="Say something to the plaza…" maxLength={200} aria-label="Town chat message" />
                     <button type="submit" className="tw-chat-send" disabled={!chatText.trim()} aria-label="Send">➤</button>
@@ -1154,6 +1183,7 @@ export default function TownClient({ initial }) {
                             <button type="button" className="tw-menu-btn" onClick={() => { walkToWorld(menuFor.x + (menuFor.x > me.x ? -3 : 3), menuFor.y); setMenuFor(null); }}>🚶 Walk over</button>
                             <button type="button" className="tw-menu-btn" onClick={() => { quickEmote("👋"); setMenuFor(null); }}>👋 Wave</button>
                             {menuFor.alias ? <Link href={`/marketplace/u/${menuFor.alias}`} className="tw-menu-btn">👤 View profile</Link> : null}
+                            {menuFor.alias ? <Link href={`/marketplace/farm?u=${encodeURIComponent(menuFor.alias)}`} className="tw-menu-btn">🏡 Visit farm</Link> : null}
                             {menuFor.alias ? <Link href={`/marketplace/trade/new?to=${encodeURIComponent(menuFor.alias)}`} className="tw-menu-btn">🤝 Trade</Link> : null}
                         </div>
                     </div>
@@ -1627,6 +1657,21 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-typing-bubble span:nth-child(3) { animation-delay: .4s; }
 @keyframes twType { 0%,60%,100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 .tw-chatbar { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+/* Persistent plaza chat LOG under the scene — column-reverse so the newest sits at the bottom and it stays
+   pinned there as messages arrive (fed newest-first). Each row shows the sender's HERO sprite + name + time. */
+.tw-chatlog { display: flex; flex-direction: column-reverse; gap: 9px; max-height: 190px; overflow-y: auto; padding: 4px 2px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 2px; }
+.tw-clog-row { display: flex; gap: 8px; align-items: flex-start; }
+.tw-clog-row.mine { flex-direction: row-reverse; }
+.tw-clog-hero { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; overflow: hidden; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-end; justify-content: center; }
+.tw-clog-hero img { width: 100%; height: 100%; object-fit: contain; }
+.tw-clog-fallback { align-self: center; font-weight: 800; font-size: 13px; opacity: 0.7; }
+.tw-clog-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 80%; }
+.tw-clog-top { display: flex; gap: 6px; align-items: baseline; }
+.tw-clog-row.mine .tw-clog-top { flex-direction: row-reverse; }
+.tw-clog-name { font-weight: 800; font-size: 12px; color: #ffe0a0; }
+.tw-clog-time { font-size: 10px; opacity: 0.45; white-space: nowrap; }
+.tw-clog-body { font-size: 13.5px; line-height: 1.34; background: rgba(255,255,255,0.06); padding: 6px 10px; border-radius: 11px; color: #f2ead9; word-break: break-word; }
+.tw-clog-row.mine .tw-clog-body { background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #2a1a06; }
 .tw-chat-form { display: flex; gap: 8px; }
 .tw-chat-form input { flex: 1 1 auto; min-width: 0; padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,215,110,0.35); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 14px; }
 .tw-chat-form input::placeholder { color: #9a8fb0; }

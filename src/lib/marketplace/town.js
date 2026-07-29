@@ -229,7 +229,7 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive] = await Promise.all([
+    const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive, chatLog] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
@@ -240,6 +240,7 @@ export async function getTownState(buyerId) {
         buyerId ? getTownQuests(buyerId).catch(() => []) : Promise.resolve([]),
         getChestArt().catch(() => ({})),
         townEventsLive().catch(() => false),
+        getGlobalChat(buyerId, 30).catch(() => []),
     ]);
     const boughtToday = await merchantBoughtToday(buyerId);
     const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt, boughtToday);
@@ -344,6 +345,7 @@ export async function getTownState(buyerId) {
         aroundCount,
         hangout,
         shiny: await getActiveShiny().catch(() => null),
+        chatLog,
     };
 }
 
@@ -429,6 +431,32 @@ export async function sendTownChat(buyerId, body) {
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
     bumpTownQuest(buyerId, "social", 1).catch(() => {});
     return { ok: true };
+}
+
+// The shared plaza chat feed as a persistent LOG (newest LAST so the client can append + auto-scroll). Each
+// message carries its sender's HERO sprite (avatar_sprite_url) + name + timestamp. Powers both the town chat
+// log under the scene AND the Social hub's Global tab — one stream: a message sent from either shows in both.
+export async function getGlobalChat(buyerId = null, limit = 40) {
+    const n = Math.max(1, Math.min(100, Number(limit) || 40));
+    const rows = await db.query(
+        `SELECT c.id, c.body, c.created_at, c.buyer_id,
+                b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
+           FROM mkt_town_chat c
+           JOIN mkt_buyer b ON b.id = c.buyer_id
+          ORDER BY c.created_at DESC
+          LIMIT $1`,
+        [n]
+    ).catch(() => []);
+    return rows.reverse().map((r) => ({
+        id: String(r.id),
+        body: r.body,
+        at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+        alias: r.alias || null,
+        name: r.display_name || "Wolf",
+        sprite: r.avatar_sprite_url || null,
+        flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
+        mine: buyerId ? String(r.buyer_id) === String(buyerId) : false,
+    }));
 }
 
 // Flag that you're typing (owner-gated). Upserts a presence row without marking you a "mover", so the "…"

@@ -79,13 +79,13 @@ export default function AvatarCosmeticsPicker({ avatarConfig = null, initial = "
                                             key={c.id}
                                             type="button"
                                             className={`cos-chip${equipped[slot] === c.id ? " is-selected" : ""}${!c.unlocked ? " is-locked" : ""}`}
-                                            disabled={busy || (!c.unlocked && (!forSale || !canAfford))}
-                                            onClick={() => (c.unlocked ? commit(slot, equipped[slot] === c.id ? null : c.id) : (forSale && canAfford ? buy(c.id) : null))}
+                                            disabled={busy || (!c.unlocked && !forSale)}
+                                            onClick={() => (c.unlocked ? commit(slot, equipped[slot] === c.id ? null : c.id) : (forSale ? (canAfford ? buy(c.id) : router.push("/marketplace/credit")) : null))}
                                             aria-pressed={equipped[slot] === c.id}
-                                            title={c.unlocked ? `${c.label} — ${c.hint}` : (forSale ? `Buy for ${price.toLocaleString()} gold` : `Unlocks at Level ${c.level}`)}
+                                            title={c.unlocked ? `${c.label} — ${c.hint}` : (forSale ? (canAfford ? `Buy for ${price.toLocaleString()} gold` : "Get more coins") : `Unlocks at Level ${c.level}`)}
                                         >
                                             <span aria-hidden="true">{c.icon}</span> {c.label}
-                                            {!c.unlocked ? <span className="cos-chip-lock"> · {forSale ? `💰 ${price.toLocaleString()}` : `Lv ${c.level}`}</span> : null}
+                                            {!c.unlocked ? <span className="cos-chip-lock"> · {forSale ? (canAfford ? `💰 ${price.toLocaleString()}` : `💰 ${price.toLocaleString()} · ＋ coins`) : `Lv ${c.level}`}</span> : null}
                                         </button>
                                     );
                                 })}

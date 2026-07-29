@@ -776,6 +776,14 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .fm-btn-fert:active:not(:disabled) { box-shadow: 0 2px 0 #2f6bb0; }
                 .fm-btn-spec { color: #3a2705; background: linear-gradient(180deg,#ffe27a,#e0a12f); box-shadow: 0 4px 0 #a8791f; }
                 .fm-btn-spec:active:not(:disabled) { box-shadow: 0 2px 0 #a8791f; }
+                /* Specialize = a purpose-built "upgrade row" CTA: star medallion + two-line label + chevron. */
+                .fm-btn-upgrade { justify-content: flex-start; gap: 11px; padding: 11px 13px; text-align: left; }
+                .fm-up-star { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: rgba(58,39,5,0.16); font-size: 17px; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(58,39,5,0.18); }
+                .fm-up-text { display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; min-width: 0; }
+                .fm-up-title { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 900; line-height: 1.12; }
+                .fm-up-lvl { font-size: 10.5px; font-weight: 900; letter-spacing: .02em; padding: 1px 7px; border-radius: 999px; background: rgba(58,39,5,0.2); }
+                .fm-up-sub { font-size: 11px; font-weight: 700; opacity: 0.72; line-height: 1.15; }
+                .fm-up-chev { font-size: 21px; font-weight: 900; opacity: 0.55; flex: 0 0 auto; line-height: 1; }
                 .fm-btn-close { color: inherit; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.16); padding: 11px; font-size: 13px; }
                 .fm-btn-close:hover { background: rgba(255,255,255,0.09); }
                 .fm-sheen::after { content: ""; position: absolute; top: 0; left: -70%; width: 45%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); transform: skewX(-18deg); animation: fmSheen 3.6s ease-in-out infinite; pointer-events: none; }
@@ -1990,8 +1998,13 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                 <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Plant plot {slot + 1}</div>
                 <div className="muted" style={{ fontSize: 12, margin: "2px 0 10px" }}>Rarer seeds take longer, feed your pet more XP, and roll better harvest loot. Here&apos;s what each one pays out:</div>
                 {onSpecialize ? (
-                    <button type="button" onClick={onSpecialize} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", marginBottom: 12, borderRadius: 12, border: "none", background: "linear-gradient(180deg,#ffd75e,#e0a12f)", color: "#3a2705", fontWeight: 900, fontSize: 13.5, cursor: "pointer", textAlign: "left", boxShadow: "0 3px 0 #a8791f" }}>
-                        <span style={{ fontSize: 16 }}>★</span><span style={{ flex: 1 }}>Specialize this plot{plotSpec ? ` · Lv ${plotSpec}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
+                    <button type="button" className="fm-btn fm-btn-spec fm-sheen fm-btn-upgrade" onClick={onSpecialize} style={{ marginBottom: 12 }}>
+                        <span className="fm-up-star" aria-hidden="true">★</span>
+                        <span className="fm-up-text">
+                            <span className="fm-up-title">Specialize this plot{plotSpec ? <span className="fm-up-lvl">Lv {plotSpec}</span> : null}</span>
+                            <span className="fm-up-sub">Invest gold to boost this bed&rsquo;s yield</span>
+                        </span>
+                        <span className="fm-up-chev" aria-hidden="true">›</span>
                     </button>
                 ) : null}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2128,8 +2141,13 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                         </>
                     )}
                     {onSpecialize ? (
-                        <button type="button" className="fm-btn fm-btn-spec fm-sheen" onClick={onSpecialize} style={{ justifyContent: "flex-start", gap: 9 }}>
-                            <span style={{ fontSize: 16 }}>★</span><span style={{ flex: 1, textAlign: "left" }}>Specialize this plot{p.specLevel ? ` · Lv ${p.specLevel}` : ""}</span><span aria-hidden="true" style={{ fontSize: 16 }}>→</span>
+                        <button type="button" className="fm-btn fm-btn-spec fm-sheen fm-btn-upgrade" onClick={onSpecialize}>
+                            <span className="fm-up-star" aria-hidden="true">★</span>
+                            <span className="fm-up-text">
+                                <span className="fm-up-title">Specialize this plot{p.specLevel ? <span className="fm-up-lvl">Lv {p.specLevel}</span> : null}</span>
+                                <span className="fm-up-sub">Invest gold to boost this bed&rsquo;s yield</span>
+                            </span>
+                            <span className="fm-up-chev" aria-hidden="true">›</span>
                         </button>
                     ) : null}
                     <button type="button" className="fm-btn fm-btn-close" onClick={onClose}>Close</button>

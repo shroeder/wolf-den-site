@@ -6793,6 +6793,25 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .social-list-top { display: flex; justify-content: flex-end; }
 .social-list-full { font-size: 0.82rem; }
 .social-empty { padding: 18px 6px; text-align: center; }
+/* Global (town/plaza) chat tab — a first-class feed with hero sprites + pretty timestamps and a pinned composer. */
+.social-global { display: flex; flex-direction: column; min-height: 100%; gap: 8px; }
+.social-global-feed { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; }
+.social-global-composer { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 2px; background: linear-gradient(180deg, transparent, var(--bg, #0e0e12) 34%); }
+.social-global-composer input { flex: 1 1 auto; min-width: 0; padding: 11px 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.92rem; }
+.social-global-composer .btn-gold { flex: 0 0 auto; }
+.gchat-row { display: flex; gap: 9px; align-items: flex-start; }
+.gchat-row.mine { flex-direction: row-reverse; }
+.gchat-hero { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 11px; overflow: hidden; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-end; justify-content: center; }
+.gchat-hero img { width: 100%; height: 100%; object-fit: contain; }
+.gchat-hero-fallback { align-self: center; font-weight: 800; opacity: 0.7; }
+.gchat-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 78%; }
+.gchat-top { display: flex; gap: 7px; align-items: baseline; }
+.gchat-row.mine .gchat-top { flex-direction: row-reverse; }
+.gchat-name { font-weight: 800; font-size: 0.82rem; color: inherit; text-decoration: none; }
+.gchat-name:hover { text-decoration: underline; }
+.gchat-time { font-size: 0.68rem; opacity: 0.5; white-space: nowrap; }
+.gchat-body { font-size: 0.92rem; line-height: 1.36; background: rgba(255,255,255,0.06); padding: 8px 12px; border-radius: 13px; word-break: break-word; }
+.gchat-row.mine .gchat-body { background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #2a1a06; font-weight: 600; }
 .social-section-label {
     font-size: 0.72rem;
     font-weight: 800;

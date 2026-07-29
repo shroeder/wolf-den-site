@@ -316,6 +316,9 @@ export default function SocialHub() {
                     ) : (
                         <>
                             <div className="social-tabs">
+                                <button type="button" className={`social-tab${tab === "global" ? " is-active" : ""}`} onClick={() => setTab("global")}>
+                                    🌐 Global
+                                </button>
                                 <button type="button" className={`social-tab${tab === "messages" ? " is-active" : ""}`} onClick={() => setTab("messages")}>
                                     Messages{unread > 0 ? <span className="social-tab-badge">{unread}</span> : null}
                                 </button>
@@ -328,7 +331,9 @@ export default function SocialHub() {
                             </div>
 
                             <div className="social-body">
-                                {tab === "messages" ? (
+                                {tab === "global" ? (
+                                    <GlobalChatTab open={open} />
+                                ) : tab === "messages" ? (
                                     <MessagesTab inbox={inbox} onOpenDm={(id, name) => setThread({ id, name })} />
                                 ) : tab === "friends" ? (
                                     <FriendsTab
@@ -432,6 +437,105 @@ function FriendsTab({ data, busyId, onMessage, onRespond }) {
                     />
                 ))
             )}
+        </div>
+    );
+}
+
+// Pretty relative timestamp for the global feed ("just now", "5m ago", "3h ago", then a date).
+function relTime(iso) {
+    const t = new Date(iso).getTime();
+    if (!t) return "";
+    const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    if (s < 45) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
+    return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// The Global tab — a first-class town/plaza chat. Same stream as the in-town chat: send here and it shows in
+// the plaza (and vice versa). Every message shows the sender's HERO sprite (not their avatar icon), name, and
+// a pretty timestamp. Polls while open.
+function GlobalChatTab({ open }) {
+    const [messages, setMessages] = useState(null);
+    const [input, setInput] = useState("");
+    const [sending, setSending] = useState(false);
+    const endRef = useRef(null);
+
+    const load = useCallback(async () => {
+        const r = await fetch("/api/marketplace/global-chat", { cache: "no-store" }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        if (d?.messages) setMessages(d.messages);
+        else setMessages((m) => (m === null ? [] : m));
+    }, []);
+
+    useEffect(() => {
+        if (!open) return undefined;
+        load();
+        const iv = setInterval(load, 12000);
+        return () => clearInterval(iv);
+    }, [open, load]);
+
+    useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages]);
+
+    async function send(e) {
+        e.preventDefault();
+        const body = input.trim();
+        if (!body || sending) return;
+        setSending(true);
+        const r = await fetch("/api/marketplace/global-chat", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ body }),
+        }).catch(() => null);
+        if (r && r.ok) { setInput(""); await load(); }
+        setSending(false);
+    }
+
+    return (
+        <div className="social-global">
+            <div className="social-global-feed">
+                {messages === null ? (
+                    <p className="muted social-empty">Loading the plaza…</p>
+                ) : messages.length === 0 ? (
+                    <p className="muted social-empty">No messages yet — say hello to the whole Den.</p>
+                ) : (
+                    messages.map((m) => (
+                        <div key={m.id} className={`gchat-row${m.mine ? " mine" : ""}`}>
+                            <span className="gchat-hero" aria-hidden="true">
+                                {m.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={m.sprite} alt="" style={{ transform: m.flip ? "scaleX(-1)" : "none" }} />
+                                ) : (
+                                    <span className="gchat-hero-fallback">{(m.name || "?").slice(0, 1).toUpperCase()}</span>
+                                )}
+                            </span>
+                            <span className="gchat-main">
+                                <span className="gchat-top">
+                                    {m.alias ? (
+                                        <Link href={`/marketplace/u/${m.alias}`} className="gchat-name">{m.name}</Link>
+                                    ) : (
+                                        <span className="gchat-name">{m.name}</span>
+                                    )}
+                                    <span className="gchat-time">{relTime(m.at)}</span>
+                                </span>
+                                <span className="gchat-body">{m.body}</span>
+                            </span>
+                        </div>
+                    ))
+                )}
+                <div ref={endRef} />
+            </div>
+            <form className="social-global-composer" onSubmit={send}>
+                <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Message the whole Den…"
+                    maxLength={200}
+                    autoCapitalize="sentences"
+                />
+                <button type="submit" className="btn-gold" disabled={sending || !input.trim()}>Send</button>
+            </form>
         </div>
     );
 }
