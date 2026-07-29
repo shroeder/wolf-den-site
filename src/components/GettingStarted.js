@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { enableWebPush, isWebPushSupported, pushPermission } from "@/lib/web-push-client";
+import { enableWebPush, isWebPushSupported } from "@/lib/web-push-client";
 
 // First-visit "Getting started" card: enable notifications + location, each granting gold once. Hides itself
 // once every task is claimed (or when dismissed). Clicking a task triggers the real browser permission prompt,
@@ -46,26 +46,32 @@ export default function GettingStarted() {
             let ok = false;
             let msg = null;
             if (key === "notifications") {
-                if (iosNeedsInstall()) {
-                    msg = "On iPhone: tap the Share button → “Add to Home Screen,” open the Wolf Den from that icon, then tap Enable again.";
-                } else if (isWebPushSupported()) {
-                    const res = await enableWebPush();
-                    ok = Boolean(res?.ok) || pushPermission() === "granted";
-                    if (!ok) msg = pushPermission() === "denied" ? "Notifications are blocked — turn them back on for this site in your browser settings." : "Couldn't turn on notifications on this device.";
-                } else if (typeof Notification !== "undefined") {
-                    ok = (await Notification.requestPermission()) === "granted";
-                    if (!ok) msg = "You'll need to allow notifications when your browser asks.";
+                const hasNotif = typeof Notification !== "undefined" && typeof Notification.requestPermission === "function";
+                if (hasNotif) {
+                    // FORCE the native prompt right here in the click gesture (browsers block it after awaits).
+                    let permission = Notification.permission;
+                    if (permission === "default") permission = await Notification.requestPermission();
+                    if (permission === "granted") {
+                        if (isWebPushSupported()) await enableWebPush().catch(() => {}); // subscribe now that we're allowed
+                        ok = true;
+                    } else {
+                        msg = "Notifications are blocked for this site — turn them back on in your browser's site settings, then tap Enable.";
+                    }
                 } else {
-                    msg = "This browser doesn't support notifications. Try Chrome, or add the site to your Home Screen on iPhone.";
+                    // No Notification API at all → an iOS Safari TAB (needs the Home-Screen app) or an unsupported browser.
+                    msg = iosNeedsInstall()
+                        ? "On iPhone, add the Wolf Den to your Home Screen (Share → “Add to Home Screen”), open it from that icon, then tap Enable."
+                        : "This browser doesn't support notifications — try Chrome.";
                 }
             } else if (key === "location") {
                 if (typeof navigator === "undefined" || !navigator.geolocation) {
                     msg = "This browser can't share your location.";
                 } else {
+                    // getCurrentPosition forces the native location prompt when it's undecided.
                     ok = await new Promise((resolve) => {
                         navigator.geolocation.getCurrentPosition(() => resolve(true), () => resolve(false), { timeout: 15000, maximumAge: 600000 });
                     });
-                    if (!ok) msg = "Location wasn't shared — allow it when prompted (or turn it on for this site) and tap Enable again.";
+                    if (!ok) msg = "Location wasn't shared — allow it when your browser asks (or enable it for this site in settings), then tap Enable.";
                 }
             }
             if (ok) await claim(key);
