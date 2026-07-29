@@ -123,6 +123,15 @@ export async function getMemberMetrics(buyerId) {
     // adjustments never create a mkt_credit_purchase row, so hand-granted credit correctly doesn't count.
     const creditRow = await db.queryOne(`SELECT COALESCE(SUM(amount_cents), 0)::bigint AS c FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`, [buyerId]).catch(() => null);
 
+    // Auction House activity — completed SALES (as seller) + BUYS (as buyer) + your biggest single sale.
+    const auctionRow = await db.queryOne(
+        `SELECT COUNT(*) FILTER (WHERE seller_id = $1 AND status = 'sold')::int AS sales,
+                COUNT(*) FILTER (WHERE buyer_id = $1 AND status = 'sold')::int AS buys,
+                COALESCE(MAX(price) FILTER (WHERE seller_id = $1 AND status = 'sold'), 0)::int AS top_sale
+           FROM mkt_auction WHERE seller_id = $1 OR buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
+
     // Farming + petting counts (from the activity log) — drive the farm/pet badges. crop_types = how many
     // DISTINCT crop kinds you've ever harvested (the Botanist "one of each" badge; there are 9 seeds).
     const farmRow = await db.queryOne(
@@ -240,6 +249,9 @@ export async function getMemberMetrics(buyerId) {
         forgeSalvages: forgeRow?.salvages || 0,
         forgeCombines: forgeRow?.combines || 0,
         maxForgeLevel: forgeLevelRow?.n || 0,
+        auctionSales: auctionRow?.sales || 0,
+        auctionBuys: auctionRow?.buys || 0,
+        auctionTopSale: auctionRow?.top_sale || 0,
     };
 }
 
@@ -489,6 +501,9 @@ export function progressForRule(rule, threshold, m) {
         case "farm_ratings_received": return { current: m.farmRatingsReceived, target: t }; // ratings your farm earned
         case "creations_made": return { current: m.creationsMade, target: t }; // custom creations finalized
         case "referrals_converted": return { current: m.referralsConverted, target: t }; // invited friends who joined
+        case "auction_sales": return { current: m.auctionSales, target: t }; // items SOLD on the Auction House
+        case "auction_buys": return { current: m.auctionBuys, target: t }; // items BOUGHT on the Auction House
+        case "auction_top_sale": return { current: m.auctionTopSale, target: t }; // biggest single sale (gold)
         default: return { current: 0, target: t || 1 };
     }
 }

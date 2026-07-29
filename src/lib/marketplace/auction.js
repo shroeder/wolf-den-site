@@ -9,6 +9,7 @@ import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { transferItemElement } from "@/lib/marketplace/item-element.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
 function mergeStats(base = {}, bonus = {}) {
@@ -249,6 +250,9 @@ export async function buyAuctionListing(buyerId, listingId) {
     // A LEVEL item the seller sold must not be auto-re-granted back to them (syncLevelItems) — mark it sold for
     // the seller, mirroring salvage. (Harmless for other sources; they're never auto-granted anyway.)
     if (it?.source === "level") await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [claim.seller_id, claim.item_id]).catch(() => {});
+    // Sale done → check both sides for newly-earned Auction badges.
+    syncEarnedBadges(buyerId).catch(() => {});
+    syncEarnedBadges(claim.seller_id).catch(() => {});
     return { ok: true, item: { id: claim.item_id, name: it?.name, rarity: it?.rarity }, price, gold: Number(paid.gold) };
 }
 
