@@ -41,6 +41,8 @@ export function showcaseTrack() {
         if (!byLevel.has(u.level)) byLevel.set(u.level, []);
         byLevel.get(u.level).push(u);
     }
+    // A bonus Gold Chest every 10th level (chests.js) — surface it on the showcase track too.
+    for (let L = 10; L <= 150; L += 10) { if (!byLevel.has(L)) byLevel.set(L, []); byLevel.get(L).push({ level: L, icon: "💰", label: "Gold Chest" }); }
     const levels = [...byLevel.keys()].sort((a, b) => a - b);
     const spine = levels.map((L, i) => ({
         level: L,

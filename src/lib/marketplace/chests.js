@@ -127,9 +127,10 @@ export async function syncLevelChests(buyerId) {
     for (let L = row.chest_level + 1; L <= level; L++) {
         const t = tierForLevel(L);
         tally[t] = (tally[t] || 0) + 1;
-        // Milestone: a BONUS Mythic chest every 15th level. This is the main way to earn a Mythic chest
-        // (level-ups otherwise cap at Gold), so mythic gear stays a rare chase — ~1 per 15 levels.
-        if (L % 15 === 0) tally.mythic = (tally.mythic || 0) + 1;
+        // Milestone: a BONUS Gold chest every 10th level — a reliable, satisfying reward without firehosing
+        // mythic gear. (Mythic chests are no longer handed out on the level cadence; they come from the boss,
+        // the elite lottery, and other rarer sources.)
+        if (L % 10 === 0) tally.gold = (tally.gold || 0) + 1;
         // Elite lottery (L20+): a tiny shot at an Ascendant→Primordial chest, exponentially rarer per tier.
         if (L >= 20) {
             for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < e.chance) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
