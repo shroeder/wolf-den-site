@@ -3,7 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, STAT_META, EQUIP_SLOTS } from "@/lib/marketplace/items.js";
+import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
@@ -13,6 +14,56 @@ function mergeStats(base = {}, bonus = {}) {
     const m = { ...(base || {}) };
     for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0);
     return m;
+}
+const parseBonus = (v) => (typeof v === "string" ? (() => { try { return JSON.parse(v); } catch { return {}; } })() : (v || {}));
+const statTotal = (stats = {}) => Object.values(stats).reduce((a, b) => a + (Number(b) || 0), 0);
+
+// The viewer's currently-equipped gear, per equip slot, with EFFECTIVE (base + forge) combat stats and farm
+// affixes — the baseline a listing is compared against. { [equipSlot]: { id, name, level, itemSlot, stats, farm } }.
+async function equippedComparisonMap(buyerId) {
+    if (!buyerId) return {};
+    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
+    const ids = Object.values(bySlot);
+    if (!ids.length) return {};
+    const enhRows = await db.query(`SELECT item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, ids]).catch(() => []);
+    const enh = new Map(enhRows.map((e) => [e.item_id, { level: Number(e.level) || 0, bonus: parseBonus(e.stat_bonus) }]));
+    const map = {};
+    for (const [slot, id] of Object.entries(bySlot)) {
+        const it = itemById(id);
+        if (!it) continue;
+        const e = enh.get(id);
+        map[slot] = { id, name: it.name, level: e?.level || 0, itemSlot: it.slot, stats: mergeStats(it.stats || {}, e?.bonus || {}), farm: it.farm || {} };
+    }
+    return map;
+}
+
+// Compare one listing (its item def + effective combat stats) against what the viewer has equipped in that slot.
+// Returns { none, equippedName, equippedEnhance, diffs:[{key,label,icon,delta,suffix}], farmDiffs:[...] } or null
+// for non-equippable items. For a two-ring slot we compare against the WEAKER equipped ring (the one you'd swap),
+// and treat an open slot as a pure upgrade (none:true).
+function buildCompare(listItem, listEffective, equippedMap) {
+    const slotDefs = EQUIP_SLOTS.filter((s) => s.accepts === listItem.slot);
+    if (!slotDefs.length) return null; // misc / non-equippable
+    const equippedHere = slotDefs.map((s) => equippedMap[s.slot]).filter(Boolean);
+    const openSlot = equippedHere.length < slotDefs.length;
+    const target = openSlot ? null : equippedHere.sort((a, b) => statTotal(a.stats) - statTotal(b.stats))[0];
+    const eqStats = target?.stats || {};
+    const listFarm = listItem.farm || {};
+    const eqFarm = target?.farm || {};
+    const diffs = [];
+    for (const k of new Set([...Object.keys(listEffective), ...Object.keys(eqStats)])) {
+        if (!STAT_META[k]) continue;
+        const delta = (Number(listEffective[k]) || 0) - (Number(eqStats[k]) || 0);
+        if (delta !== 0) diffs.push({ key: k, label: STAT_META[k].label, icon: STAT_META[k].icon, delta, suffix: STAT_META[k].suffix || "" });
+    }
+    const farmDiffs = [];
+    for (const k of new Set([...Object.keys(listFarm), ...Object.keys(eqFarm)])) {
+        const delta = (Number(listFarm[k]) || 0) - (Number(eqFarm[k]) || 0);
+        if (delta !== 0) { const m = DECO_STATS[k]; farmDiffs.push({ key: k, label: m?.label || k, icon: m?.icon || "🌱", delta }); }
+    }
+    diffs.sort((a, b) => b.delta - a.delta);
+    farmDiffs.sort((a, b) => b.delta - a.delta);
+    return { none: !target, equippedName: target?.name || null, equippedEnhance: target?.level || 0, diffs, farmDiffs };
 }
 
 // ── THE AUCTION HOUSE ───────────────────────────────────────────────────────────────────────────────────────
@@ -103,6 +154,13 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     else if (sort === "price_asc") out.sort((a, b) => a.price - b.price);
     else if (sort === "price_desc") out.sort((a, b) => b.price - a.price);
     // 'new' is already newest-first from the query order
+    // Attach a side-by-side comparison to what the viewer has equipped in that slot (upgrade/downgrade at a glance).
+    const equippedMap = await equippedComparisonMap(buyerId);
+    out = out.map((l) => {
+        const it = itemById(l.itemId);
+        const det = enhMap.get(`${l.sellerId}|${l.itemId}`);
+        return { ...l, compare: it ? buildCompare(it, mergeStats(it.stats || {}, det?.bonus || {}), equippedMap) : null };
+    });
     return out;
 }
 

@@ -29,6 +29,28 @@ function ago(iso) {
     return `${Math.floor(h / 24)}d ago`;
 }
 
+// Side-by-side comparison vs the viewer's equipped piece: green ▲ upgrades, red ▼ downgrades, per stat + farm affix.
+function CompareBlock({ c }) {
+    if (!c) return null;
+    if (c.none && !c.diffs.length && !c.farmDiffs.length) return null;
+    const chip = (d, isFarm) => (
+        <span key={(isFarm ? "f-" : "") + d.key} className={`ah-cmp-chip ${d.delta > 0 ? "up" : "down"}`}>
+            {d.icon} {d.delta > 0 ? "▲" : "▼"}{Math.abs(d.delta)}{d.suffix === "%" ? "%" : ""} {d.label}
+        </span>
+    );
+    return (
+        <div className="ah-cmp">
+            <div className="ah-cmp-head">{c.none ? "🆕 Empty slot — nothing equipped" : <>vs your <b>{c.equippedName}</b>{c.equippedEnhance > 0 ? ` ⚒️+${c.equippedEnhance}` : ""}</>}</div>
+            {c.diffs.length || c.farmDiffs.length ? (
+                <div className="ah-cmp-chips">
+                    {c.diffs.map((d) => chip(d, false))}
+                    {c.farmDiffs.map((d) => chip(d, true))}
+                </div>
+            ) : <div className="ah-cmp-same">Same stats as equipped</div>}
+        </div>
+    );
+}
+
 export default function AuctionClient({ initial }) {
     const [state, setState] = useState(initial || null);
     const [tab, setTab] = useState("browse"); // browse | sell | mine
@@ -147,6 +169,7 @@ export default function AuctionClient({ initial }) {
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
                                     {l.forgeStats ? <div className="ah-card-forge">⚒️ +{l.enhanceLevel} · {l.forgeStats}</div> : null}
+                                    {l.compare && !l.mine ? <CompareBlock c={l.compare} /> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
                                     {l.mine ? (
                                         <button type="button" className="ah-buy is-mine" disabled onClick={() => {}}>Your listing</button>
@@ -266,6 +289,14 @@ const AH_CSS = `
 .ah-card-name { font-weight: 800; font-size: 0.86rem; line-height: 1.2; }
 .ah-card-stats { font-size: 0.72rem; line-height: 1.25; }
 .ah-card-forge { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
+.ah-cmp { margin-top: 4px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); }
+.ah-cmp-head { font-size: 0.66rem; font-weight: 700; color: #b9c2cf; margin-bottom: 4px; }
+.ah-cmp-head b { color: #e7edf4; font-weight: 800; }
+.ah-cmp-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ah-cmp-chip { font-size: 0.64rem; font-weight: 800; padding: 2px 6px; border-radius: 999px; white-space: nowrap; line-height: 1.3; }
+.ah-cmp-chip.up { color: #7ee89a; background: rgba(62,192,106,0.16); border: 1px solid rgba(62,192,106,0.32); }
+.ah-cmp-chip.down { color: #ff9a8f; background: rgba(224,74,74,0.14); border: 1px solid rgba(224,74,74,0.3); }
+.ah-cmp-same { font-size: 0.64rem; font-weight: 700; color: #9aa7b5; }
 .ah-card-meta { font-size: 0.68rem; line-height: 1.3; }
 .ah-buy { margin-top: 4px; width: 100%; padding: 9px; border-radius: 10px; border: none; cursor: pointer; font-weight: 900; font-size: 0.86rem; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 0 #b57f22; transition: transform .1s ease, box-shadow .1s ease; }
 .ah-buy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }
