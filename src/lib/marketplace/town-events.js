@@ -7,6 +7,10 @@ import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
+import { getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
+import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
 
 // ── TOWN EVENTS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Admin-triggered communal encounters that spawn in the plaza (a bandit raid, etc.). Everyone in town attacks a
@@ -30,12 +34,32 @@ export const TOWN_EVENT_TYPES = {
     },
 };
 
-const HIT_THROTTLE_MS = 240;   // a strike takes a beat to recover (also anti-spam)
+const HIT_THROTTLE_MS = 1000;  // 1-second cooldown between taps
 const FLAT_MIN_GOLD = 25;      // everyone who lands a hit gets at least this
-// Damage per action. Timed-strike TIERS (miss the timing → weak; nail it → perfect crit) + the Power Slash
-// ability. Server-authoritative + bounded, so the worst a cheating client can do is always claim "perfect".
-const STRIKE_DMG = { weak: 5, normal: 11, good: 18, perfect: 30 };
-const POWER_DMG = 48;
+const RAID_PARTICIPATION_XP = 20; // XP each fighter earns when the raid resolves
+// Per-tap damage from the player's real equipped stats (+ pet), with a crit roll and a chance at a weapon-skill
+// proc. Server-authoritative so a cheating client can't inflate it. Returns { damage, crit, proc }.
+async function computeRaidHit(buyerId) {
+    const [stats, pet, ids] = await Promise.all([
+        getEquippedStats(buyerId).catch(() => ({})),
+        getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
+        getEquippedIds(buyerId).catch(() => ({})),
+    ]);
+    const ps = pet?.stats || {};
+    const might = (stats.might || 0) + (ps.might || 0);
+    const ferocity = (stats.ferocity || 0) + (ps.ferocity || 0);
+    // Base scales with your offense; even a bare hero deals a little. Small jitter so numbers feel alive.
+    let dmg = 8 + might * 0.85 + ferocity * 0.5;
+    dmg *= 0.9 + Math.random() * 0.2;
+    // Crit
+    const critChance = Math.min(0.75, (stats.crit_chance || 0) + (ps.crit_chance || 0));
+    const crit = Math.random() < critChance;
+    if (crit) dmg *= 1.5 + ((stats.crit_power || 0) + (ps.crit_power || 0)) / 100;
+    // Weapon skill proc (big bonus + a snazzy callout)
+    const proc = rollWeaponSkill(ids?.main_hand || null);
+    if (proc) dmg *= proc.mult;
+    return { damage: Math.max(1, Math.round(dmg)), crit, proc };
+}
 // An event runs at least this long (waves refill until then) so it's a real gathering, not an instant kill.
 const MIN_ACTIVE_MS = 150000;        // ~2.5 min for a real (pushed) event
 const MIN_ACTIVE_SILENT_MS = 45000;  // shorter for owner silent-tests so you're not stuck fighting for minutes
@@ -148,24 +172,37 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < HIT_THROTTLE_MS) {
         return { ok: false, error: "too_fast", hp: ev.hp };
     }
-    const dmg = move === "power" ? POWER_DMG : (STRIKE_DMG[move] ?? STRIKE_DMG.normal);
+    const hit = await computeRaidHit(buyerId);
+    const dmg = hit.damage;
     const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
-    await db.query(
+    const mine = await db.queryOne(
         `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
-         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()`,
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()
+         RETURNING damage, hits`,
         [eventId, buyerId, dmg]
-    ).catch(() => {});
+    ).catch(() => null);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     let hp = updated?.hp ?? ev.hp;
     let defeated = false;
     let wave = Number(ev.meta?.wave) || 1;
     if (hp <= 0) {
-        const w = await waveOrResolve(ev);
+        const w = await waveOrResolve(ev); // pays out + awards XP on defeat (resolveTownEvent)
         defeated = w.resolved;
         hp = w.resolved ? 0 : w.hp;
         wave = w.wave;
     }
-    return { ok: true, damage: dmg, hp, defeated, wave, crit: move === "perfect", clearedWave: (updated?.hp ?? 0) <= 0 && !defeated };
+    // On defeat, hand back this fighter's recap (their paid gold + participation XP + total damage).
+    let reward = null;
+    if (defeated) {
+        const row = await db.queryOne(`SELECT reward_gold, damage FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
+        reward = { gold: Number(row?.reward_gold || 0), xp: RAID_PARTICIPATION_XP, damage: Number(row?.damage ?? mine?.damage ?? 0) };
+    }
+    return {
+        ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
+        hp, defeated, wave, reward,
+        myDamage: Number(mine?.damage || dmg), myHits: Number(mine?.hits || 1),
+        clearedWave: (updated?.hp ?? 0) <= 0 && !defeated,
+    };
 }
 
 // Pay out an event once (atomic status flip guards against double-pay). Gold to every fighter, scaled by their
@@ -184,6 +221,7 @@ async function resolveTownEvent(eventId, outcome) {
         const gold = FLAT_MIN_GOLD + Math.round(pool * (h.damage / totalDmg));
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);
         await logCoin(h.buyer_id, gold, "town_event", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
+        await awardXp(h.buyer_id, "town_event", { points: RAID_PARTICIPATION_XP, gold: 0, dedupeKey: `town_event:${eventId}:${h.buyer_id}` }).catch(() => {});
         await db.query(`UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3 WHERE event_id = $1 AND buyer_id = $2`, [eventId, h.buyer_id, gold]).catch(() => {});
     }
     if (!ev.meta?.silent) {

@@ -140,66 +140,28 @@ function Avatar({ a, isYou, onTap }) {
 
 // Raid combat HUD: a shared HP bar (top) + a timed-strike meter and abilities (bottom). The marker sweeps; tap
 // Strike when it's in the gold zone for a PERFECT slash, or fire the Power Slash on cooldown.
-function RaidCombat({ ev, hp, onAttack, defeated }) {
-    const markerPos = useRef(50);
-    const dir = useRef(1);
-    const markerEl = useRef(null);
-    const [cool, setCool] = useState(false);
-    const [powerCd, setPowerCd] = useState(0);
+// Corner HUD for a live raid: time left, kills, and your damage. No timing meter — you just tap the foes.
+function RaidHUD({ ev, kills, myDamage }) {
+    const [left, setLeft] = useState("");
     useEffect(() => {
-        let raf; let last = performance.now();
-        const SPEED = 80; // % per second
-        const loop = (now) => {
-            const dt = Math.min(0.05, (now - last) / 1000); last = now;
-            let p = markerPos.current + dir.current * SPEED * dt;
-            if (p >= 100) { p = 100; dir.current = -1; } else if (p <= 0) { p = 0; dir.current = 1; }
-            markerPos.current = p;
-            if (markerEl.current) markerEl.current.style.left = `${p}%`;
-            raf = requestAnimationFrame(loop);
+        if (!ev?.endsAt) { setLeft(""); return undefined; }
+        const tick = () => {
+            const ms = new Date(ev.endsAt).getTime() - Date.now();
+            if (ms <= 0) { setLeft("0:00"); return; }
+            const s = Math.floor(ms / 1000);
+            setLeft(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
         };
-        raf = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(raf);
-    }, []);
-    useEffect(() => {
-        if (powerCd <= 0) return undefined;
-        const t = setInterval(() => setPowerCd((c) => Math.max(0, c - 200)), 200);
-        return () => clearInterval(t);
-    }, [powerCd > 0]);
-    const strike = () => {
-        if (cool || defeated) return;
-        const d = Math.abs(markerPos.current - 50);
-        const tier = d <= 7 ? "perfect" : d <= 18 ? "good" : d <= 34 ? "normal" : "weak";
-        onAttack(tier);
-        setCool(true); setTimeout(() => setCool(false), 250);
-    };
-    const power = () => {
-        if (powerCd > 0 || defeated) return;
-        onAttack("power");
-        setPowerCd(5000);
-    };
-    const pct = Math.max(0, Math.min(100, Math.round((hp / ev.hpMax) * 100)));
+        tick(); const t = setInterval(tick, 1000); return () => clearInterval(t);
+    }, [ev?.endsAt]);
     return (
-        <>
-            <div className="tw-raid-bar">
-                <div className="tw-raid-name">{ev.emoji} {ev.name}<span className="muted"> · {ev.fighterCount} fighting{ev.wave > 1 ? ` · wave ${ev.wave}` : ""}</span></div>
-                <div className="tw-raid-hp"><span style={{ width: `${pct}%` }} /></div>
+        <div className="tw-raid-hud">
+            <div className="tw-raid-hud-title">{ev.emoji} {ev.name}{ev.wave > 1 ? ` · wave ${ev.wave}` : ""}</div>
+            <div className="tw-raid-hud-stats">
+                {left ? <span title="Time left">⏱️ {left}</span> : null}
+                <span title="Foes you've felled">☠️ {kills}</span>
+                <span title="Your total damage">⚔️ {myDamage.toLocaleString()}</span>
             </div>
-            {defeated ? (
-                <div className="tw-raid-win">✅ Raid cleared! Gold paid to all who fought.</div>
-            ) : (
-                <div className="tw-raid-controls">
-                    <div className="tw-raid-meter" onClick={strike} role="presentation" aria-label="Timing meter">
-                        <div className="tw-raid-zone" />
-                        <div className="tw-raid-marker" ref={markerEl} />
-                    </div>
-                    <div className="tw-raid-btns">
-                        <button type="button" className="tw-raid-strike" disabled={cool} onClick={strike}>⚔️ Strike</button>
-                        <button type="button" className="tw-raid-power" disabled={powerCd > 0} onClick={power}>🔥 Power{powerCd > 0 ? ` ${Math.ceil(powerCd / 1000)}s` : ""}</button>
-                    </div>
-                    <div className="tw-raid-hint muted">Hit Strike in the gold zone for a PERFECT slash — or tap a foe. Your hits: {ev.myHits}</div>
-                </div>
-            )}
-        </>
+        </div>
     );
 }
 
@@ -229,10 +191,16 @@ export default function TownClient({ initial }) {
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
     const [previewDepth, setPreviewDepth] = useState(null); // owner: locally preview a "Grow the Plaza" depth tier before it's funded
-    const [evHp, setEvHp] = useState(null);          // optimistic event HP (drops instantly on your hit)
-    const [evFlash, setEvFlash] = useState(null);    // brief hit / "defeated" feedback
+    const [raidEnemies, setRaidEnemies] = useState([]); // per-enemy {id,x,y,hp,hpMax,floats:[],dying}
+    const [raidKills, setRaidKills] = useState(0);
+    const [raidDamage, setRaidDamage] = useState(0);    // your total damage this raid (optimistic)
+    const [raidProc, setRaidProc] = useState(null);     // weapon-skill callout {name,emoji,color,key}
+    const [raidRecap, setRaidRecap] = useState(null);   // end-of-raid recap {gold,xp,kills,damage}
+    const [raidCd, setRaidCd] = useState(false);        // 1s tap cooldown
     const evIdRef = useRef(null);
-    const lastAtk = useRef(0);
+    const raidWaveRef = useRef(1);
+    const raidCdRef = useRef(false);
+    const floatId = useRef(0);
     const sceneRef = useRef(null);
     const moveTimer = useRef(null);
     const chatClear = useRef(null);
@@ -302,14 +270,22 @@ export default function TownClient({ initial }) {
         return () => clearInterval(t);
     }, []);
 
-    // Keep the optimistic event HP in sync with the poll: reset on a new event, else take the lower (server
-    // is authoritative as it drops, and never let it bounce back up between my clicks).
+    // Spawn the on-screen enemies for the current raid wave (each with its own HP bar). Re-spawn on a NEW event
+    // or a NEW wave; clear when the raid ends. Kept client-side — the server tracks the shared wave HP for the win.
     useEffect(() => {
         const ev = state?.event;
-        if (!ev) { evIdRef.current = null; setEvHp(null); return; }
-        if (evIdRef.current !== ev.id) { evIdRef.current = ev.id; setEvHp(ev.hp); }
-        else setEvHp((cur) => (cur == null ? ev.hp : Math.min(cur, ev.hp)));
-    }, [state?.event]);
+        if (!ev || ev.defeated) { evIdRef.current = ev?.id ?? null; raidWaveRef.current = ev?.wave ?? 1; if (!ev) { setRaidEnemies([]); } return; }
+        const wave = ev.wave || 1;
+        if (evIdRef.current !== ev.id) { evIdRef.current = ev.id; setRaidKills(0); setRaidDamage(ev.myDamage || 0); }
+        if (evIdRef.current !== ev.id || raidWaveRef.current !== wave || (raidEnemies.length === 0 && ev.hp > 0)) {
+            raidWaveRef.current = wave;
+            const n = Math.min(ev.enemies || 6, 8);
+            const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
+            setRaidEnemies(Array.from({ length: n }).map((_, i) => ({
+                id: `${ev.id}-${wave}-${i}`, x: 8 + (i * 79) % 84, y: GROUND + 8 - (i % 2) * 4, hp: hpMax, hpMax, floats: [], dying: false,
+            })));
+        }
+    }, [state?.event]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const walkToWorld = useCallback((worldXPct, worldYPct) => {
         setPanExtra(0); // walking re-centres the camera on you
@@ -418,24 +394,47 @@ export default function TownClient({ initial }) {
             load();
         }
     }, [load, state?.projects]);
-    // Attack the active raid with a `move` (weak/normal/good/perfect timing tier, or "power" ability). Optimistic
-    // HP by an estimate; the server is authoritative (and handles wave refills + the win).
-    const EST = { weak: 5, normal: 11, good: 18, perfect: 30, power: 48 };
-    const attackEvent = useCallback(async (move = "normal") => {
-        const ev = state?.event; if (!ev) return;
-        const now = Date.now();
-        if (now - lastAtk.current < 240) return; // strike recovery / server throttle
-        lastAtk.current = now;
-        setEvHp((h) => Math.max(0, (h ?? ev.hp) - (EST[move] || 11)));
-        setEvFlash({ k: now, crit: move === "perfect" || move === "power" });
-        setTimeout(() => setEvFlash((f) => (f && f.k === now ? null : f)), 300);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attack", eventId: ev.id, move }) }).then((x) => x.json()).catch(() => null);
-        if (r?.ok) {
-            setEvHp(r.hp); // server value (wave refill jumps it back to full)
-            if (r.defeated) { setEvFlash({ defeated: true, k: now }); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } setTimeout(() => load(), 600); }
-            else if (r.clearedWave) setEvFlash({ k: now, wave: r.wave });
-        } else if (r?.hp != null) setEvHp(r.hp);
-    }, [state?.event, load]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Tap a raid enemy: 1s cooldown, server computes your real (stat-based) damage + crit + weapon-skill proc.
+    // Apply it to THAT enemy's HP bar with a floating number; kill it when its bar empties; recap on the win.
+    const tapEnemy = useCallback(async (enemyId) => {
+        const ev = state?.event; if (!ev || raidCdRef.current) return;
+        raidCdRef.current = true; setRaidCd(true);
+        setTimeout(() => { raidCdRef.current = false; setRaidCd(false); }, 1000);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "attack", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        if (!r?.ok) return; // too_fast / no_event — cooldown already prevents spam
+        const fid = (floatId.current += 1);
+        setRaidDamage((d) => d + r.damage);
+        // Weapon-skill proc → a snazzy callout
+        if (r.proc) { const key = fid; setRaidProc({ ...r.proc, key }); setTimeout(() => setRaidProc((p) => (p && p.key === key ? null : p)), 1500); }
+        // Apply damage to the tapped enemy + float the number
+        setRaidEnemies((prev) => prev.map((en) => {
+            if (en.id !== enemyId) return en;
+            const hp = en.hp - r.damage;
+            const floats = [...en.floats, { id: fid, dmg: r.damage, crit: r.crit, proc: Boolean(r.proc) }];
+            if (hp <= 0 && !en.dying) { setRaidKills((k) => k + 1); return { ...en, hp: 0, dying: true, floats }; }
+            return { ...en, hp: Math.max(0, hp), floats };
+        }));
+        setTimeout(() => setRaidEnemies((prev) => prev.map((en) => (en.id === enemyId ? { ...en, floats: en.floats.filter((f) => f.id !== fid) } : en))), 750);
+        if (r.defeated) {
+            // Force-clear the field, show the recap, then reload (server rotates the event).
+            setTimeout(() => setRaidEnemies((prev) => prev.map((en) => ({ ...en, dying: true }))), 60);
+            setRaidRecap({ gold: r.reward?.gold || 0, xp: r.reward?.xp || 0, kills: raidKills + 1, damage: r.reward?.damage || raidDamage + r.damage });
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
+            setTimeout(() => load(), 900);
+        } else if (r.clearedWave) {
+            // Reinforcements — respawn a fresh wave of enemies next poll (raidWaveRef guards it); nudge a reload.
+            raidWaveRef.current = -1; setTimeout(() => load(), 300);
+        } else {
+            // If the tapped enemy is dying and the wave still has HP, drop in a replacement so there's always a foe.
+            setTimeout(() => setRaidEnemies((prev) => {
+                const alive = prev.filter((en) => !en.dying);
+                if (alive.length >= 1) return prev.filter((en) => !(en.dying && en.floats.length === 0));
+                const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
+                const nid = `${ev.id}-${raidWaveRef.current}-r${floatId.current}`;
+                return [...prev.filter((en) => !(en.dying && en.floats.length === 0)), { id: nid, x: 8 + (floatId.current * 37) % 84, y: GROUND + 8 - (floatId.current % 2) * 4, hp: hpMax, hpMax, floats: [], dying: false }];
+            }), 420);
+        }
+    }, [state?.event, load, raidKills, raidDamage]);
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
@@ -656,18 +655,26 @@ export default function TownClient({ initial }) {
                             <img src={art.merchant.url} alt="Traveling Merchant" draggable={false} />
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
-                    {/* Raid: roaming enemies in the plaza — they thin out as the raid HP drops; tap one to strike it */}
-                    {state?.event ? (() => {
+                    {/* Raid: tap each foe directly — its own HP bar drains, damage numbers pop, it dies when emptied */}
+                    {state?.event && !state.event.defeated ? (() => {
                         const ev = state.event;
-                        const hp = evHp ?? ev.hp;
-                        const left = Math.max(0, Math.ceil((hp / ev.hpMax) * (ev.enemies || 6)));
                         const url = art[EVENT_ART[ev.kind]]?.url;
-                        return Array.from({ length: Math.min(left, 14) }).map((_, i) => (
-                            <button key={i} type="button" className="tw-enemy" style={{ left: `${8 + (i * 79) % 84}%`, top: `${GROUND - (i % 3)}%`, animationDelay: `${(i % 5) * 0.5}s` }} onClick={(e) => { e.stopPropagation(); attackEvent("normal"); }} aria-label={`Attack the ${ev.name}`}>
+                        return raidEnemies.map((en, i) => (
+                            <button
+                                key={en.id} type="button"
+                                className={`tw-enemy${en.dying ? " is-dying" : ""}${raidCd ? " is-cd" : ""}`}
+                                style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 98 + Math.round(en.y) }}
+                                onClick={(e) => { e.stopPropagation(); if (!en.dying) tapEnemy(en.id); }}
+                                aria-label={`Attack the ${ev.name}`}
+                            >
+                                <span className="tw-enemy-hp"><span style={{ width: `${Math.max(0, Math.round((en.hp / en.hpMax) * 100))}%` }} /></span>
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={url} alt="" draggable={false} style={{ transform: i % 2 ? "scaleX(-1)" : "none" }} />
                                 ) : <span className="tw-enemy-emoji">{ev.emoji}</span>}
+                                {en.floats.map((f) => (
+                                    <span key={f.id} className={`tw-dmg${f.crit ? " is-crit" : ""}${f.proc ? " is-proc" : ""}`}>{f.crit ? "✦" : ""}{f.dmg}</span>
+                                ))}
                             </button>
                         ));
                     })() : null}
@@ -677,10 +684,14 @@ export default function TownClient({ initial }) {
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou /> : null}
                 </div>
 
-                {/* Raid combat HUD — shared HP bar + timed-strike meter + abilities (enemies roam in-world above) */}
-                {state?.event ? <RaidCombat ev={state.event} hp={evHp ?? state.event.hp} onAttack={attackEvent} defeated={Boolean(evFlash?.defeated)} /> : null}
-
-                {/* edge hints — tap to walk that way (or just drag the street to look around) */}
+                {/* Raid HUD (corner) + weapon-skill callout */}
+                {state?.event && !state.event.defeated ? <RaidHUD ev={state.event} kills={raidKills} myDamage={raidDamage} /> : null}
+                {raidProc ? (
+                    <div className="tw-proc" style={{ "--pc": raidProc.color || "#ffb347" }} key={raidProc.key}>
+                        <span className="tw-proc-emoji">{raidProc.emoji}</span> {raidProc.name}!
+                    </div>
+                ) : null}
+                {state?.event && !state.event.defeated ? <div className="tw-raid-tip">Tap the foes to strike — your gear sets your damage.</div> : null}
             </div>
 
             <section className="card tw-chatbar">
@@ -948,6 +959,27 @@ export default function TownClient({ initial }) {
             {/* High-roller gear reveal — suspense roll → rarity burst */}
             {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
+            {/* Raid victory recap */}
+            {raidRecap ? (
+                <div className="tw-levelup" onClick={() => setRaidRecap(null)} role="presentation">
+                    <div className="tw-levelup-confetti" aria-hidden="true">
+                        {Array.from({ length: 24 }).map((_, i) => (
+                            <span key={i} style={{ left: `${(i * 4.3) % 100}%`, "--h": `${(i * 47) % 360}`, animationDelay: `${(i % 6) * 0.12}s`, animationDuration: `${1.6 + (i % 5) * 0.18}s` }} />
+                        ))}
+                    </div>
+                    <div className="tw-levelup-card" onClick={(e) => e.stopPropagation()} role="presentation">
+                        <div className="tw-levelup-badge">🏆 RAID CLEARED!</div>
+                        <div className="tw-reveal-rarity" style={{ color: "#ffd75e", marginTop: 4 }}>Your spoils</div>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", margin: "8px 0" }}>
+                            <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{raidRecap.gold.toLocaleString()} 🪙</span>
+                            <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{raidRecap.xp.toLocaleString()} ✨ XP</span>
+                        </div>
+                        <div className="muted" style={{ fontSize: "0.86rem" }}>☠️ {raidRecap.kills} felled · ⚔️ {raidRecap.damage.toLocaleString()} damage dealt</div>
+                        <button type="button" className="tw-levelup-btn" onClick={() => setRaidRecap(null)}>Huzzah! 🐺</button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* Town Development level-up celebration — the "something changed!" moment */}
             {levelUp ? (
                 <div className="tw-levelup" onClick={() => setLevelUp(null)} role="presentation">
@@ -1165,30 +1197,31 @@ const TOWN_CSS = `
 .tw-proj-perk { font-size: 0.74rem; font-weight: 700; color: #8fe39a; margin: 0 2px 6px; }
 .tw-proj-cost { font-size: 0.72rem; color: #cbb9e0; margin: 6px 2px 0; }
 
-/* Live town event (raid) overlay */
-/* Raid: roaming enemies in the plaza (tap to strike) */
-.tw-enemy { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 98; animation: twEnemyRoam 3.4s ease-in-out infinite; }
-.tw-enemy img { height: 70px; width: auto; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); }
-.tw-enemy-emoji { font-size: 44px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+/* Raid: tap each foe directly — it has its own HP bar, pops damage numbers, and dies when emptied */
+.tw-enemy { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; animation: twEnemyRoam 3.4s ease-in-out infinite; }
+.tw-enemy img { height: 76px; width: auto; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); transition: filter .08s; }
+.tw-enemy-emoji { font-size: 48px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+.tw-enemy:active img, .tw-enemy:active .tw-enemy-emoji { filter: drop-shadow(0 0 10px rgba(255,120,80,0.95)) brightness(1.4); transform: scale(.94); }
+.tw-enemy.is-cd { cursor: default; }
+.tw-enemy.is-cd img { filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)) grayscale(0.35) brightness(0.8); }
+.tw-enemy.is-dying { animation: twEnemyDie .45s ease-out forwards; pointer-events: none; }
+@keyframes twEnemyDie { 0% { transform: translate(-50%,-100%) scale(1) rotate(0); opacity: 1; } 100% { transform: translate(-50%,-70%) scale(.3) rotate(28deg); opacity: 0; } }
 @keyframes twEnemyRoam { 0%,100% { transform: translate(-50%, -100%); } 25% { transform: translate(calc(-50% - 11px), -103%); } 50% { transform: translate(-50%, -100%); } 75% { transform: translate(calc(-50% + 11px), -103%); } }
-/* Raid combat HUD */
-.tw-raid-bar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: min(90%, 440px); z-index: 500; pointer-events: none; background: rgba(20,10,14,0.86); border: 1px solid rgba(224,67,63,0.55); border-radius: 12px; padding: 6px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
-.tw-raid-name { font-size: 0.82rem; font-weight: 900; color: #ffd0c8; text-align: center; }
-.tw-raid-name .muted { font-weight: 700; font-size: 0.72rem; }
-.tw-raid-hp { height: 12px; margin-top: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
-.tw-raid-hp span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); border-radius: 999px; transition: width .18s ease; }
-.tw-raid-controls { position: absolute; left: 0; right: 0; bottom: 10px; z-index: 500; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px; }
-.tw-raid-meter { position: relative; width: min(90%, 380px); height: 22px; border-radius: 999px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); overflow: hidden; cursor: pointer; }
-.tw-raid-zone { position: absolute; top: 0; bottom: 0; left: 43%; width: 14%; background: linear-gradient(90deg, rgba(255,215,110,0.2), rgba(255,215,110,0.6), rgba(255,215,110,0.2)); border-left: 1px solid rgba(255,215,110,0.7); border-right: 1px solid rgba(255,215,110,0.7); }
-.tw-raid-marker { position: absolute; top: -2px; bottom: -2px; width: 4px; margin-left: -2px; background: #fff; border-radius: 2px; box-shadow: 0 0 8px rgba(255,255,255,0.9); }
-.tw-raid-btns { display: flex; gap: 10px; }
-.tw-raid-strike { padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: 15px; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22; }
-.tw-raid-strike:active { transform: translateY(2px); box-shadow: 0 2px 0 #b57f22; }
-.tw-raid-power { padding: 11px 20px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: 14px; color: #2a0d0a; background: linear-gradient(180deg,#ff9a3c,#e0433f); box-shadow: 0 4px 0 #a12723; }
-.tw-raid-power:active { transform: translateY(2px); box-shadow: 0 2px 0 #a12723; }
-.tw-raid-strike:disabled, .tw-raid-power:disabled { opacity: .5; cursor: default; box-shadow: none; }
-.tw-raid-hint { font-size: 0.72rem; text-align: center; background: rgba(20,14,30,0.72); padding: 2px 10px; border-radius: 999px; }
-.tw-raid-win { position: absolute; left: 0; right: 0; bottom: 20px; z-index: 500; text-align: center; color: #b8f0c2; font-weight: 800; font-size: 0.9rem; padding: 0 12px; }
+.tw-enemy-hp { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 52px; height: 6px; border-radius: 999px; background: rgba(0,0,0,0.55); border: 1px solid rgba(0,0,0,0.4); overflow: hidden; }
+.tw-enemy-hp span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); transition: width .12s ease; }
+.tw-dmg { position: absolute; top: -6px; left: 50%; font-weight: 900; font-size: 16px; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.8); pointer-events: none; animation: twDmg .75s ease-out forwards; white-space: nowrap; }
+.tw-dmg.is-crit { font-size: 22px; color: #ffe27a; }
+.tw-dmg.is-proc { color: #ff9a5a; }
+@keyframes twDmg { 0% { transform: translate(-50%, 0) scale(.6); opacity: 0; } 20% { transform: translate(-50%, -10px) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -40px) scale(.9); opacity: 0; } }
+/* Corner HUD */
+.tw-raid-hud { position: absolute; top: 8px; left: 8px; z-index: 500; pointer-events: none; background: rgba(20,10,14,0.86); border: 1px solid rgba(224,67,63,0.55); border-radius: 12px; padding: 6px 11px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.tw-raid-hud-title { font-size: 0.78rem; font-weight: 900; color: #ffd0c8; }
+.tw-raid-hud-stats { display: flex; gap: 10px; margin-top: 3px; font-size: 0.74rem; font-weight: 800; color: #ffe0b0; }
+.tw-raid-tip { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 500; pointer-events: none; font-size: 0.72rem; font-weight: 700; color: #ffe0b0; background: rgba(20,14,30,0.78); padding: 4px 12px; border-radius: 999px; white-space: nowrap; }
+/* Weapon-skill proc callout */
+.tw-proc { position: absolute; top: 34%; left: 50%; transform: translateX(-50%); z-index: 510; pointer-events: none; font-weight: 900; font-size: 1.35rem; color: var(--pc,#ffb347); text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 18px var(--pc,#ffb347); animation: twProc 1.5s ease-out forwards; white-space: nowrap; }
+.tw-proc-emoji { font-size: 1.5rem; }
+@keyframes twProc { 0% { transform: translateX(-50%) scale(.5) rotate(-8deg); opacity: 0; } 18% { transform: translateX(-50%) scale(1.2) rotate(3deg); opacity: 1; } 70% { transform: translateX(-50%) scale(1) rotate(0); opacity: 1; } 100% { transform: translate(-50%, -30px) scale(1); opacity: 0; } }
 .tw-owner-spawn { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.12); }
 .tw-owner-spawn .muted { font-size: 0.72rem; }
 .tw-owner-spawn button { flex: 0 0 auto; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(224,67,63,0.4); background: rgba(224,67,63,0.12); color: #ffcabf; font-size: 0.76rem; font-weight: 700; cursor: pointer; }
