@@ -57,18 +57,6 @@ async function merchantBoughtToday(buyerId) {
     return Object.fromEntries(rows.map((r) => [r.tier, Number(r.n) || 0]));
 }
 
-// Buildings that only appear once the community funds their unlock project (Town Development). They get their
-// own art later; for now they render with the emoji-card fallback.
-const UNLOCKABLE_BUILDINGS = [
-    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 3 },
-    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 97 },
-];
-// How each unlockable is earned (for the owner/admin panel).
-const UNLOCK_INFO = {
-    vault: { req: "Fund the Vault project (needs Town Prosperity Lv 5)" },
-    festival: { req: "Fund the Festival Stage project (needs Prosperity Lv 10 + Grow the Plaza Lv 3)" },
-};
-
 // ── THE WOLF DEN TOWN ─────────────────────────────────────────────────────────────────────────────────────
 // A persistent social overworld: your hero sprite walks a plaza and you see other players (as their real hero
 // sprites) with a live status of what they're doing. Owner-gated during the build. Shows ONLY members who are
@@ -83,14 +71,18 @@ const ONLINE_WINDOW = "90 seconds";
 
 // Buildings line the side-scrolling street at fixed x positions (0..100 % of the WIDE world); tapping one fast-
 // travels into that system (the menu still works for speed). Each optionally shows a generated sprite (mkt_town_art).
+// All nine are on by default. The Vault + Festival Stage used to be community-funded unlocks; they're now
+// standing fixtures on the (widened) street, so the plaza always feels full. x is a % of the WIDE world.
 export const TOWN_BUILDINGS = [
-    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 7 },
-    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 21 },
-    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 35 },
-    { id: "auction", emoji: "🏛️", label: "Auction House", href: "/marketplace/auction", x: 49 },
-    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 63 },
-    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 77 },
-    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 91 },
+    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 4 },
+    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 15 },
+    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 26 },
+    { id: "auction", emoji: "🏛️", label: "Auction House", href: "/marketplace/auction", x: 37 },
+    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 48 },
+    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 59 },
+    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 70 },
+    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 81 },
+    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 92 },
 ];
 
 // Shared generated art (background + building sprites), keyed. Empty until generated via the admin tool.
@@ -276,16 +268,10 @@ export async function getTownState(buyerId) {
             gold: Number(me?.gold || 0),
         },
         players,
-        buildings: [...TOWN_BUILDINGS, ...UNLOCKABLE_BUILDINGS.filter((b) => (bonuses.unlocks || []).includes(b.id))],
-        // Every unlockable building + whether it's unlocked yet + how it's earned + its art — for the owner panel
-        // (and so an owner can PREVIEW it in the plaza before it's funded).
-        unlockables: owner ? UNLOCKABLE_BUILDINGS.map((b) => ({
-            id: b.id, label: b.label, emoji: b.emoji, href: b.href, x: b.x,
-            art: art[b.id]?.url || null, unlocked: (bonuses.unlocks || []).includes(b.id), req: UNLOCK_INFO[b.id]?.req || null,
-        })) : [],
+        buildings: TOWN_BUILDINGS, // all nine are standing fixtures now (no funded unlocks)
         art,
         projects,
-        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, depth: bonuses.depth || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, unlocks: bonuses.unlocks || [] },
+        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0 },
         event,
         merchant: merchantWares,
         store: storeStatus(),

@@ -21,12 +21,6 @@ export const TOWN_PROJECTS = [
         perk: (lvl) => ({ xpPct: lvl * 2, goldPct: lvl * 2 }),
     },
     {
-        id: "depth", category: "civic", name: "Grow the Plaza", emoji: "🌆", maxLevel: 6,
-        desc: "Extend the town itself — a deeper skyline and townscape rise behind the square.",
-        baseCost: 2500, costMult: 2.1,
-        perk: (lvl) => ({ depth: lvl }),
-    },
-    {
         id: "tavern", category: "building", name: "The Tavern", emoji: "🍺", maxLevel: 6,
         desc: "A rowdier tavern — every level pours +5% more gold from Wolf's Gambit dice wins.",
         baseCost: 1200, costMult: 1.85,
@@ -43,18 +37,6 @@ export const TOWN_PROJECTS = [
         desc: "Train the town's defenders — every level pays out +10% more gold from every plaza raid.",
         baseCost: 3000, costMult: 2.0,
         perk: (lvl) => ({ raidGoldPct: lvl * 10 }),
-    },
-    {
-        id: "vault", category: "unlock", name: "The Vault", emoji: "🏦", maxLevel: 1,
-        desc: "Unlock a new building: the Vault — a standing +5% gold for the whole town.",
-        baseCost: 25000, costMult: 3, requires: { prosperity: 5 },
-        perk: (lvl) => (lvl >= 1 ? { unlock: ["vault"], goldPct: 5 } : {}),
-    },
-    {
-        id: "festival", category: "unlock", name: "Festival Stage", emoji: "🎪", maxLevel: 1,
-        desc: "Unlock the Festival Stage — the grandest plaza, and +5% XP for everyone.",
-        baseCost: 60000, costMult: 3, requires: { prosperity: 10, depth: 3 },
-        perk: (lvl) => (lvl >= 1 ? { unlock: ["festival"], xpPct: 5 } : {}),
     },
 ];
 const PROJECT_BY_ID = Object.fromEntries(TOWN_PROJECTS.map((p) => [p.id, p]));
@@ -84,7 +66,7 @@ export function invalidateTownBonuses() { _bonusCache = { at: 0, val: null }; }
 export async function getTownBonuses(nowMs = 0) {
     if (_bonusCache.val && nowMs && nowMs - _bonusCache.at < 30000) return _bonusCache.val;
     const levels = await projectLevels();
-    const agg = { xpPct: 0, goldPct: 0, merchantTier: 0, diceGoldPct: 0, raidGoldPct: 0, depth: 0, unlocks: [] };
+    const agg = { xpPct: 0, goldPct: 0, merchantTier: 0, diceGoldPct: 0, raidGoldPct: 0 };
     for (const def of TOWN_PROJECTS) {
         const lvl = levels[def.id]?.level || 0;
         if (lvl <= 0) continue;
@@ -94,8 +76,6 @@ export async function getTownBonuses(nowMs = 0) {
         if (p.merchantTier) agg.merchantTier = Math.max(agg.merchantTier, p.merchantTier);
         if (p.diceGoldPct) agg.diceGoldPct = Math.max(agg.diceGoldPct, p.diceGoldPct);
         if (p.raidGoldPct) agg.raidGoldPct = Math.max(agg.raidGoldPct, p.raidGoldPct);
-        if (p.depth) agg.depth = Math.max(agg.depth, p.depth);
-        if (p.unlock) agg.unlocks.push(...p.unlock);
     }
     _bonusCache = { at: nowMs || 1, val: agg };
     return agg;
@@ -111,8 +91,6 @@ function perkLabel(def, level) {
     if (p.merchantTier) bits.push(`Merchant tier ${p.merchantTier}`);
     if (p.diceGoldPct) bits.push(`+${p.diceGoldPct}% dice winnings`);
     if (p.raidGoldPct) bits.push(`+${p.raidGoldPct}% raid gold`);
-    if (p.depth) bits.push(`Plaza depth ${p.depth}`);
-    if (p.unlock) bits.push("unlocks a new building");
     return bits.join(" · ") || null;
 }
 

@@ -12,7 +12,7 @@ import SceneMusic from "@/components/SceneMusic";
 // each system. A roster overlay lets you see who's doing what without walking. Movement is smooth via CSS
 // transitions (poll + tween — no canvas / websockets). Positions are % of the WIDE world; y is a ground band.
 
-const WORLD_W = 2200;   // px width of the whole street (x = 0..100 maps across this)
+const WORLD_W = 2900;   // px width of the whole street (x = 0..100 maps across this) — widened for 9 buildings
 const GROUND = 72;      // % from top where building BASES sit (avatars walk in front, lower/foreground)
 const spriteTransform = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -192,8 +192,6 @@ export default function TownClient({ initial }) {
     const [questBusy, setQuestBusy] = useState(false);
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
-    const [previewDepth, setPreviewDepth] = useState(null); // owner: locally preview a "Grow the Plaza" depth tier before it's funded
-    const [previewUnlocks, setPreviewUnlocks] = useState({}); // owner: locally preview an unlockable building { [id]: true }
     const [raidEnemies, setRaidEnemies] = useState([]); // per-enemy {id,x,y,hp,hpMax,floats:[],dying}
     const [raidKills, setRaidKills] = useState(0);
     const [raidDamage, setRaidDamage] = useState(0);    // your total damage this raid (optimistic)
@@ -447,13 +445,10 @@ export default function TownClient({ initial }) {
     const you = state?.you;
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
-    const baseBuildings = state?.buildings || [];
-    // Owner preview: drop any toggled-on unlockable building into the plaza locally (if not already unlocked).
-    const previewBuildings = (state?.unlockables || []).filter((u) => previewUnlocks[u.id] && !u.unlocked).map((u) => ({ id: u.id, emoji: u.emoji, label: u.label, href: u.href, x: u.x }));
-    const buildings = [...baseBuildings, ...previewBuildings];
+    const buildings = state?.buildings || [];
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
-    const effDepth = previewDepth ?? (townBonuses.depth || 0); // owner preview overrides the real funded depth
+    const effDepth = 6; // every parallax skyline band is on by default now (no funding gate)
     const otherList = useMemo(() => Object.values(others), [others]);
     // The Town Crier's rotating live announcements (assembled from the current town state).
     const crierLines = useMemo(() => {
@@ -550,7 +545,7 @@ export default function TownClient({ initial }) {
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                        {TILES(8).map((k) => (
+                        {TILES(11).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={k} src={art.sky.url} alt="" draggable={false} />
                         ))}
@@ -563,7 +558,7 @@ export default function TownClient({ initial }) {
                     const factor = Math.max(0.3, 0.47 - (n - 1) * 0.03); // farther back → slower parallax
                     return (
                         <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                            {TILES(8).map((k) => (
+                            {TILES(11).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art[`depth${n}`].url} alt="" draggable={false} />
                             ))}
@@ -575,7 +570,7 @@ export default function TownClient({ initial }) {
                     This is what "Grow the Plaza" deepens over time (future depth tiers swap richer art in). */}
                 {layered && art.mid?.url ? (
                     <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                        {TILES(10).map((k) => (
+                        {TILES(13).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={k} src={art.mid.url} alt="" draggable={false} />
                         ))}
@@ -586,7 +581,7 @@ export default function TownClient({ initial }) {
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
-                            {TILES(14).map((k) => (
+                            {TILES(19).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art.cobble.url} alt="" draggable={false} />
                             ))}
@@ -603,7 +598,7 @@ export default function TownClient({ initial }) {
                         plaza edge (buildings & avatars draw in front of it). Ground-locked (moves with the street). */}
                     {layered && art.fg?.url ? (
                         <div className="tw-fg" aria-hidden="true">
-                            {TILES(18).map((k) => (
+                            {TILES(24).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art.fg.url} alt="" draggable={false} />
                             ))}
@@ -612,7 +607,7 @@ export default function TownClient({ initial }) {
                     {/* Plaza centerpiece — the arted wolf fountain landmark, ground-locked in the town square */}
                     {art.centerpiece?.url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "30%", top: `${GROUND}%` }} />
+                        <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "20%", top: `${GROUND}%` }} />
                     ) : null}
                     {/* Buildings */}
                     {buildings.map((b) => {
@@ -630,14 +625,14 @@ export default function TownClient({ initial }) {
                         );
                     })}
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "42%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
+                    <button type="button" className="tw-npc-btn" style={{ left: "31%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
                         ) : <span className="tw-npc-emoji">⚒️</span>}
                     </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "14%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
+                    <button type="button" className="tw-npc-btn" style={{ left: "9%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -645,7 +640,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "84%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: "64%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {art.questgiver?.url ? (
@@ -654,7 +649,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">📜</span>}
                     </button>
                     {/* Traveling Merchant — tap to browse wares */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "70%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
+                    <button type="button" className="tw-npc-btn" style={{ left: "53%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
                         {art.merchant?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -662,7 +657,7 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
                     {/* Auctioneer — links out to the Auction House */}
-                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: "56%", top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
+                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: "42%", top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
                         <span className="tw-npc-bubble">🔨 Auction House!</span>
                         {art.auctioneer?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -938,39 +933,10 @@ export default function TownClient({ initial }) {
                         {state?.owner ? (
                             <div className="tw-board-section">
                                 <div className="tw-board-title">🔧 Owner tools</div>
-                                <div className="tw-depth-preview">
-                                    <span>🌆 Preview plaza depth <b>{effDepth}</b>{previewDepth != null ? " (preview)" : ` (funded: ${townBonuses.depth || 0})`}</span>
-                                    <div className="tw-depth-steps">
-                                        <button type="button" onClick={() => setPreviewDepth(Math.max(0, effDepth - 1))} aria-label="Less depth">−</button>
-                                        <button type="button" onClick={() => setPreviewDepth(Math.min(6, effDepth + 1))} aria-label="More depth">+</button>
-                                        <button type="button" onClick={() => setPreviewDepth(null)}>live</button>
-                                    </div>
-                                </div>
                                 <button type="button" className={`tw-live-toggle${state?.eventsLive ? " is-on" : ""}`} onClick={toggleEventsLive}>
                                     {state?.eventsLive ? "🟢 Auto opening-events: LIVE" : "⚪ Auto opening-events: off"}
                                     <span className="muted">tap to {state?.eventsLive ? "turn off" : "turn on"} — pushes members when the shop opens</span>
                                 </button>
-                                {(state?.unlockables || []).length ? (
-                                    <div className="tw-unlockables">
-                                        <div className="tw-unlockables-title">🔓 Unlockable buildings</div>
-                                        {state.unlockables.map((u) => (
-                                            <div key={u.id} className="tw-unlockable">
-                                                {u.art ? (
-                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                    <img className="tw-unlockable-art" src={u.art} alt="" draggable={false} />
-                                                ) : <span className="tw-unlockable-emoji">{u.emoji}</span>}
-                                                <div className="tw-unlockable-body">
-                                                    <div className="tw-unlockable-name">{u.label} {u.unlocked ? <span className="tw-unlockable-tag is-on">UNLOCKED</span> : <span className="tw-unlockable-tag">locked</span>}{u.art ? null : <span className="tw-unlockable-tag is-warn">no art</span>}</div>
-                                                    <div className="muted" style={{ fontSize: "0.72rem" }}>{u.req}</div>
-                                                </div>
-                                                {u.unlocked ? <span className="tw-unlockable-live">live</span> : (
-                                                    <button type="button" className={`tw-unlockable-btn${previewUnlocks[u.id] ? " is-on" : ""}`} onClick={() => setPreviewUnlocks((p) => ({ ...p, [u.id]: !p[u.id] }))}>{previewUnlocks[u.id] ? "👁 Hide" : "👁 Preview"}</button>
-                                                )}
-                                            </div>
-                                        ))}
-                                        <p className="muted" style={{ fontSize: "0.7rem", margin: "6px 2px 0" }}>Preview drops the building into the plaza locally (owner-only) so you can see it before it&apos;s funded.</p>
-                                    </div>
-                                ) : null}
                             </div>
                         ) : null}
                     </div>
