@@ -1400,6 +1400,9 @@ export async function merchantBuy(buyerId, itemId) {
 // Once-a-day favorable winds: shave an hour off the remaining voyage (clamped so it can only reach "arrived",
 // never overshoot). Atomic — the WHERE enforces once-per-store-day and that a voyage is actually in progress.
 export async function favorableWind(buyerId) {
+    const preRow = await readRow(buyerId).catch(() => null);
+    const remainingMs = preRow?.returns_at ? new Date(preRow.returns_at).getTime() - Date.now() : 0;
+    const shavedMinutes = Math.round(Math.min(Math.max(0, remainingMs), 60 * 60 * 1000) / 60000);
     const updated = await db.queryOne(
         `UPDATE mkt_sailing
             SET returns_at = GREATEST(NOW(), returns_at - interval '1 hour'),
@@ -1419,7 +1422,7 @@ export async function favorableWind(buyerId) {
         await db.query(`UPDATE mkt_sailing SET wind_day = NULL WHERE buyer_id = $1`, [buyerId]).catch(() => {});
         windRefunded = true;
     }
-    return { ok: true, windRefunded, ...(await getSailingState(buyerId)) };
+    return { ok: true, windRefunded, shavedMinutes, ...(await getSailingState(buyerId)) };
 }
 
 // Paid re-use of the tailwind once the free daily one is spent: charge gold, then shave another hour off the
@@ -1428,17 +1431,22 @@ export async function rechargeWind(buyerId) {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "sailing") return { ok: false, error: "not_sailing", ...(await getSailingState(buyerId)) };
+    const returnsAt = row?.returns_at ? new Date(row.returns_at).getTime() : 0;
+    const remainingMs = returnsAt - Date.now();
+    // Nothing meaningful left to shave → DON'T charge (guards the "took my gold, did nothing" case).
+    if (remainingMs <= 90 * 1000) return { ok: false, error: "almost_there", ...(await getSailingState(buyerId)) };
     const cost = windRechargeCost(row?.wind_recharges || 0); // escalates: each extra tailwind this voyage costs double
     if (cost > 0 && (state.gold || 0) < cost) {
         return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
     }
-    // Apply the hour first (also validates a voyage is actually in progress) so we never charge with no effect.
+    // Shave up to an hour, but never more than what's left — so it ALWAYS produces a real, visible jump.
+    const shaveMs = Math.min(remainingMs, 60 * 60 * 1000);
     const updated = await db.queryOne(
         `UPDATE mkt_sailing
-            SET returns_at = GREATEST(NOW(), returns_at - interval '1 hour'), wind_recharges = COALESCE(wind_recharges, 0) + 1, updated_at = NOW()
+            SET returns_at = returns_at - ($2 || ' milliseconds')::interval, wind_recharges = COALESCE(wind_recharges, 0) + 1, updated_at = NOW()
           WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at IS NOT NULL AND returns_at > NOW()
           RETURNING returns_at`,
-        [buyerId]
+        [buyerId, shaveMs]
     ).catch(() => null);
     if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
     if (cost > 0) {
@@ -1446,7 +1454,7 @@ export async function rechargeWind(buyerId) {
         await logCoin(buyerId, -cost, "cooldown_skip", { meta: { kind: "wind_recharge" } }).catch(() => {});
     }
     await trackActivity(buyerId, "cooldown_skip", { kind: "wind_recharge", cost }).catch(() => {});
-    return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
+    return { ok: true, spent: cost, shavedMinutes: Math.round(shaveMs / 60000), ...(await getSailingState(buyerId)) };
 }
 
 // Grant treasure-chest fragment(s) to a member (used by the Cheer first-of-day item proc). Upserts the sailing

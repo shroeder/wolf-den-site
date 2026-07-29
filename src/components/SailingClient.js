@@ -205,6 +205,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
+    const [windMsg, setWindMsg] = useState(null);      // "arrived Xm sooner" / why a tailwind couldn't fire
     const [gusting, setGusting] = useState(false);     // the tailwind gust is currently playing
     const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
     const [bountyTick, setBountyTick] = useState(0);   // bumps after a voyage action → FeatureDailies re-fetches so a completed bounty flips to Claim live
@@ -277,6 +278,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const fleetIdx = useRef(0);        // round-robin cursor so consecutive ships are DIFFERENT members
     const boostRef = useRef(0);        // Date.now() until which traffic is sped up (after a tailwind)
     const gustTimer = useRef(null);    // safety timer that clears `gusting` if the animationend event is missed
+    const windMsgTimer = useRef(null); // clears the tailwind feedback toast
     const halfwayRef = useRef(null);   // departedAt we've already done the one-shot midpoint refetch for
     const lastProcRef = useRef(null);  // last dig-tool that procced, to flash each new proc once
 
@@ -418,12 +420,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             setCelebrate("depart");
             setTimeout(() => setCelebrate((c) => (c === "depart" ? null : c)), 1900);
         }
-        if (action === "wind" || action === "recharge_wind") {
-            sfx.gust();
-            triggerGust();
-            // Speed the passing fleet up for exactly the gust so it feels like you surged ahead, then reverts.
-            boostRef.current = Date.now() + GUST_MS;
-        }
+        const isWind = action === "wind" || action === "recharge_wind";
         if (action === "dig" || action === "begin_dig") sfx.dig();
         const prevLevel = stateRef.current?.level || 0;
         try {
@@ -431,6 +428,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }),
             });
             const d = await r.json().catch(() => ({}));
+            // Tailwind feedback: only celebrate (gust + sound) when the server confirms it actually shaved time.
+            if (isWind) {
+                if (d && !d.error && d.shavedMinutes) {
+                    sfx.gust(); triggerGust(); boostRef.current = Date.now() + GUST_MS;
+                    setWindMsg(`🍃 Tailwind! Arrived ${d.shavedMinutes >= 60 ? "an hour" : `${d.shavedMinutes}m`} sooner.`);
+                } else {
+                    setWindMsg(d?.error === "almost_there" ? "🛬 You're basically there — no time left to shave."
+                        : d?.error === "not_enough_gold" ? "Not enough gold for another tailwind."
+                        : d?.error === "already_used" ? "You've caught today's free tailwind — buy another below."
+                        : "The wind didn't catch — try again.");
+                }
+                clearTimeout(windMsgTimer.current);
+                windMsgTimer.current = setTimeout(() => setWindMsg(null), 2800);
+            }
             if (d && !d.error) {
                 setState(d);
                 if (!String(action).startsWith("upgrade_")) setBountyTick((t) => t + 1); // any real voyage action can progress a bounty
@@ -826,6 +837,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </div>
                 )}
                 {windSaved ? <div className="sail-windsave">🍃 Favorable! Your tailwind wasn&apos;t used up.</div> : null}
+                {windMsg ? <div className="sail-windsave">{windMsg}</div> : null}
 
                 {/* Boat identity — level + form come from upgrades, not digging. */}
                 <div className="sail-boatline">
