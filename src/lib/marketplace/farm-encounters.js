@@ -28,6 +28,12 @@ const CREATURES = {
     raccoon: { name: "Masked Raccoon", emoji: "🦝", art: "enc_raccoon", weight: 18, xp: 18, gold: 210, seedBand: ["common", "rare"], chestTier: "iron", partsTier: 2, partsMin: 1, partsMax: 3, loot: { seed: 54, chest: 24, parts: 22 } },
     boar: { name: "Truffle Boar", emoji: "🐗", art: "enc_boar", weight: 10, xp: 26, gold: 340, seedBand: ["rare", "epic"], chestTier: "iron", partsTier: 2, partsMin: 2, partsMax: 3, loot: { seed: 50, chest: 26, parts: 24 } },
     scarecrow: { name: "Merry Scarecrow", emoji: "🎃", art: "enc_scarecrow", weight: 4, xp: 45, gold: 640, seedBand: ["rare", "epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 3, loot: { seed: 46, chest: 28, parts: 26 } },
+    // ── Rarer critters — much scarcer, much richer. A real thrill when one shows up. ──
+    fox: { name: "Sly Fox", emoji: "🦊", art: "enc_fox", weight: 3, xp: 65, gold: 900, seedBand: ["epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 4, loot: { seed: 44, chest: 28, parts: 28 } },
+    owl: { name: "Wise Owl", emoji: "🦉", art: "enc_owl", weight: 2, xp: 95, gold: 1300, seedBand: ["epic", "legendary"], chestTier: "gold", partsTier: 4, partsMin: 2, partsMax: 4, loot: { seed: 42, chest: 30, parts: 28 } },
+    stag: { name: "Golden Stag", emoji: "🦌", art: "enc_stag", weight: 1.2, xp: 140, gold: 1900, seedBand: ["legendary"], chestTier: "mythic", partsTier: 4, partsMin: 3, partsMax: 5, loot: { seed: 40, chest: 32, parts: 28 } },
+    dragon: { name: "Garden Dragonling", emoji: "🐉", art: "enc_dragon", weight: 0.6, xp: 210, gold: 2800, seedBand: ["legendary", "mythic"], chestTier: "mythic", partsTier: 5, partsMin: 3, partsMax: 5, loot: { seed: 38, chest: 34, parts: 28 } },
+    unicorn: { name: "Meadow Unicorn", emoji: "🦄", art: "enc_unicorn", weight: 0.3, xp: 320, gold: 4200, seedBand: ["mythic"], chestTier: "ascendant", partsTier: 5, partsMin: 4, partsMax: 6, loot: { seed: 36, chest: 36, parts: 28 } },
 };
 const CREATURE_KEYS = Object.keys(CREATURES);
 // Public list (key + name + emoji) so the owner-debug UI can cycle through every critter to test each.

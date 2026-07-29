@@ -201,7 +201,7 @@ const pickFarmBg = (tod, condition) =>
     (condition === "storm" && FARM_BG.storm) || (condition === "snow" && FARM_BG.snow) || FARM_BG[tod] || FARM_BG.day || null;
 // Fixed straight-on backdrops for Inside (barn) and Garden — single images, shown as a cover (no wide scroll).
 // Owner-debug critter cycle (keys MUST match CREATURES in farm-encounters.js) so you can test each one.
-const TEST_CRITTERS = [{ key: "rat", label: "Field Mouse" }, { key: "crow", label: "Crop Crow" }, { key: "raccoon", label: "Raccoon" }, { key: "boar", label: "Truffle Boar" }, { key: "scarecrow", label: "Scarecrow" }];
+const TEST_CRITTERS = [{ key: "rat", label: "Field Mouse" }, { key: "crow", label: "Crop Crow" }, { key: "raccoon", label: "Raccoon" }, { key: "boar", label: "Truffle Boar" }, { key: "scarecrow", label: "Scarecrow" }, { key: "fox", label: "Sly Fox" }, { key: "owl", label: "Wise Owl" }, { key: "stag", label: "Golden Stag" }, { key: "dragon", label: "Dragonling" }, { key: "unicorn", label: "Unicorn" }];
 const VIEW_BG = {
     inside: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/barn-inside-flat-1785108049136.png",
     garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-flat-1785108098669.png",
