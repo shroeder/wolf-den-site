@@ -2257,9 +2257,9 @@ function EncounterModal({ encounter, onResolve, onClose }) {
         busyRef.current = true;
         setPhase("resolving");
         const r = await onResolve();
-        // The reward is pre-known at spawn (encounter.reward) — so even if the claim call races, we always show
-        // exactly what you got. Prefer the live grant result, fall back to the preview.
-        setReward((r?.ok ? r : null) || (encounter.reward ? { ...encounter.reward, ok: true } : { error: true }));
+        // The reward is GRANTED at spawn and its exact value is on encounter.reward — so display that (the claim
+        // call just clears the parked encounter and may come back without the numbers). Fall back to the response.
+        setReward(encounter.reward ? { ...encounter.reward, ok: true } : (r?.ok && r.xp != null ? r : { error: true }));
         setPhase("reward");
     }, [onResolve, encounter.reward]);
 
