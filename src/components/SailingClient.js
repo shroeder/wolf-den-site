@@ -1109,7 +1109,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         <div className="sail-enc-rewards">
                             <span className="sail-enc-reward">✨ +{state.encounter.xp} XP</span>
                             <span className="sail-enc-reward">🪙 +{state.encounter.coins}</span>
-                            {state.encounter.bonus ? <span className="sail-enc-reward is-bonus">{state.encounter.bonus.emoji} {state.encounter.bonus.label}</span> : null}
+                            {state.encounter.bonus ? (
+                                <span className="sail-enc-reward is-bonus">
+                                    {state.encounter.bonus.image ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={state.encounter.bonus.image} alt="" style={{ width: 18, height: 18, objectFit: "contain", verticalAlign: "-3px" }} />
+                                    ) : state.encounter.bonus.emoji} {state.encounter.bonus.label}
+                                </span>
+                            ) : null}
                         </div>
                         <button className="sail-cta" disabled={ackingEnc || !encReady} onClick={() => { setAckingEnc(true); Promise.resolve(act("ack_encounter")).finally(() => setAckingEnc(false)); }}>
                             {ackingEnc ? "…" : encReady ? "Onward! ⚓" : "…"}

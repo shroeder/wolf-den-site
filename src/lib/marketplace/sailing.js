@@ -121,8 +121,8 @@ function encounterChance(fortuneLevel = 0) {
 }
 // Reusable low-power loot items (nothing here swings the boss fight). `d(w, item)` = a weighted drop.
 const NONE = { kind: "none" };
-const FRAG1 = { kind: "fragment", n: 1, label: "a Wooden chest fragment", emoji: "🟫" };
-const FRAG2 = { kind: "fragment", n: 2, label: "2 Wooden chest fragments", emoji: "🟫" };
+const FRAG1 = { kind: "fragment", n: 1, label: "a Wooden chest fragment", emoji: "🟫", image: fragmentArt("wooden") };
+const FRAG2 = { kind: "fragment", n: 2, label: "2 Wooden chest fragments", emoji: "🟫", image: fragmentArt("wooden") };
 const TREAT_BONE = { kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" };
 const TREAT_SNACK = { kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" };
 const CHEST_WOOD = { kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" };
@@ -829,7 +829,7 @@ async function resolveDueEncounter(buyerId) {
     const loot = pickWeighted(enc.drops); // foe-themed loot
     const result = {
         foe: enc.foe, emoji: enc.emoji, art: `/images/sailing/enc-${enc.id}.png`, loot: enc.loot, xp, coins,
-        bonus: loot.kind === "none" ? null : { label: loot.label, emoji: loot.emoji },
+        bonus: loot.kind === "none" ? null : { label: loot.label, emoji: loot.emoji, image: loot.image || null },
     };
     // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.
     const claimed = await db.queryOne(
