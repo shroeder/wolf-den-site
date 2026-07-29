@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
 
@@ -195,7 +196,12 @@ export async function gambitResolve(buyerId) {
     const c = cmpHand(ph, gh);
     const jackpot = c > 0 && ph.rank === 4;
     const outcome = c > 0 ? "win" : c === 0 ? "push" : "lose";
-    const payout = outcome === "win" ? (jackpot ? bet * 3 : bet * 2) : outcome === "push" ? bet : 0;
+    let payout = outcome === "win" ? (jackpot ? bet * 3 : bet * 2) : outcome === "push" ? bet : 0;
+    // The Tavern town-upgrade pours extra gold into a WIN (+5% per level); a push just returns the ante.
+    if (outcome === "win") {
+        const diceGoldPct = (await getTownBonuses(Date.now()).catch(() => ({}))).diceGoldPct || 0;
+        if (diceGoldPct) payout = Math.round(payout * (1 + diceGoldPct / 100));
+    }
     let gold = null;
     if (payout > 0) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, payout]).catch(() => null);

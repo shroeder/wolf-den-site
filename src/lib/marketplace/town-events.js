@@ -11,6 +11,7 @@ import { getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js
 import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
 import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 
 // ── TOWN EVENTS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Admin-triggered communal encounters that spawn in the plaza (a bandit raid, etc.). Everyone in town attacks a
@@ -216,7 +217,10 @@ async function resolveTownEvent(eventId, outcome) {
     if (!ev) return; // someone else already resolved it
     const hits = await db.query(`SELECT buyer_id, damage FROM mkt_town_event_hit WHERE event_id = $1 AND damage > 0`, [eventId]).catch(() => []);
     const totalDmg = hits.reduce((s, h) => s + h.damage, 0) || 1;
-    const pool = outcome === "defeated" ? ev.reward_gold : Math.round(ev.reward_gold * Math.min(1, (ev.hp_max - ev.hp) / ev.hp_max));
+    // The Garrison town-upgrade richens every raid's gold pool (+10% per level).
+    const raidGoldPct = (await getTownBonuses(Date.now()).catch(() => ({}))).raidGoldPct || 0;
+    const basePool = outcome === "defeated" ? ev.reward_gold : Math.round(ev.reward_gold * Math.min(1, (ev.hp_max - ev.hp) / ev.hp_max));
+    const pool = raidGoldPct ? Math.round(basePool * (1 + raidGoldPct / 100)) : basePool;
     for (const h of hits) {
         const gold = FLAT_MIN_GOLD + Math.round(pool * (h.damage / totalDmg));
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);

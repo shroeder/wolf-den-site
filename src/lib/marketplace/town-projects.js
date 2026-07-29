@@ -27,10 +27,10 @@ export const TOWN_PROJECTS = [
         perk: (lvl) => ({ depth: lvl }),
     },
     {
-        id: "tavern", category: "building", name: "The Tavern", emoji: "🍺", maxLevel: 6, building: "tavern",
-        desc: "A bigger, rowdier tavern — better dice payouts and a heartier daily pint.",
+        id: "tavern", category: "building", name: "The Tavern", emoji: "🍺", maxLevel: 6,
+        desc: "A rowdier tavern — every level pours +5% more gold from Wolf's Gambit dice wins.",
         baseCost: 1200, costMult: 1.85,
-        perk: (lvl) => ({ tavernLevel: lvl }),
+        perk: (lvl) => ({ diceGoldPct: lvl * 5 }),
     },
     {
         id: "market", category: "service", name: "Trading Post", emoji: "🧳", maxLevel: 6,
@@ -40,9 +40,9 @@ export const TOWN_PROJECTS = [
     },
     {
         id: "garrison", category: "service", name: "The Garrison", emoji: "⚔️", maxLevel: 8,
-        desc: "Train the town's defenders — raids grow bigger and pay out richer bounties.",
+        desc: "Train the town's defenders — every level pays out +10% more gold from every plaza raid.",
         baseCost: 3000, costMult: 2.0,
-        perk: (lvl) => ({ raidTier: lvl }),
+        perk: (lvl) => ({ raidGoldPct: lvl * 10 }),
     },
     {
         id: "vault", category: "unlock", name: "The Vault", emoji: "🏦", maxLevel: 1,
@@ -84,7 +84,7 @@ export function invalidateTownBonuses() { _bonusCache = { at: 0, val: null }; }
 export async function getTownBonuses(nowMs = 0) {
     if (_bonusCache.val && nowMs && nowMs - _bonusCache.at < 30000) return _bonusCache.val;
     const levels = await projectLevels();
-    const agg = { xpPct: 0, goldPct: 0, merchantTier: 0, tavernLevel: 0, raidTier: 0, depth: 0, unlocks: [] };
+    const agg = { xpPct: 0, goldPct: 0, merchantTier: 0, diceGoldPct: 0, raidGoldPct: 0, depth: 0, unlocks: [] };
     for (const def of TOWN_PROJECTS) {
         const lvl = levels[def.id]?.level || 0;
         if (lvl <= 0) continue;
@@ -92,8 +92,8 @@ export async function getTownBonuses(nowMs = 0) {
         if (p.xpPct) agg.xpPct += p.xpPct;
         if (p.goldPct) agg.goldPct += p.goldPct;
         if (p.merchantTier) agg.merchantTier = Math.max(agg.merchantTier, p.merchantTier);
-        if (p.tavernLevel) agg.tavernLevel = Math.max(agg.tavernLevel, p.tavernLevel);
-        if (p.raidTier) agg.raidTier = Math.max(agg.raidTier, p.raidTier);
+        if (p.diceGoldPct) agg.diceGoldPct = Math.max(agg.diceGoldPct, p.diceGoldPct);
+        if (p.raidGoldPct) agg.raidGoldPct = Math.max(agg.raidGoldPct, p.raidGoldPct);
         if (p.depth) agg.depth = Math.max(agg.depth, p.depth);
         if (p.unlock) agg.unlocks.push(...p.unlock);
     }
@@ -109,8 +109,8 @@ function perkLabel(def, level) {
     if (p.xpPct) bits.push(`+${p.xpPct}% XP`);
     if (p.goldPct) bits.push(`+${p.goldPct}% gold`);
     if (p.merchantTier) bits.push(`Merchant tier ${p.merchantTier}`);
-    if (p.tavernLevel) bits.push(`Tavern ${p.tavernLevel}`);
-    if (p.raidTier) bits.push(`Raids +${p.raidTier}`);
+    if (p.diceGoldPct) bits.push(`+${p.diceGoldPct}% dice winnings`);
+    if (p.raidGoldPct) bits.push(`+${p.raidGoldPct}% raid gold`);
     if (p.depth) bits.push(`Plaza depth ${p.depth}`);
     if (p.unlock) bits.push("unlocks a new building");
     return bits.join(" · ") || null;

@@ -21,7 +21,7 @@ import { setSetting } from "@/lib/settings.js";
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
 // chests unlock, prices drop further. Daily caps keep it a treat: one of each chest a day (the humble wooden
 // chest, three) so it's a habit, not a gold-dump.
-const MERCHANT_BASE_DISCOUNT = 0.25; // the merchant always undercuts the list price by at least this much
+const MERCHANT_BASE_DISCOUNT = 0.05; // the merchant always undercuts the list price by at least this much
 const MERCHANT_STOCK = [
     { tier: "wooden", price: 500, minTier: 0, capPerDay: 3 },
     { tier: "iron", price: 2000, minTier: 0, capPerDay: 1 },
@@ -259,7 +259,7 @@ export async function getTownState(buyerId) {
         buildings: [...TOWN_BUILDINGS, ...UNLOCKABLE_BUILDINGS.filter((b) => (bonuses.unlocks || []).includes(b.id))],
         art,
         projects,
-        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, depth: bonuses.depth || 0, tavernLevel: bonuses.tavernLevel || 0, raidTier: bonuses.raidTier || 0, unlocks: bonuses.unlocks || [] },
+        bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, depth: bonuses.depth || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, unlocks: bonuses.unlocks || [] },
         event,
         merchant: merchantWares,
         store: storeStatus(),
