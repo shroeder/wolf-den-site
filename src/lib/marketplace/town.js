@@ -26,8 +26,9 @@ const MERCHANT_STOCK = [
     { tier: "wooden", price: 500, minTier: 0, capPerDay: 3 },
     { tier: "iron", price: 2000, minTier: 0, capPerDay: 1 },
     { tier: "gold", price: 6000, minTier: 0, capPerDay: 1 },
+    // The Trading Post unlocks ONE tier above Gold — a Mythic chest (at merchant tier 3). Nothing higher: the
+    // Ascendant+ chests stay exclusive to real gameplay (boss/sailing/forge), not something you can just buy.
     { tier: "mythic", price: 16000, minTier: 3, capPerDay: 1 },
-    { tier: "ascendant", price: 40000, minTier: 5, capPerDay: 1 },
 ];
 function merchantWaresForTier(tier = 0, chestArt = {}, boughtToday = {}) {
     const disc = Math.min(0.45, MERCHANT_BASE_DISCOUNT + tier * 0.03); // deeper discount as the Trading Post levels
