@@ -105,6 +105,14 @@ export function levelForXp(totalXp) {
 // no user / zero points / any error).
 //   dedupeKey — enforces once-per-entity via the unique index (e.g. once/card, once/day).
 //   dailyCap  — at most this many awards of this action per user per (UTC) day.
+// The active Town HANGOUT buff multiplier for a member (1 = none). Stored in the shared mkt_user_boost table as
+// kind='town_hangout' (magnitude 1.05, 2h expiry) — granted after 3 min in the plaza (see town.js).
+export async function memberHangoutMult(buyerId) {
+    if (!buyerId) return 1;
+    const rows = await db.query(`SELECT magnitude FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'town_hangout' AND expires_at > NOW()`, [buyerId]).catch(() => []);
+    return rows.reduce((m, r) => m * (Number(r.magnitude) || 1), 1);
+}
+
 export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null } = {}) {
     if (!buyerId) return null;
     const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
@@ -118,11 +126,13 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     // MARKET DAY — while the PHYSICAL Wolf Den store is open, every member earns bonus XP. Ties the game to real
     // store hours (and quietly rewards playing when you could pop in). Pure function of the clock — no DB cost.
     const marketMult = 1 + (storeStatus().open ? MARKET_DAY_XP_BONUS : 0);
-    const pts = Math.round(base * mult * xpMult * marketMult);
+    // Town HANGOUT buff — a personal +5% to XP & gold you earn after chilling in the plaza for 3 min (2h timer).
+    const hangout = await memberHangoutMult(buyerId).catch(() => 1);
+    const pts = Math.round(base * mult * xpMult * marketMult * hangout);
     // Gold is UNLINKED from XP: by default it still tracks XP 1:1 (purchases, donations, boss, quests…), but a
     // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
     // spendable currency for a payout we already paid the customer for. Town gold-boost rides on top of gold only.
-    const goldBase = gold === undefined ? base * mult : Number(gold) * mult;
+    const goldBase = (gold === undefined ? base * mult : Number(gold) * mult) * hangout;
     const goldDelta = Math.max(0, Math.round(goldBase * goldMult));
 
     // Per-action daily cap — enforced ATOMICALLY in the insert so rapid/concurrent awards can't slip past it

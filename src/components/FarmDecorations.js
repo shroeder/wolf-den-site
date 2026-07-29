@@ -157,7 +157,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                                 <span style={{ position: "absolute", top: 2, right: 2, fontSize: 11 }}>🔒</span>
                             </span>
                             <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#9aa4a0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
-                            <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: o.buyable ? "#ffd75e" : "#8fb3d6" }}>{o.buyable ? `🪙 ${o.price.toLocaleString()}` : (o.source === "spin" ? "🎡 wheel" : "🏆 track")}</span>
+                            <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: o.buyable ? "#ffd75e" : "#8fb3d6" }}>{o.buyable ? `🪙 ${o.price.toLocaleString()}` : (o.source === "spin" ? "🎡 wheel" : o.source === "glint" ? "✨ glint" : "🏆 track")}</span>
                         </button>
                     ))}
                     {onOpenCreator ? (
@@ -367,7 +367,7 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                         </div>
                     ) : null}
                     {!placed && !item.owned && !item.buyable ? (
-                        <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#8fb3d6", padding: "6px 0" }}>{item.source === "spin" ? "🎡 Win it from the Daily Spin wheel." : "🏆 Unlock it on the Rewards Track."}</div>
+                        <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#8fb3d6", padding: "6px 0" }}>{item.source === "spin" ? "🎡 Win it from the Daily Spin wheel." : item.source === "glint" ? "✨ Claim the rare hidden glint that appears in Town." : "🏆 Unlock it on the Rewards Track."}</div>
                     ) : null}
                     {!placed && item.owned ? (
                         <div className="muted" style={{ textAlign: "center", fontSize: 12 }}>You own this — drag it from your tray to place it.</div>

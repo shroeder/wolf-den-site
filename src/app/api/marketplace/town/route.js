@@ -6,6 +6,7 @@ import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownSta
 import { attackTownEvent, spawnTownEvent, duelRaidEnemy, bossRaidStrike, endTownEvent } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { claimWishingWell } from "@/lib/marketplace/town-projects.js";
+import { claimShiny } from "@/lib/marketplace/town-shiny.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -43,6 +44,7 @@ export async function POST(request) {
             else if (body?.action === "merchant_gamble") res = await gambleMerchantGear(buyer.id);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);
             else if (body?.action === "well_claim") res = await claimWishingWell(buyer.id);
+            else if (body?.action === "claim_shiny") res = await claimShiny(buyer.id, body?.shinyId);
             // Raid controls are PRIMARY-OWNER only (Luke) — a co-owner must not be able to fire a raid at the
             // whole membership. The in-Town spawn is now a REAL surprise drop: full HP + push everyone.
             else if (body?.action === "spawn_event") res = isPrimaryOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid") : { ok: false, error: "forbidden" };

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { runTownHoursTick, maybeSpawnRandomEvent } from "@/lib/marketplace/town-events.js";
+import { maybeSpawnShiny } from "@/lib/marketplace/town-shiny.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -25,7 +26,8 @@ export async function GET(request) {
             // Store-open spawn first; if that didn't fire, roll the evening-weighted random spawn.
             const hours = await runTownHoursTick();
             const random = hours.spawned ? { skipped: "store_open_spawned" } : await maybeSpawnRandomEvent();
-            return NextResponse.json({ success: true, hours, random });
+            const shiny = await maybeSpawnShiny().catch((e) => ({ error: String(e?.message || e) }));
+            return NextResponse.json({ success: true, hours, random, shiny });
         } catch (error) {
             return internalError(error, { event: "town_hours.run.failure" });
         }

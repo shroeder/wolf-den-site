@@ -150,7 +150,22 @@ export const DECORATIONS = [
     deco("deco_cornucopia", "Eternal Cornucopia", "🌽", "mythic", "level", null, { stat: "goldHarvest", value: 18 }, "overflowing golden cornucopia spilling endless harvest"),
     deco("deco_celestial_garden", "Celestial Orrery", "🪐", "mythic", "special", 12000, { stat: "harvestLuck", value: 15 }, "floating celestial orrery of orbiting planets and stars"),
     deco("deco_gaia_shrine", "Shrine of Gaia", "🌍", "mythic", "special", 12000, { stat: "seedLuck", value: 16 }, "verdant living shrine overflowing with glowing greenery and blossoms"),
+
+    // ── GLINT · SOURCE-EXCLUSIVE (source "glint", price null → un-buyable) ──────────────────────────────────
+    // The ONLY way to own these is to spot & claim the rare hidden shiny glint that drifts through the Town
+    // background 0-2× a day (first tap wins it — see town-shiny.js). A true "were you paying attention?" trophy set.
+    deco("deco_glint_meteorite", "Fallen Meteorite", "☄️", "mythic", "glint", null, { stat: "harvestLuck", value: 13 }, "glowing fallen meteorite fragment cratered in the earth, veined with molten light"),
+    deco("deco_glint_wishing_star", "Caught Wishing Star", "🌟", "legendary", "glint", null, { stat: "seedLuck", value: 12 }, "a captured five-point wishing star cradled in a little stand, softly radiating"),
+    deco("deco_glint_fae_lantern", "Faerie Lantern", "🏮", "legendary", "glint", null, { stat: "growSpeed", value: 11 }, "an ornate hovering faerie lantern glowing with warm enchanted light and drifting sparkles"),
+    deco("deco_glint_crystal_geode", "Starlit Geode", "💎", "mythic", "glint", null, { stat: "goldHarvest", value: 13 }, "a split crystal geode lined with glittering violet gemstone points catching starlight"),
+    deco("deco_glint_moonpetal", "Moonpetal Bloom", "🌙", "legendary", "glint", null, { stat: "petXp", value: 11 }, "a luminous silver-blue moonpetal flower in bloom, petals glowing faintly at night"),
+    deco("deco_glint_gilded_acorn", "Gilded Acorn", "🌰", "legendary", "glint", null, { stat: "fertPower", value: 12 }, "a polished golden acorn on a tiny pedestal, gleaming like treasure"),
+    deco("deco_glint_starforge", "Starforge Relic", "⭐", "mythic", "glint", null, { stat: "growSpeed", value: 13 }, "a small floating anvil-shaped relic forged from a star, ringed with orbiting sparks of light"),
+    deco("deco_glint_aurora_orb", "Aurora Orb", "🔮", "mythic", "glint", null, { stat: "harvestLuck", value: 12 }, "a crystal orb swirling with shifting aurora-borealis light, greens and purples"),
 ];
+
+// The pool a claimed shiny glint draws its reward from (source-exclusive — see town-shiny.js).
+export const GLINT_DECOS = DECORATIONS.filter((d) => d.source === "glint").map((d) => d.id);
 
 const BY_ID = new Map(DECORATIONS.map((d) => [d.id, d]));
 export const decorationById = (id) => BY_ID.get(id) || null;
