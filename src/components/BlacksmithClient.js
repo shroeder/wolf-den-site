@@ -87,7 +87,7 @@ export default function BlacksmithClient({ initial }) {
 
     const doCombine = useCallback(async (tier) => {
         const r = await post({ action: "combine", tier }, `cb-${tier}`);
-        if (r?.ok) SFX.perfect();
+        if (r?.ok) { (r.doubled ? SFX.pixel : SFX.perfect)(); if (r.doubled) setToast({ kind: "ok", text: "⚗️ Transmuter's Boon — the combine yielded 2!" }); }
     }, [post]);
 
     const doUpgrade = useCallback(async (key) => {

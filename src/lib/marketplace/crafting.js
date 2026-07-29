@@ -96,10 +96,11 @@ export const FORGE_UPGRADES = {
     keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.0167, base: 300, unit: "%" },
     masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 400, unit: "%" },
     steady_hand: { name: "Steady Hand", desc: "Chance a slip won't break your combo when you enhance.", max: 5, per: 0.05, base: 350, unit: "%" },
+    transmute: { name: "Transmuter's Boon", desc: "Chance a combine yields TWO parts instead of one (+1% per level).", max: 5, per: 0.01, base: 300, unit: "%" },
 };
 // Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
-const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️" };
-const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo-save chance" };
+const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️", transmute: "⚗️" };
+const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo-save chance", transmute: "Double-combine chance" };
 // Gold cost of the NEXT level: affordable base, doubling each level — mirrors the sailing/dig upgrade curves.
 const upgCost = (u, level) => Math.round(u.base * Math.pow(2, level));
 async function upgradeLevels(buyerId) {
@@ -293,12 +294,15 @@ export async function combineParts(buyerId, tier) {
     if (!buyerId || !(t >= 1 && t < MAX_TIER)) return { ok: false, error: "bad_tier" };
     const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, t, COMBINE_COST]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough", ...(await getForgeState(buyerId)) };
-    await addParts(buyerId, t + 1, 1);
+    // Transmuter's Boon: 1% per level chance the combine yields TWO of the next tier instead of one.
+    const upg = await upgradeLevels(buyerId).catch(() => ({}));
+    const made = 1 + (Math.random() < chance(upg, "transmute", null) ? 1 : 0);
+    await addParts(buyerId, t + 1, made);
     await awardXp(buyerId, "craft_combine", { points: 8, gold: 0 }).catch(() => {});
-    await logCraft(buyerId, "combine", { tier: t, meta: { to: t + 1 } });
+    await logCraft(buyerId, "combine", { tier: t, meta: { to: t + 1, made } });
     await bumpDaily(buyerId, "combines", 1);
     if (t + 1 >= MAX_TIER) grantEventBadge(buyerId, "forge_emberheart").catch(() => {});
-    return { ok: true, made: t + 1, ...(await getForgeState(buyerId)) };
+    return { ok: true, made: t + 1, madeCount: made, doubled: made > 1, ...(await getForgeState(buyerId)) };
 }
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
