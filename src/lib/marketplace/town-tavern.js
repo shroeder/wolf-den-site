@@ -137,7 +137,7 @@ export async function getTavernState(buyerId) {
             ? { active: true, bet: st.bet, dice: st.dice, rerolled: Boolean(st.rerolled), hand: scoreHand(st.dice).label, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET, playsLeft, dailyCap: GAMBIT_DAILY_CAP }
             : { active: false, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET, playsLeft, dailyCap: GAMBIT_DAILY_CAP },
         dailyPint: { available: !row?.drank_today, drinks: row?.drinks || 0, xp: PINT_XP, gold: PINT_GOLD },
-        round: { cost: ROUND_COST, bought: row?.rounds || 0 },
+        round: { cost: ROUND_COST, bought: row?.rounds || 0, hostXp: ROUND_HOST_XP, giftXp: ROUND_GIFT_XP },
         occupants: await tavernOccupants(buyerId).catch(() => []),
         rumors,
     };

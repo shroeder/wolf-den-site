@@ -297,14 +297,14 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.pint} alt="" draggable={false} />
                             ) : <span className="tv-order-emoji">🍺</span>}
-                            <span className="tv-order-lbl">Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP` : "tomorrow"}</small></span>
+                            <span className="tv-order-lbl">Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP · +${st?.dailyPint?.gold || 15}🪙` : "back tomorrow"}</small></span>
                         </button>
                         <button type="button" className="tv-order tv-order-round" disabled={busy || (st?.gold || 0) < roundCost} onClick={buyRoundAct} title="Buy a round for everyone here">
                             {iconArt?.round ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.round} alt="" draggable={false} />
                             ) : <span className="tv-order-emoji">🍻</span>}
-                            <span className="tv-order-lbl">Round · {roundCost.toLocaleString()}🪙<small>+XP for all</small></span>
+                            <span className="tv-order-lbl">Round · {roundCost.toLocaleString()}🪙<small>you +{st?.round?.hostXp || 60} XP · treats all</small></span>
                         </button>
                         <button type="button" className="tv-order tv-order-mini" onClick={askNews} title="Ask for gossip">🗞️</button>
                         <button type="button" className="tv-order tv-order-mini" onClick={() => setBarkeep(null)} aria-label="Step away">✕</button>
