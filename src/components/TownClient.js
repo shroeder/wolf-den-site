@@ -228,57 +228,64 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
     );
 }
 
-// BOSS RAID battle — the whole pack strikes ONE shared boss. Big boss + shared HP bar (live from the server),
-// the roster of everyone fighting, and a STRIKE button. No per-hit reward; killing it ends the raid (completion
-// reward handled by the parent). Damage floats pop on each hit; the bar reflects everyone's damage via polling.
-function BossRaidModal({ ev, bossArt, you, others, onStrike, onClose }) {
+// BOSS RAID battle — the whole pack rallies on ONE shared boss (like the weekly boss fight). Your hero AUTO-
+// attacks while you're here (engaging = being at the fight); everyone who's actively fighting shows as their real
+// hero sprite lunging at the boss. Shared HP bar drains for the pack; killing it ends the raid.
+function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     const [floats, setFloats] = useState([]); // { id, dmg, crit }
-    const [cd, setCd] = useState(false);
     const [localPct, setLocalPct] = useState(ev.hpPct ?? 100);
     const fidRef = useRef(0);
+    const cdRef = useRef(false);
     // Keep the bar in sync with the server (others' hits) but let a local strike drop it instantly.
     useEffect(() => { setLocalPct((p) => Math.min(p, ev.hpPct ?? 100)); }, [ev.hpPct]);
     const strike = useCallback(async () => {
-        if (cd) return;
-        setCd(true); setTimeout(() => setCd(false), 1000);
+        if (cdRef.current) return;
+        cdRef.current = true; setTimeout(() => { cdRef.current = false; }, 1000);
         const r = await onStrike();
         if (r?.ok) {
             const id = (fidRef.current += 1);
-            setFloats((f) => [...f, { id, dmg: r.damage, crit: r.crit }]);
-            setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 800);
+            setFloats((f) => [...f.slice(-6), { id, dmg: r.damage, crit: r.crit }]);
+            setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 850);
             if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
         }
-    }, [cd, onStrike]);
-    // The fighters currently in the plaza (you + others), a compact roster so you see who you're raiding with.
-    const roster = [{ id: "you", name: "You", sprite: you?.sprite, flip: you?.flip, isYou: true }, ...others.slice(0, 11).map((o) => ({ id: o.id, name: o.name, sprite: o.sprite, flip: o.flip }))];
+    }, [onStrike]);
+    // AUTO-ATTACK: your hero swings on its own while you're at the fight (no tapping). ~1.3s cadence (server 1s cd).
+    useEffect(() => {
+        strike();
+        const iv = setInterval(() => strike(), 1300);
+        return () => clearInterval(iv);
+    }, [strike]);
+    // The fighters ACTUALLY engaged right now (server: struck in the last 90s) + always you.
+    const server = ev.bossFighters || [];
+    const roster = [{ id: "you", name: "You", sprite: you?.sprite, flip: you?.flip, isYou: true }, ...server.filter((f) => !you || String(f.id) !== String(you.id)).slice(0, 13)];
     return (
         <div className="tw-boss-modal" role="dialog" aria-label="Boss raid">
             <div className="tw-boss-panel" onClick={(e) => e.stopPropagation()}>
                 <div className="tw-boss-top">
                     <div className="tw-boss-title">{ev.emoji} {ev.name}</div>
-                    <button type="button" className="tw-boss-leave" onClick={onClose} aria-label="Leave">✕</button>
+                    <button type="button" className="tw-boss-leave" onClick={onClose} aria-label="Leave the fight">✕ Leave</button>
                 </div>
-                <div className="tw-boss-stage" onClick={strike} role="button" aria-label="Strike the boss">
+                <div className="tw-boss-stage">
                     {bossArt ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className={`tw-boss-big${cd ? " is-cd" : ""}`} src={bossArt} alt={ev.name} draggable={false} />
+                        <img className="tw-boss-big" src={bossArt} alt={ev.name} draggable={false} />
                     ) : <span className="tw-boss-bigemoji">{ev.emoji}</span>}
-                    {floats.map((f) => <span key={f.id} className={`tw-boss-dmg${f.crit ? " is-crit" : ""}`} style={{ left: `${35 + (f.id * 17) % 30}%` }}>{f.crit ? "✦" : ""}{f.dmg}</span>)}
+                    {floats.map((f) => <span key={f.id} className={`tw-boss-dmg${f.crit ? " is-crit" : ""}`} style={{ left: `${28 + (f.id * 23) % 44}%` }}>{f.crit ? "✦" : ""}{f.dmg}</span>)}
                 </div>
-                <div className="tw-boss-hpwrap">
-                    <div className="tw-boss-hpline">HP <b>{Math.max(0, Math.round(localPct))}%</b> · you dealt {Number(ev.myDamage || 0).toLocaleString()}</div>
-                    <div className="tw-boss-hpouter"><span style={{ width: `${Math.max(0, localPct)}%` }} /></div>
-                </div>
-                <div className="tw-boss-roster">
-                    {roster.map((r) => (
-                        <span key={r.id} className={`tw-boss-fighter${r.isYou ? " is-you" : ""}`} title={r.name}>
-                            {r.sprite ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={r.sprite} alt="" style={{ transform: r.flip ? "scaleX(-1)" : "none" }} /> : <span>🐺</span>}
+                {/* The pack — every engaged fighter's hero sprite, lunging at the boss (staggered so it's a swarm). */}
+                <div className="tw-boss-fighters">
+                    {roster.map((r, i) => (
+                        <span key={r.id} className={`tw-boss-hero${r.isYou ? " is-you" : ""}`} title={r.name} style={{ animationDelay: `${(i * 0.17) % 1.3}s` }}>
+                            {r.sprite ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={r.sprite} alt="" style={{ transform: r.flip ? "scaleX(-1)" : "none" }} /> : <span className="tw-boss-herofallback">🐺</span>}
+                            {r.isYou ? <span className="tw-boss-heroyou">you</span> : null}
                         </span>
                     ))}
-                    <span className="tw-boss-count">{roster.length} fighting</span>
                 </div>
-                <button type="button" className={`tw-boss-strike${cd ? " is-cd" : ""}`} onClick={strike} disabled={cd}>{cd ? "…" : "⚔️ STRIKE!"}</button>
-                <div className="tw-boss-hint">Tap the boss or STRIKE — the whole pack shares its HP. Bring it down together!</div>
+                <div className="tw-boss-hpwrap">
+                    <div className="tw-boss-hpline">Boss HP <b>{Math.max(0, Math.round(localPct))}%</b> · ⚔️ {roster.length} fighting · you dealt {Number(ev.myDamage || 0).toLocaleString()}</div>
+                    <div className="tw-boss-hpouter"><span style={{ width: `${Math.max(0, localPct)}%` }} /></div>
+                </div>
+                <div className="tw-boss-hint">⚔️ Your hero is fighting — stay here to keep striking. The whole pack shares its HP; bring it down together!</div>
             </div>
         </div>
     );
@@ -1198,7 +1205,7 @@ export default function TownClient({ initial }) {
             {/* Raid victory recap */}
             {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
 
-            {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} others={otherList} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}
+            {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}
             {bossReward ? (
                 <div className="tw-duel" role="presentation" onClick={() => setBossReward(null)}>
                     <div className="tw-duel-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: "center" }}>
@@ -1373,13 +1380,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-boss-hpline b { color: #fff; }
 .tw-boss-hpouter { width: 100%; height: 16px; border-radius: 999px; background: rgba(0,0,0,0.55); border: 1px solid rgba(0,0,0,0.5); overflow: hidden; }
 .tw-boss-hpouter span { display: block; height: 100%; background: linear-gradient(90deg,#e0433f,#ff7a3c); transition: width .35s ease; }
-.tw-boss-roster { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; width: 100%; }
-.tw-boss-fighter { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); display: grid; place-items: center; font-size: 15px; }
-.tw-boss-fighter.is-you { border-color: #ffd75e; box-shadow: 0 0 8px rgba(255,215,94,0.5); }
-.tw-boss-fighter img { width: 100%; height: 100%; object-fit: contain; }
-.tw-boss-count { font-size: 0.68rem; font-weight: 800; color: #cbb9a0; margin-left: 4px; }
-.tw-boss-strike { width: 100%; padding: 14px; border-radius: 14px; border: none; background: linear-gradient(180deg,#ff8a4c,#e0431a); color: #fff; font-weight: 900; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 16px rgba(224,67,26,0.5); text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
-.tw-boss-strike.is-cd { opacity: 0.6; cursor: default; }
+/* The pack — engaged fighters' hero sprites lunging at the boss (each on its own stagger so it reads as a swarm). */
+.tw-boss-fighters { display: flex; flex-wrap: wrap; gap: 2px; align-items: flex-end; justify-content: center; width: 100%; min-height: 56px; }
+.tw-boss-hero { position: relative; width: 46px; height: 52px; display: grid; place-items: end center; animation: twBossHeroAttack 1.3s ease-in-out infinite; }
+.tw-boss-hero img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
+.tw-boss-herofallback { font-size: 30px; }
+.tw-boss-hero.is-you img { filter: drop-shadow(0 0 6px rgba(255,215,94,0.9)) drop-shadow(0 3px 4px rgba(0,0,0,0.5)); }
+.tw-boss-heroyou { position: absolute; top: -4px; left: 50%; transform: translateX(-50%); font-size: 0.5rem; font-weight: 900; color: #2a1a06; background: #ffd75e; border-radius: 999px; padding: 0 4px; }
+@keyframes twBossHeroAttack { 0%,100% { transform: translateY(0) rotate(0); } 45% { transform: translateY(-9px) rotate(-6deg); } 60% { transform: translateY(-2px) rotate(3deg); } }
 .tw-boss-hint { font-size: 0.68rem; color: #cbb9a0; text-align: center; }
 /* ── DUEL modal ── */
 .tw-duel { position: fixed; inset: 0; z-index: 640; display: grid; place-items: center; padding: 18px; background: radial-gradient(120% 120% at 50% 30%, rgba(40,12,8,0.72), rgba(4,2,1,0.9)); animation: twRevealIn .2s ease both; }

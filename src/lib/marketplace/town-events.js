@@ -39,8 +39,8 @@ export const TOWN_EVENT_TYPES = {
     // The golem is a BOSS RAID (not a skirmish): ONE huge shared boss everyone strikes together, its HP bar drains
     // for the whole pack, and killing it ENDS the raid. No per-hit rewards — only a rich completion reward.
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", boss: true, hp: 260000, testHp: 6000, rewardGold: 4000, durationMin: 20,
-        pushTitle: "💎 A Treasure Golem BOSS lumbered into Town!", pushBody: "It's massive — the whole pack has to bring it down together. Rush the plaza!",
+        name: "Treasure Golem", emoji: "💎", boss: true, hp: 5200000, testHp: 30000, rewardGold: 4000, durationMin: 45,
+        pushTitle: "💎 A Treasure Golem BOSS lumbered into Town!", pushBody: "It's MASSIVE — the whole pack has to rally and bring it down together. Rush the plaza!",
     },
 };
 
@@ -128,6 +128,18 @@ export async function getActiveTownEvent(buyerId) {
         db.query(`SELECT h.buyer_id, h.damage, b.display_name, b.alias FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id WHERE h.event_id = $1 ORDER BY h.damage DESC LIMIT 5`, [ev.id]).catch(() => []),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_event_hit WHERE event_id = $1`, [ev.id]).catch(() => ({ n: 0 })),
     ]);
+    // BOSS: the fighters ACTUALLY at the fight right now (struck in the last 90s) with their hero sprites — so the
+    // battle shows who came and engaged, not random online members.
+    let bossFighters = [];
+    if (isBoss) {
+        const fr = await db.query(
+            `SELECT h.buyer_id, h.damage, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
+               FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+              WHERE h.event_id = $1 AND h.last_hit_at > NOW() - INTERVAL '90 seconds'
+              ORDER BY h.damage DESC LIMIT 14`, [ev.id]
+        ).catch(() => []);
+        bossFighters = fr.map((r) => ({ id: r.buyer_id, name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"), sprite: r.avatar_sprite_url || null, flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false, damage: Number(r.damage) || 0 }));
+    }
     return {
         id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️", boss: isBoss,
         hp: ev.hp, hpMax: ev.hp_max, endsAt: ev.ends_at, startedAt: ev.started_at, rewardGold: ev.reward_gold,
@@ -137,6 +149,7 @@ export async function getActiveTownEvent(buyerId) {
         myDamage: mine?.damage || 0, myHits: mine?.hits || 0,
         fighterCount: count?.n || 0,
         fighters: (top || []).map((t) => ({ name: t.display_name || (t.alias ? `@${t.alias}` : "Wolf"), damage: t.damage })),
+        bossFighters,
     };
 }
 
