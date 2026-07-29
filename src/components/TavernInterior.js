@@ -35,7 +35,7 @@ const NPCS = [
 ];
 
 function Die({ value, held = false, rolling = false, locked = false, small = false, onClick }) {
-    const size = small ? 36 : 54;
+    const size = small ? 30 : 54;
     return (
         <button type="button" onClick={onClick} disabled={!onClick || locked} className={`tv-diebtn${held ? " is-held" : ""}${rolling ? " is-rolling" : ""}${!onClick ? " is-static" : ""}`} style={{ width: size, height: size }}>
             <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
@@ -87,6 +87,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
     const momentumRef = useRef(0);
     const moveTimer = useRef(null);
     const greeted = useRef(false);
+    const overlayRef = useRef(false); // true while a station/member panel is open → the room ignores its own taps/drags
 
     useEffect(() => {
         const el = sceneRef.current; if (!el) return undefined;
@@ -139,11 +140,13 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
 
     // Pointer: DRAG pans the room (with flick momentum); a TAP walks you / opens an NPC.
     const onPointerDown = useCallback((e) => {
+        if (overlayRef.current) return; // a panel is open — don't start a room drag behind it
         cancelAnimationFrame(momentumRef.current);
         drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0 };
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ok */ }
     }, []);
     const onPointerMove = useCallback((e) => {
+        if (overlayRef.current) return;
         const d = drag.current; if (!d.down) return;
         const dx = e.clientX - d.lastX;
         if (!d.moved && Math.abs(e.clientX - d.startX) > 4 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) { d.moved = true; setDragging(true); }
@@ -155,6 +158,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
     }, [followCam, maxScroll]);
     const onPointerUp = useCallback((e) => {
         const d = drag.current; d.down = false;
+        if (overlayRef.current) { setDragging(false); return; } // panel open → ignore
         if (d.moved) {
             let v = d.vx * 16;
             const glide = () => { v *= 0.94; if (Math.abs(v) < 0.4) { setDragging(false); return; } setPanExtra((p) => clamp(followCam + p - v, 0, maxScroll) - followCam); momentumRef.current = requestAnimationFrame(glide); };
@@ -162,7 +166,8 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
             return;
         }
         setDragging(false);
-        if (e.target.closest(".tv-npc")) return; // NPC handles itself
+        // NPCs, avatars, the emote bar, Leave — any button/link handles itself; don't ALSO walk the hero there.
+        if (e.target.closest("button, a, .tv-av")) return;
         const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
         const worldX = ((e.clientX - rect.left + cameraPx) / WORLD_W) * 100;
         walkToWorld(worldX);
@@ -195,7 +200,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
         setResult(null); setFlash(null);
         const r = await act({ action: "gambit_start", bet: amount });
         if (r?.ok) { setRolling(true); setG({ bet: r.bet, dice: r.dice, hold: [false, false, false], rerolled: false, hand: r.hand }); setTimeout(() => setRolling(false), 650); }
-        else setFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : "Couldn't ante up.");
+        else setFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : r?.error === "daily_limit" ? "That's your five rolls for today — the Gambler's cashing out. Back tomorrow!" : "Couldn't ante up.");
     }, [act]);
     const toggleHold = useCallback((i) => { setG((cur) => (cur && !cur.rerolled ? { ...cur, hold: cur.hold.map((h, idx) => (idx === i ? !h : h)) } : cur)); }, []);
     const reroll = useCallback(async () => {
@@ -219,6 +224,9 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
     const openStation = useCallback((key) => { setFlash(null); if (key === "dice") { setG(null); setResult(null); } if (key === "bar" || key === "hearth") setLine(pick(key === "bar" ? GREET : LORE)); setStation(key); }, []);
     const others = st?.occupants || [];
     const here = others.length + 1;
+    overlayRef.current = Boolean(station || menuFor); // keep the pointer-guard in sync each render
+    const dicePlaysLeft = st?.dice?.playsLeft ?? st?.dice?.dailyCap ?? 5;
+    const diceCap = st?.dice?.dailyCap ?? 5;
 
     return (
         <div className="stack reveal">
@@ -316,10 +324,17 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, me, onLeave }) 
                                 </div>
                                 {flash ? <div className="tv-flash">{flash}</div> : null}
                                 {!g && !result ? (
-                                    <div className="tv-bets">
-                                        {[50, 200, 500].map((amt) => <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => ante(amt)}>Ante {amt}</button>)}
-                                        <span className="muted tv-gold">🪙 {(st?.gold || 0).toLocaleString()}</span>
-                                    </div>
+                                    dicePlaysLeft > 0 ? (
+                                        <>
+                                            <div className="tv-bets">
+                                                {[50, 200, 500].map((amt) => <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => ante(amt)}>Ante {amt}</button>)}
+                                                <span className="muted tv-gold">🪙 {(st?.gold || 0).toLocaleString()}</span>
+                                            </div>
+                                            <div className="tv-dice-left muted">🎲 {dicePlaysLeft} of {diceCap} rolls left today</div>
+                                        </>
+                                    ) : (
+                                        <div className="tv-flash">🎲 That&apos;s your {diceCap} rolls for today — the Gambler&apos;s calling it a night. Come back tomorrow!</div>
+                                    )
                                 ) : null}
                                 {g ? (
                                     <div className="tv-gambit">
@@ -427,7 +442,7 @@ const TV_CSS = `
 .tv-hand-label { font-size: 0.92rem; color: #f2ead9; }
 .tv-hand-label strong { color: #ffe0b0; }
 .tv-dice-row { display: flex; gap: 12px; justify-content: center; padding: 6px 0; }
-.tv-dice-row.sm { gap: 7px; padding: 2px 0; }
+.tv-dice-row.sm { gap: 5px; padding: 2px 0; }
 .tv-diebtn { position: relative; padding: 0; border: none; background: none; cursor: pointer; border-radius: 12px; transition: transform .12s ease; }
 .tv-diebtn.is-static { cursor: default; }
 .tv-diebtn:not(.is-static):active { transform: scale(0.92); }
@@ -437,12 +452,13 @@ const TV_CSS = `
 @keyframes tvTumble { 0% { transform: translateY(-18px) rotate(-60deg) scale(.7); } 60% { transform: translateY(3px) rotate(12deg) scale(1.08); } 100% { transform: translateY(0) rotate(0) scale(1); } }
 .tv-held-tag { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 8.5px; font-weight: 900; letter-spacing: .04em; color: #06311f; background: #43d98a; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .tv-result { display: flex; flex-direction: column; gap: 12px; }
-.tv-vs { display: flex; align-items: stretch; gap: 8px; }
-.tv-vs-side { flex: 1 1 0; text-align: center; padding: 10px 6px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+.tv-vs { display: flex; align-items: stretch; gap: 6px; }
+.tv-vs-side { flex: 1 1 0; min-width: 0; overflow: hidden; text-align: center; padding: 9px 4px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 .tv-vs-side.is-win { border-color: rgba(67,217,138,0.6); background: rgba(67,217,138,0.1); box-shadow: 0 0 14px rgba(67,217,138,0.25); }
-.tv-vs-who { font-size: 0.78rem; font-weight: 800; color: #cbb9e0; margin-bottom: 4px; }
-.tv-vs-hand { font-size: 0.78rem; font-weight: 800; color: #ffe0b0; margin-top: 4px; }
-.tv-vs-x { align-self: center; font-weight: 900; color: #9aa0a6; font-size: 0.8rem; }
+.tv-vs-who { font-size: 0.76rem; font-weight: 800; color: #cbb9e0; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-vs-hand { font-size: 0.74rem; font-weight: 800; color: #ffe0b0; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-vs-x { align-self: center; font-weight: 900; color: #9aa0a6; font-size: 0.8rem; flex: 0 0 auto; }
+.tv-dice-left { text-align: center; font-size: 0.76rem; margin-top: -4px; }
 .tv-play-btns { display: flex; gap: 10px; }
 .tv-roll { flex: 1 1 auto; padding: 12px; border-radius: 12px; border: none; cursor: pointer; font-weight: 900; font-size: 15px; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 0 #b57f22; }
 .tv-roll:active { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }

@@ -56,8 +56,21 @@ const ROUND_HOST_XP = 60;             // the buyer's own toast
 // ── Wolf's Gambit: 3-dice poker vs the house Gambler. Ante → roll 3 → hold/reroll once → best hand wins. ──
 const GAMBIT_MIN_BET = 50;
 const GAMBIT_MAX_BET = 2000;
+const GAMBIT_DAILY_CAP = 5; // most Wolf's Gambit rounds a member can START per store-local (Chicago) day
 const d6 = () => 1 + Math.floor(Math.random() * 6);
 const rollThree = () => [d6(), d6(), d6()];
+
+// How many Gambit rounds you've STARTED today (store-local day) — counted off the ante ledger entries so no
+// extra column is needed. Powers the 5/day cap.
+async function gambitPlaysToday(buyerId) {
+    const row = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM mkt_coin_event
+          WHERE buyer_id = $1 AND reason = 'tavern_gambit_bet'
+            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date`,
+        [buyerId]
+    ).catch(() => null);
+    return Number(row?.n || 0);
+}
 
 // Rank a 3-die hand → { rank, tie[], label }. rank: 4 three-of-a-kind > 3 straight > 2 pair > 1 high roll.
 function scoreHand(dice) {
@@ -106,7 +119,7 @@ async function getRumors() {
 // Full tavern state for the interior screen: your gold, dice session, daily-pint availability, rumors.
 export async function getTavernState(buyerId) {
     if (!buyerId) return null;
-    const [row, gold, rumors] = await Promise.all([
+    const [row, gold, rumors, playsToday] = await Promise.all([
         db.queryOne(
             `SELECT dice_active, dice_state, rounds,
                     (last_drink_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS drank_today, drinks
@@ -114,13 +127,15 @@ export async function getTavernState(buyerId) {
         ).catch(() => null),
         db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getRumors().catch(() => []),
+        gambitPlaysToday(buyerId).catch(() => 0),
     ]);
     const st = row?.dice_active ? row.dice_state : null;
+    const playsLeft = Math.max(0, GAMBIT_DAILY_CAP - playsToday);
     return {
         gold: Number(gold?.gold || 0),
         dice: st
-            ? { active: true, bet: st.bet, dice: st.dice, rerolled: Boolean(st.rerolled), hand: scoreHand(st.dice).label, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET }
-            : { active: false, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET },
+            ? { active: true, bet: st.bet, dice: st.dice, rerolled: Boolean(st.rerolled), hand: scoreHand(st.dice).label, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET, playsLeft, dailyCap: GAMBIT_DAILY_CAP }
+            : { active: false, minBet: GAMBIT_MIN_BET, maxBet: GAMBIT_MAX_BET, playsLeft, dailyCap: GAMBIT_DAILY_CAP },
         dailyPint: { available: !row?.drank_today, drinks: row?.drinks || 0, xp: PINT_XP, gold: PINT_GOLD },
         round: { cost: ROUND_COST, bought: row?.rounds || 0 },
         occupants: await tavernOccupants(buyerId).catch(() => []),
@@ -135,6 +150,8 @@ export async function gambitStart(buyerId, bet) {
     if (b < GAMBIT_MIN_BET || b > GAMBIT_MAX_BET) return { ok: false, error: "bad_bet" };
     const cur = await db.queryOne(`SELECT dice_active FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null);
     if (cur?.dice_active) return { ok: false, error: "already_playing" };
+    // Cap: at most GAMBIT_DAILY_CAP new rounds per store-local day (an in-progress hand can still be resolved).
+    if ((await gambitPlaysToday(buyerId)) >= GAMBIT_DAILY_CAP) return { ok: false, error: "daily_limit" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, b]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -b, "tavern_gambit_bet", { balanceAfter: paid.gold }).catch(() => {});
