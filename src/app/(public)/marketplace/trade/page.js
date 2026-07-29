@@ -45,6 +45,8 @@ export default async function TradesPage() {
                                 ) : <span style={{ fontSize: 34, lineHeight: "48px" }}>{it.icon || "🎁"}</span>}
                                 <b style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.15 }}>{it.name}</b>
                                 <span style={{ fontSize: 10, textTransform: "capitalize", color: RC[it.rarity] || "#9aa0a6" }}>{it.rarity}</span>
+                                {it.stats ? <span style={{ fontSize: 9.5, color: "#cbd3c2", lineHeight: 1.25 }}>{it.stats}</span> : null}
+                                {it.enhanceLevel > 0 ? <span style={{ fontSize: 9.5, fontWeight: 800, color: "#8fe39a", lineHeight: 1.2 }}>⚒️ +{it.enhanceLevel} · {it.forgeStats}</span> : null}
                                 <span style={{ fontSize: 10, color: "#9aa0a6" }}>@{it.ownerAlias}</span>
                             </Link>
                         ))}

@@ -6,17 +6,22 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
 import { itemById } from "@/lib/marketplace/items.js";
+import { enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { getPublicProfileByAlias } from "@/lib/marketplace/profile.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Propose a trade | Wolf Den", robots: { index: false, follow: false } };
 
-// Carry the item's boss STATS (+ charged-perk / sea-affinity flags) so the trade cards can show what a piece
-// actually does — you shouldn't have to guess what you're giving away.
-const strip = (inv) => (inv?.items || []).map((i) => {
+const mergeStats = (base = {}, bonus = {}) => { const m = { ...(base || {}) }; for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0); return m; };
+
+// Carry the item's EFFECTIVE stats (base + that owner's forge enhancement) + charged/sea flags so the trade
+// cards show what a piece actually does — including forging — you shouldn't have to guess what you're giving away.
+const strip = (inv, enh = {}) => (inv?.items || []).map((i) => {
     const d = itemById(i.id);
-    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats: d?.stats || null, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea), equipped: Boolean(i.equipped) };
+    const lvl = enh[i.id]?.level || 0;
+    const stats = lvl ? mergeStats(d?.stats || {}, enh[i.id]?.bonus || {}) : (d?.stats || null);
+    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats, enhanceLevel: lvl, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea), equipped: Boolean(i.equipped) };
 });
 const petStrip = (ids) => ids.map((id) => collectibleById(id)).filter(Boolean).map((d) => ({ id: d.id, name: d.name, rarity: d.rarity }));
 
@@ -34,6 +39,11 @@ export default async function NewTradePage({ searchParams }) {
         getInventory(target.id).catch(() => null),
         petsState(me.id).catch(() => ({ earnedTradeableIds: [], ownedIds: [] })),
         petsState(target.id).catch(() => ({ earnedTradeableIds: [], ownedIds: [] })),
+    ]);
+    // Forge enhancements for each side's items → so trade cards show real (base + forge) stats.
+    const [myEnh, theirEnh] = await Promise.all([
+        enhanceDetailsFor(me.id, (myInv?.items || []).map((i) => i.id)).catch(() => ({})),
+        enhanceDetailsFor(target.id, (theirInv?.items || []).map((i) => i.id)).catch(() => ({})),
     ]);
     // My tradeable pets; their tradeable pets that I DON'T already own (no point requesting a dupe).
     const myOwned = new Set(myPets.ownedIds || []);
@@ -55,8 +65,8 @@ export default async function NewTradePage({ searchParams }) {
                 </div>
             </section>
             <TradeBuilder
-                me={{ items: strip(myInv), pets: myTradePets, gold: myInv?.gold || 0 }}
-                them={{ id: target.id, label: target.displayLabel, alias: target.alias, items: strip(theirInv), pets: theirTradePets }}
+                me={{ items: strip(myInv, myEnh), pets: myTradePets, gold: myInv?.gold || 0 }}
+                them={{ id: target.id, label: target.displayLabel, alias: target.alias, items: strip(theirInv, theirEnh), pets: theirTradePets }}
                 preselectWant={want || null}
                 preselectWantPet={wantPet || null}
             />

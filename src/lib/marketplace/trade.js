@@ -12,6 +12,13 @@ import { transferItemEnhancement } from "@/lib/marketplace/crafting.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
 
+// Merge base item stats with a forge stat-bonus into effective totals (for showing real stats on trade cards).
+function mergeStats(base = {}, bonus = {}) {
+    const m = { ...(base || {}) };
+    for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0);
+    return m;
+}
+
 function cleanItemIds(list) {
     if (!Array.isArray(list)) return [];
     return [...new Set(list.map((x) => String(x || "").trim()).filter((id) => itemById(id)))].slice(0, MAX_SIDE);
@@ -91,6 +98,12 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
         [viewerId]
     ).catch(() => []);
     const spriteMap = await itemSpriteMap().catch(() => ({}));
+    // Each browsable copy belongs to a specific owner → fetch THAT owner's forge enhancement so the card shows
+    // the item's real (base + forge) stats, not just the base.
+    const bIds = [...new Set(rows.map((r) => r.buyer_id))];
+    const iIds = [...new Set(rows.map((r) => r.item_id))];
+    const enhRows = bIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [bIds, iIds]).catch(() => []) : [];
+    const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})) }]));
     const query = String(q || "").trim().toLowerCase();
     const out = [];
     for (const r of rows) {
@@ -98,8 +111,13 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
         if (!it) continue;
         if (rarity && it.rarity !== rarity) continue;
         if (query && !it.name.toLowerCase().includes(query) && !(r.alias || "").toLowerCase().includes(query)) continue;
+        const det = enhMap.get(`${r.buyer_id}|${r.item_id}`);
+        const bonus = det?.bonus || null;
         out.push({
-            itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot, stats: describeStats(it.stats),
+            itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot,
+            stats: describeStats(mergeStats(it.stats || {}, bonus || {})),
+            forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,
+            enhanceLevel: det?.level || 0,
             icon: it.icon, sprite: spriteMap[r.item_id] || null,
             ownerName: r.display_name || `@${r.alias}`, ownerAlias: r.alias,
         });

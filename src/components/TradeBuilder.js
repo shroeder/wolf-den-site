@@ -28,6 +28,7 @@ function ItemToggle({ item, on, onClick, blocked = false }) {
                     ))}
                 </span>
             ) : <span style={{ fontSize: "0.62rem", opacity: 0.55, margin: "1px 0 2px" }}>cosmetic</span>}
+            {item.enhanceLevel > 0 ? <span style={{ fontSize: "0.6rem", color: "#8fe39a", fontWeight: 800 }}>⚒️ +{item.enhanceLevel} forged</span> : null}
             {(item.charged || item.sea) ? (
                 <span style={{ fontSize: "0.6rem", color: "#ffd75e", fontWeight: 700 }}>{item.charged ? "🔋 perk" : ""}{item.charged && item.sea ? " · " : ""}{item.sea ? "🌊 sea" : ""}</span>
             ) : null}
