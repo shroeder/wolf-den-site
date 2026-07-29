@@ -512,9 +512,10 @@ export async function getBossState(buyerId = null) {
         // Fortune (raffle luck) from pets/gear banks bonus tickets PER DAY the boss is alive (see fortuneTickets).
         const myFortuneTickets = fortuneTickets(myPet?.stats?.fortune || 0, boss);
         you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: Math.floor(dmg / divisor) + myFortuneTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
-        // Keep your Hall-of-Heroes chip in sync with your headline ticket count (dmg tickets + fortune) — the
-        // raffle counts fortune, so both should show the same total instead of the chip showing dmg-only.
-        if (mine) mine.tickets = you.tickets;
+        // NOTE: do NOT fold your fortune tickets into your roster card — that made the shared leaderboard show
+        // different totals to every viewer (each person saw only THEIR OWN card boosted). The roster now shows
+        // the same damage-based tickets to everyone; your fortune bonus lives in `you.tickets`/`you.fortuneTickets`
+        // (your personal headline) and still counts in the actual raffle draw.
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
