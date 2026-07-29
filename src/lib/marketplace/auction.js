@@ -245,6 +245,9 @@ export async function buyAuctionListing(buyerId, listingId) {
     await grantItem(buyerId, claim.item_id, "auction").catch(() => {});
     await transferItemEnhancement(claim.seller_id, buyerId, claim.item_id); // any Forge enhancement rides with it
     const it = itemById(claim.item_id);
+    // A LEVEL item the seller sold must not be auto-re-granted back to them (syncLevelItems) — mark it sold for
+    // the seller, mirroring salvage. (Harmless for other sources; they're never auto-granted anyway.)
+    if (it?.source === "level") await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [claim.seller_id, claim.item_id]).catch(() => {});
     return { ok: true, item: { id: claim.item_id, name: it?.name, rarity: it?.rarity }, price, gold: Number(paid.gold) };
 }
 

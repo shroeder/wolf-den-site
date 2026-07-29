@@ -240,16 +240,21 @@ export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rar
 // and total stats.
 export async function getInventory(buyerId) {
     if (!buyerId) return { items: [], equipped: {}, slots: EQUIP_SLOTS, stats: {}, gold: 0, shop: [] };
-    const [ownedRows, bySlot, goldRow, enhRows] = await Promise.all([
+    const [ownedRows, bySlot, goldRow, enhRows, listedRows] = await Promise.all([
         db.query(`SELECT item_id, acquired_via, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getEquippedIds(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT item_id, level, util FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
     ]);
+    // Items you have up for auction are "in escrow" — don't show them in the bag (an auto-re-granted level item
+    // could otherwise reappear here while it's still listed).
+    const listedSet = new Set(listedRows.map((r) => r.item_id));
     const ownedIds = new Set(ownedRows.map((r) => r.item_id));
     const equippedIds = new Set(Object.values(bySlot));
     const enhById = new Map((enhRows || []).map((r) => [r.item_id, { level: r.level, util: r.util }]));
     const items = ownedRows
+        .filter((r) => !listedSet.has(r.item_id)) // hide anything currently up for auction
         .map((r) => {
             const def = itemById(r.item_id);
             if (!def) return null;
@@ -394,17 +399,19 @@ async function onEliteItemGained(buyerId, item) {
 // Auto-grant the level/milestone items a member now qualifies for (source: 'level'). Like pets unlocking.
 export async function syncLevelItems(buyerId) {
     if (!buyerId) return [];
-    const [ctx, ownedRows, metrics, soldRows] = await Promise.all([
+    const [ctx, ownedRows, metrics, soldRows, listedRows] = await Promise.all([
         memberContext(buyerId),
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getMemberMetrics(buyerId).catch(() => null),
         db.query(`SELECT item_id FROM mkt_sold_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
     ]);
     const owned = new Set(ownedRows.map((r) => r.item_id));
     const sold = new Set(soldRows.map((r) => r.item_id)); // sold gear stays sold — never auto-re-granted
+    const listed = new Set(listedRows.map((r) => r.item_id)); // a level item you've LISTED must not be re-granted under you
     const granted = [];
     for (const item of ITEMS) {
-        if (item.source !== "level" || owned.has(item.id) || sold.has(item.id)) continue;
+        if (item.source !== "level" || owned.has(item.id) || sold.has(item.id) || listed.has(item.id)) continue;
         if (itemLockReason(item, ctx, metrics)) continue;
         const res = await grantItem(buyerId, item.id, "level");
         if (res.granted) granted.push(item);
