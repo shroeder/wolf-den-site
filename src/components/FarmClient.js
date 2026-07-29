@@ -964,7 +964,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             (don't also show yourself as a guest); when VISITING you appear so you see yourself here. */}
                         {(view === "outside" || view === "inside") ? (
                             (farm.visitors || []).filter((v) => (farm.mine ? !v.isYou : true)).map((vis, i) => (
-                                <div key={vis.id} className={`farm-visitor${vis.isYou ? " is-you" : ""}`} style={{ left: `${10 + (i * 71) % 78}%`, top: `${70 + (i % 3) * 6 - groundShift}%`, animationDelay: `${(i % 4) * 0.4}s` }}>
+                                <div key={vis.id} className={`farm-visitor${vis.isYou ? " is-you" : ""}`} style={{ left: `${14 + (i * 67) % 70}%`, top: `${petGroundY(83 + (i % 3) * 3)}%`, animationDelay: `${(i % 4) * 0.4}s` }}>
                                     <span className="farm-visitor-name">{vis.isYou ? "🐺 you" : vis.name}</span>
                                     {vis.sprite ? (
                                         // eslint-disable-next-line @next/next/no-img-element
