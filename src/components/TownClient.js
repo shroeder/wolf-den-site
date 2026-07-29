@@ -24,8 +24,71 @@ const TILES = (n) => Array.from({ length: n }, (_, i) => i);
 // Which town-art sprite each raid kind uses (falls back to the event emoji until the art is generated).
 const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem" };
 const CAT_LABEL = { civic: "🏛️ Civic", building: "🏚️ Buildings", service: "🧭 Services", unlock: "🌟 New buildings" };
+// Town Development projects that have a real sprite for their card icon (replaces the emoji when the art exists).
+const PROJECT_ART = { market: "trading_post" };
 // A message that's just emoji (a reaction/emote) pops as a floating emote instead of a text bubble.
 const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
+
+// Rarity colors/labels for the gear-gamble reveal (Tier 1-4 = common/rare/epic/legendary).
+const RARITY_META = {
+    common: { label: "Common", color: "#c2c9d4", glow: "rgba(194,201,212,0.65)", stars: 1 },
+    rare: { label: "Rare", color: "#4aa3ff", glow: "rgba(74,163,255,0.8)", stars: 2 },
+    epic: { label: "Epic", color: "#b878ff", glow: "rgba(184,120,255,0.85)", stars: 3 },
+    legendary: { label: "Legendary", color: "#ffcf3a", glow: "rgba(255,207,58,0.92)", stars: 4 },
+};
+
+// Full-screen gear-gamble reveal: a suspenseful dice tumble, then a rarity-colored burst that pops the won
+// item in with light, sparks (epic+) and its tier/rarity. This is the dopamine moment.
+function GambleReveal({ reveal, diceUrl, onClose }) {
+    const rolling = reveal.phase === "rolling";
+    const item = reveal.item;
+    const rar = RARITY_META[item?.rarity] || RARITY_META.common;
+    const legendary = item?.rarity === "legendary";
+    const epicPlus = legendary || item?.rarity === "epic";
+    const nSparks = legendary ? 20 : 12;
+    return (
+        <div className="tw-reveal" role="dialog" aria-modal="true" onClick={rolling ? undefined : onClose}>
+            {rolling ? (
+                <div className="tw-reveal-roll">
+                    {diceUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="tw-reveal-dice" src={diceUrl} alt="" draggable={false} />
+                    ) : <span className="tw-reveal-dice tw-reveal-dice-emoji" aria-hidden="true">🎲</span>}
+                    <div className="tw-reveal-rolltext">Rolling the bones<span className="tw-reveal-dots"><span>.</span><span>.</span><span>.</span></span></div>
+                </div>
+            ) : reveal.dupeAll ? (
+                <div className="tw-reveal-card" onClick={(e) => e.stopPropagation()} role="presentation">
+                    <div className="tw-reveal-rarity">Full collection!</div>
+                    <div className="tw-reveal-itemwrap"><span className="tw-reveal-item tw-reveal-item-emoji" aria-hidden="true">🪙</span></div>
+                    <div className="tw-reveal-name">You already own every piece</div>
+                    <div className="tw-reveal-slot">The merchant hands back {reveal.refund.toLocaleString()} gold.</div>
+                    <button type="button" className="tw-reveal-btn" onClick={onClose}>Fair enough</button>
+                </div>
+            ) : (
+                <div className={`tw-reveal-card${legendary ? " is-legendary" : ""}`} style={{ "--rar": rar.color, "--rar-glow": rar.glow }} onClick={(e) => e.stopPropagation()} role="presentation">
+                    <div className={`tw-reveal-burst${epicPlus ? " is-big" : ""}`} aria-hidden="true" />
+                    {epicPlus ? (
+                        <div className="tw-reveal-sparks" aria-hidden="true">
+                            {Array.from({ length: nSparks }).map((_, i) => (
+                                <span key={i} style={{ "--a": `${(360 / nSparks) * i}deg`, "--dly": `${(i % 5) * 0.05}s` }} />
+                            ))}
+                        </div>
+                    ) : null}
+                    <div className="tw-reveal-rarity">{rar.label} <span className="tw-reveal-stars" aria-hidden="true">{"★".repeat(rar.stars)}</span></div>
+                    <div className="tw-reveal-itemwrap">
+                        {item?.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="tw-reveal-item" src={item.image} alt={item.name} draggable={false} />
+                        ) : <span className="tw-reveal-item tw-reveal-item-emoji" aria-hidden="true">🛡️</span>}
+                    </div>
+                    <div className="tw-reveal-name">{item?.name}</div>
+                    <div className="tw-reveal-slot">Tier {item?.tier} · {item?.slot}</div>
+                    <button type="button" className="tw-reveal-btn" onClick={onClose}>Collect it →</button>
+                </div>
+            )}
+        </div>
+    );
+}
 
 function Avatar({ a, isYou, onTap }) {
     const dur = clamp((a.moveDist || 0) * 0.05, 0.4, 2.6);
@@ -156,6 +219,7 @@ export default function TownClient({ initial }) {
     const [merchantOpen, setMerchantOpen] = useState(false);
     const [merchantBusy, setMerchantBusy] = useState(false);
     const [merchantFlash, setMerchantFlash] = useState(null);
+    const [gambleReveal, setGambleReveal] = useState(null); // big gear-gamble reveal: { phase:"rolling"|"reveal", item, dupeAll, refund }
     const [crierMsg, setCrierMsg] = useState(0);      // which rotating announcement the crier is shouting
     const [questOpen, setQuestOpen] = useState(false);
     const [questBusy, setQuestBusy] = useState(false);
@@ -183,7 +247,12 @@ export default function TownClient({ initial }) {
     }, []);
 
     // Lock the page scroll while any Town overlay is open, so the background can't scroll underneath it.
-    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen;
+    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen || Boolean(gambleReveal);
+    // …and stop the scene's own pointer handlers from firing while an overlay is up (else tapping a modal
+    // button was walking the hero + scrolling the street behind the panel). Read via a ref so the [] -deps
+    // pointer callbacks always see the live value.
+    const modalOpenRef = useRef(false);
+    modalOpenRef.current = anyTownModal;
     useEffect(() => {
         if (typeof document === "undefined" || !anyTownModal) return undefined;
         const prev = document.body.style.overflow;
@@ -261,6 +330,7 @@ export default function TownClient({ initial }) {
 
     // Pointer: a DRAG pans the street (free look, with flick momentum); a TAP walks you there.
     const onPointerDown = useCallback((e) => {
+        if (modalOpenRef.current) return; // an overlay is up — don't let the street react behind it
         cancelAnimationFrame(momentumRef.current); // stop any glide
         drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0 };
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ok */ }
@@ -295,7 +365,8 @@ export default function TownClient({ initial }) {
             return; // was a pan, not a tap
         }
         setDragging(false);
-        if (e.target.closest(".tw-building") || e.target.closest(".tw-av")) return; // doors/avatars handle themselves
+        // Doors, avatars, NPCs, enemies and any button/link handle themselves — don't ALSO walk the hero there.
+        if (e.target.closest("button, a, .tw-av")) return;
         const rect = sceneRef.current?.getBoundingClientRect(); if (!rect) return;
         const worldX = ((e.clientX - rect.left + cameraPx) / WORLD_W) * 100;
         const worldY = ((e.clientY - rect.top) / rect.height) * 100;
@@ -387,19 +458,29 @@ export default function TownClient({ initial }) {
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "merchant_buy", tier }) }).then((x) => x.json()).catch(() => null);
         setMerchantBusy(false);
         if (r?.ok) { setMerchantFlash(`🎁 Bought a ${r.label}! Open it over in your Gear.`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
-        else setMerchantFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : "Couldn't buy that.");
+        else setMerchantFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : r?.error === "daily_limit" ? "You've bought your fill of that chest today — come back tomorrow." : "Couldn't buy that.");
     }, [load]);
-    // High-roller table: gamble 1,000 gold on a random piece of gear (rarely up to Tier 4).
+    // High-roller table: gamble 1,000 gold on a random piece of gear (rarely up to Tier 4). Drives a full-screen
+    // suspense→reveal so the surprise actually LANDS: dice tumble ≥1.6s, then a rarity-colored burst reveal.
     const gambleGear = useCallback(async () => {
+        if (merchantBusy) return;
         setMerchantBusy(true);
+        setMerchantFlash(null);
+        setGambleReveal({ phase: "rolling" });
+        const started = (typeof performance !== "undefined" ? performance.now() : 0);
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "merchant_gamble" }) }).then((x) => x.json()).catch(() => null);
-        setMerchantBusy(false);
-        if (r?.ok) {
-            if (r.dupeAll) setMerchantFlash(`Ha! You already own every piece — here's ${r.refund} gold back.`);
-            else setMerchantFlash(`🎉 Tier ${r.item.tier} ${r.item.rarity} — you won the ${r.item.name}! Equip it in your Gear.`);
-            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load();
-        } else setMerchantFlash(r?.error === "insufficient_gold" ? "That table's 1,000 gold, friend." : "The dice wouldn't roll.");
-    }, [load]);
+        const wait = Math.max(0, 1650 - ((typeof performance !== "undefined" ? performance.now() : 0) - started)); // let the dice tumble a beat
+        setTimeout(() => {
+            setMerchantBusy(false);
+            if (r?.ok) {
+                setGambleReveal({ phase: "reveal", item: r.item || null, dupeAll: Boolean(r.dupeAll), refund: r.refund || 0 });
+                try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load();
+            } else {
+                setGambleReveal(null);
+                setMerchantFlash(r?.error === "insufficient_gold" ? "That table's 1,000 gold, friend." : "The dice wouldn't roll.");
+            }
+        }, wait);
+    }, [load, merchantBusy]);
     // Claim a completed town bounty from the quest-giver.
     const claimQuest = useCallback(async (key) => {
         setQuestBusy(true);
@@ -447,7 +528,7 @@ export default function TownClient({ initial }) {
                 <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.82rem" }}>Tap the street to walk. Tap a building to head there. Real members who are online show up here.</p>
             </section>
 
-            <div ref={sceneRef} className="tw-scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
+            <div ref={sceneRef} className="tw-scene" style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <SceneMusic vibe="town" />
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
@@ -675,17 +756,23 @@ export default function TownClient({ initial }) {
                         </div>
                         <p className="muted" style={{ margin: "-2px 2px 8px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;Rare goods, fair prices! Fancy a chest, friend?&rdquo;</p>
                         {merchantFlash ? <div className="tw-merchant-flash">{merchantFlash}</div> : null}
-                        <div className="tw-wares">
+        <div className="tw-wares">
                             {(state?.merchant || []).map((w) => {
+                                const soldOut = w.remaining <= 0;
                                 const afford = (you?.gold || 0) >= w.price;
                                 return (
-                                    <button key={w.tier} type="button" className="tw-ware" disabled={!afford || merchantBusy} onClick={() => buyChest(w.tier)}>
+                                    <button key={w.tier} type="button" className={`tw-ware${soldOut ? " is-soldout" : ""}`} disabled={!afford || soldOut || merchantBusy} onClick={() => buyChest(w.tier)}>
+                                        {w.discountPct ? <span className="tw-ware-deal">-{w.discountPct}%</span> : null}
                                         {w.image ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img className="tw-ware-img" src={w.image} alt="" draggable={false} />
                                         ) : <span className="tw-ware-emoji" aria-hidden="true">{w.emoji}</span>}
                                         <span className="tw-ware-label">{w.label}</span>
-                                        <span className="tw-ware-price">🪙 {w.price.toLocaleString()}</span>
+                                        <span className="tw-ware-price">
+                                            {w.orig && w.orig !== w.price ? <span className="tw-ware-orig">🪙 {w.orig.toLocaleString()}</span> : null}
+                                            <span className="tw-ware-now">🪙 {w.price.toLocaleString()}</span>
+                                        </span>
+                                        <span className={`tw-ware-left${soldOut ? " is-out" : ""}`}>{soldOut ? "back tomorrow" : `${w.remaining}/${w.capPerDay} today`}</span>
                                     </button>
                                 );
                             })}
@@ -730,13 +817,34 @@ export default function TownClient({ initial }) {
                         <div className="tw-roster-head"><strong>🏛️ Town Hall</strong><button type="button" onClick={() => setBoardOpen(false)} aria-label="Close">✕</button></div>
 
                         <div className="tw-board-section">
-                            <div className="tw-board-title">📣 What&apos;s happening</div>
-                            <div className="tw-board-grid">
-                                {[["/marketplace/boss", "⚔️", "Boss Fight"], ["/marketplace/sailing", "⛵", "Sailing"], ["/marketplace/farm", "🌾", "Farm"], ["/marketplace/store", "🛒", "Store"], ["/marketplace/track", "🎁", "Rewards"], ["/marketplace/bounties", "🎯", "Bounties"]].map(([href, ic, label]) => (
-                                    <Link key={href} href={href} className="tw-board-tile"><span aria-hidden="true">{ic}</span>{label}</Link>
+                            <div className="tw-board-title">🟢 Who&apos;s online — {otherList.length + 1}</div>
+                            <div className="tw-heroes">
+                                {you ? (
+                                    <div className="tw-hero is-you">
+                                        <div className="tw-hero-card">
+                                            {you.sprite ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={you.sprite} alt="You" draggable={false} style={you.flip ? { transform: "scaleX(-1)" } : undefined} />
+                                            ) : <span className="tw-hero-fallback" aria-hidden="true">🐺</span>}
+                                        </div>
+                                        <div className="tw-hero-name">You</div>
+                                        <div className="tw-hero-status">🐺 in the plaza</div>
+                                    </div>
+                                ) : null}
+                                {otherList.map((p) => (
+                                    <button key={p.id} type="button" className={`tw-hero${p.friend ? " is-friend" : ""}`} onClick={() => { setBoardOpen(false); setMenuFor(p); }}>
+                                        <div className="tw-hero-card">
+                                            {p.sprite ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={p.sprite} alt={p.name} draggable={false} style={p.flip ? { transform: "scaleX(-1)" } : undefined} />
+                                            ) : <span className="tw-hero-fallback" aria-hidden="true">🐺</span>}
+                                        </div>
+                                        <div className="tw-hero-name">{p.friend ? "⭐ " : ""}{p.name}</div>
+                                        <div className="tw-hero-status">{p.status}</div>
+                                    </button>
                                 ))}
                             </div>
-                            <p className="muted" style={{ fontSize: "0.8rem", margin: "8px 2px 0" }}>🟢 {state?.onlineCount ?? 1} online in the Den right now.</p>
+                            {otherList.length === 0 ? <p className="muted" style={{ fontSize: "0.8rem", margin: "8px 2px 0" }}>Just you around the Den right now — the plaza fills up as members come online.</p> : null}
                         </div>
 
                         {projects.length ? (
@@ -761,7 +869,10 @@ export default function TownClient({ initial }) {
                                             {inCat.map((p) => (
                                                 <div key={p.id} className={`tw-proj${p.maxed ? " is-maxed" : ""}`}>
                                                     <div className="tw-proj-head">
-                                                        <span className="tw-proj-emoji" aria-hidden="true">{p.emoji}</span>
+                                                        {PROJECT_ART[p.id] && art[PROJECT_ART[p.id]]?.url ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img className="tw-proj-sprite" src={art[PROJECT_ART[p.id]].url} alt="" draggable={false} />
+                                                        ) : <span className="tw-proj-emoji" aria-hidden="true">{p.emoji}</span>}
                                                         <span className="tw-proj-name">{p.name}</span>
                                                         <span className="tw-proj-lvl">{p.maxed ? "MAX" : `Lv ${p.level}`}</span>
                                                     </div>
@@ -820,6 +931,9 @@ export default function TownClient({ initial }) {
                     </div>
                 </div>
             ) : null}
+
+            {/* High-roller gear reveal — suspense roll → rarity burst */}
+            {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
             <style>{TOWN_CSS}</style>
         </div>
@@ -1044,4 +1158,64 @@ const TOWN_CSS = `
 .tw-owner-spawn { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.12); }
 .tw-owner-spawn .muted { font-size: 0.72rem; }
 .tw-owner-spawn button { flex: 0 0 auto; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(224,67,63,0.4); background: rgba(224,67,63,0.12); color: #ffcabf; font-size: 0.76rem; font-weight: 700; cursor: pointer; }
+
+/* Merchant wares — discount badge, struck list price, per-day stock */
+.tw-ware { position: relative; }
+.tw-ware-deal { position: absolute; top: 6px; right: 6px; font-size: 0.58rem; font-weight: 900; color: #10240f; background: linear-gradient(180deg,#8fe39a,#4ec06a); border-radius: 6px; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.tw-ware-price { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.tw-ware-orig { font-size: 0.62rem; color: #9a8fb0; text-decoration: line-through; font-weight: 700; }
+.tw-ware-left { font-size: 0.62rem; color: #8fe39a; font-weight: 800; margin-top: 1px; }
+.tw-ware-left.is-out { color: #e69a9a; }
+.tw-ware.is-soldout { opacity: 0.5; }
+
+/* Town Hall — online hero cards (real hero sprites) */
+.tw-heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; }
+.tw-hero { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); background: rgba(255,255,255,0.04); cursor: pointer; font: inherit; }
+.tw-hero:not(.is-you):hover { border-color: rgba(255,215,110,0.5); }
+.tw-hero.is-friend { border-color: rgba(120,200,255,0.5); background: rgba(120,200,255,0.08); }
+.tw-hero.is-you { border-color: rgba(255,215,110,0.5); background: rgba(255,215,110,0.08); cursor: default; }
+.tw-hero-card { width: 66px; height: 66px; display: grid; place-items: center; border-radius: 12px; overflow: hidden; background: radial-gradient(120% 120% at 50% 18%, rgba(96,74,150,0.5), rgba(20,14,34,0.65)); }
+.tw-hero-card img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+.tw-hero-fallback { font-size: 34px; }
+.tw-hero-name { font-size: 0.72rem; font-weight: 800; color: #f2ead9; max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-hero.is-you .tw-hero-name { color: #ffe488; }
+.tw-hero-status { font-size: 0.62rem; color: #c3aee0; line-height: 1.2; max-width: 86px; }
+.tw-proj-sprite { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+
+/* ── High-roller gear reveal (suspense → rarity burst) ── */
+.tw-reveal { position: fixed; inset: 0; z-index: 600; display: grid; place-items: center; padding: 20px; cursor: pointer;
+    background: radial-gradient(120% 120% at 50% 40%, rgba(24,12,44,0.72), rgba(4,2,10,0.93)); backdrop-filter: blur(4px); animation: twRevealIn .2s ease both; }
+@keyframes twRevealIn { from { opacity: 0; } to { opacity: 1; } }
+.tw-reveal-roll { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.tw-reveal-dice { width: 128px; height: 128px; object-fit: contain; filter: drop-shadow(0 10px 22px rgba(0,0,0,0.6)); animation: twDiceTumble .72s cubic-bezier(.5,.1,.5,.9) infinite; }
+.tw-reveal-dice-emoji { font-size: 108px; line-height: 1; }
+@keyframes twDiceTumble { 0% { transform: rotate(-18deg) translateY(0) scale(1); } 25% { transform: rotate(45deg) translateY(-24px) scale(1.07); } 50% { transform: rotate(180deg) translateY(0) scale(1); } 75% { transform: rotate(305deg) translateY(-15px) scale(1.04); } 100% { transform: rotate(342deg) translateY(0) scale(1); } }
+.tw-reveal-rolltext { font-weight: 900; font-size: 1.06rem; color: #ffe0b0; letter-spacing: .02em; }
+.tw-reveal-dots span { animation: twType 1.2s infinite; }
+.tw-reveal-dots span:nth-child(2) { animation-delay: .2s; }
+.tw-reveal-dots span:nth-child(3) { animation-delay: .4s; }
+.tw-reveal-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; width: min(340px, 88vw); padding: 26px 22px 20px; border-radius: 22px; cursor: default; text-align: center;
+    background: linear-gradient(180deg, rgba(30,22,50,0.97), rgba(16,11,28,0.98)); border: 1.5px solid var(--rar, #c2c9d4);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.6), 0 0 60px -10px var(--rar-glow, transparent); animation: twCardPop .5s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes twCardPop { 0% { transform: scale(.72); opacity: 0; } 60% { transform: scale(1.04); } 100% { transform: scale(1); opacity: 1; } }
+.tw-reveal-card.is-legendary { animation: twCardPop .5s cubic-bezier(.2,1.3,.4,1) both, twLegendGlow 1.7s ease-in-out .5s infinite; }
+@keyframes twLegendGlow { 0%,100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.6), 0 0 50px -12px var(--rar-glow); } 50% { box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 20px 60px rgba(0,0,0,0.6), 0 0 95px -4px var(--rar-glow); } }
+.tw-reveal-burst { position: absolute; top: 44%; left: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; pointer-events: none; z-index: 0;
+    background: radial-gradient(circle, var(--rar-glow) 0%, transparent 62%); opacity: 0; animation: twBurst .85s ease-out .05s both; }
+.tw-reveal-burst.is-big { width: 340px; height: 340px; margin: -170px 0 0 -170px; }
+@keyframes twBurst { 0% { transform: scale(.2); opacity: 0; } 30% { opacity: .95; } 100% { transform: scale(1.28); opacity: 0; } }
+.tw-reveal-sparks { position: absolute; top: 42%; left: 50%; width: 0; height: 0; z-index: 1; pointer-events: none; }
+.tw-reveal-sparks span { position: absolute; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: var(--rar, #fff); box-shadow: 0 0 8px var(--rar-glow); transform: rotate(var(--a)) translateY(0); animation: twSpark .85s ease-out var(--dly, 0s) both; }
+@keyframes twSpark { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 0; } 15% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-125px) scale(.2); opacity: 0; } }
+.tw-reveal-rarity { position: relative; z-index: 2; font-weight: 900; font-size: .82rem; letter-spacing: .1em; text-transform: uppercase; color: var(--rar, #c2c9d4); }
+.tw-reveal-stars { letter-spacing: 1px; }
+.tw-reveal-itemwrap { position: relative; z-index: 2; display: grid; place-items: center; width: 150px; height: 150px; margin: 4px 0; }
+.tw-reveal-item { max-width: 150px; max-height: 150px; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)) drop-shadow(0 0 16px var(--rar-glow)); animation: twItemPop .6s cubic-bezier(.2,1.4,.4,1) .12s both, twItemFloat 3s ease-in-out .82s infinite; }
+.tw-reveal-item-emoji { font-size: 96px; line-height: 1; }
+@keyframes twItemPop { 0% { transform: scale(0) rotate(-28deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes twItemFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.tw-reveal-name { position: relative; z-index: 2; font-weight: 900; font-size: 1.12rem; color: #fff; text-wrap: balance; }
+.tw-reveal-slot { position: relative; z-index: 2; font-size: .8rem; color: #c7bcd8; text-transform: capitalize; }
+.tw-reveal-btn { position: relative; z-index: 2; margin-top: 12px; padding: 11px 26px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: .95rem; color: #1c130a; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 5px 0 #b57f22; }
+.tw-reveal-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #b57f22; }
 `;

@@ -14,24 +14,44 @@ import { townEventsLive } from "@/lib/marketplace/town-events.js";
 import { getTownProjects, getTownBonuses, contributeToProject } from "@/lib/marketplace/town-projects.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
+import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { setSetting } from "@/lib/settings.js";
 
-// The Traveling Merchant's wares — loot chests sold for gold (a gold SINK). Stock + prices improve as the
-// community levels up the Trading Post (Town Development merchantTier): rarer chests unlock, prices drop.
+// The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
+// "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
+// chests unlock, prices drop further. Daily caps keep it a treat: one of each chest a day (the humble wooden
+// chest, three) so it's a habit, not a gold-dump.
+const MERCHANT_BASE_DISCOUNT = 0.25; // the merchant always undercuts the list price by at least this much
 const MERCHANT_STOCK = [
-    { tier: "wooden", price: 500, minTier: 0 },
-    { tier: "iron", price: 2000, minTier: 0 },
-    { tier: "gold", price: 6000, minTier: 0 },
-    { tier: "mythic", price: 16000, minTier: 3 },
-    { tier: "ascendant", price: 40000, minTier: 5 },
+    { tier: "wooden", price: 500, minTier: 0, capPerDay: 3 },
+    { tier: "iron", price: 2000, minTier: 0, capPerDay: 1 },
+    { tier: "gold", price: 6000, minTier: 0, capPerDay: 1 },
+    { tier: "mythic", price: 16000, minTier: 3, capPerDay: 1 },
+    { tier: "ascendant", price: 40000, minTier: 5, capPerDay: 1 },
 ];
-function merchantWaresForTier(tier = 0, chestArt = {}) {
-    const disc = Math.min(0.2, tier * 0.03); // up to 20% off as the Trading Post levels
-    return MERCHANT_STOCK.filter((w) => tier >= w.minTier).map((w) => ({
-        tier: w.tier, price: Math.round(w.price * (1 - disc)),
-        label: CHEST_TIERS[w.tier]?.label || w.tier, emoji: CHEST_TIERS[w.tier]?.emoji || "📦",
-        image: chestArt[w.tier] || null,
-    }));
+function merchantWaresForTier(tier = 0, chestArt = {}, boughtToday = {}) {
+    const disc = Math.min(0.45, MERCHANT_BASE_DISCOUNT + tier * 0.03); // deeper discount as the Trading Post levels
+    return MERCHANT_STOCK.filter((w) => tier >= w.minTier).map((w) => {
+        const bought = boughtToday[w.tier] || 0;
+        return {
+            tier: w.tier, price: Math.round(w.price * (1 - disc)), orig: w.price, discountPct: Math.round(disc * 100),
+            label: CHEST_TIERS[w.tier]?.label || w.tier, emoji: CHEST_TIERS[w.tier]?.emoji || "📦",
+            image: chestArt[w.tier] || null,
+            capPerDay: w.capPerDay, boughtToday: bought, remaining: Math.max(0, w.capPerDay - bought),
+        };
+    });
+}
+// How many chests of each tier this member has already bought from the merchant TODAY (UTC day). Powers the
+// per-tier daily cap. Read from the coin ledger (reason 'merchant_chest', meta.tier) so no extra table is needed.
+async function merchantBoughtToday(buyerId) {
+    if (!buyerId) return {};
+    const rows = await db.query(
+        `SELECT meta->>'tier' AS tier, COUNT(*)::int AS n FROM mkt_coin_event
+          WHERE buyer_id = $1 AND reason = 'merchant_chest' AND created_at >= date_trunc('day', NOW())
+          GROUP BY 1`,
+        [buyerId]
+    ).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.tier, Number(r.n) || 0]));
 }
 
 // Buildings that only appear once the community funds their unlock project (Town Development). They get their
@@ -158,7 +178,8 @@ export async function getTownState(buyerId) {
         getChestArt().catch(() => ({})),
         townEventsLive().catch(() => false),
     ]);
-    const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt);
+    const boughtToday = await merchantBoughtToday(buyerId);
+    const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt, boughtToday);
     const friendSet = new Set((friends || []).map((f) => f.id));
     // Latest activity per player (status bubble), who's walking/typing now, and recent chat speech-bubbles.
     const [acts, presence, chats] = await Promise.all([
@@ -257,14 +278,15 @@ export async function setTownEventsLive(buyerId, on) {
 // Trading Post tier. Guarded gold spend → a chest.
 export async function buyMerchantChest(buyerId, tier) {
     if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
-    const bonuses = await getTownBonuses().catch(() => ({}));
-    const ware = merchantWaresForTier(bonuses.merchantTier || 0).find((w) => w.tier === tier);
+    const [bonuses, boughtToday] = await Promise.all([getTownBonuses().catch(() => ({})), merchantBoughtToday(buyerId)]);
+    const ware = merchantWaresForTier(bonuses.merchantTier || 0, {}, boughtToday).find((w) => w.tier === tier);
     if (!ware) return { ok: false, error: "not_for_sale" };
+    if (ware.remaining <= 0) return { ok: false, error: "daily_limit" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, ware.price]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -ware.price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
     await addChests(buyerId, { [tier]: 1 }, { source: "merchant" }).catch(() => {});
-    return { ok: true, gold: Number(paid.gold), tier, label: ware.label };
+    return { ok: true, gold: Number(paid.gold), tier, label: ware.label, remaining: ware.remaining - 1 };
 }
 
 // The Traveling Merchant's high-roller table: gamble 1,000 gold on a random piece of gear. Mostly low tiers,
@@ -292,7 +314,8 @@ export async function gambleMerchantGear(buyerId) {
     }
     const pick = pool[Math.floor(Math.random() * pool.length)];
     await grantItem(buyerId, pick.id, "merchant_gamble").catch(() => {});
-    return { ok: true, item: { id: pick.id, name: pick.name, rarity: pick.rarity, tier: RARITY_TIER[pick.rarity], slot: pick.slot }, gold: Number(paid.gold) };
+    const image = await itemSpriteFor(pick.id).catch(() => null);
+    return { ok: true, item: { id: pick.id, name: pick.name, rarity: pick.rarity, tier: RARITY_TIER[pick.rarity], slot: pick.slot, image }, gold: Number(paid.gold) };
 }
 
 // Contribute gold to a Town Development project (owner-gated during the build). Also ticks the civic quest.
