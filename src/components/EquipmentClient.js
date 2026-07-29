@@ -569,39 +569,56 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 ))}
                             </div>
                         ) : null}
-                        {/* Compare against whatever's equipped in this slot so you can tell if it's an upgrade. */}
-                        {(() => {
-                            const eqId = equipped[detailItem.slot];
-                            if (detailItem.equipped || !eqId || eqId === detailItem.id) return null;
-                            const cur = itemDef(eqId);
-                            if (!cur) return null;
-                            const keys = Array.from(new Set([...Object.keys(detailItem.stats || {}), ...Object.keys(cur.stats || {})])).filter((k) => STAT_META[k]);
-                            if (!keys.length) return null;
-                            let ups = 0; let downs = 0;
-                            keys.forEach((k) => { const d = (detailItem.stats?.[k] || 0) - (cur.stats?.[k] || 0); if (d > 0) ups += 1; else if (d < 0) downs += 1; });
+                        {/* Compare against whatever's equipped in the slot(s) this item accepts. Rings accept TWO
+                            slots, so show BOTH — each with its own "Equip here" so you pick which ring to replace. */}
+                        {!detailItem.equipped ? (() => {
+                            const slotDefs = EQUIP_SLOTS.filter((s) => s.accepts === detailItem.slot);
+                            if (!slotDefs.length) return null;
+                            const multi = slotDefs.length > 1;
+                            const canEquip = !detailItem.shop; // shop preview compares but you buy before you can equip
                             return (
-                                <div style={{ margin: "10px 0 0", padding: "9px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                                    <div style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9aa0a6", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                                        vs equipped · {cur.name}
-                                        <span style={{ marginLeft: "auto", fontWeight: 900, color: ups > downs ? "#8fe39a" : downs > ups ? "#ff8f9a" : "#cdd9c6" }}>{ups > downs ? "↑ upgrade" : downs > ups ? "↓ downgrade" : "≈ sidegrade"}</span>
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                        {keys.map((k) => {
-                                            const a = detailItem.stats?.[k] || 0; const b = cur.stats?.[k] || 0; const d = a - b; const suf = STAT_META[k].suffix || "";
-                                            return (
-                                                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.85rem", gap: 10 }}>
-                                                    <span>{STAT_META[k].icon} {STAT_META[k].label}</span>
-                                                    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                                                        <span className="muted">{b}{suf} → {a}{suf}</span>{" "}
-                                                        <b style={{ color: d > 0 ? "#8fe39a" : d < 0 ? "#ff8f9a" : "#9aa0a6" }}>{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</b>
-                                                    </span>
+                                <div style={{ margin: "10px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
+                                    {multi ? <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9aa0a6" }}>Two {detailItem.slot} slots — choose which to fill:</div> : null}
+                                    {slotDefs.map((sd) => {
+                                        const eqId = equipped[sd.slot];
+                                        if (eqId === detailItem.id) return null; // already sitting in this slot
+                                        const cur = eqId ? itemDef(eqId) : null;
+                                        const keys = Array.from(new Set([...Object.keys(detailItem.stats || {}), ...Object.keys(cur?.stats || {})])).filter((k) => STAT_META[k]);
+                                        let ups = 0; let downs = 0;
+                                        keys.forEach((k) => { const d = (detailItem.stats?.[k] || 0) - (cur?.stats?.[k] || 0); if (d > 0) ups += 1; else if (d < 0) downs += 1; });
+                                        return (
+                                            <div key={sd.slot} style={{ padding: "9px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                                                <div style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9aa0a6", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                                                    {multi ? `${sd.label} · ` : "vs equipped · "}{cur ? cur.name : "empty slot"}
+                                                    <span style={{ marginLeft: "auto", fontWeight: 900, color: !cur ? "#8fe39a" : ups > downs ? "#8fe39a" : downs > ups ? "#ff8f9a" : "#cdd9c6" }}>{!cur ? "🆕 free" : ups > downs ? "↑ upgrade" : downs > ups ? "↓ downgrade" : "≈ sidegrade"}</span>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+                                                {cur && keys.length ? (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                                        {keys.map((k) => {
+                                                            const a = detailItem.stats?.[k] || 0; const b = cur.stats?.[k] || 0; const d = a - b; const suf = STAT_META[k].suffix || "";
+                                                            return (
+                                                                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.85rem", gap: 10 }}>
+                                                                    <span>{STAT_META[k].icon} {STAT_META[k].label}</span>
+                                                                    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                                                                        <span className="muted">{b}{suf} → {a}{suf}</span>{" "}
+                                                                        <b style={{ color: d > 0 ? "#8fe39a" : d < 0 ? "#ff8f9a" : "#9aa0a6" }}>{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</b>
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : !cur ? <div className="muted" style={{ fontSize: "0.8rem" }}>Nothing equipped here — a pure gain.</div> : null}
+                                                {canEquip ? (
+                                                    <button type="button" className="button primary" style={{ marginTop: 8, width: "100%" }} disabled={busy} onClick={() => { equip(sd.slot, detailItem.id); closeDetail(); }}>
+                                                        ⚔️ Equip{multi ? ` to ${sd.label}` : ""}{cur ? ` — replace ${cur.name}` : ""}
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             );
-                        })()}
+                        })() : null}
                         {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
                         {detailItem.farm ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#8fe39a" }}>🌱 Farm affinity: {describeFarm(detailItem.farm)} <span className="muted" style={{ fontWeight: 600 }}>— helps you on the farm (crops · seeds · harvests)</span></p> : null}
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
@@ -625,9 +642,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 )
                             ) : detailItem.equipped ? (
                                 <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
-                            ) : (
+                            ) : EQUIP_SLOTS.filter((s) => s.accepts === detailItem.slot).length === 0 ? (
+                                // Equippable gear equips via the per-slot buttons in the comparison above; this is a fallback only.
                                 <button type="button" className="button primary" onClick={() => { equipFromBag(detailItem); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
-                            )}
+                            ) : null}
                             {!detailItem.shop && detailItem.sellValue > 0 ? (
                                 sellArmed ? (
                                     <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>

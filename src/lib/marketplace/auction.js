@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeFarm, describeSea, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -92,6 +92,8 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
         name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null,
         stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, // effective (base + forge) totals
         forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, // the forge bonus alone
+        farm: it.farm ? describeFarm(it.farm) : null, // 🌱 harvest/farm affinity (kept out of combat stats)
+        sea: it.sea ? describeSea(it.sea) : null, // ⚓ sailing affinity
         util: det?.util || null, // rare Forge attunement (spin-off bonus stat) that rides with the item
         signature: signatureFor(row.item_id), // ★ signature ability (the item's special power)
         sprite: sprites[row.item_id] || null,
@@ -130,7 +132,7 @@ export async function getSellableItems(buyerId) {
         .map((id) => {
             const it = itemById(id);
             const bonus = enh[id]?.bonus || null;
-            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -170,7 +172,9 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     return out;
 }
 
-// A seller's own listings (active first, then recently ended).
+// A seller's own listings (active first, then recently ended). Carries the SAME rich detail as browse cards
+// (effective stats, forge bonus, attunement, signature, farm/sea affinity + a comparison vs your equipped) so
+// the detail modal works for your own listings too.
 export async function getMyListings(buyerId) {
     if (!buyerId) return [];
     await expireAuctions();
@@ -183,11 +187,30 @@ export async function getMyListings(buyerId) {
           ORDER BY (a.status = 'active') DESC, a.listed_at DESC LIMIT 100`, [buyerId]
     ).catch(() => []);
     const sprites = await itemSpriteMap().catch(() => ({}));
+    // Forge enhancement per listed item (for effective stats + the "⚒️ +N" badge) and the viewer's equipped baseline.
+    const itemIds = [...new Set(rows.map((r) => r.item_id))];
+    const enhRows = itemIds.length ? await db.query(`SELECT item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, itemIds]).catch(() => []) : [];
+    const enh = new Map(enhRows.map((e) => [e.item_id, { level: Number(e.level) || 0, bonus: parseBonus(e.stat_bonus), util: describeUtil(e.util) }]));
+    const equippedMap = await equippedComparisonMap(buyerId);
     return rows.map((r) => {
         const it = itemById(r.item_id);
         if (!it) return null;
+        const det = enh.get(r.item_id);
+        const bonus = det?.bonus || null;
         const buyerName = r.status === "sold" ? (r.buyer_name || (r.buyer_alias ? `@${r.buyer_alias}` : "a wolf")) : null;
-        return { id: Number(r.id), itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[r.item_id] || null, price: Number(r.price), status: r.status, listedAt: r.listed_at, expiresAt: r.expires_at, soldAt: r.sold_at, buyerName, buyerAlias: r.status === "sold" ? r.buyer_alias : null };
+        return {
+            id: Number(r.id), itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[r.item_id] || null,
+            price: Number(r.price), status: r.status, listedAt: r.listed_at, expiresAt: r.expires_at, soldAt: r.sold_at, buyerName, buyerAlias: r.status === "sold" ? r.buyer_alias : null,
+            stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null,
+            forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,
+            farm: it.farm ? describeFarm(it.farm) : null,
+            sea: it.sea ? describeSea(it.sea) : null,
+            util: det?.util || null,
+            signature: signatureFor(r.item_id),
+            enhanceLevel: det?.level || 0,
+            compare: buildCompare(it, mergeStats(it.stats || {}, bonus || {}), equippedMap),
+            mine: true,
+        };
     }).filter(Boolean);
 }
 

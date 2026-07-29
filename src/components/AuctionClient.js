@@ -65,6 +65,7 @@ export default function AuctionClient({ initial }) {
     const [sellPick, setSellPick] = useState(null); // item being listed { itemId,... }
     const [price, setPrice] = useState("");
     const [days, setDays] = useState(3);
+    const [detail, setDetail] = useState(null); // listing being inspected in the full-detail modal (browse OR mine)
 
     const gold = state?.gold || 0;
     const feePct = state?.feePct || 0.05;
@@ -138,7 +139,8 @@ export default function AuctionClient({ initial }) {
             <div className="ah-tabs" role="tablist" style={{ "--i": TABS.findIndex((t) => t.k === tab) }}>
                 <span className="ah-tabs-glide" aria-hidden="true" />
                 {TABS.map((t) => {
-                    const n = t.k === "browse" ? listings.length : t.k === "mine" ? (state?.mine?.length || 0) : (state?.sellable?.length || 0);
+                    // Listings badge = ACTIVE listings only (sold/expired/cancelled don't count).
+                    const n = t.k === "browse" ? listings.length : t.k === "mine" ? (state?.mine || []).filter((m) => m.status === "active").length : (state?.sellable?.length || 0);
                     return (
                         <button key={t.k} type="button" role="tab" aria-selected={tab === t.k} className={`ah-tab${tab === t.k ? " is-on" : ""}`} onClick={() => setTab(t.k)}>
                             <span className="ah-tab-ic" aria-hidden="true">{t.ic}</span>
@@ -165,24 +167,27 @@ export default function AuctionClient({ initial }) {
                     ) : (
                         <div className="ah-grid">
                             {listings.map((l) => (
-                                <div key={l.id} className="ah-card" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }}>
+                                <div key={l.id} className="ah-card ah-card-tap" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }} onClick={() => setDetail(l)} role="button" tabIndex={0}>
                                     <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
                                     {l.forgeStats ? <div className="ah-card-forge">⚒️ +{l.enhanceLevel} · {l.forgeStats}</div> : null}
                                     {l.util ? <div className="ah-card-attune">🔮 +{l.util.value}{l.util.unit} {l.util.label}{l.util.level > 1 ? ` Lv${l.util.level}` : ""} <span className="ah-attune-blurb">· {l.util.blurb}</span></div> : null}
+                                    {l.farm ? <div className="ah-card-farm">🌱 {l.farm}</div> : null}
+                                    {l.sea ? <div className="ah-card-sea">⚓ {l.sea}</div> : null}
                                     {l.signature ? <div className="ah-card-sig">★ {l.signature.label} — {l.signature.desc}</div> : null}
                                     {l.compare && !l.mine ? <CompareBlock c={l.compare} /> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
                                     {l.mine ? (
-                                        <button type="button" className="ah-buy is-mine" disabled onClick={() => {}}>Your listing</button>
+                                        <button type="button" className="ah-buy is-mine" onClick={(e) => { e.stopPropagation(); setDetail(l); }}>Your listing · view</button>
                                     ) : l.owned ? (
-                                        <button type="button" className="ah-buy" disabled>Owned</button>
+                                        <button type="button" className="ah-buy" disabled onClick={(e) => e.stopPropagation()}>Owned</button>
                                     ) : gold < l.price ? (
-                                        <CoinCta price={l.price} have={gold} label="coins" />
+                                        <span onClick={(e) => e.stopPropagation()}><CoinCta price={l.price} have={gold} label="coins" /></span>
                                     ) : (
-                                        <button type="button" className="ah-buy" disabled={busy} onClick={() => buy(l.id)}>🪙 {l.price.toLocaleString()}</button>
+                                        <button type="button" className="ah-buy" disabled={busy} onClick={(e) => { e.stopPropagation(); buy(l.id); }}>🪙 {l.price.toLocaleString()}</button>
                                     )}
+                                    <div className="ah-card-tapHint">Tap for full details ›</div>
                                 </div>
                             ))}
                         </div>
@@ -204,6 +209,8 @@ export default function AuctionClient({ initial }) {
                                     {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
                                     {it.forgeStats ? <div className="ah-card-forge">⚒️ +{it.enhanceLevel} · {it.forgeStats}</div> : null}
                                     {it.util ? <div className="ah-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</div> : null}
+                                    {it.farm ? <div className="ah-card-farm">🌱 {it.farm}</div> : null}
+                                    {it.sea ? <div className="ah-card-sea">⚓ {it.sea}</div> : null}
                                     {it.signature ? <div className="ah-card-sig">★ {it.signature.label}</div> : null}
                                 </button>
                             ))}
@@ -234,7 +241,7 @@ export default function AuctionClient({ initial }) {
                     ) : (
                         <div className="ah-mine">
                             {(state?.mine || []).map((l) => (
-                                <div key={l.id} className="ah-minerow" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }}>
+                                <div key={l.id} className="ah-minerow ah-minerow-tap" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }} onClick={() => setDetail(l)} role="button" tabIndex={0}>
                                     <div className="ah-minerow-art"><ItemArt id={l.itemId} icon={l.icon} /></div>
                                     <div className="ah-minerow-body">
                                         <div className="ah-minerow-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
@@ -243,16 +250,57 @@ export default function AuctionClient({ initial }) {
                                         </div>
                                         {l.status === "sold" && l.buyerName ? (
                                             <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "#8fe39a", marginTop: 2 }}>
-                                                🤝 Bought by {l.buyerAlias ? <Link href={`/marketplace/u/${l.buyerAlias}`} style={{ color: "#8fe39a" }}>{l.buyerName}</Link> : l.buyerName}{l.soldAt ? ` · ${ago(l.soldAt)}` : ""}
+                                                🤝 Bought by {l.buyerAlias ? <Link href={`/marketplace/u/${l.buyerAlias}`} style={{ color: "#8fe39a" }} onClick={(e) => e.stopPropagation()}>{l.buyerName}</Link> : l.buyerName}{l.soldAt ? ` · ${ago(l.soldAt)}` : ""}
                                             </div>
                                         ) : null}
                                     </div>
-                                    {l.status === "active" ? <button type="button" className="ah-cancel-btn" disabled={busy} onClick={() => cancel(l.id)}>Cancel</button> : null}
+                                    {l.status === "active" ? <button type="button" className="ah-cancel-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); cancel(l.id); }}>Cancel</button> : <span className="ah-minerow-chev" aria-hidden="true">›</span>}
                                 </div>
                             ))}
                         </div>
                     )}
                 </section>
+            ) : null}
+
+            {detail ? (
+                <div className="ah-detail-overlay" onClick={() => setDetail(null)}>
+                    <div className={`ah-detail rar-${detail.rarity}`} style={{ "--rc": RARITY_TXT[detail.rarity] || "#9aa7b5" }} onClick={(e) => e.stopPropagation()}>
+                        <div className="ah-detail-head">
+                            <div className="ah-detail-art"><ItemArt id={detail.itemId} icon={detail.icon} />{detail.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{detail.enhanceLevel}</span> : null}</div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                                <div className="ah-detail-name" style={{ color: RARITY_TXT[detail.rarity] || "#fff" }}>{detail.name}</div>
+                                <div className="ah-detail-sub">{detail.rarity} · {String(detail.slot || "").replace(/_/g, " ")}</div>
+                            </div>
+                            <button type="button" className="ah-detail-x" onClick={() => setDetail(null)} aria-label="Close">✕</button>
+                        </div>
+                        {detail.stats ? <div className="ah-detail-stats">{detail.stats}</div> : null}
+                        {detail.forgeStats ? <div className="ah-card-forge" style={{ textAlign: "left" }}>⚒️ +{detail.enhanceLevel} forge · {detail.forgeStats}</div> : null}
+                        {detail.util ? <div className="ah-card-attune" style={{ textAlign: "left" }}>🔮 +{detail.util.value}{detail.util.unit} {detail.util.label}{detail.util.level > 1 ? ` Lv${detail.util.level}` : ""}{detail.util.blurb ? <span className="ah-attune-blurb"> · {detail.util.blurb}</span> : null}</div> : null}
+                        {detail.farm ? <div className="ah-card-farm" style={{ textAlign: "left" }}>🌱 Farm affinity: {detail.farm} <span className="ah-attune-blurb">— helps on the farm</span></div> : null}
+                        {detail.sea ? <div className="ah-card-sea" style={{ textAlign: "left" }}>⚓ Sea affinity: {detail.sea} <span className="ah-attune-blurb">— helps at sea</span></div> : null}
+                        {detail.signature ? <div className="ah-card-sig" style={{ textAlign: "left" }}>★ {detail.signature.label} — {detail.signature.desc}</div> : null}
+                        {detail.compare ? <CompareBlock c={detail.compare} /> : null}
+                        <div className="ah-detail-meta muted">
+                            {detail.mine
+                                ? (detail.status === "sold" && detail.buyerName ? <>🤝 Sold to {detail.buyerName}{detail.soldAt ? ` · ${ago(detail.soldAt)}` : ""}</> : detail.status === "active" ? <>Your listing · ⏳ {timeLeft(detail.expiresAt)} left</> : `Your listing · ${detail.status}`)
+                                : <>by {detail.sellerName} · {ago(detail.listedAt)} · ⏳ {timeLeft(detail.expiresAt)}</>}
+                        </div>
+                        <div className="ah-detail-actions">
+                            {detail.mine ? (
+                                detail.status === "active" ? (
+                                    <button type="button" className="ah-cancel-btn" style={{ flex: 1 }} disabled={busy} onClick={() => { cancel(detail.id); setDetail(null); }}>Cancel listing · 🪙 {detail.price.toLocaleString()}</button>
+                                ) : null
+                            ) : detail.owned ? (
+                                <button type="button" className="ah-buy" disabled style={{ flex: 1 }}>You own this</button>
+                            ) : gold < detail.price ? (
+                                <div style={{ flex: 1 }}><CoinCta price={detail.price} have={gold} label="coins" /></div>
+                            ) : (
+                                <button type="button" className="ah-buy" style={{ flex: 1 }} disabled={busy} onClick={() => { buy(detail.id); setDetail(null); }}>🪙 Buy for {detail.price.toLocaleString()}</button>
+                            )}
+                            <button type="button" className="ah-detail-close" onClick={() => setDetail(null)}>Close</button>
+                        </div>
+                    </div>
+                </div>
             ) : null}
 
             <style>{AH_CSS}</style>
@@ -301,7 +349,27 @@ const AH_CSS = `
 .ah-card-forge { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
 .ah-card-attune { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #e0c8ff; }
 .ah-attune-blurb { font-weight: 600; color: #b7a9cf; }
+.ah-card-farm { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
+.ah-card-sea { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #7fd8ff; }
 .ah-card-sig { font-size: 0.7rem; line-height: 1.3; font-weight: 700; color: #ffd75e; }
+.ah-card-tap { cursor: pointer; }
+.ah-card-tapHint { font-size: 0.6rem; font-weight: 700; color: #8a93a0; opacity: 0; transition: opacity .14s; }
+.ah-card-tap:hover .ah-card-tapHint { opacity: 1; }
+.ah-minerow-tap { cursor: pointer; }
+.ah-minerow-chev { flex: 0 0 auto; font-size: 1.3rem; font-weight: 900; color: #8a93a0; padding: 0 4px; }
+/* Full-detail modal (browse card or your listing) */
+.ah-detail-overlay { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.72); padding: 0; }
+.ah-detail { width: 100%; max-width: 460px; margin: 0; padding: 16px 16px calc(18px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; background: linear-gradient(180deg, #221830, #17111f); border: 1px solid rgba(255,255,255,0.12); border-top: 3px solid var(--rc, #9aa7b5); box-shadow: 0 -12px 40px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 8px; max-height: 88vh; overflow-y: auto; }
+.ah-detail-head { display: flex; align-items: center; gap: 12px; }
+.ah-detail-art { position: relative; width: 62px; height: 62px; flex: 0 0 auto; display: grid; place-items: center; }
+.ah-detail-art svg, .ah-detail-art img { width: 56px; height: 56px; }
+.ah-detail-name { font-weight: 900; font-size: 1.12rem; line-height: 1.15; }
+.ah-detail-sub { font-size: 0.78rem; color: #b7a9cf; text-transform: capitalize; }
+.ah-detail-x { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e8e2d6; font-weight: 800; cursor: pointer; }
+.ah-detail-stats { font-weight: 800; font-size: 0.95rem; color: #f2ead9; }
+.ah-detail-meta { font-size: 0.74rem; }
+.ah-detail-actions { display: flex; gap: 8px; margin-top: 6px; align-items: stretch; }
+.ah-detail-close { flex: 0 0 auto; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #e8e2d6; font-weight: 800; cursor: pointer; }
 .ah-cmp { margin-top: 4px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.08); }
 .ah-cmp-head { font-size: 0.66rem; font-weight: 700; color: #b9c2cf; margin-bottom: 4px; }
 .ah-cmp-head b { color: #e7edf4; font-weight: 800; }
