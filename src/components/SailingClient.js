@@ -1000,7 +1000,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             <section className="card" style={{ borderColor: "rgba(214,158,80,0.5)", background: "linear-gradient(180deg, rgba(180,120,50,0.1), transparent 40%)" }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(214,158,80,0.16)", border: "1px solid rgba(214,158,80,0.5)", color: "#e6b878", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛏️ Digging</div>
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
-                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Tools below unlock with <b>🎁 {state.digTools?.chestPoints ?? 0} chests unlocked</b> (earned forging chests — bigger chests count more){state.digTools?.nextUnlock ? <> · next: <b>{state.digTools.nextUnlock.name}</b> at {state.digTools.nextUnlock.unlockPoints}</> : ""}.</p>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Level these with gold — and every level also counts toward unlocking the tools above. You've invested <b>{state.digTools?.points ?? 0}</b> of {state.digTools?.pointsTotal ?? 30}{state.digTools?.nextUnlock ? <> · <b>{state.digTools.nextUnlock.toUnlock}</b> more unlocks <b>{state.digTools.nextUnlock.name}</b></> : <> · every tool unlocked</>}.</p>
 {/* TOOLS FIRST. They were the last thing on the longest section of a long scroll, which is why they read
                     as an afterthought — they are the most interesting part of digging. */}
                 <div className="sail-tools-head">🧰 Tools <span className="muted">· fire as random procs while you dig — invest to raise the chance</span></div>
@@ -1010,7 +1010,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             <span className="sail-tool-emoji">{t.unlocked ? t.emoji : "🔒"}</span>
                             <div className="sail-tool-body">
                                 <div className="sail-tool-name">{t.name}{t.unlocked ? <span className="muted"> · {(t.procNow * 100).toFixed(1)}% proc</span> : null}</div>
-                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · unlock at 🎁 ${t.unlockPoints} chests unlocked`}</div>
+                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · ${t.toUnlock} more dig upgrade${t.toUnlock === 1 ? "" : "s"} to unlock`}</div>
                             </div>
                             {t.unlocked ? (
                                 t.maxed ? <button className="pill" disabled>✓ Max</button>
@@ -1062,7 +1062,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     ) : (
                         <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.82rem" }}>You can only fish once the boat is under way or moored at the island.</p>
                     )}
-                    <a className="btn-ghost" href="/marketplace/fishing" style={{ display: "block", textAlign: "center", marginTop: 8, textDecoration: "none" }}>📖 Fishing Log &amp; records</a>
+                    <a className="btn-ghost" href="/marketplace/fishing" style={{ display: "block", textAlign: "center", marginTop: 14, padding: "11px", textDecoration: "none" }}>📖 Fishing Log &amp; records</a>
 
                     {/* THE RAIL'S TRACKS — fishing's first real progression. Each buys a different KIND of
                         fishing (more / rarer / more treasure / safer) so they don't collapse into one obvious

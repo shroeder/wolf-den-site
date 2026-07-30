@@ -11353,10 +11353,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upg-desc { margin: 0; font-size: 0.8rem; }
 .sail-upg-desc b { color: #ffd75e; }
 /* The "what it does now → next level" effect row on each upgrade card. */
-.sail-upg-effect { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.78rem;
+/* The "what it does · now → next" row. A long description used to squeeze the numbers until "+4% →" wrapped
+   away from the "+6%" it points at, splitting one value across two lines. The number block never shrinks and
+   never breaks now; the description takes whatever's left and wraps on its own. */
+.sail-upg-effect { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.78rem;
     margin: 1px 0 3px; padding: 6px 9px; border-radius: 9px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.06); }
-.sail-upg-effect > span { color: #9fb0c0; }
-.sail-upg-effect b { display: inline-flex; align-items: center; gap: 4px; color: #f2e8d6; }
+.sail-upg-effect > span { flex: 1 1 auto; min-width: 0; color: #9fb0c0; }
+.sail-upg-effect b { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+    color: #f2e8d6; font-variant-numeric: tabular-nums; }
 .sail-upg-next { color: #7cffb2; font-weight: 800; }
 .sail-upg > button, .sail-upg > .coin-cta { margin-top: auto; }
 .sail-upg > .coin-cta { width: 100%; justify-content: center; }
@@ -12312,4 +12316,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-close { display: block; width: 100%; margin-top: 12px; padding: 11px; border: 1px solid #2f3a48; border-radius: 12px; background: #171d27; color: #cfd8e3; font-weight: 800; cursor: pointer; }
 
 /* The at-sea entry point, alongside the tailwind and raid CTAs. */
-.sail-cta-fish { background: linear-gradient(180deg,#5ec8f0,#2d84b8); color: #041d2c; }
+/* "Cast a line" at the Rail. It inherited .sail-cta — the full hero treatment, sized for the one big action
+   on the screen — so a blue button carried the gold CTA's drop shadow and glow underneath it, at 1.24rem with
+   44px of side padding, sitting flush against the Fishing Log link below. Toned to match the station panels. */
+.sail-cta-fish { background: linear-gradient(180deg,#5ec8f0,#2d84b8); color: #041d2c;
+    font-size: 1rem; padding: 13px 20px; border-radius: 13px; animation: none;
+    box-shadow: 0 3px 0 #1c5f88, 0 4px 12px rgba(0,0,0,0.35); }
+.sail-cta-fish:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 0 #1c5f88; }

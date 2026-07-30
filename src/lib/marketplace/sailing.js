@@ -309,19 +309,29 @@ const digTrackValue = (t, lvl) => Math.min(DIG_TRACKS[t].cap, Math.max(0, lvl) *
 // Area-clear TOOLS — no longer selected/charged. They fire as RANDOM PROCS on a dig, each clearing a cols×rows
 // patch `layers` deep. Unlocked by CHEST-POINTS (chests you've forged, weighted by tier: 1/2/3/4). You can
 // INVEST gold to raise a tool's proc chance up to TOOL_MAX_LEVEL (each level costs exponentially more).
+// Tools unlock off DIG UPGRADE LEVELS — the total you've put into the five excavation tracks (30 available:
+// stamina 10, pierce/strike/efficient/detonator 5 each).
+//
+// They used to unlock off "chest points": chests you'd forged, weighted 1-4 by tier, needing 12 / 30 / 100 /
+// 400. That number lived nowhere the player could watch it climb, came from a different system entirely, and
+// 400 weighted chests is a number nobody could relate to a goal. Now it's the thing directly above the tools
+// on the same screen — invest in digging, and digging tools open up. You can see exactly how close you are.
 const DIG_TOOLS = [
-    { id: "wide",      name: "Wide Dig",   emoji: "🪓", unlockPoints: 12,  cols: 2, rows: 2, layers: 1 },
-    { id: "deep",      name: "Deep Blast", emoji: "💥", unlockPoints: 30,  cols: 2, rows: 2, layers: 2 },
-    { id: "quake",     name: "Quake",      emoji: "🌋", unlockPoints: 100, cols: 3, rows: 3, layers: 1 },
-    { id: "cataclysm", name: "Cataclysm",  emoji: "☄️", unlockPoints: 400, cols: 3, rows: 3, layers: 2 },
+    { id: "wide",      name: "Wide Dig",   emoji: "🪓", unlockPoints: 3,  cols: 2, rows: 2, layers: 1 },
+    { id: "deep",      name: "Deep Blast", emoji: "💥", unlockPoints: 8,  cols: 2, rows: 2, layers: 2 },
+    { id: "quake",     name: "Quake",      emoji: "🌋", unlockPoints: 15, cols: 3, rows: 3, layers: 1 },
+    { id: "cataclysm", name: "Cataclysm",  emoji: "☄️", unlockPoints: 24, cols: 3, rows: 3, layers: 2 },
 ];
+// Total levels invested across the five excavation tracks — the tools' unlock currency.
+const digUpgradeLevels = (row) => Object.values(DIG_TRACK_COL).reduce((n, col) => n + (Number(row?.[col]) || 0), 0);
+const DIG_LEVELS_TOTAL = 30;
 const TOOL_PROC_BASE = 0.015;      // 1.5% per unlocked tool at level 0 …
 const TOOL_PROC_PER_LEVEL = 0.007; // … +0.7%/level → 5% when maxed
 const TOOL_MAX_LEVEL = 5;
 const toolProcChance = (lvl = 0) => TOOL_PROC_BASE + Math.min(TOOL_MAX_LEVEL, Math.max(0, lvl)) * TOOL_PROC_PER_LEVEL;
 const toolUpgradeCost = (lvl = 0) => Math.round(250 * Math.pow(2.2, Math.max(0, lvl))); // 250 → 550 → 1210 → 2662 → 5856
 const CHEST_POINT_WEIGHT = (tierKey) => Math.min(4, Math.max(1, CHEST_ORDER.indexOf(tierKey) + 1)); // tier 1–4 → 1–4 pts
-const unlockedTools = (chestPoints = 0) => DIG_TOOLS.filter((t) => chestPoints >= t.unlockPoints);
+const unlockedTools = (points = 0) => DIG_TOOLS.filter((t) => points >= t.unlockPoints);
 const DIG_TRACK_COL = { stamina: "dig_stamina_level", pierce: "dig_pierce_level", strike: "dig_strike_level", efficient: "dig_efficient_level", detonator: "dig_detonator_level" };
 function digTrackView(row, t) {
     const lvl = row?.[DIG_TRACK_COL[t]] || 0;
@@ -340,19 +350,21 @@ function digUpgradesView(row) {
 }
 // Tool INVEST view — each tool's unlock state (by chest-points), current proc %, and next invest level/cost.
 function toolsView(row) {
-    const chestPoints = row?.chest_points || 0;
+    const points = digUpgradeLevels(row);
     const levels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
     const tools = DIG_TOOLS.map((t) => {
         const lvl = Number(levels[t.id]) || 0;
-        const unlocked = chestPoints >= t.unlockPoints;
+        const unlocked = points >= t.unlockPoints;
         return {
             id: t.id, name: t.name, emoji: t.emoji, area: `${t.cols}×${t.rows}`, layers: t.layers,
             unlocked, unlockPoints: t.unlockPoints,
+            // How close you are, so the lock isn't a mystery.
+            toUnlock: Math.max(0, t.unlockPoints - points),
             level: lvl, max: TOOL_MAX_LEVEL, maxed: lvl >= TOOL_MAX_LEVEL,
             procNow: toolProcChance(lvl), procNext: toolProcChance(lvl + 1), cost: toolUpgradeCost(lvl),
         };
     });
-    return { chestPoints, tools, nextUnlock: tools.find((t) => !t.unlocked) || null };
+    return { points, pointsTotal: DIG_LEVELS_TOTAL, tools, nextUnlock: tools.find((t) => !t.unlocked) || null };
 }
 
 // The 8 boat FORMS. Reaching each level unlocks a new hull art (BOAT_ART[tier]) + a permanent perk applied by
@@ -586,7 +598,7 @@ function newBoard(row) {
     };
     // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
     const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
-    const tools = unlockedTools(row?.chest_points || 0).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
+    const tools = unlockedTools(digUpgradeLevels(row)).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
     return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
@@ -1625,7 +1637,9 @@ export async function forgeChest(buyerId, fragmentTier = "wooden") {
     }
     await addChests(buyerId, { [tierKey]: 1 }, { source: "sailing_forge" }).catch(() => {});
     await trackActivity(buyerId, "sail_forge", { tier: tierKey, upgraded: tierKey !== fragmentTier }).catch(() => {});
-    // Chest-points (tier-weighted 1–4) drive the dig-tool unlocks + their invest tiers.
+    // Chest-points (tier-weighted 1–4). These NO LONGER gate the dig tools — that moved to dig upgrade levels,
+    // which the player can actually watch climb on the same screen. Kept as a running stat (and so the column
+    // isn't silently abandoned mid-flight); nothing reads it for unlocks any more.
     await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});
     // Achievement badges (hard): forge count + forging a gold-or-better chest.
     const forgedRow = await db.queryOne(`UPDATE mkt_sailing SET chests_forged = COALESCE(chests_forged, 0) + 1 WHERE buyer_id = $1 RETURNING chests_forged`, [buyerId]).catch(() => null);
@@ -1825,7 +1839,7 @@ export async function upgradeTool(buyerId, toolId) {
     const row = await readRow(buyerId);
     const tool = DIG_TOOLS.find((t) => t.id === String(toolId));
     if (!tool) return { ok: false, error: "bad_tool", ...(await getSailingState(buyerId)) };
-    if ((row?.chest_points || 0) < tool.unlockPoints) return { ok: false, error: "locked", ...(await getSailingState(buyerId)) };
+    if (digUpgradeLevels(row) < tool.unlockPoints) return { ok: false, error: "locked", ...(await getSailingState(buyerId)) };
     const levels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
     const lvl = Number(levels[tool.id]) || 0;
     if (lvl >= TOOL_MAX_LEVEL) return { ok: false, error: "maxed", ...(await getSailingState(buyerId)) };
