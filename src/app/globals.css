@@ -11285,8 +11285,25 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-stars .on { color: #ffd75e; } .sail-stars .off { color: #40485a; }
 .sail-xpbar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .sail-xpbar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); border-radius: 999px; transition: width 0.4s ease; }
-.sail-actions { margin-top: 14px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-.sail-actions > button { font-size: 1rem; }
+/* Three compact tiles on one line, instead of three stacked hero CTAs pushing the scene off screen. */
+.sail-actions { margin-top: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.sail-act { flex: 1 1 0; min-width: 96px; max-width: 168px; display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 9px 8px 8px; border-radius: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    color: #f0e6d2; background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.035));
+    border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+.sail-act:not(:disabled):active { transform: translateY(2px); box-shadow: none; }
+.sail-act:disabled { opacity: 0.45; cursor: default; }
+.sail-act-ico { font-size: 21px; line-height: 1.1; }
+.sail-act b { font-size: 0.92rem; font-weight: 900; letter-spacing: 0.01em; }
+/* The detail line — cost, casts left, what it does. Small on purpose: the verb is what you scan for. */
+.sail-act em { font-style: normal; font-size: 0.66rem; color: #b7c0cf; white-space: nowrap; }
+/* A tint each, so they're told apart by colour as well as by icon. */
+.sail-act.is-wind { border-color: rgba(126,213,126,0.42); }
+.sail-act.is-wind b { color: #9ce8a0; }
+.sail-act.is-fish { border-color: rgba(126,200,255,0.42); }
+.sail-act.is-fish b { color: #8fd8ff; }
+.sail-act.is-raid { border-color: rgba(255,158,110,0.42); }
+.sail-act.is-raid b { color: #ffb98c; }
 
 .sail-upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; --accent: #ffd75e; --accent-soft: rgba(255,215,94,0.45); }
 .sail-upgrades.is-boat { --accent: #6fd0ff; --accent-soft: rgba(111,208,255,0.45); } /* sea-blue for travel/loot levers */

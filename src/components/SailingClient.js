@@ -849,30 +849,50 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </div>
                 )}
 
-                {/* At-sea + digging controls below the scene. The tailwind is the one real action here, so it's a primary CTA. */}
+                {/* At-sea + digging controls, BELOW the scene.
+                    These were three full-width gold CTAs at 1.24rem with 44px of side padding, all pulsing —
+                    sized for a single hero action, but there are three of them, so they wrapped into a stack
+                    tall enough to crowd the boat out of frame. And every one read as a sentence ("Catch a
+                    tailwind — arrive 1h sooner"), so nothing was scannable.
+                    Now: compact equal-weight tiles, each an ICON + a one-word VERB + the detail underneath.
+                    Three fit on one line on a phone, and you can tell them apart at a glance. */}
                 {(liveStatus === "sailing" || liveStatus === "digging" || (liveStatus === "arrived" && state.fishing?.available)) && (
                     <div className="sail-actions">
                         {liveStatus === "sailing" && (
                             state.windAvailable
-                                ? <button className="sail-cta sail-cta-wind" disabled={busy} onClick={() => act("wind")}>{busy ? "Catching the wind…" : "Catch a tailwind — arrive 1h sooner"}</button>
-                                : <button className="sail-cta sail-cta-wind" disabled={busy || windTooPoor} onClick={() => act("recharge_wind")}>
-                                    {busy ? "Catching the wind…" : windCost > 0 ? `Catch another tailwind — 🪙 ${windCost.toLocaleString()}` : "Catch another tailwind — free (testing)"}
+                                ? <button className="sail-act is-wind" disabled={busy} onClick={() => act("wind")}>
+                                    <span className="sail-act-ico" aria-hidden="true">🍃</span>
+                                    <b>Tailwind</b><em>{busy ? "catching…" : "arrive 1h sooner"}</em>
+                                </button>
+                                : <button className="sail-act is-wind" disabled={busy || windTooPoor} onClick={() => act("recharge_wind")}>
+                                    <span className="sail-act-ico" aria-hidden="true">🍃</span>
+                                    <b>Tailwind</b><em>{busy ? "catching…" : windCost > 0 ? `🪙 ${windCost.toLocaleString()}` : "free"}</em>
                                 </button>
                         )}
                         {/* Fishing — the reason a four-hour voyage isn't four hours of nothing. Also offered while
                             docked, since the server allows a line over the rail at anchor too. */}
                         {liveStatus !== "digging" && state.fishing?.available && (
-                            <button className="sail-cta sail-cta-fish" disabled={busy} onClick={() => setFishOpen(true)}>
-                                🎣 Fish off the rail{state.fishing.casts?.left ? ` · ${state.fishing.casts.left} casts` : " · out of casts"}
+                            <button className="sail-act is-fish" disabled={busy || !state.fishing.casts?.left} onClick={() => setFishOpen(true)}>
+                                <span className="sail-act-ico" aria-hidden="true">🎣</span>
+                                <b>Fish</b><em>{state.fishing.casts?.left ? `${state.fishing.casts.left} casts left` : "none left today"}</em>
                             </button>
                         )}
-                        {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
+                        {liveStatus === "digging" && (
+                            <button className="sail-act" disabled>
+                                <span className="sail-act-ico" aria-hidden="true">⛏️</span>
+                                <b>Digging</b><em>{dig?.stamina} digs left</em>
+                            </button>
+                        )}
                         {liveStatus === "sailing" && (
                             state.raid?.available ? (
-                                <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
+                                <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
+                                    <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
+                                    <b>Raid</b><em>a passing ship</em>
+                                </button>
                             ) : (
-                                <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
-                                    {busy ? "…" : resetCost > 0 ? <>⚔️ Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>⚔️ Buy another raid — free</>}
+                                <button className="sail-act is-raid" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
+                                    <span className="sail-act-ico" aria-hidden="true">⚔️</span>
+                                    <b>Raid</b><em>{busy ? "…" : resetCost > 0 ? `🪙 ${resetCost.toLocaleString()}` : "free"}</em>
                                 </button>
                             )
                         )}
