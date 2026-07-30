@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 
+import { AskForCopy, CreationShareHub } from "@/components/CreationShare";
+
 const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8" };
 
 // ── Decorate DOCK: a bottom tray you drag decorations OUT of, straight onto the farm scene (which stays fully
@@ -295,6 +297,11 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{item.rarity}{item.source === "special" ? " · premium" : ""}</div>
                 </div>
                 <div style={{ padding: "8px 16px 4px" }}>
+                    {/* Standing on someone else's farm looking at a piece they made — the moment to ask for one.
+                        AskForCopy checks with the server first, so it only appears when an ask is actually
+                        possible, and explains itself when it isn't. */}
+                    {/* Placed pieces carry `decoId`; catalog entries carry `id` — accept either. */}
+                    {!mine && item.source === "custom" && (item.decoId || item.id) ? <AskForCopy decoId={item.decoId || item.id} /> : null}
                     {item.buffText ? (
                         <div style={{ padding: "10px 12px", borderRadius: 11, background: "rgba(126,213,126,0.14)", border: "1px solid rgba(126,213,126,0.5)", color: "#a7e6a7", fontSize: 13, fontWeight: 800, textAlign: "center" }}>
                             While placed: {item.buffText}
@@ -418,6 +425,9 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
                 </div>
 
                 <div style={{ overflowY: "auto", padding: 12 }}>
+                    {/* Sharing lives at the top of your own decorations: incoming gifts, people asking for your
+                        art, and the one-time "share a copy" picker. Renders nothing when there's none of that. */}
+                    {tab === "mine" ? <CreationShareHub /> : null}
                     {tab === "mine" ? (
                         owned.length === 0 ? (
                             <div style={{ textAlign: "center", padding: "20px 12px" }}>
@@ -503,7 +513,8 @@ const CGHOST = { padding: "9px 14px", fontWeight: 800, fontSize: 13, borderRadiu
 const customErr = (e) => ({ no_credits: "You're out of creations — grab a bundle to get more.", describe_it: "Describe your decoration first.", gen_failed: "The art pipeline hiccuped — try again (your creation was refunded).", no_attempts: "No refines left.", bad_choice: "Pick one of the options.", not_found: "That draft expired — start over." }[e] || "Something went wrong — try again.");
 
 // ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a Creation
-// (bought on /marketplace/creations; owner can self-grant). Personal-only + never tradeable.
+// (bought on /marketplace/creations; owner can self-grant). Never sellable — but a finished creation CAN be
+// passed on to exactly one other member, once (see creation-share.js); their copy is the end of the line.
 export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onSuggest, onClose }) {
     const [draft, setDraft] = useState(custom?.draft || null);
     const [credits, setCredits] = useState(custom?.credits || 0);

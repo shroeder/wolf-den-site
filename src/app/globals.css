@@ -11988,3 +11988,38 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .raid-loot-tag { font-size: 0.72rem; font-weight: 800; color: #ffd86a; text-transform: uppercase; letter-spacing: 0.5px; }
 .raid-loot-name { font-weight: 800; }
 .raid-loot-note { font-size: 0.76rem; }
+
+/* ── Sharing creations (CreationShare.js) ─────────────────────────────────────────────────────────────────── */
+.cshare { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.cshare-err { color: #e05b6a; font-size: 0.82rem; font-weight: 700; margin: 0; }
+.cshare-note { color: #7ad07a; font-size: 0.85rem; font-weight: 800; margin: 0; }
+.cshare-art { border-radius: 10px; object-fit: contain; background: rgba(255,255,255,0.05); flex: 0 0 auto; }
+.cshare-art.is-empty { display: flex; align-items: center; justify-content: center; font-size: 20px; }
+/* An incoming gift is the happiest moment in the feature — give it the gold treatment. */
+.cshare-card { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 13px; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; flex-wrap: wrap; }
+.cshare-card.is-gift { background: rgba(255,215,94,0.11); border-color: rgba(255,215,94,0.36); }
+.cshare-card.is-ask { background: rgba(185,140,255,0.09); border-color: rgba(185,140,255,0.3); }
+.cshare-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 150px; }
+.cshare-body strong { font-size: 0.9rem; }
+.cshare-body span { font-size: 0.78rem; color: #b7c0cf; line-height: 1.35; }
+.cshare-actions { display: flex; gap: 7px; flex: 0 0 auto; }
+.cshare-actions button { padding: 8px 13px; font-size: 0.85rem; }
+.cshare-pending { display: flex; align-items: center; gap: 8px; font-size: 0.79rem; color: #b7c0cf; background: rgba(255,255,255,0.03); border-radius: 10px; padding: 8px 11px; flex-wrap: wrap; }
+.cshare-cancel { margin-left: auto; background: none; border: none; color: #8b93a0; font-size: 0.76rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.cshare-group { display: flex; flex-direction: column; gap: 4px; }
+.cshare-grouphead { display: flex; align-items: baseline; gap: 8px; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: #ffd75e; margin: 4px 2px 2px; flex-wrap: wrap; }
+.cshare-grouphead span { font-size: 0.68rem; font-weight: 600; text-transform: none; letter-spacing: 0; color: #8b93a0; }
+.cshare-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 11px; background: rgba(255,255,255,0.035); }
+.cshare-row.is-spent { opacity: 0.72; }
+.cshare-name { flex: 1 1 auto; font-size: 0.86rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cshare-give { flex: 0 0 auto; padding: 7px 11px; font-size: 0.8rem; }
+.cshare-locked { flex: 0 0 auto; font-size: 0.74rem; font-weight: 800; color: #8b93a0; }
+.cshare-give-panel { background: rgba(0,0,0,0.3); border: 1px solid #2a2f37; border-radius: 12px; padding: 12px; margin-top: 4px; }
+.cshare-warn { font-size: 0.79rem; color: #ffe9a8; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.3); border-radius: 10px; padding: 9px 11px; line-height: 1.4; margin-bottom: 10px; }
+.cshare-label { display: block; font-size: 0.74rem; font-weight: 800; color: #8b93a0; margin-bottom: 4px; }
+.cshare-input { width: 100%; padding: 10px 11px; border-radius: 10px; border: 1px solid #2a2f37; background: rgba(0,0,0,0.35); color: inherit; font-size: 0.9rem; }
+.cshare-askbox { margin-top: 8px; }
+.cshare-askcopy { margin: 0 0 8px; font-size: 0.82rem; color: #e7dcc4; line-height: 1.4; }
+.cshare-askcopy span { display: block; color: #8b93a0; font-size: 0.76rem; margin-top: 2px; }
+.cshare-asked { margin: 8px 0 0; font-size: 0.84rem; font-weight: 800; color: #7ad07a; }
+.cshare-cant { margin: 8px 0 0; font-size: 0.78rem; color: #8b93a0; }

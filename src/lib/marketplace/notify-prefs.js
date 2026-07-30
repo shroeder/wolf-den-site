@@ -23,6 +23,7 @@ export const NOTIFY_GROUPS = [
 // channels: which channels this kind can actually be delivered on (drives which switches the UI shows).
 export const NOTIFY_KINDS = [
     { key: "gift", group: "waiting", label: "Pet gifts", desc: "Someone offers you a pet, or accepts the one you offered", channels: ["push"] },
+    { key: "creation", group: "waiting", label: "Shared creations", desc: "Someone shares their custom art with you, or asks for a copy of yours", channels: ["push"] },
     { key: "trade", group: "waiting", label: "Trade offers", desc: "A new trade offer, and when yours is accepted or declined", channels: ["push"] },
     { key: "auction", group: "waiting", label: "Auction house", desc: "Your listing sells, or comes back unsold", channels: ["push"] },
 
