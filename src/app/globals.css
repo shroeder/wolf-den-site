@@ -6984,6 +6984,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .enotif-note p { margin: 0; font-size: 0.83rem; line-height: 1.45; color: #cbd2da; }
 .enotif-links { margin: 18px 0 0; font-size: 0.84rem; }
 .enotif-links a { color: #ffd75e; font-weight: 700; }
+.enotif-bounty { margin: 0 auto 12px; max-width: 34ch; font-size: 0.9rem; color: #ffe9a8; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.34); border-radius: 11px; padding: 9px 12px; line-height: 1.4; }
+.enotif-earned { margin: 12px 0 0; font-weight: 900; font-size: 1.05rem; color: #ffd75e; animation: enotifPop 0.5s ease-out; }
+@keyframes enotifPop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 @media (max-width: 480px) {
     .social-fab { right: 16px; bottom: 16px; }
 }

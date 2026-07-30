@@ -143,6 +143,60 @@ export async function sendRecapDigestEmail(email, { name = "", hooks = [], waiti
     }
 }
 
+// One-time re-engagement email: turn on notifications, collect the gold the onboarding task already owes you.
+// Single subject, single CTA, no news round-up — anything else dilutes the one action we want.
+export async function sendPushWinbackEmail(email, { name = "", gold = 0 } = {}) {
+    if (!process.env.RESEND_API_KEY) return false;
+    if (!email) return false;
+    const resend = getResendClient();
+    const site = baseUrl();
+    const enableUrl = `${site}/marketplace/notifications`;
+    const settingsUrl = `${site}/marketplace/profile`;
+
+    const html = `
+        <div style="max-width:520px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#26221c;">
+          <div style="background:linear-gradient(180deg,#2f8f52,#215f39);border-radius:16px 16px 0 0;padding:30px 24px;text-align:center;">
+            <div style="font-size:50px;line-height:1;">🔔</div>
+            <h1 style="margin:12px 0 0;color:#ffffff;font-size:23px;">You're missing the good bits</h1>
+            ${gold ? `<p style="margin:8px 0 0;color:#ffe9a8;font-size:14px;font-weight:700;">Turn on alerts and grab ${gold} gold</p>` : ""}
+          </div>
+          <div style="background:#fbf8f2;border:1px solid #e6ddcb;border-top:none;border-radius:0 0 16px 16px;padding:24px;">
+            <p style="margin:0 0 12px;">${name ? `Hey ${name},` : "Hey there,"}</p>
+            <p style="margin:0 0 14px;line-height:1.6;font-size:15px;">
+              Almost everything in the Den is time-sensitive — raids last minutes, gifts sit unclaimed, listings
+              expire. Right now notifications are off for you, so you're finding out late or not at all.
+            </p>
+            <table style="width:100%;border-collapse:collapse;margin:0 0 4px;">
+              <tr><td style="padding:6px 0;width:30px;font-size:18px;">🎁</td><td style="padding:6px 0;font-size:15px;line-height:1.5;">Someone sends you a pet or a trade offer</td></tr>
+              <tr><td style="padding:6px 0;width:30px;font-size:18px;">⚔️</td><td style="padding:6px 0;font-size:15px;line-height:1.5;">A raid hits the plaza</td></tr>
+              <tr><td style="padding:6px 0;width:30px;font-size:18px;">💰</td><td style="padding:6px 0;font-size:15px;line-height:1.5;">Your auction listing sells</td></tr>
+            </table>
+            ${gold ? `<p style="margin:14px 0 0;line-height:1.6;font-size:15px;">And there's <strong>${gold} gold</strong> waiting the moment you switch them on — it's been sitting there unclaimed.</p>` : ""}
+            <div style="text-align:center;margin:22px 0 6px;">
+              <a href="${enableUrl}" style="display:inline-block;background:#2f8f52;color:#ffffff;padding:14px 28px;border-radius:10px;font-weight:800;text-decoration:none;font-size:15px;">${gold ? `Turn on alerts &amp; claim ${gold} gold` : "Turn on alerts"}</a>
+            </div>
+            <p style="text-align:center;margin:10px 0 0;font-size:12.5px;color:#8a8172;">Takes one tap. You choose exactly which alerts you get, and can turn any of them off.</p>
+            <p style="color:#8a8172;font-size:12px;margin-top:22px;border-top:1px solid #e6ddcb;padding-top:14px;line-height:1.5;">
+              This is a one-off — we won't email you about this again.
+              <a href="${settingsUrl}" style="color:#8a8172;text-decoration:underline;">Manage your email preferences</a>.
+            </p>
+          </div>
+        </div>`;
+
+    try {
+        await resend.emails.send({
+            from: FROM_ADDRESS,
+            to: email,
+            subject: gold ? `You have ${gold} gold waiting at The Wolf Den` : "You're missing the good bits at The Wolf Den",
+            html,
+            headers: { "List-Unsubscribe": `<${settingsUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export async function sendVerificationEmail(email, code) {
     const resend = getResendClient();
     await resend.emails.send({

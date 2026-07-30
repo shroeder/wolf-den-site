@@ -35,6 +35,31 @@ export default function EnableNotificationsClient() {
     const [state, setState] = useState("loading"); // loading | on | off | blocked | ios | unsupported
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState(null);
+    // The onboarding "notifications" task already pays gold once and is already idempotent — it's just that
+    // members who blew past the first-visit card never saw the offer. Surface it here instead of inventing a
+    // second reward.
+    const [bounty, setBounty] = useState(null); // { gold } while unclaimed
+    const [earned, setEarned] = useState(null);
+
+    const loadBounty = useCallback(async () => {
+        const r = await fetch("/api/marketplace/onboarding", { cache: "no-store" }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        const t = (d?.tasks || []).find((x) => x.key === "notifications");
+        setBounty(t && !t.claimed ? { gold: t.gold } : null);
+    }, []);
+
+    useEffect(() => { loadBounty(); }, [loadBounty]);
+
+    // Claim the gold once the browser has actually granted permission.
+    const claimBounty = useCallback(async () => {
+        const r = await fetch("/api/marketplace/onboarding", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "notifications" }),
+        }).then((x) => x.json()).catch(() => null);
+        if (r?.ok && r.gold) { setEarned(r.gold); setBounty(null); }
+        else setBounty(null);
+    }, []);
 
     const detect = useCallback(async () => {
         if (iosNeedsInstall()) { setState("ios"); return; }
@@ -58,6 +83,7 @@ export default function EnableNotificationsClient() {
         if (res.ok) {
             setState("on");
             setMsg("You're all set — we'll ping this device from now on.");
+            if (bounty) await claimBounty();
             return;
         }
         if (res.reason === "denied") {
@@ -102,12 +128,17 @@ export default function EnableNotificationsClient() {
 
                 {state === "off" ? (
                     <>
+                        {bounty ? (
+                            <p className="enotif-bounty">🪙 Turn them on and we&apos;ll drop <strong>{bounty.gold} gold</strong> in your pocket.</p>
+                        ) : null}
                         <button type="button" className="btn-gold enotif-cta" onClick={turnOn} disabled={busy}>
-                            {busy ? "Turning on…" : "🔔 Turn on notifications"}
+                            {busy ? "Turning on…" : bounty ? `🔔 Turn on · +${bounty.gold} gold` : "🔔 Turn on notifications"}
                         </button>
                         <p className="enotif-fine">Your browser will ask you to allow it. One tap, and you can turn any of it off later.</p>
                     </>
                 ) : null}
+
+                {earned ? <p className="enotif-earned">+{earned} 🪙 added to your gold</p> : null}
 
                 {state === "on" ? (
                     <button type="button" className="btn-ghost" onClick={turnOff} disabled={busy}>Turn off on this device</button>
