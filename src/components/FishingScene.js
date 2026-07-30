@@ -250,10 +250,11 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                     {warming ? "get ready…" : inside ? "CAUGHT!" : "chase it!"}
                 </div>
             </div>
-            {/* Labelled SIZE, because that is literally what it buys: the score decides how big the fish is.
-                An unlabelled bar creeping up from zero read as a progress bar you were failing. */}
+            {/* Labelled REEL, not SIZE. It used to be the size, literally — you watched the number you were
+                going to get count up, and the reveal just restated it. Your reel now shifts the ODDS of a big
+                one, so this is how well you're doing, not what you've already won. */}
             <div className="fish-strain-row">
-                <span className="fish-strain-label">SIZE</span>
+                <span className="fish-strain-label">REEL</span>
                 <div className="fish-strain">
                     <div className="fish-strain-fill" style={{ width: `${scoreNow * 100}%` }} />
                 </div>

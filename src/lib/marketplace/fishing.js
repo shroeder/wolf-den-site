@@ -108,11 +108,8 @@ const BITE_GRACE_MS = 12000;         // after which the fish has clearly gone (t
 // add one. Multiplicative on the weight of anything above common.
 const RARE_TILT_PER_ANGLING = 0.035; // +3.5% weight to non-common fish per Angling point
 const RARE_TILT_CAP = 0.9;
-// How much of the final size comes from your REELING vs. the luck of what bit. Skill-forward, but a bad reel on
-// a big fish still beats a perfect reel on a sardine — species matters more than execution, which is what makes
-// the chase for a rare species the point.
-const SIZE_FROM_QUALITY = 0.62;
-const SIZE_FROM_ROLL = 0.38;
+// (The old SIZE_FROM_QUALITY / SIZE_FROM_ROLL blend lived here. It made size a foregone conclusion — see
+// weightFor, where the reel now shapes the distribution instead of averaging into the answer.)
 // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Every cast rolls ONE bonus alongside the fish (or nothing, which is still the most common outcome). Rolled as
 // a single weighted table rather than a stack of independent chances, so the odds are legible and a cast can't
@@ -267,21 +264,33 @@ function rollSpecies(rareTilt = 0) {
     return FISH[FISH.length - 1];
 }
 
-// Weight in pounds from the pre-rolled luck and how well the member reeled. Distributed on a CURVE, not
-// linearly: t³ means most fish land in the lower half of the range and a near-maximum specimen is genuinely
-// rare, which is what makes a personal best worth chasing. A linear roll made 2000lb sharks routine.
+// ── HOW BIG IS IT? ───────────────────────────────────────────────────────────────────────────────────────────
+// Your reel shifts the ODDS. It does not set the answer.
+//
+// It used to be a straight blend — 62% your reel, 38% a pre-rolled number — which made the size a foregone
+// conclusion: the live meter counted up during the reel and the reveal just restated it. Nothing to find out.
+//
+// Now the pre-rolled `roll` (uniform, committed at cast time so it can't be rerolled) is SHAPED by how well
+// you reeled: t = roll^(1/(0.6 + 2.4·q)). A bad reel bends the distribution toward the small end, a great one
+// bends it toward the big end, but every outcome stays reachable from every reel. Average share of the range:
+//
+//     reel 0%  → ~0.38        reel 60% → ~0.60        reel 100% → ~0.75
+//
+// So skill pays over a season of fishing, and any single cast can still surprise you in both directions —
+// a perfect reel that lands a tiddler, or a sloppy one that hauls up the biggest of its kind you've seen.
+const SIZE_CURVE = 1.6;          // applied after shaping, so near-maximum specimens stay genuinely rare
 function weightFor(species, roll, quality) {
     const [min, max] = species.lb;
-    const t = clamp01(SIZE_FROM_ROLL * clamp01(roll) + SIZE_FROM_QUALITY * clamp01(quality));
-    const curved = Math.pow(t, 2.2);
-    const lb = min + (max - min) * curved;
+    const q = clamp01(quality);
+    const shaped = Math.pow(clamp01(roll), 1 / (0.6 + 2.4 * q));
+    const lb = min + (max - min) * Math.pow(shaped, SIZE_CURVE);
     return lb < 10 ? Math.round(lb * 100) / 100 : round1(lb);
 }
 // Where this fish sits in its species' weight range (0..1) — drives payout and the "monster!" callouts.
-// Measured on the same curve the weight came off, so "82% of max" means 82% of the way up the achievable
-// scale rather than 82% of the raw poundage (which for a whale would be almost unreachable).
+// Inverted through the same curve, so "82% of max" means 82% of the way up the ACHIEVABLE scale rather than
+// 82% of the raw poundage (which for a whale would be nearly unreachable).
 const percentileOf = (species, lb) => clamp01(Math.pow(
-    (Number(lb) - species.lb[0]) / Math.max(0.0001, species.lb[1] - species.lb[0]), 1 / 2.2,
+    (Number(lb) - species.lb[0]) / Math.max(0.0001, species.lb[1] - species.lb[0]), 1 / SIZE_CURVE,
 ));
 
 // ── THE LOG ──────────────────────────────────────────────────────────────────────────────────────────────────
