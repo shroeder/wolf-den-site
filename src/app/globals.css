@@ -12145,6 +12145,21 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-band-label { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.56rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(190,255,215,0.85); pointer-events: none; }
 .fish-top-rank { flex: 0 0 auto; min-width: 20px; text-align: right; font-size: 0.8rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
 .fish-log-art { flex: 0 0 auto; object-fit: contain; }
+
+/* ── The dedicated fishing screen ────────────────────────────────────────────────────────────────────────── */
+.fishhome { max-width: 620px; margin: 0 auto; padding: 14px 12px 40px; }
+.fishhome-head h1 { margin: 0 0 3px; font-size: 1.5rem; color: #ffd75e; }
+.fishhome-head p { margin: 0 0 14px; font-size: 0.84rem; color: #8b93a0; line-height: 1.4; }
+.fishhome-stats { display: flex; gap: 8px; }
+.fishhome-stat { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 12px 6px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; }
+.fishhome-stat b { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.fishhome-stat b em { font-style: normal; font-size: 0.8rem; color: #8b93a0; }
+.fishhome-stat span { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8b93a0; text-align: center; }
+.fishhome-progress { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.4); overflow: hidden; margin: 10px 0 12px; }
+.fishhome-progress span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#3fa8e0,#58d989); transition: width 0.4s ease; }
+.fishhome-go { display: block; text-align: center; text-decoration: none; padding: 13px; border-radius: 13px; font-weight: 900; font-size: 0.98rem; color: #10240f; background: linear-gradient(180deg,#7ed57e,#4bbf6a); box-shadow: 0 3px 0 #2f8a4a; margin-bottom: 6px; }
+/* The log renders inside the page rather than a modal, so drop the modal's own chrome. */
+.fishhome .fish-log { max-height: none; height: auto; }
 /* Your weight against your previous best and the species ceiling. */
 .fish-compare { display: flex; gap: 8px; margin: 10px 0 2px; width: 100%; }
 .fish-compare-cell { position: relative; flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 6px; border-radius: 11px; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; }

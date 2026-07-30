@@ -29,6 +29,7 @@ const NAV_SPRITE = {
     "/marketplace/track": "rewards", "/marketplace/badges": "badges", "/marketplace/leaderboard": "ranks",
     "/marketplace/invite": "invite", "/marketplace/friends": "friends", "/marketplace/inbox": "inbox",
     "/marketplace/play": "home", "/marketplace/customize": "customize", "/marketplace/profile": "profile",
+    "/marketplace/fishing": "fishing",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -83,10 +84,14 @@ export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [signedIn, setSignedIn] = useState(false); // gates the Town link + the one-time Forge announcement — declared before `links`
+    // Fishing is still owner-gated, so its nav entry only exists for accounts that can open it. Declared
+    // HERE, beside signedIn, because `links` below reads it — declaring it further down is a TDZ crash.
+    const [owner, setOwner] = useState(false);
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
-        ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : [])];
+        ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
+        ...(owner ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -105,7 +110,7 @@ export default function GameNav() {
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
-            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setSailAttn(Boolean(d?.attention)); }).catch(() => {});
+            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setOwner(Boolean(d?.owner)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
         };
         loadChests();
@@ -159,6 +164,7 @@ export default function GameNav() {
             { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Daily Spin", sub: "Spin the wheel" },
             { href: "/marketplace/quests", emoji: "📜", label: "Quests", sub: "Daily bounties" },
             { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties", sub: "Post & claim" },
+            ...(owner ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing", sub: "Log & records" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },

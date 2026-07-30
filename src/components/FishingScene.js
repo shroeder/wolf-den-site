@@ -213,7 +213,10 @@ function ReelStruggle({ onDone, sfx }) {
 }
 
 // ── THE LOG ──────────────────────────────────────────────────────────────────────────────────────────────────
-function FishingLog({ log, known, total, records, onClose }) {
+// Exported so the dedicated /marketplace/fishing page renders the SAME boards. It used to be reachable only
+// through this modal — which is only offered while a voyage is in flight — so your own log was invisible
+// whenever your boat was docked.
+export function FishingLog({ log, known, total, records, onClose }) {
     const [tab, setTab] = useState("log");
     // `records` arrives as { records, top } — the per-species board and the ranked leaderboard.
     const perSpecies = records?.records || [];
@@ -286,7 +289,8 @@ function FishingLog({ log, known, total, records, onClose }) {
                     {!perSpecies.length ? <p className="muted" style={{ padding: 12 }}>Nobody has landed anything yet. The board is yours for the taking.</p> : null}
                 </div>
             )}
-            <button type="button" className="fish-close" onClick={onClose}>Back to the rail</button>
+            {/* No close button on the dedicated page — there's nothing to close, it IS the screen. */}
+            {onClose ? <button type="button" className="fish-close" onClick={onClose}>Back to the rail</button> : null}
         </div>
     );
 }

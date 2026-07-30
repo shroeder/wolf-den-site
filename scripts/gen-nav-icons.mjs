@@ -60,6 +60,7 @@ const ICONS = {
     inbox: "A sealed envelope with a folded flap and a round red wax seal",
     home: "A heraldic shield crest bearing a bold stylised wolf head in profile",
     customize: "An ornate hand mirror with a scrolled metal frame, a paintbrush crossed behind it",
+    fishing: "A wooden fishing rod angled across the frame with a taut line and a bright red-and-white float bobbing below it",
     profile: "A single hooded human adventurer shown from the chest up, framed inside a thick ornate circular ring like a portrait medallion",
 };
 
