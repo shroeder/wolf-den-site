@@ -6690,6 +6690,22 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     justify-content: center;
     border: 2px solid var(--bg, #0e0e12);
 }
+/* Plaza chatter only: a dot, not a number. Nobody is waiting on a reply, so it draws the eye without implying
+   an obligation — and it can never inflate the count that does. */
+.social-fab-dot {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4fc3d9;
+    border: 2px solid var(--bg, #0e0e12);
+    animation: socialDotPulse 2.4s ease-in-out infinite;
+}
+@keyframes socialDotPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.22); opacity: 0.72; } }
+/* Chat counts are informational, so they're the calmer accent rather than the red "you owe someone" badge. */
+.social-tab-badge.is-chat { background: #4fc3d9; color: #06222a; }
 /* Full-screen "go in / get back out" experience — not a corner modal. Locks the page behind it. */
 .social-panel {
     position: fixed;

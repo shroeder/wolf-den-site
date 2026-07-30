@@ -132,6 +132,8 @@ function ActionButton({ member, busy, onAdd, onMessage, onRespond }) {
 export default function SocialHub() {
     const [authed, setAuthed] = useState(false);
     const [unread, setUnread] = useState(0);
+    // Plaza chatter, kept apart from `unread` — see /api/marketplace/unread for why it isn't folded in.
+    const [globalNew, setGlobalNew] = useState(0);
     const [requests, setRequests] = useState(0);
     const [bubble, setBubble] = useState(false);
     const prevTotalRef = useRef(-1);
@@ -152,6 +154,7 @@ export default function SocialHub() {
             setAuthed(Boolean(d.authenticated));
             setUnread(d.total || 0);
             setRequests(d.requests || 0);
+            setGlobalNew(d.global || 0);
             // Pop the notifications bubble on first load with pending items, and again whenever the
             // total grows (something new arrived) — so it grabs attention both on return and live.
             const total = (d.total || 0) + (d.requests || 0);
@@ -298,7 +301,14 @@ export default function SocialHub() {
                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                     </svg>
                 )}
-                {!open && totalNotif > 0 ? <span className="social-fab-badge">{totalNotif > 99 ? "99+" : totalNotif}</span> : null}
+                {/* A number means someone is waiting on YOU (DMs, requests). If the only thing new is plaza
+                    chatter, show a plain dot instead — enough to draw the eye without implying an obligation
+                    or inflating the count that actually matters. */}
+                {!open && totalNotif > 0 ? (
+                    <span className="social-fab-badge">{totalNotif > 99 ? "99+" : totalNotif}</span>
+                ) : !open && globalNew > 0 ? (
+                    <span className="social-fab-dot" aria-label={`${globalNew} new chat message${globalNew === 1 ? "" : "s"}`} />
+                ) : null}
             </button>
 
             {open ? (
@@ -317,7 +327,7 @@ export default function SocialHub() {
                         <>
                             <div className="social-tabs">
                                 <button type="button" className={`social-tab${tab === "global" ? " is-active" : ""}`} onClick={() => setTab("global")}>
-                                    🌐 Global
+                                    🌐 Global{globalNew > 0 && tab !== "global" ? <span className="social-tab-badge is-chat">{globalNew > 99 ? "99+" : globalNew}</span> : null}
                                 </button>
                                 <button type="button" className={`social-tab${tab === "messages" ? " is-active" : ""}`} onClick={() => setTab("messages")}>
                                     Messages{unread > 0 ? <span className="social-tab-badge">{unread}</span> : null}
@@ -332,7 +342,7 @@ export default function SocialHub() {
 
                             <div className="social-body">
                                 {tab === "global" ? (
-                                    <GlobalChatTab open={open} />
+                                    <GlobalChatTab open={open} onRead={() => setGlobalNew(0)} />
                                 ) : tab === "messages" ? (
                                     <MessagesTab inbox={inbox} onOpenDm={(id, name) => setThread({ id, name })} />
                                 ) : tab === "friends" ? (
@@ -464,7 +474,7 @@ function heroInner(m) {
 // The Global tab — a first-class town/plaza chat. Same stream as the in-town chat: send here and it shows in
 // the plaza (and vice versa). Every message shows the sender's HERO sprite (not their avatar icon), name, and
 // a pretty timestamp. Polls while open.
-function GlobalChatTab({ open }) {
+function GlobalChatTab({ open, onRead }) {
     const [messages, setMessages] = useState(null);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
@@ -475,7 +485,10 @@ function GlobalChatTab({ open }) {
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         if (d?.messages) setMessages(d.messages);
         else setMessages((m) => (m === null ? [] : m));
-    }, []);
+        // That GET marked the feed read server-side; clear the local count now instead of waiting up to 30s
+        // for the next unread poll to catch up.
+        if (d?.authenticated) onRead?.();
+    }, [onRead]);
 
     useEffect(() => {
         if (!open) return undefined;

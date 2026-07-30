@@ -436,6 +436,28 @@ export async function sendTownChat(buyerId, body) {
 // The shared plaza chat feed as a persistent LOG (newest LAST so the client can append + auto-scroll). Each
 // message carries its sender's HERO sprite (avatar_sprite_url) + name + timestamp. Powers both the town chat
 // log under the scene AND the Social hub's Global tab — one stream: a message sent from either shows in both.
+// How many global-chat messages this member hasn't seen. Excludes their OWN messages — your own chatter is
+// never "unread". A member who has never opened the chat gets everything from the last 7 days rather than all
+// history, so a new member isn't met with a meaningless pile.
+export async function globalChatUnread(buyerId) {
+    if (!buyerId) return 0;
+    const row = await db.queryOne(
+        `SELECT COUNT(*)::int AS n
+           FROM mkt_town_chat c
+           JOIN mkt_buyer b ON b.id = $1
+          WHERE c.buyer_id <> $1
+            AND c.created_at > COALESCE(b.global_chat_seen_at, NOW() - INTERVAL '7 days')`,
+        [buyerId]
+    ).catch(() => null);
+    return row?.n || 0;
+}
+
+// Stamp the chat as read. Called when the member actually looks at the feed.
+export async function markGlobalChatSeen(buyerId) {
+    if (!buyerId) return;
+    await db.query(`UPDATE mkt_buyer SET global_chat_seen_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
+}
+
 export async function getGlobalChat(buyerId = null, limit = 40) {
     const n = Math.max(1, Math.min(100, Number(limit) || 40));
     const rows = await db.query(
