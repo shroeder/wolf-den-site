@@ -953,6 +953,7 @@ export async function runSailingArrivals() {
           LIMIT 500`,
     ).catch(() => []);
     let pushed = 0;
+    let delivered = 0;
     for (const r of due) {
         const claimed = await db.queryOne(
             `UPDATE mkt_sailing SET arrival_notified = TRUE
@@ -961,35 +962,90 @@ export async function runSailingArrivals() {
             [r.buyer_id],
         ).catch(() => null);
         if (!claimed) continue;
-        await sendWebPush(r.buyer_id, {
+        // Record what the push actually did. `pushed` counts rows we claimed; `delivered` counts browsers that
+        // really got it — when those two diverge, the channel is broken and the job says so instead of
+        // reporting a cheerful success while reaching nobody.
+        const res = await sendWebPush(r.buyer_id, {
             kind: "sailing",
             title: "🏝️ Land ho!",
             body: "Your boat reached the island — head ashore and dig for buried treasure.",
             url: "/marketplace/sailing", tag: "sail-arrival", data: { type: "sail_arrival" },
-        }).catch(() => {});
+        }).catch(() => ({ sent: 0, error: true }));
         pushed += 1;
+        delivered += Number(res?.sent) || 0;
     }
-    return { checked: due.length, pushed };
+    return { checked: due.length, pushed, delivered };
 }
 
-// How long the boat can sit docked before we nudge "you forgot to sail", and how often the nudge can repeat
-// while it stays idle (so it's a reminder, not a nag).
+// How long the boat can sit unattended before we nudge, and how often a nudge may repeat while it stays that
+// way (so it's a reminder, not a nag). `idle_notified_at` is the shared "last nudge" stamp for BOTH reminders
+// below, which is why a single repeat window governs them.
 const SAIL_IDLE_AFTER_HOURS = 3;
 const SAIL_IDLE_REPEAT_HOURS = 20;
 
-// "Your boat is docked — send it out" reminder. Fires for anyone whose boat has been idle (no active voyage,
-// no dig) for SAIL_IDLE_AFTER_HOURS, at most once per SAIL_IDLE_REPEAT_HOURS. Only nudges players who've sailed
-// before (voyages_completed > 0), so a never-sailed account isn't pestered. Cleared when a new voyage departs.
+// Nudge anyone whose boat is waiting on them. Two dead-ends, one cadence:
+//
+//   1. LANDED, TREASURE UNDUG — runSailingArrivals() fires exactly ONCE per voyage (arrival_notified latches
+//      TRUE and only clears on the next departure). A player who landed and didn't dig then fell into a hole:
+//      the arrival latch was spent, and reminder 2 below could never see them because a landed boat still
+//      carries departed_at. They got no nudge again, ever. That hole is why idle_notified_at had never been
+//      stamped once in production, with 14 players stranded in it — the oldest for a week.
+//   2. DOCKED, NOT SAILING — dig finished, boat home, player hasn't sent it back out.
+//
+// Both claim atomically (stamp only if still due) so overlapping cron ticks can't double-send, and neither
+// touches updated_at — that column is reminder 2's idle clock, and re-stamping it would defer it forever.
 export async function runSailingIdleReminders() {
+    const after = String(SAIL_IDLE_AFTER_HOURS);
+    const repeat = String(SAIL_IDLE_REPEAT_HOURS);
+    let pushed = 0;
+    let delivered = 0;
+
+    // sendWebPush never throws and reports {sent}. Count REAL deliveries, not loop iterations — discarding that
+    // result is exactly how a dead push channel keeps reporting success while reaching nobody.
+    const nudge = async (buyerId, push) => {
+        const res = await sendWebPush(buyerId, push).catch(() => ({ sent: 0, error: true }));
+        pushed += 1;
+        delivered += Number(res?.sent) || 0;
+    };
+
+    // ── 1. Landed, but the treasure is still in the ground ──────────────────────────────────────────────────
+    // No voyages_completed gate here: that counter only increments once a dig FINISHES, so requiring it would
+    // skip everyone stranded on their very first voyage — the players most worth bringing back.
+    const stranded = await db.query(
+        `SELECT buyer_id FROM mkt_sailing
+          WHERE departed_at IS NOT NULL AND returns_at IS NOT NULL AND dig_state IS NULL
+            AND returns_at < NOW() - ($1 || ' hours')::interval
+            AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
+          LIMIT 500`,
+        [after, repeat],
+    ).catch(() => []);
+    for (const r of stranded) {
+        const claimed = await db.queryOne(
+            `UPDATE mkt_sailing SET idle_notified_at = NOW()
+              WHERE buyer_id = $1 AND departed_at IS NOT NULL AND dig_state IS NULL AND returns_at <= NOW()
+                AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
+              RETURNING buyer_id`,
+            [r.buyer_id, repeat],
+        ).catch(() => null);
+        if (!claimed) continue;
+        await nudge(r.buyer_id, {
+            kind: "sailing",
+            title: "🏝️ Your treasure is still buried",
+            body: "Your crew landed but never dug. Grab a shovel — the loot is waiting.",
+            url: "/marketplace/sailing", tag: "sail-dig", data: { type: "sail_dig" },
+        });
+    }
+
+    // ── 2. Docked and idle — "you forgot to sail" ───────────────────────────────────────────────────────────
+    // voyages_completed > 0 here so a never-sailed account isn't pestered. Cleared when a new voyage departs.
     const idle = await db.query(
         `SELECT buyer_id FROM mkt_sailing
           WHERE departed_at IS NULL AND dig_state IS NULL AND voyages_completed > 0
             AND updated_at < NOW() - ($1 || ' hours')::interval
             AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
           LIMIT 500`,
-        [String(SAIL_IDLE_AFTER_HOURS), String(SAIL_IDLE_REPEAT_HOURS)],
+        [after, repeat],
     ).catch(() => []);
-    let pushed = 0;
     for (const r of idle) {
         // Atomic claim — stamp idle_notified_at only if it's still due, so overlapping cron ticks can't double-send.
         const claimed = await db.queryOne(
@@ -997,18 +1053,18 @@ export async function runSailingIdleReminders() {
               WHERE buyer_id = $1 AND departed_at IS NULL AND dig_state IS NULL
                 AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
               RETURNING buyer_id`,
-            [r.buyer_id, String(SAIL_IDLE_REPEAT_HOURS)],
+            [r.buyer_id, repeat],
         ).catch(() => null);
         if (!claimed) continue;
-        await sendWebPush(r.buyer_id, {
+        await nudge(r.buyer_id, {
             kind: "sailing",
             title: "⛵ Your boat is docked",
             body: "It's ready to set sail — send it on a voyage to haul back treasure.",
             url: "/marketplace/sailing", tag: "sail-idle", data: { type: "sail_idle" },
-        }).catch(() => {});
-        pushed += 1;
+        });
     }
-    return { idleChecked: idle.length, idlePushed: pushed };
+
+    return { strandedChecked: stranded.length, idleChecked: idle.length, idlePushed: pushed, idleDelivered: delivered };
 }
 
 // Wave to a passing sailor — up to WAVES_PER_DAY/day, each a little XP + coins + a small travel-time cut.
