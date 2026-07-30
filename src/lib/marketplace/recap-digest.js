@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { sendRecapDigestEmail } from "@/lib/marketplace/email.js";
+import { VAPID_ROTATED_AT } from "@/lib/marketplace/notify-prefs.js";
 
 // ── THE WIN-BACK RECAP ───────────────────────────────────────────────────────────────────────────────────────
 // An occasional "here's what you missed" email for members we CANNOT reach by push. The entire design goal is
@@ -39,8 +40,13 @@ async function candidates(limit) {
                 AND (b.digest_last_sent_at IS NULL OR b.digest_last_sent_at < NOW() - INTERVAL '${COOLDOWN_DAYS} days')
                 -- actually away
                 AND (b.last_seen_at IS NULL OR b.last_seen_at < NOW() - INTERVAL '${AWAY_DAYS} days')
-                -- push genuinely can't reach them: no subscription at all
-                AND NOT EXISTS (SELECT 1 FROM mkt_web_push w WHERE w.buyer_id = b.id)
+                -- Push genuinely can't reach them. A pre-rotation subscription does NOT count as reachable —
+                -- the push service 403s it and it's never pruned, so those members would otherwise fall
+                -- through the gap and get nothing on either channel.
+                AND NOT EXISTS (
+                    SELECT 1 FROM mkt_web_push w
+                     WHERE w.buyer_id = b.id AND w.created_at >= '${VAPID_ROTATED_AT}'
+                )
               ORDER BY b.last_seen_at ASC NULLS FIRST
               LIMIT ${Math.max(1, Math.min(200, Number(limit) || BATCH))}`
         )
@@ -64,13 +70,17 @@ async function personalHooks(buyerId) {
         db.queryOne(`SELECT COALESCE(SUM(count),0)::int AS n FROM mkt_user_chest WHERE buyer_id = $1`, [buyerId]).catch(() => null),
     ]);
 
+    // `justifies` marks a hook strong enough to earn an email BY ITSELF — meaning a real person is waiting on
+    // this member. Unopened chests are worth mentioning but must not justify a send: nearly everyone always
+    // has some, so counting them would make the "is there anything to say?" guard always pass and every
+    // away-member would get mail on a fixed schedule regardless of whether anything happened.
     const hooks = [];
     for (const g of gifts || []) {
         const pet = collectibleById(g.pet_id);
-        hooks.push({ icon: "🎁", text: `${g.from_name || "A member"} is giving you <strong>${pet?.name || "a pet"}</strong> — it's still waiting for you to accept.`, url: "/marketplace/pets" });
+        hooks.push({ justifies: true, icon: "🎁", text: `${g.from_name || "A member"} is giving you <strong>${pet?.name || "a pet"}</strong> — it's still waiting for you to accept.`, url: "/marketplace/pets" });
     }
-    if (trades?.n) hooks.push({ icon: "🤝", text: `You have <strong>${trades.n} trade offer${trades.n === 1 ? "" : "s"}</strong> waiting on an answer.`, url: "/marketplace/trade" });
-    if (chests?.n) hooks.push({ icon: "🎲", text: `<strong>${chests.n} unopened chest${chests.n === 1 ? "" : "s"}</strong> are sitting in your stash.`, url: "/marketplace/rewards" });
+    if (trades?.n) hooks.push({ justifies: true, icon: "🤝", text: `You have <strong>${trades.n} trade offer${trades.n === 1 ? "" : "s"}</strong> waiting on an answer.`, url: "/marketplace/trade" });
+    if (chests?.n) hooks.push({ justifies: false, icon: "🎲", text: `<strong>${chests.n} unopened chest${chests.n === 1 ? "" : "s"}</strong> are sitting in your stash.`, url: "/marketplace/rewards" });
     return hooks;
 }
 
@@ -104,14 +114,16 @@ export async function runRecapDigest({ limit = BATCH, dryRun = false } = {}) {
         const since = m.last_seen_at || new Date(Date.now() - COOLDOWN_DAYS * 86400000).toISOString();
         const [hooks, news] = await Promise.all([personalHooks(m.id), denNews(since)]);
 
-        // Rule 3: personal hooks justify a send on their own; otherwise the Den has to have been busy.
-        if (!hooks.length && news.length < MIN_DEN_NEWS) {
+        // Rule 3: a hook only earns a send on its own if someone is genuinely WAITING on this member;
+        // otherwise the Den itself has to have been busy enough to be worth an email.
+        const waiting = hooks.filter((h) => h.justifies).length;
+        if (!waiting && news.length < MIN_DEN_NEWS) {
             out.skippedNothingToSay += 1;
             continue;
         }
 
         if (dryRun) {
-            out.recipients.push({ name: m.name, hooks: hooks.length, news: news.length, awayDays: daysSince(m.last_seen_at) });
+            out.recipients.push({ name: m.name, waiting, hooks: hooks.length, news: news.length, awayDays: daysSince(m.last_seen_at) });
             out.sent += 1;
             continue;
         }
@@ -119,6 +131,7 @@ export async function runRecapDigest({ limit = BATCH, dryRun = false } = {}) {
         const ok = await sendRecapDigestEmail(m.email, {
             name: m.name || "",
             hooks,
+            waiting,
             news,
             awayDays: daysSince(m.last_seen_at),
         }).catch(() => false);
@@ -126,7 +139,7 @@ export async function runRecapDigest({ limit = BATCH, dryRun = false } = {}) {
         if (ok) {
             await db.query(`UPDATE mkt_buyer SET digest_last_sent_at = NOW() WHERE id = $1`, [m.id]).catch(() => {});
             out.sent += 1;
-            out.recipients.push({ name: m.name, hooks: hooks.length, news: news.length });
+            out.recipients.push({ name: m.name, waiting, hooks: hooks.length, news: news.length });
         } else {
             out.failed += 1;
         }

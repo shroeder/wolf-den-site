@@ -50,6 +50,11 @@ export const NOTIFY_KINDS = [
     { key: "digest", group: "shop", label: "Weekly recap email", desc: "An occasional summary of what you missed while you were away", channels: ["email"], hideGroup: true },
 ];
 
+// The VAPID keypair rotation date. Subscriptions created before it are signed for the old public key, so the
+// push service rejects them (403) and broadcastWebPush never prunes them (it only prunes 404/410). Anything
+// asking "can we actually reach this member by push?" has to discount them.
+export const VAPID_ROTATED_AT = "2026-07-25";
+
 const KIND_KEYS = new Set(NOTIFY_KINDS.map((k) => k.key));
 export const isNotifyKind = (kind) => KIND_KEYS.has(String(kind || ""));
 export const prefKey = (channel, kind) => `${channel}:${kind}`;

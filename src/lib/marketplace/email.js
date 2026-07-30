@@ -80,7 +80,7 @@ export async function broadcastAnnouncementEmail({ subject, heading, emoji = "�
 // Den news, then ONE primary CTA that turns on instant alerts — the goal is to convert them to push so they
 // stop needing this email. Ends with a plain, obvious way to stop these specific emails; burying that is how
 // you earn a spam complaint instead of an unsubscribe.
-export async function sendRecapDigestEmail(email, { name = "", hooks = [], news = [], awayDays = null } = {}) {
+export async function sendRecapDigestEmail(email, { name = "", hooks = [], waiting = 0, news = [], awayDays = null } = {}) {
     if (!process.env.RESEND_API_KEY) return false;
     if (!email) return false;
     const resend = getResendClient();
@@ -92,9 +92,11 @@ export async function sendRecapDigestEmail(email, { name = "", hooks = [], news 
         .join("");
 
     // The headline promises only what we can actually deliver — a vague "you missed a lot!" is what makes
-    // people unsubscribe. If something is genuinely waiting, lead with that instead.
+    // people unsubscribe. "Something's waiting" is reserved for a real person waiting on them (`waiting`);
+    // standing loot like unopened chests renders in the body but must never set the promise.
     const hasHooks = hooks.length > 0;
-    const heading = hasHooks ? "Something's waiting for you" : "Here's what you missed";
+    const isWaiting = Number(waiting) > 0;
+    const heading = isWaiting ? "Something's waiting for you" : "Here's what you missed";
     const sub = awayDays ? `It's been about ${awayDays} day${awayDays === 1 ? "" : "s"}.` : "";
 
     const html = `
@@ -127,7 +129,7 @@ export async function sendRecapDigestEmail(email, { name = "", hooks = [], news 
         await resend.emails.send({
             from: FROM_ADDRESS,
             to: email,
-            subject: hasHooks ? "Something's waiting for you at The Wolf Den" : "What you missed at The Wolf Den",
+            subject: isWaiting ? "Something's waiting for you at The Wolf Den" : "What you missed at The Wolf Den",
             html,
             headers: { "List-Unsubscribe": `<${settingsUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
         });
