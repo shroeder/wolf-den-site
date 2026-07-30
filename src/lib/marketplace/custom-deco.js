@@ -155,8 +155,26 @@ export async function finalizeCustomDeco(buyerId, id, chosenUrl) {
 
 // Finalized customs for a member → { 'custom:<id>' → { name, url } }. Used to render custom decos in the farm.
 export async function listFinalCustomDecos(buyerId) {
-    const rows = await db.query(`SELECT id, name, chosen_url FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'final'`, [buyerId]).catch(() => []);
+    // Copies carry their origin so a gifted piece can credit the member who actually made it — otherwise a
+    // received creation is indistinguishable from one you drew yourself.
+    const rows = await db.query(
+        `SELECT c.id, c.name, c.chosen_url, c.copy_of,
+                COALESCE(NULLIF(o.display_name,''), o.alias) AS creator_name, o.alias AS creator_alias
+           FROM mkt_custom_deco c
+           LEFT JOIN mkt_custom_deco src ON src.id = c.copy_of
+           LEFT JOIN mkt_buyer o ON o.id = src.buyer_id
+          WHERE c.buyer_id = $1 AND c.status = 'final'`,
+        [buyerId]
+    ).catch(() => []);
     const map = new Map();
-    for (const r of rows || []) map.set(`custom:${r.id}`, { name: r.name, url: r.chosen_url });
+    for (const r of rows || []) {
+        map.set(`custom:${r.id}`, {
+            name: r.name,
+            url: r.chosen_url,
+            copyOf: r.copy_of ? Number(r.copy_of) : null,
+            creatorName: r.copy_of ? (r.creator_name || "another member") : null,
+            creatorAlias: r.copy_of ? (r.creator_alias || null) : null,
+        });
+    }
     return map;
 }

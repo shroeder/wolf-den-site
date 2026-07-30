@@ -522,24 +522,23 @@ export default function TownClient({ initial }) {
         return () => clearInterval(t);
     }, []);
 
-    // Spawn the on-screen enemies for the current raid wave (each with its own HP bar). Re-spawn on a NEW event
-    // or a NEW wave; clear when the raid ends. Kept client-side — the server tracks the shared wave HP for the win.
+    // The foes come from the SERVER now (ev.swarm), so every client draws the same goblins in the same places and
+    // can see who's locked onto each one. This used to be generated locally with Math.random() positions — which
+    // is exactly why a raid felt like everyone fighting their own private copy of the swarm.
     useEffect(() => {
         const ev = state?.event;
-        if (!ev || ev.defeated || ev.boss) { evIdRef.current = ev?.id ?? null; raidWaveRef.current = ev?.wave ?? 1; if (!ev || ev.boss) { setRaidEnemies([]); } return; } // boss raids have no roaming duel foes
-        const wave = ev.wave || 1;
-        if (evIdRef.current !== ev.id) { evIdRef.current = ev.id; setRaidKills(0); setRaidDamage(ev.myDamage || 0); }
-        if (evIdRef.current !== ev.id || raidWaveRef.current !== wave || (raidEnemies.length === 0 && ev.hp > 0)) {
-            raidWaveRef.current = wave;
-            const n = Math.min(ev.enemies || 6, 8);
-            const hpMax = Math.max(24, Math.round((ev.hpMax || 600) / (ev.enemies || 6)));
-            // Spread across the street in per-enemy slots with a random offset inside each slot, so they never
-            // line up in the same predictable spots twice.
-            const slot = 92 / n;
-            setRaidEnemies(Array.from({ length: n }).map((_, i) => ({
-                id: `${ev.id}-${wave}-${i}`, x: Math.round(4 + (i + 0.15 + Math.random() * 0.7) * slot), y: GROUND + 14 - Math.floor(Math.random() * 5) * 2, hp: hpMax, hpMax, floats: [], dying: false,
-            })));
+        if (!ev || ev.defeated || ev.boss) {
+            evIdRef.current = ev?.id ?? null;
+            if (!ev || ev.boss) setRaidEnemies([]);
+            return;
         }
+        if (evIdRef.current !== ev.id) { evIdRef.current = ev.id; setRaidKills(0); setRaidDamage(ev.myDamage || 0); }
+        raidWaveRef.current = ev.swarm?.wave ?? 1;
+        setRaidEnemies((prev) => (ev.swarm?.enemies || []).map((e) => {
+            // Keep any in-flight death animation / damage floats for a foe we already know about.
+            const was = prev.find((x) => String(x.id) === String(e.id));
+            return { ...e, floats: was?.floats || [], dying: was?.dying || false };
+        }));
     }, [state?.event]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const walkToWorld = useCallback((worldXPct, worldYPct) => {
@@ -671,7 +670,7 @@ export default function TownClient({ initial }) {
         const ev = state?.event; if (!ev || raidCdRef.current || duel) return;
         raidCdRef.current = true; setRaidCd(true);
         setTimeout(() => { raidCdRef.current = false; setRaidCd(false); }, 700);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id, enemyId }) }).then((x) => x.json()).catch(() => null);
         if (!r?.ok) return; // too_fast / no_event
         if (r.win && typeof r.wins === "number") setRaidKills(r.wins);
         if (r.win && r.reward) setRaidHaul((h) => ({ xp: h.xp + (r.reward.xp || 0), gold: h.gold + (r.reward.coin || 0), chests: h.chests + ((r.reward.loot || []).length || 0) }));
@@ -1058,18 +1057,28 @@ export default function TownClient({ initial }) {
                         return raidEnemies.map((en, i) => (
                             <button
                                 key={en.id} type="button"
-                                className={`tw-enemy${en.dying ? " is-dying" : ""}${raidCd ? " is-cd" : ""}`}
+                                className={`tw-enemy${en.dying ? " is-dying" : ""}${raidCd ? " is-cd" : ""}${en.takeable === false ? " is-taken" : ""}${en.mine ? " is-mine" : ""}`}
                                 // Each foe roams on its OWN clock (per-enemy delay/duration/sway) so they move independently,
                                 // sit low in the foreground, and draw above the buildings (z well over the ~192 building band).
                                 style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 240 + Math.round(en.y), animationDelay: `${((i * 0.83) % 2.6).toFixed(2)}s`, animationDuration: `${(3 + (i % 4) * 0.7).toFixed(2)}s`, "--sway": `${9 + (i % 3) * 6}px` }}
-                                onClick={(e) => { e.stopPropagation(); if (!en.dying) startDuel(en.id, url); }}
-                                aria-label={`Fight the ${ev.name}`}
+                                onClick={(e) => { e.stopPropagation(); if (!en.dying && en.takeable !== false) startDuel(en.id, url); }}
+                                aria-label={en.takeable === false ? `${en.engagedName} is fighting this one` : `Fight the ${en.label || ev.name}`}
                             >
-                                <span className="tw-enemy-crossed" aria-hidden="true">⚔️</span>
+                                {/* Who's locked onto this foe — the thing that makes the fight feel shared instead
+                                    of everyone swinging at their own copy. Yours reads "you". */}
+                                {en.engagedBy ? (
+                                    <span className={`tw-enemy-lock${en.mine ? " is-mine" : ""}`}>
+                                        {en.mine ? "⚔️ you" : `⚔️ ${en.engagedName}`}
+                                    </span>
+                                ) : <span className="tw-enemy-crossed" aria-hidden="true">⚔️</span>}
+                                {/* Per-foe HP, straight from the server, so everyone sees the same damage. */}
+                                <span className="tw-enemy-hp"><span style={{ width: `${en.hpPct ?? 100}%` }} /></span>
+                                {en.elite ? <span className="tw-enemy-tag is-elite">{en.label}</span> : null}
+                                {en.chieftain ? <span className="tw-enemy-tag is-chief">{en.label}</span> : null}
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={url} alt="" draggable={false} style={{ transform: en.x > 50 ? "scaleX(-1)" : "none" }} />
-                                ) : <span className="tw-enemy-emoji">{ev.emoji}</span>}
+                                    <img src={url} alt="" draggable={false} style={{ transform: en.flip ? "scaleX(-1)" : "none", height: en.chieftain ? 118 : en.elite ? 92 : undefined }} />
+                                ) : <span className="tw-enemy-emoji">{en.emoji || ev.emoji}</span>}
                             </button>
                         ));
                     })() : null}

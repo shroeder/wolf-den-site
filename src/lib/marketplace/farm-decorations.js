@@ -95,6 +95,8 @@ export async function getPlacements(buyerId) {
             id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: resolveLight(r), ...lightSettings(r),
             name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
             spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
+            // Credit the original artist on a gifted copy.
+            copiedFrom: cm?.creatorName || null, copiedFromAlias: cm?.creatorAlias || null,
         };
     });
 }
@@ -137,6 +139,7 @@ export async function decoState(buyerId) {
     const customCatalog = [...customMap.entries()].map(([id, cm]) => ({
         id, name: cm.name, emoji: "🎨", rarity: "custom", rarityColor: CUSTOM_COLOR, source: "custom", price: null,
         spriteUrl: sprites[id] || cm.url || null, buff: null, buffText: null, owned: true, placed: placedCount[id] || 0, buyable: false, custom: true,
+        copiedFrom: cm.creatorName || null, copiedFromAlias: cm.creatorAlias || null,
     }));
     const catalog = [...customCatalog, ...DECORATIONS
         .map((d) => ({

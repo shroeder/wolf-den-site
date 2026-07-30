@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
 import { getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
@@ -174,6 +175,19 @@ export async function getActiveTownEvent(buyerId) {
             ev = { ...ev, hp: passive.hp };
         }
     }
+    // THE SHARED SWARM. Skirmishes now use a server-side roster so every client draws the same foes in the same
+    // places and can see who is locked onto each one. Wave 1 is spawned lazily on first read, so an event created
+    // before this existed still gets a roster.
+    let swarm = null;
+    if (!isBoss) {
+        swarm = await swarmState(ev.id, buyerId).catch(() => null);
+        if (!swarm || swarm.remaining === 0) {
+            const fighters = await liveFighterCount(ev.id).catch(() => 1);
+            const nextWave = swarm?.wave ? Math.min(CHIEFTAIN_WAVE, swarm.wave + 1) : 1;
+            await spawnWave(ev.id, nextWave, fighters).catch(() => {});
+            swarm = await swarmState(ev.id, buyerId).catch(() => null);
+        }
+    }
     const enemies = Number(ev.meta?.enemies) || 6;
     const [mine, top, count] = await Promise.all([
         buyerId ? db.queryOne(`SELECT damage, hits, passive_damage FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : Promise.resolve(null),
@@ -203,6 +217,8 @@ export async function getActiveTownEvent(buyerId) {
         bossFighters,
         // Everyone swinging right now, boss or skirmish — the plaza reads this to label them as fighting.
         activeFighterIds: activeFighters.map((f) => String(f.id)),
+        swarm, // shared foe roster (skirmishes only): positions, per-foe HP, and who's locked onto each
+        totalWaves: swarm?.totalWaves ?? null,
     };
 }
 
@@ -560,7 +576,8 @@ function simulateDuel({ myPower, foePower, myCrit = 0, myCritPow = 30 }) {
 // Fight ONE foe: a duel exchange. Win → small XP + coin + a low loot chance; a loss pays a little consolation.
 // Your FIRST duel of a raid always drops a low-tier chest (thanks for coming down to play). Wins drain the wave
 // (which just refills — the raid runs its full timer).
-export async function duelRaidEnemy(buyerId, eventId) {
+// enemyId targets a specific foe on the shared roster; the duel claims it, then drops it on a win.
+export async function duelRaidEnemy(buyerId, eventId, enemyId = null) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // started_at is needed by the XP budget below — XP events carry no raid ref, so "this raid" means "since it
     // started". Without it the window falls back to an hour and bleeds a previous raid's XP into this one's cap.
@@ -599,16 +616,35 @@ export async function duelRaidEnemy(buyerId, eventId) {
 
     let xp = 0, coin = 0;
     let hp = ev.hp, wave = Number(ev.meta?.wave) || 1;
+    let cleared = null; // "wave" | "chieftain" | "raid_won" — drives the client's celebration
     if (sim.win) {
         xp = DUEL_WIN_XP + randInt(0, 6);
         coin = DUEL_WIN_GOLD + randInt(0, 8);
         // Low loot chance on a win.
         if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
-        // Drain the wave; a cleared wave just refills (raid runs its full timer).
+        // Kill the REAL foe on the shared roster (claim → strike), so the whole plaza sees the same board change.
+        if (enemyId) {
+            const claim = await engageEnemy(buyerId, enemyId).catch(() => null);
+            if (claim?.ok) {
+                const st = await strikeEnemy(buyerId, enemyId, claim.hpMax).catch(() => null); // a won duel drops it
+                if (st?.ok && st.waveCleared) {
+                    // Wave down. Next wave, or the chieftain, or — after the chieftain — the raid is WON.
+                    if (st.wave >= CHIEFTAIN_WAVE) {
+                        await resolveTownEvent(eventId, "defeated").catch(() => {});
+                        cleared = "raid_won";
+                    } else {
+                        const fighters = await liveFighterCount(eventId).catch(() => 1);
+                        await spawnWave(eventId, st.wave + 1, fighters).catch(() => {});
+                        cleared = st.wave + 1 >= CHIEFTAIN_WAVE ? "chieftain" : "wave";
+                        wave = st.wave + 1;
+                    }
+                }
+            }
+        }
+        // Keep the legacy shared HP bar in step so the raid HUD still reads sensibly.
         const perEnemy = Math.max(1, Math.round((ev.hp_max || 600) / (type.enemies || 6)));
         const upd = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, perEnemy]).catch(() => null);
-        hp = upd?.hp ?? ev.hp;
-        if (hp <= 0) { const w = await refillWave(ev); hp = w.hp; wave = w.wave; }
+        hp = Math.max(0, upd?.hp ?? ev.hp);
     } else {
         coin = DUEL_LOSS_GOLD; // never nothing
     }
@@ -642,7 +678,7 @@ export async function duelRaidEnemy(buyerId, eventId) {
 
     return {
         ok: true, win: sim.win, events: sim.events, reward: { xp, coin, loot }, firstDuel, hp, wave,
-        wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️",
+        wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️", cleared,
         // Tell the client the spoils are done, so it can say so instead of silently paying zero.
         capped: cappedGold || cappedXp,
     };

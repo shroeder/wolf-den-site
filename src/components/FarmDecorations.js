@@ -295,6 +295,16 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     </span>
                     <div style={{ fontWeight: 900, fontSize: 18, marginTop: 8 }}>{item.name}</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: ring, textTransform: "capitalize" }}>{item.rarity}{item.source === "special" ? " · premium" : ""}</div>
+                    {/* A gifted copy credits the member who actually drew it — otherwise it's indistinguishable
+                        from something you made yourself, and the artist gets no recognition for it. */}
+                    {item.copiedFrom ? (
+                        <div style={{ marginTop: 5, fontSize: 11.5, fontWeight: 700, color: "#c9a2ff" }}>
+                            🎨 Copied from{" "}
+                            {item.copiedFromAlias
+                                ? <a href={`/marketplace/u/${item.copiedFromAlias}`} style={{ color: "#d9b8ff", textDecoration: "underline" }}>@{item.copiedFromAlias}</a>
+                                : item.copiedFrom}
+                        </div>
+                    ) : null}
                 </div>
                 <div style={{ padding: "8px 16px 4px" }}>
                     {/* Standing on someone else's farm looking at a piece they made — the moment to ask for one.

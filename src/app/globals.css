@@ -12036,3 +12036,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dm-typing span:nth-child(2) { animation-delay: 0.15s; }
 .dm-typing span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes dmType { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-3px); opacity: 1; } }
+
+/* ── Shared swarm: who is locked onto which foe ───────────────────────────────────────────────────────────── */
+.tw-enemy-lock { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10.5px; font-weight: 900; padding: 2px 7px; border-radius: 999px; background: rgba(20,16,6,0.92); border: 1px solid rgba(255,255,255,0.22); color: #e8d6c0; pointer-events: none; }
+.tw-enemy-lock.is-mine { background: rgba(255,215,94,0.95); border-color: #ffd75e; color: #3a2c08; }
+/* Someone else's foe: dimmed and unclickable, so the lock is obvious before you tap. */
+.tw-enemy.is-taken { cursor: default; }
+.tw-enemy.is-taken img, .tw-enemy.is-taken .tw-enemy-emoji { filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)) grayscale(0.5) brightness(0.72); }
+.tw-enemy.is-mine img { filter: drop-shadow(0 0 9px rgba(255,215,94,0.75)) drop-shadow(0 5px 7px rgba(0,0,0,0.5)); }
+.tw-enemy-tag { position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 9.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; padding: 1.5px 6px; border-radius: 999px; pointer-events: none; }
+.tw-enemy-tag.is-elite { background: rgba(185,140,255,0.92); color: #20122e; }
+.tw-enemy-tag.is-chief { background: rgba(224,91,106,0.95); color: #fff; }
