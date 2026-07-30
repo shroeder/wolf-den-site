@@ -105,6 +105,9 @@ const EVENT_STATUS = {
     buy_consumable: "🛒 shopping", use_consumable: "🧪 using an item", buy_pet: "🐾 adopting a pet",
 };
 const PATH_STATUS = [
+    // The Town itself was missing, so EVERYONE standing in the plaza fell through to "around town" — the single
+    // most common case in the whole list read as "not really here".
+    ["/marketplace/town", "🐺 in the plaza"],
     ["/marketplace/blacksmith", "⚒️ forging gear"],
     ["/marketplace/sailing", "⛵ out at sea"],
     ["/marketplace/boss", "⚔️ fighting the boss"],
@@ -287,10 +290,17 @@ export async function getTownState(buyerId) {
     const moverBy = Object.fromEntries(presence.map((m) => [m.buyer_id, m]));
     const chatBy = Object.fromEntries(chats.map((c) => [c.buyer_id, c.body]));
 
+    // Anyone who has swung at the live raid in the last 90s is IN the fight — so they get a fighting status and
+    // count as in-town regardless of what their last tracked activity happened to be. Without this, two people
+    // standing in the same brawl both read "🐺 around town", which made a shared fight feel like solo play.
+    const fightingSet = new Set((event?.activeFighterIds || []).map(String));
+    const raidLabel = event ? `⚔️ fighting the ${String(event.name || "raid").toLowerCase()}` : null;
+
     const players = recent.map((r) => {
         const a = actBy[r.id];
         const mv = moverBy[r.id];
         const walking = Boolean(mv?.walking);
+        const fighting = fightingSet.has(String(r.id));
         const slot = activitySlot(r.id, a?.event, a?.path);
         const pet = petSpriteForLevel(r.featured_collectible, r.featured_pet_xp, petSprites, petSpriteLevels);
         return {
@@ -302,11 +312,13 @@ export async function getTownState(buyerId) {
             pet: pet?.url || null,
             petFlip: pet ? pet.flip === true : false,
             friend: friendSet.has(r.id),
-            status: statusFor(a?.event, a?.path),
+            status: fighting && raidLabel ? raidLabel : statusFor(a?.event, a?.path),
+            fighting,                                   // swinging at the live raid right now
             chat: chatBy[r.id] || null,                 // recent speech-bubble message (shows ~8s)
             typing: Boolean(mv?.typing),
             walking,                                    // true = actively moving in the plaza, use real x/y
-            inTown: Boolean(mv?.in_town),               // true = ON the Town page right now (vs just online elsewhere)
+            // Swinging at the raid IS being here — a stale heartbeat shouldn't ghost someone mid-fight.
+            inTown: Boolean(mv?.in_town) || fighting,
             x: walking ? mv.x : slot.x,
             y: walking ? mv.y : slot.y,
             facing: walking ? mv.facing : 1,

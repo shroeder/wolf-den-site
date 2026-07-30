@@ -58,10 +58,18 @@ const RAID_PARTICIPATION_XP = 250; // XP each fighter earns when the raid resolv
 // ── DUELS (skirmish raids) ── clicking a foe starts a back-and-forth exchange. Win → a small reward + a low loot
 // chance; your FIRST fight of a raid always drops a chest (thanks for coming down); a loss still pays a little.
 const DUEL_THROTTLE_MS = 700;
-const DUEL_WIN_XP = 18;         // tuned DOWN — per-enemy spoils were too rich
-const DUEL_WIN_GOLD = 22;
-const DUEL_LOSS_GOLD = 8;       // consolation so a loss is never nothing
+// Measured from a real raid before this change: 108 duels paid one member 3,951 gold and ~3,240 XP, because the
+// per-duel drip was UNCAPPED and cleared waves refilled forever. The stated intent was "a nice bonus, not a
+// jackpot" (RAID_MAX_GOLD 500) — but that cap only ever guarded the completion payout, so the drip sailed past it
+// by ~8x. Two changes: smaller per-kill spoils, and a real per-raid ceiling enforced below.
+const DUEL_WIN_XP = 6;
+const DUEL_WIN_GOLD = 7;
+const DUEL_LOSS_GOLD = 2;       // consolation so a loss is never nothing
 const DUEL_LOOT_CHANCE = 0.03;  // chance a WIN also drops a low-tier chest — chests are meant to be RARE here
+// The ceiling that actually binds: total duel spoils ONE fighter can take from ONE raid. Past this, foes still
+// die and still count for damage, badges and quests — there's just no more loot to farm out of a treadmill.
+const DUEL_GOLD_BUDGET = 300;
+const DUEL_XP_BUDGET = 350;
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep
@@ -172,18 +180,17 @@ export async function getActiveTownEvent(buyerId) {
         db.query(`SELECT h.buyer_id, h.damage, b.display_name, b.alias FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id WHERE h.event_id = $1 ORDER BY h.damage DESC LIMIT 5`, [ev.id]).catch(() => []),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_event_hit WHERE event_id = $1`, [ev.id]).catch(() => ({ n: 0 })),
     ]);
-    // BOSS: the fighters ACTUALLY at the fight right now (struck in the last 90s) with their hero sprites — so the
-    // battle shows who came and engaged, not random online members.
-    let bossFighters = [];
-    if (isBoss) {
-        const fr = await db.query(
-            `SELECT h.buyer_id, h.damage, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
-               FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
-              WHERE h.event_id = $1 AND h.last_hit_at > NOW() - INTERVAL '90 seconds'
-              ORDER BY h.damage DESC LIMIT 14`, [ev.id]
-        ).catch(() => []);
-        bossFighters = fr.map((r) => ({ id: r.buyer_id, name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"), sprite: r.avatar_sprite_url || null, flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false, damage: Number(r.damage) || 0 }));
-    }
+    // Who is ACTUALLY swinging right now (struck in the last 90s). Needed for EVERY raid, not just the boss:
+    // the plaza uses it to show a skirmish fighter as "fighting" rather than defaulting them to "around town",
+    // which made people standing shoulder to shoulder in the same fight look like they weren't there.
+    const fr = await db.query(
+        `SELECT h.buyer_id, h.damage, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
+           FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+          WHERE h.event_id = $1 AND h.last_hit_at > NOW() - INTERVAL '90 seconds'
+          ORDER BY h.damage DESC LIMIT 14`, [ev.id]
+    ).catch(() => []);
+    const activeFighters = fr.map((r) => ({ id: r.buyer_id, name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"), sprite: r.avatar_sprite_url || null, flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false, damage: Number(r.damage) || 0 }));
+    const bossFighters = isBoss ? activeFighters : [];
     return {
         id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️", boss: isBoss, siege: isSiege,
         hp: ev.hp, hpMax: ev.hp_max, endsAt: ev.ends_at, startedAt: ev.started_at, rewardGold: ev.reward_gold,
@@ -194,6 +201,8 @@ export async function getActiveTownEvent(buyerId) {
         fighterCount: count?.n || 0,
         fighters: (top || []).map((t) => ({ name: t.display_name || (t.alias ? `@${t.alias}` : "Wolf"), damage: t.damage })),
         bossFighters,
+        // Everyone swinging right now, boss or skirmish — the plaza reads this to label them as fighting.
+        activeFighterIds: activeFighters.map((f) => String(f.id)),
     };
 }
 
@@ -553,7 +562,9 @@ function simulateDuel({ myPower, foePower, myCrit = 0, myCritPow = 30 }) {
 // (which just refills — the raid runs its full timer).
 export async function duelRaidEnemy(buyerId, eventId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const ev = await db.queryOne(`SELECT id, hp, hp_max, meta, kind, name FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
+    // started_at is needed by the XP budget below — XP events carry no raid ref, so "this raid" means "since it
+    // started". Without it the window falls back to an hour and bleeds a previous raid's XP into this one's cap.
+    const ev = await db.queryOne(`SELECT id, hp, hp_max, meta, kind, name, started_at FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev) return { ok: false, error: "no_event" };
     const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < DUEL_THROTTLE_MS) return { ok: false, error: "too_fast" };
@@ -589,8 +600,8 @@ export async function duelRaidEnemy(buyerId, eventId) {
     let xp = 0, coin = 0;
     let hp = ev.hp, wave = Number(ev.meta?.wave) || 1;
     if (sim.win) {
-        xp = DUEL_WIN_XP + randInt(0, 20);
-        coin = DUEL_WIN_GOLD + randInt(0, 30);
+        xp = DUEL_WIN_XP + randInt(0, 6);
+        coin = DUEL_WIN_GOLD + randInt(0, 8);
         // Low loot chance on a win.
         if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
         // Drain the wave; a cleared wave just refills (raid runs its full timer).
@@ -601,11 +612,38 @@ export async function duelRaidEnemy(buyerId, eventId) {
     } else {
         coin = DUEL_LOSS_GOLD; // never nothing
     }
+
+    // ── THE PER-RAID CEILING ─────────────────────────────────────────────────────────────────────────────────
+    // Clamp to what's left of this fighter's budget for THIS raid, counted from what the ledger says they've
+    // already taken. Foes still die, damage still counts, badges and quests still progress — the farm is what
+    // stops. Reading the ledger means the cap survives a refresh, a second device, and a server restart.
+    const spent = await db.queryOne(
+        `SELECT COALESCE(SUM(delta), 0)::int AS gold FROM mkt_coin_event
+          WHERE buyer_id = $1 AND reason = 'town_duel' AND ref = $2 AND delta > 0`,
+        [buyerId, String(eventId)]
+    ).catch(() => null);
+    const goldLeft = Math.max(0, DUEL_GOLD_BUDGET - Number(spent?.gold || 0));
+    const xpSpent = await db.queryOne(
+        `SELECT COALESCE(SUM(points), 0)::int AS xp FROM mkt_xp_event
+          WHERE buyer_id = $1 AND action = 'town_duel' AND created_at > $2`,
+        [buyerId, ev.started_at || new Date(Date.now() - 3600000)]
+    ).catch(() => null);
+    const xpLeft = Math.max(0, DUEL_XP_BUDGET - Number(xpSpent?.xp || 0));
+    const cappedGold = coin > 0 && goldLeft <= 0;
+    const cappedXp = xp > 0 && xpLeft <= 0;
+    coin = Math.min(coin, goldLeft);
+    xp = Math.min(xp, xpLeft);
+
     if (coin > 0) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, coin]).catch(() => null);
         await logCoin(buyerId, coin, "town_duel", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
     }
     if (xp > 0) await awardXp(buyerId, "town_duel", { points: xp, gold: 0 }).catch(() => {});
 
-    return { ok: true, win: sim.win, events: sim.events, reward: { xp, coin, loot }, firstDuel, hp, wave, wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️" };
+    return {
+        ok: true, win: sim.win, events: sim.events, reward: { xp, coin, loot }, firstDuel, hp, wave,
+        wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️",
+        // Tell the client the spoils are done, so it can say so instead of silently paying zero.
+        capped: cappedGold || cappedXp,
+    };
 }
