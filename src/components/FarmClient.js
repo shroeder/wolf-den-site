@@ -967,10 +967,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {/* Live VISITORS — real wolves currently viewing this farm. On your OWN farm you're the farmer
                             (don't also show yourself as a guest); when VISITING you appear so you see yourself here. */}
                         {(view === "outside" || view === "inside") ? (
+                            // Visitors used to stand at 83-89%, BELOW the pets (~82%) and jammed against the bottom
+                            // edge, so a visiting hero read as falling off the screen rather than standing in the
+                            // pasture. Same band as the pets now (76-82%), sharing the grass.
                             (farm.visitors || []).filter((v) => (farm.mine ? !v.isYou : true)).map((vis, i) => (
-                                {/* Visitors used to stand at 83-89%, BELOW the pets (~82%) and jammed against the
-                                    bottom edge — a visiting hero read as falling off the screen rather than
-                                    standing in the pasture. Same band as the pets now, so they share the grass. */}
                                 <div key={vis.id} className={`farm-visitor${vis.isYou ? " is-you" : ""}`} style={{ left: `${14 + (i * 67) % 70}%`, top: `${petGroundY(76 + (i % 3) * 3)}%`, zIndex: Math.round(petGroundY(76 + (i % 3) * 3)), animationDelay: `${(i % 4) * 0.4}s` }}>
                                     <span className="farm-visitor-name">{vis.isYou ? "🐺 you" : vis.name}</span>
                                     {vis.sprite ? (
