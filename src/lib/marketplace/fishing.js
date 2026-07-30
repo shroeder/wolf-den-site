@@ -357,7 +357,12 @@ const logOf = (row) => (row && row.fish_log) || {};
 
 async function readFishRow(buyerId) {
     return db.queryOne(
+        // The four Rail track levels are load-bearing here, not decoration: castLine computes the daily cap
+        // through fishTrackLevels(row), and without these columns every level reads 0. A member with Line 3
+        // saw "2/13 casts left" from the view (which reads the full row) while castLine allowed only 10 and
+        // refused with out_of_casts at 11. Two different answers to "how many casts do I get".
         `SELECT buyer_id, voyages_completed, fish_state, fish_log, fish_caught,
+                fish_line_level, fish_lure_level, fish_net_level, fish_gaff_level,
                 COALESCE(fish_casts, 0) AS fish_casts,
                 (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today
            FROM mkt_sailing WHERE buyer_id = $1`,

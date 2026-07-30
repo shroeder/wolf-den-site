@@ -995,7 +995,7 @@ export async function sailingNeedsAttention(buyerId) {
 export async function unusedCasts(buyerId) {
     if (!buyerId) return 0;
     const row = await db.queryOne(
-        `SELECT departed_at, dig_state,
+        `SELECT departed_at, dig_state, COALESCE(fish_line_level, 0) AS line,
                 COALESCE(CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
                               THEN fish_casts ELSE 0 END, 0) AS used
            FROM mkt_sailing WHERE buyer_id = $1`,
@@ -1004,7 +1004,8 @@ export async function unusedCasts(buyerId) {
     if (!row?.departed_at || row.dig_state) return 0;   // only while there's actually a rail to fish from
     const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
     const { castsPerDay } = await import("@/lib/marketplace/fishing.js");
-    const max = castsPerDay(seaEffects(sea).angling, 0);
+    // Line level included — a hard-coded 0 here would badge the wrong number for anyone who bought casts.
+    const max = castsPerDay(seaEffects(sea).angling, Number(row.line) || 0);
     return Math.max(0, max - (Number(row.used) || 0));
 }
 
