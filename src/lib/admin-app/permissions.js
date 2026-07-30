@@ -32,6 +32,8 @@ export const ALL_PERMISSIONS = Object.freeze([
     "remediations.run",
     "staff.manage",
     "marketplace.manage",
+    // Clocking yourself in and out of Square. Every role that works a shift gets this by default.
+    "timeclock.use",
 ]);
 
 const PERMISSION_SET = new Set(ALL_PERMISSIONS);
@@ -56,11 +58,13 @@ const ROLE_DEFAULTS = Object.freeze({
         "reports.view",
         "banking.view",
         "ai.use",
+        "timeclock.use",
     ]),
     staff: Object.freeze([
         "inventory.scan",
         "labels.print",
         "mystery.report",
+        "timeclock.use",
     ]),
 });
 
