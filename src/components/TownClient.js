@@ -295,10 +295,13 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
             if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
         }
     }, [onStrike]);
-    // AUTO-ATTACK: your hero swings on its own while you're at the fight (no tapping). ~1.3s cadence (server 1s cd).
+    // AUTO-ATTACK while you're at the fight. This used to fire every 1.3s, which meant a raid was really
+    // "leave the tab open and it hits for you" — that's why being present felt mandatory, and four players
+    // alone spiked Vercel to 17x normal invocations. The server-side siege now does the sustained damage
+    // whether or not anyone is watching, so presence is a BONUS burst and can be far less chatty.
     useEffect(() => {
         strike();
-        const iv = setInterval(() => strike(), 1300);
+        const iv = setInterval(() => strike(), 5000);
         return () => clearInterval(iv);
     }, [strike]);
     // The fighters ACTUALLY engaged right now (server: struck in the last 90s) + always you.
@@ -448,7 +451,10 @@ export default function TownClient({ initial }) {
         });
     }, []);
 
-    useEffect(() => { load(); const t = setInterval(load, 2500); return () => clearInterval(t); }, [load]);
+    // Main town poll. Every viewer hits this on a timer, so it's the steady baseline cost — 2.5s was a large
+    // share of the 17x invocation spike. Avatars interpolate/wander client-side between updates, so 4s looks
+    // the same while cutting the request rate ~40%.
+    useEffect(() => { load(); const t = setInterval(load, 4000); return () => clearInterval(t); }, [load]);
 
     // Ambient wander for idle players.
     useEffect(() => {
@@ -643,10 +649,11 @@ export default function TownClient({ initial }) {
         }
         return r;
     }, [state?.event, load]);
-    // While the boss modal is open, poll a little faster so the shared HP bar reflects everyone's hits live.
+    // While the boss modal is open, poll faster so the shared HP bar reflects everyone's hits. 2s per viewer
+    // was a big slice of the invocation spike; 4s still feels live because the bar animates between updates.
     useEffect(() => {
         if (!bossOpen) return undefined;
-        const t = setInterval(() => load(), 2000);
+        const t = setInterval(() => load(), 4000);
         return () => clearInterval(t);
     }, [bossOpen, load]);
     // If the boss dies (event clears) while the modal's open, close it.
@@ -1001,8 +1008,11 @@ export default function TownClient({ initial }) {
                             </button>
                         ));
                     })() : null}
-                    {/* Other players */}
-                    {otherList.map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} raiding={raidActive} />)}
+                    {/* Other players — only people ACTUALLY in town get a body in the world. Members who are
+                        merely online elsewhere used to render as faded ghosts standing in the plaza, which reads
+                        as a rendering bug rather than as "they're not here". They're still counted in the
+                        "around" chip and listed in Who's here. */}
+                    {otherList.filter((p) => p.inTown !== false).map((p) => <Avatar key={p.id} a={p} isYou={false} onTap={() => setMenuFor(p)} raiding={raidActive} />)}
                     {/* You */}
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou raiding={raidActive} /> : null}
                 </div>
@@ -1551,7 +1561,10 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-boss-panel { width: min(440px, 96vw); border-radius: 20px; padding: 14px; background: linear-gradient(180deg, rgba(28,16,12,0.99), rgba(14,8,6,0.99)); border: 1px solid rgba(224,120,74,0.55); box-shadow: 0 22px 60px rgba(0,0,0,0.72); display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .tw-boss-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .tw-boss-title { font-size: 1.05rem; font-weight: 900; color: #ffcaba; }
-.tw-boss-leave { background: rgba(255,255,255,0.08); border: none; color: #e8d6c0; width: 30px; height: 30px; border-radius: 999px; font-size: 15px; cursor: pointer; }
+/* Was a fixed 30px circle holding the text "✕ Leave", so the label overflowed the button and ran off the
+   right edge of the screen. It's a pill that sizes to its own content now. */
+.tw-boss-leave { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.16); color: #e8d6c0; width: auto; height: 30px; padding: 0 11px; border-radius: 999px; font-size: 13px; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; }
+.tw-boss-leave:hover { background: rgba(255,255,255,0.16); }
 .tw-boss-stage { position: relative; width: 100%; display: grid; place-items: center; padding: 6px 0 2px; cursor: pointer; }
 .tw-boss-big { height: 230px; width: auto; max-width: 100%; filter: drop-shadow(0 10px 16px rgba(0,0,0,0.6)); transition: transform .1s; }
 .tw-boss-big.is-cd { filter: drop-shadow(0 10px 16px rgba(0,0,0,0.6)) brightness(1.25) saturate(1.2); }

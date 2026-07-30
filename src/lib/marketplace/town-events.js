@@ -40,8 +40,12 @@ export const TOWN_EVENT_TYPES = {
     },
     // The golem is a BOSS RAID (not a skirmish): ONE huge shared boss everyone strikes together, its HP bar drains
     // for the whole pack, and killing it ENDS the raid. No per-hit rewards — only a rich completion reward.
+    // A SIEGE, not a tap-fest. 5.2M HP over 45 minutes needed ~13 people tapping every second for the full
+    // window — mathematically unkillable, and at that scale one tap moved the bar by 0.003%, so nothing you did
+    // was visible. It now runs for hours and everyone who has joined keeps chipping away while they're away
+    // (siegeTick), so nobody has to hold the screen open. Tapping is a bonus burst on top.
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", boss: true, hp: 5200000, testHp: 30000, rewardGold: 4000, durationMin: 45,
+        name: "Treasure Golem", emoji: "💎", boss: true, siege: true, hp: 350000, testHp: 30000, rewardGold: 4000, durationMin: 480,
         pushTitle: "💎 A Treasure Golem BOSS lumbered into Town!", pushBody: "It's MASSIVE — the whole pack has to rally and bring it down together. Rush the plaza!",
     },
 };
@@ -60,6 +64,13 @@ const DUEL_LOOT_CHANCE = 0.03;  // chance a WIN also drops a low-tier chest — 
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 1000;
+// A tap on a siege boss lands a real BLOW rather than a pinprick — with the pool sized for hours of passive
+// chipping, an un-multiplied tap would barely register and the fight would feel pointless to be present for.
+const BOSS_TAP_MULT = 6;
+// Passive siege: every member who has landed at least one hit keeps fighting while away. Rate is their own
+// hit power per minute, so gear and pets matter here exactly as much as they do when tapping.
+const SIEGE_TICK_CAP_MIN = 45;   // if the cron missed runs, never credit more than this in one go
+const SIEGE_RATE_PER_MIN = 1.0;  // multiplier on their per-hit power, per minute besieging
 const BOSS_COMPLETE_GOLD = 900;   // to every fighter on a kill
 const BOSS_COMPLETE_XP = 800;
 const BOSS_ESCAPE_MULT = 0.4;     // if the boss survives the timer, fighters get this fraction of the reward
@@ -167,7 +178,9 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     const row = await db.queryOne(
         `INSERT INTO mkt_town_event (kind, name, status, hp_max, hp, reward_gold, ends_at, meta)
          VALUES ($1, $2, 'active', $3, $3, $4, NOW() + ($5 || ' minutes')::interval, $6) RETURNING id`,
-        [kind, type.name, spawnHp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent), boss: Boolean(type.boss), enemies: type.enemies || 6, minMs: silent ? MIN_ACTIVE_SILENT_MS : MIN_ACTIVE_MS, wave: 1 })]
+        // `siege` must be stamped here — siegeTick reads it off meta to decide whether an event accrues passive
+        // damage, so a missing flag would silently mean no siege ever ticks.
+        [kind, type.name, spawnHp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent), boss: Boolean(type.boss), siege: Boolean(type.siege), enemies: type.enemies || 6, minMs: silent ? MIN_ACTIVE_SILENT_MS : MIN_ACTIVE_MS, wave: 1 })]
     ).catch(() => null);
     if (!row) return { ok: false, error: "spawn_failed" };
     // Rally the whole pack — browser push + phone-app push, both deep-linking to the Town. These MUST be
@@ -335,6 +348,58 @@ async function resolveTownEvent(eventId, outcome) {
     }
 }
 
+// ── PASSIVE SIEGE ────────────────────────────────────────────────────────────────────────────────────────────
+// Everyone who has landed at least one hit on a siege boss keeps fighting while they're away. Called from the
+// town-hours cron, so progress accrues whether or not anyone has the page open — which is the whole point: you
+// shouldn't have to hold a screen for 45 minutes to take part.
+//
+// Rate is each besieger's OWN hit power per minute, so gear and pets matter here exactly as they do when
+// tapping, and a member who never joined contributes nothing (you have to turn up at least once).
+export async function siegeTick() {
+    const ev = await db.queryOne(
+        `SELECT id, hp, hp_max, meta, started_at FROM mkt_town_event WHERE status = 'active' LIMIT 1`
+    ).catch(() => null);
+    if (!ev || !ev.meta?.siege) return { skipped: "no_siege" };
+
+    // Minutes since the last tick (or since the raid started), clamped so a missed cron can't dump hours of
+    // damage in one go and end the siege instantly.
+    const lastAt = ev.meta?.lastSiegeAt ? new Date(ev.meta.lastSiegeAt) : new Date(ev.started_at);
+    const mins = Math.min(SIEGE_TICK_CAP_MIN, Math.max(0, (Date.now() - lastAt.getTime()) / 60000));
+    if (mins < 1) return { skipped: "too_soon" };
+
+    const besiegers = await db.query(`SELECT buyer_id FROM mkt_town_event_hit WHERE event_id = $1`, [ev.id]).catch(() => []);
+    if (!besiegers.length) {
+        // Nobody has joined yet — just move the clock so the first joiner isn't retroactively credited.
+        await db.query(`UPDATE mkt_town_event SET meta = meta || jsonb_build_object('lastSiegeAt', NOW()) WHERE id = $1`, [ev.id]).catch(() => {});
+        return { skipped: "no_besiegers" };
+    }
+
+    let total = 0;
+    for (const b of besiegers) {
+        const hit = await computeRaidHit(b.buyer_id).catch(() => null);
+        const dmg = Math.max(1, Math.round((hit?.damage || 1) * SIEGE_RATE_PER_MIN * mins));
+        // Credit it to their own tally so the leaderboard and reward eligibility reflect passive work too.
+        await db.query(
+            `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 0, NOW())
+             ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3`,
+            [ev.id, b.buyer_id, dmg]
+        ).catch(() => {});
+        total += dmg;
+    }
+
+    const updated = await db.queryOne(
+        `UPDATE mkt_town_event
+            SET hp = GREATEST(0, hp - $2), meta = meta || jsonb_build_object('lastSiegeAt', NOW())
+          WHERE id = $1 AND status = 'active' RETURNING hp`,
+        [ev.id, total]
+    ).catch(() => null);
+
+    const hp = updated?.hp ?? ev.hp;
+    let killed = false;
+    if (hp <= 0) { await resolveTownEvent(ev.id, "defeated").catch(() => {}); killed = true; }
+    return { eventId: Number(ev.id), besiegers: besiegers.length, minutes: Math.round(mins), damage: total, hp, killed };
+}
+
 // Strike the BOSS RAID (the golem): everyone hits ONE shared HP pool. No per-hit reward — killing it ends the raid
 // and pays the completion reward (resolveTownEvent). Returns the boss's new HP + your running damage.
 export async function bossRaidStrike(buyerId, eventId) {
@@ -344,7 +409,7 @@ export async function bossRaidStrike(buyerId, eventId) {
     const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < BOSS_STRIKE_THROTTLE_MS) return { ok: false, error: "too_fast", hp: ev.hp };
     const hit = await computeRaidHit(buyerId);
-    const dmg = hit.damage;
+    const dmg = Math.max(1, Math.round(hit.damage * BOSS_TAP_MULT));
     const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
     const mine = await db.queryOne(
         `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
