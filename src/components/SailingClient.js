@@ -477,7 +477,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "fish_records" }),
             });
             const d = await r.json().catch(() => ({}));
-            if (d?.records) setFishRecords(d.records);
+            if (d?.records) setFishRecords({ records: d.records, top: d.top || [] });
         } catch { /* the log still renders; the board just stays empty */ }
     }, []);
 

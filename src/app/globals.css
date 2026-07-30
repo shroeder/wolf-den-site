@@ -12135,8 +12135,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-band { position: absolute; left: 0; right: 0; background: linear-gradient(180deg, rgba(88,217,137,0.34), rgba(88,217,137,0.16)); border-top: 2px solid rgba(120,240,170,0.85); border-bottom: 2px solid rgba(120,240,170,0.85); }
 .fish-catch { position: absolute; left: 50%; margin-left: -15px; margin-bottom: -14px; width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.6)); }
 .fish-rod-hint { position: absolute; inset: auto 0 6px 0; text-align: center; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(210,230,250,0.55); pointer-events: none; }
-.fish-strain { height: 10px; margin: 12px 0 6px; border-radius: 999px; background: #1a2230; overflow: hidden; }
+.fish-strain { flex: 1 1 auto; height: 10px; border-radius: 999px; background: #1a2230; overflow: hidden; }
 .fish-strain-fill { height: 100%; background: linear-gradient(90deg,#3fa8e0,#58d989); transition: width 0.1s linear; }
+/* The size meter, labelled — an unlabelled bar creeping up from zero read as a progress bar you were failing. */
+.fish-strain-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; }
+.fish-strain-label { flex: 0 0 auto; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; color: #8b93a0; }
+.fish-strain-pct { flex: 0 0 auto; min-width: 34px; text-align: right; font-size: 0.72rem; font-weight: 900; color: #58d989; font-variant-numeric: tabular-nums; }
+/* Names the target band, so it reads as "the place to be" rather than as decoration. */
+.fish-band-label { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.56rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(190,255,215,0.85); pointer-events: none; }
+.fish-top-rank { flex: 0 0 auto; min-width: 20px; text-align: right; font-size: 0.8rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
 .fish-timer { height: 4px; border-radius: 999px; background: #1a2230; overflow: hidden; }
 .fish-timer-fill { height: 100%; background: #ffd75e; transition: width 0.1s linear; }
 .fish-hold-btn { display: block; width: 100%; margin-top: 14px; padding: 16px; border: none; border-radius: 14px; font-weight: 900; font-size: 1rem; letter-spacing: 0.05em; color: #06283d; background: linear-gradient(180deg,#8fe0ff,#3fa8e0); cursor: pointer; touch-action: none; user-select: none; }

@@ -64,7 +64,7 @@ export async function POST(request) {
                 // and the time-of-day half of that gate is recomputed server-side (see fishing.js).
                 case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky }));
                 case "fish_land": return noStore(await fishLand(g.buyer.id, { quality: body.quality, missed: body.missed, sky: body.sky }));
-                case "fish_records": return noStore({ ok: true, records: await fishRecords(g.buyer.id) });
+                case "fish_records": return noStore({ ok: true, ...(await fishRecords(g.buyer.id)) });
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

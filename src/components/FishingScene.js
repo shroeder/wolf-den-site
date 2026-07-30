@@ -24,6 +24,14 @@ const GRAVITY = 0.62;            // the fish sinking, per second²
 const REEL_PULL = 1.35;          // upward acceleration while you're holding
 const DAMPING = 0.86;            // velocity bleed so it feels weighty rather than twitchy
 const DART_EVERY_MS = 900;       // the fish makes a run for it this often
+const REEL_WARMUP_MS = 700;      // grace before scoring starts — see the note at the scoring site
+
+// THE score, in one place. It used to be computed only at the end (as sqrt of time-in-band) while the on-screen
+// strain bar drew the RAW fraction — so the single piece of live feedback disagreed with the result it was
+// supposedly previewing: reel at 0.45 and the bar read 45% while you were actually banking 67%. The curve is
+// still applied (raw time-in-band sits near 0.45 even when you're playing well, because the band moves), but
+// the bar and the submitted score now come from this same function.
+const scoreOf = (inFrames, total) => Math.max(0, Math.min(1, Math.sqrt(total ? inFrames / total : 0)));
 const BITE_HOLD_MS = 2600;       // how long the bite stays tappable once it starts
 
 const RARITY_COLOR = {
@@ -110,11 +118,17 @@ function ReelStruggle({ onDone, sfx }) {
             if (posRef.current <= 0) { posRef.current = 0; velRef.current = Math.abs(velRef.current) * 0.3; }
             if (posRef.current >= 1) { posRef.current = 1; velRef.current = -Math.abs(velRef.current) * 0.3; }
 
-            // Credit, banked per frame. This is the whole score.
-            totalRef.current += 1;
+            // Credit, banked per frame. This is the whole score — but not until the fish has settled.
+            // WARM-UP: the first moments are spent reacting to where the band even is, and because the score is
+            // an average over the WHOLE run, fumbling them used to cap your result permanently with no way to
+            // see it happening. Those frames are now simply not counted.
+            const scoring = elapsed >= REEL_WARMUP_MS;
             const lo = bandRef.current - BAND_H / 2, hi = bandRef.current + BAND_H / 2;
             const inside = posRef.current >= lo && posRef.current <= hi;
-            if (inside) inRef.current += 1;
+            if (scoring) {
+                totalRef.current += 1;
+                if (inside) inRef.current += 1;
+            }
             // Reel clicks while you're holding and on target — the audio feedback that tells you it's working.
             if (inside && holdRef.current && ts - clickRef.current > 110) { clickRef.current = ts; sfx.click(); }
 
@@ -123,11 +137,7 @@ function ReelStruggle({ onDone, sfx }) {
             if (elapsed >= REEL_MS) {
                 if (!doneRef.current) {
                     doneRef.current = true;
-                    // Curved slightly in the player's favour: raw time-in-band tends to sit around 0.45 even when
-                    // you're playing well, because the band moves. sqrt lifts competent play into the range where
-                    // the size difference is visible and satisfying.
-                    const raw = totalRef.current ? inRef.current / totalRef.current : 0;
-                    onDone(Math.max(0, Math.min(1, Math.sqrt(raw))));
+                    onDone(scoreOf(inRef.current, totalRef.current));
                 }
                 return;
             }
@@ -144,25 +154,38 @@ function ReelStruggle({ onDone, sfx }) {
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
     const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
-    const scoreNow = totalRef.current ? inRef.current / totalRef.current : 0;
+    // Same function the server gets. The bar is a real preview now, not a different number.
+    const scoreNow = scoreOf(inRef.current, totalRef.current);
+    const warming = elapsed < REEL_WARMUP_MS;
 
     return (
         <div className="fish-reel" data-tick={tick}>
             <div className="fish-reel-head">
                 <strong>REEL IT IN!</strong>
-                <span className="muted">hold to reel · keep it in the green</span>
+                {/* Two things move on this rod and nothing used to say how they related — players read the fish
+                    marker as the fish swimming on its own and tried to chase it, when in fact the marker is
+                    THEIR line (hold = up, release = down) and the green band is what drifts. Say so outright. */}
+                <span className="muted">hold to pull your line up · let go to let it sink · keep it in the green</span>
             </div>
             <div
                 className={`fish-rod${inside ? " is-on" : ""}`}
                 onPointerDown={down} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
                 role="presentation"
             >
-                <div className="fish-band" style={{ bottom: `${(band - BAND_H / 2) * 100}%`, height: `${BAND_H * 100}%` }} />
+                <div className="fish-band" style={{ bottom: `${(band - BAND_H / 2) * 100}%`, height: `${BAND_H * 100}%` }}>
+                    <span className="fish-band-label">KEEP IT HERE</span>
+                </div>
                 <div className="fish-catch" style={{ bottom: `${pos * 100}%` }}>🐟</div>
-                <div className="fish-rod-hint">{inside ? "REELING" : "hold!"}</div>
+                <div className="fish-rod-hint">{warming ? "get ready…" : inside ? "REELING" : "hold!"}</div>
             </div>
-            <div className="fish-strain">
-                <div className="fish-strain-fill" style={{ width: `${scoreNow * 100}%` }} />
+            {/* Labelled SIZE, because that is literally what it buys: the score decides how big the fish is.
+                An unlabelled bar creeping up from zero read as a progress bar you were failing. */}
+            <div className="fish-strain-row">
+                <span className="fish-strain-label">SIZE</span>
+                <div className="fish-strain">
+                    <div className="fish-strain-fill" style={{ width: `${scoreNow * 100}%` }} />
+                </div>
+                <span className="fish-strain-pct">{Math.round(scoreNow * 100)}%</span>
             </div>
             <div className="fish-timer"><div className="fish-timer-fill" style={{ width: `${left * 100}%` }} /></div>
             <button type="button" className="fish-hold-btn" onPointerDown={down} onPointerUp={up} onPointerLeave={up}>
@@ -175,12 +198,15 @@ function ReelStruggle({ onDone, sfx }) {
 // ── THE LOG ──────────────────────────────────────────────────────────────────────────────────────────────────
 function FishingLog({ log, known, total, records, onClose }) {
     const [tab, setTab] = useState("log");
-    const byId = useMemo(() => new Map((records || []).map((r) => [r.id, r])), [records]);
+    // `records` arrives as { records, top } — the per-species board and the ranked leaderboard.
+    const perSpecies = records?.records || [];
+    const top = records?.top || [];
     return (
         <div className="fish-log">
             <div className="fish-log-tabs">
                 <button type="button" className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>📖 My Log</button>
-                <button type="button" className={tab === "rec" ? "on" : ""} onClick={() => setTab("rec")}>🥇 Den Records</button>
+                <button type="button" className={tab === "top" ? "on" : ""} onClick={() => setTab("top")}>🏆 Top Catches</button>
+                <button type="button" className={tab === "rec" ? "on" : ""} onClick={() => setTab("rec")}>🥇 Records</button>
             </div>
             {tab === "log" ? (
                 <>
@@ -206,9 +232,32 @@ function FishingLog({ log, known, total, records, onClose }) {
                         ))}
                     </div>
                 </>
+            ) : tab === "top" ? (
+                <>
+                    {/* Scored against each species' own maximum, so this isn't just a list of whales — and so a
+                        perfect Sardine on your first day can genuinely sit at the top of the Den. */}
+                    <p className="fish-log-progress">Best catches in the Den — how close each came to the biggest that species gets</p>
+                    <div className="fish-log-grid">
+                        {top.map((r, i) => (
+                            <div key={`${r.species}-${r.alias}-${r.cm}-${i}`} className="fish-log-row">
+                                <span className="fish-top-rank">{i + 1}</span>
+                                <span className="fish-log-emoji" style={{ color: RARITY_COLOR[r.rarity] }}>{r.emoji}</span>
+                                <span className="fish-log-name">
+                                    {r.name}
+                                    <em>{r.who ? `@${r.alias}` : "—"}</em>
+                                </span>
+                                <span className="fish-log-best">
+                                    <strong>{lengthLabel(r.cm)}</strong>
+                                    <em>{r.pct}% of max</em>
+                                </span>
+                            </div>
+                        ))}
+                        {!top.length ? <p className="muted" style={{ padding: 12 }}>No catches yet. The top of the board is wide open.</p> : null}
+                    </div>
+                </>
             ) : (
                 <div className="fish-log-grid">
-                    {(records || []).map((r) => (
+                    {perSpecies.map((r) => (
                         <div key={r.id} className={`fish-log-row${r.record ? "" : " is-unknown"}`}>
                             <span className="fish-log-emoji" style={{ color: RARITY_COLOR[r.rarity] }}>{r.emoji}</span>
                             <span className="fish-log-name">{r.name}<em>{r.who ? `@${r.alias}` : "unclaimed"}</em></span>
@@ -217,7 +266,7 @@ function FishingLog({ log, known, total, records, onClose }) {
                             </span>
                         </div>
                     ))}
-                    {!(records || []).length ? <p className="muted" style={{ padding: 12 }}>Nobody has landed anything yet. The board is yours for the taking.</p> : null}
+                    {!perSpecies.length ? <p className="muted" style={{ padding: 12 }}>Nobody has landed anything yet. The board is yours for the taking.</p> : null}
                 </div>
             )}
             <button type="button" className="fish-close" onClick={onClose}>Back to the rail</button>

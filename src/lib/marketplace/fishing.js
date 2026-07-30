@@ -37,40 +37,44 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 //          some only in a storm. Nothing else in the game rewards you for playing at 11pm in the rain.
 const F = (id, name, emoji, rarity, weight, cm, gold, xp, extra = {}) => ({ id, name, emoji, rarity, weight, cm, gold, xp, minVoyages: 0, sky: null, ...extra });
 
+// PAYOUTS ARE DELIBERATELY TINY. They were cut by ~75% after the first pass: a day of fishing paid 150-300
+// gold for two minutes of tapping, which is real money next to a daily quest at 110-140 and made the whole
+// feature read as a gold faucet. What you're playing for is the LOG and the record board, so the gold is now
+// pocket change — a mythic pays about what a single sailing daily does, and a sardine buys nothing at all.
 export const FISH = [
     // ── COMMON · the harbour regulars (always available, so a brand-new member always catches something) ──
-    F("fish_sardine", "Sardine", "🐟", "common", 100, [8, 22], 6, 5),
-    F("fish_perch", "Silver Perch", "🐟", "common", 90, [14, 38], 9, 7),
-    F("fish_mackerel", "Mackerel", "🐟", "common", 80, [20, 46], 11, 8),
-    F("fish_crab", "Rock Crab", "🦀", "common", 60, [9, 26], 12, 8),
-    F("fish_squid", "Bay Squid", "🦑", "common", 55, [18, 55], 13, 9),
+    F("fish_sardine", "Sardine", "🐟", "common", 100, [8, 22], 2, 2),
+    F("fish_perch", "Silver Perch", "🐟", "common", 90, [14, 38], 2, 2),
+    F("fish_mackerel", "Mackerel", "🐟", "common", 80, [20, 46], 3, 3),
+    F("fish_crab", "Rock Crab", "🦀", "common", 60, [9, 26], 3, 3),
+    F("fish_squid", "Bay Squid", "🦑", "common", 55, [18, 55], 4, 3),
 
     // ── RARE · worth stopping for ──
-    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 46, [26, 62], 26, 16),
-    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 40, [10, 24], 24, 14),
-    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 34, [16, 40], 30, 18),
-    F("fish_lobster", "Blue Lobster", "🦞", "rare", 26, [22, 58], 38, 22),
-    F("fish_octopus", "Reef Octopus", "🐙", "rare", 24, [30, 90], 36, 21, { minVoyages: 4 }),
-    F("fish_moonfish", "Moonfish", "🌙", "rare", 22, [24, 70], 40, 24, { sky: ["night", "aurora"], minVoyages: 3 }),
+    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 46, [26, 62], 7, 5),
+    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 40, [10, 24], 6, 4),
+    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 34, [16, 40], 8, 5),
+    F("fish_lobster", "Blue Lobster", "🦞", "rare", 26, [22, 58], 10, 7),
+    F("fish_octopus", "Reef Octopus", "🐙", "rare", 24, [30, 90], 9, 6, { minVoyages: 4 }),
+    F("fish_moonfish", "Moonfish", "🌙", "rare", 22, [24, 70], 10, 7, { sky: ["night", "aurora"], minVoyages: 3 }),
 
     // ── EPIC · a story when you land one ──
-    F("fish_swordfish", "Swordfish", "🗡️", "epic", 16, [90, 240], 80, 44, { minVoyages: 8 }),
-    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 15, [80, 220], 74, 40, { minVoyages: 8 }),
-    F("fish_manta", "Manta Ray", "🪁", "epic", 11, [120, 340], 92, 50, { minVoyages: 12 }),
-    F("fish_stormpike", "Storm Pike", "⚡", "epic", 10, [60, 160], 96, 54, { sky: ["storm"], minVoyages: 6 }),
-    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 9, [18, 52], 88, 48, { sky: ["night", "dusk"], minVoyages: 10 }),
+    F("fish_swordfish", "Swordfish", "🗡️", "epic", 16, [90, 240], 20, 13, { minVoyages: 8 }),
+    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 15, [80, 220], 18, 12, { minVoyages: 8 }),
+    F("fish_manta", "Manta Ray", "🪁", "epic", 11, [120, 340], 23, 15, { minVoyages: 12 }),
+    F("fish_stormpike", "Storm Pike", "⚡", "epic", 10, [60, 160], 24, 16, { sky: ["storm"], minVoyages: 6 }),
+    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 9, [18, 52], 22, 14, { sky: ["night", "dusk"], minVoyages: 10 }),
 
     // ── LEGENDARY · the deep ──
-    F("fish_shark", "Great White", "🦈", "legendary", 5, [280, 620], 190, 110, { minVoyages: 16 }),
-    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 4, [190, 330], 175, 100, { sky: ["fog"], minVoyages: 14 }),
-    F("fish_marlin", "Black Marlin", "🐟", "legendary", 4, [240, 500], 210, 120, { minVoyages: 20 }),
-    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 3, [110, 200], 240, 140, { minVoyages: 24 }),
+    F("fish_shark", "Great White", "🦈", "legendary", 5, [280, 620], 48, 33, { minVoyages: 16 }),
+    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 4, [190, 330], 44, 30, { sky: ["fog"], minVoyages: 14 }),
+    F("fish_marlin", "Black Marlin", "🐟", "legendary", 4, [240, 500], 52, 36, { minVoyages: 20 }),
+    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 3, [110, 200], 60, 42, { minVoyages: 24 }),
 
     // ── MYTHIC · four of these exist in the whole ocean ──
-    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 2, [900, 2600], 420, 260, { minVoyages: 30 }),
-    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 1.5, [400, 1200], 480, 300, { sky: ["storm", "night"], minVoyages: 34 }),
-    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 1, [520, 1800], 560, 340, { minVoyages: 40 }),
-    F("fish_starfish", "Fallen Star", "⭐", "mythic", 1, [30, 90], 600, 380, { sky: ["aurora", "night"], minVoyages: 26 }),
+    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 2, [900, 2600], 105, 78, { minVoyages: 30 }),
+    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 1.5, [400, 1200], 120, 90, { sky: ["storm", "night"], minVoyages: 34 }),
+    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 1, [520, 1800], 140, 102, { minVoyages: 40 }),
+    F("fish_starfish", "Fallen Star", "⭐", "mythic", 1, [30, 90], 150, 114, { sky: ["aurora", "night"], minVoyages: 26 }),
 ];
 
 const BY_ID = new Map(FISH.map((f) => [f.id, f]));
@@ -97,9 +101,10 @@ const RARE_TILT_CAP = 0.9;
 const SIZE_FROM_QUALITY = 0.62;
 const SIZE_FROM_ROLL = 0.38;
 // Fragment/chest sprinkles, so fishing feeds the existing forge loop rather than being a closed economy.
-const FRAGMENT_CHANCE = { epic: 0.18, legendary: 0.42, mythic: 0.8 };
-const CHEST_ON_MYTHIC = "gold";
-const CHEST_ON_RECORD_LEGENDARY = "iron";  // a personal best on a legendary+ also drops a chest
+// Cut back with the gold: a gold chest on every mythic was the single most valuable thing in the feature.
+const FRAGMENT_CHANCE = { epic: 0.10, legendary: 0.22, mythic: 0.45 };
+const CHEST_ON_MYTHIC = "iron";
+const CHEST_ON_RECORD_LEGENDARY = "wooden";  // a personal best on a legendary+ also drops a chest
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────────────────────────────────────
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
@@ -117,24 +122,49 @@ export function anglingEffects(angling = 0) {
 export const castsPerDay = (angling = 0) => Math.min(CASTS_MAX, CASTS_PER_DAY + anglingEffects(angling).bonusCasts);
 
 // ── WHAT SKY ARE YOU ACTUALLY UNDER? ─────────────────────────────────────────────────────────────────────────
-// The weather-gated species are the reason to fish at 11pm in a thunderstorm, so the gate has to mean something.
-// The sky the client is rendering comes from the real-weather ambiance route (and a cookie), which the member
-// could in principle spoof — so the two halves of the gate are trusted differently:
+// The weather-gated species are the reason to fish at 11pm in a thunderstorm, so the gate has to mean something
+// — and, crucially, has to be REACHABLE.
 //
-//   TIME-OF-DAY (night, dusk) is computed from the SERVER clock in store-local time. Unspoofable.
-//   WEATHER (storm, fog, aurora, overcast) is taken from what the client reports it's rendering. Spoofable, but
-//     the ceiling on that is a slightly better species roll inside a hard 18-casts-a-day cap, and the prize is a
-//     PUBLIC record board — so it isn't worth building a weather oracle to defend.
+// It wasn't. The gate used to read the sky the CLIENT said it was rendering, which comes from the ambiance
+// route and needs the member's granted coordinates. Most members never granted location, so `sky` arrived null
+// and nine of the twenty-four species — every weather-gated one — could never bite for them. Silently. With no
+// way to tell from inside the game that a permission prompt was the reason.
+//
+// Both halves are now resolved on the SERVER, and the weather half is the sky over THE DEN itself:
+//
+//   TIME-OF-DAY (night, dusk)      — server clock, store-local. Unspoofable, same for everyone.
+//   WEATHER (storm, fog, aurora…)  — live weather at the shop's own coordinates, via sky.js.
+//
+// One shop, one sky, everybody fishing under the same weather. Nothing the client sends is trusted any more,
+// and nobody is gated behind a browser permission they declined.
 const WEATHER_SKIES = new Set(["storm", "fog", "aurora", "overcast", "clearday", "sunrise", "sunset", "goldenhour"]);
-export function effectiveSkies(reportedSky = null) {
+
+// Time-of-day half — pure, synchronous, always available even if the weather service is down.
+function clockSkies() {
     const out = new Set();
-    // Store-local hour, straight from the server.
     const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false }).format(new Date()));
     if (hour >= 21 || hour < 5) out.add("night");
     if ((hour >= 19 && hour < 21) || (hour >= 5 && hour < 7)) out.add("dusk");
-    const rep = String(reportedSky || "");
-    if (WEATHER_SKIES.has(rep)) out.add(rep);
+    return out;
+}
+
+/**
+ * The skies in effect right now. `knownWeather` is an already-resolved sky type (see denSkies) — passing it in
+ * keeps this function pure so fishingView can stay a free, synchronous read off the sailing row.
+ */
+export function effectiveSkies(knownWeather = null) {
+    const out = clockSkies();
+    const w = String(knownWeather || "");
+    if (WEATHER_SKIES.has(w)) out.add(w);
     return [...out];
+}
+
+// The live version: asks sky.js for the weather over the shop. Falls back to time-of-day alone if the weather
+// service is unreachable, so a fetch failure narrows the pool rather than breaking a cast.
+export async function denSkies() {
+    const { skyAtTheDen } = await import("@/lib/marketplace/sky.js");
+    const resolved = await skyAtTheDen().catch(() => null);
+    return effectiveSkies(resolved?.skyType || null);
 }
 
 // Which fish could bite right now, given the skies in effect.
@@ -189,7 +219,9 @@ export function fishingView(row, angling = 0, status = "idle", sky = null) {
     const max = castsPerDay(angling);
     const used = castsUsed(row);
     const hooked = row?.fish_state || null;
-    const skies = effectiveSkies(sky);
+    // Takes the already-resolved list (getSailingState hands down denSkies()), or a bare weather string for
+    // any caller that still has one. Stays synchronous either way so this is free on every sailing load.
+    const skies = Array.isArray(sky) ? sky : effectiveSkies(sky);
     const pool = poolFor({ voyages, skies });
     // Species the member has SEEN (their log) plus which of the rest could bite here — enough for a progress
     // ring and an "unknown waters" teaser, without leaking exactly which mythic is swimming under the boat.
@@ -226,7 +258,7 @@ export function fishingView(row, angling = 0, status = "idle", sky = null) {
 // ── CAST ─────────────────────────────────────────────────────────────────────────────────────────────────────
 // Spends a cast, rolls the fish, and parks it on the line. Returns only the bite TIMING — never the species,
 // because the surprise of what surfaces is most of the fun.
-export async function castLine(buyerId, { status = "sailing", sky = null, angling = 0 } = {}) {
+export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     if (status !== "sailing" && status !== "arrived") return { ok: false, error: "not_at_sea" };
     const row = await readFishRow(buyerId);
@@ -235,7 +267,9 @@ export async function castLine(buyerId, { status = "sailing", sky = null, anglin
     const max = castsPerDay(angling);
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
 
-    const skies = effectiveSkies(sky);
+    // Resolved here, not taken from the caller — this is the roll that decides which species is on the line,
+    // so it must not be something the client can influence.
+    const skies = await denSkies();
     const pool = poolFor({ voyages: Number(row.voyages_completed) || 0, skies });
     const species = rollSpecies(pool, anglingEffects(angling).rareTilt);
     const state = {
@@ -412,6 +446,37 @@ export async function checkFishingBadges(buyerId) {
         [buyerId]
     ).catch(() => null);
     if (holds) await grantEventBadge(buyerId, "fish_record_holder").catch(() => {});
+}
+
+// ── TOP CATCHES ──────────────────────────────────────────────────────────────────────────────────────────────
+// The board people actually want: the best catches in the Den, ranked against each other.
+//
+// Ranking on raw cm would be a whale leaderboard and nothing else — a Sunlit Whale's floor (900cm) is larger
+// than a Great White's ceiling, so no other species could ever appear. Instead every catch is scored on how
+// close it came to ITS OWN species maximum, which is the thing that actually took skill and luck. A 21.8cm
+// Sardine at 99% of possible beats a middling whale, and the board stays winnable from the first cast.
+// Rarity breaks ties, so a perfect Kraken still outranks a perfect Sardine.
+export async function denTopCatches(limit = 25) {
+    const rows = await db.query(
+        `SELECT c.buyer_id, c.species, c.cm, c.caught_at,
+                COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias
+           FROM mkt_fish_catch c LEFT JOIN mkt_buyer b ON b.id = c.buyer_id
+          ORDER BY c.cm DESC LIMIT 600`
+    ).catch(() => []);
+    return (rows || [])
+        .map((r) => {
+            const f = fishById(r.species);
+            if (!f) return null;
+            return {
+                species: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity,
+                cm: round1(Number(r.cm)), max: f.cm[1],
+                pct: Math.round(percentileOf(f, Number(r.cm)) * 100),
+                who: r.who || null, alias: r.alias || null, at: r.caught_at || null,
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => (b.pct - a.pct) || (RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity]) || (b.cm - a.cm))
+        .slice(0, Math.max(1, Math.min(100, limit)));
 }
 
 // ── THE RECORD BOARD ─────────────────────────────────────────────────────────────────────────────────────────

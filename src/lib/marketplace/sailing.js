@@ -21,7 +21,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantFragment, so this static import can't cycle.
-import { fishingView, castLine, landFish, denFishRecords } from "@/lib/marketplace/fishing.js";
+import { fishingView, castLine, landFish, denFishRecords, denTopCatches, denSkies } from "@/lib/marketplace/fishing.js";
 // Fishing is still in development — owner-only until the design settles. See fishingUnlocked() below.
 import { isOwner } from "@/lib/marketplace/owner.js";
 
@@ -876,13 +876,15 @@ async function resolveDueEncounter(buyerId) {
     await trackActivity(buyerId, "sail_encounter", { type: enc.id, outcome: loot.kind, gold: coins }).catch(() => {});
 }
 
-// `skyKey` is the ambiance sky the client says it's rendering ("storm", "night", …). It only affects FISHING —
-// some species bite only in certain weather. The trust model is spelled out in fishing.js (effectiveSkies):
-// time-of-day is recomputed from the server clock, weather is taken on the client's word.
+// `skyKey` is the ambiance sky the CLIENT says it's rendering. It is accepted for call-site compatibility and
+// then ignored for anything that matters: the fishing weather gate now resolves server-side from the sky over
+// the shop (fishing.js denSkies), because gating on the member's own weather needed a location grant most
+// members never gave, which silently made nine of the twenty-four species uncatchable for them.
 export async function getSailingState(buyerId, skyKey = null) {
+    void skyKey;
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, petMap, chestArt, sea, raidExtras] = await Promise.all([
+    const [row, goldRow, others, petMap, chestArt, sea, raidExtras, skies] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
@@ -905,6 +907,8 @@ export async function getSailingState(buyerId, skyKey = null) {
         getChestArt().catch(() => ({})),
         equippedSeaAffinity(buyerId),
         equippedRaidExtras(buyerId),
+        // The Den's real sky — cached 15 min in sky.js, so this is a map lookup on all but the first call.
+        denSkies().catch(() => []),
     ]);
     const seaEff = seaEffects(sea);
     const fleet = (others || []).map((o) => {
@@ -924,7 +928,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, skyKey), gold: goldRow?.gold || 0, fleet, sky, sea };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, skies), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1125,10 +1129,11 @@ export async function waveAtSailor(buyerId) {
 // points and the voyage status are resolved here (fishing.js stays free of the sea-affinity plumbing).
 export async function fishCast(buyerId, { sky = null } = {}) {
     if (!fishingUnlocked(buyerId)) return { ok: false, error: "not_available" };
+    void sky; // the weather gate is resolved server-side now — see getSailingState's note
     const [row, sea] = await Promise.all([readRow(buyerId), equippedSeaAffinity(buyerId)]);
     const status = decorate(row).status;
-    const res = await castLine(buyerId, { status, sky, angling: seaEffects(sea).angling });
-    return { ...res, ...(await getSailingState(buyerId, sky)) };
+    const res = await castLine(buyerId, { status, angling: seaEffects(sea).angling });
+    return { ...res, ...(await getSailingState(buyerId)) };
 }
 
 export async function fishLand(buyerId, { quality = 0, missed = false, sky = null } = {}) {
@@ -1141,9 +1146,15 @@ export async function fishLand(buyerId, { quality = 0, missed = false, sky = nul
     return { ...res, catchResult: res.landed ? res : null, ...(await getSailingState(buyerId, sky)) };
 }
 
-// The Den-wide record board (biggest ever landed, per species). Re-exported so the route has one import surface.
-// Gated too — the board would otherwise advertise an unreleased feature (and its species list) to anyone who asks.
-export const fishRecords = (buyerId) => (fishingUnlocked(buyerId) ? denFishRecords() : []);
+// The Den-wide boards. Re-exported so the route has one import surface, and gated too — they'd otherwise
+// advertise an unreleased feature (and its whole species list) to anyone who asks.
+//   records → biggest ever landed, per species
+//   top     → the leaderboard: best catches in the Den, scored against each species' own maximum
+export const fishRecords = async (buyerId) => {
+    if (!fishingUnlocked(buyerId)) return { records: [], top: [] };
+    const [records, top] = await Promise.all([denFishRecords(), denTopCatches(25)]);
+    return { records, top };
+};
 
 // Acknowledge (dismiss) a resolved encounter's recap — clears it so it never shows again.
 export async function ackEncounter(buyerId) {
