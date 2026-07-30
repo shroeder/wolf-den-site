@@ -29,6 +29,10 @@ function Thread({ thread, onActivity }) {
     const [cp, setCp] = useState(null);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
+    // The DM API has always returned these two; the UI just ignored them.
+    const [online, setOnline] = useState(false);
+    const [typing, setTyping] = useState(false);
+    const typingSentRef = useRef(0);
     const endRef = useRef(null);
 
     const load = useCallback(async () => {
@@ -39,6 +43,8 @@ function Thread({ thread, onActivity }) {
             setCounterpart(t.counterpart?.displayLabel || thread.name || "Conversation");
             setCp(t.counterpart || null);
             setMessages(Array.isArray(t.messages) ? t.messages : []);
+            setOnline(Boolean(t.otherOnline));
+            setTyping(Boolean(t.otherTyping));
             onActivity?.();
         } else {
             setMessages((m) => (m === null ? [] : m));
@@ -47,13 +53,25 @@ function Thread({ thread, onActivity }) {
 
     useEffect(() => {
         (async () => { await load(); })();
-        const iv = setInterval(() => { load(); }, 15000);
+        // 4s, not 15s: the server treats typing as live for 6s, so a 15s poll would nearly always miss it.
+        const iv = setInterval(() => { load(); }, 4000);
         return () => clearInterval(iv);
     }, [load]);
 
     useEffect(() => {
         endRef.current?.scrollIntoView({ block: "end" });
     }, [messages]);
+
+    // Ping "I'm typing" as they compose, at most once every 3s (the server window is 6s, so this keeps it alive
+    // without a request per keystroke).
+    function onInput(v) {
+        setInput(v);
+        const now = Date.now();
+        if (v.trim() && now - typingSentRef.current > 3000) {
+            typingSentRef.current = now;
+            fetch(`/api/marketplace/dm/${thread.id}/typing`, { method: "POST" }).catch(() => {});
+        }
+    }
 
     async function send(e) {
         e.preventDefault();
@@ -83,7 +101,13 @@ function Thread({ thread, onActivity }) {
                         <span aria-hidden="true">{(counterpart || "?").slice(0, 1).toUpperCase()}</span>
                     )}
                 </span>
-                <strong className="mkt-dock-title">{counterpart}</strong>
+                <span className="mkt-dock-titlewrap">
+                    <strong className="mkt-dock-title">{counterpart}</strong>
+                    <span className={`dm-presence${online ? " is-online" : ""}`}>
+                        <span className="dm-dot" aria-hidden="true" />
+                        {typing ? "typing…" : online ? "online" : "offline"}
+                    </span>
+                </span>
                 <Link href={`/marketplace/dm/${thread.id}`} className="mkt-dock-full">Open ↗</Link>
             </div>
             <div className="mkt-dock-msgs">
@@ -112,8 +136,13 @@ function Thread({ thread, onActivity }) {
                 )}
                 <div ref={endRef} />
             </div>
+            {typing ? (
+                <div className="dm-typing" aria-live="polite">
+                    <span /><span /><span /> {counterpart} is typing
+                </div>
+            ) : null}
             <form className="mkt-dock-composer" onSubmit={send}>
-                <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Message…" />
+                <input value={input} onChange={(e) => onInput(e.target.value)} placeholder="Message…" />
                 <button type="submit" className="btn-gold" disabled={sending || !input.trim()}>Send</button>
             </form>
         </div>

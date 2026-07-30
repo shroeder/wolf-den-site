@@ -490,7 +490,9 @@ export async function getGlobalChat(buyerId = null, limit = 40) {
         body: r.body,
         at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
         alias: r.alias || null,
-        name: r.display_name || "Wolf",
+        // Fall back to the @handle before the generic "Wolf" — the plaza roster already does this, and skipping it
+        // here is why a member with a handle but no display name showed up as "Wolf" in chat.
+        name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"),
         sprite: r.avatar_sprite_url || null,
         flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
         mine: buyerId ? String(r.buyer_id) === String(buyerId) : false,

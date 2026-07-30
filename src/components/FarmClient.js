@@ -11,6 +11,7 @@ import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
+import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
@@ -1131,6 +1132,17 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <div style={{ maxWidth: "min(92vw, 460px)", textAlign: "center", padding: "9px 18px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.25, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", animation: "pigPop .4s ease both" }}>
                         🐷👑 The Loot Pig appeared — grab the coins he drops!
                     </div>
+                </div>
+            ) : null}
+
+            {/* Creation sharing: gifts waiting on you, people asking for copies of your art, and the one-time
+                share picker. Mounted HERE because it must be impossible to miss — it first went into
+                DecoManager, which turned out never to be rendered at all, so the requests were invisible. */}
+            {farm.mine ? (
+                <div style={{ padding: "0 12px 10px" }}>
+                    {/* No onChanged: the hub refetches its own state after every action, and a newly received
+                        decoration shows up in the inventory on the next farm load. */}
+                    <CreationShareHub />
                 </div>
             ) : null}
 

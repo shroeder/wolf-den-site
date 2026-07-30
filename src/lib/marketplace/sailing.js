@@ -66,8 +66,11 @@ const RAID_ITEM_COPY_CHANCE = 0.005;             // 0.5% to copy one random item
 const RAID_DODGE_BASE = 0.005, RAID_DODGE_PER = 0.0025; // 0.5% + 0.25%/level to NOT use up the daily raid
 const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_DODGE_PER;
 const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
-// Daily raid allowance: 1 base + ship perks (Celestial Sovereign +1) + set bonus (later). Count-based so >1/day works.
-const raidsPerDay = (level = 1, setBonus = 0) => 1 + boatPerks(level).bonusRaids + Math.max(0, setBonus);
+// Daily raid allowance: BASE + ship perks (Celestial Sovereign +1) + set bonus. Count-based so >1/day works.
+// Base raised 1 → 3: one raid a day made the whole raiding system a single tap you could miss entirely, and the
+// upgrade track + Dread Corsair bonus had almost nothing to sit on top of.
+const BASE_RAIDS_PER_DAY = 3;
+const raidsPerDay = (level = 1, setBonus = 0) => BASE_RAIDS_PER_DAY + boatPerks(level).bonusRaids + Math.max(0, setBonus);
 const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) : 0); // count only counts if it's TODAY's
 // Full-set raid extras (Dread Corsair capstone): +1 raid/day and double raid-win gold. One equipped-gear read.
 async function equippedRaidExtras(buyerId) {
