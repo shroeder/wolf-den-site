@@ -12149,24 +12149,21 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-reel-head > span { font-size: 0.78rem; }
 .fish-rod { position: relative; height: 46dvh; min-height: 240px; max-height: 380px; margin: 0 auto; width: 88px; border-radius: 16px; border: 2px solid #2b3d52; background: linear-gradient(180deg, rgba(60,140,200,0.2), rgba(8,26,48,0.75)); overflow: hidden; touch-action: none; cursor: pointer; transition: border-color 0.12s, box-shadow 0.12s; }
 .fish-rod.is-on { border-color: #58d989; box-shadow: 0 0 0 3px rgba(88,217,137,0.18), inset 0 0 26px rgba(88,217,137,0.28); }
-/* The target zone. Deliberately quieter than it was — as a solid green slab it was the loudest thing on the
-   rod, so the eye tracked the target drifting and never found the hook that actually responds to you. */
-.fish-band { position: absolute; left: 0; right: 0; z-index: 1; background: rgba(88,217,137,0.12);
-    border-top: 2px dashed rgba(120,240,170,0.75); border-bottom: 2px dashed rgba(120,240,170,0.75); }
-/* Your line: a lit hook that clearly belongs to you, riding a line up to the rod tip. Sized and glowing so it
-   out-reads the band — the band is the target, but THIS is the thing that answers your thumb. */
-.fish-catch { position: absolute; left: 50%; margin-left: -26px; margin-bottom: -20px; width: 52px; height: 40px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
-    font-size: 1.7rem; z-index: 3; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.75)); transition: filter 0.1s; }
-.fish-catch-hook { line-height: 1; text-shadow: 0 0 14px rgba(255,228,136,0.95), 0 0 30px rgba(255,180,60,0.55); }
-.fish-catch-tag { font-size: 0.5rem; font-weight: 900; letter-spacing: 0.12em; color: #06283d; background: #ffe488;
-    border-radius: 999px; padding: 0 5px; margin-top: -2px; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
-.fish-catch.is-pulling { filter: drop-shadow(0 0 12px rgba(255,228,136,0.9)); }
-.fish-catch.is-pulling .fish-catch-hook { animation: fishTug 0.28s ease-in-out infinite; }
-@keyframes fishTug { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-/* The line itself — from the hook up to the top of the rod, so "your line" is literal, not a metaphor. */
-.fish-line { position: absolute; left: 50%; margin-left: -1px; width: 2px; top: 0; z-index: 2;
-    background: linear-gradient(180deg, rgba(255,228,136,0.15), rgba(255,228,136,0.7)); pointer-events: none; }
+/* YOUR BAR — the thing your thumb drives. It's the actor, so it's the loud element: solid fill, bright rails,
+   and it lights up whenever the fish is inside it. */
+.fish-band { position: absolute; left: 0; right: 0; z-index: 1; transition: background 0.1s, box-shadow 0.1s;
+    background: linear-gradient(180deg, rgba(88,217,137,0.34), rgba(88,217,137,0.18));
+    border-top: 3px solid rgba(120,240,170,0.95); border-bottom: 3px solid rgba(120,240,170,0.95); }
+.fish-rod.is-on .fish-band { background: linear-gradient(180deg, rgba(120,240,170,0.55), rgba(88,217,137,0.32));
+    box-shadow: 0 0 22px rgba(88,217,137,0.55), inset 0 0 18px rgba(255,255,255,0.18); }
+/* THE FISH — swims on its own; nothing you press moves it. Bright enough to track, but the BAR is the actor. */
+.fish-catch { position: absolute; left: 50%; margin-left: -20px; margin-bottom: -18px; width: 40px; height: 36px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.75rem; z-index: 3;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.8)); transition: filter 0.12s, transform 0.12s; }
+.fish-catch-hook { line-height: 1; display: block; animation: fishWiggle 0.5s ease-in-out infinite; }
+@keyframes fishWiggle { 0%,100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+/* Caught in the bar right now — the moment you're being scored on, so it's unmistakable. */
+.fish-catch.is-caught { filter: drop-shadow(0 0 14px rgba(120,240,170,1)) drop-shadow(0 2px 6px rgba(0,0,0,0.8)); transform: scale(1.16); }
 .fish-rod-hint { position: absolute; inset: auto 0 6px 0; text-align: center; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(210,230,250,0.55); pointer-events: none; }
 .fish-strain { flex: 1 1 auto; height: 10px; border-radius: 999px; background: #1a2230; overflow: hidden; }
 .fish-strain-fill { height: 100%; background: linear-gradient(90deg,#3fa8e0,#58d989); transition: width 0.1s linear; }

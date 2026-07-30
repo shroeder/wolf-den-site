@@ -8,12 +8,16 @@ import { createPortal } from "react-dom";
 //
 //   CAST   tap once. The server has already decided what's down there.
 //   BITE   the line twitches at a moment you can't predict. Tap again.
-//   REEL   a strain band drifts up and down the rod; HOLD to reel the fish up, release to let it fall. Keep it
-//          inside the band. Time-in-band IS the score, and the score decides how BIG the fish is.
+//   REEL   the fish swims up and down on its own. HOLD to raise YOUR BAR, release and it falls. Keep the fish
+//          inside the bar. Time-in-bar IS the score, and the score decides how BIG the fish is.
 //
-// The reel is deliberately NOT the forge's timing bar — this one is continuous and forgiving. Every frame inside
-// the band is credit banked, so a shaky reel lands a smaller fish rather than nothing. The only way to lose the
-// fish is to never tap the bite at all, and that refunds the cast server-side.
+// The roles were the other way round at first — you drove a hook and the zone drifted — and it read as broken:
+// "the green bar just goes up and down without any input from me". A fish that swims itself is what everyone
+// expects a fish to do, and chasing it with a capture bar is an idiom players already know.
+//
+// The reel is deliberately NOT the forge's timing bar — this one is continuous and forgiving. Every frame the
+// fish is inside the bar is credit banked, so a shaky reel lands a smaller fish rather than nothing. The only
+// way to lose the fish is to never tap the bite at all, and that refunds the cast server-side.
 //
 // The server owns everything that matters: species, the luck half of the size, and the payout. This component
 // reports one number — quality, 0..1 — exactly like the forge's enhance minigame and the merchant's coin game.
@@ -127,9 +131,10 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
     const F = FIGHT[fight] || FIGHT.common;
     const [tick, setTick] = useState(0);          // repaint pulse
     const holdRef = useRef(false);
-    const posRef = useRef(0.5);                   // the fish, 0 (bottom) .. 1 (top of the rod)
+    const posRef = useRef(0.5);                   // THE FISH, 0 (bottom) .. 1 (top). Swims itself.
     const velRef = useRef(0);
-    const bandRef = useRef(0.5);
+    const bandRef = useRef(0.5);                  // YOUR BAR (centre). Hold to raise, release to fall.
+    const barVelRef = useRef(0);
     const inRef = useRef(0);                      // frames inside the band
     const totalRef = useRef(0);
     const startRef = useRef(0);
@@ -149,14 +154,24 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
             prev = ts;
             const elapsed = ts - startRef.current;
 
-            // The band drifts on two out-of-phase sines so it never feels like a metronome.
+            // THE FISH swims on its own. It wanders toward a target it keeps re-picking, with panicked darts
+            // on top — nothing you do moves it. A fish that swims reads as a fish; when the player drove this
+            // marker instead, people watched the zone drift past and concluded nothing responded to them.
             const t = elapsed / 1000;
-            bandRef.current = 0.5 + Math.sin(t * 1.15) * 0.26 + Math.sin(t * 0.47 + 1.1) * 0.1;
-            bandRef.current = Math.max(BAND_H / 2, Math.min(1 - BAND_H / 2, bandRef.current));
+            if (elapsed - lastDartRef.current > DART_EVERY_MS / F.dart) {
+                lastDartRef.current = elapsed;
+                velRef.current += (Math.random() - 0.5) * 1.5 * F.dart;   // a run, either way
+            }
+            // A slow wander underneath the darts, so it drifts with intent instead of jittering in place.
+            velRef.current += Math.sin(t * 0.9 + 0.7) * 0.55 * dt * F.dart;
+            velRef.current *= Math.pow(DAMPING, dt * 60);
+            posRef.current += velRef.current * dt;
+            if (posRef.current <= 0.04) { posRef.current = 0.04; velRef.current = Math.abs(velRef.current) * 0.5; }
+            if (posRef.current >= 0.96) { posRef.current = 0.96; velRef.current = -Math.abs(velRef.current) * 0.5; }
 
-            // TENSION. Holding loads the line; letting go bleeds it off. Redline and the line goes slack for
-            // a moment — your pull stops working and the fish sinks — so "keep holding" is a real decision
-            // rather than the obvious answer. Nothing is lost, which keeps the no-punishment rule intact.
+            // TENSION. Holding loads the line; letting go bleeds it off. Redline and the line goes slack for a
+            // moment — your bar stops rising and falls — so "keep holding" is a real decision rather than the
+            // obvious answer. Nothing is lost, which keeps the no-punishment rule intact.
             const slack = ts < slackUntilRef.current;
             const pulling = holdRef.current && !slack;
             if (pulling) tensionRef.current += TENSION_RISE * F.tension * dt;
@@ -170,24 +185,21 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                 try { navigator.vibrate?.([40, 30, 40]); } catch { /* no haptics here */ }
             }
 
-            // The fish: gravity down, your reeling up (only while the line has bite), plus panicked runs.
-            velRef.current += (pulling ? REEL_PULL * F.pull : 0) * dt;
-            velRef.current -= GRAVITY * dt;
-            if (elapsed - lastDartRef.current > DART_EVERY_MS / F.dart) {
-                lastDartRef.current = elapsed;
-                velRef.current += (Math.random() - 0.62) * 0.9 * F.dart; // biased downward — it wants to go deep
-            }
-            velRef.current *= Math.pow(DAMPING, dt * 60);
-            posRef.current += velRef.current * dt;
-            if (posRef.current <= 0) { posRef.current = 0; velRef.current = Math.abs(velRef.current) * 0.3; }
-            if (posRef.current >= 1) { posRef.current = 1; velRef.current = -Math.abs(velRef.current) * 0.3; }
+            // THE BAR is yours: hold to raise it, release and it falls. This is the only thing your thumb
+            // touches, and chasing a fish with a capture zone is an idiom players already know.
+            barVelRef.current += (pulling ? REEL_PULL : 0) * dt;
+            barVelRef.current -= GRAVITY * dt;
+            barVelRef.current *= Math.pow(DAMPING, dt * 60);
+            bandRef.current += barVelRef.current * dt;
+            const half = BAND_H / 2;
+            if (bandRef.current <= half) { bandRef.current = half; barVelRef.current = 0; }
+            if (bandRef.current >= 1 - half) { bandRef.current = 1 - half; barVelRef.current = 0; }
 
-            // Credit, banked per frame. This is the whole score — but not until the fish has settled.
-            // WARM-UP: the first moments are spent reacting to where the band even is, and because the score is
-            // an average over the WHOLE run, fumbling them used to cap your result permanently with no way to
-            // see it happening. Those frames are now simply not counted.
+            // Credit, banked per frame: is the FISH inside YOUR BAR right now.
+            // WARM-UP: the first moments are spent finding the fish, and because the score is an average over
+            // the WHOLE run, fumbling them used to cap your result permanently with no way to see it happen.
             const scoring = elapsed >= REEL_WARMUP_MS;
-            const lo = bandRef.current - BAND_H / 2, hi = bandRef.current + BAND_H / 2;
+            const lo = bandRef.current - half, hi = bandRef.current + half;
             const inside = posRef.current >= lo && posRef.current <= hi;
             if (scoring) {
                 totalRef.current += 1;
@@ -242,7 +254,7 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                 {/* Two things move on this rod and nothing used to say how they related — players read the fish
                     marker as the fish swimming on its own and tried to chase it, when in fact the marker is
                     THEIR line (hold = up, release = down) and the green band is what drifts. Say so outright. */}
-                <span className="muted">hold to pull your line up · let go to let it sink · keep it in the green</span>
+                <span className="muted">HOLD to raise your bar · let go to drop it · keep the fish inside it</span>
             </div>
             <div
                 className={`fish-rod${inside ? " is-on" : ""}`}
@@ -250,16 +262,12 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                 role="presentation"
             >
                 <div className="fish-band" style={{ bottom: `${(band - BAND_H / 2) * 100}%`, height: `${BAND_H * 100}%` }}>
-                    <span className="fish-band-label">KEEP IT HERE</span>
+                    <span className="fish-band-label">YOUR BAR</span>
                 </div>
-                {/* YOUR LINE. It was a 1.35rem emoji against a full-width green block, so the thing you
-                    control was the least visible element on the rod and read as scenery — people watched the
-                    band drift and concluded nothing responded to them. Now it's a lit hook on a visible line
-                    running up to the rod tip, so it's obvious what moves when you hold. */}
-                <div className="fish-line" style={{ bottom: `${pos * 100}%` }} aria-hidden="true" />
-                <div className={`fish-catch${holdRef.current && !slack ? " is-pulling" : ""}`} style={{ bottom: `${pos * 100}%` }}>
-                    <span className="fish-catch-hook" aria-hidden="true">🎣</span>
-                    <span className="fish-catch-tag">YOU</span>
+                {/* THE FISH — it swims on its own now, which is what everyone expects a fish to do. Your
+                    thumb drives the BAR above; nothing you press moves this. */}
+                <div className={`fish-catch${inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }}>
+                    <span className="fish-catch-hook" aria-hidden="true">🐟</span>
                 </div>
                 <div className="fish-rod-hint">
                     {warming ? "get ready…" : slack ? "LINE SLACK — ease off!" : inside ? "REELING" : "hold!"}
