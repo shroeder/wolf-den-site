@@ -337,6 +337,13 @@ const BADGE_BONUSES = {
     raid_plunderer: S({ plunder: 5 }), raid_defender: S({ ironclad: 3 }), raid_bastion: S({ ironclad: 5 }),
     // ── DIGGING → dredge / trove ──
     dig_excavator: S({ trove: 4 }), dig_goldtouch: S({ trove: 3, dredge: 2 }), dig_cleansweep: S({ dredge: 4 }),
+    // ── FISHING → Angling (its own stat: more casts a day, rarer fish on the line), so fishing badges make you
+    // a better fisherman. The Whole Ocean is the completionist prize: every species means fishing at night, in a
+    // storm, in fog, and sailing forty voyages to reach deep water.
+    fish_first: S({ angling: 1 }), fish_angler: S({ angling: 3 }), fish_master: S({ angling: 6, bounty: 3 }),
+    fish_naturalist: S({ angling: 4 }), fish_deepwater: S({ angling: 5, trove: 3 }),
+    fish_trophy: S({ angling: 4, bounty: 2 }), fish_record_holder: S({ angling: 5, bounty: 3 }),
+    fish_complete: S({ angling: 12, bounty: 6, trove: 4, tailwind: 4 }),
     // ── Upgrade mastery (ship + dig) ──
     sail_shipwright: S({ broadside: 2, dredge: 2 }), sail_sovereign: S({ broadside: 3, ironclad: 3, dredge: 3, trove: 3, tailwind: 3, bounty: 3 }),
 

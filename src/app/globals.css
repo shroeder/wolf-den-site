@@ -12057,3 +12057,106 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* ── Skirmish foe archetypes: each fights differently, so each must LOOK different ─────────────────────────── */
 .tw-enemy-badge { position: absolute; top: -16px; right: -6px; width: 19px; height: 19px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; border: 1.5px solid rgba(0,0,0,0.55); pointer-events: none; z-index: 2; }
 .tw-swing-hint { margin: -6px 0 12px; font-size: 0.8rem; color: #b7c0cf; line-height: 1.35; }
+
+/* ── FISHING (sailing) ─────────────────────────────────────────────────────────────────────────────────────────
+   Cast → bite → reel. The reel is a HOLD control, so everything about it has to read at a glance while your
+   thumb is down: the safe band is the only bright thing on the rod, and the strain bar under it fills with the
+   credit you have banked, so the score is visible before the reveal. */
+.fish-wrap { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; padding: 14px; background: radial-gradient(120% 90% at 50% 10%, rgba(12,32,54,0.94), rgba(4,10,20,0.97)); backdrop-filter: blur(3px); }
+.fish-sea { position: absolute; inset: auto 0 0 0; height: 40%; overflow: hidden; pointer-events: none; background: linear-gradient(180deg, rgba(30,90,140,0.18), rgba(8,26,48,0.55)); }
+.fish-ripple { position: absolute; bottom: 12%; width: 70px; height: 70px; margin-left: -35px; border-radius: 50%; border: 1px solid rgba(140,205,255,0.24); animation: fishRipple 4.2s linear infinite; }
+@keyframes fishRipple { from { transform: scale(0.2); opacity: 0; } 25% { opacity: 0.85; } to { transform: scale(1.7); opacity: 0; } }
+
+.fish-card { position: relative; width: min(94vw, 420px); max-height: 92dvh; overflow-y: auto; background: #10141c; border: 1px solid #2a3442; border-radius: 20px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); }
+.fish-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #212a36; }
+.fish-head > strong { font-size: 1.02rem; }
+.fish-casts { margin-left: auto; font-size: 0.76rem; font-weight: 800; color: #8fd8ff; background: rgba(85,211,255,0.12); border: 1px solid rgba(85,211,255,0.3); border-radius: 999px; padding: 3px 9px; }
+.fish-x { background: none; border: none; color: #8b93a0; font-size: 1rem; cursor: pointer; padding: 2px 4px; }
+
+.fish-stage { padding: 18px 16px 20px; text-align: center; }
+.fish-idle-art { font-size: 3.4rem; line-height: 1; animation: fishSway 3.4s ease-in-out infinite; }
+@keyframes fishSway { 0%,100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+.fish-copy { font-size: 0.9rem; line-height: 1.45; color: #d5dde8; margin: 10px 2px 4px; }
+.fish-err { color: #ff9ea8; font-size: 0.84rem; font-weight: 700; margin: 8px 0 0; }
+.fish-tally { font-size: 0.78rem; margin: 10px 0 0; }
+.fish-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.fish-cta { padding: 12px 18px; border: none; border-radius: 12px; font-weight: 900; font-size: 0.96rem; color: #06283d; background: linear-gradient(180deg,#8fe0ff,#3fa8e0); cursor: pointer; box-shadow: 0 6px 18px rgba(63,168,224,0.34); }
+.fish-cta:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.fish-ghost { padding: 12px 14px; border: 1px solid #2f3a48; border-radius: 12px; background: #171d27; color: #cfd8e3; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
+
+/* Waiting for the bite — a float bobbing on the water and nothing to do but watch it. */
+.fish-line-art { height: 90px; display: flex; align-items: flex-end; justify-content: center; }
+.fish-bob { font-size: 1.6rem; animation: fishBob 1.9s ease-in-out infinite; }
+@keyframes fishBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+.fish-wait { font-weight: 800; }
+.fish-dots { animation: fishDots 1.2s steps(4) infinite; }
+@keyframes fishDots { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+
+/* THE BITE — the whole card becomes one enormous tap target, because a small button here would be cruel. */
+.fish-bite { display: block; width: 100%; border: none; background: linear-gradient(180deg, rgba(255,215,94,0.18), rgba(255,140,60,0.1)); padding: 34px 16px 30px; text-align: center; cursor: pointer; animation: fishAlarm 0.42s ease-in-out infinite alternate; }
+@keyframes fishAlarm { from { background-color: rgba(255,190,70,0.05); } to { background-color: rgba(255,190,70,0.19); } }
+.fish-bite-flash { display: block; font-size: 3.6rem; font-weight: 900; color: #ffd75e; line-height: 1; text-shadow: 0 0 22px rgba(255,215,94,0.7); }
+.fish-bite > strong { display: block; font-size: 1.7rem; letter-spacing: 0.06em; color: #fff; margin-top: 4px; }
+.fish-bite > em { display: block; font-style: normal; font-size: 0.84rem; color: #ffe9b0; margin-top: 4px; }
+
+/* THE REEL — a vertical rod, a drifting safe band, and a fish that fights to get back down. */
+.fish-reel { padding: 14px 16px 18px; }
+.fish-reel-head { display: flex; flex-direction: column; gap: 2px; text-align: center; margin-bottom: 10px; }
+.fish-reel-head > strong { font-size: 1.06rem; letter-spacing: 0.04em; color: #ffd75e; }
+.fish-reel-head > span { font-size: 0.78rem; }
+.fish-rod { position: relative; height: 46dvh; min-height: 240px; max-height: 380px; margin: 0 auto; width: 88px; border-radius: 16px; border: 2px solid #2b3d52; background: linear-gradient(180deg, rgba(60,140,200,0.2), rgba(8,26,48,0.75)); overflow: hidden; touch-action: none; cursor: pointer; transition: border-color 0.12s, box-shadow 0.12s; }
+.fish-rod.is-on { border-color: #58d989; box-shadow: 0 0 0 3px rgba(88,217,137,0.18), inset 0 0 26px rgba(88,217,137,0.28); }
+.fish-band { position: absolute; left: 0; right: 0; background: linear-gradient(180deg, rgba(88,217,137,0.34), rgba(88,217,137,0.16)); border-top: 2px solid rgba(120,240,170,0.85); border-bottom: 2px solid rgba(120,240,170,0.85); }
+.fish-catch { position: absolute; left: 50%; margin-left: -15px; margin-bottom: -14px; width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.6)); }
+.fish-rod-hint { position: absolute; inset: auto 0 6px 0; text-align: center; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(210,230,250,0.55); pointer-events: none; }
+.fish-strain { height: 10px; margin: 12px 0 6px; border-radius: 999px; background: #1a2230; overflow: hidden; }
+.fish-strain-fill { height: 100%; background: linear-gradient(90deg,#3fa8e0,#58d989); transition: width 0.1s linear; }
+.fish-timer { height: 4px; border-radius: 999px; background: #1a2230; overflow: hidden; }
+.fish-timer-fill { height: 100%; background: #ffd75e; transition: width 0.1s linear; }
+.fish-hold-btn { display: block; width: 100%; margin-top: 14px; padding: 16px; border: none; border-radius: 14px; font-weight: 900; font-size: 1rem; letter-spacing: 0.05em; color: #06283d; background: linear-gradient(180deg,#8fe0ff,#3fa8e0); cursor: pointer; touch-action: none; user-select: none; }
+.fish-hold-btn:active { transform: translateY(1px); filter: brightness(1.1); }
+
+/* THE REVEAL — the payoff beat. Size is the headline, because size is what the log records. */
+.fish-result { padding-top: 8px; }
+.fish-banner { display: inline-block; padding: 5px 13px; border-radius: 999px; font-weight: 900; font-size: 0.8rem; letter-spacing: 0.05em; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); margin-bottom: 6px; }
+.fish-banner.is-new { background: linear-gradient(180deg,#d8b6ff,#a06bff); color: #1b0a33; }
+.fish-banner.is-den { background: linear-gradient(180deg,#ffd0e2,#ff7fb0); color: #3a0a20; animation: fishPop 0.5s ease-out; }
+@keyframes fishPop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.fish-reveal { font-size: 4.6rem; line-height: 1; animation: fishLand 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes fishLand { 0% { transform: translateY(34px) scale(0.4) rotate(-24deg); opacity: 0; } 60% { transform: translateY(-6px) scale(1.12) rotate(6deg); } 100% { transform: none; opacity: 1; } }
+.fish-name { font-size: 1.28rem; font-weight: 900; margin-top: 4px; }
+.fish-rarity { font-size: 0.76rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.85; }
+.fish-size { font-size: 2rem; font-weight: 900; margin: 8px 0 2px; color: #fff; }
+.fish-pct { margin: 6px auto 2px; max-width: 300px; }
+.fish-pct-bar { height: 7px; border-radius: 999px; background: #1a2230; overflow: hidden; }
+.fish-pct-fill { height: 100%; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+.fish-pct > span { display: block; font-size: 0.72rem; color: #8b93a0; margin-top: 5px; }
+.fish-prev { font-size: 0.78rem; margin: 8px 0 0; }
+.fish-spoils { display: flex; gap: 7px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.fish-chip { padding: 5px 11px; border-radius: 999px; font-weight: 900; font-size: 0.84rem; }
+.fish-chip.gold { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
+.fish-chip.xp { color: #0a2e1c; background: linear-gradient(180deg,#8fe39a,#3ec06a); }
+.fish-chip.extra { color: #e0c8ff; background: rgba(150,90,255,0.2); border: 1px solid rgba(184,120,255,0.42); }
+
+/* THE LOG — the actual reward. Unknown species stay redacted with only a flavour hint, so the list reads as a
+   set of mysteries rather than a checklist of requirements. */
+.fish-log { padding: 12px 12px 14px; }
+.fish-log-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.fish-log-tabs button { flex: 1; padding: 9px 6px; border: 1px solid #2a3442; border-radius: 10px; background: #151b24; color: #8b93a0; font-weight: 800; font-size: 0.82rem; cursor: pointer; }
+.fish-log-tabs button.on { background: rgba(85,211,255,0.14); border-color: rgba(85,211,255,0.4); color: #8fd8ff; }
+.fish-log-progress { text-align: center; font-size: 0.82rem; font-weight: 800; color: #8fd8ff; margin: 0 0 8px; }
+.fish-log-grid { display: flex; flex-direction: column; gap: 4px; }
+.fish-log-row { position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 10px; background: #151b24; border: 1px solid #212a36; }
+.fish-log-row.is-unknown { opacity: 0.5; }
+.fish-log-row.is-biting { border-color: rgba(88,217,137,0.45); }
+.fish-log-emoji { font-size: 1.3rem; width: 26px; text-align: center; }
+.fish-log-name { display: flex; flex-direction: column; line-height: 1.2; font-weight: 800; font-size: 0.88rem; }
+.fish-log-name > em { font-style: normal; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; opacity: 0.75; }
+.fish-log-best { margin-left: auto; text-align: right; display: flex; flex-direction: column; line-height: 1.2; }
+.fish-log-best > strong { font-size: 0.9rem; color: #fff; }
+.fish-log-best > em { font-style: normal; font-size: 0.72rem; color: #8b93a0; }
+.fish-log-biting { position: absolute; top: -6px; right: -4px; font-size: 0.8rem; }
+.fish-close { display: block; width: 100%; margin-top: 12px; padding: 11px; border: 1px solid #2f3a48; border-radius: 12px; background: #171d27; color: #cfd8e3; font-weight: 800; cursor: pointer; }
+
+/* The at-sea entry point, alongside the tailwind and raid CTAs. */
+.sail-cta-fish { background: linear-gradient(180deg,#5ec8f0,#2d84b8); color: #041d2c; }

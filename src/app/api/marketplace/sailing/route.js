@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -60,6 +60,11 @@ export async function POST(request) {
                 case "ack_encounter": return noStore(await ackEncounter(g.buyer.id));
                 case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected, body.perfect));
                 case "merchant_buy": return noStore(await merchantBuy(g.buyer.id, body.item));
+                // Fishing. `sky` is what the client says it's rendering — it only gates which SPECIES can bite,
+                // and the time-of-day half of that gate is recomputed server-side (see fishing.js).
+                case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky }));
+                case "fish_land": return noStore(await fishLand(g.buyer.id, { quality: body.quality, missed: body.missed, sky: body.sky }));
+                case "fish_records": return noStore({ ok: true, records: await fishRecords(g.buyer.id) });
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

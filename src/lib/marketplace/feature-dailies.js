@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // ── Per-feature daily quests (farm + sailing) ───────────────────────────────────────────────────────────────
 // A dedicated, always-present set of 3 daily bounties shown on each feature's own screen (like the Forge's).
@@ -21,6 +22,11 @@ export const FEATURE_DAILIES = {
         { key: "sail_voyage1", label: "Set sail on a voyage", metric: "voyage_start", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
         { key: "sail_dig1", label: "Dig up buried treasure", metric: "dig_done", need: 1, reward: { gold: 140 }, rewardLabel: "+140 gold" },
         { key: "sail_raid1", label: "Raid a passing ship", metric: "raid_do", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
+        // the one task you can finish without waiting on a four-hour timer.
+        // ownerOnly while fishing is unreleased: without it every member would be handed a bounty they cannot
+        // start, which both advertises the feature and permanently parks their sailing card at 3/4 complete.
+        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold", ownerOnly: true },
     ],
 };
 
@@ -41,9 +47,14 @@ export async function bumpFeatureDaily(buyerId, metric, amount = 1) {
     ).catch(() => {});
 }
 
+// Tasks belonging to a feature that hasn't shipped yet are filtered out per-member, so an unreleased system
+// never leaks through the daily card. Applied to BOTH the card list and the nav claim count — a bounty that
+// is invisible but still counted would light up the attention badge with nothing behind it.
+const visibleTasks = (tasks, buyerId) => (tasks || []).filter((t) => !t.ownerOnly || isOwner(buyerId));
+
 export async function getFeatureDailies(buyerId, feature) {
-    const tasks = FEATURE_DAILIES[feature];
-    if (!buyerId || !tasks) return [];
+    const tasks = visibleTasks(FEATURE_DAILIES[feature], buyerId);
+    if (!buyerId || !tasks.length) return [];
     const row = await db.queryOne(`SELECT progress, claimed FROM mkt_feature_daily WHERE buyer_id = $1 AND feature = $2 AND day = ${DAY}`, [buyerId, feature]).catch(() => null);
     const progress = parseJson(row?.progress, {});
     const claimed = new Set(parseJson(row?.claimed, []));
@@ -60,8 +71,8 @@ export async function getFeatureClaimCounts(buyerId) {
     if (!buyerId) return out;
     const rows = await db.query(`SELECT feature, progress, claimed FROM mkt_feature_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => []);
     for (const row of rows) {
-        const tasks = FEATURE_DAILIES[row.feature];
-        if (!tasks) continue;
+        const tasks = visibleTasks(FEATURE_DAILIES[row.feature], buyerId);
+        if (!tasks.length) continue;
         const progress = parseJson(row.progress, {});
         const claimed = new Set(parseJson(row.claimed, []));
         out[row.feature] = tasks.filter((t) => Math.min(Number(progress[t.metric] || 0), t.need) >= t.need && !claimed.has(t.key)).length;
@@ -72,8 +83,8 @@ export async function getFeatureClaimCounts(buyerId) {
 }
 
 export async function claimFeatureDaily(buyerId, feature, key) {
-    const tasks = FEATURE_DAILIES[feature];
-    const t = tasks?.find((x) => x.key === key);
+    // visibleTasks, not the raw pool — an unreleased task must be unclaimable by hand-rolled POST, not merely hidden.
+    const t = visibleTasks(FEATURE_DAILIES[feature], buyerId).find((x) => x.key === key);
     if (!buyerId || !t) return { ok: false, error: "bad_task" };
     const row = await db.queryOne(`SELECT progress, claimed FROM mkt_feature_daily WHERE buyer_id = $1 AND feature = $2 AND day = ${DAY}`, [buyerId, feature]).catch(() => null);
     const progress = parseJson(row?.progress, {});

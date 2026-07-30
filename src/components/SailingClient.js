@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
 import MerchantScene from "@/components/MerchantScene";
+import FishingScene from "@/components/FishingScene";
 import RaidScene from "@/components/RaidScene";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
@@ -220,12 +221,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // session (later state updates re-roll d.sky, but we keep this original).
     const [sky, setSky] = useState(() => initial?.sky || initial?.oceanBg || null);
     const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
+    const [fishOpen, setFishOpen] = useState(false);       // the fishing scene (cast → bite → reel) is open
+    const [fishRecords, setFishRecords] = useState(null);  // Den-wide biggest-per-species board (lazy-loaded)
     const [raidOpen, setRaidOpen] = useState(false);       // the raid target-picker modal is open
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidPlay, setRaidPlay] = useState(null);        // the resolved raid → drives the full-screen battle scene
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
     // Lock the background from scrolling while any sailing modal is open (raid picker, raid battle, arrival).
-    useScrollLock(raidOpen || Boolean(raidPlay) || arriveModal);
+    useScrollLock(raidOpen || Boolean(raidPlay) || arriveModal || fishOpen);
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -461,6 +464,22 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             return d;
         } finally { setBusy(false); }
     }, [triggerGust]);
+
+    // ── FISHING ── the scene owns the minigame; these just carry its two actions to the server and hand the reply
+    // straight back, since the scene needs the server's verdict (species, size, records) to celebrate with.
+    const fishCast = useCallback((extra) => act("fish_cast", extra), [act]);
+    const fishLand = useCallback((extra) => act("fish_land", extra), [act]);
+    // The record board is a READ, so it deliberately does NOT go through act() — act() calls setState(d) on any
+    // non-error reply, and fish_records returns { ok, records } with no sailing state, which would wipe the screen.
+    const loadFishRecords = useCallback(async () => {
+        try {
+            const r = await fetch("/api/marketplace/sailing", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "fish_records" }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (d?.records) setFishRecords(d.records);
+        } catch { /* the log still renders; the board just stays empty */ }
+    }, []);
 
     // Dig a tile: spray rock chunks from it instantly (feels tactile), then send the dig to the server.
     const digTile = useCallback((r, c) => {
@@ -815,7 +834,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 )}
 
                 {/* At-sea + digging controls below the scene. The tailwind is the one real action here, so it's a primary CTA. */}
-                {(liveStatus === "sailing" || liveStatus === "digging") && (
+                {(liveStatus === "sailing" || liveStatus === "digging" || (liveStatus === "arrived" && state.fishing?.available)) && (
                     <div className="sail-actions">
                         {liveStatus === "sailing" && (
                             state.windAvailable
@@ -823,6 +842,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 : <button className="sail-cta sail-cta-wind" disabled={busy || windTooPoor} onClick={() => act("recharge_wind")}>
                                     {busy ? "Catching the wind…" : windCost > 0 ? `Catch another tailwind — 🪙 ${windCost.toLocaleString()}` : "Catch another tailwind — free (testing)"}
                                 </button>
+                        )}
+                        {/* Fishing — the reason a four-hour voyage isn't four hours of nothing. Also offered while
+                            docked, since the server allows a line over the rail at anchor too. */}
+                        {liveStatus !== "digging" && state.fishing?.available && (
+                            <button className="sail-cta sail-cta-fish" disabled={busy} onClick={() => setFishOpen(true)}>
+                                🎣 Fish off the rail{state.fishing.casts?.left ? ` · ${state.fishing.casts.left} casts` : " · out of casts"}
+                            </button>
                         )}
                         {liveStatus === "digging" && <button className="pill" disabled>⛏️ Digging · {dig?.stamina} digs left</button>}
                         {liveStatus === "sailing" && (
@@ -1158,6 +1184,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         </div>
                     </div>
                 </div>
+            ) : null}
+
+            {/* FISHING — cast → bite → reel, plus the Log and the Den record board. The scene reports one number
+                (reel quality); the server owns the species, the size and the payout. */}
+            {fishOpen && state.fishing ? (
+                <FishingScene
+                    fishing={state.fishing}
+                    sky={skyType || null}
+                    records={fishRecords}
+                    onCast={fishCast}
+                    onLand={fishLand}
+                    onLoadRecords={loadFishRecords}
+                    onClose={() => setFishOpen(false)}
+                />
             ) : null}
 
             {/* RAID — target picker: choose WHO to raid (best-gear-first) with the stakes shown up front. */}

@@ -19,6 +19,11 @@ import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+// Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
+// via a dynamic import for grantFragment, so this static import can't cycle.
+import { fishingView, castLine, landFish, denFishRecords } from "@/lib/marketplace/fishing.js";
+// Fishing is still in development — owner-only until the design settles. See fishingUnlocked() below.
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -199,7 +204,7 @@ async function equippedSeaAffinity(buyerId) {
     // is silently dropped. (This previously seeded only plunder/dredge/bulwark/tailwind, so broadside, ironclad,
     // bounty and trove were always 0 for BOTH gear and pets — Turtle/Marlin/Anglerfish etc. did nothing. The
     // old `bulwark` key wasn't a real effect and is removed.)
-    const sea = { broadside: 0, ironclad: 0, plunder: 0, bounty: 0, dredge: 0, trove: 0, tailwind: 0 };
+    const sea = { broadside: 0, ironclad: 0, plunder: 0, bounty: 0, dredge: 0, trove: 0, tailwind: 0, angling: 0 };
     if (!buyerId) return sea;
     const [bySlot, me] = await Promise.all([
         getEquippedIds(buyerId).catch(() => ({})),
@@ -239,6 +244,9 @@ function seaEffects(sea = {}) {
         // Voyages
         voyageSpeed: Math.min(0.15, (sea.tailwind || 0) * 0.01),        // Tailwind: −1% voyage time/pt (cap −15%)
         bonusWaves: Math.floor((sea.tailwind || 0) / 4),                // Tailwind: +1 daily wave per 4 points
+        // Fishing — Angling buys casts and tilts the species roll. The curve itself lives in fishing.js
+        // (anglingEffects) since both effects are consumed there; this just passes the raw points through.
+        angling: sea.angling || 0,
     };
 }
 
@@ -703,7 +711,7 @@ function boardView(board) {
 }
 
 // --- state ---------------------------------------------------------------------------------------------
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -802,7 +810,18 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0) {
         // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
         windRecharge: { cost: windRechargeCost(row?.wind_recharges || 0) },
         dig: status === "digging" ? boardView(dig) : null,
+        // Fishing — offered while at sea or docked. fishingView is PURE off this same row, so the log, the daily
+        // cast count and anything currently on the line all come along for free with no extra query.
+        // Owner-only while the design settles. A null here removes the whole surface: SailingClient guards every
+        // fishing affordance on `state.fishing`, so members see no rail button, no scene, no trace of it.
+        fishing: fishingUnlocked(row?.buyer_id) ? fishingView(row, angling, status, sky) : null,
     };
+}
+
+// The single gate for the fishing minigame. The API actions check this too — hiding the UI is not access
+// control, and a hand-rolled POST would otherwise reach castLine/landFish just fine.
+export function fishingUnlocked(buyerId) {
+    return isOwner(buyerId);
 }
 
 async function readRow(buyerId) {
@@ -857,7 +876,10 @@ async function resolveDueEncounter(buyerId) {
     await trackActivity(buyerId, "sail_encounter", { type: enc.id, outcome: loot.kind, gold: coins }).catch(() => {});
 }
 
-export async function getSailingState(buyerId) {
+// `skyKey` is the ambiance sky the client says it's rendering ("storm", "night", …). It only affects FISHING —
+// some species bite only in certain weather. The trust model is spelled out in fishing.js (effectiveSkies):
+// time-of-day is recomputed from the server clock, weather is taken on the client's word.
+export async function getSailingState(buyerId, skyKey = null) {
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
     const [row, goldRow, others, petMap, chestArt, sea, raidExtras] = await Promise.all([
@@ -902,7 +924,7 @@ export async function getSailingState(buyerId) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids), gold: goldRow?.gold || 0, fleet, sky, sea };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, skyKey), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1097,6 +1119,31 @@ export async function waveAtSailor(buyerId) {
     if (wt >= BADGE_WAVE_BELOVED) await grantEventBadge(buyerId, "wave_beloved").catch(() => {});
     return { ok: true, waved: { xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000 }, ...(await getSailingState(buyerId)) };
 }
+
+// ── FISHING ────────────────────────────────────────────────────────────────────────────────────────────
+// Thin wrappers so the fishing actions return the full sailing state like every other mutator, and so the ANGLING
+// points and the voyage status are resolved here (fishing.js stays free of the sea-affinity plumbing).
+export async function fishCast(buyerId, { sky = null } = {}) {
+    if (!fishingUnlocked(buyerId)) return { ok: false, error: "not_available" };
+    const [row, sea] = await Promise.all([readRow(buyerId), equippedSeaAffinity(buyerId)]);
+    const status = decorate(row).status;
+    const res = await castLine(buyerId, { status, sky, angling: seaEffects(sea).angling });
+    return { ...res, ...(await getSailingState(buyerId, sky)) };
+}
+
+export async function fishLand(buyerId, { quality = 0, missed = false, sky = null } = {}) {
+    if (!fishingUnlocked(buyerId)) return { ok: false, error: "not_available" };
+    const res = await landFish(buyerId, { quality, missed });
+    if (res.ok && res.landed) {
+        // A landed fish is a sailing daily too — same metric pump the rest of the feature uses.
+        await bumpQuestProgress(buyerId, "fish", 1).catch(() => {});
+    }
+    return { ...res, catchResult: res.landed ? res : null, ...(await getSailingState(buyerId, sky)) };
+}
+
+// The Den-wide record board (biggest ever landed, per species). Re-exported so the route has one import surface.
+// Gated too — the board would otherwise advertise an unreleased feature (and its species list) to anyone who asks.
+export const fishRecords = (buyerId) => (fishingUnlocked(buyerId) ? denFishRecords() : []);
 
 // Acknowledge (dismiss) a resolved encounter's recap — clears it so it never shows again.
 export async function ackEncounter(buyerId) {

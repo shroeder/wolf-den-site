@@ -639,6 +639,7 @@ export const SEA_META = {
     dredge: { label: "Dredge", icon: "⛏️", desc: "Higher chance your dig tools proc while excavating." },
     trove: { label: "Trove", icon: "🔱", desc: "Dig up more treasure fragments per excavation." },
     tailwind: { label: "Tailwind", icon: "🌬️", desc: "Faster voyages, and more sailors to greet each day." },
+    angling: { label: "Angling", icon: "🎣", desc: "More casts a day, and rarer fish on the line." },
 };
 export function sumItemSea(itemIds = []) {
     const total = {};

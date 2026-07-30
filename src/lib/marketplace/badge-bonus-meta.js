@@ -25,6 +25,7 @@ export const BONUS_META = {
             // tailwind is also a once-daily action you spend. It's actually −1% voyage time per point (cap −15%),
             // so the point value already IS the percentage — show that instead.
             tailwind: { icon: "🌬️", label: "Voyage Speed", suffix: "%" },
+            angling: { icon: "🎣", label: "Angling", suffix: "" },
         },
     },
     farm: {
