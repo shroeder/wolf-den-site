@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
+import FishingLaunch from "@/components/FishingLaunch";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
@@ -84,14 +85,12 @@ export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [signedIn, setSignedIn] = useState(false); // gates the Town link + the one-time Forge announcement — declared before `links`
-    // Fishing is still owner-gated, so its nav entry only exists for accounts that can open it. Declared
-    // HERE, beside signedIn, because `links` below reads it — declaring it further down is a TDZ crash.
-    const [owner, setOwner] = useState(false);
+    // (Fishing was owner-gated at launch prep; it's public now and rides `signedIn` like Town.)
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
         ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
-        ...(owner ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : [])];
+        ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -101,6 +100,7 @@ export default function GameNav() {
     const [cropsReady, setCropsReady] = useState(0);
     const [petNudge, setPetNudge] = useState(0); // own pets you can still pet today (free daily reward)
     const [sailAttn, setSailAttn] = useState(false);
+    const [castsLeft, setCastsLeft] = useState(0); // unthrown fishing casts — nudges people back to the rail
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
@@ -110,7 +110,7 @@ export default function GameNav() {
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
-            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setOwner(Boolean(d?.owner)); }).catch(() => {});
+            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
         };
         loadChests();
@@ -148,7 +148,14 @@ export default function GameNav() {
         if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };
         // Feature pills also badge their claimable daily-quests (farm crops + quests together).
         if (href === "/marketplace/farm") { const n = cropsReady + petNudge + (featureClaims.farm || 0); if (n > 0) return { badge: n, title: [cropsReady ? `${plural(cropsReady, "crop")} ready` : null, petNudge ? `${plural(petNudge, "pet")} to pet` : null, featureClaims.farm ? `${plural(featureClaims.farm, "quest")} to claim` : null].filter(Boolean).join(" · ") }; }
-        if (href === "/marketplace/sailing" && (featureClaims.sailing || 0) > 0) return { badge: featureClaims.sailing, title: `${plural(featureClaims.sailing, "quest")} to claim` };
+        // Sailing badges claimable dailies OR unthrown casts — fishing happens during a voyage nobody watches,
+        // so the ten free casts quietly expire unless something points at them. Casts win when both apply:
+        // it's the one that's about to be lost.
+        if (href === "/marketplace/sailing") {
+            if (castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left — your line's out` };
+            if ((featureClaims.sailing || 0) > 0) return { badge: featureClaims.sailing, title: `${plural(featureClaims.sailing, "quest")} to claim` };
+        }
+        if (href === "/marketplace/fishing" && castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left today` };
         if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };
         return { badge: null, title: null };
     };
@@ -164,7 +171,7 @@ export default function GameNav() {
             { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Daily Spin", sub: "Spin the wheel" },
             { href: "/marketplace/quests", emoji: "📜", label: "Quests", sub: "Daily bounties" },
             { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties", sub: "Post & claim" },
-            ...(owner ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing", sub: "Log & records" }] : []),
+            ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing", sub: "Log & records" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
@@ -197,6 +204,7 @@ export default function GameNav() {
     return (
         <>
             {signedIn ? <ForgeAnnounce /> : null}
+            {signedIn ? <FishingLaunch /> : null}
             <style>{GAMENAV_CSS}</style>
             <nav className="game-nav" aria-label="Game menu">
                 <div className="game-nav-scroll">

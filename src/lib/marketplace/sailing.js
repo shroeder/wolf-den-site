@@ -22,8 +22,6 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantFragment, so this static import can't cycle.
 import { fishingView, castLine, landFish, denFishRecords, denTopCatches, FISH_TRACKS, FISH_TRACK_COL } from "@/lib/marketplace/fishing.js";
-// Fishing is still in development — owner-only until the design settles. See fishingUnlocked() below.
-import { isOwner } from "@/lib/marketplace/owner.js";
 
 // Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
 // 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
@@ -830,10 +828,12 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
     };
 }
 
-// The single gate for the fishing minigame. The API actions check this too — hiding the UI is not access
-// control, and a hand-rolled POST would otherwise reach castLine/landFish just fine.
+// The single gate for the fishing minigame. LIVE for every signed-in member as of launch — it was owner-only
+// while the design settled. Kept as a function rather than deleted: the API actions, the /marketplace/fishing
+// page, the nav entry, the daily quest and the profile log all route through it, so if fishing ever needs
+// pulling back it's one return value rather than a hunt through six files.
 export function fishingUnlocked(buyerId) {
-    return isOwner(buyerId);
+    return Boolean(buyerId);
 }
 
 async function readRow(buyerId) {
@@ -843,7 +843,11 @@ async function readRow(buyerId) {
         `SELECT *, (wind_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wind_used_today,
                 (wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wave_is_today,
                 (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_used_today,
-                (raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_reset_is_today
+                (raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_reset_is_today,
+                -- fish_is_today was MISSING, and castsUsed() reads it: without it every view reported zero
+                -- casts spent, so the screen said "13/13 casts left today" while the server — which reads the
+                -- row through readFishRow, where the flag IS computed — refused with out_of_casts.
+                (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId]
     ).catch(() => null);
@@ -972,11 +976,36 @@ export async function sailingNeedsAttention(buyerId) {
     if (!buyerId) return false;
     const row = await db.queryOne(
         `SELECT (departed_at IS NOT NULL AND returns_at IS NOT NULL AND returns_at <= NOW() AND dig_state IS NULL) AS landed,
-                (encounter_result IS NOT NULL) AS enc
+                (encounter_result IS NOT NULL) AS enc,
+                -- UNUSED CASTS. Fishing's whole problem is that it happens during a voyage nobody is watching:
+                -- you set sail, close the tab, and the ten free casts quietly expire. This lights the Sailing
+                -- pill while the boat is out (or moored) and you still have a line to throw, which is the only
+                -- moment the nudge is actionable.
+                (departed_at IS NOT NULL AND dig_state IS NULL
+                 AND COALESCE(CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                                   THEN fish_casts ELSE 0 END, 0) < 10) AS castsleft
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId],
     ).catch(() => null);
-    return Boolean(row && (row.landed || row.enc));
+    return Boolean(row && (row.landed || row.enc || row.castsleft));
+}
+
+// Casts still unthrown today, for the nav nudge. Deliberately separate from the boolean above so the pill can
+// say "3 casts" rather than just glowing — a number people can act on beats a dot they learn to ignore.
+export async function unusedCasts(buyerId) {
+    if (!buyerId) return 0;
+    const row = await db.queryOne(
+        `SELECT departed_at, dig_state,
+                COALESCE(CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                              THEN fish_casts ELSE 0 END, 0) AS used
+           FROM mkt_sailing WHERE buyer_id = $1`,
+        [buyerId],
+    ).catch(() => null);
+    if (!row?.departed_at || row.dig_state) return 0;   // only while there's actually a rail to fish from
+    const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
+    const { castsPerDay } = await import("@/lib/marketplace/fishing.js");
+    const max = castsPerDay(seaEffects(sea).angling, 0);
+    return Math.max(0, max - (Number(row.used) || 0));
 }
 
 // CRON: push members whose voyage just LANDED (once each) so they come back to dig. Voyages resolve lazily on

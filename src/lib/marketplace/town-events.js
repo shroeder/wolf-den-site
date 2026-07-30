@@ -63,10 +63,17 @@ const DUEL_THROTTLE_MS = 700;
 // per-duel drip was UNCAPPED and cleared waves refilled forever. The stated intent was "a nice bonus, not a
 // jackpot" (RAID_MAX_GOLD 500) — but that cap only ever guarded the completion payout, so the drip sailed past it
 // by ~8x. Two changes: smaller per-kill spoils, and a real per-raid ceiling enforced below.
-const DUEL_WIN_XP = 6;
-const DUEL_WIN_GOLD = 7;
-const DUEL_LOSS_GOLD = 2;       // consolation so a loss is never nothing
-const DUEL_LOOT_CHANCE = 0.06;  // chance a WIN also drops a low-tier chest — still rare, just no longer a novelty
+// Raised after the drip was cut too far. Killing a foe paid 7 gold and 6 XP with a 6% chest chance — so a
+// whole raid's worth of duels felt like nothing happened, and the loot roll effectively never fired: 6% on a
+// win means most people cleared several waves and saw not one chest. Roughly doubled, with the chest chance
+// tripled so a raid reliably produces a couple.
+//
+// The per-raid CEILINGS below are what actually guard the economy (DUEL_GOLD_BUDGET / DUEL_XP_BUDGET), so
+// raising the per-kill rate makes a raid feel generous without raising what one person can extract from it.
+const DUEL_WIN_XP = 14;
+const DUEL_WIN_GOLD = 16;
+const DUEL_LOSS_GOLD = 5;       // consolation so a loss is never nothing
+const DUEL_LOOT_CHANCE = 0.18;  // chance a WIN also drops a low-tier chest
 // ── SALVAGE FODDER ── goblins and bandits are the Den's scrap heap. The Forge consumes gear to make parts, but
 // every other gear source is slow or one-per-lifetime, so smiths run dry of things to melt. A won duel now has a
 // real chance to drop a junk COMMON/RARE piece straight into your bags — worth almost nothing equipped, which is
@@ -75,8 +82,8 @@ const DUEL_FODDER_CHANCE = 0.14;    // a won duel drops junk gear this often
 const DUEL_FODDER_ELITE_BONUS = 0.16; // + this much when the foe was an elite/chieftain (tougher foe, better scrap)
 // The ceiling that actually binds: total duel spoils ONE fighter can take from ONE raid. Past this, foes still
 // die and still count for damage, badges and quests — there's just no more loot to farm out of a treadmill.
-const DUEL_GOLD_BUDGET = 300;
-const DUEL_XP_BUDGET = 350;
+const DUEL_GOLD_BUDGET = 600;
+const DUEL_XP_BUDGET = 700;
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep
@@ -717,8 +724,8 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
     let hp = ev.hp, wave = Number(ev.meta?.wave) || 1;
     let cleared = null; // "wave" | "chieftain" | "raid_won" — drives the client's celebration
     if (sim.win) {
-        xp = DUEL_WIN_XP + randInt(0, 6);
-        coin = DUEL_WIN_GOLD + randInt(0, 8);
+        xp = DUEL_WIN_XP + randInt(0, 10);
+        coin = DUEL_WIN_GOLD + randInt(0, 14);
         // Low loot chance on a win.
         if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ kind: "chest", tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
         // Kill the REAL foe on the shared roster (claim → strike), so the whole plaza sees the same board change.

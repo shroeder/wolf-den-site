@@ -23,10 +23,9 @@ export const FEATURE_DAILIES = {
         { key: "sail_dig1", label: "Dig up buried treasure", metric: "dig_done", need: 1, reward: { gold: 140 }, rewardLabel: "+140 gold" },
         { key: "sail_raid1", label: "Raid a passing ship", metric: "raid_do", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
-        // the one task you can finish without waiting on a four-hour timer.
-        // ownerOnly while fishing is unreleased: without it every member would be handed a bounty they cannot
-        // start, which both advertises the feature and permanently parks their sailing card at 3/4 complete.
-        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold", ownerOnly: true },
+        // the one task you can finish without waiting on a four-hour timer. (Was ownerOnly while fishing was
+        // unreleased; the `ownerOnly` filter below is kept for the next feature that needs it.)
+        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },
     ],
 };
 
