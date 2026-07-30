@@ -67,17 +67,19 @@ const DUEL_LOOT_CHANCE = 0.03;  // chance a WIN also drops a low-tier chest — 
 const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep
 
 // ── RAID_TUNING ──────────────────────────────────────────────────────────────────────────────────────────────
-// Target: 5-10 people kill the golem in 5-10 minutes. Observed base hit power is ~144 per swing.
+// Target: 5-10 people kill the golem in 5-10 minutes, EITHER by playing the timing game or by passive DPS
+// alone. Measured base hit power is ~153 per swing (from the first real golem kill: 5 fighters, 250k, 13.9 min).
 //
-//   Passive only (nobody playing the minigame):
-//     7 present x 144 x PASSIVE_RATE_PER_SEC(0.42) = ~423 dmg/sec  →  260k / 423 ≈ 10.2 min
-//   With everyone playing the timing game (avg "great", x2.6, one swing/2.6s):
-//     passive 423/s + 7 x (144 x 2.6 / 2.6s) = 423 + 1008 = ~1431 dmg/sec  →  260k ≈ 3.0 min
-//   A realistic mix (half the crowd swinging, average timing) lands around 5-7 minutes.
+//   Passive only — nobody touching the minigame, HP 260k, rate 0.6:
+//      5 present → 260k / (5 x 153 x 0.6)  = ~9.4 min
+//     10 present → 260k / (10 x 153 x 0.6) = ~4.7 min
+//   Everyone timing well on top (avg "great" x2.6, one swing per 2.6s ⇒ +153/sec each):
+//      5 present → ~4.0 min      10 present → ~2.0 min
 //
-// So: idle presence alone still wins but takes the full window; playing well ends it fast. Retune HP and this
-// note together.
-const PASSIVE_RATE_PER_SEC = 0.42;   // multiplier on the member's own hit power, per second in the square
+// So presence alone lands in the asked-for window, and skill is the accelerator rather than the requirement.
+// Duration is 20 min, so a thin turnout can still fail. Retune HP, the rate and this note TOGETHER — the
+// numbers above are the only record of why these values are what they are.
+const PASSIVE_RATE_PER_SEC = 0.6;    // multiplier on the member's own hit power, per second in the square
 const PASSIVE_MAX_CATCHUP_S = 30;    // never credit more than this from one poll gap (tab left open, etc.)
 // Timing grades, mirroring the Forge's bands so the feel is familiar. Server-authoritative: the client sends
 // its distance-from-centre, we grade it here and clamp, so a tampered client can't claim PERFECT every time.
