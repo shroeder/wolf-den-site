@@ -12216,6 +12216,41 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-banner.is-den { background: linear-gradient(180deg,#ffd0e2,#ff7fb0); color: #3a0a20; animation: fishPop 0.5s ease-out; }
 @keyframes fishPop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .fish-reveal { font-size: 4.6rem; line-height: 1; animation: fishLand 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+
+/* ── THE REVEAL ──────────────────────────────────────────────────────────────────────────────────────────────
+   The sprite used to simply appear. This is the payoff for the whole cast, so it now arrives: rays sweep out,
+   a ring bursts past it, and on a legendary/mythic/new-species/record, sparks fire outward. Everything is
+   tinted by rarity via --rc, so a mythic reads differently from a sardine without a word of text. */
+.fish-reveal.is-pop { position: relative; display: grid; place-items: center; width: 100%; min-height: 168px; --rc: #cfd8e3; }
+.fish-reveal.rarity-rare { --rc: #7ec8ff; }
+.fish-reveal.rarity-epic { --rc: #c9a2ff; }
+.fish-reveal.rarity-legendary { --rc: #ffd75e; }
+.fish-reveal.rarity-mythic { --rc: #ff9ec4; }
+.fish-reveal.is-pop > * { grid-area: 1 / 1; }
+.fish-reveal-art { position: relative; z-index: 3; animation: fishRevealArt 0.62s cubic-bezier(.2,1.7,.4,1) both; }
+@keyframes fishRevealArt { 0% { transform: scale(0.35) rotate(-14deg); opacity: 0; } 60% { transform: scale(1.14) rotate(4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+/* Rays — a slow conic sweep behind the art. */
+.fish-rays { z-index: 1; width: 240px; height: 240px; border-radius: 50%; opacity: 0.5;
+    background: conic-gradient(from 0deg, transparent 0 8%, color-mix(in srgb, var(--rc) 55%, transparent) 8% 12%, transparent 12% 25%,
+        color-mix(in srgb, var(--rc) 55%, transparent) 25% 29%, transparent 29% 50%,
+        color-mix(in srgb, var(--rc) 55%, transparent) 50% 54%, transparent 54% 75%,
+        color-mix(in srgb, var(--rc) 55%, transparent) 75% 79%, transparent 79%);
+    mask-image: radial-gradient(circle, transparent 26%, #000 42%, #000 62%, transparent 74%);
+    -webkit-mask-image: radial-gradient(circle, transparent 26%, #000 42%, #000 62%, transparent 74%);
+    animation: fishRays 7s linear infinite, fishRaysIn 0.5s ease-out both; }
+@keyframes fishRays { to { transform: rotate(360deg); } }
+@keyframes fishRaysIn { from { opacity: 0; transform: scale(0.5); } }
+/* A ring that bursts outward past the art once. */
+.fish-burst { z-index: 2; width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--rc);
+    animation: fishBurst 0.75s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes fishBurst { 0% { transform: scale(0.3); opacity: 0.95; } 100% { transform: scale(2.3); opacity: 0; } }
+/* Sparks — reserved for the moments worth one: legendary+, a new species, or a Den record. */
+.fish-sparks { z-index: 2; width: 0; height: 0; }
+.fish-sparks i { position: absolute; left: 0; top: 0; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%;
+    background: var(--rc); box-shadow: 0 0 10px var(--rc);
+    transform: rotate(var(--a)) translateY(0); animation: fishSpark 0.85s ease-out var(--d) both; }
+@keyframes fishSpark { 0% { transform: rotate(var(--a)) translateY(0) scale(0.4); opacity: 0; }
+    25% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-120px) scale(0.2); opacity: 0; } }
 @keyframes fishLand { 0% { transform: translateY(34px) scale(0.4) rotate(-24deg); opacity: 0; } 60% { transform: translateY(-6px) scale(1.12) rotate(6deg); } 100% { transform: none; opacity: 1; } }
 .fish-name { font-size: 1.28rem; font-weight: 900; margin-top: 4px; }
 .fish-rarity { font-size: 0.76rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.85; }

@@ -465,9 +465,15 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
             // that state carries `gold` = the member's total balance — so `res.gold` is your wallet, not the
             // payout. A 12-gold Tiger Prawn proudly reported "+1879 🪙". XP looked fine only because the
             // sailing state has no `xp` key to overwrite. catchResult is the untouched landFish result.
-            setResult(res.catchResult || res);
+            const landed = res.catchResult || res;
+            setResult(landed);
             setPhase("result");
+            // A bigger fish gets a bigger noise — the flat four-note arpeggio played identically for a
+            // sardine and a kraken, which flattened the one moment worth celebrating.
+            const grand = landed.denRecord || landed.firstEver
+                || ["legendary", "mythic"].includes(landed.fish?.rarity || landed.tier);
             sfx.land();
+            if (grand) { setTimeout(() => sfx.land(), 300); setTimeout(() => sfx.bite(), 620); }
         } else if (res?.ok) {
             setPhase("gone");
             sfx.gone();
@@ -557,7 +563,18 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                     // One cast in five surfaces treasure instead of a fish — its own moment, not a footnote.
                     <div className="fish-stage fish-result">
                         <div className="fish-banner is-new">🧭 TREASURE!</div>
-                        <div className="fish-reveal" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</div>
+                        <div className={`fish-reveal is-pop rarity-${result.tier || "common"}`}>
+                            <span className="fish-rays" aria-hidden="true" />
+                            <span className="fish-burst" aria-hidden="true" />
+                            {["legendary", "mythic"].includes(result.tier) ? (
+                                <span className="fish-sparks" aria-hidden="true">
+                                    {Array.from({ length: 10 }, (_, i) => (
+                                        <i key={i} style={{ "--a": `${i * 36}deg`, "--d": `${0.05 + (i % 5) * 0.045}s` }} />
+                                    ))}
+                                </span>
+                            ) : null}
+                            <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</span>
+                        </div>
                         <div className="fish-name" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{result.prize?.label || "Something"}</div>
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{RARITY_LABEL[result.tier] || "Common"}</div>
                         <p className="fish-copy">You hauled it up off the sea floor — no fish this time.</p>
@@ -573,7 +590,21 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                         {result.denRecord ? <div className="fish-banner is-den">🥇 BIGGEST IN THE DEN!</div>
                             : result.firstEver ? <div className="fish-banner is-new">✨ NEW SPECIES!</div>
                                 : result.personalBest ? <div className="fish-banner">📈 PERSONAL BEST!</div> : null}
-                        <div className="fish-reveal"><FishArt id={result.fish.id} emoji={result.fish.emoji} size={140} /></div>
+                        {/* THE REVEAL. The sprite used to just appear — the biggest moment in the feature
+                            arriving with no ceremony at all. Rays, a burst ring and sparks, all tinted to the
+                            rarity, so a mythic feels different from a sardine without reading a word. */}
+                        <div className={`fish-reveal is-pop rarity-${result.fish.rarity}`}>
+                            <span className="fish-rays" aria-hidden="true" />
+                            <span className="fish-burst" aria-hidden="true" />
+                            {["legendary", "mythic"].includes(result.fish.rarity) || result.denRecord || result.firstEver ? (
+                                <span className="fish-sparks" aria-hidden="true">
+                                    {Array.from({ length: 10 }, (_, i) => (
+                                        <i key={i} style={{ "--a": `${i * 36}deg`, "--d": `${0.05 + (i % 5) * 0.045}s` }} />
+                                    ))}
+                                </span>
+                            ) : null}
+                            <FishArt id={result.fish.id} emoji={result.fish.emoji} size={140} className="fish-reveal-art" />
+                        </div>
                         <div className="fish-name" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{result.fish.name}</div>
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{RARITY_LABEL[result.fish.rarity]}</div>
                         <div className="fish-size">{weightLabel(result.fish.lb)}</div>
