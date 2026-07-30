@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── SHARING CREATIONS ────────────────────────────────────────────────────────────────────────────────────────
 // Two components, one feature:
@@ -28,6 +28,70 @@ const ERRORS = {
 };
 const errText = (e) => ERRORS[e] || "That didn't work. Try again.";
 
+// ── Who am I giving this to? ─────────────────────────────────────────────────────────────────────────────────
+// This used to be a bare "@handle" text box, which quietly demanded you already knew someone's exact handle —
+// so in practice you could only gift art to people you'd memorised. Now the Den shows up as a list of faces:
+// friends first, then everyone else by level, with typing as a filter rather than the only way in.
+function MemberPicker({ value, onPick }) {
+    const [q, setQ] = useState("");
+    const [people, setPeople] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const reqId = useRef(0);
+
+    useEffect(() => {
+        const mine = ++reqId.current;
+        setLoading(true);
+        // Debounced: typing shouldn't fire a request per keystroke, and a slow early response must never
+        // overwrite a newer one (hence the request-id guard).
+        const t = setTimeout(async () => {
+            const r = await fetch(`/api/marketplace/members?q=${encodeURIComponent(q.trim().replace(/^@/, ""))}`, { cache: "no-store" }).catch(() => null);
+            const d = r && r.ok ? await r.json().catch(() => null) : null;
+            if (reqId.current === mine) { setPeople(Array.isArray(d?.members) ? d.members : []); setLoading(false); }
+        }, q ? 250 : 0);
+        return () => clearTimeout(t);
+    }, [q]);
+
+    // Friends to the top — the people you're actually likely to hand a piece of art to.
+    const sorted = useMemo(() => {
+        const list = people || [];
+        return [...list].sort((a, b) => (a.relation === "friends" ? 0 : 1) - (b.relation === "friends" ? 0 : 1));
+    }, [people]);
+
+    return (
+        <div className="cshare-picker">
+            <input
+                className="cshare-input" value={q} autoComplete="off" inputMode="search"
+                onChange={(e) => setQ(e.target.value)} placeholder="🔍 Search the Den…" aria-label="Search members"
+            />
+            <div className="cshare-picker-list" role="listbox">
+                {people === null || (loading && !sorted.length) ? (
+                    <p className="cshare-picker-empty">Loading the Den…</p>
+                ) : !sorted.length ? (
+                    <p className="cshare-picker-empty">Nobody by that name.</p>
+                ) : sorted.map((m) => {
+                    const on = value?.alias && m.alias === value.alias;
+                    return (
+                        <button
+                            key={m.id} type="button" role="option" aria-selected={on}
+                            className={`cshare-person${on ? " is-on" : ""}`}
+                            onClick={() => onPick(on ? null : m)}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="cshare-person-av" src={m.avatarUrl} alt="" />
+                            <span className="cshare-person-body">
+                                <b>{m.displayLabel}</b>
+                                <span>@{m.alias} · Lv {m.level}</span>
+                            </span>
+                            {m.relation === "friends" ? <span className="cshare-person-tag">friend</span> : null}
+                            {on ? <span className="cshare-person-check" aria-hidden="true">✓</span> : null}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function Art({ url, name, size = 46 }) {
     if (!url) return <span className="cshare-art is-empty" style={{ width: size, height: size }} aria-hidden="true">🎨</span>;
     // eslint-disable-next-line @next/next/no-img-element
@@ -41,7 +105,7 @@ export function CreationShareHub({ onChanged }) {
     const [err, setErr] = useState(null);
     const [note, setNote] = useState(null);
     const [giving, setGiving] = useState(null); // creation being offered
-    const [handle, setHandle] = useState("");
+    const [pick, setPick] = useState(null);     // member chosen to receive it
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/creations/share", { cache: "no-store" }).catch(() => null);
@@ -124,7 +188,7 @@ export function CreationShareHub({ onChanged }) {
                         <div key={c.id} className="cshare-row">
                             <Art url={c.url} name={c.name} />
                             <span className="cshare-name">{c.name}</span>
-                            <button type="button" className="btn-ghost cshare-give" onClick={() => { setGiving(giving?.id === c.id ? null : c); setHandle(""); setErr(null); }}>
+                            <button type="button" className="btn-ghost cshare-give" onClick={() => { setGiving(giving?.id === c.id ? null : c); setPick(null); setErr(null); }}>
                                 {giving?.id === c.id ? "✕ Cancel" : "🎁 Share a copy"}
                             </button>
                         </div>
@@ -136,20 +200,17 @@ export function CreationShareHub({ onChanged }) {
                                 single share, so this doesn&apos;t use up any of the others. Their copy can&apos;t be passed on again,
                                 and yours stays on your farm.
                             </div>
-                            <label className="cshare-label" htmlFor="cshare-handle">Share with which member?</label>
-                            <input
-                                id="cshare-handle" className="cshare-input" value={handle} autoComplete="off"
-                                onChange={(e) => setHandle(e.target.value)} placeholder="@handle"
-                            />
+                            <label className="cshare-label">Share with which member?</label>
+                            <MemberPicker value={pick} onPick={setPick} />
                             <button
                                 type="button" className="btn-gold" style={{ width: "100%", marginTop: 8 }}
-                                disabled={!handle.trim() || busy === `give${giving.id}`}
+                                disabled={!pick?.alias || busy === `give${giving.id}`}
                                 onClick={async () => {
-                                    const r = await post({ action: "offer", creationId: giving.id, toAlias: handle.trim() }, `give${giving.id}`);
-                                    if (r?.ok) { setNote(`🎁 Offered “${giving.name}” to ${r.to}.`); setGiving(null); setHandle(""); }
+                                    const r = await post({ action: "offer", creationId: giving.id, toAlias: pick.alias }, `give${giving.id}`);
+                                    if (r?.ok) { setNote(`🎁 Offered “${giving.name}” to ${r.to}.`); setGiving(null); setPick(null); }
                                 }}
                             >
-                                {busy === `give${giving.id}` ? "Sending…" : "Offer it"}
+                                {busy === `give${giving.id}` ? "Sending…" : pick ? `Offer it to ${pick.displayLabel}` : "Pick someone above"}
                             </button>
                         </div>
                     ) : null}
@@ -169,6 +230,55 @@ export function CreationShareHub({ onChanged }) {
                 </div>
             ) : null}
         </div>
+    );
+}
+
+// ── The way in ───────────────────────────────────────────────────────────────────────────────────────────────
+// The hub used to be mounted inline, far below the farm scene — you had to scroll past the whole field, the
+// controls and the seed bag to find out someone had offered you art. It lives behind this button instead: it
+// sits up with the farm tabs, carries a count badge when something is waiting, and opens as a sheet.
+export function CreationShareLauncher() {
+    const [open, setOpen] = useState(false);
+    const [counts, setCounts] = useState(null);
+
+    const refresh = useCallback(async () => {
+        const r = await fetch("/api/marketplace/creations/share", { cache: "no-store" }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        setCounts(d ? {
+            waiting: (d.incomingGifts?.length || 0) + (d.incomingRequests?.length || 0),
+            any: Boolean(d.mine?.length || d.incomingGifts?.length || d.incomingRequests?.length || d.outgoing?.length),
+        } : null);
+    }, []);
+    useEffect(() => { refresh(); }, [refresh]);
+
+    // Nothing made, nothing offered, nothing asked — don't put a dead button on the farm.
+    if (!counts?.any) return null;
+    const waiting = counts.waiting;
+
+    return (
+        <>
+            <button
+                type="button" className={`farm-artbtn${waiting ? " has-attn" : ""}`} onClick={() => setOpen(true)}
+                title={waiting ? `${waiting} waiting on you` : "Share your creations"}
+            >
+                <span aria-hidden="true">🎨</span>Art
+                {waiting ? <span className="farm-tab-badge">{waiting}</span> : null}
+            </button>
+            {open ? (
+                <div className="cshare-sheet-wrap" role="dialog" aria-modal="true" aria-label="Creation sharing">
+                    <button type="button" className="cshare-sheet-scrim" aria-label="Close" onClick={() => setOpen(false)} />
+                    <div className="cshare-sheet">
+                        <div className="cshare-sheet-head">
+                            <strong>🎨 Your art</strong>
+                            <button type="button" className="cshare-sheet-x" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+                        </div>
+                        <div className="cshare-sheet-body">
+                            <CreationShareHub onChanged={refresh} />
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+        </>
     );
 }
 

@@ -11,7 +11,7 @@ import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
-import { CreationShareHub } from "@/components/CreationShare";
+import { CreationShareLauncher } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
@@ -852,6 +852,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @media (hover: hover) { .farm-viewtabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0e0; } }
                 .farm-viewtabs button.has-attn:not(.on) { box-shadow: inset 0 0 0 1px rgba(224,67,63,0.55); }
                 .farm-viewtabs .farm-tab-badge { font-size: 10px; font-weight: 900; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #e0433f; color: #fff; display: inline-grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.45); animation: farmTabPulse 1.6s ease-in-out infinite; }
+                /* The Art button opens a sheet rather than switching views, so it doesn't take an equal third of
+                   the row and it reads gold instead of green — an action sitting beside the three places. */
+                .farm-viewtabs .farm-artbtn { flex: 0 0 auto; padding: 9px 12px; color: #ffd75e; }
+                @media (hover: hover) { .farm-viewtabs .farm-artbtn:hover { background: rgba(255,215,94,0.12); color: #ffe9a8; } }
                 @keyframes farmTabPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
             `}</style>
 
@@ -910,6 +914,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                         </button>
                     );
                 })}
+                {/* Creation sharing sits with the tabs, not a thousand pixels below the field: gifts waiting on
+                    you and people asking for your art are the whole point, and they were previously invisible
+                    unless you scrolled past the entire farm. Badges when something needs an answer. */}
+                {farm.mine ? <CreationShareLauncher /> : null}
             </div>
 
             {farm.mine && liveNudge > 0 && view !== "garden" ? (
@@ -1138,16 +1146,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             ) : null}
 
-            {/* Creation sharing: gifts waiting on you, people asking for copies of your art, and the one-time
-                share picker. Mounted HERE because it must be impossible to miss — it first went into
-                DecoManager, which turned out never to be rendered at all, so the requests were invisible. */}
-            {farm.mine ? (
-                <div style={{ padding: "0 12px 10px" }}>
-                    {/* No onChanged: the hub refetches its own state after every action, and a newly received
-                        decoration shows up in the inventory on the next farm load. */}
-                    <CreationShareHub />
-                </div>
-            ) : null}
 
             {/* Decorate DOCK: bottom tray you drag decorations out of, onto the (still-visible) farm scene. */}
             {decorating && canDecorate && farm.mine && farm.decorations ? (
