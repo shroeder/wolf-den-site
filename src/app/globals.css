@@ -12047,3 +12047,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .tw-enemy-tag { position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 9.5px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; padding: 1.5px 6px; border-radius: 999px; pointer-events: none; }
 .tw-enemy-tag.is-elite { background: rgba(185,140,255,0.92); color: #20122e; }
 .tw-enemy-tag.is-chief { background: rgba(224,91,106,0.95); color: #fff; }
+
+/* ── Skirmish timing swing (reuses the .tw-strike bands from the golem) ───────────────────────────────────── */
+.tw-swing { width: min(92vw, 380px); background: #14141b; border: 1px solid #2a2f37; border-radius: 16px; padding: 18px 16px; text-align: center; }
+.tw-swing-title { font-weight: 900; font-size: 1.02rem; margin-bottom: 12px; }
+.tw-swing-skip { margin-top: 8px; background: none; border: none; color: #8b93a0; font-size: 0.8rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.tw-duel-capped { margin: 4px 0 0; font-size: 0.76rem; color: #8b93a0; }

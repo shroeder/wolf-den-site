@@ -605,7 +605,7 @@ function simulateDuel({ myPower, foePower, myCrit = 0, myCritPow = 30 }) {
 // Your FIRST duel of a raid always drops a low-tier chest (thanks for coming down to play). Wins drain the wave
 // (which just refills — the raid runs its full timer).
 // enemyId targets a specific foe on the shared roster; the duel claims it, then drops it on a win.
-export async function duelRaidEnemy(buyerId, eventId, enemyId = null) {
+export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = null) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // started_at is needed by the XP budget below — XP events carry no raid ref, so "this raid" means "since it
     // started". Without it the window falls back to an hour and bleeds a previous raid's XP into this one's cap.
@@ -627,6 +627,12 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null) {
     const critP = (stats.crit_power || 0) + (ps.crit_power || 0) || 30;
     let myPower = 6 + might * 0.9 + ferocity * 0.6;
     myPower *= 1 + (util.raidDmg || 0) / 100;
+    // TIMING. Graded server-side from the reported distance-from-centre and clamped, so a tampered client can't
+    // claim PIXEL PERFECT every swing. A clean strike roughly doubles your power for the exchange; a glancing one
+    // halves it — which is what makes the fight skill rather than a stat roll.
+    const grade = dist == null ? { key: null, label: null, mult: 1 } : gradeForDist(Math.min(0.5, Math.max(0, Number(dist))));
+    const timingMult = dist == null ? 1 : 0.5 + (grade.mult / STRIKE_GRADES[0].mult) * 1.5; // glancing 0.65x → pixel 2.0x
+    myPower *= timingMult;
     const type = TOWN_EVENT_TYPES[ev.kind] || {};
     const sim = simulateDuel({ myPower, foePower: type.duelPower || 16, myCrit: critC, myCritPow: critP });
     // Record participation (damage this exchange = foe HP removed; hits = duels won — powers the leaderboard).
@@ -707,6 +713,7 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null) {
     return {
         ok: true, win: sim.win, events: sim.events, reward: { xp, coin, loot }, firstDuel, hp, wave,
         wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️", cleared,
+        grade: grade.key, gradeLabel: grade.label,
         // Tell the client the spoils are done, so it can say so instead of silently paying zero.
         capped: cappedGold || cappedXp,
     };

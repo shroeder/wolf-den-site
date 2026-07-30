@@ -217,6 +217,50 @@ function RaidHUD({ ev, kills, onExpire }) {
 }
 
 // A duel: animate the back-and-forth exchange (two HP bars, damage ticks), then the win/lose + reward.
+// The skirmish timing swing: a marker ping-pongs the banded bar, you tap, and how close to centre you land
+// decides the blow. Identical bands to the golem's strike and the Forge anvil, so the skill transfers.
+function SwingBar({ onSwing, onCancel }) {
+    const [marker, setMarker] = useState(0.5);
+    const markerRef = useRef(0.5);
+    const firedRef = useRef(false);
+    const SWEEP_MS = 950; // a touch faster than the golem — skirmish foes are meant to feel scrappy
+
+    useEffect(() => {
+        let raf = 0;
+        const t0 = performance.now();
+        const loop = (t) => {
+            const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
+            const pos = phase <= 1 ? phase : 2 - phase;
+            markerRef.current = pos; setMarker(pos);
+            raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+    }, []);
+
+    const fire = () => {
+        if (firedRef.current) return;
+        firedRef.current = true;
+        onSwing(Math.abs(markerRef.current - 0.5));
+    };
+
+    return (
+        <div className="tw-duel" role="presentation" onClick={onCancel}>
+            <div className="tw-swing" onClick={(e) => e.stopPropagation()}>
+                <div className="tw-swing-title">⚔️ Time your strike</div>
+                <div className="tw-strike-bar" aria-hidden="true">
+                    <span className="tw-strike-band is-good" />
+                    <span className="tw-strike-band is-great" />
+                    <span className="tw-strike-band is-perfect" />
+                    <span className="tw-strike-marker" style={{ left: `${marker * 100}%` }} />
+                </div>
+                <button type="button" className="tw-strike-btn" onClick={fire}>Strike!</button>
+                <button type="button" className="tw-swing-skip" onClick={onCancel}>Back off</button>
+            </div>
+        </div>
+    );
+}
+
 function DuelModal({ duel, youSprite, youFlip, onClose }) {
     const events = duel.events || [];
     const [step, setStep] = useState(0);      // how many events have played
@@ -240,6 +284,10 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
         <div className="tw-duel" role="dialog" aria-label="Duel">
             <div className="tw-duel-card" onClick={(e) => e.stopPropagation()}>
                 <div className="tw-duel-title">⚔️ {duel.name}</div>
+                {/* Acknowledge the swing — a timing game with no feedback on the timing is just a button. */}
+                {duel.gradeLabel ? <div className={`tw-strike-grade is-${duel.grade}`}>{duel.gradeLabel}</div> : null}
+                {/* Spoils exhausted for this raid: say so, rather than silently paying zero. */}
+                {duel.capped ? <div className="tw-duel-capped">Spoils spent for this raid — kills still count for badges &amp; quests.</div> : null}
                 <div className="tw-duel-arena">
                     <div className={`tw-duel-side${pop?.side === "foe" && !done ? " is-hit" : ""}`}>
                         {youSprite ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={youSprite} alt="You" style={{ transform: youFlip ? "scaleX(-1)" : "none" }} /> : <span className="tw-duel-emoji">🐺</span>}
@@ -666,16 +714,26 @@ export default function TownClient({ initial }) {
     // Apply it to THAT enemy's HP bar with a floating number; kill it when its bar empties; recap on the win.
     // Click a foe → a back-and-forth DUEL (like the ship battles). The server resolves the exchange; we open the
     // duel modal to animate it, then reward. On a win the foe falls + the field resyncs (fresh foes keep coming).
-    const startDuel = useCallback(async (enemyId, foeArt) => {
-        const ev = state?.event; if (!ev || raidCdRef.current || duel) return;
+    // Tapping a foe opens the TIMING swing; the duel only resolves once they've taken their shot, so a kill is
+    // skill rather than a stat roll. Same bands as the Forge anvil and the golem, so the feel carries across.
+    const [swing, setSwing] = useState(null); // { enemyId, foeArt } while the bar is up
+    const startDuel = useCallback((enemyId, foeArt) => {
+        const ev = state?.event; if (!ev || raidCdRef.current || duel || swing) return;
+        setSwing({ enemyId, foeArt: foeArt || null });
+    }, [state?.event, duel, swing]);
+
+    // Resolve the duel with the swing's distance-from-centre; the server grades and clamps it.
+    const resolveSwing = useCallback(async (enemyId, foeArt, dist) => {
+        const ev = state?.event; if (!ev) return;
+        setSwing(null);
         raidCdRef.current = true; setRaidCd(true);
         setTimeout(() => { raidCdRef.current = false; setRaidCd(false); }, 700);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id, enemyId }) }).then((x) => x.json()).catch(() => null);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id, enemyId, dist }) }).then((x) => x.json()).catch(() => null);
         if (!r?.ok) return; // too_fast / no_event
         if (r.win && typeof r.wins === "number") setRaidKills(r.wins);
         if (r.win && r.reward) setRaidHaul((h) => ({ xp: h.xp + (r.reward.xp || 0), gold: h.gold + (r.reward.coin || 0), chests: h.chests + ((r.reward.loot || []).length || 0) }));
-        setDuel({ enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] } });
-    }, [state?.event, duel]);
+        setDuel({ enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] }, grade: r.grade || null, gradeLabel: r.gradeLabel || null, capped: Boolean(r.capped), cleared: r.cleared || null });
+    }, [state?.event]);
     const closeDuel = useCallback(() => {
         const d = duel; setDuel(null);
         if (d?.win) {
@@ -1399,6 +1457,7 @@ export default function TownClient({ initial }) {
             {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
             {/* Raid victory recap */}
+            {swing ? <SwingBar onSwing={(d) => resolveSwing(swing.enemyId, swing.foeArt, d)} onCancel={() => setSwing(null)} /> : null}
             {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
 
             {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}
