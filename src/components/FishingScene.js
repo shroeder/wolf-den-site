@@ -9,7 +9,8 @@ import { createPortal } from "react-dom";
 //   CAST   tap once. The server has already decided what's down there.
 //   BITE   the line twitches at a moment you can't predict. Tap again.
 //   REEL   the fish swims up and down on its own. HOLD to raise YOUR BAR, release and it falls. Keep the fish
-//          inside the bar. Time-in-bar IS the score, and the score decides how BIG the fish is.
+//          inside the bar. Time-in-bar is your reel score — shown live, but it does NOT decide the size.
+//          Size is luck; a good reel only floors the bad end of it (see weightFor in fishing.js).
 //
 // The roles were the other way round at first — you drove a hook and the zone drifted — and it read as broken:
 // "the green bar just goes up and down without any input from me". A fish that swims itself is what everyone
@@ -220,8 +221,9 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
     const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
-    // The score is still computed and still sent — it just isn't shown. Nothing on this screen previews the
-    // result any more; scoreOf runs once, at the end, in the rAF loop.
+    // Shown live, and it's the same number the server receives — but it no longer predicts the size, so it
+    // reads as "how am I doing" rather than "here is what you've won".
+    const scoreNow = scoreOf(inRef.current, totalRef.current);
     const warming = elapsed < REEL_WARMUP_MS;
 
     return (
@@ -250,11 +252,17 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                     {warming ? "get ready…" : inside ? "CAUGHT!" : "chase it!"}
                 </div>
             </div>
-            {/* NO SCORE METER. There was a live percentage here and it was the whole problem: you
-                watched your result accumulate, so the reveal had nothing left to tell you. Reeling well now
-                only puts a floor under the size (see weightFor) and you find out what you caught when it
-                surfaces. The rod itself still says whether the fish is in your bar — that's how you play,
-                not how you're scoring. */}
+            {/* REEL — how well you're holding the fish, shown live. What's hidden is the RELATIONSHIP: this
+                used to map 1:1 onto the size, so watching it was watching your result accumulate and the
+                reveal had nothing left to say. Now the size is luck and a good reel only floors the bad end
+                (see weightFor), so this is honest feedback on your handling and not a spoiler. */}
+            <div className="fish-strain-row">
+                <span className="fish-strain-label">REEL</span>
+                <div className="fish-strain">
+                    <div className="fish-strain-fill" style={{ width: `${scoreNow * 100}%` }} />
+                </div>
+                <span className="fish-strain-pct">{Math.round(scoreNow * 100)}%</span>
+            </div>
             <div className="fish-timer"><div className="fish-timer-fill" style={{ width: `${left * 100}%` }} /></div>
             <button type="button" className="fish-hold-btn" onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
                 HOLD TO REEL
