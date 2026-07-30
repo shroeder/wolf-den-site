@@ -170,12 +170,19 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
         [kind, type.name, spawnHp, type.rewardGold, String(type.durationMin), JSON.stringify({ silent: Boolean(silent), boss: Boolean(type.boss), enemies: type.enemies || 6, minMs: silent ? MIN_ACTIVE_SILENT_MS : MIN_ACTIVE_MS, wave: 1 })]
     ).catch(() => null);
     if (!row) return { ok: false, error: "spawn_failed" };
+    // Rally the whole pack — browser push + phone-app push, both deep-linking to the Town. These MUST be
+    // awaited: on Vercel the handler's response freezes the instance, so a fire-and-forget push is killed
+    // mid-flight and nobody ever hears about the raid. The send counts ride back out so the cron response
+    // (and the owner's spawn button) actually shows whether anyone was reached.
+    let push = null;
     if (!silent) {
-        // Rally the whole pack — browser push + phone-app push, both deep-linking to the Town.
-        broadcastWebPush({ title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch(() => {});
-        broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch(() => {});
+        const [web, app] = await Promise.all([
+            broadcastWebPush({ title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
+            broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
+        ]);
+        push = { web, app };
     }
-    return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent) };
+    return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent), push };
 }
 
 // Owner/admin: force-end the active event (for testing) — closes it out so a new one can be spawned. No reward
@@ -206,7 +213,7 @@ export async function runTownHoursTick() {
     const kinds = Object.keys(TOWN_EVENT_TYPES);
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     const res = await spawnTownEvent(kind);
-    return { spawned: res.ok ? kind : null, error: res.error || null };
+    return { spawned: res.ok ? kind : null, push: res.push || null, error: res.error || null };
 }
 
 // Per-15-min spawn chance by CENTRAL hour — concentrated in the evening (~5–8pm CT) when the most members are
@@ -234,7 +241,7 @@ export async function maybeSpawnRandomEvent() {
     const kinds = Object.keys(TOWN_EVENT_TYPES);
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     const res = await spawnTownEvent(kind);
-    return { spawned: res.ok ? kind : null, hour: h, chance, error: res.error || null };
+    return { spawned: res.ok ? kind : null, hour: h, chance, push: res.push || null, error: res.error || null };
 }
 
 // Land an attack on the raid. `move` is the timed-strike tier (weak/normal/good/perfect) or "power" (ability).
@@ -307,7 +314,8 @@ async function resolveTownEvent(eventId, outcome) {
             await maybeGrantRaidPet(h.buyer_id, { boss: true, killed }).catch(() => {});
         }
         if (!ev.meta?.silent) {
-            broadcastWebPush({ title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+            // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
+            await broadcastWebPush({ title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
         }
         return;
     }
@@ -318,7 +326,8 @@ async function resolveTownEvent(eventId, outcome) {
         await maybeGrantRaidPet(h.buyer_id, { boss: false, killed: false }).catch(() => {});
     }
     if (!ev.meta?.silent) {
-        broadcastWebPush({ title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+        // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
+        await broadcastWebPush({ title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
     }
 }
 
