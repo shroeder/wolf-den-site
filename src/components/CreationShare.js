@@ -97,7 +97,7 @@ export function CreationShareHub({ onChanged }) {
                     <Art url={q.url} name={q.name} size={54} />
                     <div className="cshare-body">
                         <strong>{q.asker} is asking for a copy</strong>
-                        <span>of your “{q.name}”. Sharing it uses your <b>one</b> share for this piece.</span>
+                        <span>of your “{q.name}”. Sharing uses up <b>this piece&apos;s</b> one and only share — your other creations aren&apos;t affected.</span>
                     </div>
                     <div className="cshare-actions">
                         <button type="button" className="btn-gold" disabled={busy === `q${q.id}`} onClick={async () => {
@@ -119,7 +119,7 @@ export function CreationShareHub({ onChanged }) {
 
             {shareable.length ? (
                 <div className="cshare-group">
-                    <div className="cshare-grouphead">Share a creation<span>Each piece can be passed on once</span></div>
+                    <div className="cshare-grouphead">Share a creation<span>Every piece gets its own single share</span></div>
                     {shareable.map((c) => (
                         <div key={c.id} className="cshare-row">
                             <Art url={c.url} name={c.name} />
@@ -132,8 +132,9 @@ export function CreationShareHub({ onChanged }) {
                     {giving ? (
                         <div className="cshare-give-panel">
                             <div className="cshare-warn">
-                                🔒 You can share “{giving.name}” with <strong>one</strong> member, once. Their copy can&apos;t be passed on
-                                again, and yours stays on your farm.
+                                🔒 <strong>“{giving.name}”</strong> can go to one member, once — every creation you make gets its own
+                                single share, so this doesn&apos;t use up any of the others. Their copy can&apos;t be passed on again,
+                                and yours stays on your farm.
                             </div>
                             <label className="cshare-label" htmlFor="cshare-handle">Share with which member?</label>
                             <input
