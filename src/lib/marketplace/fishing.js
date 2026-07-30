@@ -270,20 +270,23 @@ function rollSpecies(rareTilt = 0) {
 // It used to be a straight blend — 62% your reel, 38% a pre-rolled number — which made the size a foregone
 // conclusion: the live meter counted up during the reel and the reveal just restated it. Nothing to find out.
 //
-// Now the pre-rolled `roll` (uniform, committed at cast time so it can't be rerolled) is SHAPED by how well
-// you reeled: t = roll^(1/(0.6 + 2.4·q)). A bad reel bends the distribution toward the small end, a great one
-// bends it toward the big end, but every outcome stays reachable from every reel. Average share of the range:
+// Reeling well then shaped the whole distribution, which was too much the other way — it made a good reel the
+// main author of the size, just probabilistically instead of directly.
 //
-//     reel 0%  → ~0.38        reel 60% → ~0.60        reel 100% → ~0.75
+// What it does now: the size is the pre-rolled `roll` (uniform, committed at cast so it can't be rerolled) and
+// nothing else. A good reel only puts a FLOOR under it — a perfect reel guarantees you won't land in the
+// bottom third of the range, and does nothing whatsoever to the top end. Your ceiling is luck, always. Reeling
+// well just means fewer embarrassments.
 //
-// So skill pays over a season of fishing, and any single cast can still surprise you in both directions —
-// a perfect reel that lands a tiddler, or a sloppy one that hauls up the biggest of its kind you've seen.
-const SIZE_CURVE = 1.6;          // applied after shaping, so near-maximum specimens stay genuinely rare
+// It is also deliberately INVISIBLE: no live score, no percentage, no meter. You fish; you find out what you
+// caught when it surfaces. Watching a number tick up was what killed the reveal in the first place.
+const SIZE_CURVE = 1.6;          // near-maximum specimens stay genuinely rare
+const REEL_FLOOR = 0.35;         // the most a flawless reel can lift the bottom, before the curve
 function weightFor(species, roll, quality) {
     const [min, max] = species.lb;
-    const q = clamp01(quality);
-    const shaped = Math.pow(clamp01(roll), 1 / (0.6 + 2.4 * q));
-    const lb = min + (max - min) * Math.pow(shaped, SIZE_CURVE);
+    const floor = clamp01(quality) * REEL_FLOOR;
+    const t = Math.max(clamp01(roll), floor);
+    const lb = min + (max - min) * Math.pow(t, SIZE_CURVE);
     return lb < 10 ? Math.round(lb * 100) / 100 : round1(lb);
 }
 // Where this fish sits in its species' weight range (0..1) — drives payout and the "monster!" callouts.

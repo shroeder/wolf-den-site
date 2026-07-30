@@ -220,8 +220,8 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
     const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
-    // Same function the server gets. The bar is a real preview now, not a different number.
-    const scoreNow = scoreOf(inRef.current, totalRef.current);
+    // The score is still computed and still sent — it just isn't shown. Nothing on this screen previews the
+    // result any more; scoreOf runs once, at the end, in the rAF loop.
     const warming = elapsed < REEL_WARMUP_MS;
 
     return (
@@ -250,16 +250,11 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                     {warming ? "get ready…" : inside ? "CAUGHT!" : "chase it!"}
                 </div>
             </div>
-            {/* Labelled REEL, not SIZE. It used to be the size, literally — you watched the number you were
-                going to get count up, and the reveal just restated it. Your reel now shifts the ODDS of a big
-                one, so this is how well you're doing, not what you've already won. */}
-            <div className="fish-strain-row">
-                <span className="fish-strain-label">REEL</span>
-                <div className="fish-strain">
-                    <div className="fish-strain-fill" style={{ width: `${scoreNow * 100}%` }} />
-                </div>
-                <span className="fish-strain-pct">{Math.round(scoreNow * 100)}%</span>
-            </div>
+            {/* NO SCORE METER. There was a live percentage here and it was the whole problem: you
+                watched your result accumulate, so the reveal had nothing left to tell you. Reeling well now
+                only puts a floor under the size (see weightFor) and you find out what you caught when it
+                surfaces. The rod itself still says whether the fish is in your bar — that's how you play,
+                not how you're scoring. */}
             <div className="fish-timer"><div className="fish-timer-fill" style={{ width: `${left * 100}%` }} /></div>
             <button type="button" className="fish-hold-btn" onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
                 HOLD TO REEL
