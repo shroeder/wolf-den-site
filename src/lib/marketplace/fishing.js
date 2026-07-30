@@ -37,44 +37,53 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 //          some only in a storm. Nothing else in the game rewards you for playing at 11pm in the rain.
 const F = (id, name, emoji, rarity, weight, cm, gold, xp, extra = {}) => ({ id, name, emoji, rarity, weight, cm, gold, xp, minVoyages: 0, sky: null, ...extra });
 
-// PAYOUTS ARE DELIBERATELY TINY. They were cut by ~75% after the first pass: a day of fishing paid 150-300
-// gold for two minutes of tapping, which is real money next to a daily quest at 110-140 and made the whole
-// feature read as a gold faucet. What you're playing for is the LOG and the record board, so the gold is now
-// pocket change — a mythic pays about what a single sailing daily does, and a sardine buys nothing at all.
+// PAYOUT TUNING, and the story behind these numbers so nobody re-derives them from scratch:
+//
+// The first pass paid 150-300 gold a day. That got cut by 75% on the belief that fishing had handed out a
+// 2,000-gold catch — but the ledger showed the catches themselves paid 4 and 27 gold. The jackpot was two
+// one-time BADGES (fish_first + fish_record_holder, 120 each) firing on the very first cast. The cut was made
+// on a false premise and left a full day of fishing worth 30-58 gold, under half of one daily quest.
+//
+// These sit at roughly HALF the original: a day lands around 60-120 gold, a mythic near 300. Still well under
+// a daily quest at 110-140, so it can't be farmed as an income source, but a legendary is worth landing and a
+// mythic — which shows up about twice a month — actually feels like an event.
 export const FISH = [
     // ── COMMON · the harbour regulars (always available, so a brand-new member always catches something) ──
-    F("fish_sardine", "Sardine", "🐟", "common", 100, [8, 22], 2, 2),
-    F("fish_perch", "Silver Perch", "🐟", "common", 90, [14, 38], 2, 2),
-    F("fish_mackerel", "Mackerel", "🐟", "common", 80, [20, 46], 3, 3),
-    F("fish_crab", "Rock Crab", "🦀", "common", 60, [9, 26], 3, 3),
-    F("fish_squid", "Bay Squid", "🦑", "common", 55, [18, 55], 4, 3),
+    F("fish_sardine", "Sardine", "🐟", "common", 100, [8, 22], 4, 4),
+    F("fish_perch", "Silver Perch", "🐟", "common", 90, [14, 38], 4, 4),
+    F("fish_mackerel", "Mackerel", "🐟", "common", 80, [20, 46], 6, 6),
+    F("fish_crab", "Rock Crab", "🦀", "common", 60, [9, 26], 6, 6),
+    F("fish_squid", "Bay Squid", "🦑", "common", 55, [18, 55], 8, 6),
 
     // ── RARE · worth stopping for ──
-    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 46, [26, 62], 7, 5),
-    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 40, [10, 24], 6, 4),
-    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 34, [16, 40], 8, 5),
-    F("fish_lobster", "Blue Lobster", "🦞", "rare", 26, [22, 58], 10, 7),
-    F("fish_octopus", "Reef Octopus", "🐙", "rare", 24, [30, 90], 9, 6, { minVoyages: 4 }),
-    F("fish_moonfish", "Moonfish", "🌙", "rare", 22, [24, 70], 10, 7, { sky: ["night", "aurora"], minVoyages: 3 }),
+    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 46, [26, 62], 14, 10),
+    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 40, [10, 24], 12, 8),
+    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 34, [16, 40], 16, 10),
+    F("fish_lobster", "Blue Lobster", "🦞", "rare", 26, [22, 58], 20, 14),
+    F("fish_octopus", "Reef Octopus", "🐙", "rare", 24, [30, 90], 18, 12, { minVoyages: 4 }),
+    F("fish_moonfish", "Moonfish", "🌙", "rare", 22, [24, 70], 20, 14, { sky: ["night"], minVoyages: 3 }),
 
     // ── EPIC · a story when you land one ──
-    F("fish_swordfish", "Swordfish", "🗡️", "epic", 16, [90, 240], 20, 13, { minVoyages: 8 }),
-    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 15, [80, 220], 18, 12, { minVoyages: 8 }),
-    F("fish_manta", "Manta Ray", "🪁", "epic", 11, [120, 340], 23, 15, { minVoyages: 12 }),
-    F("fish_stormpike", "Storm Pike", "⚡", "epic", 10, [60, 160], 24, 16, { sky: ["storm"], minVoyages: 6 }),
-    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 9, [18, 52], 22, 14, { sky: ["night", "dusk"], minVoyages: 10 }),
+    F("fish_swordfish", "Swordfish", "🗡️", "epic", 16, [90, 240], 40, 26, { minVoyages: 8 }),
+    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 15, [80, 220], 36, 24, { minVoyages: 8 }),
+    F("fish_manta", "Manta Ray", "🪁", "epic", 11, [120, 340], 46, 30, { minVoyages: 12 }),
+    F("fish_stormpike", "Storm Pike", "⚡", "epic", 10, [60, 160], 48, 32, { sky: ["storm"], minVoyages: 6 }),
+    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 9, [18, 52], 44, 28, { sky: ["night", "dusk"], minVoyages: 10 }),
 
     // ── LEGENDARY · the deep ──
-    F("fish_shark", "Great White", "🦈", "legendary", 5, [280, 620], 48, 33, { minVoyages: 16 }),
-    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 4, [190, 330], 44, 30, { sky: ["fog"], minVoyages: 14 }),
-    F("fish_marlin", "Black Marlin", "🐟", "legendary", 4, [240, 500], 52, 36, { minVoyages: 20 }),
-    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 3, [110, 200], 60, 42, { minVoyages: 24 }),
+    F("fish_shark", "Great White", "🦈", "legendary", 5, [280, 620], 96, 66, { minVoyages: 16 }),
+    // Fog + overcast, not fog alone. Open-Meteo only reports fog for WMO 45/48, which at the Den is a handful
+    // of autumn mornings a year — this fish was effectively unobtainable. Overcast/drizzle is the same grey
+    // weather to look at and happens often enough for a legendary to be a real chase rather than a lottery.
+    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 4, [190, 330], 88, 60, { sky: ["fog", "overcast"], minVoyages: 14 }),
+    F("fish_marlin", "Black Marlin", "🐟", "legendary", 4, [240, 500], 104, 72, { minVoyages: 20 }),
+    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 3, [110, 200], 120, 84, { minVoyages: 24 }),
 
     // ── MYTHIC · four of these exist in the whole ocean ──
-    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 2, [900, 2600], 105, 78, { minVoyages: 30 }),
-    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 1.5, [400, 1200], 120, 90, { sky: ["storm", "night"], minVoyages: 34 }),
-    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 1, [520, 1800], 140, 102, { minVoyages: 40 }),
-    F("fish_starfish", "Fallen Star", "⭐", "mythic", 1, [30, 90], 150, 114, { sky: ["aurora", "night"], minVoyages: 26 }),
+    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 2, [900, 2600], 210, 156, { minVoyages: 30 }),
+    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 1.5, [400, 1200], 240, 180, { sky: ["storm", "night"], minVoyages: 34 }),
+    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 1, [520, 1800], 280, 204, { minVoyages: 40 }),
+    F("fish_starfish", "Fallen Star", "⭐", "mythic", 1, [30, 90], 300, 228, { sky: ["night"], minVoyages: 26 }),
 ];
 
 const BY_ID = new Map(FISH.map((f) => [f.id, f]));
@@ -101,9 +110,9 @@ const RARE_TILT_CAP = 0.9;
 const SIZE_FROM_QUALITY = 0.62;
 const SIZE_FROM_ROLL = 0.38;
 // Fragment/chest sprinkles, so fishing feeds the existing forge loop rather than being a closed economy.
-// Cut back with the gold: a gold chest on every mythic was the single most valuable thing in the feature.
-const FRAGMENT_CHANCE = { epic: 0.10, legendary: 0.22, mythic: 0.45 };
-const CHEST_ON_MYTHIC = "iron";
+// Halfway back up with the gold. A mythic surfaces roughly twice a month, so it keeps the gold chest.
+const FRAGMENT_CHANCE = { epic: 0.14, legendary: 0.30, mythic: 0.60 };
+const CHEST_ON_MYTHIC = "gold";
 const CHEST_ON_RECORD_LEGENDARY = "wooden";  // a personal best on a legendary+ also drops a chest
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -137,7 +146,11 @@ export const castsPerDay = (angling = 0) => Math.min(CASTS_MAX, CASTS_PER_DAY + 
 //
 // One shop, one sky, everybody fishing under the same weather. Nothing the client sends is trusted any more,
 // and nobody is gated behind a browser permission they declined.
-const WEATHER_SKIES = new Set(["storm", "fog", "aurora", "overcast", "clearday", "sunrise", "sunset", "goldenhour"]);
+// Exactly the sky types sky.js can actually return. "aurora" used to be listed here and on two fish, but
+// pickSky has no branch that produces it — it was a gate on a value the weather service never emits. Both of
+// those fish also allowed "night", so they were still catchable and nothing looked broken; the aurora half was
+// simply dead. Anything added here must correspond to a real pickSky output or it silently gates a fish out.
+const WEATHER_SKIES = new Set(["storm", "fog", "overcast", "clearday", "sunrise", "sunset", "goldenhour"]);
 
 // Time-of-day half — pure, synchronous, always available even if the weather service is down.
 function clockSkies() {
@@ -438,11 +451,21 @@ export async function checkFishingBadges(buyerId) {
     // A fish within 2% of its species maximum — a genuinely perfect specimen.
     const trophy = FISH.some((f) => { const e = log[f.id]; return e && Number(e.best) >= f.cm[1] * 0.98; });
     if (trophy) await grantEventBadge(buyerId, "fish_trophy").catch(() => {});
-    // Holding the Den record for any species right now.
+    // Holding the Den record for any species right now — but only where a record was actually CONTESTED.
+    //
+    // On an empty board the first person to catch anything automatically "holds its record", so this secret
+    // prestige badge fired on the very first cast of the feature (a 14cm Sardine) and paid out 120 gold for
+    // nothing. Every new member would have got the same freebie. The species now needs catches from at least
+    // two different members before its record means anything.
     const holds = await db.queryOne(
-        `SELECT 1 FROM (
-             SELECT DISTINCT ON (species) species, buyer_id FROM mkt_fish_catch ORDER BY species, cm DESC, caught_at ASC
-         ) t WHERE t.buyer_id = $1 LIMIT 1`,
+        `WITH contested AS (
+             SELECT species FROM mkt_fish_catch GROUP BY species HAVING COUNT(DISTINCT buyer_id) >= 2
+         ), leaders AS (
+             SELECT DISTINCT ON (c.species) c.species, c.buyer_id
+               FROM mkt_fish_catch c JOIN contested x ON x.species = c.species
+              ORDER BY c.species, c.cm DESC, c.caught_at ASC
+         )
+         SELECT 1 FROM leaders WHERE buyer_id = $1 LIMIT 1`,
         [buyerId]
     ).catch(() => null);
     if (holds) await grantEventBadge(buyerId, "fish_record_holder").catch(() => {});
