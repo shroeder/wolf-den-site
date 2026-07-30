@@ -284,26 +284,48 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     const cdRef = useRef(false);
     // Keep the bar in sync with the server (others' hits) but let a local strike drop it instantly.
     useEffect(() => { setLocalPct((p) => Math.min(p, ev.hpPct ?? 100)); }, [ev.hpPct]);
+    // ── TIMING STRIKE ────────────────────────────────────────────────────────────────────────────────────────
+    // Same feel as the Forge's anvil: a marker sweeps the bar, you tap, and how close to the centre you land
+    // decides the multiplier. This replaced a 1.3s auto-attack, which meant a raid was really "leave the tab
+    // open and it swings for you" — no skill, and four players alone spiked Vercel to 17x invocations. Standing
+    // in the square still does passive damage server-side, so a tap is a burst on top rather than an obligation.
+    const [marker, setMarker] = useState(0.5);
+    const [grade, setGrade] = useState(null); // { key, label, dmg } — last swing's result
+    const markerRef = useRef(0.5);
+    const swingRef = useRef(false);
+    const SWEEP_MS = 1150;
+
+    useEffect(() => {
+        let raf = 0;
+        const t0 = performance.now();
+        const loop = (t) => {
+            // Ping-pong 0→1→0 so both edges are reachable and the centre is hit twice a sweep.
+            const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
+            const pos = phase <= 1 ? phase : 2 - phase;
+            markerRef.current = pos;
+            setMarker(pos);
+            raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+    }, []);
+
     const strike = useCallback(async () => {
-        if (cdRef.current) return;
-        cdRef.current = true; setTimeout(() => { cdRef.current = false; }, 1000);
-        const r = await onStrike();
+        if (cdRef.current || swingRef.current) return;
+        swingRef.current = true;
+        cdRef.current = true; setTimeout(() => { cdRef.current = false; }, 2600); // matches server throttle
+        const dist = Math.abs(markerRef.current - 0.5);
+        const r = await onStrike(dist);
+        swingRef.current = false;
         if (r?.ok) {
             const id = (fidRef.current += 1);
-            setFloats((f) => [...f.slice(-6), { id, dmg: r.damage, crit: r.crit }]);
+            setFloats((f) => [...f.slice(-6), { id, dmg: r.damage, crit: r.crit, grade: r.grade }]);
             setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 850);
+            setGrade({ key: r.grade, label: r.gradeLabel, dmg: r.damage });
+            setTimeout(() => setGrade(null), 1100);
             if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
         }
     }, [onStrike]);
-    // AUTO-ATTACK while you're at the fight. This used to fire every 1.3s, which meant a raid was really
-    // "leave the tab open and it hits for you" — that's why being present felt mandatory, and four players
-    // alone spiked Vercel to 17x normal invocations. The server-side siege now does the sustained damage
-    // whether or not anyone is watching, so presence is a BONUS burst and can be far less chatty.
-    useEffect(() => {
-        strike();
-        const iv = setInterval(() => strike(), 5000);
-        return () => clearInterval(iv);
-    }, [strike]);
     // The fighters ACTUALLY engaged right now (server: struck in the last 90s) + always you.
     const server = ev.bossFighters || [];
     const roster = [{ id: "you", name: "You", sprite: you?.sprite, flip: you?.flip, isYou: true }, ...server.filter((f) => !you || String(f.id) !== String(you.id)).slice(0, 13)];
@@ -334,7 +356,32 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                     <div className="tw-boss-hpline">Boss HP <b>{Math.max(0, Math.round(localPct))}%</b> · ⚔️ {roster.length} fighting · you dealt {Number(ev.myDamage || 0).toLocaleString()}</div>
                     <div className="tw-boss-hpouter"><span style={{ width: `${Math.max(0, localPct)}%` }} /></div>
                 </div>
-                <div className="tw-boss-hint">⚔️ Your hero is fighting — stay here to keep striking. The whole pack shares its HP; bring it down together!</div>
+
+                {/* The timing strike. Bands mirror the Forge so the skill transfers; the server grades the
+                    swing from the distance we report, so this is presentation only. */}
+                <div className="tw-strike">
+                    <div className="tw-strike-bar" aria-hidden="true">
+                        <span className="tw-strike-band is-good" />
+                        <span className="tw-strike-band is-great" />
+                        <span className="tw-strike-band is-perfect" />
+                        <span className="tw-strike-marker" style={{ left: `${marker * 100}%` }} />
+                    </div>
+                    <button
+                        type="button"
+                        className={`tw-strike-btn${cdRef.current ? " is-cooling" : ""}`}
+                        onClick={strike}
+                    >
+                        ⚔️ Strike
+                    </button>
+                    {grade ? (
+                        <div className={`tw-strike-grade is-${grade.key}`}>{grade.label} · {Number(grade.dmg).toLocaleString()}</div>
+                    ) : null}
+                </div>
+
+                <div className="tw-boss-hint">
+                    ⚔️ Time your strike as the marker crosses the middle — the closer to centre, the bigger the hit.
+                    {ev.siege ? <> Just standing in the square chips away too{ev.myPassive ? <> (<b>{Number(ev.myPassive).toLocaleString()}</b> so far)</> : null}.</> : null}
+                </div>
             </div>
         </div>
     );
@@ -639,10 +686,11 @@ export default function TownClient({ initial }) {
         setTimeout(() => load(), 350);
     }, [duel, load]);
     // BOSS RAID: strike the shared boss. Returns the server result so the modal can float damage + drain the bar.
-    const bossStrike = useCallback(async () => {
+    // `dist` is how far the timing marker was from centre when they swung; the server grades it.
+    const bossStrike = useCallback(async (dist = null) => {
         const ev = state?.event; if (!ev || bossCdRef.current) return null;
-        bossCdRef.current = true; setTimeout(() => { bossCdRef.current = false; }, 1000);
-        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "boss_strike", eventId: ev.id }) }).then((x) => x.json()).catch(() => null);
+        bossCdRef.current = true; setTimeout(() => { bossCdRef.current = false; }, 2500);
+        const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "boss_strike", eventId: ev.id, dist }) }).then((x) => x.json()).catch(() => null);
         if (r?.ok) {
             try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
             if (r.killed) { bossKillRef.current = true; setBossOpen(false); setBossReward(r.reward || { gold: 0, xp: 0 }); setTimeout(() => load(), 500); }
@@ -671,6 +719,19 @@ export default function TownClient({ initial }) {
         }
         wasRaidingRef.current = active;
     }, [state?.event]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // The SERVER-side itemised recap. The old client-accumulated one was skipped entirely on a boss kill, so
+    // anyone who didn't land the final blow saw nothing — no damage, no rewards. This arrives in town state for
+    // everyone who took part, so it also survives a refresh.
+    const [bossRecap, setBossRecap] = useState(null);
+    const seenRecapRef = useRef(null);
+    useEffect(() => {
+        const rc = state?.raidRecap;
+        if (!rc || seenRecapRef.current === rc.eventId) return;
+        seenRecapRef.current = rc.eventId;
+        setBossRecap(rc);
+        setRaidRecap(null); // the server recap supersedes the thin client one
+    }, [state?.raidRecap]);
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "spawn_event", kind }) }).catch(() => {});
@@ -1328,6 +1389,58 @@ export default function TownClient({ initial }) {
             {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
 
             {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}
+
+            {/* Itemised raid wrap-up: what YOU dealt and earned, plus the full damage board. */}
+            {bossRecap ? (
+                <div className="tw-duel" role="presentation" onClick={() => setBossRecap(null)}>
+                    <div className="tw-recap" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-recap-head">
+                            <div className="tw-recap-emoji" aria-hidden="true">{bossRecap.killed ? "🏆" : "💨"}</div>
+                            <h3 className="tw-recap-title">{bossRecap.killed ? `${bossRecap.name} FELLED!` : `${bossRecap.name} escaped`}</h3>
+                            <p className="tw-recap-sub">
+                                {bossRecap.fighters} {bossRecap.fighters === 1 ? "wolf" : "wolves"} fought · {Number(bossRecap.totalDamage).toLocaleString()} total damage
+                            </p>
+                        </div>
+
+                        <div className="tw-recap-you">
+                            <div className="tw-recap-yourow">
+                                <span>Your damage</span>
+                                <b>{Number(bossRecap.me.damage).toLocaleString()}</b>
+                            </div>
+                            <div className="tw-recap-yousub">
+                                {bossRecap.me.rank ? `#${bossRecap.me.rank} of ${bossRecap.fighters}` : "joined"} · {bossRecap.me.share}% of the total
+                                {bossRecap.me.passive ? ` · ${Number(bossRecap.me.passive).toLocaleString()} from holding the square` : ""}
+                                {bossRecap.me.hits ? ` · ${bossRecap.me.hits} strike${bossRecap.me.hits === 1 ? "" : "s"}` : ""}
+                            </div>
+                        </div>
+
+                        <div className="tw-recap-rewards">
+                            {bossRecap.me.gold ? <span className="tw-recap-chip">🪙 +{Number(bossRecap.me.gold).toLocaleString()} gold</span> : null}
+                            {bossRecap.me.xp ? <span className="tw-recap-chip">⭐ +{Number(bossRecap.me.xp).toLocaleString()} XP</span> : null}
+                            {bossRecap.me.chest ? <span className="tw-recap-chip">🎁 {bossRecap.me.chest} chest</span> : null}
+                            {!bossRecap.me.gold && !bossRecap.me.xp && !bossRecap.me.chest ? <span className="muted" style={{ fontSize: "0.82rem" }}>No payout on this one.</span> : null}
+                        </div>
+
+                        <div className="tw-recap-boardhead">Damage board</div>
+                        <div className="tw-recap-board">
+                            {bossRecap.board.map((r) => (
+                                <div key={r.rank} className={`tw-recap-row${r.isYou ? " is-you" : ""}`}>
+                                    <span className="tw-recap-rank">{r.rank}</span>
+                                    <span className="tw-recap-hero" aria-hidden="true">
+                                        {r.sprite ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={r.sprite} alt="" style={{ transform: r.flip ? "scaleX(-1)" : "none" }} /> : "🐺"}
+                                    </span>
+                                    <span className="tw-recap-name">{r.isYou ? "You" : r.name}</span>
+                                    <span className="tw-recap-dmg">{Number(r.damage).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button type="button" className="tw-levelup-btn" onClick={() => setBossRecap(null)}>
+                            {bossRecap.killed ? "Nice work! 🐺" : "Next time"}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             {bossReward ? (
                 <div className="tw-duel" role="presentation" onClick={() => setBossReward(null)}>
                     <div className="tw-duel-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: "center" }}>
@@ -1565,6 +1678,47 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    right edge of the screen. It's a pill that sizes to its own content now. */
 .tw-boss-leave { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.16); color: #e8d6c0; width: auto; height: 30px; padding: 0 11px; border-radius: 999px; font-size: 13px; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; }
 .tw-boss-leave:hover { background: rgba(255,255,255,0.16); }
+
+/* ── Timing strike: bands mirror the Forge's anvil so the skill carries over ─────────────────────────────── */
+.tw-strike { margin: 8px 10px 2px; }
+.tw-strike-bar { position: relative; height: 22px; border-radius: 11px; overflow: hidden; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); display: flex; }
+.tw-strike-band { position: absolute; top: 0; bottom: 0; }
+/* Widths mirror the server's grade bands: good ±0.16, great ±0.10, perfect ±0.055 of the bar. */
+.tw-strike-band.is-good { left: 34%; width: 32%; background: rgba(215,196,138,0.28); }
+.tw-strike-band.is-great { left: 40%; width: 20%; background: rgba(143,227,154,0.34); }
+.tw-strike-band.is-perfect { left: 44.5%; width: 11%; background: rgba(143,227,255,0.5); }
+.tw-strike-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.9); border-radius: 2px; }
+.tw-strike-btn { width: 100%; margin-top: 8px; padding: 12px; border: none; border-radius: 12px; font-weight: 900; font-size: 1rem; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 0 #b57f22; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tw-strike-btn.is-cooling { opacity: 0.55; box-shadow: none; }
+.tw-strike-grade { text-align: center; margin-top: 6px; font-weight: 900; font-size: 0.95rem; animation: twStrikePop 0.35s ease-out; }
+.tw-strike-grade.is-pixel { color: #ffd75e; }
+.tw-strike-grade.is-perfect { color: #8fe3ff; }
+.tw-strike-grade.is-great { color: #8fe39a; }
+.tw-strike-grade.is-good { color: #d7c48a; }
+.tw-strike-grade.is-miss { color: #ff8f9a; }
+@keyframes twStrikePop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ── Itemised raid recap ─────────────────────────────────────────────────────────────────────────────────── */
+.tw-recap { width: min(94vw, 420px); max-height: 86vh; overflow-y: auto; background: #14141b; border: 1px solid #2a2f37; border-radius: 16px; padding: 18px 16px; text-align: center; }
+.tw-recap-head { margin-bottom: 12px; }
+.tw-recap-emoji { font-size: 42px; line-height: 1; }
+.tw-recap-title { margin: 6px 0 2px; font-size: 1.15rem; }
+.tw-recap-sub { margin: 0; font-size: 0.82rem; color: #8b93a0; }
+.tw-recap-you { background: rgba(255,215,94,0.1); border: 1px solid rgba(255,215,94,0.3); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.tw-recap-yourow { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.92rem; }
+.tw-recap-yourow b { font-size: 1.35rem; color: #ffd75e; }
+.tw-recap-yousub { margin-top: 3px; font-size: 0.75rem; color: #b7c0cf; text-align: left; line-height: 1.35; }
+.tw-recap-rewards { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.tw-recap-chip { font-size: 0.82rem; font-weight: 800; color: #e7dcc4; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 999px; padding: 5px 10px; }
+.tw-recap-boardhead { text-align: left; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: #8b93a0; margin-bottom: 5px; }
+.tw-recap-board { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+.tw-recap-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; background: rgba(255,255,255,0.03); }
+.tw-recap-row.is-you { background: rgba(255,215,94,0.14); border: 1px solid rgba(255,215,94,0.3); }
+.tw-recap-rank { width: 18px; font-size: 0.76rem; font-weight: 800; color: #8b93a0; }
+.tw-recap-hero { width: 26px; height: 26px; display: flex; align-items: flex-end; justify-content: center; flex: 0 0 auto; }
+.tw-recap-hero img { width: 100%; height: 100%; object-fit: contain; }
+.tw-recap-name { flex: 1 1 auto; text-align: left; font-size: 0.85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw-recap-dmg { font-size: 0.85rem; font-weight: 800; color: #ffd75e; }
 .tw-boss-stage { position: relative; width: 100%; display: grid; place-items: center; padding: 6px 0 2px; cursor: pointer; }
 .tw-boss-big { height: 230px; width: auto; max-width: 100%; filter: drop-shadow(0 10px 16px rgba(0,0,0,0.6)); transition: transform .1s; }
 .tw-boss-big.is-cd { filter: drop-shadow(0 10px 16px rgba(0,0,0,0.6)) brightness(1.25) saturate(1.2); }

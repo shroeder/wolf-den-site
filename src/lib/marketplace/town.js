@@ -7,7 +7,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { listFriends } from "@/lib/marketplace/friends.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { getActiveTownEvent } from "@/lib/marketplace/town-events.js";
+import { getActiveTownEvent, lastRaidRecap } from "@/lib/marketplace/town-events.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
@@ -242,6 +242,9 @@ export async function getTownState(buyerId) {
         townEventsLive().catch(() => false),
         getGlobalChat(buyerId, 30).catch(() => []),
     ]);
+    // The itemised wrap-up for a raid that just ended, for anyone who took part — served from the DB so it
+    // survives a refresh and reaches everyone, not just whoever landed the killing blow.
+    const raidRecap = event ? null : await lastRaidRecap(buyerId).catch(() => null);
     const boughtToday = await merchantBoughtToday(buyerId);
     const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt, boughtToday);
     // Wishing Well: only surfaced once the town has funded it (wellGold > 0). Tells the client the daily payout
@@ -336,6 +339,7 @@ export async function getTownState(buyerId) {
         bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, farmGrowPct: bonuses.farmGrowPct || 0, farmYieldPct: bonuses.farmYieldPct || 0 },
         well,
         event,
+        raidRecap,
         merchant: merchantWares,
         store: storeStatus(),
         quests,

@@ -40,12 +40,13 @@ export const TOWN_EVENT_TYPES = {
     },
     // The golem is a BOSS RAID (not a skirmish): ONE huge shared boss everyone strikes together, its HP bar drains
     // for the whole pack, and killing it ENDS the raid. No per-hit rewards — only a rich completion reward.
-    // A SIEGE, not a tap-fest. 5.2M HP over 45 minutes needed ~13 people tapping every second for the full
-    // window — mathematically unkillable, and at that scale one tap moved the bar by 0.003%, so nothing you did
-    // was visible. It now runs for hours and everyone who has joined keeps chipping away while they're away
-    // (siegeTick), so nobody has to hold the screen open. Tapping is a bonus burst on top.
+    // Two damage sources, both requiring you to be IN THE SQUARE (see accrueSquarePassive + bossRaidStrike):
+    //   · passive DPS — just being present chips away, so nobody has to grind taps
+    //   · timing strikes — a Forge-style sweeping bar; better timing, bigger hit
+    // HP is tuned so 5-10 people bring it down in roughly 5-10 minutes. See RAID_TUNING below for the maths;
+    // change HP and the tuning note together or the fight silently drifts out of that window again.
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", boss: true, siege: true, hp: 350000, testHp: 30000, rewardGold: 4000, durationMin: 480,
+        name: "Treasure Golem", emoji: "💎", boss: true, siege: true, hp: 260000, testHp: 26000, rewardGold: 4000, durationMin: 20,
         pushTitle: "💎 A Treasure Golem BOSS lumbered into Town!", pushBody: "It's MASSIVE — the whole pack has to rally and bring it down together. Rush the plaza!",
     },
 };
@@ -63,14 +64,31 @@ const DUEL_LOSS_GOLD = 8;       // consolation so a loss is never nothing
 const DUEL_LOOT_CHANCE = 0.03;  // chance a WIN also drops a low-tier chest — chests are meant to be RARE here
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
-const BOSS_STRIKE_THROTTLE_MS = 1000;
-// A tap on a siege boss lands a real BLOW rather than a pinprick — with the pool sized for hours of passive
-// chipping, an un-multiplied tap would barely register and the fight would feel pointless to be present for.
-const BOSS_TAP_MULT = 6;
-// Passive siege: every member who has landed at least one hit keeps fighting while away. Rate is their own
-// hit power per minute, so gear and pets matter here exactly as much as they do when tapping.
-const SIEGE_TICK_CAP_MIN = 45;   // if the cron missed runs, never credit more than this in one go
-const SIEGE_RATE_PER_MIN = 1.0;  // multiplier on their per-hit power, per minute besieging
+const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep
+
+// ── RAID_TUNING ──────────────────────────────────────────────────────────────────────────────────────────────
+// Target: 5-10 people kill the golem in 5-10 minutes. Observed base hit power is ~144 per swing.
+//
+//   Passive only (nobody playing the minigame):
+//     7 present x 144 x PASSIVE_RATE_PER_SEC(0.42) = ~423 dmg/sec  →  260k / 423 ≈ 10.2 min
+//   With everyone playing the timing game (avg "great", x2.6, one swing/2.6s):
+//     passive 423/s + 7 x (144 x 2.6 / 2.6s) = 423 + 1008 = ~1431 dmg/sec  →  260k ≈ 3.0 min
+//   A realistic mix (half the crowd swinging, average timing) lands around 5-7 minutes.
+//
+// So: idle presence alone still wins but takes the full window; playing well ends it fast. Retune HP and this
+// note together.
+const PASSIVE_RATE_PER_SEC = 0.42;   // multiplier on the member's own hit power, per second in the square
+const PASSIVE_MAX_CATCHUP_S = 30;    // never credit more than this from one poll gap (tab left open, etc.)
+// Timing grades, mirroring the Forge's bands so the feel is familiar. Server-authoritative: the client sends
+// its distance-from-centre, we grade it here and clamp, so a tampered client can't claim PERFECT every time.
+const STRIKE_GRADES = [
+    { key: "pixel", max: 0.022, mult: 5.0, label: "PIXEL PERFECT" },
+    { key: "perfect", max: 0.055, mult: 3.6, label: "PERFECT" },
+    { key: "great", max: 0.10, mult: 2.6, label: "GREAT" },
+    { key: "good", max: 0.16, mult: 1.6, label: "GOOD" },
+];
+const STRIKE_MISS = { key: "miss", mult: 0.5, label: "GLANCING" };
+const gradeForDist = (dist) => STRIKE_GRADES.find((g) => dist <= g.max) || STRIKE_MISS;
 const BOSS_COMPLETE_GOLD = 900;   // to every fighter on a kill
 const BOSS_COMPLETE_XP = 800;
 const BOSS_ESCAPE_MULT = 0.4;     // if the boss survives the timer, fighters get this fraction of the reward
@@ -135,9 +153,20 @@ export async function getActiveTownEvent(buyerId) {
         ev = { ...ev, hp: w.hp, meta: { ...ev.meta, wave: w.wave } };
     }
     const type = TOWN_EVENT_TYPES[ev.kind] || {};
+    const isSiege = Boolean(ev.meta?.siege);
+    // PRESENCE = DAMAGE. This runs on the member's own town poll, which is exactly the proof that they're stood
+    // in the square, so passive DPS accrues here rather than on a cron. It can finish the boss off, in which
+    // case the raid is over and there's nothing left to report.
+    if (buyerId && isSiege) {
+        const passive = await accrueSquarePassive(buyerId, { id: ev.id, siege: true }).catch(() => null);
+        if (passive) {
+            if (passive.hp <= 0) return null;
+            ev = { ...ev, hp: passive.hp };
+        }
+    }
     const enemies = Number(ev.meta?.enemies) || 6;
     const [mine, top, count] = await Promise.all([
-        buyerId ? db.queryOne(`SELECT damage, hits FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : Promise.resolve(null),
+        buyerId ? db.queryOne(`SELECT damage, hits, passive_damage FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : Promise.resolve(null),
         db.query(`SELECT h.buyer_id, h.damage, b.display_name, b.alias FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id WHERE h.event_id = $1 ORDER BY h.damage DESC LIMIT 5`, [ev.id]).catch(() => []),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_event_hit WHERE event_id = $1`, [ev.id]).catch(() => ({ n: 0 })),
     ]);
@@ -154,15 +183,83 @@ export async function getActiveTownEvent(buyerId) {
         bossFighters = fr.map((r) => ({ id: r.buyer_id, name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"), sprite: r.avatar_sprite_url || null, flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false, damage: Number(r.damage) || 0 }));
     }
     return {
-        id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️", boss: isBoss,
+        id: Number(ev.id), kind: ev.kind, name: ev.name, emoji: type.emoji || "⚔️", boss: isBoss, siege: isSiege,
         hp: ev.hp, hpMax: ev.hp_max, endsAt: ev.ends_at, startedAt: ev.started_at, rewardGold: ev.reward_gold,
         enemies, enemiesLeft: ev.hp <= 0 ? 0 : Math.max(1, Math.ceil((ev.hp / ev.hp_max) * enemies)),
         hpPct: ev.hp_max ? Math.max(0, Math.round((ev.hp / ev.hp_max) * 100)) : 0,
         wave: Number(ev.meta?.wave) || 1, minMs: Number(ev.meta?.minMs) || MIN_ACTIVE_MS,
-        myDamage: mine?.damage || 0, myHits: mine?.hits || 0,
+        myDamage: mine?.damage || 0, myHits: mine?.hits || 0, myPassive: mine?.passive_damage || 0,
         fighterCount: count?.n || 0,
         fighters: (top || []).map((t) => ({ name: t.display_name || (t.alias ? `@${t.alias}` : "Wolf"), damage: t.damage })),
         bossFighters,
+    };
+}
+
+// ── END-OF-RAID RECAP ────────────────────────────────────────────────────────────────────────────────────────
+// The itemised wrap-up for the most recently finished raid: who fought, what each of them dealt, and exactly
+// what YOU walked away with. Previously the recap was assembled client-side from strike responses and skipped
+// entirely on a boss kill, so anyone who didn't land the final blow saw nothing at all — no damage, no rewards.
+export async function lastRaidRecap(buyerId) {
+    if (!buyerId) return null;
+    const ev = await db.queryOne(
+        `SELECT id, kind, name, status, hp_max, defeated_at, meta
+           FROM mkt_town_event
+          WHERE status <> 'active' AND defeated_at > NOW() - INTERVAL '10 minutes'
+            AND COALESCE(meta->>'silent','false') <> 'true'
+          ORDER BY defeated_at DESC LIMIT 1`
+    ).catch(() => null);
+    if (!ev) return null;
+
+    // Only show it to people who actually took part — otherwise a passer-by gets a recap for a fight they
+    // never joined.
+    const mine = await db.queryOne(
+        `SELECT damage, hits, passive_damage, reward_gold, reward_xp, reward_chest, rewarded
+           FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`,
+        [ev.id, buyerId]
+    ).catch(() => null);
+    if (!mine) return null;
+
+    const board = await db.query(
+        `SELECT h.buyer_id, h.damage, h.hits, h.passive_damage,
+                COALESCE(NULLIF(b.display_name,''), b.alias, 'Wolf') AS name,
+                b.avatar_sprite_url, b.avatar_sprite_flip
+           FROM mkt_town_event_hit h LEFT JOIN mkt_buyer b ON b.id = h.buyer_id
+          WHERE h.event_id = $1 ORDER BY h.damage DESC LIMIT 12`,
+        [ev.id]
+    ).catch(() => []);
+
+    const total = board.reduce((s, r) => s + (Number(r.damage) || 0), 0);
+    const myRank = board.findIndex((r) => String(r.buyer_id) === String(buyerId)) + 1;
+    const type = TOWN_EVENT_TYPES[ev.kind] || {};
+
+    return {
+        eventId: Number(ev.id),
+        name: ev.name,
+        emoji: type.emoji || "⚔️",
+        killed: ev.status === "defeated",
+        fighters: board.length,
+        totalDamage: total,
+        me: {
+            damage: Number(mine.damage) || 0,
+            hits: Number(mine.hits) || 0,
+            passive: Number(mine.passive_damage) || 0,
+            rank: myRank || null,
+            share: total ? Math.round(((Number(mine.damage) || 0) / total) * 100) : 0,
+            gold: Number(mine.reward_gold) || 0,
+            xp: Number(mine.reward_xp) || 0,
+            chest: mine.reward_chest || null,
+            rewarded: Boolean(mine.rewarded),
+        },
+        board: board.map((r, i) => ({
+            rank: i + 1,
+            name: r.name,
+            damage: Number(r.damage) || 0,
+            hits: Number(r.hits) || 0,
+            passive: Number(r.passive_damage) || 0,
+            sprite: r.avatar_sprite_url || null,
+            flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
+            isYou: String(r.buyer_id) === String(buyerId),
+        })),
     };
 }
 
@@ -325,7 +422,13 @@ async function resolveTownEvent(eventId, outcome) {
             if (xp > 0) await awardXp(h.buyer_id, "boss_raid", { points: xp, gold: 0, dedupeKey: `boss_raid:${eventId}:${h.buyer_id}` }).catch(() => {});
             // Completion chest — a Gold chest on a kill (a Wooden one if it escaped).
             await addChests(h.buyer_id, { [killed ? "gold" : "wooden"]: 1 }, { source: "boss_raid" }).catch(() => {});
-            await db.query(`UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3 WHERE event_id = $1 AND buyer_id = $2`, [eventId, h.buyer_id, gold]).catch(() => {});
+            // Record WHAT they got, not just the gold — the end-of-raid recap itemises this, and without the xp
+            // and chest stored there's nothing to show anyone who didn't land the killing blow.
+            await db.query(
+                `UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3, reward_xp = $4, reward_chest = $5
+                  WHERE event_id = $1 AND buyer_id = $2`,
+                [eventId, h.buyer_id, gold, xp, killed ? "gold" : "wooden"]
+            ).catch(() => {});
             // Hard raid/boss badges + the very-rare raid-exclusive pet drop (best odds on a kill).
             await checkTownRaidBadges(h.buyer_id, { topDamagerOnKill: killed && h.buyer_id === topId }).catch(() => {});
             await maybeGrantRaidPet(h.buyer_id, { boss: true, killed }).catch(() => {});
@@ -348,68 +451,58 @@ async function resolveTownEvent(eventId, outcome) {
     }
 }
 
-// ── PASSIVE SIEGE ────────────────────────────────────────────────────────────────────────────────────────────
-// Everyone who has landed at least one hit on a siege boss keeps fighting while they're away. Called from the
-// town-hours cron, so progress accrues whether or not anyone has the page open — which is the whole point: you
-// shouldn't have to hold a screen for 45 minutes to take part.
+// ── PASSIVE DPS FOR BEING IN THE SQUARE ──────────────────────────────────────────────────────────────────────
+// Standing in the plaza during a boss raid chips away on its own, so nobody has to grind taps to take part.
+// Driven by the member's own town poll rather than a cron: the poll IS the proof they're present, and a 15-min
+// cron is far too coarse for a fight meant to last 5-10 minutes.
 //
-// Rate is each besieger's OWN hit power per minute, so gear and pets matter here exactly as they do when
-// tapping, and a member who never joined contributes nothing (you have to turn up at least once).
-export async function siegeTick() {
-    const ev = await db.queryOne(
-        `SELECT id, hp, hp_max, meta, started_at FROM mkt_town_event WHERE status = 'active' LIMIT 1`
+// Rate scales off their real hit power, so gear and pets matter here exactly as they do when swinging.
+export async function accrueSquarePassive(buyerId, event) {
+    if (!buyerId || !event?.id || !event?.siege) return null;
+    // First poll of this raid just starts their clock — otherwise they'd be credited for time before arriving.
+    const row = await db.queryOne(
+        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_passive_at) VALUES ($1, $2, 0, 0, NOW())
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET last_passive_at = COALESCE(mkt_town_event_hit.last_passive_at, NOW())
+         RETURNING EXTRACT(EPOCH FROM (NOW() - last_passive_at))::float AS secs`,
+        [Number(event.id), buyerId]
     ).catch(() => null);
-    if (!ev || !ev.meta?.siege) return { skipped: "no_siege" };
+    const secs = Math.min(PASSIVE_MAX_CATCHUP_S, Math.max(0, Number(row?.secs) || 0));
+    if (secs < 1) return null;
 
-    // Minutes since the last tick (or since the raid started), clamped so a missed cron can't dump hours of
-    // damage in one go and end the siege instantly.
-    const lastAt = ev.meta?.lastSiegeAt ? new Date(ev.meta.lastSiegeAt) : new Date(ev.started_at);
-    const mins = Math.min(SIEGE_TICK_CAP_MIN, Math.max(0, (Date.now() - lastAt.getTime()) / 60000));
-    if (mins < 1) return { skipped: "too_soon" };
-
-    const besiegers = await db.query(`SELECT buyer_id FROM mkt_town_event_hit WHERE event_id = $1`, [ev.id]).catch(() => []);
-    if (!besiegers.length) {
-        // Nobody has joined yet — just move the clock so the first joiner isn't retroactively credited.
-        await db.query(`UPDATE mkt_town_event SET meta = meta || jsonb_build_object('lastSiegeAt', NOW()) WHERE id = $1`, [ev.id]).catch(() => {});
-        return { skipped: "no_besiegers" };
-    }
-
-    let total = 0;
-    for (const b of besiegers) {
-        const hit = await computeRaidHit(b.buyer_id).catch(() => null);
-        const dmg = Math.max(1, Math.round((hit?.damage || 1) * SIEGE_RATE_PER_MIN * mins));
-        // Credit it to their own tally so the leaderboard and reward eligibility reflect passive work too.
-        await db.query(
-            `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 0, NOW())
-             ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3`,
-            [ev.id, b.buyer_id, dmg]
-        ).catch(() => {});
-        total += dmg;
-    }
+    const hit = await computeRaidHit(buyerId).catch(() => null);
+    const dmg = Math.max(1, Math.round((hit?.damage || 1) * PASSIVE_RATE_PER_SEC * secs));
 
     const updated = await db.queryOne(
-        `UPDATE mkt_town_event
-            SET hp = GREATEST(0, hp - $2), meta = meta || jsonb_build_object('lastSiegeAt', NOW())
-          WHERE id = $1 AND status = 'active' RETURNING hp`,
-        [ev.id, total]
+        `UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp, hp_max`,
+        [Number(event.id), dmg]
     ).catch(() => null);
+    if (!updated) return null;
 
-    const hp = updated?.hp ?? ev.hp;
-    let killed = false;
-    if (hp <= 0) { await resolveTownEvent(ev.id, "defeated").catch(() => {}); killed = true; }
-    return { eventId: Number(ev.id), besiegers: besiegers.length, minutes: Math.round(mins), damage: total, hp, killed };
+    await db.query(
+        `UPDATE mkt_town_event_hit
+            SET damage = damage + $3, passive_damage = passive_damage + $3, last_passive_at = NOW()
+          WHERE event_id = $1 AND buyer_id = $2`,
+        [Number(event.id), buyerId, dmg]
+    ).catch(() => {});
+
+    const hp = Number(updated.hp);
+    if (hp <= 0) await resolveTownEvent(Number(event.id), "defeated").catch(() => {});
+    return { passive: dmg, hp, hpMax: Number(updated.hp_max) };
 }
 
 // Strike the BOSS RAID (the golem): everyone hits ONE shared HP pool. No per-hit reward — killing it ends the raid
 // and pays the completion reward (resolveTownEvent). Returns the boss's new HP + your running damage.
-export async function bossRaidStrike(buyerId, eventId) {
+export async function bossRaidStrike(buyerId, eventId, dist = null) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const ev = await db.queryOne(`SELECT id, hp, hp_max, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev || !ev.meta?.boss) return { ok: false, error: "no_boss" };
     const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < BOSS_STRIKE_THROTTLE_MS) return { ok: false, error: "too_fast", hp: ev.hp };
     const hit = await computeRaidHit(buyerId);
-    const dmg = Math.max(1, Math.round(hit.damage * BOSS_TAP_MULT));
+    // Grade the swing HERE from the raw distance-from-centre the client reports. Grading server-side (and
+    // clamping the distance) means a tampered client can't simply claim PIXEL PERFECT on every swing.
+    const grade = gradeForDist(Math.min(0.5, Math.max(0, Number(dist))) || 0.5);
+    const dmg = Math.max(1, Math.round(hit.damage * grade.mult));
     const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
     const mine = await db.queryOne(
         `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
@@ -423,6 +516,7 @@ export async function bossRaidStrike(buyerId, eventId) {
     if (hp <= 0) { await resolveTownEvent(eventId, "defeated").catch(() => {}); killed = true; }
     return {
         ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
+        grade: grade.key, gradeLabel: grade.label, mult: grade.mult,
         hp, hpMax: ev.hp_max, hpPct: ev.hp_max ? Math.max(0, Math.round((hp / ev.hp_max) * 100)) : 0,
         myDamage: Number(mine?.damage || dmg), killed,
         reward: killed ? { gold: BOSS_COMPLETE_GOLD, xp: BOSS_COMPLETE_XP, chest: "gold" } : null,

@@ -39,7 +39,8 @@ export async function POST(request) {
             else if (body?.action === "project_contribute") res = await contributeTownProject(buyer.id, body?.projectId, body?.amount);
             else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId, body?.move);
             else if (body?.action === "duel") res = await duelRaidEnemy(buyer.id, body?.eventId);
-            else if (body?.action === "boss_strike") res = await bossRaidStrike(buyer.id, body?.eventId);
+            // `dist` is the swing's distance from the timing bar's centre (0 = dead centre). Graded server-side.
+            else if (body?.action === "boss_strike") res = await bossRaidStrike(buyer.id, body?.eventId, body?.dist);
             else if (body?.action === "merchant_buy") res = await buyMerchantChest(buyer.id, body?.tier);
             else if (body?.action === "merchant_gamble") res = await gambleMerchantGear(buyer.id);
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);

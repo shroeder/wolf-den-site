@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runTownHoursTick, maybeSpawnRandomEvent, siegeTick } from "@/lib/marketplace/town-events.js";
+import { runTownHoursTick, maybeSpawnRandomEvent } from "@/lib/marketplace/town-events.js";
 import { maybeSpawnShiny } from "@/lib/marketplace/town-shiny.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -27,9 +27,9 @@ export async function GET(request) {
             const hours = await runTownHoursTick();
             const random = hours.spawned ? { skipped: "store_open_spawned" } : await maybeSpawnRandomEvent();
             const shiny = await maybeSpawnShiny().catch((e) => ({ error: String(e?.message || e) }));
-            // Advance any live siege BEFORE reporting, so the response shows the passive damage this tick added.
-            const siege = await siegeTick().catch((e) => ({ error: String(e?.message || e) }));
-            return NextResponse.json({ success: true, hours, random, shiny, siege });
+            // Boss passive damage is NOT ticked here — it accrues from each present member's own town poll
+            // (accrueSquarePassive), because a 15-minute cron is far too coarse for a 5-10 minute fight.
+            return NextResponse.json({ success: true, hours, random, shiny });
         } catch (error) {
             return internalError(error, { event: "town_hours.run.failure" });
         }
