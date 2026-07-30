@@ -21,7 +21,10 @@ export const BONUS_META = {
             bounty: { icon: "🪙", label: "Sea Gold", suffix: "" },
             dredge: { icon: "⛏️", label: "Dig Luck", suffix: "" },
             trove: { icon: "💎", label: "Fragments", suffix: "" },
-            tailwind: { icon: "🌬️", label: "Tailwind", suffix: "" },
+            // Labelled by its EFFECT, not its name: "+3 Tailwind" reads as "three tailwinds a day" because a
+            // tailwind is also a once-daily action you spend. It's actually −1% voyage time per point (cap −15%),
+            // so the point value already IS the percentage — show that instead.
+            tailwind: { icon: "🌬️", label: "Voyage Speed", suffix: "%" },
         },
     },
     farm: {
