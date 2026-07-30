@@ -350,6 +350,8 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     // in the square still does passive damage server-side, so a tap is a burst on top rather than an obligation.
     const [grade, setGrade] = useState(null); // { key, label, dmg } — last swing's result
     const [cooling, setCooling] = useState(false); // drives the button's look; the marker never re-renders
+    const [combo, setCombo] = useState(0);        // consecutive good-or-better swings
+    const [procFx, setProcFx] = useState(null);   // the loud one-off callout when a strike procs
     const markerRef = useRef(0.5);
     const cdUntilRef = useRef(0);
     const swingRef = useRef(false);
@@ -400,10 +402,16 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
             setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 850);
             setGrade({ key: r.grade, label: r.gradeLabel, dmg: r.damage });
             setTimeout(() => setGrade(null), 1100);
+            setCombo(Number(r.combo) || 0);
+            if (r.strikeProc) {
+                setProcFx({ ...r.strikeProc, k: Date.now() });
+                setTimeout(() => setProcFx((p) => (p && p.k === r.strikeProc.k ? null : p)), 1600);
+            }
             // Haptics: the better the swing, the more you feel it. Best-effort — desktop and iOS Safari have
             // no vibrate, and a missing API must never break the strike.
             try {
-                const pattern = r.crit ? [22, 40, 22, 40, 55]
+                const pattern = r.strikeProc ? [30, 40, 30, 40, 30, 40, 80]
+                    : r.crit ? [22, 40, 22, 40, 55]
                     : r.grade === "perfect" ? [18, 34, 46]
                         : r.grade === "great" ? [14, 30] : [10];
                 navigator.vibrate?.(pattern);
@@ -469,7 +477,21 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                     {grade ? (
                         <div className={`tw-strike-grade is-${grade.key}`}>{grade.label} · {Number(grade.dmg).toLocaleString()}</div>
                     ) : null}
+                    {/* THE CHAIN. A run of clean swings is worth more than the same swings scattered — this is
+                        the only place that's visible, so it has to read at a glance and climb loudly. */}
+                    {combo >= 2 ? (
+                        <div className={`tw-combo${combo >= 8 ? " is-hot" : combo >= 5 ? " is-warm" : ""}`} key={combo}>
+                            <b>{combo}×</b> CHAIN
+                        </div>
+                    ) : null}
                 </div>
+
+                {procFx ? (
+                    <div className="tw-bossproc" key={procFx.k}>
+                        <b>{procFx.label}</b>
+                        <span>{procFx.tell} ×{procFx.mult}</span>
+                    </div>
+                ) : null}
 
                 <div className="tw-boss-hint">
                     ⚔️ Time your strike as the marker crosses the middle — the closer to centre, the bigger the hit.
@@ -995,8 +1017,22 @@ export default function TownClient({ initial }) {
 
             <div ref={sceneRef} className="tw-scene" style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <SceneMusic vibe={raidActive ? "raid" : "town"} />
-                {/* Live in-town count — green bubble, top-left (hidden behind the raid HUD during a raid). */}
-                {!raidActive ? <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Members here right now"><span className="tw-online-dot" />{state?.inTownCount ?? 1} in town</button> : null}
+                {/* ONE status bubble, top-left: who's here AND whether the shop is open. These were two separate
+                    absolutely-positioned pills and they overlapped each other the moment the Den was open —
+                    the "1 in town" count sat underneath "Open until 9 PM". They're the same kind of
+                    information (what's true right now), so they're one control. Tap = who's here. */}
+                {!raidActive ? (
+                    <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Members here right now">
+                        <span className="tw-online-dot" />{state?.inTownCount ?? 1} in town
+                        {marketDay ? (
+                            <>
+                                <span className="tw-online-sep">·</span>
+                                <span className="tw-online-open">Open til {state.store.closesLabel}</span>
+                                <span className="tw-online-xp">+10% XP</span>
+                            </>
+                        ) : null}
+                    </button>
+                ) : null}
                 {/* The hidden shiny glint — barely visible, tucked up in the sky/rooftops. Tap to claim it. */}
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
@@ -1231,15 +1267,8 @@ export default function TownClient({ initial }) {
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou raiding={raidActive} /> : null}
                 </div>
 
-                {/* The shop is physically OPEN. This is a REAL-WORLD fact about a real business — the shouty
-                    party-popper ribbon read as a mobile-game promo rather than "the store you can drive to is
-                    serving customers right now". Quiet, factual, and it still carries the +XP. */}
-                {marketDay ? (
-                    <div className="tw-marketday" aria-hidden="true">
-                        <span className="tw-marketday-dot" />
-                        Open until {state.store.closesLabel}<span className="tw-marketday-sep">·</span><b>+10% XP</b>
-                    </div>
-                ) : null}
+                {/* (The standalone Market Day ribbon lived here. It's folded into the status bubble above —
+                    two pills pinned to the same corner of the same scene was always going to collide.) */}
 
                 {/* Raid HUD (corner) + weapon-skill callout */}
                 {state?.event && !state.event.defeated ? <RaidHUD ev={state.event} kills={raidKills} onExpire={load} /> : null}
@@ -1896,6 +1925,27 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 @keyframes twStrikeFlash { 0% { filter: brightness(2.4); transform: scale(1.03); } 100% { filter: brightness(1); transform: scale(1); } }
 .tw-strike-btn { position: relative; overflow: hidden; width: 100%; margin-top: 10px; padding: 17px; border: none; border-radius: 14px; font-weight: 900; font-size: 1.15rem; letter-spacing: 0.02em; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22, 0 6px 18px rgba(0,0,0,0.4); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tw-strike-btn-label { position: relative; z-index: 2; }
+/* ── COMBO CHAIN ── the only place a run of clean swings is visible, so it climbs loudly. */
+.tw-combo { text-align: center; margin-top: 6px; font-size: 0.9rem; font-weight: 900; letter-spacing: 0.08em;
+    color: #8fe3ff; animation: twComboPop 0.34s cubic-bezier(.2,1.7,.4,1) both; }
+.tw-combo b { font-size: 1.2rem; }
+.tw-combo.is-warm { color: #ffd75e; text-shadow: 0 0 12px rgba(255,215,94,0.6); }
+.tw-combo.is-hot { color: #ff9e6e; text-shadow: 0 0 16px rgba(255,120,60,0.85); }
+@keyframes twComboPop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
+/* ── STRIKE PROC ── the loud payoff for executing well. Deliberately covers the fight for a beat. */
+.tw-bossproc { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 620; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; width: max-content; max-width: 92%;
+    animation: twBossProc 1.6s cubic-bezier(.2,1.4,.3,1) both; }
+.tw-bossproc b { font-size: 1.35rem; font-weight: 900; letter-spacing: 0.02em; color: #fff3c4;
+    text-shadow: 0 0 18px rgba(255,200,80,0.95), 0 3px 10px rgba(0,0,0,0.8); }
+.tw-bossproc span { font-size: 0.78rem; font-weight: 800; color: #ffe488; text-shadow: 0 2px 8px rgba(0,0,0,0.9); }
+@keyframes twBossProc {
+    0% { transform: translate(-50%,-50%) scale(0.4); opacity: 0; }
+    18% { transform: translate(-50%,-50%) scale(1.18); opacity: 1; }
+    30% { transform: translate(-50%,-50%) scale(1); }
+    78% { opacity: 1; }
+    100% { transform: translate(-50%,-90%) scale(1); opacity: 0; }
+}
 /* The cooldown drains left-to-right across the button. A dead button that comes back at an unannounced moment
    reads as broken; a visible drain reads as a rhythm you can play to. */
 .tw-strike-cd { position: absolute; inset: 0; z-index: 1; transform-origin: right center; transform: scaleX(0);
@@ -2023,19 +2073,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* "Open until 9 PM · +10% XP" — a statement about a real shop, so it's styled like a status, not a sale.
    Dark glass with a live green dot, matching the "Open til 9 PM" chip on the header rather than shouting over
    the artwork in gold. */
-.tw-marketday { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 480; pointer-events: none;
-    max-width: calc(100% - 96px); display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
-    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.01em; color: #e8f2e6;
-    background: rgba(12,18,14,0.78); border: 1px solid rgba(126,213,126,0.45); backdrop-filter: blur(6px);
-    padding: 5px 13px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,0.45); overflow: hidden; }
-.tw-marketday b { color: #9ce8a0; font-weight: 800; }
-.tw-marketday-sep { color: rgba(232,242,230,0.35); }
-/* The live dot does the work the party popper was doing — "this is happening right now" — without the noise. */
-.tw-marketday-dot { width: 7px; height: 7px; border-radius: 50%; background: #7ed57e; flex: 0 0 auto;
-    box-shadow: 0 0 8px rgba(126,213,126,0.9); animation: twOpenPulse 2.2s ease-in-out infinite; }
-@keyframes twOpenPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
-.tw-marketday-glow { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.65) 50%, transparent 80%); transform: translateX(-100%); animation: twSheen 3.2s ease-in-out infinite; }
-@keyframes twSheen { 0% { transform: translateX(-100%); } 60%,100% { transform: translateX(100%); } }
+/* The single status bubble: who's here, and — when the shop is physically open — that it's open, with the XP
+   bonus. One pill instead of two fighting for the same corner. */
+.tw-online-sep { color: rgba(216,255,224,0.35); margin: 0 1px; }
+.tw-online-open { color: #d8ffe0; font-weight: 700; }
+.tw-online-xp { color: #ffe488; font-weight: 900; }
 .tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
 /* contact shadow so the building reads as sitting ON the cobblestones */
 .tw-building::after { content: ""; position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); width: 72%; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 72%); z-index: -1; pointer-events: none; }

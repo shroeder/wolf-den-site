@@ -81,6 +81,42 @@ const DUEL_XP_BUDGET = 350;
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep
 
+// ── COMBO CHAINS + STRIKE PROCS ──────────────────────────────────────────────────────────────────────────────
+// The timing bar is one axis: how close to centre. That's fine, but it means every swing is an island — the
+// tenth good hit feels exactly like the first. Two layers on top, both riding execution you're already doing:
+//
+//   COMBO   consecutive GOOD-or-better swings stack a multiplier. Break the chain and it resets to 1.
+//           Nothing is lost when it breaks — you just stop earning the bonus — which keeps the
+//           no-punishment rule while giving a run of clean hits a shape.
+//   PROCS   a clean swing can randomly fire something loud. Better grade AND longer combo = better odds,
+//           so procs are a payoff for execution rather than a slot machine bolted on the side.
+//
+// Combo state lives on the hit row (`combo`), not in memory, so it survives a refresh and can't be faked by
+// a client that just stops sending misses.
+const COMBO_STEP = 0.12;          // +12% damage per link
+const COMBO_MAX = 2.2;            // hard ceiling on the multiplier
+const COMBO_MIN_GRADE = "good";   // this grade or better keeps the chain alive
+// Procs, rarest first — the first one that hits wins. `base` is the chance at combo 1 on a PERFECT swing;
+// a longer chain scales it up, a merely-good swing scales it down.
+const STRIKE_PROCS = [
+    { key: "shatter", base: 0.010, mult: 4.0, label: "💥 SHATTERED THE PLATING!", tell: "Its armour cracks wide open." },
+    { key: "quake", base: 0.022, mult: 2.6, label: "🌋 GROUND QUAKE!", tell: "The whole plaza shakes." },
+    { key: "sunder", base: 0.045, mult: 1.9, label: "⚡ SUNDERING BLOW!", tell: "You find the seam." },
+    { key: "rally", base: 0.070, mult: 1.45, label: "🐺 THE PACK RALLIES!", tell: "The wolves howl with you." },
+];
+const GRADE_RANK = { miss: 0, good: 1, great: 2, perfect: 3, pixel: 4 };
+// A perfect swing on a long chain is where the good stuff lives.
+function rollStrikeProc(gradeKey, combo) {
+    const rank = GRADE_RANK[gradeKey] ?? 0;
+    if (rank < 2) return null;                       // great or better only
+    const gradeScale = rank >= 4 ? 1.8 : rank >= 3 ? 1.25 : 0.6;
+    const comboScale = 1 + Math.min(9, Math.max(0, combo - 1)) * 0.22;
+    for (const p of STRIKE_PROCS) {
+        if (Math.random() < p.base * gradeScale * comboScale) return p;
+    }
+    return null;
+}
+
 // ── RAID_TUNING ──────────────────────────────────────────────────────────────────────────────────────────────
 // Target: 5-10 people kill the golem in 5-10 minutes, EITHER by playing the timing game or by passive DPS
 // alone. Measured base hit power is ~153 per swing (from the first real golem kill: 5 fighters, 250k, 13.9 min).
@@ -407,7 +443,7 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const ev = await db.queryOne(`SELECT id, hp, hp_max, started_at, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev) return { ok: false, error: "no_event" };
-    const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
+    const prior = await db.queryOne(`SELECT last_hit_at, combo FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < HIT_THROTTLE_MS) {
         return { ok: false, error: "too_fast", hp: ev.hp };
     }
@@ -567,19 +603,30 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const ev = await db.queryOne(`SELECT id, hp, hp_max, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev || !ev.meta?.boss) return { ok: false, error: "no_boss" };
-    const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
+    const prior = await db.queryOne(`SELECT last_hit_at, combo FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < BOSS_STRIKE_THROTTLE_MS) return { ok: false, error: "too_fast", hp: ev.hp };
     const hit = await computeRaidHit(buyerId);
     // Grade the swing HERE from the raw distance-from-centre the client reports. Grading server-side (and
     // clamping the distance) means a tampered client can't simply claim PIXEL PERFECT on every swing.
     const grade = gradeForDist(Math.min(0.5, Math.max(0, Number(dist))) || 0.5);
-    const dmg = Math.max(1, Math.round(hit.damage * grade.mult));
+
+    // COMBO. A good-or-better swing extends the chain; anything worse resets it to 1. Read from the row so it
+    // survives a refresh and a client can't hold a chain open by simply never reporting its misses.
+    const kept = (GRADE_RANK[grade.key] ?? 0) >= GRADE_RANK[COMBO_MIN_GRADE];
+    const priorCombo = Math.max(0, Number(prior?.combo) || 0);
+    const combo = kept ? priorCombo + 1 : 0;
+    const comboMult = Math.min(COMBO_MAX, 1 + Math.max(0, combo - 1) * COMBO_STEP);
+
+    // PROC. Rolled off the grade AND the chain, so it's a reward for a run of clean hits rather than a lottery.
+    const proc = kept ? rollStrikeProc(grade.key, combo) : null;
+
+    const dmg = Math.max(1, Math.round(hit.damage * grade.mult * comboMult * (proc?.mult || 1)));
     const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
     const mine = await db.queryOne(
-        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
-         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()
+        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, combo, last_hit_at) VALUES ($1, $2, $3, 1, $4, NOW())
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, combo = $4, last_hit_at = NOW()
          RETURNING damage, hits`,
-        [eventId, buyerId, dmg]
+        [eventId, buyerId, dmg, combo]
     ).catch(() => null);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     const hp = updated?.hp ?? ev.hp;
@@ -588,6 +635,8 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
     return {
         ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
         grade: grade.key, gradeLabel: grade.label, mult: grade.mult,
+        combo, comboMult: Math.round(comboMult * 100) / 100, comboBroken: !kept && priorCombo >= 3,
+        strikeProc: proc ? { key: proc.key, label: proc.label, tell: proc.tell, mult: proc.mult } : null,
         hp, hpMax: ev.hp_max, hpPct: ev.hp_max ? Math.max(0, Math.round((hp / ev.hp_max) * 100)) : 0,
         myDamage: Number(mine?.damage || dmg), killed,
         reward: killed ? { gold: BOSS_COMPLETE_GOLD, xp: BOSS_COMPLETE_XP, chest: "gold" } : null,
@@ -627,7 +676,7 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
     // started". Without it the window falls back to an hour and bleeds a previous raid's XP into this one's cap.
     const ev = await db.queryOne(`SELECT id, hp, hp_max, meta, kind, name, started_at FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev) return { ok: false, error: "no_event" };
-    const prior = await db.queryOne(`SELECT last_hit_at FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
+    const prior = await db.queryOne(`SELECT last_hit_at, combo FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < DUEL_THROTTLE_MS) return { ok: false, error: "too_fast" };
     const firstDuel = !prior;
     // Your combat power for the exchange (gear + pet offense + Raid Fury attunement).
